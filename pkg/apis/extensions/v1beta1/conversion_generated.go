@@ -24,7 +24,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	experimental "k8s.io/kubernetes/pkg/apis/extensions"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -2132,22 +2132,22 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *api.V
 	return autoconvert_v1_VolumeSource_To_api_VolumeSource(in, out, s)
 }
 
-func autoconvert_extensions_APIVersion_To_v1beta1_APIVersion(in *experimental.APIVersion, out *APIVersion, s conversion.Scope) error {
+func autoconvert_extensions_APIVersion_To_v1beta1_APIVersion(in *extensions.APIVersion, out *APIVersion, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.APIVersion))(in)
+		defaulting.(func(*extensions.APIVersion))(in)
 	}
 	out.Name = in.Name
 	out.APIGroup = in.APIGroup
 	return nil
 }
 
-func convert_extensions_APIVersion_To_v1beta1_APIVersion(in *experimental.APIVersion, out *APIVersion, s conversion.Scope) error {
+func convert_extensions_APIVersion_To_v1beta1_APIVersion(in *extensions.APIVersion, out *APIVersion, s conversion.Scope) error {
 	return autoconvert_extensions_APIVersion_To_v1beta1_APIVersion(in, out, s)
 }
 
-func autoconvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *experimental.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
+func autoconvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ClusterAutoscaler))(in)
+		defaulting.(func(*extensions.ClusterAutoscaler))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2161,13 +2161,13 @@ func autoconvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *e
 	return nil
 }
 
-func convert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *experimental.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
+func convert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
 	return autoconvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in, out, s)
 }
 
-func autoconvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *experimental.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
+func autoconvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *extensions.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ClusterAutoscalerList))(in)
+		defaulting.(func(*extensions.ClusterAutoscalerList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2188,13 +2188,13 @@ func autoconvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerLi
 	return nil
 }
 
-func convert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *experimental.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
+func convert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in *extensions.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
 	return autoconvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList(in, out, s)
 }
 
-func autoconvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *experimental.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
+func autoconvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *extensions.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ClusterAutoscalerSpec))(in)
+		defaulting.(func(*extensions.ClusterAutoscalerSpec))(in)
 	}
 	out.MinNodes = in.MinNodes
 	out.MaxNodes = in.MaxNodes
@@ -2211,13 +2211,13 @@ func autoconvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSp
 	return nil
 }
 
-func convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *experimental.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
+func convert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in *extensions.ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, s conversion.Scope) error {
 	return autoconvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec(in, out, s)
 }
 
-func autoconvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *experimental.DaemonSet, out *DaemonSet, s conversion.Scope) error {
+func autoconvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet, out *DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DaemonSet))(in)
+		defaulting.(func(*extensions.DaemonSet))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2234,13 +2234,13 @@ func autoconvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *experimental.Daem
 	return nil
 }
 
-func convert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *experimental.DaemonSet, out *DaemonSet, s conversion.Scope) error {
+func convert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet, out *DaemonSet, s conversion.Scope) error {
 	return autoconvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in, out, s)
 }
 
-func autoconvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *experimental.DaemonSetList, out *DaemonSetList, s conversion.Scope) error {
+func autoconvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.DaemonSetList, out *DaemonSetList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DaemonSetList))(in)
+		defaulting.(func(*extensions.DaemonSetList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2261,13 +2261,13 @@ func autoconvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *experimen
 	return nil
 }
 
-func convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *experimental.DaemonSetList, out *DaemonSetList, s conversion.Scope) error {
+func convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.DaemonSetList, out *DaemonSetList, s conversion.Scope) error {
 	return autoconvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in, out, s)
 }
 
-func autoconvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *experimental.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
+func autoconvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DaemonSetSpec))(in)
+		defaulting.(func(*extensions.DaemonSetSpec))(in)
 	}
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
@@ -2288,13 +2288,13 @@ func autoconvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *experimen
 	return nil
 }
 
-func convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *experimental.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
+func convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
 	return autoconvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in, out, s)
 }
 
-func autoconvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *experimental.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
+func autoconvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DaemonSetStatus))(in)
+		defaulting.(func(*extensions.DaemonSetStatus))(in)
 	}
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
@@ -2302,13 +2302,13 @@ func autoconvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exper
 	return nil
 }
 
-func convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *experimental.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
+func convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
 	return autoconvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in, out, s)
 }
 
-func autoconvert_extensions_Deployment_To_v1beta1_Deployment(in *experimental.Deployment, out *Deployment, s conversion.Scope) error {
+func autoconvert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployment, out *Deployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.Deployment))(in)
+		defaulting.(func(*extensions.Deployment))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2325,13 +2325,13 @@ func autoconvert_extensions_Deployment_To_v1beta1_Deployment(in *experimental.De
 	return nil
 }
 
-func convert_extensions_Deployment_To_v1beta1_Deployment(in *experimental.Deployment, out *Deployment, s conversion.Scope) error {
+func convert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployment, out *Deployment, s conversion.Scope) error {
 	return autoconvert_extensions_Deployment_To_v1beta1_Deployment(in, out, s)
 }
 
-func autoconvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *experimental.DeploymentList, out *DeploymentList, s conversion.Scope) error {
+func autoconvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensions.DeploymentList, out *DeploymentList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DeploymentList))(in)
+		defaulting.(func(*extensions.DeploymentList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2352,13 +2352,13 @@ func autoconvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *experim
 	return nil
 }
 
-func convert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *experimental.DeploymentList, out *DeploymentList, s conversion.Scope) error {
+func convert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensions.DeploymentList, out *DeploymentList, s conversion.Scope) error {
 	return autoconvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in, out, s)
 }
 
-func autoconvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *experimental.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
+func autoconvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DeploymentSpec))(in)
+		defaulting.(func(*extensions.DeploymentSpec))(in)
 	}
 	if err := s.Convert(&in.Replicas, &out.Replicas, 0); err != nil {
 		return err
@@ -2388,22 +2388,22 @@ func autoconvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *experim
 	return nil
 }
 
-func autoconvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *experimental.DeploymentStatus, out *DeploymentStatus, s conversion.Scope) error {
+func autoconvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *extensions.DeploymentStatus, out *DeploymentStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DeploymentStatus))(in)
+		defaulting.(func(*extensions.DeploymentStatus))(in)
 	}
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	return nil
 }
 
-func convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *experimental.DeploymentStatus, out *DeploymentStatus, s conversion.Scope) error {
+func convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *extensions.DeploymentStatus, out *DeploymentStatus, s conversion.Scope) error {
 	return autoconvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in, out, s)
 }
 
-func autoconvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *experimental.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
+func autoconvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *extensions.DeploymentStrategy, out *DeploymentStrategy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.DeploymentStrategy))(in)
+		defaulting.(func(*extensions.DeploymentStrategy))(in)
 	}
 	out.Type = DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
@@ -2417,9 +2417,9 @@ func autoconvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in 
 	return nil
 }
 
-func autoconvert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *experimental.HTTPIngressPath, out *HTTPIngressPath, s conversion.Scope) error {
+func autoconvert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *extensions.HTTPIngressPath, out *HTTPIngressPath, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.HTTPIngressPath))(in)
+		defaulting.(func(*extensions.HTTPIngressPath))(in)
 	}
 	out.Path = in.Path
 	if err := convert_extensions_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
@@ -2428,13 +2428,13 @@ func autoconvert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *exper
 	return nil
 }
 
-func convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *experimental.HTTPIngressPath, out *HTTPIngressPath, s conversion.Scope) error {
+func convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *extensions.HTTPIngressPath, out *HTTPIngressPath, s conversion.Scope) error {
 	return autoconvert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in, out, s)
 }
 
-func autoconvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *experimental.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
+func autoconvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *extensions.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.HTTPIngressRuleValue))(in)
+		defaulting.(func(*extensions.HTTPIngressRuleValue))(in)
 	}
 	if in.Paths != nil {
 		out.Paths = make([]HTTPIngressPath, len(in.Paths))
@@ -2449,13 +2449,13 @@ func autoconvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue
 	return nil
 }
 
-func convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *experimental.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
+func convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *extensions.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoconvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoconvert_extensions_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(in *experimental.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
+func autoconvert_extensions_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(in *extensions.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.HorizontalPodAutoscaler))(in)
+		defaulting.(func(*extensions.HorizontalPodAutoscaler))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2472,13 +2472,13 @@ func autoconvert_extensions_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAuto
 	return nil
 }
 
-func convert_extensions_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(in *experimental.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
+func convert_extensions_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(in *extensions.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
 	return autoconvert_extensions_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(in, out, s)
 }
 
-func autoconvert_extensions_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAutoscalerList(in *experimental.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
+func autoconvert_extensions_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAutoscalerList(in *extensions.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.HorizontalPodAutoscalerList))(in)
+		defaulting.(func(*extensions.HorizontalPodAutoscalerList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2499,13 +2499,13 @@ func autoconvert_extensions_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPod
 	return nil
 }
 
-func convert_extensions_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAutoscalerList(in *experimental.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
+func convert_extensions_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAutoscalerList(in *extensions.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
 	return autoconvert_extensions_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAutoscalerList(in, out, s)
 }
 
-func autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *experimental.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *extensions.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.HorizontalPodAutoscalerSpec))(in)
+		defaulting.(func(*extensions.HorizontalPodAutoscalerSpec))(in)
 	}
 	if in.ScaleRef != nil {
 		out.ScaleRef = new(SubresourceReference)
@@ -2523,13 +2523,13 @@ func autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPod
 	return nil
 }
 
-func convert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *experimental.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func convert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *extensions.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	return autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in, out, s)
 }
 
-func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *experimental.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *extensions.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.HorizontalPodAutoscalerStatus))(in)
+		defaulting.(func(*extensions.HorizontalPodAutoscalerStatus))(in)
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
@@ -2551,13 +2551,13 @@ func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalP
 	return nil
 }
 
-func convert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *experimental.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func convert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *extensions.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	return autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
-func autoconvert_extensions_Ingress_To_v1beta1_Ingress(in *experimental.Ingress, out *Ingress, s conversion.Scope) error {
+func autoconvert_extensions_Ingress_To_v1beta1_Ingress(in *extensions.Ingress, out *Ingress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.Ingress))(in)
+		defaulting.(func(*extensions.Ingress))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2574,13 +2574,13 @@ func autoconvert_extensions_Ingress_To_v1beta1_Ingress(in *experimental.Ingress,
 	return nil
 }
 
-func convert_extensions_Ingress_To_v1beta1_Ingress(in *experimental.Ingress, out *Ingress, s conversion.Scope) error {
+func convert_extensions_Ingress_To_v1beta1_Ingress(in *extensions.Ingress, out *Ingress, s conversion.Scope) error {
 	return autoconvert_extensions_Ingress_To_v1beta1_Ingress(in, out, s)
 }
 
-func autoconvert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *experimental.IngressBackend, out *IngressBackend, s conversion.Scope) error {
+func autoconvert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *extensions.IngressBackend, out *IngressBackend, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressBackend))(in)
+		defaulting.(func(*extensions.IngressBackend))(in)
 	}
 	out.ServiceName = in.ServiceName
 	if err := s.Convert(&in.ServicePort, &out.ServicePort, 0); err != nil {
@@ -2589,13 +2589,13 @@ func autoconvert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *experim
 	return nil
 }
 
-func convert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *experimental.IngressBackend, out *IngressBackend, s conversion.Scope) error {
+func convert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *extensions.IngressBackend, out *IngressBackend, s conversion.Scope) error {
 	return autoconvert_extensions_IngressBackend_To_v1beta1_IngressBackend(in, out, s)
 }
 
-func autoconvert_extensions_IngressList_To_v1beta1_IngressList(in *experimental.IngressList, out *IngressList, s conversion.Scope) error {
+func autoconvert_extensions_IngressList_To_v1beta1_IngressList(in *extensions.IngressList, out *IngressList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressList))(in)
+		defaulting.(func(*extensions.IngressList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2616,13 +2616,13 @@ func autoconvert_extensions_IngressList_To_v1beta1_IngressList(in *experimental.
 	return nil
 }
 
-func convert_extensions_IngressList_To_v1beta1_IngressList(in *experimental.IngressList, out *IngressList, s conversion.Scope) error {
+func convert_extensions_IngressList_To_v1beta1_IngressList(in *extensions.IngressList, out *IngressList, s conversion.Scope) error {
 	return autoconvert_extensions_IngressList_To_v1beta1_IngressList(in, out, s)
 }
 
-func autoconvert_extensions_IngressRule_To_v1beta1_IngressRule(in *experimental.IngressRule, out *IngressRule, s conversion.Scope) error {
+func autoconvert_extensions_IngressRule_To_v1beta1_IngressRule(in *extensions.IngressRule, out *IngressRule, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressRule))(in)
+		defaulting.(func(*extensions.IngressRule))(in)
 	}
 	out.Host = in.Host
 	if err := convert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
@@ -2631,13 +2631,13 @@ func autoconvert_extensions_IngressRule_To_v1beta1_IngressRule(in *experimental.
 	return nil
 }
 
-func convert_extensions_IngressRule_To_v1beta1_IngressRule(in *experimental.IngressRule, out *IngressRule, s conversion.Scope) error {
+func convert_extensions_IngressRule_To_v1beta1_IngressRule(in *extensions.IngressRule, out *IngressRule, s conversion.Scope) error {
 	return autoconvert_extensions_IngressRule_To_v1beta1_IngressRule(in, out, s)
 }
 
-func autoconvert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *experimental.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
+func autoconvert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *extensions.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressRuleValue))(in)
+		defaulting.(func(*extensions.IngressRuleValue))(in)
 	}
 	if in.HTTP != nil {
 		out.HTTP = new(HTTPIngressRuleValue)
@@ -2650,13 +2650,13 @@ func autoconvert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *exp
 	return nil
 }
 
-func convert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *experimental.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
+func convert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *extensions.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
 	return autoconvert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in, out, s)
 }
 
-func autoconvert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *experimental.IngressSpec, out *IngressSpec, s conversion.Scope) error {
+func autoconvert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *extensions.IngressSpec, out *IngressSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressSpec))(in)
+		defaulting.(func(*extensions.IngressSpec))(in)
 	}
 	if in.Backend != nil {
 		out.Backend = new(IngressBackend)
@@ -2679,13 +2679,13 @@ func autoconvert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *experimental.
 	return nil
 }
 
-func convert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *experimental.IngressSpec, out *IngressSpec, s conversion.Scope) error {
+func convert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *extensions.IngressSpec, out *IngressSpec, s conversion.Scope) error {
 	return autoconvert_extensions_IngressSpec_To_v1beta1_IngressSpec(in, out, s)
 }
 
-func autoconvert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *experimental.IngressStatus, out *IngressStatus, s conversion.Scope) error {
+func autoconvert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *extensions.IngressStatus, out *IngressStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.IngressStatus))(in)
+		defaulting.(func(*extensions.IngressStatus))(in)
 	}
 	if err := convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
@@ -2693,13 +2693,13 @@ func autoconvert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *experimen
 	return nil
 }
 
-func convert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *experimental.IngressStatus, out *IngressStatus, s conversion.Scope) error {
+func convert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *extensions.IngressStatus, out *IngressStatus, s conversion.Scope) error {
 	return autoconvert_extensions_IngressStatus_To_v1beta1_IngressStatus(in, out, s)
 }
 
-func autoconvert_extensions_Job_To_v1beta1_Job(in *experimental.Job, out *Job, s conversion.Scope) error {
+func autoconvert_extensions_Job_To_v1beta1_Job(in *extensions.Job, out *Job, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.Job))(in)
+		defaulting.(func(*extensions.Job))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2716,13 +2716,13 @@ func autoconvert_extensions_Job_To_v1beta1_Job(in *experimental.Job, out *Job, s
 	return nil
 }
 
-func convert_extensions_Job_To_v1beta1_Job(in *experimental.Job, out *Job, s conversion.Scope) error {
+func convert_extensions_Job_To_v1beta1_Job(in *extensions.Job, out *Job, s conversion.Scope) error {
 	return autoconvert_extensions_Job_To_v1beta1_Job(in, out, s)
 }
 
-func autoconvert_extensions_JobCondition_To_v1beta1_JobCondition(in *experimental.JobCondition, out *JobCondition, s conversion.Scope) error {
+func autoconvert_extensions_JobCondition_To_v1beta1_JobCondition(in *extensions.JobCondition, out *JobCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.JobCondition))(in)
+		defaulting.(func(*extensions.JobCondition))(in)
 	}
 	out.Type = JobConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
@@ -2737,13 +2737,13 @@ func autoconvert_extensions_JobCondition_To_v1beta1_JobCondition(in *experimenta
 	return nil
 }
 
-func convert_extensions_JobCondition_To_v1beta1_JobCondition(in *experimental.JobCondition, out *JobCondition, s conversion.Scope) error {
+func convert_extensions_JobCondition_To_v1beta1_JobCondition(in *extensions.JobCondition, out *JobCondition, s conversion.Scope) error {
 	return autoconvert_extensions_JobCondition_To_v1beta1_JobCondition(in, out, s)
 }
 
-func autoconvert_extensions_JobList_To_v1beta1_JobList(in *experimental.JobList, out *JobList, s conversion.Scope) error {
+func autoconvert_extensions_JobList_To_v1beta1_JobList(in *extensions.JobList, out *JobList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.JobList))(in)
+		defaulting.(func(*extensions.JobList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2764,13 +2764,13 @@ func autoconvert_extensions_JobList_To_v1beta1_JobList(in *experimental.JobList,
 	return nil
 }
 
-func convert_extensions_JobList_To_v1beta1_JobList(in *experimental.JobList, out *JobList, s conversion.Scope) error {
+func convert_extensions_JobList_To_v1beta1_JobList(in *extensions.JobList, out *JobList, s conversion.Scope) error {
 	return autoconvert_extensions_JobList_To_v1beta1_JobList(in, out, s)
 }
 
-func autoconvert_extensions_JobSpec_To_v1beta1_JobSpec(in *experimental.JobSpec, out *JobSpec, s conversion.Scope) error {
+func autoconvert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *JobSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.JobSpec))(in)
+		defaulting.(func(*extensions.JobSpec))(in)
 	}
 	if in.Parallelism != nil {
 		out.Parallelism = new(int)
@@ -2803,13 +2803,13 @@ func autoconvert_extensions_JobSpec_To_v1beta1_JobSpec(in *experimental.JobSpec,
 	return nil
 }
 
-func convert_extensions_JobSpec_To_v1beta1_JobSpec(in *experimental.JobSpec, out *JobSpec, s conversion.Scope) error {
+func convert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *JobSpec, s conversion.Scope) error {
 	return autoconvert_extensions_JobSpec_To_v1beta1_JobSpec(in, out, s)
 }
 
-func autoconvert_extensions_JobStatus_To_v1beta1_JobStatus(in *experimental.JobStatus, out *JobStatus, s conversion.Scope) error {
+func autoconvert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.JobStatus))(in)
+		defaulting.(func(*extensions.JobStatus))(in)
 	}
 	if in.Conditions != nil {
 		out.Conditions = make([]JobCondition, len(in.Conditions))
@@ -2841,26 +2841,26 @@ func autoconvert_extensions_JobStatus_To_v1beta1_JobStatus(in *experimental.JobS
 	return nil
 }
 
-func convert_extensions_JobStatus_To_v1beta1_JobStatus(in *experimental.JobStatus, out *JobStatus, s conversion.Scope) error {
+func convert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoconvert_extensions_JobStatus_To_v1beta1_JobStatus(in, out, s)
 }
 
-func autoconvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *experimental.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
+func autoconvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.NodeUtilization))(in)
+		defaulting.(func(*extensions.NodeUtilization))(in)
 	}
 	out.Resource = NodeResource(in.Resource)
 	out.Value = in.Value
 	return nil
 }
 
-func convert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *experimental.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
+func convert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
 	return autoconvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in, out, s)
 }
 
-func autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in *experimental.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
+func autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in *extensions.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ReplicationControllerDummy))(in)
+		defaulting.(func(*extensions.ReplicationControllerDummy))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2868,13 +2868,13 @@ func autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationCon
 	return nil
 }
 
-func convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in *experimental.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
+func convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in *extensions.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	return autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in, out, s)
 }
 
-func autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in *experimental.ResourceConsumption, out *ResourceConsumption, s conversion.Scope) error {
+func autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in *extensions.ResourceConsumption, out *ResourceConsumption, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ResourceConsumption))(in)
+		defaulting.(func(*extensions.ResourceConsumption))(in)
 	}
 	out.Resource = v1.ResourceName(in.Resource)
 	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
@@ -2883,13 +2883,13 @@ func autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(i
 	return nil
 }
 
-func convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in *experimental.ResourceConsumption, out *ResourceConsumption, s conversion.Scope) error {
+func convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in *extensions.ResourceConsumption, out *ResourceConsumption, s conversion.Scope) error {
 	return autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in, out, s)
 }
 
-func autoconvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *experimental.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
+func autoconvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.RollingUpdateDeployment))(in)
+		defaulting.(func(*extensions.RollingUpdateDeployment))(in)
 	}
 	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
@@ -2901,9 +2901,9 @@ func autoconvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDepl
 	return nil
 }
 
-func autoconvert_extensions_Scale_To_v1beta1_Scale(in *experimental.Scale, out *Scale, s conversion.Scope) error {
+func autoconvert_extensions_Scale_To_v1beta1_Scale(in *extensions.Scale, out *Scale, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.Scale))(in)
+		defaulting.(func(*extensions.Scale))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2920,25 +2920,25 @@ func autoconvert_extensions_Scale_To_v1beta1_Scale(in *experimental.Scale, out *
 	return nil
 }
 
-func convert_extensions_Scale_To_v1beta1_Scale(in *experimental.Scale, out *Scale, s conversion.Scope) error {
+func convert_extensions_Scale_To_v1beta1_Scale(in *extensions.Scale, out *Scale, s conversion.Scope) error {
 	return autoconvert_extensions_Scale_To_v1beta1_Scale(in, out, s)
 }
 
-func autoconvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *experimental.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
+func autoconvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ScaleSpec))(in)
+		defaulting.(func(*extensions.ScaleSpec))(in)
 	}
 	out.Replicas = in.Replicas
 	return nil
 }
 
-func convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *experimental.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
+func convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
 	return autoconvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in, out, s)
 }
 
-func autoconvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *experimental.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
+func autoconvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ScaleStatus))(in)
+		defaulting.(func(*extensions.ScaleStatus))(in)
 	}
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
@@ -2952,13 +2952,13 @@ func autoconvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *experimental.
 	return nil
 }
 
-func convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *experimental.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
+func convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
 	return autoconvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in, out, s)
 }
 
-func autoconvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *experimental.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
+func autoconvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *extensions.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.SubresourceReference))(in)
+		defaulting.(func(*extensions.SubresourceReference))(in)
 	}
 	out.Kind = in.Kind
 	out.Namespace = in.Namespace
@@ -2968,13 +2968,13 @@ func autoconvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference
 	return nil
 }
 
-func convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *experimental.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
+func convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *extensions.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
 	return autoconvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in, out, s)
 }
 
-func autoconvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *experimental.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
+func autoconvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResource))(in)
+		defaulting.(func(*extensions.ThirdPartyResource))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2996,13 +2996,13 @@ func autoconvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in 
 	return nil
 }
 
-func convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *experimental.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
+func convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
 	return autoconvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in, out, s)
 }
 
-func autoconvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(in *experimental.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
+func autoconvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(in *extensions.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResourceData))(in)
+		defaulting.(func(*extensions.ThirdPartyResourceData))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -3016,13 +3016,13 @@ func autoconvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResource
 	return nil
 }
 
-func convert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(in *experimental.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
+func convert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(in *extensions.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
 	return autoconvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(in, out, s)
 }
 
-func autoconvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in *experimental.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
+func autoconvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in *extensions.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResourceDataList))(in)
+		defaulting.(func(*extensions.ThirdPartyResourceDataList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -3043,13 +3043,13 @@ func autoconvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyReso
 	return nil
 }
 
-func convert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in *experimental.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
+func convert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in *extensions.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
 	return autoconvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in, out, s)
 }
 
-func autoconvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *experimental.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
+func autoconvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *extensions.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*experimental.ThirdPartyResourceList))(in)
+		defaulting.(func(*extensions.ThirdPartyResourceList))(in)
 	}
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -3070,11 +3070,11 @@ func autoconvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResource
 	return nil
 }
 
-func convert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *experimental.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
+func convert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *extensions.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	return autoconvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in, out, s)
 }
 
-func autoconvert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out *experimental.APIVersion, s conversion.Scope) error {
+func autoconvert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out *extensions.APIVersion, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*APIVersion))(in)
 	}
@@ -3083,11 +3083,11 @@ func autoconvert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out
 	return nil
 }
 
-func convert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out *experimental.APIVersion, s conversion.Scope) error {
+func convert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out *extensions.APIVersion, s conversion.Scope) error {
 	return autoconvert_v1beta1_APIVersion_To_extensions_APIVersion(in, out, s)
 }
 
-func autoconvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *experimental.ClusterAutoscaler, s conversion.Scope) error {
+func autoconvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ClusterAutoscaler))(in)
 	}
@@ -3103,11 +3103,11 @@ func autoconvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *C
 	return nil
 }
 
-func convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *experimental.ClusterAutoscaler, s conversion.Scope) error {
+func convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
 	return autoconvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in, out, s)
 }
 
-func autoconvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *experimental.ClusterAutoscalerList, s conversion.Scope) error {
+func autoconvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *extensions.ClusterAutoscalerList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ClusterAutoscalerList))(in)
 	}
@@ -3118,7 +3118,7 @@ func autoconvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerLi
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.ClusterAutoscaler, len(in.Items))
+		out.Items = make([]extensions.ClusterAutoscaler, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3130,18 +3130,18 @@ func autoconvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerLi
 	return nil
 }
 
-func convert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *experimental.ClusterAutoscalerList, s conversion.Scope) error {
+func convert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in *ClusterAutoscalerList, out *extensions.ClusterAutoscalerList, s conversion.Scope) error {
 	return autoconvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList(in, out, s)
 }
 
-func autoconvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *experimental.ClusterAutoscalerSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *extensions.ClusterAutoscalerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ClusterAutoscalerSpec))(in)
 	}
 	out.MinNodes = in.MinNodes
 	out.MaxNodes = in.MaxNodes
 	if in.TargetUtilization != nil {
-		out.TargetUtilization = make([]experimental.NodeUtilization, len(in.TargetUtilization))
+		out.TargetUtilization = make([]extensions.NodeUtilization, len(in.TargetUtilization))
 		for i := range in.TargetUtilization {
 			if err := convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(&in.TargetUtilization[i], &out.TargetUtilization[i], s); err != nil {
 				return err
@@ -3153,11 +3153,11 @@ func autoconvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSp
 	return nil
 }
 
-func convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *experimental.ClusterAutoscalerSpec, s conversion.Scope) error {
+func convert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in *ClusterAutoscalerSpec, out *extensions.ClusterAutoscalerSpec, s conversion.Scope) error {
 	return autoconvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec(in, out, s)
 }
 
-func autoconvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *experimental.DaemonSet, s conversion.Scope) error {
+func autoconvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSet))(in)
 	}
@@ -3176,11 +3176,11 @@ func autoconvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *e
 	return nil
 }
 
-func convert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *experimental.DaemonSet, s conversion.Scope) error {
+func convert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
 	return autoconvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in, out, s)
 }
 
-func autoconvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSetList, out *experimental.DaemonSetList, s conversion.Scope) error {
+func autoconvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSetList, out *extensions.DaemonSetList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetList))(in)
 	}
@@ -3191,7 +3191,7 @@ func autoconvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSet
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.DaemonSet, len(in.Items))
+		out.Items = make([]extensions.DaemonSet, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_DaemonSet_To_extensions_DaemonSet(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3203,11 +3203,11 @@ func autoconvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSet
 	return nil
 }
 
-func convert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSetList, out *experimental.DaemonSetList, s conversion.Scope) error {
+func convert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in *DaemonSetList, out *extensions.DaemonSetList, s conversion.Scope) error {
 	return autoconvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(in, out, s)
 }
 
-func autoconvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *experimental.DaemonSetSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetSpec))(in)
 	}
@@ -3230,11 +3230,11 @@ func autoconvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	return nil
 }
 
-func convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *experimental.DaemonSetSpec, s conversion.Scope) error {
+func convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
 	return autoconvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in, out, s)
 }
 
-func autoconvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *experimental.DaemonSetStatus, s conversion.Scope) error {
+func autoconvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetStatus))(in)
 	}
@@ -3244,11 +3244,11 @@ func autoconvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 	return nil
 }
 
-func convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *experimental.DaemonSetStatus, s conversion.Scope) error {
+func convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
 	return autoconvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in, out, s)
 }
 
-func autoconvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *experimental.Deployment, s conversion.Scope) error {
+func autoconvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Deployment))(in)
 	}
@@ -3267,11 +3267,11 @@ func autoconvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out
 	return nil
 }
 
-func convert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *experimental.Deployment, s conversion.Scope) error {
+func convert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
 	return autoconvert_v1beta1_Deployment_To_extensions_Deployment(in, out, s)
 }
 
-func autoconvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *DeploymentList, out *experimental.DeploymentList, s conversion.Scope) error {
+func autoconvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentList))(in)
 	}
@@ -3282,7 +3282,7 @@ func autoconvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *Deploym
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.Deployment, len(in.Items))
+		out.Items = make([]extensions.Deployment, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_Deployment_To_extensions_Deployment(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3294,11 +3294,11 @@ func autoconvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *Deploym
 	return nil
 }
 
-func convert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *DeploymentList, out *experimental.DeploymentList, s conversion.Scope) error {
+func convert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
 	return autoconvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in, out, s)
 }
 
-func autoconvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentSpec, out *experimental.DeploymentSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentSpec))(in)
 	}
@@ -3326,7 +3326,7 @@ func autoconvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	return nil
 }
 
-func autoconvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *DeploymentStatus, out *experimental.DeploymentStatus, s conversion.Scope) error {
+func autoconvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *DeploymentStatus, out *extensions.DeploymentStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStatus))(in)
 	}
@@ -3335,11 +3335,11 @@ func autoconvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 	return nil
 }
 
-func convert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *DeploymentStatus, out *experimental.DeploymentStatus, s conversion.Scope) error {
+func convert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *DeploymentStatus, out *extensions.DeploymentStatus, s conversion.Scope) error {
 	return autoconvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in, out, s)
 }
 
-func autoconvert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in *HTTPIngressPath, out *experimental.HTTPIngressPath, s conversion.Scope) error {
+func autoconvert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in *HTTPIngressPath, out *extensions.HTTPIngressPath, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HTTPIngressPath))(in)
 	}
@@ -3350,16 +3350,16 @@ func autoconvert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in *HTTPI
 	return nil
 }
 
-func convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in *HTTPIngressPath, out *experimental.HTTPIngressPath, s conversion.Scope) error {
+func convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in *HTTPIngressPath, out *extensions.HTTPIngressPath, s conversion.Scope) error {
 	return autoconvert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in, out, s)
 }
 
-func autoconvert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *experimental.HTTPIngressRuleValue, s conversion.Scope) error {
+func autoconvert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *extensions.HTTPIngressRuleValue, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HTTPIngressRuleValue))(in)
 	}
 	if in.Paths != nil {
-		out.Paths = make([]experimental.HTTPIngressPath, len(in.Paths))
+		out.Paths = make([]extensions.HTTPIngressPath, len(in.Paths))
 		for i := range in.Paths {
 			if err := convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
 				return err
@@ -3371,11 +3371,11 @@ func autoconvert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue
 	return nil
 }
 
-func convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *experimental.HTTPIngressRuleValue, s conversion.Scope) error {
+func convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *extensions.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoconvert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoconvert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *experimental.HorizontalPodAutoscaler, s conversion.Scope) error {
+func autoconvert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *extensions.HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscaler))(in)
 	}
@@ -3394,11 +3394,11 @@ func autoconvert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAuto
 	return nil
 }
 
-func convert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *experimental.HorizontalPodAutoscaler, s conversion.Scope) error {
+func convert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *extensions.HorizontalPodAutoscaler, s conversion.Scope) error {
 	return autoconvert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in, out, s)
 }
 
-func autoconvert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *experimental.HorizontalPodAutoscalerList, s conversion.Scope) error {
+func autoconvert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *extensions.HorizontalPodAutoscalerList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerList))(in)
 	}
@@ -3409,7 +3409,7 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPod
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.HorizontalPodAutoscaler, len(in.Items))
+		out.Items = make([]extensions.HorizontalPodAutoscaler, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3421,16 +3421,16 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPod
 	return nil
 }
 
-func convert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *experimental.HorizontalPodAutoscalerList, s conversion.Scope) error {
+func convert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *extensions.HorizontalPodAutoscalerList, s conversion.Scope) error {
 	return autoconvert_v1beta1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscalerList(in, out, s)
 }
 
-func autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *experimental.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *extensions.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerSpec))(in)
 	}
 	if in.ScaleRef != nil {
-		out.ScaleRef = new(experimental.SubresourceReference)
+		out.ScaleRef = new(extensions.SubresourceReference)
 		if err := convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in.ScaleRef, out.ScaleRef, s); err != nil {
 			return err
 		}
@@ -3445,18 +3445,18 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPod
 	return nil
 }
 
-func convert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *experimental.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func convert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *extensions.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	return autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscalerSpec(in, out, s)
 }
 
-func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *experimental.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *extensions.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerStatus))(in)
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentConsumption != nil {
-		out.CurrentConsumption = new(experimental.ResourceConsumption)
+		out.CurrentConsumption = new(extensions.ResourceConsumption)
 		if err := convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
 			return err
 		}
@@ -3473,11 +3473,11 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalP
 	return nil
 }
 
-func convert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *experimental.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func convert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *extensions.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	return autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
-func autoconvert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *experimental.Ingress, s conversion.Scope) error {
+func autoconvert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *extensions.Ingress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Ingress))(in)
 	}
@@ -3496,11 +3496,11 @@ func autoconvert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *experim
 	return nil
 }
 
-func convert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *experimental.Ingress, s conversion.Scope) error {
+func convert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *extensions.Ingress, s conversion.Scope) error {
 	return autoconvert_v1beta1_Ingress_To_extensions_Ingress(in, out, s)
 }
 
-func autoconvert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *IngressBackend, out *experimental.IngressBackend, s conversion.Scope) error {
+func autoconvert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *IngressBackend, out *extensions.IngressBackend, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressBackend))(in)
 	}
@@ -3511,11 +3511,11 @@ func autoconvert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *Ingress
 	return nil
 }
 
-func convert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *IngressBackend, out *experimental.IngressBackend, s conversion.Scope) error {
+func convert_v1beta1_IngressBackend_To_extensions_IngressBackend(in *IngressBackend, out *extensions.IngressBackend, s conversion.Scope) error {
 	return autoconvert_v1beta1_IngressBackend_To_extensions_IngressBackend(in, out, s)
 }
 
-func autoconvert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out *experimental.IngressList, s conversion.Scope) error {
+func autoconvert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out *extensions.IngressList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressList))(in)
 	}
@@ -3526,7 +3526,7 @@ func autoconvert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, 
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.Ingress, len(in.Items))
+		out.Items = make([]extensions.Ingress, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_Ingress_To_extensions_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3538,11 +3538,11 @@ func autoconvert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, 
 	return nil
 }
 
-func convert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out *experimental.IngressList, s conversion.Scope) error {
+func convert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out *extensions.IngressList, s conversion.Scope) error {
 	return autoconvert_v1beta1_IngressList_To_extensions_IngressList(in, out, s)
 }
 
-func autoconvert_v1beta1_IngressRule_To_extensions_IngressRule(in *IngressRule, out *experimental.IngressRule, s conversion.Scope) error {
+func autoconvert_v1beta1_IngressRule_To_extensions_IngressRule(in *IngressRule, out *extensions.IngressRule, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressRule))(in)
 	}
@@ -3553,16 +3553,16 @@ func autoconvert_v1beta1_IngressRule_To_extensions_IngressRule(in *IngressRule, 
 	return nil
 }
 
-func convert_v1beta1_IngressRule_To_extensions_IngressRule(in *IngressRule, out *experimental.IngressRule, s conversion.Scope) error {
+func convert_v1beta1_IngressRule_To_extensions_IngressRule(in *IngressRule, out *extensions.IngressRule, s conversion.Scope) error {
 	return autoconvert_v1beta1_IngressRule_To_extensions_IngressRule(in, out, s)
 }
 
-func autoconvert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *IngressRuleValue, out *experimental.IngressRuleValue, s conversion.Scope) error {
+func autoconvert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *IngressRuleValue, out *extensions.IngressRuleValue, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressRuleValue))(in)
 	}
 	if in.HTTP != nil {
-		out.HTTP = new(experimental.HTTPIngressRuleValue)
+		out.HTTP = new(extensions.HTTPIngressRuleValue)
 		if err := convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in.HTTP, out.HTTP, s); err != nil {
 			return err
 		}
@@ -3572,16 +3572,16 @@ func autoconvert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *Ing
 	return nil
 }
 
-func convert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *IngressRuleValue, out *experimental.IngressRuleValue, s conversion.Scope) error {
+func convert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *IngressRuleValue, out *extensions.IngressRuleValue, s conversion.Scope) error {
 	return autoconvert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in, out, s)
 }
 
-func autoconvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, out *experimental.IngressSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, out *extensions.IngressSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressSpec))(in)
 	}
 	if in.Backend != nil {
-		out.Backend = new(experimental.IngressBackend)
+		out.Backend = new(extensions.IngressBackend)
 		if err := convert_v1beta1_IngressBackend_To_extensions_IngressBackend(in.Backend, out.Backend, s); err != nil {
 			return err
 		}
@@ -3589,7 +3589,7 @@ func autoconvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, 
 		out.Backend = nil
 	}
 	if in.Rules != nil {
-		out.Rules = make([]experimental.IngressRule, len(in.Rules))
+		out.Rules = make([]extensions.IngressRule, len(in.Rules))
 		for i := range in.Rules {
 			if err := convert_v1beta1_IngressRule_To_extensions_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
 				return err
@@ -3601,11 +3601,11 @@ func autoconvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, 
 	return nil
 }
 
-func convert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, out *experimental.IngressSpec, s conversion.Scope) error {
+func convert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, out *extensions.IngressSpec, s conversion.Scope) error {
 	return autoconvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in, out, s)
 }
 
-func autoconvert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressStatus, out *experimental.IngressStatus, s conversion.Scope) error {
+func autoconvert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressStatus, out *extensions.IngressStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*IngressStatus))(in)
 	}
@@ -3615,11 +3615,11 @@ func autoconvert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressSt
 	return nil
 }
 
-func convert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressStatus, out *experimental.IngressStatus, s conversion.Scope) error {
+func convert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressStatus, out *extensions.IngressStatus, s conversion.Scope) error {
 	return autoconvert_v1beta1_IngressStatus_To_extensions_IngressStatus(in, out, s)
 }
 
-func autoconvert_v1beta1_Job_To_extensions_Job(in *Job, out *experimental.Job, s conversion.Scope) error {
+func autoconvert_v1beta1_Job_To_extensions_Job(in *Job, out *extensions.Job, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Job))(in)
 	}
@@ -3638,15 +3638,15 @@ func autoconvert_v1beta1_Job_To_extensions_Job(in *Job, out *experimental.Job, s
 	return nil
 }
 
-func convert_v1beta1_Job_To_extensions_Job(in *Job, out *experimental.Job, s conversion.Scope) error {
+func convert_v1beta1_Job_To_extensions_Job(in *Job, out *extensions.Job, s conversion.Scope) error {
 	return autoconvert_v1beta1_Job_To_extensions_Job(in, out, s)
 }
 
-func autoconvert_v1beta1_JobCondition_To_extensions_JobCondition(in *JobCondition, out *experimental.JobCondition, s conversion.Scope) error {
+func autoconvert_v1beta1_JobCondition_To_extensions_JobCondition(in *JobCondition, out *extensions.JobCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobCondition))(in)
 	}
-	out.Type = experimental.JobConditionType(in.Type)
+	out.Type = extensions.JobConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
 	if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
 		return err
@@ -3659,11 +3659,11 @@ func autoconvert_v1beta1_JobCondition_To_extensions_JobCondition(in *JobConditio
 	return nil
 }
 
-func convert_v1beta1_JobCondition_To_extensions_JobCondition(in *JobCondition, out *experimental.JobCondition, s conversion.Scope) error {
+func convert_v1beta1_JobCondition_To_extensions_JobCondition(in *JobCondition, out *extensions.JobCondition, s conversion.Scope) error {
 	return autoconvert_v1beta1_JobCondition_To_extensions_JobCondition(in, out, s)
 }
 
-func autoconvert_v1beta1_JobList_To_extensions_JobList(in *JobList, out *experimental.JobList, s conversion.Scope) error {
+func autoconvert_v1beta1_JobList_To_extensions_JobList(in *JobList, out *extensions.JobList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobList))(in)
 	}
@@ -3674,7 +3674,7 @@ func autoconvert_v1beta1_JobList_To_extensions_JobList(in *JobList, out *experim
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.Job, len(in.Items))
+		out.Items = make([]extensions.Job, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_Job_To_extensions_Job(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3686,11 +3686,11 @@ func autoconvert_v1beta1_JobList_To_extensions_JobList(in *JobList, out *experim
 	return nil
 }
 
-func convert_v1beta1_JobList_To_extensions_JobList(in *JobList, out *experimental.JobList, s conversion.Scope) error {
+func convert_v1beta1_JobList_To_extensions_JobList(in *JobList, out *extensions.JobList, s conversion.Scope) error {
 	return autoconvert_v1beta1_JobList_To_extensions_JobList(in, out, s)
 }
 
-func autoconvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *experimental.JobSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.JobSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobSpec))(in)
 	}
@@ -3725,16 +3725,16 @@ func autoconvert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *experim
 	return nil
 }
 
-func convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *experimental.JobSpec, s conversion.Scope) error {
+func convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.JobSpec, s conversion.Scope) error {
 	return autoconvert_v1beta1_JobSpec_To_extensions_JobSpec(in, out, s)
 }
 
-func autoconvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *experimental.JobStatus, s conversion.Scope) error {
+func autoconvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *extensions.JobStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobStatus))(in)
 	}
 	if in.Conditions != nil {
-		out.Conditions = make([]experimental.JobCondition, len(in.Conditions))
+		out.Conditions = make([]extensions.JobCondition, len(in.Conditions))
 		for i := range in.Conditions {
 			if err := convert_v1beta1_JobCondition_To_extensions_JobCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 				return err
@@ -3763,24 +3763,24 @@ func autoconvert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *e
 	return nil
 }
 
-func convert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *experimental.JobStatus, s conversion.Scope) error {
+func convert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *extensions.JobStatus, s conversion.Scope) error {
 	return autoconvert_v1beta1_JobStatus_To_extensions_JobStatus(in, out, s)
 }
 
-func autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *experimental.NodeUtilization, s conversion.Scope) error {
+func autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeUtilization))(in)
 	}
-	out.Resource = experimental.NodeResource(in.Resource)
+	out.Resource = extensions.NodeResource(in.Resource)
 	out.Value = in.Value
 	return nil
 }
 
-func convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *experimental.NodeUtilization, s conversion.Scope) error {
+func convert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
 	return autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in, out, s)
 }
 
-func autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in *ReplicationControllerDummy, out *experimental.ReplicationControllerDummy, s conversion.Scope) error {
+func autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in *ReplicationControllerDummy, out *extensions.ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerDummy))(in)
 	}
@@ -3790,11 +3790,11 @@ func autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationCon
 	return nil
 }
 
-func convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in *ReplicationControllerDummy, out *experimental.ReplicationControllerDummy, s conversion.Scope) error {
+func convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in *ReplicationControllerDummy, out *extensions.ReplicationControllerDummy, s conversion.Scope) error {
 	return autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in, out, s)
 }
 
-func autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in *ResourceConsumption, out *experimental.ResourceConsumption, s conversion.Scope) error {
+func autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in *ResourceConsumption, out *extensions.ResourceConsumption, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceConsumption))(in)
 	}
@@ -3805,11 +3805,11 @@ func autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(i
 	return nil
 }
 
-func convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in *ResourceConsumption, out *experimental.ResourceConsumption, s conversion.Scope) error {
+func convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in *ResourceConsumption, out *extensions.ResourceConsumption, s conversion.Scope) error {
 	return autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in, out, s)
 }
 
-func autoconvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *experimental.RollingUpdateDeployment, s conversion.Scope) error {
+func autoconvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RollingUpdateDeployment))(in)
 	}
@@ -3819,7 +3819,7 @@ func autoconvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDepl
 	return nil
 }
 
-func autoconvert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *experimental.Scale, s conversion.Scope) error {
+func autoconvert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *extensions.Scale, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Scale))(in)
 	}
@@ -3838,11 +3838,11 @@ func autoconvert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *experimental.
 	return nil
 }
 
-func convert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *experimental.Scale, s conversion.Scope) error {
+func convert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *extensions.Scale, s conversion.Scope) error {
 	return autoconvert_v1beta1_Scale_To_extensions_Scale(in, out, s)
 }
 
-func autoconvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *ScaleSpec, out *experimental.ScaleSpec, s conversion.Scope) error {
+func autoconvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *ScaleSpec, out *extensions.ScaleSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ScaleSpec))(in)
 	}
@@ -3850,11 +3850,11 @@ func autoconvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *ScaleSpec, out *e
 	return nil
 }
 
-func convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *ScaleSpec, out *experimental.ScaleSpec, s conversion.Scope) error {
+func convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *ScaleSpec, out *extensions.ScaleSpec, s conversion.Scope) error {
 	return autoconvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in, out, s)
 }
 
-func autoconvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *experimental.ScaleStatus, s conversion.Scope) error {
+func autoconvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ScaleStatus))(in)
 	}
@@ -3870,11 +3870,11 @@ func autoconvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, 
 	return nil
 }
 
-func convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *experimental.ScaleStatus, s conversion.Scope) error {
+func convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
 	return autoconvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in, out, s)
 }
 
-func autoconvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in *SubresourceReference, out *experimental.SubresourceReference, s conversion.Scope) error {
+func autoconvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in *SubresourceReference, out *extensions.SubresourceReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SubresourceReference))(in)
 	}
@@ -3886,11 +3886,11 @@ func autoconvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference
 	return nil
 }
 
-func convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in *SubresourceReference, out *experimental.SubresourceReference, s conversion.Scope) error {
+func convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in *SubresourceReference, out *extensions.SubresourceReference, s conversion.Scope) error {
 	return autoconvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in, out, s)
 }
 
-func autoconvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *experimental.ThirdPartyResource, s conversion.Scope) error {
+func autoconvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *extensions.ThirdPartyResource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResource))(in)
 	}
@@ -3902,7 +3902,7 @@ func autoconvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in 
 	}
 	out.Description = in.Description
 	if in.Versions != nil {
-		out.Versions = make([]experimental.APIVersion, len(in.Versions))
+		out.Versions = make([]extensions.APIVersion, len(in.Versions))
 		for i := range in.Versions {
 			if err := convert_v1beta1_APIVersion_To_extensions_APIVersion(&in.Versions[i], &out.Versions[i], s); err != nil {
 				return err
@@ -3914,11 +3914,11 @@ func autoconvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in 
 	return nil
 }
 
-func convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *experimental.ThirdPartyResource, s conversion.Scope) error {
+func convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *extensions.ThirdPartyResource, s conversion.Scope) error {
 	return autoconvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in, out, s)
 }
 
-func autoconvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in *ThirdPartyResourceData, out *experimental.ThirdPartyResourceData, s conversion.Scope) error {
+func autoconvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in *ThirdPartyResourceData, out *extensions.ThirdPartyResourceData, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceData))(in)
 	}
@@ -3934,11 +3934,11 @@ func autoconvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResource
 	return nil
 }
 
-func convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in *ThirdPartyResourceData, out *experimental.ThirdPartyResourceData, s conversion.Scope) error {
+func convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in *ThirdPartyResourceData, out *extensions.ThirdPartyResourceData, s conversion.Scope) error {
 	return autoconvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in, out, s)
 }
 
-func autoconvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *experimental.ThirdPartyResourceDataList, s conversion.Scope) error {
+func autoconvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *extensions.ThirdPartyResourceDataList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceDataList))(in)
 	}
@@ -3949,7 +3949,7 @@ func autoconvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyReso
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.ThirdPartyResourceData, len(in.Items))
+		out.Items = make([]extensions.ThirdPartyResourceData, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3961,11 +3961,11 @@ func autoconvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyReso
 	return nil
 }
 
-func convert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *experimental.ThirdPartyResourceDataList, s conversion.Scope) error {
+func convert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *extensions.ThirdPartyResourceDataList, s conversion.Scope) error {
 	return autoconvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList(in, out, s)
 }
 
-func autoconvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in *ThirdPartyResourceList, out *experimental.ThirdPartyResourceList, s conversion.Scope) error {
+func autoconvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in *ThirdPartyResourceList, out *extensions.ThirdPartyResourceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResourceList))(in)
 	}
@@ -3976,7 +3976,7 @@ func autoconvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResource
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]experimental.ThirdPartyResource, len(in.Items))
+		out.Items = make([]extensions.ThirdPartyResource, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3988,7 +3988,7 @@ func autoconvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResource
 	return nil
 }
 
-func convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in *ThirdPartyResourceList, out *experimental.ThirdPartyResourceList, s conversion.Scope) error {
+func convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in *ThirdPartyResourceList, out *extensions.ThirdPartyResourceList, s conversion.Scope) error {
 	return autoconvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in, out, s)
 }
 
