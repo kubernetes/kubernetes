@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-APIROOTS=${APIROOTS:-pkg/api pkg/apis/experimental}
+APIROOTS=${APIROOTS:-pkg/api pkg/apis/extensions}
 _tmp="${KUBE_ROOT}/_tmp"
 
 cleanup() {
