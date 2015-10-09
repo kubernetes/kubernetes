@@ -1013,7 +1013,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 
 		result, err := r.prober.ProbeLiveness(pod, podStatus, container, c.ID, c.Created)
 		// TODO(vmarmol): examine this logic.
-		if err == nil && result != probe.Success {
+		if err == nil && result != probe.Success && pod.Spec.RestartPolicy != api.RestartPolicyNever {
 			glog.Infof("Pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
 			restartPod = true
 			break
