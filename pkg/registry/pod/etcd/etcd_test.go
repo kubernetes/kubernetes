@@ -38,7 +38,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	storage := NewStorage(etcdStorage, false, nil)
+	storage := NewStorage(etcdStorage, false, nil, nil)
 	return storage.Pod, storage.Binding, storage.Status, fakeClient
 }
 
@@ -740,7 +740,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 
 func TestPodLogValidates(t *testing.T) {
 	etcdStorage, _ := registrytest.NewEtcdStorage(t, "")
-	storage := NewStorage(etcdStorage, false, nil)
+	storage := NewStorage(etcdStorage, false, nil, nil)
 
 	negativeOne := int64(-1)
 	testCases := []*api.PodLogOptions{
