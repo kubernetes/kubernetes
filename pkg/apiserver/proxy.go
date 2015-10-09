@@ -17,11 +17,8 @@ limitations under the License.
 package apiserver
 
 import (
-	"crypto/tls"
-	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -40,7 +37,6 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // ProxyHandler provides a http.Handler which will proxy traffic to locations
@@ -51,8 +47,6 @@ type ProxyHandler struct {
 	codec                  runtime.Codec
 	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
-
-	dial func(network, addr string) (net.Conn, error)
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -125,11 +119,8 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
-	// If we have a custom dialer, and no pre-existing transport, initialize it to use the dialer.
-	if roundTripper == nil && r.dial != nil {
-		glog.V(5).Infof("[%x: %v] making a dial-only transport...", proxyHandlerTraceID, req.URL)
-		roundTripper = &http.Transport{Dial: r.dial}
-	} else if roundTripper != nil {
+
+	if roundTripper != nil {
 		glog.V(5).Infof("[%x: %v] using transport %T...", proxyHandlerTraceID, req.URL, roundTripper)
 	}
 
@@ -217,7 +208,7 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
-	backendConn, err := dialURL(location, transport)
+	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w, true)
@@ -262,46 +253,6 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 
 	<-done
 	return true
-}
-
-func dialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(url)
-
-	switch url.Scheme {
-	case "http":
-		return net.Dial("tcp", dialAddr)
-	case "https":
-		// Get the tls config from the transport if we recognize it
-		var tlsConfig *tls.Config
-		if transport != nil {
-			httpTransport, ok := transport.(*http.Transport)
-			if ok {
-				tlsConfig = httpTransport.TLSClientConfig
-			}
-		}
-
-		// Dial
-		tlsConn, err := tls.Dial("tcp", dialAddr, tlsConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		// Return if we were configured to skip validation
-		if tlsConfig != nil && tlsConfig.InsecureSkipVerify {
-			return tlsConn, nil
-		}
-
-		// Verify
-		host, _, _ := net.SplitHostPort(dialAddr)
-		if err := tlsConn.VerifyHostname(host); err != nil {
-			tlsConn.Close()
-			return nil, err
-		}
-
-		return tlsConn, nil
-	default:
-		return nil, fmt.Errorf("Unknown scheme: %s", url.Scheme)
-	}
 }
 
 // borrowed from net/http/httputil/reverseproxy.go
