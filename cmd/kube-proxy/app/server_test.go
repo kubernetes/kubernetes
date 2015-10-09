@@ -40,15 +40,15 @@ func Test_mayTryIptablesProxy(t *testing.T) {
 		{"userspace", "", "", false},
 		{"iptables", "", "", true},
 		{"", "", "", false},
-		{"", "net.extensions.kubernetes.io/proxy-mode", "userspace", false},
-		{"", "net.extensions.kubernetes.io/proxy-mode", "iptables", true},
-		{"", "net.extensions.kubernetes.io/proxy-mode", "other", false},
-		{"", "net.extensions.kubernetes.io/proxy-mode", "", false},
+		{"", "net.experimental.kubernetes.io/proxy-mode", "userspace", false},
+		{"", "net.experimental.kubernetes.io/proxy-mode", "iptables", true},
+		{"", "net.experimental.kubernetes.io/proxy-mode", "other", false},
+		{"", "net.experimental.kubernetes.io/proxy-mode", "", false},
 		{"", "proxy-mode", "iptables", false},
-		{"userspace", "net.extensions.kubernetes.io/proxy-mode", "userspace", false},
-		{"userspace", "net.extensions.kubernetes.io/proxy-mode", "iptables", false},
-		{"iptables", "net.extensions.kubernetes.io/proxy-mode", "userspace", true},
-		{"iptables", "net.extensions.kubernetes.io/proxy-mode", "iptables", true},
+		{"userspace", "net.experimental.kubernetes.io/proxy-mode", "userspace", false},
+		{"userspace", "net.experimental.kubernetes.io/proxy-mode", "iptables", false},
+		{"iptables", "net.experimental.kubernetes.io/proxy-mode", "userspace", true},
+		{"iptables", "net.experimental.kubernetes.io/proxy-mode", "iptables", true},
 	}
 	for i, c := range cases {
 		getter := &fakeNodeInterface{}
