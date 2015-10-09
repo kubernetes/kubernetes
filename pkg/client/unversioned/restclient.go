@@ -105,7 +105,7 @@ func (c *RESTClient) Put() *Request {
 }
 
 // Patch begins a PATCH request. Short for c.Verb("Patch").
-func (c *RESTClient) Patch(pt api.PatchType) *Request {
+func (c *RESTClient) Patch(pt unversioned.PatchType) *Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 

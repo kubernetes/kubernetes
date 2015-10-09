@@ -27,7 +27,7 @@ import (
 type RESTClient interface {
 	Get() *client.Request
 	Post() *client.Request
-	Patch(api.PatchType) *client.Request
+	Patch(unversioned.PatchType) *client.Request
 	Delete() *client.Request
 	Put() *client.Request
 }

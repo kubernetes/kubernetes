@@ -41,6 +41,6 @@ func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.
 		// Extract the paths handled using mux handler.
 		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
 		sort.Strings(handledPaths)
-		writeRawJSON(status, api.RootPaths{Paths: handledPaths}, w)
+		writeRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
 	}
 }
