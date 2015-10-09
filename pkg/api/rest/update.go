@@ -59,9 +59,27 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	} else {
 		objectMeta.Namespace = api.NamespaceNone
 	}
+
+	uerr := revertUIDIfNone(objectMeta, old)
+	if uerr != nil {
+		return uerr
+	}
+
 	strategy.PrepareForUpdate(obj, old)
 	if errs := strategy.ValidateUpdate(ctx, obj, old); len(errs) > 0 {
 		return errors.NewInvalid(kind, objectMeta.Name, errs)
+	}
+	return nil
+}
+
+// If UID is missing, revert it from old object.
+func revertUIDIfNone(objectMeta *api.ObjectMeta, old runtime.Object) error {
+	oldObjectMeta, oerr := api.ObjectMetaFor(old)
+	if oerr != nil {
+		return errors.NewInternalError(oerr)
+	}
+	if objectMeta.UID == "" {
+		objectMeta.UID = oldObjectMeta.UID
 	}
 	return nil
 }
