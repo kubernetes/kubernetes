@@ -43,7 +43,7 @@ EOF
 }
 
 # TODO(lavalamp): get this list by listing the pkg/apis/ directory?
-DEFAULT_GROUP_VERSIONS="v1 experimental/v1alpha1"
+DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 for ver in $VERSIONS; do
   # Ensure that the version being processed is registered by setting
