@@ -75,11 +75,11 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := latest.GroupOrDie("experimental").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "experimental/v1alpha1" || k != "HorizontalPodAutoscaler" {
+	if v, k, err := latest.GroupOrDie("experimental").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "extensions/v1beta1" || k != "HorizontalPodAutoscaler" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 
-	if m, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "experimental/v1alpha1" || m.Resource != "daemonsets" {
+	if m, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "extensions/v1beta1" || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 

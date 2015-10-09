@@ -28,7 +28,7 @@ func TestGetVersion(t *testing.T) {
 			"v1",
 		},
 		{
-			"experimental/v1alpha1",
+			"extensions/v1beta1",
 			"v1alpha1",
 		},
 	}
@@ -50,7 +50,7 @@ func TestGetGroup(t *testing.T) {
 			"",
 		},
 		{
-			"experimental/v1alpha1",
+			"extensions/v1beta1",
 			"experimental",
 		},
 	}
