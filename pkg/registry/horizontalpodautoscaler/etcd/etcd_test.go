@@ -36,19 +36,19 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewHorizontalPodAutoscaler(name string) *experimental.HorizontalPodAutoscaler {
-	return &experimental.HorizontalPodAutoscaler{
+func validNewHorizontalPodAutoscaler(name string) *extensions.HorizontalPodAutoscaler {
+	return &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: experimental.HorizontalPodAutoscalerSpec{
-			ScaleRef: &experimental.SubresourceReference{
+		Spec: extensions.HorizontalPodAutoscalerSpec{
+			ScaleRef: &extensions.SubresourceReference{
 				Subresource: "scale",
 			},
 			MinReplicas: 1,
 			MaxReplicas: 5,
-			Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+			Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 		},
 	}
 }
@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		autoscaler,
 		// invalid
-		&experimental.HorizontalPodAutoscaler{},
+		&extensions.HorizontalPodAutoscaler{},
 	)
 }
 
@@ -74,7 +74,7 @@ func TestUpdate(t *testing.T) {
 		validNewHorizontalPodAutoscaler("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.HorizontalPodAutoscaler)
+			object := obj.(*extensions.HorizontalPodAutoscaler)
 			object.Spec.MaxReplicas = object.Spec.MaxReplicas + 1
 			return object
 		},

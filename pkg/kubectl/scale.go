@@ -83,7 +83,7 @@ func (precondition *ScalePrecondition) ValidateReplicationController(controller 
 }
 
 // ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
-func (precondition *ScalePrecondition) ValidateJob(job *experimental.Job) error {
+func (precondition *ScalePrecondition) ValidateJob(job *extensions.Job) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
 	}

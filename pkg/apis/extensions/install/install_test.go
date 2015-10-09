@@ -27,7 +27,7 @@ import (
 )
 
 func TestResourceVersioner(t *testing.T) {
-	daemonSet := experimental.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
+	daemonSet := extensions.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -36,7 +36,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Errorf("unexpected version %v", version)
 	}
 
-	daemonSetList := experimental.DaemonSetList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
+	daemonSetList := extensions.DaemonSetList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
 	version, err = accessor.ResourceVersion(&daemonSetList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -47,14 +47,14 @@ func TestResourceVersioner(t *testing.T) {
 }
 
 func TestCodec(t *testing.T) {
-	daemonSet := experimental.DaemonSet{}
+	daemonSet := extensions.DaemonSet{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
 	data, err := latest.GroupOrDie("extensions").Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	other := experimental.DaemonSet{}
+	other := extensions.DaemonSet{}
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}
 
-		rc := &experimental.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		rc := &extensions.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		name, err := mapping.MetadataAccessor.Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

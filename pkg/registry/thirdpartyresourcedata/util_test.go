@@ -47,7 +47,7 @@ func TestExtractAPIGroupAndKind(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		kind, group, err := ExtractApiGroupAndKind(&experimental.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: test.input}})
+		kind, group, err := ExtractApiGroupAndKind(&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: test.input}})
 		if err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v", err)
 			continue
