@@ -659,7 +659,7 @@ func runPatchTest(c *client.Client) {
 		glog.Fatalf("Failed creating patchservice: %v", err)
 	}
 
-	patchBodies := map[string]map[api.PatchType]struct {
+	patchBodies := map[string]map[unversioned.PatchType]struct {
 		AddLabelBody        []byte
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
@@ -685,7 +685,7 @@ func runPatchTest(c *client.Client) {
 
 	pb := patchBodies[c.APIVersion()]
 
-	execPatch := func(pt api.PatchType, body []byte) error {
+	execPatch := func(pt unversioned.PatchType, body []byte) error {
 		return c.Patch(pt).
 			Resource(resource).
 			Namespace(api.NamespaceDefault).
