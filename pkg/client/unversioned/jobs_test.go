@@ -35,7 +35,7 @@ func TestListJobs(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
 			Body: &experimental.JobList{
@@ -65,7 +65,7 @@ func TestGetJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
@@ -111,7 +111,7 @@ func TestUpdateJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
@@ -146,7 +146,7 @@ func TestUpdateJobStatus(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
@@ -177,7 +177,7 @@ func TestDeleteJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{StatusCode: 200},
@@ -197,7 +197,7 @@ func TestCreateJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
 			Body:   requestJob,
 			Query:  buildQueryValues(nil),
 		},

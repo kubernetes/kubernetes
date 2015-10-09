@@ -53,7 +53,7 @@ func getKey(ds *experimental.DaemonSet, t *testing.T) string {
 
 func newDaemonSet(name string) *experimental.DaemonSet {
 	return &experimental.DaemonSet{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Experimental.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Extensions.Version()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
