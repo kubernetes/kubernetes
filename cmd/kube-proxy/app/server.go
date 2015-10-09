@@ -98,6 +98,7 @@ const (
 	proxyModeUserspace              = "userspace"
 	proxyModeIptables               = "iptables"
 	experimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
+	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
 )
 
 func checkKnownProxyMode(proxyMode string) bool {
@@ -327,9 +328,15 @@ func mayTryIptablesProxy(proxyMode string, client nodeGetter, hostname string) b
 		glog.Errorf("Not trying iptables proxy: got nil Node %q", hostname)
 		return false
 	}
-	proxyMode, found := node.Annotations[experimentalProxyModeAnnotation]
+	proxyMode, found := node.Annotations[betaProxyModeAnnotation]
 	if found {
-		glog.V(1).Infof("Found experimental annotation %q = %q", experimentalProxyModeAnnotation, proxyMode)
+		glog.V(1).Infof("Found beta annotation %q = %q", betaProxyModeAnnotation, proxyMode)
+	} else {
+		// We already published some information about this annotation with the "experimental" name, so we will respect it.
+		proxyMode, found = node.Annotations[experimentalProxyModeAnnotation]
+		if found {
+			glog.V(1).Infof("Found experimental annotation %q = %q", experimentalProxyModeAnnotation, proxyMode)
+		}
 	}
 	if proxyMode == proxyModeIptables {
 		glog.V(1).Infof("Annotation allows iptables proxy")
