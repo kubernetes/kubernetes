@@ -18,6 +18,7 @@ package master
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,12 +26,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -81,7 +79,12 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 // using the configuration properly.
 func TestNew(t *testing.T) {
 	_, config, assert := setUp(t)
+
 	config.KubeletClient = client.FakeKubeletClient{}
+
+	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
+	config.ProxyTLSClientConfig = &tls.Config{}
+
 	master := New(&config)
 
 	// Verify many of the variables match their config counterparts
@@ -105,7 +108,15 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.clusterIP, config.PublicAddress)
 	assert.Equal(master.publicReadWritePort, config.ReadWritePort)
 	assert.Equal(master.serviceReadWriteIP, config.ServiceReadWriteIP)
-	assert.Equal(master.installSSHKey, config.InstallSSHKey)
+	assert.Equal(master.tunneler, config.Tunneler)
+
+	// These functions should point to the same memory location
+	masterDialer, _ := util.Dialer(master.proxyTransport)
+	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
+	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
+	assert.Equal(masterDialerFunc, configDialerFunc)
+
+	assert.Equal(master.proxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
 }
 
 // TestNewEtcdStorage verifies that the usage of NewEtcdStorage reacts properly when
@@ -270,7 +281,6 @@ func TestInstallSwaggerAPI(t *testing.T) {
 // creates the expected APIGroupVersion based off of master.
 func TestDefaultAPIGroupVersion(t *testing.T) {
 	master, _, assert := setUp(t)
-	master.dialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 
 	apiGroup := master.defaultAPIGroupVersion()
 
@@ -278,11 +288,6 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 	assert.Equal(apiGroup.Admit, master.admissionControl)
 	assert.Equal(apiGroup.Context, master.requestContextMapper)
 	assert.Equal(apiGroup.MinRequestTimeout, master.minRequestTimeout)
-
-	// These functions should be different instances of the same function
-	groupDialerFunc := fmt.Sprintf("%+v", apiGroup.ProxyDialerFn)
-	masterDialerFunc := fmt.Sprintf("%+v", master.dialer)
-	assert.Equal(groupDialerFunc, masterDialerFunc)
 }
 
 // TestExpapi verifies that the unexported exapi creates
@@ -296,42 +301,6 @@ func TestExpapi(t *testing.T) {
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("extensions").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("extensions").SelfLinker)
 	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("extensions").GroupVersion)
-}
-
-// TestSecondsSinceSync verifies that proper results are returned
-// when checking the time between syncs
-func TestSecondsSinceSync(t *testing.T) {
-	master, _, assert := setUp(t)
-	master.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
-
-	// Nano Second. No difference.
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC)}
-	assert.Equal(int64(0), master.secondsSinceSync())
-
-	// Second
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC)}
-	assert.Equal(int64(1), master.secondsSinceSync())
-
-	// Minute
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC)}
-	assert.Equal(int64(60), master.secondsSinceSync())
-
-	// Hour
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC)}
-	assert.Equal(int64(3600), master.secondsSinceSync())
-
-	// Day
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC)}
-	assert.Equal(int64(86400), master.secondsSinceSync())
-
-	// Month
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC)}
-	assert.Equal(int64(2678400), master.secondsSinceSync())
-
-	// Future Month. Should be -Month.
-	master.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC)}
-	assert.Equal(int64(-2678400), master.secondsSinceSync())
 }
 
 // TestGetNodeAddresses verifies that proper results are returned
@@ -363,73 +332,6 @@ func TestGetNodeAddresses(t *testing.T) {
 	addrs, err = master.getNodeAddresses()
 	assert.NoError(err, "getNodeAddresses failback should not have returned an error.")
 	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
-}
-
-// TestRefreshTunnels verifies that the function errors when no addresses
-// are associated with nodes
-func TestRefreshTunnels(t *testing.T) {
-	master, _, assert := setUp(t)
-
-	// Fail case (no addresses associated with nodes)
-	assert.Error(master.refreshTunnels("test", "/tmp/undefined"))
-
-	// TODO: pass case without needing actual connections?
-}
-
-// TestIsTunnelSyncHealthy verifies that the 600 second lag test
-// is honored.
-func TestIsTunnelSyncHealthy(t *testing.T) {
-	master, _, assert := setUp(t)
-
-	// Pass case: 540 second lag
-	master.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 9, 1, 1, time.UTC)}
-	err := master.IsTunnelSyncHealthy(nil)
-	assert.NoError(err, "IsTunnelSyncHealthy() should not have returned an error.")
-
-	// Fail case: 720 second lag
-	master.clock = &util.FakeClock{Time: time.Date(2015, time.January, 1, 1, 12, 1, 1, time.UTC)}
-	err = master.IsTunnelSyncHealthy(nil)
-	assert.Error(err, "IsTunnelSyncHealthy() should have returned an error.")
-}
-
-// generateTempFile creates a temporary file path
-func generateTempFilePath(prefix string) string {
-	tmpPath, _ := filepath.Abs(fmt.Sprintf("%s/%s-%d", os.TempDir(), prefix, time.Now().Unix()))
-	return tmpPath
-}
-
-// TestGenerateSSHKey verifies that SSH key generation does indeed
-// generate keys even with keys already exist.
-func TestGenerateSSHKey(t *testing.T) {
-	master, _, assert := setUp(t)
-
-	privateKey := generateTempFilePath("private")
-	publicKey := generateTempFilePath("public")
-
-	// Make sure we have no test keys laying around
-	os.Remove(privateKey)
-	os.Remove(publicKey)
-
-	// Pass case: Sunny day case
-	err := master.generateSSHKey("unused", privateKey, publicKey)
-	assert.NoError(err, "generateSSHKey should not have retuend an error: %s", err)
-
-	// Pass case: PrivateKey exists test case
-	os.Remove(publicKey)
-	err = master.generateSSHKey("unused", privateKey, publicKey)
-	assert.NoError(err, "generateSSHKey should not have retuend an error: %s", err)
-
-	// Pass case: PublicKey exists test case
-	os.Remove(privateKey)
-	err = master.generateSSHKey("unused", privateKey, publicKey)
-	assert.NoError(err, "generateSSHKey should not have retuend an error: %s", err)
-
-	// Make sure we have no test keys laying around
-	os.Remove(privateKey)
-	os.Remove(publicKey)
-
-	// TODO: testing error cases where the file can not be removed?
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {

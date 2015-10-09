@@ -17,7 +17,6 @@ limitations under the License.
 package pod
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -46,13 +45,6 @@ type podStrategy struct {
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
 var Strategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// PodProxyTransport is used by the API proxy to connect to pods
-// Exported to allow overriding TLS options (like adding a client certificate)
-var PodProxyTransport = util.SetTransportDefaults(&http.Transport{
-	// Turn off hostname verification, because connections are to assigned IPs, not deterministic
-	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-})
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -199,7 +191,7 @@ func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, erro
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
 	// If port is not specified, try to use the first defined port on the pod.
 	scheme, name, port, valid := util.SplitSchemeNamePort(id)
@@ -231,7 +223,7 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 	} else {
 		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
 	}
-	return loc, PodProxyTransport, nil
+	return loc, rt, nil
 }
 
 // LogLocation returns the log URL for a pod container. If opts.Container is blank

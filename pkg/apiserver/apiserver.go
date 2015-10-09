@@ -102,7 +102,6 @@ type APIGroupVersion struct {
 	Admit   admission.Interface
 	Context api.RequestContextMapper
 
-	ProxyDialerFn     ProxyDialerFunc
 	MinRequestTimeout time.Duration
 }
 
@@ -163,7 +162,6 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 		info:              info,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
-		proxyDialerFn:     g.ProxyDialerFn,
 	}
 	return installer
 }

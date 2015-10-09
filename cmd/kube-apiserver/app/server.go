@@ -387,6 +387,30 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
+	// Setup tunneler if needed
+	var tunneler master.Tunneler
+	var proxyDialerFn apiserver.ProxyDialerFunc
+	if len(s.SSHUser) > 0 {
+		// Get ssh key distribution func, if supported
+		var installSSH master.InstallSSHKey
+		if cloud != nil {
+			if instances, supported := cloud.Instances(); supported {
+				installSSH = instances.AddSSHKeyToAllInstances
+			}
+		}
+
+		// Set up the tunneler
+		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, installSSH)
+
+		// Use the tunneler's dialer to connect to the kubelet
+		s.KubeletConfig.Dial = tunneler.Dial
+		// Use the tunneler's dialer when proxying to pods, services, and nodes
+		proxyDialerFn = tunneler.Dial
+	}
+
+	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
+	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+
 	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
 	if err != nil {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
@@ -500,12 +524,7 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}
 	}
-	var installSSH master.InstallSSHKey
-	if cloud != nil {
-		if instances, supported := cloud.Instances(); supported {
-			installSSH = instances.AddSSHKeyToAllInstances
-		}
-	}
+
 	config := &master.Config{
 		StorageDestinations:      storageDestinations,
 		StorageVersions:          storageVersions,
@@ -533,9 +552,9 @@ func (s *APIServer) Run(_ []string) error {
 		ClusterName:              s.ClusterName,
 		ExternalHost:             s.ExternalHost,
 		MinRequestTimeout:        s.MinRequestTimeout,
-		SSHUser:                  s.SSHUser,
-		SSHKeyfile:               s.SSHKeyfile,
-		InstallSSHKey:            installSSH,
+		ProxyDialer:              proxyDialerFn,
+		ProxyTLSClientConfig:     proxyTLSClientConfig,
+		Tunneler:                 tunneler,
 		ServiceNodePortRange:     s.ServiceNodePortRange,
 	}
 	m := master.New(config)

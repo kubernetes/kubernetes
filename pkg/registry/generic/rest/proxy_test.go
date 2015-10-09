@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -304,6 +305,21 @@ func TestProxyUpgrade(t *testing.T) {
 				return ts
 			},
 			ProxyTransport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: localhostPool}},
+		},
+		"https (valid hostname + RootCAs + custom dialer)": {
+			ServerFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+				if err != nil {
+					t.Errorf("https (valid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			ProxyTransport: &http.Transport{Dial: net.Dial, TLSClientConfig: &tls.Config{RootCAs: localhostPool}},
 		},
 	}
 

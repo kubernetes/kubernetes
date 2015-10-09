@@ -46,7 +46,7 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	portRange := util.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
-	storage := NewStorage(registry, endpointRegistry, r, portAllocator)
+	storage := NewStorage(registry, endpointRegistry, r, portAllocator, nil)
 
 	return storage, registry
 }

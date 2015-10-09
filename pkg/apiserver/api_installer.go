@@ -42,7 +42,6 @@ type APIInstaller struct {
 	info              *APIRequestInfoResolver
 	prefix            string // Path prefix where API resources are to be registered.
 	minRequestTimeout time.Duration
-	proxyDialerFn     ProxyDialerFunc
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -65,7 +64,7 @@ var errEmptyName = errors.NewBadRequest("name must be provided")
 func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
 	errors = make([]error, 0)
 
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))

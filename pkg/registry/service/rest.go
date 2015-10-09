@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"net"
@@ -48,23 +47,18 @@ type REST struct {
 	endpoints        endpoint.Registry
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
+	proxyTransport   http.RoundTripper
 }
-
-// ServiceProxyTransport is used by the API proxy to connect to services
-// Exported to allow overriding TLS options (like adding a client certificate)
-var ServiceProxyTransport = util.SetTransportDefaults(&http.Transport{
-	// Turn off hostname verification, because connections are to assigned IPs, not deterministic
-	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-})
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface) *REST {
+	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *REST {
 	return &REST{
 		registry:         registry,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
+		proxyTransport:   proxyTransport,
 	}
 }
 
@@ -314,7 +308,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 				return &url.URL{
 					Scheme: svcScheme,
 					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
-				}, ServiceProxyTransport, nil
+				}, rs.proxyTransport, nil
 			}
 		}
 	}

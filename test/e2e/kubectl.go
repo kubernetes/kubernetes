@@ -705,6 +705,9 @@ var _ = Describe("Kubectl client", func() {
 			By("curling proxy /api/ output")
 			localAddr := fmt.Sprintf("http://localhost:%d/api/", port)
 			apiVersions, err := getAPIVersions(localAddr)
+			if err != nil {
+				Failf("Expected at least one supported apiversion, got error %v", err)
+			}
 			if len(apiVersions.Versions) < 1 {
 				Failf("Expected at least one supported apiversion, got %v", apiVersions)
 			}

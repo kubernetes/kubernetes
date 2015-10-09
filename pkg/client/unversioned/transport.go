@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type userAgentRoundTripper struct {
@@ -40,6 +42,12 @@ func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	req = cloneRequest(req)
 	req.Header.Set("User-Agent", rt.agent)
 	return rt.rt.RoundTrip(req)
+}
+
+var _ = util.RoundTripperWrapper(&userAgentRoundTripper{})
+
+func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.rt
 }
 
 type basicAuthRoundTripper struct {
@@ -63,6 +71,12 @@ func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	return rt.rt.RoundTrip(req)
 }
 
+var _ = util.RoundTripperWrapper(&basicAuthRoundTripper{})
+
+func (rt *basicAuthRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.rt
+}
+
 type bearerAuthRoundTripper struct {
 	bearer string
 	rt     http.RoundTripper
@@ -82,6 +96,12 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	req = cloneRequest(req)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
 	return rt.rt.RoundTrip(req)
+}
+
+var _ = util.RoundTripperWrapper(&bearerAuthRoundTripper{})
+
+func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.rt
 }
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
