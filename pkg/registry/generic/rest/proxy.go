@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
@@ -44,17 +45,19 @@ type UpgradeAwareProxyHandler struct {
 	Transport       http.RoundTripper
 	FlushInterval   time.Duration
 	MaxBytesPerSec  int64
+	Path            string
 	err             error
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
 
 // NewUpgradeAwareProxyHandler creates a new proxy handler with a default flush interval
-func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, upgradeRequired bool) *UpgradeAwareProxyHandler {
+func NewUpgradeAwareProxyHandler(location *url.URL, path string, transport http.RoundTripper, upgradeRequired bool) *UpgradeAwareProxyHandler {
 	return &UpgradeAwareProxyHandler{
 		Location:        location,
 		Transport:       transport,
 		UpgradeRequired: upgradeRequired,
+		Path:            path,
 		FlushInterval:   defaultFlushInterval,
 	}
 }
@@ -62,6 +65,16 @@ func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper,
 // RequestError returns an error that occurred while handling request
 func (h *UpgradeAwareProxyHandler) RequestError() error {
 	return h.err
+}
+
+// proxyRequestURL returns a URL to send a back-end server using the raw RequestURI from the
+// request instead of the decoded URL received by the handler. It makes it possible to send
+// encoded characters like %2f in the path to the back-end.
+func (h *UpgradeAwareProxyHandler) proxyRequestURL(req *http.Request) *url.URL {
+	requestPath := strings.TrimPrefix(req.RequestURI, h.proxyPath(req.URL))
+	newURL := &url.URL{}
+	newURL.Opaque = util.SingleJoiningSlash(h.Location.Path, requestPath)
+	return newURL
 }
 
 // ServeHTTP handles the proxy request
@@ -78,20 +91,11 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	loc := *h.Location
-	loc.RawQuery = req.URL.RawQuery
-
-	// If original request URL ended in '/', append a '/' at the end of the
-	// of the proxy URL
-	if !strings.HasSuffix(loc.Path, "/") && strings.HasSuffix(req.URL.Path, "/") {
-		loc.Path += "/"
-	}
-
 	// From pkg/apiserver/proxy.go#ServeHTTP:
 	// Redirect requests with an empty path to a location that ends with a '/'
 	// This is essentially a hack for http://issue.k8s.io/4958.
 	// Note: Keep this code after tryUpgrade to not break that flow.
-	if len(loc.Path) == 0 {
+	if len(h.Path) == 0 && !strings.HasSuffix(req.RequestURI, "/") {
 		var queryPart string
 		if len(req.URL.RawQuery) > 0 {
 			queryPart = "?" + req.URL.RawQuery
@@ -105,12 +109,10 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		h.Transport = h.defaultProxyTransport(req.URL)
 	}
 
-	newReq, err := http.NewRequest(req.Method, loc.String(), req.Body)
-	if err != nil {
-		h.err = err
-		return
-	}
-	newReq.Header = req.Header
+	backendURL := h.proxyRequestURL(req)
+	newReq := &http.Request{}
+	*newReq = *req
+	newReq.URL = backendURL
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
@@ -258,18 +260,23 @@ func (h *UpgradeAwareProxyHandler) dialURL() (net.Conn, error) {
 	}
 }
 
-func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.RoundTripper {
-	scheme := url.Scheme
-	host := url.Host
-	suffix := h.Location.Path
+// proxyPath returns the part of the request URL path that is not to be
+// sent the the backend server (ie. /namespaces/[ns]/pods/[pod:port]/proxy)
+func (h *UpgradeAwareProxyHandler) proxyPath(url *url.URL) string {
+	suffix := util.SingleJoiningSlash("", h.Path)
 	if strings.HasSuffix(url.Path, "/") && !strings.HasSuffix(suffix, "/") {
 		suffix += "/"
 	}
-	pathPrepend := strings.TrimSuffix(url.Path, suffix)
+	return util.SingleJoiningSlash("", strings.TrimSuffix(url.Path, suffix))
+}
+
+// defaultProxyTansport creates a URL-rewriting Transport that will fix up URLs in text/html
+// content type responses. All URLs will be prepended with the path to the proxy
+func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.RoundTripper {
 	internalTransport := &proxy.Transport{
-		Scheme:      scheme,
-		Host:        host,
-		PathPrepend: pathPrepend,
+		Scheme:      url.Scheme,
+		Host:        url.Host,
+		PathPrepend: h.proxyPath(url),
 	}
 	return &corsRemovingTransport{
 		RoundTripper: internalTransport,

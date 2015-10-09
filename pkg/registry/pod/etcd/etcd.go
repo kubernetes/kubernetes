@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -289,8 +288,7 @@ func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (re
 	if err != nil {
 		return nil, err
 	}
-	location.Path = path.Join(location.Path, proxyOpts.Path)
-	return newUpgradeAwareProxyHandler(location, nil, false), nil
+	return newUpgradeAwareProxyHandler(location, proxyOpts.Path, nil, false), nil
 }
 
 // Support both GET and POST methods. Over time, we want to move all clients to start using POST and then stop supporting GET.
@@ -321,7 +319,7 @@ func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object) 
 	if err != nil {
 		return nil, err
 	}
-	return genericrest.NewUpgradeAwareProxyHandler(location, transport, true), nil
+	return genericrest.NewUpgradeAwareProxyHandler(location, "", transport, true), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -359,7 +357,7 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object) (r
 	if err != nil {
 		return nil, err
 	}
-	return newUpgradeAwareProxyHandler(location, transport, true), nil
+	return newUpgradeAwareProxyHandler(location, "", transport, true), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -403,11 +401,11 @@ func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Obj
 	if err != nil {
 		return nil, err
 	}
-	return newUpgradeAwareProxyHandler(location, transport, true), nil
+	return newUpgradeAwareProxyHandler(location, "", transport, true), nil
 }
 
-func newUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, upgradeRequired bool) *genericrest.UpgradeAwareProxyHandler {
-	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, upgradeRequired)
+func newUpgradeAwareProxyHandler(location *url.URL, path string, transport http.RoundTripper, upgradeRequired bool) *genericrest.UpgradeAwareProxyHandler {
+	handler := genericrest.NewUpgradeAwareProxyHandler(location, path, transport, upgradeRequired)
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }

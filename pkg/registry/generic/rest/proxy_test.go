@@ -28,8 +28,6 @@ import (
 	"testing"
 
 	"golang.org/x/net/websocket"
-
-	"k8s.io/kubernetes/pkg/util/proxy"
 )
 
 type SimpleBackendHandler struct {
@@ -131,6 +129,12 @@ func TestServeHTTP(t *testing.T) {
 			requestBody:   "test request body",
 		},
 		{
+			name:         "path with encoded character",
+			method:       "GET",
+			requestPath:  "/path/to%2ftest",
+			expectedPath: "/path/to%2ftest",
+		},
+		{
 			name:          "request headers",
 			method:        "PUT",
 			requestPath:   "/some/path",
@@ -179,9 +183,9 @@ func TestServeHTTP(t *testing.T) {
 			defer backendServer.Close()
 
 			backendURL, _ := url.Parse(backendServer.URL)
-			backendURL.Path = test.requestPath
 			proxyHandler := &UpgradeAwareProxyHandler{
 				Location: backendURL,
+				Path:     test.requestPath,
 			}
 			proxyServer := httptest.NewServer(proxyHandler)
 			defer proxyServer.Close()
@@ -346,58 +350,96 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 }
 
-func TestDefaultProxyTransport(t *testing.T) {
+func TestProxyPath(t *testing.T) {
 	tests := []struct {
-		name,
 		url,
-		location,
-		expectedScheme,
-		expectedHost,
-		expectedPathPrepend string
+		path,
+		expected string
 	}{
 
 		{
-			name:                "simple path",
-			url:                 "http://test.server:8080/a/test/location",
-			location:            "http://localhost/location",
-			expectedScheme:      "http",
-			expectedHost:        "test.server:8080",
-			expectedPathPrepend: "/a/test",
+			url:      "http://test.server:8080/a/test/location",
+			path:     "location",
+			expected: "/a/test",
 		},
 		{
-			name:                "empty path",
-			url:                 "http://test.server:8080/a/test/",
-			location:            "http://localhost",
-			expectedScheme:      "http",
-			expectedHost:        "test.server:8080",
-			expectedPathPrepend: "/a/test",
+			url:      "http://test.server:8080/a/test/location/",
+			path:     "location",
+			expected: "/a/test",
 		},
 		{
-			name:                "location ending in slash",
-			url:                 "http://test.server:8080/a/test/",
-			location:            "http://localhost/",
-			expectedScheme:      "http",
-			expectedHost:        "test.server:8080",
-			expectedPathPrepend: "/a/test",
+			url:      "http://test.server:8080/a/test",
+			path:     "",
+			expected: "/a/test",
+		},
+		{
+			url:      "http://test.server:8080/a/test/",
+			path:     "",
+			expected: "/a/test",
 		},
 	}
 
 	for _, test := range tests {
-		locURL, _ := url.Parse(test.location)
-		URL, _ := url.Parse(test.url)
+		locURL, _ := url.Parse(test.url)
 		h := UpgradeAwareProxyHandler{
-			Location: locURL,
+			Path: test.path,
 		}
-		result := h.defaultProxyTransport(URL)
-		transport := result.(*corsRemovingTransport).RoundTripper.(*proxy.Transport)
-		if transport.Scheme != test.expectedScheme {
-			t.Errorf("%s: unexpected scheme. Actual: %s, Expected: %s", test.name, transport.Scheme, test.expectedScheme)
+		result := h.proxyPath(locURL)
+		if result != test.expected {
+			t.Errorf("Unexpected result for url %s and path %s. Expected: %s. Got: %s.",
+				test.url, test.path, test.expected, result)
 		}
-		if transport.Host != test.expectedHost {
-			t.Errorf("%s: unexpected host. Actual: %s, Expected: %s", test.name, transport.Host, test.expectedHost)
+	}
+}
+
+func TestProxyRequestURL(t *testing.T) {
+	tests := []struct {
+		backendURL,
+		requestURI,
+		path,
+		expectedURL string
+	}{
+		{
+			backendURL:  "http://back-end.server:80",
+			requestURI:  "/path/to/proxy/hello/world",
+			path:        "hello/world",
+			expectedURL: "/hello/world",
+		},
+		{
+			backendURL:  "http://back-end.server/path",
+			requestURI:  "/namespaces/testns/pods/podname-test/proxy/test/hello%2fworld",
+			path:        "test/hello/world",
+			expectedURL: "/path/test/hello%2fworld",
+		},
+		{
+			backendURL:  "http://back-end.server:443",
+			requestURI:  "/namespaces/testns/pods/podname:443/proxy/the/request/",
+			path:        "the/request",
+			expectedURL: "/the/request/",
+		},
+	}
+
+	u := func(s string) *url.URL {
+		result, err := url.Parse(s)
+		if err != nil {
+			t.Fatalf("Error parsing url %s: %v", s, err)
 		}
-		if transport.PathPrepend != test.expectedPathPrepend {
-			t.Errorf("%s: unexpected path prepend. Actual: %s, Expected: %s", test.name, transport.PathPrepend, test.expectedPathPrepend)
+		return result
+	}
+
+	for _, tc := range tests {
+		h := UpgradeAwareProxyHandler{
+			Path:     tc.path,
+			Location: u(tc.backendURL),
+		}
+
+		req := &http.Request{
+			RequestURI: tc.requestURI,
+			URL:        u("http://front-end.server" + tc.requestURI),
+		}
+		result := h.proxyRequestURL(req)
+		if result.String() != tc.expectedURL {
+			t.Errorf("Unexpected result: %s", result.String())
 		}
 	}
 }

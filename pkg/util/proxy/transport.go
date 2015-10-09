@@ -31,6 +31,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -140,7 +141,7 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
 	if strings.HasPrefix(url.Path, t.PathPrepend) {
 		return url.String()
 	}
-	url.Path = path.Join(t.PathPrepend, url.Path)
+	url.Path = util.SingleJoiningSlash(t.PathPrepend, url.Path)
 	if strings.HasSuffix(origPath, "/") {
 		// Add back the trailing slash, which was stripped by path.Join().
 		url.Path += "/"
