@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -59,7 +59,7 @@ type PodConfig struct {
 	mux  *config.Mux
 
 	// the channel of denormalized changes passed to listeners
-	updates chan kubeletTypes.PodUpdate
+	updates chan kubetypes.PodUpdate
 
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
@@ -69,7 +69,7 @@ type PodConfig struct {
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
 func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder) *PodConfig {
-	updates := make(chan kubeletTypes.PodUpdate, 50)
+	updates := make(chan kubetypes.PodUpdate, 50)
 	storage := newPodStorage(updates, mode, recorder)
 	podConfig := &PodConfig{
 		pods:    storage,
@@ -100,7 +100,7 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
-func (c *PodConfig) Updates() <-chan kubeletTypes.PodUpdate {
+func (c *PodConfig) Updates() <-chan kubetypes.PodUpdate {
 	return c.updates
 }
 
@@ -122,7 +122,7 @@ type podStorage struct {
 	// ensures that updates are delivered in strict order
 	// on the updates channel
 	updateLock sync.Mutex
-	updates    chan<- kubeletTypes.PodUpdate
+	updates    chan<- kubetypes.PodUpdate
 
 	// contains the set of all sources that have sent at least one SET
 	sourcesSeenLock sync.Mutex
@@ -135,7 +135,7 @@ type podStorage struct {
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubeletTypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
+func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
 	return &podStorage{
 		pods:        make(map[string]map[string]*api.Pod),
 		mode:        mode,
@@ -172,12 +172,12 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *updates
 		}
 		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubeletTypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubeletTypes.SET, Source: source}
+			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
 		}
 
 	case PodConfigNotificationSnapshot:
 		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubeletTypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubeletTypes.SET, Source: source}
+			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
 		}
 
 	case PodConfigNotificationUnknown:
@@ -189,23 +189,23 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubeletTypes.PodUpdate) {
+func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
-	adds = &kubeletTypes.PodUpdate{Op: kubeletTypes.ADD, Source: source}
-	updates = &kubeletTypes.PodUpdate{Op: kubeletTypes.UPDATE, Source: source}
-	deletes = &kubeletTypes.PodUpdate{Op: kubeletTypes.REMOVE, Source: source}
+	adds = &kubetypes.PodUpdate{Op: kubetypes.ADD, Source: source}
+	updates = &kubetypes.PodUpdate{Op: kubetypes.UPDATE, Source: source}
+	deletes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Source: source}
 
 	pods := s.pods[source]
 	if pods == nil {
 		pods = make(map[string]*api.Pod)
 	}
 
-	update := change.(kubeletTypes.PodUpdate)
+	update := change.(kubetypes.PodUpdate)
 	switch update.Op {
-	case kubeletTypes.ADD, kubeletTypes.UPDATE:
-		if update.Op == kubeletTypes.ADD {
+	case kubetypes.ADD, kubetypes.UPDATE:
+		if update.Op == kubetypes.ADD {
 			glog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
 		} else {
 			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
@@ -218,7 +218,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			if ref.Annotations == nil {
 				ref.Annotations = make(map[string]string)
 			}
-			ref.Annotations[kubeletTypes.ConfigSourceAnnotationKey] = source
+			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
 			if existing, found := pods[name]; found {
 				if checkAndUpdatePod(existing, ref) {
 					// this is an update
@@ -234,7 +234,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			adds.Pods = append(adds.Pods, ref)
 		}
 
-	case kubeletTypes.REMOVE:
+	case kubetypes.REMOVE:
 		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
 			name := kubecontainer.GetPodFullName(value)
@@ -247,7 +247,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			// this is a no-op
 		}
 
-	case kubeletTypes.SET:
+	case kubetypes.SET:
 		glog.V(4).Infof("Setting pods for source %s", source)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
@@ -261,7 +261,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			if ref.Annotations == nil {
 				ref.Annotations = make(map[string]string)
 			}
-			ref.Annotations[kubeletTypes.ConfigSourceAnnotationKey] = source
+			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
 				if checkAndUpdatePod(existing, ref) {
@@ -335,9 +335,9 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 
 // Annotations that the kubelet adds to the pod.
 var localAnnotations = []string{
-	kubeletTypes.ConfigSourceAnnotationKey,
-	kubeletTypes.ConfigMirrorAnnotationKey,
-	kubeletTypes.ConfigFirstSeenAnnotationKey,
+	kubetypes.ConfigSourceAnnotationKey,
+	kubetypes.ConfigMirrorAnnotationKey,
+	kubetypes.ConfigFirstSeenAnnotationKey,
 }
 
 func isLocalAnnotationKey(key string) bool {
@@ -379,7 +379,7 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 // recordFirstSeenTime records the first seen time of this pod.
 func recordFirstSeenTime(pod *api.Pod) {
 	glog.V(4).Infof("Receiving a new pod %q", kubeletUtil.FormatPodName(pod))
-	pod.Annotations[kubeletTypes.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
+	pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
 }
 
 // updateAnnotations returns an Annotation map containing the api annotation map plus
@@ -420,7 +420,7 @@ func checkAndUpdatePod(existing, ref *api.Pod) bool {
 
 	// Overwrite the first-seen time with the existing one. This is our own
 	// internal annotation, there is no need to update.
-	ref.Annotations[kubeletTypes.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubeletTypes.ConfigFirstSeenAnnotationKey]
+	ref.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = existing.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]
 
 	existing.Spec = ref.Spec
 	existing.Labels = ref.Labels
@@ -434,7 +434,7 @@ func checkAndUpdatePod(existing, ref *api.Pod) bool {
 func (s *podStorage) Sync() {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
-	s.updates <- kubeletTypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubeletTypes.SET, Source: kubeletTypes.AllSource}
+	s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: kubetypes.AllSource}
 }
 
 // Object implements config.Accessor
