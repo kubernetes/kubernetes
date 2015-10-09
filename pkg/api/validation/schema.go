@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strings"
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -78,7 +78,7 @@ func (s *SwaggerSchema) validateList(obj map[string]interface{}) errs.Validation
 	}
 	itemList, ok := items.([]interface{})
 	if !ok {
-		return append(allErrs, fmt.Errorf("items isn't a slice"))
+		return append(allErrs, fmt.Errorf("object's items field isn't a slice"))
 	}
 	for i, item := range itemList {
 		fields, ok := item.(map[string]interface{})
@@ -98,6 +98,7 @@ func (s *SwaggerSchema) validateList(obj map[string]interface{}) errs.Validation
 		}
 		if len(itemVersion) == 0 {
 			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion is empty", i))
+			continue
 		}
 		kind := fields["kind"]
 		if kind == nil {
@@ -111,6 +112,7 @@ func (s *SwaggerSchema) validateList(obj map[string]interface{}) errs.Validation
 		}
 		if len(itemKind) == 0 {
 			allErrs = append(allErrs, fmt.Errorf("items[%d].kind is empty", i))
+			continue
 		}
 		version := apiutil.GetVersion(itemVersion)
 		errs := s.ValidateObject(item, "", version+"."+itemKind)
@@ -122,38 +124,20 @@ func (s *SwaggerSchema) validateList(obj map[string]interface{}) errs.Validation
 }
 
 func (s *SwaggerSchema) ValidateBytes(data []byte) error {
-	var obj interface{}
 	out, err := yaml.ToJSON(data)
 	if err != nil {
 		return err
 	}
 	data = out
-	if err := json.Unmarshal(data, &obj); err != nil {
+	unstruct := &runtime.Unstructured{}
+	if err := runtime.UnstructuredJSONScheme.DecodeInto(data, unstruct); err != nil {
 		return err
 	}
-	fields, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("error in unmarshaling data %s", string(data))
+	if err := runtime.KindHasList(unstruct); err == nil {
+		return errors.NewAggregate(s.validateList(unstruct.Object))
 	}
-	groupVersion := fields["apiVersion"]
-	if groupVersion == nil {
-		return fmt.Errorf("apiVersion not set")
-	}
-	if _, ok := groupVersion.(string); !ok {
-		return fmt.Errorf("apiVersion isn't string type")
-	}
-	kind := fields["kind"]
-	if kind == nil {
-		return fmt.Errorf("kind not set")
-	}
-	if _, ok := kind.(string); !ok {
-		return fmt.Errorf("kind isn't string type")
-	}
-	if strings.HasSuffix(kind.(string), "List") {
-		return errors.NewAggregate(s.validateList(fields))
-	}
-	version := apiutil.GetVersion(groupVersion.(string))
-	allErrs := s.ValidateObject(obj, "", version+"."+kind.(string))
+	version := apiutil.GetVersion(unstruct.APIVersion)
+	allErrs := s.ValidateObject(unstruct.Object, "", version+"."+unstruct.Kind)
 	if len(allErrs) == 1 {
 		return allErrs[0]
 	}
