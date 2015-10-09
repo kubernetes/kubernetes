@@ -257,24 +257,31 @@ func NewOrDie(c *Config) *Client {
 // running inside a pod running on kuberenetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
-	if err != nil {
-		return nil, err
-	}
-	tlsClientConfig := TLSClientConfig{}
-	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
-	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
-		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+	config := &Config{}
+	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount"); err != nil {
+		// TODO: switch to using cluster DNS.
+		config.Host = "http://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"))
 	} else {
-		tlsClientConfig.CAFile = rootCAFile
+		// TODO: switch to using cluster DNS.
+		config.Host = "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"))
+
+		token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
+		if err != nil {
+			return nil, err
+		}
+		config.BearerToken = string(token)
+
+		tlsClientConfig := TLSClientConfig{}
+		rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
+		if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
+			glog.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		} else {
+			tlsClientConfig.CAFile = rootCAFile
+		}
+		config.TLSClientConfig = tlsClientConfig
 	}
 
-	return &Config{
-		// TODO: switch to using cluster DNS.
-		Host:            "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
-		BearerToken:     string(token),
-		TLSClientConfig: tlsClientConfig,
-	}, nil
+	return config, nil
 }
 
 // NewInCluster is a shortcut for calling InClusterConfig() and then New().

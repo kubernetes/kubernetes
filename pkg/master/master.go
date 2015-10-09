@@ -450,8 +450,8 @@ func New(c *Config) *Master {
 		clusterIP:           c.PublicAddress,
 		publicReadWritePort: c.ReadWritePort,
 		serviceReadWriteIP:  c.ServiceReadWriteIP,
-		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
-		serviceReadWritePort: 443,
+		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be the same as public read-write port.
+		serviceReadWritePort: c.ReadWritePort,
 
 		installSSHKey:             c.InstallSSHKey,
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
