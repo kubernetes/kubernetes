@@ -64,7 +64,7 @@ func TestListPods(t *testing.T) {
 
 func TestListPodsLabels(t *testing.T) {
 	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Default.Version())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",

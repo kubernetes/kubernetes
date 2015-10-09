@@ -305,7 +305,7 @@ func handleVersion(req *restful.Request, resp *restful.Response) {
 func APIVersionHandler(versions ...string) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, api.APIVersions{Versions: versions}, resp.ResponseWriter)
+		writeRawJSON(http.StatusOK, unversioned.APIVersions{Versions: versions}, resp.ResponseWriter)
 	}
 }
 

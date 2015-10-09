@@ -60,7 +60,7 @@ func TestListServices(t *testing.T) {
 
 func TestListServicesLabels(t *testing.T) {
 	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Default.Version())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
