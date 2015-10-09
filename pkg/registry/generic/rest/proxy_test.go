@@ -388,7 +388,7 @@ func TestDefaultProxyTransport(t *testing.T) {
 		h := UpgradeAwareProxyHandler{
 			Location: locURL,
 		}
-		result := h.defaultProxyTransport(URL)
+		result := h.defaultProxyTransport(URL, nil)
 		transport := result.(*corsRemovingTransport).RoundTripper.(*proxy.Transport)
 		if transport.Scheme != test.expectedScheme {
 			t.Errorf("%s: unexpected scheme. Actual: %s, Expected: %s", test.name, transport.Scheme, test.expectedScheme)
