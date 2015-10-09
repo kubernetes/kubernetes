@@ -79,7 +79,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]string{
 				"":             "v1",
-				"experimental": "extensions/v1beta1",
+				"extensions": "extensions/v1beta1",
 			},
 		},
 		{
@@ -87,7 +87,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]string{
 				"":             "v1",
-				"experimental": "extensions/v1beta1",
+				"extensions": "extensions/v1beta1",
 			},
 		},
 		{
@@ -123,7 +123,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
 		},
 		{
-			apigroup: "experimental",
+			apigroup: "extensions",
 			resource: "resource",
 			servers:  []string{"http://127.0.0.1:10000"},
 		},

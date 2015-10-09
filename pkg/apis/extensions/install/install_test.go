@@ -50,7 +50,7 @@ func TestCodec(t *testing.T) {
 	daemonSet := experimental.DaemonSet{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("experimental").Codec.Encode(&daemonSet)
+	data, err := latest.GroupOrDie("extensions").Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,33 +58,33 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("experimental").GroupVersion || other.Kind != "DaemonSet" {
+	if other.APIVersion != latest.GroupOrDie("extensions").GroupVersion || other.Kind != "DaemonSet" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("experimental").InterfacesFor(""); err == nil {
+	if _, err := latest.GroupOrDie("extensions").InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]string{latest.GroupOrDie("experimental").GroupVersion}, latest.GroupOrDie("experimental").GroupVersions...) {
-		if vi, err := latest.GroupOrDie("experimental").InterfacesFor(groupVersion); err != nil || vi == nil {
+	for i, groupVersion := range append([]string{latest.GroupOrDie("extensions").GroupVersion}, latest.GroupOrDie("extensions").GroupVersions...) {
+		if vi, err := latest.GroupOrDie("extensions").InterfacesFor(groupVersion); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := latest.GroupOrDie("experimental").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "extensions/v1beta1" || k != "HorizontalPodAutoscaler" {
+	if v, k, err := latest.GroupOrDie("extensions").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "extensions/v1beta1" || k != "HorizontalPodAutoscaler" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 
-	if m, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "extensions/v1beta1" || m.Resource != "daemonsets" {
+	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "extensions/v1beta1" || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, groupVersion := range latest.GroupOrDie("experimental").GroupVersions {
-		mapping, err := latest.GroupOrDie("experimental").RESTMapper.RESTMapping("HorizontalPodAutoscaler", groupVersion)
+	for _, groupVersion := range latest.GroupOrDie("extensions").GroupVersions {
+		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("HorizontalPodAutoscaler", groupVersion)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -96,7 +96,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("experimental").InterfacesFor(groupVersion)
+		interfaces, _ := latest.GroupOrDie("extensions").InterfacesFor(groupVersion)
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

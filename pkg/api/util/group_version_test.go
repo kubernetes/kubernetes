@@ -51,7 +51,7 @@ func TestGetGroup(t *testing.T) {
 		},
 		{
 			"extensions/v1beta1",
-			"experimental",
+			"extensions",
 		},
 	}
 	for _, test := range testCases {

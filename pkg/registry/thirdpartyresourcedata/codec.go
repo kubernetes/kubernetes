@@ -59,7 +59,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, groupVersions ..
 	if kind != "ThirdPartyResourceData" {
 		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
 	}
-	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("experimental").GroupVersion)
+	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("extensions").GroupVersion)
 	if err != nil {
 		return nil, err
 	}
