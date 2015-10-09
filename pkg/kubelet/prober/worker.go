@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
@@ -75,7 +76,7 @@ func run(m *manager, w *worker) {
 		// Clean up.
 		probeTicker.Stop()
 		if !w.containerID.IsEmpty() {
-			m.readinessCache.removeReadiness(w.containerID)
+			m.readinessCache.Remove(w.containerID)
 		}
 
 		m.removeReadinessProbe(w.pod.UID, w.container.Name)
@@ -122,7 +123,7 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 
 	if w.containerID.String() != c.ContainerID {
 		if !w.containerID.IsEmpty() {
-			m.readinessCache.removeReadiness(w.containerID)
+			m.readinessCache.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 	}
@@ -130,7 +131,7 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 	if c.State.Running == nil {
 		glog.V(3).Infof("Non-running container probed: %v - %v",
 			kubeutil.FormatPodName(w.pod), w.container.Name)
-		m.readinessCache.setReadiness(w.containerID, false)
+		m.readinessCache.Set(w.containerID, results.Failure)
 		// Abort if the container will not be restarted.
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != api.RestartPolicyNever
@@ -138,14 +139,14 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 
 	if int64(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
 		// Readiness defaults to false during the initial delay.
-		m.readinessCache.setReadiness(w.containerID, false)
+		m.readinessCache.Set(w.containerID, results.Failure)
 		return true
 	}
 
 	// TODO: Move error handling out of prober.
 	result, _ := m.prober.ProbeReadiness(w.pod, status, w.container, w.containerID)
 	if result != probe.Unknown {
-		m.readinessCache.setReadiness(w.containerID, result != probe.Failure)
+		m.readinessCache.Set(w.containerID, result != probe.Failure)
 	}
 
 	return true
