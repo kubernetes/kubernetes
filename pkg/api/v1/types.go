@@ -135,7 +135,7 @@ type ObjectMeta struct {
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
-	// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+	// Clients may not set this value. It is represented in RFC3339NANO form and is in UTC.
 	//
 	// Populated by the system.
 	// Read-only.
@@ -143,7 +143,7 @@ type ObjectMeta struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	CreationTimestamp unversioned.Time `json:"creationTimestamp,omitempty"`
 
-	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
+	// DeletionTimestamp is RFC3339NANO date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
 	// directly settable by a client. The resource will be deleted (no longer visible from
 	// resource lists, and not reachable by name) after the time in this field. Once set, this
@@ -1266,7 +1266,7 @@ type PodStatus struct {
 	// Empty if not yet allocated.
 	PodIP string `json:"podIP,omitempty"`
 
-	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
+	// RFC3339NANO date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.
 	StartTime *unversioned.Time `json:"startTime,omitempty"`
 
@@ -2013,7 +2013,7 @@ type PodLogOptions struct {
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceSeconds *int64 `json:"sinceSeconds,omitempty"`
-	// An RFC3339 timestamp from which to show logs. If this value
+	// A RFC3339NANO timestamp from which to show logs. If this value
 	// preceeds the time a pod was started, only logs since the pod start will be returned.
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.

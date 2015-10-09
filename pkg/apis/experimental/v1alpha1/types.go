@@ -430,12 +430,12 @@ type JobStatus struct {
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
 	// It is not guaranteed to be set in happens-before order across separate operations.
-	// It is represented in RFC3339 form and is in UTC.
+	// It is represented in RFC3339NANO form and is in UTC.
 	StartTime *unversioned.Time `json:"startTime,omitempty"`
 
 	// CompletionTime represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
-	// It is represented in RFC3339 form and is in UTC.
+	// It is represented in RFC3339NANO form and is in UTC.
 	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
 
 	// Active is the number of actively running pods.
