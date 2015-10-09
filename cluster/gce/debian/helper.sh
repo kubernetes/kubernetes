@@ -63,6 +63,11 @@ EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
 EOF
   fi
+  if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
+    cat >>$file <<EOF
+TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
+EOF
+  fi
   if [ -n "${TEST_CLUSTER:-}" ]; then
     cat >>$file <<EOF
 TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})

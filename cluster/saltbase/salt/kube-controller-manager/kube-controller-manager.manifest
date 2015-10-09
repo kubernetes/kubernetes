@@ -1,6 +1,8 @@
 {% set cluster_name = "" -%}
 {% set cluster_cidr = "" -%}
 {% set allocate_node_cidrs = "" -%}
+{% set terminated_pod_gc = "" -%}
+
 
 {% if pillar['instance_prefix'] is defined -%}
   {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
@@ -10,6 +12,9 @@
 {% endif -%}
 {% if pillar['allocate_node_cidrs'] is defined -%}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
+{% endif -%}
+{% if pillar['terminated_pod_gc_threshold'] is defined -%}
+  {% set terminated_pod_gc = "--terminated-pod-gc-threshold=" + pillar['terminated_pod_gc_threshold'] -%}
 {% endif -%}
 
 {% set cloud_provider = "" -%}
@@ -34,7 +39,8 @@
    {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
-{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
+{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
+
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['controller_manager_test_args'] is defined -%}
