@@ -27,6 +27,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	appcschema "github.com/appc/spec/schema"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 const (
@@ -1099,8 +1101,25 @@ func (r *Runtime) RunInContainer(containerID kubecontainer.ContainerID, cmd []st
 	args := append([]string{}, "enter", fmt.Sprintf("--app=%s", id.appName), id.uuid)
 	args = append(args, cmd...)
 
-	result, err := r.runCommand(args...)
-	return []byte(strings.Join(result, "\n")), err
+	result, err := r.buildCommand(args...).CombinedOutput()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			err = &rktExitError{exitErr}
+		}
+	}
+	return result, err
+}
+
+// rktExitError implemets /pkg/util/exec.ExitError interface.
+type rktExitError struct{ *exec.ExitError }
+
+var _ utilexec.ExitError = &rktExitError{}
+
+func (r *rktExitError) ExitStatus() int {
+	if status, ok := r.Sys().(syscall.WaitStatus); ok {
+		return status.ExitStatus()
+	}
+	return 0
 }
 
 func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
