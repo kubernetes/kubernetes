@@ -433,7 +433,7 @@ type kubeletExecutor struct {
 	clientConfig    *client.Config
 }
 
-func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions *kubelet.TLSOptions, enableDebuggingHandlers bool) {
+func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions *kubelet.TLSOptions, auth kubelet.AuthInterface, enableDebuggingHandlers bool) {
 	// this func could be called many times, depending how often the HTTP server crashes,
 	// so only execute certain initialization procs once
 	kl.initialize.Do(func() {
@@ -445,7 +445,7 @@ func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions 
 		}()
 	})
 	log.Infof("Starting kubelet server...")
-	kubelet.ListenAndServeKubeletServer(kl, address, port, tlsOptions, enableDebuggingHandlers)
+	kubelet.ListenAndServeKubeletServer(kl, address, port, tlsOptions, auth, enableDebuggingHandlers)
 }
 
 // runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
