@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
