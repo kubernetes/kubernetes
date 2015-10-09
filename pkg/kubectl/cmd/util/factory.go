@@ -532,3 +532,11 @@ func (f *Factory) ClientMapperForCommand() resource.ClientMapper {
 		return f.RESTClient(mapping)
 	})
 }
+
+// NilClientMapperForCommand returns a ClientMapper which always returns nil.
+// When command is running locally and client isn't needed, this mapper can be parsed to NewBuilder.
+func (f *Factory) NilClientMapperForCommand() resource.ClientMapper {
+	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+		return nil, nil
+	})
+}
