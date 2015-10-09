@@ -139,6 +139,9 @@ type DockerManager struct {
 
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
+
+	// Container GC manager
+	containerGC *containerGC
 }
 
 func NewDockerManager(
@@ -214,6 +217,7 @@ func NewDockerManager(
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm, imageBackOff)
+	dm.containerGC = NewContainerGC(client, containerLogsDir)
 
 	return dm
 }
@@ -2018,4 +2022,9 @@ func (dm *DockerManager) GetNetNs(containerID kubecontainer.ContainerID) (string
 	}
 	netnsPath := fmt.Sprintf(DockerNetnsFmt, inspectResult.State.Pid)
 	return netnsPath, nil
+}
+
+// Garbage collection of dead containers
+func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
+	return dm.containerGC.GarbageCollect(gcPolicy)
 }
