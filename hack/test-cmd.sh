@@ -136,6 +136,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
+  --runtime_config="extensions/v1beta1=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -190,22 +191,20 @@ runTests() {
   #######################
 
   # Make sure the UI can be proxied
-  start-proxy --api-prefix=/
+  start-proxy
   check-curl-proxy-code /ui 301
   check-curl-proxy-code /metrics 200
-  if [[ -n "${version}" ]]; then
-    check-curl-proxy-code /api/${version}/namespaces 200
-  fi
-  stop-proxy
-
-  # Default proxy locks you into the /api path (legacy behavior)
-  start-proxy
-  check-curl-proxy-code /ui 404
-  check-curl-proxy-code /metrics 404
   check-curl-proxy-code /api/ui 404
   if [[ -n "${version}" ]]; then
     check-curl-proxy-code /api/${version}/namespaces 200
   fi
+  check-curl-proxy-code /healthz/ 200
+  stop-proxy
+
+  # Make sure the in-development api is accessible by default
+  start-proxy
+  check-curl-proxy-code /apis 200
+  check-curl-proxy-code /apis/extensions/ 200
   stop-proxy
 
   # Custom paths let you see everything.
