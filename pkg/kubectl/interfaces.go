@@ -23,7 +23,7 @@ import client "k8s.io/kubernetes/pkg/client/unversioned"
 type RESTClient interface {
 	Get() *client.Request
 	Post() *client.Request
-	Patch(unversioned.PatchType) *client.Request
+	Patch(api.PatchType) *client.Request
 	Delete() *client.Request
 	Put() *client.Request
 }

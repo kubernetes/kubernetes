@@ -50,7 +50,7 @@ func (c *RESTClient) Put() *unversioned.Request {
 	return unversioned.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
-func (c *RESTClient) Patch(_ unversioned.PatchType) *unversioned.Request {
+func (c *RESTClient) Patch(_ api.PatchType) *unversioned.Request {
 	return unversioned.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
 }
 
