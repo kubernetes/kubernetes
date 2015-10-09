@@ -67,7 +67,7 @@ func TestAuthenticatedClientV2(t *testing.T) {
 				"versions": {
 					"values": [
 						{
-							"status": "extensions",
+							"status": "experimental",
 							"id": "v3.0",
 							"links": [
 								{ "href": "%s", "rel": "self" }
