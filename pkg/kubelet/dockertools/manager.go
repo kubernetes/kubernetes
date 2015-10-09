@@ -47,6 +47,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -729,6 +730,8 @@ func (dm *DockerManager) runContainer(
 	}
 
 	_, containerName := BuildDockerName(dockerName, container)
+	// If annotation is present then time the results
+	creatContainerOptionsTiming := kubeletutil.RecordStartTimeByAnnotation(pod)
 	dockerOpts := docker.CreateContainerOptions{
 		Name: containerName,
 		Config: &docker.Config{
@@ -756,6 +759,7 @@ func (dm *DockerManager) runContainer(
 	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
+	kubeletutil.RecordEndTimeByAnnotation(creatContainerOptionsTiming, pod, "CreateContainer")
 	if err != nil {
 		dm.recorder.Eventf(ref, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 		return kubecontainer.ContainerID{}, err
@@ -816,13 +820,15 @@ func (dm *DockerManager) runContainer(
 	}
 	securityContextProvider.ModifyHostConfig(pod, container, hc)
 
+	// If annotation then time then record the time
+	startcontainerTiming := kubeletutil.RecordStartTimeByAnnotation(pod)
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		dm.recorder.Eventf(ref, kubecontainer.FailedToStartContainer,
 			"Failed to start container with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
 	}
 	dm.recorder.Eventf(ref, kubecontainer.StartedContainer, "Started container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
-
+	kubeletutil.RecordEndTimeByAnnotation(startcontainerTiming, pod, "StartContainer")
 	return kubetypes.DockerID(dockerContainer.ID).ContainerID(), nil
 }
 
