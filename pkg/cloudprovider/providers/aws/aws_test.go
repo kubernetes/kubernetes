@@ -83,9 +83,9 @@ func TestReadAWSCloudConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
-		var metadata AWSMetadata
+		var metadata EC2Metadata
 		if test.aws != nil {
-			metadata = test.aws.Metadata()
+			metadata, _ = test.aws.Metadata()
 		}
 		cfg, err := readAWSCloudConfig(test.reader, metadata)
 		if test.expectError {
@@ -132,8 +132,8 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.instanceId = "i-self"
 	s.privateDnsName = "ip-172-20-0-100.ec2.internal"
 	var selfInstance ec2.Instance
-	selfInstance.InstanceID = &s.instanceId
-	selfInstance.PrivateDNSName = &s.privateDnsName
+	selfInstance.InstanceId = &s.instanceId
+	selfInstance.PrivateDnsName = &s.privateDnsName
 	s.instances = []*ec2.Instance{&selfInstance}
 
 	var tag ec2.Tag
@@ -166,8 +166,8 @@ func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 	return s.asg, nil
 }
 
-func (s *FakeAWSServices) Metadata() AWSMetadata {
-	return s.metadata
+func (s *FakeAWSServices) Metadata() (EC2Metadata, error) {
+	return s.metadata, nil
 }
 
 func TestFilterTags(t *testing.T) {
@@ -263,10 +263,10 @@ func contains(haystack []*string, needle string) bool {
 func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 	name := *filter.Name
 	if name == "private-dns-name" {
-		if instance.PrivateDNSName == nil {
+		if instance.PrivateDnsName == nil {
 			return false
 		}
-		return contains(filter.Values, *instance.PrivateDNSName)
+		return contains(filter.Values, *instance.PrivateDnsName)
 	}
 	panic("Unknown filter name: " + name)
 }
@@ -274,15 +274,15 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 func (self *FakeEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
 	matches := []*ec2.Instance{}
 	for _, instance := range self.aws.instances {
-		if request.InstanceIDs != nil {
-			if instance.InstanceID == nil {
+		if request.InstanceIds != nil {
+			if instance.InstanceId == nil {
 				glog.Warning("Instance with no instance id: ", instance)
 				continue
 			}
 
 			found := false
-			for _, instanceId := range request.InstanceIDs {
-				if *instanceId == *instance.InstanceID {
+			for _, instanceId := range request.InstanceIds {
+				if *instanceId == *instance.InstanceId {
 					found = true
 					break
 				}
@@ -313,31 +313,31 @@ type FakeMetadata struct {
 	aws *FakeAWSServices
 }
 
-func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
+func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 	networkInterfacesPrefix := "network/interfaces/macs/"
 	if key == "placement/availability-zone" {
-		return []byte(self.aws.availabilityZone), nil
+		return self.aws.availabilityZone, nil
 	} else if key == "instance-id" {
-		return []byte(self.aws.instanceId), nil
+		return self.aws.instanceId, nil
 	} else if key == "local-hostname" {
-		return []byte(self.aws.privateDnsName), nil
+		return self.aws.privateDnsName, nil
 	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
 		if key == networkInterfacesPrefix {
-			return []byte(strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n"), nil
+			return strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n", nil
 		} else {
 			keySplit := strings.Split(key, "/")
 			macParam := keySplit[3]
 			if len(keySplit) == 5 && keySplit[4] == "vpc-id" {
 				for i, macElem := range self.aws.networkInterfacesMacs {
 					if macParam == macElem {
-						return []byte(self.aws.networkInterfacesVpcIDs[i]), nil
+						return self.aws.networkInterfacesVpcIDs[i], nil
 					}
 				}
 			}
-			return nil, nil
+			return "", nil
 		}
 	} else {
-		return nil, nil
+		return "", nil
 	}
 }
 
@@ -381,7 +381,7 @@ func (ec2 *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressIn
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVPCsInput) ([]*ec2.VPC, error) {
+func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVpcsInput) ([]*ec2.Vpc, error) {
 	panic("Not implemented")
 }
 
@@ -500,8 +500,8 @@ func TestList(t *testing.T) {
 		Value: aws.String("foo"),
 	}
 	instance0.Tags = []*ec2.Tag{&tag0}
-	instance0.InstanceID = aws.String("instance0")
-	instance0.PrivateDNSName = aws.String("instance0.ec2.internal")
+	instance0.InstanceId = aws.String("instance0")
+	instance0.PrivateDnsName = aws.String("instance0.ec2.internal")
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -513,8 +513,8 @@ func TestList(t *testing.T) {
 		Value: aws.String("bar"),
 	}
 	instance1.Tags = []*ec2.Tag{&tag1}
-	instance1.InstanceID = aws.String("instance1")
-	instance1.PrivateDNSName = aws.String("instance1.ec2.internal")
+	instance1.InstanceId = aws.String("instance1")
+	instance1.PrivateDnsName = aws.String("instance1.ec2.internal")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -526,8 +526,8 @@ func TestList(t *testing.T) {
 		Value: aws.String("baz"),
 	}
 	instance2.Tags = []*ec2.Tag{&tag2}
-	instance2.InstanceID = aws.String("instance2")
-	instance2.PrivateDNSName = aws.String("instance2.ec2.internal")
+	instance2.InstanceId = aws.String("instance2")
+	instance2.PrivateDnsName = aws.String("instance2.ec2.internal")
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -539,8 +539,8 @@ func TestList(t *testing.T) {
 		Value: aws.String("quux"),
 	}
 	instance3.Tags = []*ec2.Tag{&tag3}
-	instance3.InstanceID = aws.String("instance3")
-	instance3.PrivateDNSName = aws.String("instance3.ec2.internal")
+	instance3.InstanceId = aws.String("instance3")
+	instance3.PrivateDnsName = aws.String("instance3.ec2.internal")
 	state3 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -585,10 +585,10 @@ func TestNodeAddresses(t *testing.T) {
 	var instance1 ec2.Instance
 
 	//0
-	instance0.InstanceID = aws.String("instance-same")
-	instance0.PrivateDNSName = aws.String("instance-same.ec2.internal")
-	instance0.PrivateIPAddress = aws.String("192.168.0.1")
-	instance0.PublicIPAddress = aws.String("1.2.3.4")
+	instance0.InstanceId = aws.String("instance-same")
+	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
+	instance0.PrivateIpAddress = aws.String("192.168.0.1")
+	instance0.PublicIpAddress = aws.String("1.2.3.4")
 	instance0.InstanceType = aws.String("c3.large")
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -596,9 +596,9 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.State = &state0
 
 	//1
-	instance1.InstanceID = aws.String("instance-same")
-	instance1.PrivateDNSName = aws.String("instance-same.ec2.internal")
-	instance1.PrivateIPAddress = aws.String("192.168.0.2")
+	instance1.InstanceId = aws.String("instance-same")
+	instance1.PrivateDnsName = aws.String("instance-same.ec2.internal")
+	instance1.PrivateIpAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),

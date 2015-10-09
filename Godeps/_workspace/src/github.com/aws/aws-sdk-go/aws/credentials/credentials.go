@@ -63,6 +63,7 @@ import (
 //     svc := s3.New(&aws.Config{Credentials: AnonymousCredentials})
 //     // Access public S3 buckets.
 //
+// @readonly
 var AnonymousCredentials = NewStaticCredentials("", "", "")
 
 // A Value is the AWS credentials value for individual credential fields.
@@ -91,6 +92,50 @@ type Provider interface {
 	// IsExpired returns if the credentials are no longer valid, and need
 	// to be retrieved.
 	IsExpired() bool
+}
+
+// A Expiry provides shared expiration logic to be used by credentials
+// providers to implement expiry functionality.
+//
+// The best method to use this struct is as an anonymous field within the
+// provider's struct.
+//
+// Example:
+//     type EC2RoleProvider struct {
+//         Expiry
+//         ...
+//     }
+type Expiry struct {
+	// The date/time when to expire on
+	expiration time.Time
+
+	// If set will be used by IsExpired to determine the current time.
+	// Defaults to time.Now if CurrentTime is not set.  Available for testing
+	// to be able to mock out the current time.
+	CurrentTime func() time.Time
+}
+
+// SetExpiration sets the expiration IsExpired will check when called.
+//
+// If window is greater than 0 the expiration time will be reduced by the
+// window value.
+//
+// Using a window is helpful to trigger credentials to expire sooner than
+// the expiration time given to ensure no requests are made with expired
+// tokens.
+func (e *Expiry) SetExpiration(expiration time.Time, window time.Duration) {
+	e.expiration = expiration
+	if window > 0 {
+		e.expiration = e.expiration.Add(-window)
+	}
+}
+
+// IsExpired returns if the credentials are expired.
+func (e *Expiry) IsExpired() bool {
+	if e.CurrentTime == nil {
+		e.CurrentTime = time.Now
+	}
+	return e.expiration.Before(e.CurrentTime())
 }
 
 // A Credentials provides synchronous safe retrieval of AWS credentials Value.
@@ -173,6 +218,3 @@ func (c *Credentials) IsExpired() bool {
 func (c *Credentials) isExpired() bool {
 	return c.forceRefresh || c.provider.IsExpired()
 }
-
-// Provide a stub-able time.Now for unit tests so expiry can be tested.
-var currentTime = time.Now
