@@ -394,9 +394,9 @@ func (s *APIServer) Run(_ []string) error {
 	disableV1 := disableAllAPIs
 	disableV1 = !s.getRuntimeConfigValue("api/v1", !disableV1)
 
-	// "experimental/v1alpha1={true|false} allows users to enable/disable the experimental API.
+	// "extensions/v1beta1={true|false} allows users to enable/disable the experimental API.
 	// This takes preference over api/all, if specified.
-	enableExp := s.getRuntimeConfigValue("experimental/v1alpha1", false)
+	enableExp := s.getRuntimeConfigValue("extensions/v1beta1", false)
 
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),

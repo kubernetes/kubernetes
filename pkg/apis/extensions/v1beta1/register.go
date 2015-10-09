@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var Codec = runtime.CodecFor(api.Scheme, "experimental/v1alpha1")
+var Codec = runtime.CodecFor(api.Scheme, "extensions/v1beta1")
 
 func init() {
 	addKnownTypes()
@@ -31,7 +31,7 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("experimental/v1alpha1",
+	api.Scheme.AddKnownTypes("extensions/v1beta1",
 		&Deployment{},
 		&DeploymentList{},
 		&HorizontalPodAutoscaler{},
