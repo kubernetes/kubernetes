@@ -33,9 +33,9 @@ import (
 )
 
 var (
-	Groups       = make(map[string]TestGroup)
-	Default      TestGroup
-	Experimental TestGroup
+	Groups     = make(map[string]TestGroup)
+	Default    TestGroup
+	Extensions TestGroup
 )
 
 type TestGroup struct {
@@ -71,7 +71,7 @@ func init() {
 	}
 
 	Default = Groups[""]
-	Experimental = Groups["extensions"]
+	Extensions = Groups["extensions"]
 }
 
 // Version returns the API version to test against, as set by the KUBE_TEST_API env var.
