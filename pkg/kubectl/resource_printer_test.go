@@ -1236,22 +1236,22 @@ func TestTranslateTimestamp(t *testing.T) {
 
 func TestPrintDeployment(t *testing.T) {
 	tests := []struct {
-		deployment experimental.Deployment
+		deployment extensions.Deployment
 		expect     string
 	}{
 		{
-			experimental.Deployment{
+			extensions.Deployment{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: experimental.DeploymentSpec{
+				Spec: extensions.DeploymentSpec{
 					Replicas: 5,
 					Template: &api.PodTemplateSpec{
 						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
 					},
 				},
-				Status: experimental.DeploymentStatus{
+				Status: extensions.DeploymentStatus{
 					Replicas:        10,
 					UpdatedReplicas: 2,
 				},

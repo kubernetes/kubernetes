@@ -36,15 +36,15 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
 	return storage, statusStorage, fakeClient
 }
 
-func validNewJob() *experimental.Job {
+func validNewJob() *extensions.Job {
 	completions := 1
 	parallelism := 1
-	return &experimental.Job{
+	return &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Completions: &completions,
 			Parallelism: &parallelism,
 			Selector:    map[string]string{"a": "b"},
@@ -77,8 +77,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		validJob,
 		// invalid (empty selector)
-		&experimental.Job{
-			Spec: experimental.JobSpec{
+		&extensions.Job{
+			Spec: extensions.JobSpec{
 				Completions: validJob.Spec.Completions,
 				Selector:    map[string]string{},
 				Template:    validJob.Spec.Template,
@@ -96,18 +96,18 @@ func TestUpdate(t *testing.T) {
 		validNewJob(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.Job)
+			object := obj.(*extensions.Job)
 			object.Spec.Parallelism = &two
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.Job)
+			object := obj.(*extensions.Job)
 			object.Spec.Selector = map[string]string{}
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.Job)
+			object := obj.(*extensions.Job)
 			object.Spec.Completions = &two
 			return object
 		},

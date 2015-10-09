@@ -34,13 +34,13 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
 	return storage, statusStorage, fakeClient
 }
 
-func newValidDaemonSet() *experimental.DaemonSet {
-	return &experimental.DaemonSet{
+func newValidDaemonSet() *extensions.DaemonSet {
+	return &extensions.DaemonSet{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: experimental.DaemonSetSpec{
+		Spec: extensions.DaemonSetSpec{
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -73,8 +73,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		ds,
 		// invalid (invalid selector)
-		&experimental.DaemonSet{
-			Spec: experimental.DaemonSetSpec{
+		&extensions.DaemonSet{
+			Spec: extensions.DaemonSetSpec{
 				Selector: map[string]string{},
 				Template: validDaemonSet.Spec.Template,
 			},
@@ -90,28 +90,28 @@ func TestUpdate(t *testing.T) {
 		newValidDaemonSet(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.DaemonSet)
+			object := obj.(*extensions.DaemonSet)
 			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.DaemonSet)
+			object := obj.(*extensions.DaemonSet)
 			object.UID = "newUID"
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.DaemonSet)
+			object := obj.(*extensions.DaemonSet)
 			object.Name = ""
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.DaemonSet)
+			object := obj.(*extensions.DaemonSet)
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.DaemonSet)
+			object := obj.(*extensions.DaemonSet)
 			object.Spec.Selector = map[string]string{}
 			return object
 		},

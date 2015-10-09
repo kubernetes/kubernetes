@@ -47,12 +47,12 @@ type MetricsClient interface {
 
 type ResourceConsumptionClient interface {
 	// Gets average resource consumption for pods under the given selector.
-	Get(resourceName api.ResourceName, selector map[string]string) (*experimental.ResourceConsumption, error)
+	Get(resourceName api.ResourceName, selector map[string]string) (*extensions.ResourceConsumption, error)
 }
 
 // Aggregates results into ResourceConsumption. Also returns number of
 // pods included in the aggregation.
-type metricAggregator func(heapster.MetricResultList) (experimental.ResourceConsumption, int)
+type metricAggregator func(heapster.MetricResultList) (extensions.ResourceConsumption, int)
 
 type metricDefinition struct {
 	name       string
@@ -76,23 +76,23 @@ func NewHeapsterMetricsClient(client client.Interface) *HeapsterMetricsClient {
 
 var heapsterMetricDefinitions = map[api.ResourceName]metricDefinition{
 	api.ResourceCPU: {"cpu-usage",
-		func(metrics heapster.MetricResultList) (experimental.ResourceConsumption, int) {
+		func(metrics heapster.MetricResultList) (extensions.ResourceConsumption, int) {
 			sum, count := calculateSumFromLatestSample(metrics)
 			value := "0"
 			if count > 0 {
 				// assumes that cpu usage is in millis
 				value = fmt.Sprintf("%dm", sum/uint64(count))
 			}
-			return experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(value)}, count
+			return extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(value)}, count
 		}},
 	api.ResourceMemory: {"memory-usage",
-		func(metrics heapster.MetricResultList) (experimental.ResourceConsumption, int) {
+		func(metrics heapster.MetricResultList) (extensions.ResourceConsumption, int) {
 			sum, count := calculateSumFromLatestSample(metrics)
 			value := int64(0)
 			if count > 0 {
 				value = int64(sum) / int64(count)
 			}
-			return experimental.ResourceConsumption{Resource: api.ResourceMemory, Quantity: *resource.NewQuantity(value, resource.DecimalSI)}, count
+			return extensions.ResourceConsumption{Resource: api.ResourceMemory, Quantity: *resource.NewQuantity(value, resource.DecimalSI)}, count
 		}},
 }
 
@@ -104,7 +104,7 @@ func (h *HeapsterMetricsClient) ResourceConsumption(namespace string) ResourceCo
 	}
 }
 
-func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, selector map[string]string) (*experimental.ResourceConsumption, error) {
+func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, selector map[string]string) (*extensions.ResourceConsumption, error) {
 	podList, err := h.client.Pods(h.namespace).
 		List(labels.SelectorFromSet(labels.Set(selector)), fields.Everything())
 
@@ -118,7 +118,7 @@ func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, s
 	return h.getForPods(resourceName, podNames)
 }
 
-func (h *HeapsterResourceConsumptionClient) getForPods(resourceName api.ResourceName, podNames []string) (*experimental.ResourceConsumption, error) {
+func (h *HeapsterResourceConsumptionClient) getForPods(resourceName api.ResourceName, podNames []string) (*extensions.ResourceConsumption, error) {
 	metricSpec, metricDefined := h.resourceDefinitions[resourceName]
 	if !metricDefined {
 		return nil, fmt.Errorf("heapster metric not defined for %v", resourceName)

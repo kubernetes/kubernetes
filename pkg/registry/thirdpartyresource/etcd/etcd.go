@@ -38,8 +38,8 @@ func NewREST(s storage.Interface) *REST {
 	prefix := "/thirdpartyresources"
 
 	store := &etcdgeneric.Etcd{
-		NewFunc:     func() runtime.Object { return &experimental.ThirdPartyResource{} },
-		NewListFunc: func() runtime.Object { return &experimental.ThirdPartyResourceList{} },
+		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResource{} },
+		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceList{} },
 		KeyRootFunc: func(ctx api.Context) string {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
@@ -47,7 +47,7 @@ func NewREST(s storage.Interface) *REST {
 			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*experimental.ThirdPartyResource).Name, nil
+			return obj.(*extensions.ThirdPartyResource).Name, nil
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return thirdpartyresource.Matcher(label, field)

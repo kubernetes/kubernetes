@@ -122,7 +122,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	return fakeClient
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *experimental.ResourceConsumption, err error) {
+func (tc *testCase) verifyResults(t *testing.T, val *extensions.ResourceConsumption, err error) {
 	assert.Equal(t, tc.desiredError, err)
 	if tc.desiredError != nil {
 		return

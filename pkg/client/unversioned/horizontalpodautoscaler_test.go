@@ -33,7 +33,7 @@ func getHorizontalPodAutoscalersResoureName() string {
 
 func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -58,7 +58,7 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 
 func TestHorizontalPodAutoscalerGet(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -80,8 +80,8 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 
 func TestHorizontalPodAutoscalerList(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscalerList := &experimental.HorizontalPodAutoscalerList{
-		Items: []experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscalerList := &extensions.HorizontalPodAutoscalerList{
+		Items: []extensions.HorizontalPodAutoscaler{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
@@ -105,7 +105,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 
 func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,
