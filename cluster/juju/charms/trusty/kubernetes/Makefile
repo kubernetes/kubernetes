@@ -6,7 +6,7 @@ virtualenv:
 	.venv/bin/pip install -q -r requirements.txt
 
 lint: virtualenv
-	@.venv/bin/flake8 hooks --exclude=charmhelpers
+	@.venv/bin/flake8 hooks --exclude=charmhelpers --ignore=W391
 	@.venv/bin/charm proof
 
 test: virtualenv 
