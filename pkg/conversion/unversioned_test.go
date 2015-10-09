@@ -65,7 +65,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 
 func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	// TODO: caesarxuchao: use the testapi.Experimental.Codec() once the PR that
-	// moves experimental from v1 to v1alpha1 got merged.
+	// moves experimental from v1 to v1beta1 got merged.
 	// expCodec := testapi.Experimental.Codec()
 	expCodec := runtime.CodecFor(api.Scheme, "extensions/v1beta1")
 	encoded, err := expCodec.Encode(status)
