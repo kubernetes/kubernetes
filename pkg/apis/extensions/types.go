@@ -26,7 +26,7 @@ beyond registration differences. In other words, experimental API group
 support is experimental.
 */
 
-package experimental
+package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
