@@ -69,22 +69,22 @@ case "$1" in
 	start)
 		fail_unless_root
 		log_begin_msg "Starting $FLANNEL_DESC: $BASE"
-        $KUBE_APISERVER_START
+        $FLANNEL_START
 		log_end_msg $?
 		;;
 
 	stop)
 		fail_unless_root
 		log_begin_msg "Stopping $FLANNEL_DESC: $BASE"
-		$KUBE_APISERVER_STOP
+		$FLANNEL_STOP
 		log_end_msg $?
 		;;
 
 	restart | force-reload)
 		fail_unless_root
 		log_begin_msg "Stopping $FLANNEL_DESC: $BASE"
-		$KUBE_APISERVER_STOP
-		$KUBE_APISERVER_START
+		$FLANNEL_STOP
+		$FLANNEL_START
 		log_end_msg $?
 		;;
 
