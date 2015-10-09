@@ -25,6 +25,8 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
+TEST_ARGS="$@"
+
 SMOKE_TEST_FOCUS_REGEX="Guestbook.application"
 
-exec "${KUBE_ROOT}/cluster/test-e2e.sh" -ginkgo.focus="${SMOKE_TEST_FOCUS_REGEX}"
+exec "${KUBE_ROOT}/cluster/test-e2e.sh" -ginkgo.focus="${SMOKE_TEST_FOCUS_REGEX}" ${TEST_ARGS}
