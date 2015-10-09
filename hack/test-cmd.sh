@@ -775,8 +775,7 @@ __EOF__
     kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'mock:'
     # Command
     # kubectl create -f $file "${kube_flags[@]}" # test fails here now
-    # TODO: test get when PR "Fix get with List #14888" is merged
-    # kubectl get -f $file "${kube_flags[@]}"
+    kubectl get -f $file "${kube_flags[@]}"
     kubectl describe -f $file "${kube_flags[@]}"
     # Command
     # TODO: remove --validate=false when PR "Add validate support for list kind #14726" is merged
