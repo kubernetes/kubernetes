@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	"github.com/emicklei/go-restful"
 )
