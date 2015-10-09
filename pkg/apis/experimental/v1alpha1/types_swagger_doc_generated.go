@@ -315,8 +315,8 @@ func (JobSpec) SwaggerDoc() map[string]string {
 var map_JobStatus = map[string]string{
 	"":               "JobStatus represents the current state of a Job.",
 	"conditions":     "Conditions represent the latest available observations of an object's current state. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md",
-	"startTime":      "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-	"completionTime": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+	"startTime":      "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339NANO form and is in UTC.",
+	"completionTime": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339NANO form and is in UTC.",
 	"active":         "Active is the number of actively running pods.",
 	"successful":     "Successful is the number of pods which reached Phase Succeeded.",
 	"unsuccessful":   "Unsuccessful is the number of pods which reached Phase Failed.",
