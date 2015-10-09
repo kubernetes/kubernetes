@@ -29,13 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	_ "k8s.io/kubernetes/pkg/apis/experimental"
+	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/experimental"
+const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 
 var accessor = meta.NewAccessor()
 

@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/controller"
 	"k8s.io/kubernetes/pkg/registry/controller/etcd"
 
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Container includes dummy storage for RC pods and experimental storage for Scale.
