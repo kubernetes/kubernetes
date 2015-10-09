@@ -501,11 +501,13 @@ type IngressList struct {
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
 	// A default backend capable of servicing requests that don't match any
-	// IngressRule. It is optional to allow the loadbalancer controller or
-	// defaulting logic to specify a global default.
+	// rule. At least one of 'backend' or 'rules' must be specified. This field
+	// is optional to allow the loadbalancer controller or defaulting logic to
+	// specify a global default.
 	Backend *IngressBackend `json:"backend,omitempty"`
-	// A list of host rules used to configure the Ingress.
-	Rules []IngressRule `json:"rules"`
+	// A list of host rules used to configure the Ingress. If unspecified, or
+	// no rule matches, all traffic is sent to the default backend.
+	Rules []IngressRule `json:"rules,omitempty"`
 	// TODO: Add the ability to specify load-balancer IP through claims
 }
 
@@ -516,7 +518,8 @@ type IngressStatus struct {
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
-// the related backend services.
+// the related backend services. Incoming requests are first evaluated for a host
+// match, then routed to the backend associated with the matching IngressRuleValue.
 type IngressRule struct {
 	// Host is the fully qualified domain name of a network host, as defined
 	// by RFC 3986. Note the following deviations from the "host" part of the
@@ -527,14 +530,22 @@ type IngressRule struct {
 	//	  Currently the port of an Ingress is implicitly :80 for http and
 	//	  :443 for https.
 	// Both these may change in the future.
-	// Incoming requests are matched against the Host before the IngressRuleValue.
+	// Incoming requests are matched against the host before the IngressRuleValue.
+	// If the host is unspecified, the Ingress routes all traffic based on the
+	// specified IngressRuleValue.
 	Host string `json:"host,omitempty"`
 	// IngressRuleValue represents a rule to route requests for this IngressRule.
-	IngressRuleValue `json:",inline"`
+	// If unspecified, the rule defaults to a http catch-all. Whether that sends
+	// just traffic matching the host to the default backend or all traffic to the
+	// default backend, is left to the controller fulfilling the Ingress. Http is
+	// currently the only supported IngressRuleValue.
+	IngressRuleValue `json:",inline,omitempty"`
 }
 
 // IngressRuleValue represents a rule to apply against incoming requests. If the
-// rule is satisfied, the request is routed to the specified backend.
+// rule is satisfied, the request is routed to the specified backend. Currently
+// mixing different types of rules in a single Ingress is disallowed, so exactly
+// one of the following must be set.
 type IngressRuleValue struct {
 	//TODO:
 	// 1. Consider renaming this resource and the associated rules so they
@@ -542,33 +553,39 @@ type IngressRuleValue struct {
 	// 2. Consider adding fields for ingress-type specific global options
 	// usable by a loadbalancer, like http keep-alive.
 
-	// Currently mixing different types of rules in a single Ingress is
-	// disallowed, so exactly one of the following must be set.
-	HTTP *HTTPIngressRuleValue `json:"http"`
+	HTTP *HTTPIngressRuleValue `json:"http,omitempty"`
 }
 
-// HTTPIngressRuleValue is a list of http selectors pointing to IngressBackends.
-// In the example: http://<host>/<path>?<searchpart> -> IngressBackend where
-// parts of the url correspond to RFC 3986, this resource will be used to
+// HTTPIngressRuleValue is a list of http selectors pointing to backends.
+// In the example: http://<host>/<path>?<searchpart> -> backend where
+// where parts of the url correspond to RFC 3986, this resource will be used
 // to match against everything after the last '/' and before the first '?'
 // or '#'.
 type HTTPIngressRuleValue struct {
-	// A collection of paths that map requests to IngressBackends.
+	// A collection of paths that map requests to backends.
 	Paths []HTTPIngressPath `json:"paths"`
+	// TODO: Consider adding fields for ingress-type specific global
+	// options usable by a loadbalancer, like http keep-alive.
 }
 
-// IngressPath associates a path regex with an IngressBackend.
-// Incoming urls matching the Path are forwarded to the Backend.
+// HTTPIngressPath associates a path regex with a backend. Incoming urls matching
+// the path are forwarded to the backend.
 type HTTPIngressPath struct {
-	// Path is a regex matched against the url of an incoming request.
+	// Path is a extended POSIX regex as defined by IEEE Std 1003.1,
+	// (i.e this follows the egrep/unix syntax, not the perl syntax)
+	// matched against the path of an incoming request. Currently it can
+	// contain characters disallowed from the conventional "path"
+	// part of a URL as defined by RFC 3986. Paths must begin with
+	// a '/'. If unspecified, the path defaults to a catch all sending
+	// traffic to the backend.
 	Path string `json:"path,omitempty"`
 
-	// Define the referenced service endpoint which the traffic will be
-	// forwarded to.
+	// Backend defines the referenced service endpoint to which the traffic
+	// will be forwarded to.
 	Backend IngressBackend `json:"backend"`
 }
 
-// IngressBackend describes all endpoints for a given Service and port.
+// IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
 	// Specifies the name of the referenced service.
 	ServiceName string `json:"serviceName"`
