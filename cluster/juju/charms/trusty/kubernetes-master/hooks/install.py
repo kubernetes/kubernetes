@@ -35,7 +35,7 @@ def install():
         'export GOROOT=/usr/local/go\n',
         'export PATH=$PATH:$GOROOT/bin\n',
         'export KUBERNETES_MASTER=http://{0}:8080\n'.format(address),
-        ]
+    ]
     update_rc_files(strings)
     hookenv.log('Downloading kubernetes code')
     clone_repository()
