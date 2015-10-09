@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -257,7 +256,7 @@ func AddApiWebService(container *restful.Container, apiPrefix string, versions [
 }
 
 // Adds a service to return the supported api versions at /apis.
-func AddApisWebService(container *restful.Container, apiPrefix string, groups []api.APIGroup) {
+func AddApisWebService(container *restful.Container, apiPrefix string, groups []unversioned.APIGroup) {
 	rootAPIHandler := RootAPIHandler(groups)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
@@ -272,7 +271,7 @@ func AddApisWebService(container *restful.Container, apiPrefix string, groups []
 
 // Adds a service to return the supported versions, preferred version, and name
 // of a group. E.g., a such web service will be registered at /apis/extensions.
-func AddGroupWebService(container *restful.Container, path string, group api.APIGroup) {
+func AddGroupWebService(container *restful.Container, path string, group unversioned.APIGroup) {
 	groupHandler := GroupHandler(group)
 	ws := new(restful.WebService)
 	ws.Path(path)
@@ -287,7 +286,7 @@ func AddGroupWebService(container *restful.Container, path string, group api.API
 
 // Adds a service to return the supported resources, E.g., a such web service
 // will be registered at /apis/extensions/v1.
-func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion string, apiResources []api.APIResource) {
+func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion string, apiResources []unversioned.APIResource) {
 	resourceHandler := SupportedResourcesHandler(groupVersion, apiResources)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
@@ -311,16 +310,16 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
-func RootAPIHandler(groups []api.APIGroup) restful.RouteFunction {
+func RootAPIHandler(groups []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, api.APIGroupList{Groups: groups}, resp.ResponseWriter)
+		writeRawJSON(http.StatusOK, unversioned.APIGroupList{Groups: groups}, resp.ResponseWriter)
 	}
 }
 
 // GroupHandler returns a handler which will return the api.GroupAndVersion of
 // the group.
-func GroupHandler(group api.APIGroup) restful.RouteFunction {
+func GroupHandler(group unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
 		writeRawJSON(http.StatusOK, group, resp.ResponseWriter)
@@ -328,10 +327,10 @@ func GroupHandler(group api.APIGroup) restful.RouteFunction {
 }
 
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
-func SupportedResourcesHandler(groupVersion string, apiResources []api.APIResource) restful.RouteFunction {
+func SupportedResourcesHandler(groupVersion string, apiResources []unversioned.APIResource) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, api.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter)
+		writeRawJSON(http.StatusOK, unversioned.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter)
 	}
 }
 

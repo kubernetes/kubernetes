@@ -649,7 +649,7 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	// allGroups records all supported groups at /apis
-	allGroups := []api.APIGroup{}
+	allGroups := []unversioned.APIGroup{}
 	if m.exp {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups["extensions"].Default
 		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
@@ -673,7 +673,7 @@ func (m *Master) init(c *Config) {
 		if !found {
 			glog.Fatalf("Couldn't find storage version of group %v", g.Group)
 		}
-		group := api.APIGroup{
+		group := unversioned.APIGroup{
 			Name:             g.Group,
 			Versions:         expAPIVersions,
 			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
@@ -985,7 +985,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
 	}
-	apiGroup := api.APIGroup{
+	apiGroup := unversioned.APIGroup{
 		Name:     group,
 		Versions: []api.GroupVersion{groupVersion},
 	}
