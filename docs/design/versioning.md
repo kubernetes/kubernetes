@@ -44,9 +44,9 @@ Legend:
 
 * Kube 1.0.0, 1.0.1 -- DONE!
 * Kube 1.0.X (X>1): Standard operating procedure. We patch the release-1.0 branch as needed and increment the patch number.
-* Kube 1.1.0-alpha.X: Released roughly every two weeks by cutting from HEAD. No cherrypick releases. If there is a critical bugfix, a new release from HEAD can be created ahead of schedule. (This applies to the beta releases as well.)
-* Kube 1.1.0-beta.X: When HEAD is feature-complete, we go into code freeze 2 weeks prior to the desired 1.1.0 date and only merge PRs essential to 1.1. Releases continue to be cut from HEAD until we're essentially done.
-* Kube 1.1.0: Final release. Should occur between 3 and 4 months after 1.0.
+* Kube 1.1.0-alpha.X: Released roughly every two weeks by cutting from HEAD. No cherrypick releases. If there is a critical bugfix, a new release from HEAD can be created ahead of schedule.
+* Kube 1.1.0-beta: When HEAD is feature-complete, we will cut the release-1.1.0 branch 2 weeks prior to the desired 1.1.0 date and only merge PRs essential to 1.1.  This cut will be marked as 1.1.0-beta, and HEAD will be revved to 1.2.0-alpha.0.
+* Kube 1.1.0: Final release, cut from the release-1.1.0 branch cut two weeks prior. Should occur between 3 and 4 months after 1.0.  1.1.1-beta will be tagged at the same time on the same branch.
 
 ### Major version timeline
 
