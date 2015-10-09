@@ -274,8 +274,8 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Experimental.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions["extensions"] = testapi.Experimental.GroupAndVersion()
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

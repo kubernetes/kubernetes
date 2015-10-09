@@ -34,7 +34,7 @@ func TestListDaemonSets(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getDSResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
 			Body: &experimental.DaemonSetList{
@@ -63,7 +63,7 @@ func TestListDaemonSets(t *testing.T) {
 func TestGetDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "GET", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{
@@ -101,7 +101,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{
@@ -128,7 +128,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo") + "/status", Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo") + "/status", Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{
@@ -153,7 +153,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 func TestDeleteDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Experimental().DaemonSets(ns).Delete("foo")
@@ -166,7 +166,7 @@ func TestCreateDaemonSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: testapi.Experimental.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: buildQueryValues(nil)},
+		Request: testRequest{Method: "POST", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &experimental.DaemonSet{

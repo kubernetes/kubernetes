@@ -122,7 +122,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	var controller api.ReplicationController
-	testapi.Experimental.Codec().DecodeInto([]byte(response.Node.Value), &controller)
+	testapi.Extensions.Codec().DecodeInto([]byte(response.Node.Value), &controller)
 	if controller.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, controller.Spec.Replicas)
 	}

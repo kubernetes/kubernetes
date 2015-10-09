@@ -35,7 +35,7 @@ func TestListIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
 			Body: &experimental.IngressList{
@@ -65,7 +65,7 @@ func TestGetIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
@@ -111,7 +111,7 @@ func TestUpdateIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
@@ -154,7 +154,7 @@ func TestUpdateIngressStatus(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo") + "/status",
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
@@ -185,7 +185,7 @@ func TestDeleteIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{StatusCode: 200},
@@ -205,7 +205,7 @@ func TestCreateIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
 			Body:   requestIngress,
 			Query:  buildQueryValues(nil),
 		},

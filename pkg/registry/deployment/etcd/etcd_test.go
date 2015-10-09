@@ -191,7 +191,7 @@ func TestScaleGet(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validDeployment), 0); err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Extensions.Codec(), &validDeployment), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -211,7 +211,7 @@ func TestScaleUpdate(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Experimental.Codec(), &validDeployment), 0); err != nil {
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Extensions.Codec(), &validDeployment), 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
@@ -231,7 +231,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 
 	var deployment experimental.Deployment
-	testapi.Experimental.Codec().DecodeInto([]byte(response.Node.Value), &deployment)
+	testapi.Extensions.Codec().DecodeInto([]byte(response.Node.Value), &deployment)
 	if deployment.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
 	}
