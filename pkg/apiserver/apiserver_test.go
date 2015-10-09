@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -102,7 +103,9 @@ func addTestTypes() {
 		Watch                bool   `json:"watch,omitempty"`
 		ResourceVersion      string `json:"resourceVersion,omitempty"`
 	}
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &unversioned.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(
+		testVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(testVersion, &api.Pod{})
 }
 
@@ -115,7 +118,9 @@ func addNewTestTypes() {
 		Watch                bool   `json:"watch,omitempty"`
 		ResourceVersion      string `json:"resourceVersion,omitempty"`
 	}
-	api.Scheme.AddKnownTypes(newVersion, &Simple{}, &SimpleList{}, &unversioned.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(
+		newVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
 func init() {
@@ -123,7 +128,9 @@ func init() {
 	// api.Status is returned in errors
 
 	// "internal" version
-	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &unversioned.Status{}, &api.ListOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(
+		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&api.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	addTestTypes()
 	addNewTestTypes()
 
@@ -234,50 +241,8 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	return &defaultAPIServer{mux, group, container}
 }
 
-type Simple struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	Other                string            `json:"other,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-}
-
-func (*Simple) IsAnAPIObject() {}
-
-type SimpleRoot struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	Other                string            `json:"other,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty"`
-}
-
-func (*SimpleRoot) IsAnAPIObject() {}
-
-type SimpleGetOptions struct {
-	unversioned.TypeMeta `json:",inline"`
-	Param1               string `json:"param1"`
-	Param2               string `json:"param2"`
-	Path                 string `json:"atAPath"`
-}
-
-func (SimpleGetOptions) SwaggerDoc() map[string]string {
-	return map[string]string{
-		"param1": "description for param1",
-		"param2": "description for param2",
-	}
-}
-
-func (*SimpleGetOptions) IsAnAPIObject() {}
-
-type SimpleList struct {
-	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,inline"`
-	Items                []Simple `json:"items,omitempty"`
-}
-
-func (*SimpleList) IsAnAPIObject() {}
-
 func TestSimpleSetupRight(t *testing.T) {
-	s := &Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
+	s := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
 	wire, err := codec.Encode(s)
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +257,7 @@ func TestSimpleSetupRight(t *testing.T) {
 }
 
 func TestSimpleOptionsSetupRight(t *testing.T) {
-	s := &SimpleGetOptions{}
+	s := &apiservertesting.SimpleGetOptions{}
 	wire, err := codec.Encode(s)
 	if err != nil {
 		t.Fatal(err)
@@ -308,11 +273,11 @@ func TestSimpleOptionsSetupRight(t *testing.T) {
 
 type SimpleRESTStorage struct {
 	errors map[string]error
-	list   []Simple
-	item   Simple
+	list   []apiservertesting.Simple
+	item   apiservertesting.Simple
 
-	updated *Simple
-	created *Simple
+	updated *apiservertesting.Simple
+	created *apiservertesting.Simple
 
 	stream *SimpleStream
 
@@ -342,7 +307,7 @@ type SimpleRESTStorage struct {
 
 func (storage *SimpleRESTStorage) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	result := &SimpleList{
+	result := &apiservertesting.SimpleList{
 		Items: storage.list,
 	}
 	storage.requestedLabelSelector = label
@@ -408,22 +373,22 @@ func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *ap
 	var obj runtime.Object = &unversioned.Status{Status: unversioned.StatusSuccess}
 	var err error
 	if storage.injectedFunction != nil {
-		obj, err = storage.injectedFunction(&Simple{ObjectMeta: api.ObjectMeta{Name: id}})
+		obj, err = storage.injectedFunction(&apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
 	return obj, err
 }
 
 func (storage *SimpleRESTStorage) New() runtime.Object {
-	return &Simple{}
+	return &apiservertesting.Simple{}
 }
 
 func (storage *SimpleRESTStorage) NewList() runtime.Object {
-	return &SimpleList{}
+	return &apiservertesting.SimpleList{}
 }
 
 func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	storage.created = obj.(*Simple)
+	storage.created = obj.(*apiservertesting.Simple)
 	if err := storage.errors["create"]; err != nil {
 		return nil, err
 	}
@@ -436,7 +401,7 @@ func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (r
 
 func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
-	storage.updated = obj.(*Simple)
+	storage.updated = obj.(*apiservertesting.Simple)
 	if err := storage.errors["update"]; err != nil {
 		return nil, false, err
 	}
@@ -494,7 +459,7 @@ type ConnecterRESTStorage struct {
 var _ = rest.Connecter(&ConnecterRESTStorage{})
 
 func (s *ConnecterRESTStorage) New() runtime.Object {
-	return &Simple{}
+	return &apiservertesting.Simple{}
 }
 
 func (s *ConnecterRESTStorage) Connect(ctx api.Context, id string, options runtime.Object) (rest.ConnectHandler, error) {
@@ -540,7 +505,7 @@ type GetWithOptionsRESTStorage struct {
 }
 
 func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options runtime.Object) (runtime.Object, error) {
-	if _, ok := options.(*SimpleGetOptions); !ok {
+	if _, ok := options.(*apiservertesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
 	r.optionsReceived = options
@@ -549,9 +514,9 @@ func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options ru
 
 func (r *GetWithOptionsRESTStorage) NewGetOptions() (runtime.Object, bool, string) {
 	if len(r.takesPath) > 0 {
-		return &SimpleGetOptions{}, true, r.takesPath
+		return &apiservertesting.SimpleGetOptions{}, true, r.takesPath
 	}
-	return &SimpleGetOptions{}, false, ""
+	return &apiservertesting.SimpleGetOptions{}, false, ""
 }
 
 var _ rest.GetterWithOptions = &GetWithOptionsRESTStorage{}
@@ -563,7 +528,7 @@ type NamedCreaterRESTStorage struct {
 
 func (storage *NamedCreaterRESTStorage) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	storage.created = obj.(*Simple)
+	storage.created = obj.(*apiservertesting.Simple)
 	storage.createdName = name
 	if err := storage.errors["create"]; err != nil {
 		return nil, err
@@ -673,7 +638,7 @@ func TestNotFound(t *testing.T) {
 type UnimplementedRESTStorage struct{}
 
 func (UnimplementedRESTStorage) New() runtime.Object {
-	return &Simple{}
+	return &apiservertesting.Simple{}
 }
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
@@ -910,7 +875,7 @@ func TestErrorList(t *testing.T) {
 func TestNonEmptyList(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		list: []Simple{
+		list: []apiservertesting.Simple{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "something", Namespace: "other"},
 				Other:      "foo",
@@ -936,7 +901,7 @@ func TestNonEmptyList(t *testing.T) {
 		t.Logf("Data: %s", string(body))
 	}
 
-	var listOut SimpleList
+	var listOut apiservertesting.SimpleList
 	body, err := extractBody(resp, &listOut)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -961,7 +926,7 @@ func TestNonEmptyList(t *testing.T) {
 func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		list: []Simple{
+		list: []apiservertesting.Simple{
 			{
 				ObjectMeta: api.ObjectMeta{Namespace: "other"},
 				Other:      "foo",
@@ -986,7 +951,7 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 		}
 		t.Logf("Data: %s", string(body))
 	}
-	var listOut SimpleList
+	var listOut apiservertesting.SimpleList
 	body, err := extractBody(resp, &listOut)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1031,7 +996,7 @@ func TestMetadata(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		item: Simple{
+		item: apiservertesting.Simple{
 			Other: "foo",
 		},
 	}
@@ -1053,7 +1018,7 @@ func TestGet(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1145,7 +1110,7 @@ func TestGetWithOptions(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := GetWithOptionsRESTStorage{
 		SimpleRESTStorage: &SimpleRESTStorage{
-			item: Simple{
+			item: apiservertesting.Simple{
 				Other: "foo",
 			},
 		},
@@ -1162,7 +1127,7 @@ func TestGetWithOptions(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1172,7 +1137,7 @@ func TestGetWithOptions(t *testing.T) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
 
-	opts, ok := simpleStorage.optionsReceived.(*SimpleGetOptions)
+	opts, ok := simpleStorage.optionsReceived.(*apiservertesting.SimpleGetOptions)
 	if !ok {
 		t.Errorf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
 		return
@@ -1186,7 +1151,7 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := GetWithOptionsRESTStorage{
 		SimpleRESTStorage: &SimpleRESTStorage{
-			item: Simple{
+			item: apiservertesting.Simple{
 				Other: "foo",
 			},
 		},
@@ -1204,7 +1169,7 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1214,7 +1179,7 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
 
-	opts, ok := simpleStorage.optionsReceived.(*SimpleGetOptions)
+	opts, ok := simpleStorage.optionsReceived.(*apiservertesting.SimpleGetOptions)
 	if !ok {
 		t.Errorf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
 		return
@@ -1226,7 +1191,7 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 func TestGetAlternateSelfLink(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		item: Simple{
+		item: apiservertesting.Simple{
 			Other: "foo",
 		},
 	}
@@ -1248,7 +1213,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1264,7 +1229,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 func TestGetNamespaceSelfLink(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		item: Simple{
+		item: apiservertesting.Simple{
 			Other: "foo",
 		},
 	}
@@ -1286,7 +1251,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1358,7 +1323,7 @@ func TestConnect(t *testing.T) {
 func TestConnectWithOptionsRouteParams(t *testing.T) {
 	connectStorage := &ConnecterRESTStorage{
 		connectHandler:      &SimpleConnectHandler{},
-		emptyConnectOptions: &SimpleGetOptions{},
+		emptyConnectOptions: &apiservertesting.SimpleGetOptions{},
 	}
 	storage := map[string]rest.Storage{
 		"simple":         &SimpleRESTStorage{},
@@ -1389,7 +1354,7 @@ func TestConnectWithOptions(t *testing.T) {
 		connectHandler: &SimpleConnectHandler{
 			response: responseText,
 		},
-		emptyConnectOptions: &SimpleGetOptions{},
+		emptyConnectOptions: &apiservertesting.SimpleGetOptions{},
 	}
 	storage := map[string]rest.Storage{
 		"simple":         &SimpleRESTStorage{},
@@ -1418,7 +1383,7 @@ func TestConnectWithOptions(t *testing.T) {
 	if string(body) != responseText {
 		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
 	}
-	opts, ok := connectStorage.receivedConnectOptions.(*SimpleGetOptions)
+	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
 		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
@@ -1435,7 +1400,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 		connectHandler: &SimpleConnectHandler{
 			response: responseText,
 		},
-		emptyConnectOptions: &SimpleGetOptions{},
+		emptyConnectOptions: &apiservertesting.SimpleGetOptions{},
 		takesPath:           "atAPath",
 	}
 	storage := map[string]rest.Storage{
@@ -1465,7 +1430,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	if string(body) != responseText {
 		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
 	}
-	opts, ok := connectStorage.receivedConnectOptions.(*SimpleGetOptions)
+	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
 		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
@@ -1645,7 +1610,7 @@ func TestDeleteMissing(t *testing.T) {
 func TestPatch(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
@@ -1683,7 +1648,7 @@ func TestPatch(t *testing.T) {
 func TestPatchRequiresMatchingName(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
@@ -1723,7 +1688,7 @@ func TestUpdate(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
@@ -1760,7 +1725,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: api.NamespaceDefault,
@@ -1793,7 +1758,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		Other: "bar",
 	}
 	body, err := codec.Encode(item)
@@ -1822,7 +1787,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name: ID,
 		},
@@ -1859,7 +1824,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "other", // does not match request
@@ -1896,7 +1861,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "other",
@@ -1931,7 +1896,7 @@ func TestUpdateMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := &Simple{
+	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: api.NamespaceDefault,
@@ -1966,7 +1931,7 @@ func TestCreateNotFound(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{Other: "foo"}
+	simple := &apiservertesting.Simple{Other: "foo"}
 	data, err := codec.Encode(simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2097,8 +2062,8 @@ func TestUpdateREST(t *testing.T) {
 
 func TestParentResourceIsRequired(t *testing.T) {
 	storage := &SimpleTypedStorage{
-		baseType: &SimpleRoot{}, // a root scoped type
-		item:     &SimpleRoot{},
+		baseType: &apiservertesting.SimpleRoot{}, // a root scoped type
+		item:     &apiservertesting.SimpleRoot{},
 	}
 	group := &APIGroupVersion{
 		Storage: map[string]rest.Storage{
@@ -2125,8 +2090,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 	}
 
 	storage = &SimpleTypedStorage{
-		baseType: &SimpleRoot{}, // a root scoped type
-		item:     &SimpleRoot{},
+		baseType: &apiservertesting.SimpleRoot{}, // a root scoped type
+		item:     &apiservertesting.SimpleRoot{},
 	}
 	group = &APIGroupVersion{
 		Storage: map[string]rest.Storage{
@@ -2182,7 +2147,7 @@ func TestCreateWithName(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{Other: "foo"}
+	simple := &apiservertesting.Simple{Other: "foo"}
 	data, err := codec.Encode(simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2283,7 +2248,7 @@ func TestCreate(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{
+	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
 	data, err := codec.Encode(simple)
@@ -2307,7 +2272,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(response, &itemOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2342,7 +2307,7 @@ func TestCreateInNamespace(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{
+	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
 	data, err := codec.Encode(simple)
@@ -2366,7 +2331,7 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	var itemOut Simple
+	var itemOut apiservertesting.Simple
 	body, err := extractBody(response, &itemOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2401,7 +2366,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{
+	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
 	data, err := codec.Encode(simple)
@@ -2531,7 +2496,7 @@ func TestCreateTimeout(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	simple := &Simple{Other: "foo"}
+	simple := &apiservertesting.Simple{Other: "foo"}
 	data, err := codec.Encode(simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2622,7 +2587,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{}
+	simple := &apiservertesting.Simple{}
 	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
 	data, err := newCodec.Encode(simple)
 	if err != nil {
@@ -2653,7 +2618,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{}
+	simple := &apiservertesting.Simple{}
 	data, err := codec.Encode(simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2688,7 +2653,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	simple := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 	data, err := newCodec.Encode(simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
