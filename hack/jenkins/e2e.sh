@@ -995,11 +995,6 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
-  if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
-        echo "publish githash to ci/latest-green.txt: ${githash}"
-        echo "${githash}" > ${WORKSPACE}/githash.txt
-        gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
-  fi
   ./test/kubemark/stop-kubemark.sh
   NUM_MINIONS=${NUM_MINIONS_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
