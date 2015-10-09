@@ -76,18 +76,18 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 	}{
 		{
 			legacyVersion:   "v1",
-			storageVersions: "v1,experimental/v1alpha1",
+			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]string{
 				"":             "v1",
-				"experimental": "experimental/v1alpha1",
+				"experimental": "extensions/v1beta1",
 			},
 		},
 		{
 			legacyVersion:   "",
-			storageVersions: "experimental/v1alpha1,v1",
+			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]string{
 				"":             "v1",
-				"experimental": "experimental/v1alpha1",
+				"experimental": "extensions/v1beta1",
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 }
 
 func TestUpdateEtcdOverrides(t *testing.T) {
-	storageVersions := generateStorageVersionMap("", "v1,experimental/v1alpha1")
+	storageVersions := generateStorageVersionMap("", "v1,extensions/v1beta1")
 
 	testCases := []struct {
 		apigroup string
