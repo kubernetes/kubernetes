@@ -70,7 +70,7 @@ It takes around 10s to complete.
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: experimental/v1alpha1
+apiVersion: extensions/v1beta1 
 kind: Job
 metadata:
   name: pi
