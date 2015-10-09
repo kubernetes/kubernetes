@@ -400,8 +400,9 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.
 			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", name, err)
 		}
 		if deleteFwdRuleIP {
-			// Delete the old IP to avoid leaking it, since we're going to be using
-			// the user-requested IP when recreating the forwarding rule below.
+			// Delete the old forwarding rule's IP to avoid leaking it, since we're
+			// going to be using the user-requested IP when recreating the forwarding
+			// rule below.
 			gce.deleteStaticIP(name, region)
 		}
 	}
@@ -429,6 +430,10 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.
 	return status, nil
 }
 
+// Passing nil for requested IP is perfectly fine - it just means that no specific
+// IP is being requested.
+// Returns whether the forwarding rule exists, whether it needs to be updated,
+// what its IP address is (if it exists), and any error we encountered.
 func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, requestedIP net.IP, ports []*api.ServicePort) (exists bool, needsUpdate bool, ipAddress string, err error) {
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err != nil {
@@ -507,13 +512,10 @@ func (gce *GCECloud) firewallNeedsUpdate(name, region, ipAddress string, ports [
 	if fw.Description != makeFirewallDescription(ipAddress) {
 		return true, true, nil
 	}
-	// Make sure the allowed ports match
-	if len(fw.Allowed) != 1 {
+	if len(fw.Allowed) != 1 || fw.Allowed[0].IPProtocol != "tcp" {
 		return true, true, nil
 	}
-	if fw.Allowed[0].IPProtocol != "tcp" {
-		return true, true, nil
-	}
+	// Make sure the allowed ports match.
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
@@ -624,7 +626,7 @@ func (gce *GCECloud) updateFirewall(name, region, ipAddress string, ports []*api
 	}
 	if op != nil {
 		err = gce.waitForGlobalOp(op)
-		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+		if err != nil {
 			return err
 		}
 	}
