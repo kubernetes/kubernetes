@@ -148,6 +148,7 @@ GCE_SLOW_TESTS=(
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
     "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
     "monotonically\sincreasing\srestart\scount"       # 1.5 to 5 min, file: pods.go,                 slow by design
+    "Garbage\scollector\sshould"                      # 7 min,        file: garbage_collector.go,    slow by design
     "KubeProxy\sshould\stest\skube-proxy"             # 9 min 30 sec, file: kubeproxy.go,            issue: #14204
     )
 
