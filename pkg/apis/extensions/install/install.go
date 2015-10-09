@@ -40,12 +40,12 @@ const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 var accessor = meta.NewAccessor()
 
 func init() {
-	groupMeta, err := latest.RegisterGroup("experimental")
+	groupMeta, err := latest.RegisterGroup("extensions")
 	if err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
-	registeredGroupVersions := registered.GroupVersionsForGroup("experimental")
+	registeredGroupVersions := registered.GroupVersionsForGroup("extensions")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
@@ -70,7 +70,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper("experimental", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	groupMeta.RESTMapper = api.NewDefaultRESTMapper("extensions", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 }
@@ -86,7 +86,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group("experimental")
+		g, _ := latest.Group("extensions")
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
 	}
 }
