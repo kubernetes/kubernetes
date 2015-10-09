@@ -40,30 +40,23 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 const validEtcdVersion = "etcd 2.0.9"
 
-type TestResource struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	Value                int `json:"value"`
-}
-
-func (*TestResource) IsAnAPIObject() {}
-
 var scheme *runtime.Scheme
 var codec runtime.Codec
 
 func init() {
 	scheme = runtime.NewScheme()
-	scheme.AddKnownTypes("", &TestResource{})
-	scheme.AddKnownTypes(testapi.Default.Version(), &TestResource{})
+	scheme.AddKnownTypes("", &storagetesting.TestResource{})
+	scheme.AddKnownTypes(testapi.Default.Version(), &storagetesting.TestResource{})
 	codec = runtime.CodecFor(scheme, testapi.Default.Version())
 	scheme.AddConversionFuncs(
-		func(in *TestResource, out *TestResource, s conversion.Scope) error {
+		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
 			*out = *in
 			return nil
 		},
@@ -568,8 +561,8 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
-	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
 	if err != nil {
@@ -587,11 +580,11 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
+	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
-		if in.(*TestResource).Value != 1 {
+		if in.(*storagetesting.TestResource).Value != 1 {
 			t.Errorf("Callback input was not current set value")
 		}
 
@@ -623,8 +616,8 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
-	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		if res.TTL != 0 {
 			t.Fatalf("unexpected response meta: %#v", res)
 		}
@@ -649,14 +642,14 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
+	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		if res.TTL != 10 {
 			t.Fatalf("unexpected response meta: %#v", res)
 		}
 		callbackCalled = true
 
-		if in.(*TestResource).Value != 1 {
+		if in.(*storagetesting.TestResource).Value != 1 {
 			t.Errorf("Callback input was not current set value")
 		}
 
@@ -681,14 +674,14 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 
 	// Update an existing node and change ttl
 	callbackCalled = false
-	objUpdate = &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 3}
-	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	objUpdate = &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 3}
+	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, func(in runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		if res.TTL != 10 {
 			t.Fatalf("unexpected response meta: %#v", res)
 		}
 		callbackCalled = true
 
-		if in.(*TestResource).Value != 2 {
+		if in.(*storagetesting.TestResource).Value != 2 {
 			t.Errorf("Callback input was not current set value")
 		}
 
@@ -724,8 +717,8 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
-	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
 	if err != nil {
@@ -734,8 +727,8 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		fakeClient.Err = errors.New("should not be called")
 		callbackCalled = true
 		return objUpdate, nil
@@ -756,20 +749,20 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
-	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 
 	f := storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	})
 
 	ignoreNotFound := false
-	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, ignoreNotFound, f)
+	err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, ignoreNotFound, f)
 	if err == nil {
 		t.Errorf("Expected error for key not found.")
 	}
 
 	ignoreNotFound = true
-	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, ignoreNotFound, f)
+	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, ignoreNotFound, f)
 	if err != nil {
 		t.Errorf("Unexpected error %v.", err)
 	}
@@ -790,12 +783,12 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	wgForceCollision.Add(concurrency)
 
 	for i := 0; i < concurrency; i++ {
-		// Increment TestResource.Value by 1
+		// Increment storagetesting.TestResource.Value by 1
 		go func() {
 			defer wgDone.Done()
 
 			firstCall := true
-			err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+			err := helper.GuaranteedUpdate(context.TODO(), "/some/key", &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 				defer func() { firstCall = false }()
 
 				if firstCall {
@@ -804,8 +797,8 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 					wgForceCollision.Wait()
 				}
 
-				currValue := in.(*TestResource).Value
-				obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
+				currValue := in.(*storagetesting.TestResource).Value
+				obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
 				return obj, nil
 			}))
 			if err != nil {
@@ -815,9 +808,9 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	}
 	wgDone.Wait()
 
-	// Check that stored TestResource has received all updates.
+	// Check that stored storagetesting.TestResource has received all updates.
 	body := fakeClient.Data[key].R.Node.Value
-	stored := &TestResource{}
+	stored := &storagetesting.TestResource{}
 	if err := codec.DecodeInto([]byte(body), stored); err != nil {
 		t.Errorf("Error decoding stored value: %v", body)
 	}
