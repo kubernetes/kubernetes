@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from mock import patch
+from mock import ANY
 from path import Path
 import pytest
 import subprocess
@@ -79,15 +80,28 @@ class TestKubernetesInstaller():
         ki.build("master")
         # TODO: run is called many times but mock only remembers last one.
         rmock.assert_called_with('git reset --hard origin/master')
+
         # TODO: call is complex and hard to verify with mock, fix that.
-        cmock.assert_called_once()
+        # this is not doing what we think it should be doing, magic mock
+        # makes this tricky.
+        # list['foo', 'baz'], env = ANY
+        make_args = ['make', 'all', 'WHAT=cmd/kube-apiserver cmd/kubectl cmd/kube-controller-manager plugin/cmd/kube-scheduler cmd/kubelet cmd/kube-proxy']  # noqa
+        cmock.assert_called_once_with(make_args, env=ANY)
+
+    @patch('kubernetes_installer.run')
+    @patch('kubernetes_installer.subprocess.call')
+    def test_schenanigans(self, cmock, rmock):
+        """ Test the build method with master and non-master branches. """
+        directory = Path('/tmp/kubernetes_installer_test/build')
+        ki = self.makeone('amd64', 'v99.00.11', directory)
+        assert not directory.exists(), 'The %s directory exists!' % directory
 
         # Call the build method with something other than "master" branch.
         ki.build("branch")
         # TODO: run is called many times, but mock only remembers last one.
         rmock.assert_called_with('git checkout -b v99.00.11 branch')
         # TODO: call is complex and hard to verify with mock, fix that.
-        cmock.assert_called_once()
+        assert cmock.called
 
         directory.rmtree_p()
 
