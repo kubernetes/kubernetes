@@ -327,37 +327,39 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.
 		return nil, err
 	}
 
-	// If a specific IP address has been requested, we have to respect the user's
-	// request and use that IP. If the forwarding rule was already using a
-	// different IP, then we have to make sure to delete it once it's no longer
-	// attached to the forwarding rule to avoid leaking it.
-	ipAddress := fwdRuleIP
-	deleteFwdRuleIP := false
-	if requestedIP != nil && requestedIP.String() != fwdRuleIP {
-		ipAddress = requestedIP.String()
-		deleteFwdRuleIP = true
-	}
-
-	// Make sure we have an IP address to use if we weren't able to pull it from
-	// an existing forwarding rule. Note that we absolutely do not ever delete an
-	// IP address in this function -- we always reuse the old one if possible.
+	// Make sure we know which IP address will be used and have properly reserved
+	// it as static before moving forward with the rest of our operations.
 	//
-	// We use static IP addresses to ensure that we can replace a load balancer's
-	// other components without changing the address a service is reachable on.
-	// Note that while static addresses that _aren't_ in use cost the user money,
-	// addresses that _are_ in use cost nothing.
-	// However, quota is limited to only 7 addresses per region by default.
-	if ipAddress == "" {
-		if requestedIP != nil {
-			if err := gce.projectOwnsStaticIP(name, region, requestedIP.String()); err != nil {
-				return nil, err
-			}
-			ipAddress = requestedIP.String()
-		} else {
-			ipAddress, err = gce.createStaticIP(name, region)
-			if err != nil {
-				return nil, err
-			}
+	// We use static IP addresses when updating a load balancer to ensure that we
+	// can replace the load balancer's other components without changing the
+	// address its service is reachable on. We do it this way rather than always
+	// keeping the static IP around even though this is more complicated because
+	// it makes it less likely that we'll run into quota issues. Only 7 static
+	// IP addresses are allowed per region by default.
+	//
+	// We could let an IP be allocated for us when the forwarding rule is created,
+	// but we need the IP to set up the firewall rule, and we want to keep the
+	// forwarding rule creation as the last thing that needs to be done in this
+	// function in order to maintain the invariant that "if the forwarding rule
+	// exists, the LB has been fully created".
+	ipAddress := ""
+	if requestedIP != nil {
+		// If a specific IP address has been requested, we have to respect the
+		// user's request and use that IP. If the forwarding rule was already using
+		// a different IP, it will be harmlessly abandoned because it was only an
+		// ephemeral IP (or it was a different static IP owned by the user, in which
+		// case we shouldn't delete it anyway).
+		if err := gce.projectOwnsStaticIP(name, region, requestedIP.String()); err != nil {
+			return nil, err
+		}
+		ipAddress = requestedIP.String()
+	} else {
+		// This will either allocate a new static IP if the forwarding rule didn't
+		// already have an IP, or it will promote the forwarding rule's IP from
+		// ephemeral to static.
+		ipAddress, err = gce.createOrPromoteStaticIP(name, region, fwdRuleIP)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -399,12 +401,6 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.
 		if err := gce.deleteForwardingRule(name, region); err != nil {
 			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", name, err)
 		}
-		if deleteFwdRuleIP {
-			// Delete the old forwarding rule's IP to avoid leaking it, since we're
-			// going to be using the user-requested IP when recreating the forwarding
-			// rule below.
-			gce.deleteStaticIP(name, region)
-		}
 	}
 	if tpExists && tpNeedsUpdate {
 		if err := gce.deleteTargetPool(name, region); err != nil {
@@ -423,6 +419,12 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.
 		if err := gce.createForwardingRule(name, region, ipAddress, ports); err != nil {
 			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", name, err)
 		}
+	}
+
+	// Now that we're done operating on everything, demote the static IP back to
+	// ephemeral to avoid taking up the user's static IP quota.
+	if err := gce.deleteStaticIP(name, region); err != nil {
+		return nil, fmt.Errorf("failed to release static IP %s after finishing update of load balancer resources: %v", err)
 	}
 
 	status := &api.LoadBalancerStatus{}
@@ -712,10 +714,16 @@ func (gce *GCECloud) projectOwnsStaticIP(name, region string, ipAddress string) 
 	return fmt.Errorf("this gce project doesn't own the IP address: %s", ipAddress)
 }
 
-func (gce *GCECloud) createStaticIP(name, region string) (ipAddress string, err error) {
-	// If the address already exists, this will harmlessly continue on to getting
-	// the address in the next section.
-	op, err := gce.service.Addresses.Insert(gce.projectID, region, &compute.Address{Name: name}).Do()
+func (gce *GCECloud) createOrPromoteStaticIP(name, region, existingIP string) (ipAddress string, err error) {
+	// If the address doesn't exist, this will create it.
+	// If the existingIP exists but is ephemeral, this will promote it to static.
+	// If the address already exists, this will harmlessly return a StatusConflict
+	// and we'll grab the IP before returning.
+	addressObj := &compute.Address{Name: name}
+	if existingIP != "" {
+		addressObj.Address = existingIP
+	}
+	op, err := gce.service.Addresses.Insert(gce.projectID, region, addressObj).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return "", fmt.Errorf("error creating gce static IP address: %v", err)
 	}
@@ -799,17 +807,17 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	err := errors.AggregateGoroutines(
 		func() error { return gce.deleteFirewall(name, region) },
+		// Even though we don't hold on to static IPs for load balancers, it's
+		// possible that EnsureTCPLoadBalancer left one around in a failed
+		// creation/update attempt, so make sure we clean it up here just in case.
+		func() error { return gce.deleteStaticIP(name, region) },
 		func() error {
+			// The forwarding rule must be deleted before either the target pool can,
+			// unfortunately, so we have to do these two serially.
 			if err := gce.deleteForwardingRule(name, region); err != nil {
 				return err
 			}
-			// The forwarding rule must be deleted before either the target pool or
-			// static IP address can, unfortunately.
-			err := errors.AggregateGoroutines(
-				func() error { return gce.deleteTargetPool(name, region) },
-				func() error { return gce.deleteStaticIP(name, region) },
-			)
-			if err != nil {
+			if err := gce.deleteTargetPool(name, region); err != nil {
 				return err
 			}
 			return nil
