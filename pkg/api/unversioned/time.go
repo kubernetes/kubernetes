@@ -70,9 +70,9 @@ func Unix(sec int64, nsec int64) Time {
 	return Time{time.Unix(sec, nsec)}
 }
 
-// Rfc3339Copy returns a copy of the Time at second-level precision.
-func (t Time) Rfc3339Copy() Time {
-	copied, _ := time.Parse(time.RFC3339, t.Format(time.RFC3339))
+// Rfc3339NanoCopy returns a copy of the Time at nanosecond-level precision.
+func (t Time) Rfc3339NanoCopy() Time {
+	copied, _ := time.Parse(time.RFC3339Nano, t.Format(time.RFC3339Nano))
 	return Time{copied}
 }
 
@@ -86,7 +86,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	var str string
 	json.Unmarshal(b, &str)
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(time.RFC3339Nano, str)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (t Time) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.UTC().Format(time.RFC3339))
+	return json.Marshal(t.UTC().Format(time.RFC3339Nano))
 }
 
 // Fuzz satisfies fuzz.Interface.

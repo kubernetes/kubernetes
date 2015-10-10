@@ -103,7 +103,7 @@ type ObjectMeta struct {
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
-	// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+	// Clients may not set this value. It is represented in RFC3339NANO form and is in UTC.
 	CreationTimestamp unversioned.Time `json:"creationTimestamp,omitempty"`
 
 	// DeletionTimestamp is the time after which this resource will be deleted. This
@@ -1625,7 +1625,7 @@ type PodLogOptions struct {
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceSeconds *int64
-	// An RFC3339 timestamp from which to show logs. If this value
+	// An RFC3339NANO timestamp from which to show logs. If this value
 	// preceeds the time a pod was started, only logs since the pod start will be returned.
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.
