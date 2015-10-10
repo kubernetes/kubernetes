@@ -42,9 +42,9 @@ const (
 
 type GCController struct {
 	kubeClient     client.Interface
-	podControl     controller.PodControlInterface
 	podStore       cache.StoreToPodLister
 	podStoreSyncer *framework.Controller
+	deletePod      func(namespace, name string) error
 	threshold      int
 }
 
@@ -55,11 +55,10 @@ func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, 
 
 	gcc := &GCController{
 		kubeClient: kubeClient,
-		podControl: controller.RealPodControl{
-			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "pod-garbage-collector"}),
-			KubeClient: kubeClient,
+		threshold:  threshold,
+		deletePod: func(namespace, name string) error {
+			return kubeClient.Pods(namespace).Delete(name, api.NewDeleteOptions(0))
 		},
-		threshold: threshold,
 	}
 
 	terminatedSelector := compileTerminatedPodSelector()
@@ -105,7 +104,7 @@ func (gcc *GCController) gc() {
 		wait.Add(1)
 		go func(namespace string, name string) {
 			defer wait.Done()
-			if err := gcc.podControl.DeletePod(namespace, name); err != nil {
+			if err := gcc.deletePod(namespace, name); err != nil {
 				// ignore not founds
 				defer util.HandleError(err)
 			}
