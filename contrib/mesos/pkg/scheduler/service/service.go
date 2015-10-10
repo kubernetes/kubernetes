@@ -678,8 +678,15 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	as := scheduler.NewAllocationStrategy(
-		podtask.DefaultPredicate,
-		podtask.NewDefaultProcurement(s.DefaultContainerCPULimit, s.DefaultContainerMemLimit))
+		podtask.NewDefaultPredicate(
+			s.DefaultContainerCPULimit,
+			s.DefaultContainerMemLimit,
+		),
+		podtask.NewDefaultProcurement(
+			s.DefaultContainerCPULimit,
+			s.DefaultContainerMemLimit,
+		),
+	)
 
 	// downgrade allocation strategy if user disables "account-for-pod-resources"
 	if !s.AccountForPodResources {

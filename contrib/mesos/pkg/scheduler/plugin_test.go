@@ -450,7 +450,10 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 
 	// create scheduler
 	strategy := NewAllocationStrategy(
-		podtask.DefaultPredicate,
+		podtask.NewDefaultPredicate(
+			mresource.DefaultDefaultContainerCPULimit,
+			mresource.DefaultDefaultContainerMemLimit,
+		),
 		podtask.NewDefaultProcurement(
 			mresource.DefaultDefaultContainerCPULimit,
 			mresource.DefaultDefaultContainerMemLimit,
