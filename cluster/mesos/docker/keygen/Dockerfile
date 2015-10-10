@@ -1,4 +1,4 @@
-FROM ubuntu:14.04.2
+FROM ubuntu:14.04.3
 MAINTAINER Mesosphere <support@mesosphere.io>
 
 RUN locale-gen en_US.UTF-8
