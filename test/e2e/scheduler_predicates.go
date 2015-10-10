@@ -165,7 +165,7 @@ var _ = Describe("SchedulerPredicates", func() {
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
 	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check
 	// if max-pods is working we need to fully saturate the cluster and keep it in this state for few seconds.
-	It("validates MaxPods limit number of pods that are allowed to run.", func() {
+	It("validates MaxPods limit number of pods that are allowed to run", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
@@ -231,7 +231,7 @@ var _ = Describe("SchedulerPredicates", func() {
 	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
-	It("validates resource limits of pods that are allowed to run.", func() {
+	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
 		nodeToCapacityMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			capacity, found := node.Status.Capacity["cpu"]
@@ -320,7 +320,7 @@ var _ = Describe("SchedulerPredicates", func() {
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// nonempty Selector set.
-	It("validates that NodeSelector is respected if not matching", func() {
+	It("validates that NodeSelector is respected if not matching [Conformance]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
@@ -358,7 +358,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		cleanupPods(c, ns)
 	})
 
-	It("validates that NodeSelector is respected if matching.", func() {
+	It("validates that NodeSelector is respected if matching [Conformance]", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be

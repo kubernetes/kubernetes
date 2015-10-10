@@ -449,7 +449,7 @@ var _ = Describe("Examples e2e", func() {
 	})
 
 	Describe("[Example]ClusterDns", func() {
-		It("should create pod that uses dns", func() {
+		It("should create pod that uses dns [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/cluster-dns", file)
 			}

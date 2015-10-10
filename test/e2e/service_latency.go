@@ -44,7 +44,7 @@ func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 var _ = Describe("Service endpoints latency", func() {
 	f := NewFramework("svc-latency")
 
-	It("should not be very high", func() {
+	It("should not be very high [Conformance]", func() {
 		const (
 			// These are very generous criteria. Ideally we will
 			// get this much lower in the future. See issue
