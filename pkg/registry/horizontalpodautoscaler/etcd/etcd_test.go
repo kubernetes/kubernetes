@@ -21,9 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	// Ensure that experimental/v1alpha1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	// Ensure that extensions/v1beta1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -32,23 +32,23 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "experimental")
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "extensions")
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewHorizontalPodAutoscaler(name string) *experimental.HorizontalPodAutoscaler {
-	return &experimental.HorizontalPodAutoscaler{
+func validNewHorizontalPodAutoscaler(name string) *extensions.HorizontalPodAutoscaler {
+	return &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: experimental.HorizontalPodAutoscalerSpec{
-			ScaleRef: &experimental.SubresourceReference{
+		Spec: extensions.HorizontalPodAutoscalerSpec{
+			ScaleRef: &extensions.SubresourceReference{
 				Subresource: "scale",
 			},
 			MinReplicas: 1,
 			MaxReplicas: 5,
-			Target:      experimental.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+			Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 		},
 	}
 }
@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		autoscaler,
 		// invalid
-		&experimental.HorizontalPodAutoscaler{},
+		&extensions.HorizontalPodAutoscaler{},
 	)
 }
 
@@ -74,7 +74,7 @@ func TestUpdate(t *testing.T) {
 		validNewHorizontalPodAutoscaler("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*experimental.HorizontalPodAutoscaler)
+			object := obj.(*extensions.HorizontalPodAutoscaler)
 			object.Spec.MaxReplicas = object.Spec.MaxReplicas + 1
 			return object
 		},

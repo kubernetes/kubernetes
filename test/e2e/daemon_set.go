@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -74,11 +74,11 @@ var _ = Describe("Daemon set", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		Logf("Creating simple daemon set %s", dsName)
-		_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
+		_, err := c.DaemonSets(ns).Create(&extensions.DaemonSet{
 			ObjectMeta: api.ObjectMeta{
 				Name: dsName,
 			},
-			Spec: experimental.DaemonSetSpec{
+			Spec: extensions.DaemonSetSpec{
 				Template: &api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: label,
@@ -129,11 +129,11 @@ var _ = Describe("Daemon set", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		Logf("Creating daemon with a node selector %s", dsName)
-		_, err := c.DaemonSets(ns).Create(&experimental.DaemonSet{
+		_, err := c.DaemonSets(ns).Create(&extensions.DaemonSet{
 			ObjectMeta: api.ObjectMeta{
 				Name: dsName,
 			},
-			Spec: experimental.DaemonSetSpec{
+			Spec: extensions.DaemonSetSpec{
 				Selector: complexLabel,
 				Template: &api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{

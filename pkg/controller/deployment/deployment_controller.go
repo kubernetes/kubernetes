@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -73,22 +73,22 @@ func (d *DeploymentController) reconcileDeployments() []error {
 	return errs
 }
 
-func (d *DeploymentController) reconcileDeployment(deployment *experimental.Deployment) error {
+func (d *DeploymentController) reconcileDeployment(deployment *extensions.Deployment) error {
 	switch deployment.Spec.Strategy.Type {
-	case experimental.RecreateDeploymentStrategyType:
+	case extensions.RecreateDeploymentStrategyType:
 		return d.reconcileRecreateDeployment(*deployment)
-	case experimental.RollingUpdateDeploymentStrategyType:
+	case extensions.RollingUpdateDeploymentStrategyType:
 		return d.reconcileRollingUpdateDeployment(*deployment)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", deployment.Spec.Strategy.Type)
 }
 
-func (d *DeploymentController) reconcileRecreateDeployment(deployment experimental.Deployment) error {
+func (d *DeploymentController) reconcileRecreateDeployment(deployment extensions.Deployment) error {
 	// TODO: implement me.
 	return nil
 }
 
-func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment experimental.Deployment) error {
+func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment extensions.Deployment) error {
 	newRC, err := d.getNewRC(deployment)
 	if err != nil {
 		return err
@@ -124,13 +124,13 @@ func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment exper
 	return nil
 }
 
-func (d *DeploymentController) getOldRCs(deployment experimental.Deployment) ([]*api.ReplicationController, error) {
+func (d *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, error) {
 	return deploymentUtil.GetOldRCs(deployment, d.client)
 }
 
 // Returns an RC that matches the intent of the given deployment.
 // It creates a new RC if required.
-func (d *DeploymentController) getNewRC(deployment experimental.Deployment) (*api.ReplicationController, error) {
+func (d *DeploymentController) getNewRC(deployment extensions.Deployment) (*api.ReplicationController, error) {
 	existingNewRC, err := deploymentUtil.GetNewRC(deployment, d.client)
 	if err != nil || existingNewRC != nil {
 		return existingNewRC, err
@@ -158,7 +158,7 @@ func (d *DeploymentController) getNewRC(deployment experimental.Deployment) (*ap
 	return createdRC, nil
 }
 
-func (d *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) (bool, error) {
+func (d *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) (bool, error) {
 	if newRC.Spec.Replicas == deployment.Spec.Replicas {
 		// Scaling not required.
 		return false, nil
@@ -192,7 +192,7 @@ func (d *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationControlle
 	return true, err
 }
 
-func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationController, oldRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) (bool, error) {
+func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationController, oldRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) (bool, error) {
 	oldPodsCount := deploymentUtil.GetReplicaCountForRCs(oldRCs)
 	if oldPodsCount == 0 {
 		// Cant scale down further
@@ -239,12 +239,12 @@ func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControll
 	return true, err
 }
 
-func (d *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment experimental.Deployment) error {
+func (d *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
 	totalReplicas := deploymentUtil.GetReplicaCountForRCs(allRCs)
 	updatedReplicas := deploymentUtil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
 	newDeployment := deployment
 	// TODO: Reconcile this with API definition. API definition talks about ready pods, while this just computes created pods.
-	newDeployment.Status = experimental.DeploymentStatus{
+	newDeployment.Status = extensions.DeploymentStatus{
 		Replicas:        totalReplicas,
 		UpdatedReplicas: updatedReplicas,
 	}
@@ -252,7 +252,7 @@ func (d *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationC
 	return err
 }
 
-func (d *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationController, newScale int, deployment experimental.Deployment) (*api.ReplicationController, error) {
+func (d *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationController, newScale int, deployment extensions.Deployment) (*api.ReplicationController, error) {
 	scalingOperation := "down"
 	if rc.Spec.Replicas < newScale {
 		scalingOperation = "up"
@@ -270,7 +270,7 @@ func (d *DeploymentController) scaleRC(rc *api.ReplicationController, newScale i
 	return d.client.ReplicationControllers(rc.ObjectMeta.Namespace).Update(rc)
 }
 
-func (d *DeploymentController) updateDeployment(deployment *experimental.Deployment) (*experimental.Deployment, error) {
+func (d *DeploymentController) updateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	// TODO: Using client for now, update to use store when it is ready.
 	return d.client.Experimental().Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
 }

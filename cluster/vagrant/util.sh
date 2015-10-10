@@ -36,10 +36,10 @@ function detect-minions {
 function verify-prereqs {
   if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
     if [[ -z "${RUNTIME_CONFIG}" ]]; then
-      RUNTIME_CONFIG="experimental/v1alpha1"
+      RUNTIME_CONFIG="extensions/v1beta1"
     else
       # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1=false" and appending "experimental/v1=true" if not.
-      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1=true"; then
         echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
         exit 1
       fi

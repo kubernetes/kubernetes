@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
@@ -51,7 +51,7 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 	return apivalidation.ValidateReplicationControllerName(name, prefix)
 }
 
-func validateHorizontalPodAutoscalerSpec(autoscaler experimental.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
+func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if autoscaler.MinReplicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, isNegativeErrorMsg))
@@ -73,25 +73,25 @@ func validateHorizontalPodAutoscalerSpec(autoscaler experimental.HorizontalPodAu
 	return allErrs
 }
 
-func ValidateHorizontalPodAutoscaler(autoscaler *experimental.HorizontalPodAutoscaler) errs.ValidationErrorList {
+func ValidateHorizontalPodAutoscaler(autoscaler *extensions.HorizontalPodAutoscaler) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName).Prefix("metadata")...)
 	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec)...)
 	return allErrs
 }
 
-func ValidateHorizontalPodAutoscalerUpdate(newAutoscler, oldAutoscaler *experimental.HorizontalPodAutoscaler) errs.ValidationErrorList {
+func ValidateHorizontalPodAutoscalerUpdate(newAutoscler, oldAutoscaler *extensions.HorizontalPodAutoscaler) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&newAutoscler.ObjectMeta, &oldAutoscaler.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscler.Spec)...)
 	return allErrs
 }
 
-func ValidateThirdPartyResourceUpdate(old, update *experimental.ThirdPartyResource) errs.ValidationErrorList {
+func ValidateThirdPartyResourceUpdate(old, update *extensions.ThirdPartyResource) errs.ValidationErrorList {
 	return ValidateThirdPartyResource(update)
 }
 
-func ValidateThirdPartyResource(obj *experimental.ThirdPartyResource) errs.ValidationErrorList {
+func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(obj.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
@@ -111,7 +111,7 @@ func ValidateThirdPartyResource(obj *experimental.ThirdPartyResource) errs.Valid
 }
 
 // ValidateDaemonSet tests if required fields in the DaemonSet are set.
-func ValidateDaemonSet(controller *experimental.DaemonSet) errs.ValidationErrorList {
+func ValidateDaemonSet(controller *extensions.DaemonSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
@@ -119,7 +119,7 @@ func ValidateDaemonSet(controller *experimental.DaemonSet) errs.ValidationErrorL
 }
 
 // ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
-func ValidateDaemonSetUpdate(oldController, controller *experimental.DaemonSet) errs.ValidationErrorList {
+func ValidateDaemonSetUpdate(oldController, controller *extensions.DaemonSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
@@ -128,7 +128,7 @@ func ValidateDaemonSetUpdate(oldController, controller *experimental.DaemonSet) 
 }
 
 // validateDaemonSetStatus validates a DaemonSetStatus
-func validateDaemonSetStatus(status *experimental.DaemonSetStatus) errs.ValidationErrorList {
+func validateDaemonSetStatus(status *extensions.DaemonSetStatus) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentNumberScheduled), "currentNumberScheduled")...)
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.NumberMisscheduled), "numberMisscheduled")...)
@@ -137,7 +137,7 @@ func validateDaemonSetStatus(status *experimental.DaemonSetStatus) errs.Validati
 }
 
 // ValidateDaemonSetStatus validates tests if required fields in the DaemonSet Status section
-func ValidateDaemonSetStatusUpdate(controller, oldController *experimental.DaemonSet) errs.ValidationErrorList {
+func ValidateDaemonSetStatusUpdate(controller, oldController *extensions.DaemonSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateDaemonSetStatus(&controller.Status)...)
@@ -160,7 +160,7 @@ func ValidateDaemonSetTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplat
 }
 
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
-func ValidateDaemonSetSpec(spec *experimental.DaemonSetSpec) errs.ValidationErrorList {
+func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	selector := labels.Set(spec.Selector).AsSelector()
@@ -237,7 +237,7 @@ func IsNotMoreThan100Percent(intOrStringValue util.IntOrString, fieldName string
 	return allErrs
 }
 
-func ValidateRollingUpdateDeployment(rollingUpdate *experimental.RollingUpdateDeployment, fieldName string) errs.ValidationErrorList {
+func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDeployment, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fieldName+"maxUnavailable")...)
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fieldName+".maxSurge")...)
@@ -251,22 +251,22 @@ func ValidateRollingUpdateDeployment(rollingUpdate *experimental.RollingUpdateDe
 	return allErrs
 }
 
-func ValidateDeploymentStrategy(strategy *experimental.DeploymentStrategy, fieldName string) errs.ValidationErrorList {
+func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if strategy.RollingUpdate == nil {
 		return allErrs
 	}
 	switch strategy.Type {
-	case experimental.RecreateDeploymentStrategyType:
-		allErrs = append(allErrs, errs.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+experimental.RecreateDeploymentStrategyType))
-	case experimental.RollingUpdateDeploymentStrategyType:
+	case extensions.RecreateDeploymentStrategyType:
+		allErrs = append(allErrs, errs.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+extensions.RecreateDeploymentStrategyType))
+	case extensions.RollingUpdateDeploymentStrategyType:
 		allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, "rollingUpdate")...)
 	}
 	return allErrs
 }
 
 // Validates given deployment spec.
-func ValidateDeploymentSpec(spec *experimental.DeploymentSpec) errs.ValidationErrorList {
+func ValidateDeploymentSpec(spec *extensions.DeploymentSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonEmptySelector(spec.Selector, "selector")...)
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(spec.Replicas), "replicas")...)
@@ -276,25 +276,25 @@ func ValidateDeploymentSpec(spec *experimental.DeploymentSpec) errs.ValidationEr
 	return allErrs
 }
 
-func ValidateDeploymentUpdate(old, update *experimental.Deployment) errs.ValidationErrorList {
+func ValidateDeploymentUpdate(old, update *extensions.Deployment) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec).Prefix("spec")...)
 	return allErrs
 }
 
-func ValidateDeployment(obj *experimental.Deployment) errs.ValidationErrorList {
+func ValidateDeployment(obj *extensions.Deployment) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec).Prefix("spec")...)
 	return allErrs
 }
 
-func ValidateThirdPartyResourceDataUpdate(old, update *experimental.ThirdPartyResourceData) errs.ValidationErrorList {
+func ValidateThirdPartyResourceDataUpdate(old, update *extensions.ThirdPartyResourceData) errs.ValidationErrorList {
 	return ValidateThirdPartyResourceData(update)
 }
 
-func ValidateThirdPartyResourceData(obj *experimental.ThirdPartyResourceData) errs.ValidationErrorList {
+func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(obj.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
@@ -302,7 +302,7 @@ func ValidateThirdPartyResourceData(obj *experimental.ThirdPartyResourceData) er
 	return allErrs
 }
 
-func ValidateJob(job *experimental.Job) errs.ValidationErrorList {
+func ValidateJob(job *extensions.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	// Jobs and rcs have the same name validation
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
@@ -310,7 +310,7 @@ func ValidateJob(job *experimental.Job) errs.ValidationErrorList {
 	return allErrs
 }
 
-func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
+func ValidateJobSpec(spec *extensions.JobSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if spec.Parallelism != nil && *spec.Parallelism < 0 {
@@ -342,7 +342,7 @@ func ValidateJobSpec(spec *experimental.JobSpec) errs.ValidationErrorList {
 	return allErrs
 }
 
-func ValidateJobStatus(status *experimental.JobStatus) errs.ValidationErrorList {
+func ValidateJobStatus(status *extensions.JobStatus) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), "active")...)
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Succeeded), "succeeded")...)
@@ -350,21 +350,21 @@ func ValidateJobStatus(status *experimental.JobStatus) errs.ValidationErrorList 
 	return allErrs
 }
 
-func ValidateJobUpdate(oldJob, job *experimental.Job) errs.ValidationErrorList {
+func ValidateJobUpdate(oldJob, job *extensions.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateJobSpecUpdate(oldJob.Spec, job.Spec).Prefix("spec")...)
 	return allErrs
 }
 
-func ValidateJobUpdateStatus(oldJob, job *experimental.Job) errs.ValidationErrorList {
+func ValidateJobUpdateStatus(oldJob, job *extensions.Job) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateJobStatusUpdate(oldJob.Status, job.Status).Prefix("status")...)
 	return allErrs
 }
 
-func ValidateJobSpecUpdate(oldSpec, spec experimental.JobSpec) errs.ValidationErrorList {
+func ValidateJobSpecUpdate(oldSpec, spec extensions.JobSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec)...)
 	if !api.Semantic.DeepEqual(oldSpec.Completions, spec.Completions) {
@@ -379,14 +379,14 @@ func ValidateJobSpecUpdate(oldSpec, spec experimental.JobSpec) errs.ValidationEr
 	return allErrs
 }
 
-func ValidateJobStatusUpdate(oldStatus, status experimental.JobStatus) errs.ValidationErrorList {
+func ValidateJobStatusUpdate(oldStatus, status extensions.JobStatus) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateJobStatus(&status)...)
 	return allErrs
 }
 
 // ValidateIngress tests if required fields in the Ingress are set.
-func ValidateIngress(ingress *experimental.Ingress) errs.ValidationErrorList {
+func ValidateIngress(ingress *extensions.Ingress) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec).Prefix("spec")...)
@@ -399,7 +399,7 @@ func ValidateIngressName(name string, prefix bool) (bool, string) {
 }
 
 // ValidateIngressSpec tests if required fields in the IngressSpec are set.
-func ValidateIngressSpec(spec *experimental.IngressSpec) errs.ValidationErrorList {
+func ValidateIngressSpec(spec *extensions.IngressSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	// TODO: Is a default backend mandatory?
 	if spec.Backend != nil {
@@ -414,14 +414,14 @@ func ValidateIngressSpec(spec *experimental.IngressSpec) errs.ValidationErrorLis
 }
 
 // ValidateIngressUpdate tests if required fields in the Ingress are set.
-func ValidateIngressUpdate(oldIngress, ingress *experimental.Ingress) errs.ValidationErrorList {
+func ValidateIngressUpdate(oldIngress, ingress *extensions.Ingress) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec).Prefix("spec")...)
 	return allErrs
 }
 
-func validateIngressRules(IngressRules []experimental.IngressRule) errs.ValidationErrorList {
+func validateIngressRules(IngressRules []extensions.IngressRule) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(IngressRules) == 0 {
 		return append(allErrs, errs.NewFieldRequired("IngressRules"))
@@ -442,7 +442,7 @@ func validateIngressRules(IngressRules []experimental.IngressRule) errs.Validati
 	return allErrs
 }
 
-func validateIngressRuleValue(ingressRule *experimental.IngressRuleValue) errs.ValidationErrorList {
+func validateIngressRuleValue(ingressRule *extensions.IngressRuleValue) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if ingressRule.HTTP != nil {
 		allErrs = append(allErrs, validateHTTPIngressRuleValue(ingressRule.HTTP).Prefix("http")...)
@@ -450,7 +450,7 @@ func validateIngressRuleValue(ingressRule *experimental.IngressRuleValue) errs.V
 	return allErrs
 }
 
-func validateHTTPIngressRuleValue(httpIngressRuleValue *experimental.HTTPIngressRuleValue) errs.ValidationErrorList {
+func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRuleValue) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(httpIngressRuleValue.Paths) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("paths"))
@@ -480,7 +480,7 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *experimental.HTTPIngress
 }
 
 // validateIngressBackend tests if a given backend is valid.
-func validateIngressBackend(backend *experimental.IngressBackend) errs.ValidationErrorList {
+func validateIngressBackend(backend *extensions.IngressBackend) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	// All backends must reference a single local service by name, and a single service port by name or number.
@@ -502,7 +502,7 @@ func validateIngressBackend(backend *experimental.IngressBackend) errs.Validatio
 	return allErrs
 }
 
-func validateClusterAutoscalerSpec(spec experimental.ClusterAutoscalerSpec) errs.ValidationErrorList {
+func validateClusterAutoscalerSpec(spec extensions.ClusterAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if spec.MinNodes < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("minNodes", spec.MinNodes, `must be non-negative`))
@@ -527,7 +527,7 @@ func validateClusterAutoscalerSpec(spec experimental.ClusterAutoscalerSpec) errs
 	return allErrs
 }
 
-func ValidateClusterAutoscaler(autoscaler *experimental.ClusterAutoscaler) errs.ValidationErrorList {
+func ValidateClusterAutoscaler(autoscaler *extensions.ClusterAutoscaler) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if autoscaler.Name != "ClusterAutoscaler" {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", autoscaler.Name, `name must be ClusterAutoscaler`))

@@ -271,7 +271,7 @@ func AddApisWebService(container *restful.Container, apiPrefix string, groups []
 }
 
 // Adds a service to return the supported versions, preferred version, and name
-// of a group. E.g., a such web service will be registered at /apis/experimental.
+// of a group. E.g., a such web service will be registered at /apis/extensions.
 func AddGroupWebService(container *restful.Container, path string, group api.APIGroup) {
 	groupHandler := GroupHandler(group)
 	ws := new(restful.WebService)
@@ -286,7 +286,7 @@ func AddGroupWebService(container *restful.Container, path string, group api.API
 }
 
 // Adds a service to return the supported resources, E.g., a such web service
-// will be registered at /apis/experimental/v1.
+// will be registered at /apis/extensions/v1.
 func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion string, apiResources []api.APIResource) {
 	resourceHandler := SupportedResourcesHandler(groupVersion, apiResources)
 	ws.Route(ws.GET("/").To(resourceHandler).

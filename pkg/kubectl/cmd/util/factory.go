@@ -142,7 +142,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch group {
 			case "":
 				return client.RESTClient, nil
-			case "experimental":
+			case "extensions":
 				return client.ExperimentalClient.RESTClient, nil
 			}
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
@@ -406,7 +406,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
 	}
-	if group == "experimental" {
+	if group == "extensions" {
 		if c.c.ExperimentalClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}

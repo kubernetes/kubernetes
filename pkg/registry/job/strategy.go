@@ -21,8 +21,8 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -46,20 +46,20 @@ func (jobStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(obj runtime.Object) {
-	job := obj.(*experimental.Job)
-	job.Status = experimental.JobStatus{}
+	job := obj.(*extensions.Job)
+	job.Status = extensions.JobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newJob := obj.(*experimental.Job)
-	oldJob := old.(*experimental.Job)
+	newJob := obj.(*extensions.Job)
+	oldJob := old.(*extensions.Job)
 	newJob.Status = oldJob.Status
 }
 
 // Validate validates a new job.
 func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	job := obj.(*experimental.Job)
+	job := obj.(*extensions.Job)
 	return validation.ValidateJob(job)
 }
 
@@ -74,8 +74,8 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateJob(obj.(*experimental.Job))
-	updateErrorList := validation.ValidateJobUpdate(old.(*experimental.Job), obj.(*experimental.Job))
+	validationErrorList := validation.ValidateJob(obj.(*extensions.Job))
+	updateErrorList := validation.ValidateJobUpdate(old.(*extensions.Job), obj.(*extensions.Job))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -86,17 +86,17 @@ type jobStatusStrategy struct {
 var StatusStrategy = jobStatusStrategy{Strategy}
 
 func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newJob := obj.(*experimental.Job)
-	oldJob := old.(*experimental.Job)
+	newJob := obj.(*extensions.Job)
+	oldJob := old.(*extensions.Job)
 	newJob.Spec = oldJob.Spec
 }
 
 func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateJobUpdateStatus(obj.(*experimental.Job), old.(*experimental.Job))
+	return validation.ValidateJobUpdateStatus(obj.(*extensions.Job), old.(*extensions.Job))
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.
-func JobToSelectableFields(job *experimental.Job) fields.Set {
+func JobToSelectableFields(job *extensions.Job) fields.Set {
 	return fields.Set{
 		"metadata.name":     job.Name,
 		"status.successful": strconv.Itoa(job.Status.Succeeded),
@@ -111,7 +111,7 @@ func MatchJob(label labels.Selector, field fields.Selector) generic.Matcher {
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			job, ok := obj.(*experimental.Job)
+			job, ok := obj.(*extensions.Job)
 			if !ok {
 				return nil, nil, fmt.Errorf("Given object is not a job.")
 			}

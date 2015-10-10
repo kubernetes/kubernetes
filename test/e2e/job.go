@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -183,12 +183,12 @@ var _ = Describe("Job", func() {
 })
 
 // newTestJob returns a job which does one of several testing behaviors.
-func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *experimental.Job {
-	job := &experimental.Job{
+func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *extensions.Job {
+	job := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
 			Template: &api.PodTemplateSpec{
@@ -223,7 +223,7 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 	return job
 }
 
-func createJob(c *client.Client, ns string, job *experimental.Job) (*experimental.Job, error) {
+func createJob(c *client.Client, ns string, job *extensions.Job) (*extensions.Job, error) {
 	return c.Experimental().Jobs(ns).Create(job)
 }
 

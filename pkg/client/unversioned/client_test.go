@@ -92,7 +92,7 @@ func (c *testClient) Setup(t *testing.T) *testClient {
 		// We will fix this by supporting multiple group versions in Config
 		version = c.Version
 		if len(version) == 0 {
-			version = testapi.Experimental.Version()
+			version = testapi.Extensions.Version()
 		}
 		c.ExperimentalClient = NewExperimentalOrDie(&Config{
 			Host:    c.server.URL,
@@ -229,8 +229,8 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
-		} else if api.Scheme.Recognizes(testapi.Experimental.GroupAndVersion(), kind) {
-			bs, err = testapi.Experimental.Codec().Encode(obj)
+		} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
+			bs, err = testapi.Extensions.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}

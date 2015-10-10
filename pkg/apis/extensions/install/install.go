@@ -29,23 +29,23 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	_ "k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/experimental"
+const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 
 var accessor = meta.NewAccessor()
 
 func init() {
-	groupMeta, err := latest.RegisterGroup("experimental")
+	groupMeta, err := latest.RegisterGroup("extensions")
 	if err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
-	registeredGroupVersions := registered.GroupVersionsForGroup("experimental")
+	registeredGroupVersions := registered.GroupVersionsForGroup("extensions")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
@@ -70,7 +70,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper("experimental", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	groupMeta.RESTMapper = api.NewDefaultRESTMapper("extensions", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 }
@@ -79,14 +79,14 @@ func init() {
 // string, or an error if the version is not known.
 func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "experimental/v1alpha1":
+	case "extensions/v1beta1":
 		return &meta.VersionInterfaces{
-			Codec:            v1alpha1.Codec,
+			Codec:            v1beta1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group("experimental")
+		g, _ := latest.Group("extensions")
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
 	}
 }

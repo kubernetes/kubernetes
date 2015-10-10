@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -122,7 +122,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	return fakeClient
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *experimental.ResourceConsumption, err error) {
+func (tc *testCase) verifyResults(t *testing.T, val *extensions.ResourceConsumption, err error) {
 	assert.Equal(t, tc.desiredError, err)
 	if tc.desiredError != nil {
 		return

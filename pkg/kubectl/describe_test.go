@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
@@ -481,12 +481,12 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 }
 
 func TestDescribeDeployment(t *testing.T) {
-	fake := testclient.NewSimpleFake(&experimental.Deployment{
+	fake := testclient.NewSimpleFake(&extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Template: &api.PodTemplateSpec{},
 		},
 	})

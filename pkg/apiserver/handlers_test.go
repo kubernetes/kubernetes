@@ -242,10 +242,10 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"POST", "/api/v1/namespaces/other/pods", "create", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// api group identification
-		{"POST", "/apis/experimental/v1/namespaces/other/pods", "create", "api", "experimental", "v1", "other", "pods", "", "", []string{"pods"}},
+		{"POST", "/apis/extensions/v1/namespaces/other/pods", "create", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// api version identification
-		{"POST", "/apis/experimental/v1beta3/namespaces/other/pods", "create", "api", "experimental", "v1beta3", "other", "pods", "", "", []string{"pods"}},
+		{"POST", "/apis/extensions/v1beta3/namespaces/other/pods", "create", "api", "extensions", "v1beta3", "other", "pods", "", "", []string{"pods"}},
 	}
 
 	apiRequestInfoResolver := newTestAPIRequestInfoResolver()

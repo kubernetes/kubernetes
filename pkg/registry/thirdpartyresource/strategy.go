@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -52,7 +52,7 @@ func (strategy) PrepareForCreate(obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateThirdPartyResource(obj.(*experimental.ThirdPartyResource))
+	return validation.ValidateThirdPartyResource(obj.(*extensions.ThirdPartyResource))
 }
 
 func (strategy) AllowCreateOnUpdate() bool {
@@ -63,7 +63,7 @@ func (strategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateThirdPartyResourceUpdate(old.(*experimental.ThirdPartyResource), obj.(*experimental.ThirdPartyResource))
+	return validation.ValidateThirdPartyResourceUpdate(old.(*extensions.ThirdPartyResource), obj.(*extensions.ThirdPartyResource))
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
@@ -73,7 +73,7 @@ func (strategy) AllowUnconditionalUpdate() bool {
 // Matcher returns a generic matcher for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*experimental.ThirdPartyResource)
+		sa, ok := obj.(*extensions.ThirdPartyResource)
 		if !ok {
 			return false, fmt.Errorf("not a ThirdPartyResource")
 		}
@@ -83,6 +83,6 @@ func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 }
 
 // SelectableFields returns a label set that can be used for filter selection
-func SelectableFields(obj *experimental.ThirdPartyResource) labels.Set {
+func SelectableFields(obj *extensions.ThirdPartyResource) labels.Set {
 	return labels.Set{}
 }

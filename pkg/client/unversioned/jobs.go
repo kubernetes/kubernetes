@@ -19,7 +19,7 @@ package unversioned
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -32,13 +32,13 @@ type JobsNamespacer interface {
 
 // JobInterface exposes methods to work on Job resources.
 type JobInterface interface {
-	List(label labels.Selector, field fields.Selector) (*experimental.JobList, error)
-	Get(name string) (*experimental.Job, error)
-	Create(job *experimental.Job) (*experimental.Job, error)
-	Update(job *experimental.Job) (*experimental.Job, error)
+	List(label labels.Selector, field fields.Selector) (*extensions.JobList, error)
+	Get(name string) (*extensions.Job, error)
+	Create(job *extensions.Job) (*extensions.Job, error)
+	Update(job *extensions.Job) (*extensions.Job, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	UpdateStatus(job *experimental.Job) (*experimental.Job, error)
+	UpdateStatus(job *extensions.Job) (*extensions.Job, error)
 }
 
 // jobs implements JobsNamespacer interface
@@ -56,29 +56,29 @@ func newJobs(c *ExperimentalClient, namespace string) *jobs {
 var _ JobInterface = &jobs{}
 
 // List returns a list of jobs that match the label and field selectors.
-func (c *jobs) List(label labels.Selector, field fields.Selector) (result *experimental.JobList, err error) {
-	result = &experimental.JobList{}
+func (c *jobs) List(label labels.Selector, field fields.Selector) (result *extensions.JobList, err error) {
+	result = &extensions.JobList{}
 	err = c.r.Get().Namespace(c.ns).Resource("jobs").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular job.
-func (c *jobs) Get(name string) (result *experimental.Job, err error) {
-	result = &experimental.Job{}
+func (c *jobs) Get(name string) (result *extensions.Job, err error) {
+	result = &extensions.Job{}
 	err = c.r.Get().Namespace(c.ns).Resource("jobs").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new job.
-func (c *jobs) Create(job *experimental.Job) (result *experimental.Job, err error) {
-	result = &experimental.Job{}
+func (c *jobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
+	result = &extensions.Job{}
 	err = c.r.Post().Namespace(c.ns).Resource("jobs").Body(job).Do().Into(result)
 	return
 }
 
 // Update updates an existing job.
-func (c *jobs) Update(job *experimental.Job) (result *experimental.Job, err error) {
-	result = &experimental.Job{}
+func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
+	result = &extensions.Job{}
 	err = c.r.Put().Namespace(c.ns).Resource("jobs").Name(job.Name).Body(job).Do().Into(result)
 	return
 }
@@ -109,8 +109,8 @@ func (c *jobs) Watch(label labels.Selector, field fields.Selector, resourceVersi
 }
 
 // UpdateStatus takes the name of the job and the new status.  Returns the server's representation of the job, and an error, if it occurs.
-func (c *jobs) UpdateStatus(job *experimental.Job) (result *experimental.Job, err error) {
-	result = &experimental.Job{}
+func (c *jobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
+	result = &extensions.Job{}
 	err = c.r.Put().Namespace(c.ns).Resource("jobs").Name(job.Name).SubResource("status").Body(job).Do().Into(result)
 	return
 }

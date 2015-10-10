@@ -14,24 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var Codec = runtime.CodecFor(api.Scheme, "experimental/v1alpha1")
-
 func init() {
+	// Register the API.
 	addKnownTypes()
-	addDefaultingFuncs()
-	addConversionFuncs()
 }
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("experimental/v1alpha1",
+	api.Scheme.AddKnownTypes("",
 		&ClusterAutoscaler{},
 		&ClusterAutoscalerList{},
 		&Deployment{},
