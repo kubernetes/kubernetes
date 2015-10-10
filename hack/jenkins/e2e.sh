@@ -952,6 +952,9 @@ cd kubernetes
 ARTIFACTS=${WORKSPACE}/_artifacts
 mkdir -p ${ARTIFACTS}
 export E2E_REPORT_DIR=${ARTIFACTS}
+declare -r gcp_resources_before="${ARTIFACTS}/gcp-resources-before.txt"
+declare -r gcp_resources_cluster_up="${ARTIFACTS}/gcp-resources-cluster-up.txt"
+declare -r gcp_resources_after="${ARTIFACTS}/gcp-resources-after.txt"
 
 ### Pre Set Up ###
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
@@ -971,8 +974,14 @@ fi
 ### Set up ###
 if [[ "${E2E_UP,,}" == "true" ]]; then
     go run ./hack/e2e.go ${E2E_OPT} -v --down
+    if [[ ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ]]; then
+      ./cluster/gce/list-resources.sh > "${gcp_resources_before}"
+    fi
     go run ./hack/e2e.go ${E2E_OPT} -v --up
     go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
+    if [[ ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ]]; then
+      ./cluster/gce/list-resources.sh > "${gcp_resources_cluster_up}"
+    fi
 fi
 
 ### Run tests ###
@@ -1005,14 +1014,6 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   unset MASTER_SIZE_BKP
 fi
 
-# TODO(zml): We have a bunch of legacy Jenkins configs that are
-# expecting junit*.xml to be in ${WORKSPACE} root and it's Friday
-# afternoon, so just put the junit report where it's expected.
-# If link already exists, non-zero return code should not cause build to fail.
-for junit in ${ARTIFACTS}/junit*.xml; do
-  ln -s -f ${junit} ${WORKSPACE} || true
-done
-
 ### Clean up ###
 if [[ "${E2E_DOWN,,}" == "true" ]]; then
     # Sleep before deleting the cluster to give the controller manager time to
@@ -1023,4 +1024,11 @@ if [[ "${E2E_DOWN,,}" == "true" ]]; then
     # for the wait between attempts.
     sleep 30
     go run ./hack/e2e.go ${E2E_OPT} -v --down
+    if [[ ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ]]; then
+      ./cluster/gce/list-resources.sh > "${gcp_resources_after}"
+    fi
+fi
+
+if [[ -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
+  diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}" || true
 fi
