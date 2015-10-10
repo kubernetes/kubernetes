@@ -673,7 +673,12 @@ type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository"`
 	// Commit hash for the specified revision.
-	Revision string `json:"revision"`
+	Revision string `json:"revision,omitempty"`
+	// Target directory name.
+	// Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the
+	// git repository.  Otherwise, if specified, the volume will contain the git repository in
+	// the subdirectory with the given name.
+	Directory string `json:"directory,omitempty"`
 }
 
 // SecretVolumeSource adapts a Secret into a VolumeSource.
