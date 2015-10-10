@@ -50,6 +50,7 @@ mesosslave:
   - MESOS_RESOURCES=cpus:4;mem:1280;disk:25600;ports:[8000-21099]
   - MESOS_SWITCH_USER=0
   - MESOS_CONTAINERIZERS=docker,mesos
+  - MESOS_ISOLATION=cgroups/cpu,cgroups/mem
   - DOCKER_DAEMON_ARGS
   links:
   - etcd
@@ -144,6 +145,7 @@ scheduler:
     --mesos-master=mesosmaster1:5050
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
+    --mesos-executor-cpus=1.0
     --v=4
   environment:
   - MESOS_DOCKER_ETCD_TIMEOUT

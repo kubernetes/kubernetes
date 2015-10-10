@@ -92,6 +92,11 @@ type kuberTask struct {
 
 type podStatusFunc func() (*api.PodStatus, error)
 
+type NodeInfo struct {
+	Cores int
+	Mem   int64 // in bytes
+}
+
 // KubernetesExecutor is an mesos executor that runs pods
 // in a minion machine.
 type KubernetesExecutor struct {
@@ -113,6 +118,7 @@ type KubernetesExecutor struct {
 	staticPodsConfigPath string
 	podController        *framework.Controller
 	launchGracePeriod    time.Duration
+	nodeInfos            chan<- NodeInfo
 }
 
 type Config struct {
@@ -127,6 +133,7 @@ type Config struct {
 	StaticPodsConfigPath string
 	PodLW                cache.ListerWatcher // mandatory, otherwise initialiation will panic
 	LaunchGracePeriod    time.Duration
+	NodeInfos            chan<- NodeInfo
 }
 
 func (k *KubernetesExecutor) isConnected() bool {
@@ -152,6 +159,7 @@ func New(config Config) *KubernetesExecutor {
 		podStatusFunc:        config.PodStatusFunc,
 		staticPodsConfigPath: config.StaticPodsConfigPath,
 		launchGracePeriod:    config.LaunchGracePeriod,
+		nodeInfos:            config.NodeInfos,
 	}
 
 	// watch pods from the given pod ListWatch
@@ -236,6 +244,10 @@ func (k *KubernetesExecutor) Registered(driver bindings.ExecutorDriver,
 		Pods: []*api.Pod{},
 		Op:   kubetypes.SET,
 	})
+
+	if slaveInfo != nil && k.nodeInfos != nil {
+		k.nodeInfos <- nodeInfo(slaveInfo, executorInfo) // leave it behind the upper lock to avoid panics
+	}
 }
 
 // Reregistered is called when the executor is successfully re-registered with the slave.
@@ -254,6 +266,16 @@ func (k *KubernetesExecutor) Reregistered(driver bindings.ExecutorDriver, slaveI
 		if err != nil {
 			log.Errorf("cannot update node labels: %v", err)
 		}
+	}
+
+	if slaveInfo != nil && k.nodeInfos != nil {
+		// make sure nodeInfos is not nil and send new NodeInfo
+		k.lock.Lock()
+		defer k.lock.Unlock()
+		if k.isDone() {
+			return
+		}
+		k.nodeInfos <- nodeInfo(slaveInfo, nil)
 	}
 }
 
@@ -796,6 +818,7 @@ func (k *KubernetesExecutor) doShutdown(driver bindings.ExecutorDriver) {
 	// signal to all listeners that this KubeletExecutor is done!
 	close(k.terminate)
 	close(k.updateChan)
+	close(k.nodeInfos)
 
 	if k.shutdownAlert != nil {
 		func() {
@@ -925,4 +948,42 @@ func differentTime(a, b *unversionedapi.Time) bool {
 
 func differentPeriod(a, b *int64) bool {
 	return (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b)
+}
+
+func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
+	var executorCPU, executorMem float64
+
+	// get executor resources
+	if ei != nil {
+		for _, r := range ei.GetResources() {
+			if r == nil || r.GetType() != mesos.Value_SCALAR {
+				continue
+			}
+			switch r.GetName() {
+			case "cpus":
+				executorCPU = r.GetScalar().GetValue()
+			case "mem":
+				executorMem = r.GetScalar().GetValue()
+			}
+		}
+	}
+
+	// get resource capacity of the node
+	ni := NodeInfo{}
+	for _, r := range si.GetResources() {
+		if r == nil || r.GetType() != mesos.Value_SCALAR {
+			continue
+		}
+
+		switch r.GetName() {
+		case "cpus":
+			// We intentionally take the floor of executorCPU because cores are integers
+			// and we would loose a complete cpu here if the value is <1.
+			// TODO(sttts): switch to float64 when "Machine Allocables" are implemented
+			ni.Cores = int(r.GetScalar().GetValue() - float64(int(executorCPU)))
+		case "mem":
+			ni.Mem = int64(r.GetScalar().GetValue()-executorMem) * 1024 * 1024
+		}
+	}
+	return ni
 }
