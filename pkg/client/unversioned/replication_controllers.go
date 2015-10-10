@@ -34,6 +34,7 @@ type ReplicationControllerInterface interface {
 	Get(name string) (*api.ReplicationController, error)
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateStatus(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -74,6 +75,13 @@ func (c *replicationControllers) Create(controller *api.ReplicationController) (
 func (c *replicationControllers) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).Body(controller).Do().Into(result)
+	return
+}
+
+// UpdateStatus updates an existing replication controller status
+func (c *replicationControllers) UpdateStatus(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).SubResource("status").Body(controller).Do().Into(result)
 	return
 }
 

@@ -124,6 +124,36 @@ func TestUpdateController(t *testing.T) {
 	c.Validate(t, receivedController, err)
 }
 
+func TestUpdateStatusController(t *testing.T) {
+	ns := api.NamespaceDefault
+	requestController := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+	}
+	c := &testClient{
+		Request: testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo") + "/status", Query: buildQueryValues(nil)},
+		Response: Response{
+			StatusCode: 200,
+			Body: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas: 2,
+				},
+			},
+		},
+	}
+	receivedController, err := c.Setup(t).ReplicationControllers(ns).UpdateStatus(requestController)
+	c.Validate(t, receivedController, err)
+}
 func TestDeleteController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
