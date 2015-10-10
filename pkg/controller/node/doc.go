@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package nodecontroller contains code for syncing cloud instances with
+// Package node contains code for syncing cloud instances with
 // node registry
-package nodecontroller
+package node
