@@ -225,7 +225,7 @@ func restartNodes(provider string, nt time.Duration) error {
 // with the following bash, but needs to be written in Go:
 //
 //   # Step 1: Get instance names.
-//   list=$(gcloud preview instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
+//   list=$(gcloud compute instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
 //   i=""
 //   for l in $list; do
 // 	  i="${l##*/},${i}"
