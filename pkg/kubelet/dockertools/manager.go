@@ -351,25 +351,35 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 				}
 			}
 		}
-	} else if !inspectResult.State.FinishedAt.IsZero() {
+	} else if !inspectResult.State.FinishedAt.IsZero() || inspectResult.State.ExitCode != 0 {
+		// When a container fails to start State.ExitCode is non-zero, FinishedAt and StartedAt are both zero
 		reason := ""
-		message := ""
+		message := inspectResult.State.Error
+		finishedAt := unversioned.NewTime(inspectResult.State.FinishedAt)
+		startedAt := unversioned.NewTime(inspectResult.State.StartedAt)
+
 		// Note: An application might handle OOMKilled gracefully.
 		// In that case, the container is oom killed, but the exit
 		// code could be 0.
 		if inspectResult.State.OOMKilled {
 			reason = "OOMKilled"
-		} else {
+		} else if inspectResult.State.ExitCode == 0 {
+			reason = "Completed"
+		} else if !inspectResult.State.FinishedAt.IsZero() {
 			reason = "Error"
-			message = inspectResult.State.Error
+		} else {
+			// finishedAt is zero and ExitCode is nonZero occurs when docker fails to start the container
+			reason = ErrContainerCannotRun.Error()
+			// Adjust time to the time docker attempted to run the container, otherwise startedAt and finishedAt will be set to epoch, which is misleading
+			finishedAt = unversioned.NewTime(inspectResult.Created)
+			startedAt = unversioned.NewTime(inspectResult.Created)
 		}
 		result.status.State.Terminated = &api.ContainerStateTerminated{
-			ExitCode: inspectResult.State.ExitCode,
-			Message:  message,
-			Reason:   reason,
-
-			StartedAt:   unversioned.NewTime(inspectResult.State.StartedAt),
-			FinishedAt:  unversioned.NewTime(inspectResult.State.FinishedAt),
+			ExitCode:    inspectResult.State.ExitCode,
+			Message:     message,
+			Reason:      reason,
+			StartedAt:   startedAt,
+			FinishedAt:  finishedAt,
 			ContainerID: DockerPrefix + dockerID,
 		}
 		if tPath != "" {
@@ -383,13 +393,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 				}
 			}
 		}
-	} else {
-		// TODO(dchen1107): Separate issue docker/docker#8294 was filed
-		result.status.State.Waiting = &api.ContainerStateWaiting{
-			Reason: ErrContainerCannotRun.Error(),
-		}
 	}
-
 	return &result
 }
 
@@ -1962,7 +1966,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 			continue
 		}
 		// first failure
-		if containerStatus.State.Terminated != nil {
+		if containerStatus.State.Terminated != nil && !containerStatus.State.Terminated.FinishedAt.IsZero() {
 			ts = containerStatus.State.Terminated.FinishedAt
 			break
 		}
