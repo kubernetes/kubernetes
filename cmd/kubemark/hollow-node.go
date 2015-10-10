@@ -27,6 +27,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -93,6 +94,7 @@ func main() {
 
 	if config.Morph == "kubelet" {
 		cadvisorInterface := new(cadvisor.Fake)
+		containerManager := cm.NewStubContainerManager()
 
 		fakeDockerClient := &dockertools.FakeDockerClient{}
 		fakeDockerClient.VersionInfo = docker.Env{"ApiVersion=1.18"}
@@ -106,6 +108,7 @@ func main() {
 			fakeDockerClient,
 			config.KubeletPort,
 			config.KubeletReadOnlyPort,
+			containerManager,
 		)
 		hollowKubelet.Run()
 	}

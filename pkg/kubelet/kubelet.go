@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -195,7 +196,9 @@ func NewMainKubelet(
 	daemonEndpoints *api.NodeDaemonEndpoints,
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
+	containerManager cm.ContainerManager,
 ) (*Kubelet, error) {
+
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -302,6 +305,7 @@ func NewMainKubelet(
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
+		containerManager:               containerManager,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -390,12 +394,11 @@ func NewMainKubelet(
 
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
-	containerManager, err := newContainerManager(mounter, cadvisorInterface, dockerDaemonContainer, systemContainer, resourceContainer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
+	klet.nodeConfig = cm.NodeConfig{
+		DockerDaemonContainerName: dockerDaemonContainer,
+		SystemContainerName:       systemContainer,
+		KubeletContainerName:      resourceContainer,
 	}
-	klet.containerManager = containerManager
-
 	klet.runtimeState.setRuntimeSync(time.Now())
 
 	klet.runner = klet.containerRuntime
@@ -575,7 +578,8 @@ type Kubelet struct {
 	writer kubeio.Writer
 
 	// Manager of non-Runtime containers.
-	containerManager containerManager
+	containerManager cm.ContainerManager
+	nodeConfig       cm.NodeConfig
 
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
@@ -813,7 +817,7 @@ func (kl *Kubelet) preRun() error {
 		return fmt.Errorf("Failed to start CAdvisor %v", err)
 	}
 
-	if err := kl.containerManager.Start(); err != nil {
+	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
@@ -1971,7 +1975,7 @@ func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
 		// TODO: Should we admit the pod when machine info is unavailable?
 		return false, false
 	}
-	capacity := CapacityFromMachineInfo(info)
+	capacity := cadvisor.CapacityFromMachineInfo(info)
 	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, capacity)
 	return len(notFittingCPU) > 0, len(notFittingMemory) > 0
 }
@@ -2506,7 +2510,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
-		node.Status.Capacity = CapacityFromMachineInfo(info)
+		node.Status.Capacity = cadvisor.CapacityFromMachineInfo(info)
 		node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
 			int64(kl.pods), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&

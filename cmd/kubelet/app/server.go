@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -409,6 +410,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		ClusterDomain:             s.ClusterDomain,
 		ConfigFile:                s.Config,
 		ConfigureCBR0:             s.ConfigureCBR0,
+		ContainerManager:          nil,
 		ContainerRuntime:          s.ContainerRuntime,
 		CPUCFSQuota:               s.CPUCFSQuota,
 		DiskSpacePolicy:           diskSpacePolicy,
@@ -474,6 +476,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 // Otherwise, the caller is assumed to have set up the KubeletConfig object and all defaults
 // will be ignored.
 func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
+	var err error
 	if kcfg == nil {
 		cfg, err := s.UnsecuredKubeletConfig()
 		if err != nil {
@@ -498,11 +501,17 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 	}
 
 	if kcfg.CAdvisorInterface == nil {
-		ca, err := cadvisor.New(s.CAdvisorPort)
+		kcfg.CAdvisorInterface, err = cadvisor.New(s.CAdvisorPort)
 		if err != nil {
 			return err
 		}
-		kcfg.CAdvisorInterface = ca
+	}
+
+	if kcfg.ContainerManager == nil {
+		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface)
+		if err != nil {
+			return err
+		}
 	}
 
 	util.ReallyCrash = s.ReallyCrashForTesting
@@ -670,7 +679,7 @@ func SimpleKubelet(client *client.Client,
 	osInterface kubecontainer.OSInterface,
 	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency time.Duration,
 	maxPods int,
-) *KubeletConfig {
+	containerManager cm.ContainerManager) *KubeletConfig {
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -686,6 +695,7 @@ func SimpleKubelet(client *client.Client,
 		CgroupRoot:                "",
 		Cloud:                     cloud,
 		ConfigFile:                configFilePath,
+		ContainerManager:          containerManager,
 		ContainerRuntime:          "docker",
 		CPUCFSQuota:               false,
 		DiskSpacePolicy:           diskSpacePolicy,
@@ -724,8 +734,8 @@ func SimpleKubelet(client *client.Client,
 		SyncFrequency:       syncFrequency,
 		SystemContainer:     "",
 		TLSOptions:          tlsOptions,
-		Writer:              &io.StdWriter{},
 		VolumePlugins:       volumePlugins,
+		Writer:              &io.StdWriter{},
 	}
 	return &kcfg
 }
@@ -864,6 +874,7 @@ type KubeletConfig struct {
 	ClusterDomain                  string
 	ConfigFile                     string
 	ConfigureCBR0                  bool
+	ContainerManager               cm.ContainerManager
 	ContainerRuntime               string
 	CPUCFSQuota                    bool
 	DiskSpacePolicy                kubelet.DiskSpacePolicy
@@ -1004,6 +1015,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		daemonEndpoints,
 		kc.OOMAdjuster,
 		kc.SerializeImagePulls,
+		kc.ContainerManager,
 	)
 
 	if err != nil {
