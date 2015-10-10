@@ -293,7 +293,7 @@ func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (re
 	return newUpgradeAwareProxyHandler(location, nil, false), nil
 }
 
-// Support both GET and POST methods. Over time, we want to move all clients to start using POST and then stop supporting GET.
+// Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
 var upgradeableMethods = []string{"GET", "POST"}
 
 // AttachREST implements the attach subresource for a Pod

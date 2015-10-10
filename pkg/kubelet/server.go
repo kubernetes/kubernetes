@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
+	"k8s.io/kubernetes/pkg/util/wsstream"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -255,7 +256,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	ws = new(restful.WebService)
 	ws.
 		Path("/exec")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getExec).
+		Operation("getExec"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+		To(s.getExec).
+		Operation("getExec"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getExec).
 		Operation("getExec"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
@@ -266,7 +273,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	ws = new(restful.WebService)
 	ws.
 		Path("/attach")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getAttach).
+		Operation("getAttach"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+		To(s.getAttach).
+		Operation("getAttach"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getAttach).
 		Operation("getAttach"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
@@ -533,6 +546,10 @@ func getContainerCoordinates(request *restful.Request) (namespace, pod string, u
 
 const defaultStreamCreationTimeout = 30 * time.Second
 
+type Closer interface {
+	Close() error
+}
+
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	podNamespace, podID, uid, container := getContainerCoordinates(request)
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
@@ -600,23 +617,72 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 }
 
-func (s *Server) createStreams(request *restful.Request, response *restful.Response) (io.Reader, io.WriteCloser, io.WriteCloser, io.WriteCloser, httpstream.Connection, bool, bool) {
-	// start at 1 for error stream
-	expectedStreams := 1
-	if request.QueryParameter(api.ExecStdinParam) == "1" {
-		expectedStreams++
+// standardShellChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
+// along with the approprxate duplex value
+func standardShellChannels(stdin, stdout, stderr bool) []wsstream.ChannelType {
+	// open three half-duplex channels
+	channels := []wsstream.ChannelType{wsstream.ReadChannel, wsstream.WriteChannel, wsstream.WriteChannel}
+	if !stdin {
+		channels[0] = wsstream.IgnoreChannel
 	}
-	if request.QueryParameter(api.ExecStdoutParam) == "1" {
-		expectedStreams++
+	if !stdout {
+		channels[1] = wsstream.IgnoreChannel
 	}
+	if !stderr {
+		channels[2] = wsstream.IgnoreChannel
+	}
+	return channels
+}
+
+func (s *Server) createStreams(request *restful.Request, response *restful.Response) (io.Reader, io.WriteCloser, io.WriteCloser, io.WriteCloser, Closer, bool, bool) {
 	tty := request.QueryParameter(api.ExecTTYParam) == "1"
-	if !tty && request.QueryParameter(api.ExecStderrParam) == "1" {
+	stdin := request.QueryParameter(api.ExecStdinParam) == "1"
+	stdout := request.QueryParameter(api.ExecStdoutParam) == "1"
+	stderr := request.QueryParameter(api.ExecStderrParam) == "1"
+	if tty && stderr {
+		// TODO: make this an error before we reach this method
+		glog.V(4).Infof("Access to exec with tty and stderr is not supported, bypassing stderr")
+		stderr = false
+	}
+
+	// count the streams client asked for, starting with 1
+	expectedStreams := 1
+	if stdin {
+		expectedStreams++
+	}
+	if stdout {
+		expectedStreams++
+	}
+	if stderr {
 		expectedStreams++
 	}
 
 	if expectedStreams == 1 {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr"))
 		return nil, nil, nil, nil, nil, false, false
+	}
+
+	if wsstream.IsWebSocketRequest(request.Request) {
+		// open the requested channels, and always open the error channel
+		channels := append(standardShellChannels(stdin, stdout, stderr), wsstream.WriteChannel)
+		conn := wsstream.NewConn(channels...)
+		conn.SetIdleTimeout(s.host.StreamingConnectionIdleTimeout())
+		streams, err := conn.Open(httplog.Unlogged(response.ResponseWriter), request.Request)
+		if err != nil {
+			glog.Errorf("Unable to upgrade websocket connection: %v", err)
+			return nil, nil, nil, nil, nil, false, false
+		}
+		// Send an empty message to the lowest writable channel to notify the client the connection is established
+		// TODO: make generic to SDPY and WebSockets and do it outside of this method?
+		switch {
+		case stdout:
+			streams[1].Write([]byte{})
+		case stderr:
+			streams[2].Write([]byte{})
+		default:
+			streams[3].Write([]byte{})
+		}
+		return streams[0], streams[1], streams[2], streams[3], conn, tty, true
 	}
 
 	streamCh := make(chan httpstream.Stream)
