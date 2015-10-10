@@ -25,40 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-type FakePodControl struct {
-	podSpec       []api.PodTemplateSpec
-	deletePodName []string
-	lock          sync.Mutex
-	err           error
-}
-
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
-	panic("unimplemented")
-}
-
-func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
-	panic("unimplemented")
-}
-
-func (f *FakePodControl) DeletePod(namespace string, podName string) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if f.err != nil {
-		return f.err
-	}
-	f.deletePodName = append(f.deletePodName, podName)
-	return nil
-}
-func (f *FakePodControl) clear() {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.deletePodName = []string{}
-	f.podSpec = []api.PodTemplateSpec{}
-}
 
 func TestGC(t *testing.T) {
 	type nameToPhase struct {
@@ -100,8 +68,14 @@ func TestGC(t *testing.T) {
 	for i, test := range testCases {
 		client := testclient.NewSimpleFake()
 		gcc := New(client, controller.NoResyncPeriodFunc, test.threshold)
-		fake := &FakePodControl{}
-		gcc.podControl = fake
+		deletedPodNames := make([]string, 0)
+		var lock sync.Mutex
+		gcc.deletePod = func(_, name string) error {
+			lock.Lock()
+			defer lock.Unlock()
+			deletedPodNames = append(deletedPodNames, name)
+			return nil
+		}
 
 		creationTime := time.Unix(0, 0)
 		for _, pod := range test.pods {
@@ -115,16 +89,16 @@ func TestGC(t *testing.T) {
 		gcc.gc()
 
 		pass := true
-		for _, pod := range fake.deletePodName {
+		for _, pod := range deletedPodNames {
 			if !test.deletedPodNames.Has(pod) {
 				pass = false
 			}
 		}
-		if len(fake.deletePodName) != len(test.deletedPodNames) {
+		if len(deletedPodNames) != len(test.deletedPodNames) {
 			pass = false
 		}
 		if !pass {
-			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v", i, test.deletedPodNames, fake.deletePodName)
+			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v", i, test.deletedPodNames, deletedPodNames)
 		}
 	}
 }
