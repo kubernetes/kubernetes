@@ -353,7 +353,7 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
-		glog.Fatalf("specify either --etcd-servers or --etcd-config")
+		glog.Fatalf("Specify either --etcd-servers or --etcd-config")
 	}
 
 	if s.KubernetesServiceNodePort > 0 && !s.ServiceNodePortRange.Contains(s.KubernetesServiceNodePort) {
@@ -434,7 +434,7 @@ func (s *APIServer) Run(_ []string) error {
 	if enableExp {
 		expGroup, err := latest.Group("extensions")
 		if err != nil {
-			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+			glog.Fatalf("Experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
 		if _, found := storageVersions[expGroup.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.Group, storageVersions)
@@ -455,7 +455,7 @@ func (s *APIServer) Run(_ []string) error {
 		if apiserver.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
 			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
 		} else {
-			glog.Warning("no RSA key provided, service account token authentication disabled")
+			glog.Warning("No RSA key provided, service account token authentication disabled")
 		}
 	}
 	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
@@ -490,15 +490,15 @@ func (s *APIServer) Run(_ []string) error {
 		if s.CloudProvider == "gce" {
 			instances, supported := cloud.Instances()
 			if !supported {
-				glog.Fatalf("gce cloud provider has no instances.  this shouldn't happen. exiting.")
+				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
 			}
 			name, err := os.Hostname()
 			if err != nil {
-				glog.Fatalf("failed to get hostname: %v", err)
+				glog.Fatalf("Failed to get hostname: %v", err)
 			}
 			addrs, err := instances.NodeAddresses(name)
 			if err != nil {
-				glog.Warningf("unable to obtain external host address from cloud provider: %v", err)
+				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
 			} else {
 				for _, addr := range addrs {
 					if addr.Type == api.NodeExternalIP {
@@ -588,7 +588,7 @@ func (s *APIServer) Run(_ []string) error {
 		if len(s.ClientCAFile) > 0 {
 			clientCAs, err := util.CertPoolFromFile(s.ClientCAFile)
 			if err != nil {
-				glog.Fatalf("unable to load client CA file: %v", err)
+				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
 			// Populate PeerCertificates in requests, but don't reject connections without certificates
 			// This allows certificates to be validated by authenticators, while still allowing other auth types

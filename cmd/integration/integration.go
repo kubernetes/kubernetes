@@ -164,7 +164,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	publicAddress := net.ParseIP(host)
 	if publicAddress == nil {
-		glog.Fatalf("no public address for %s", host)
+		glog.Fatalf("No public address for %s", host)
 	}
 
 	// Create a master and install handlers into mux.
@@ -483,7 +483,7 @@ func runAPIVersionsTest(c *client.Client) {
 	v, err := c.ServerAPIVersions()
 	clientVersion := c.APIVersion()
 	if err != nil {
-		glog.Fatalf("failed to get api versions: %v", err)
+		glog.Fatalf("Failed to get api versions: %v", err)
 	}
 	// Verify that the server supports the API version used by the client.
 	for _, version := range v.Versions {
@@ -749,7 +749,7 @@ func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
 	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything())
 	if err != nil {
-		glog.Fatalf("unexpected error listing services: %v", err)
+		glog.Fatalf("Unexpected error listing services: %v", err)
 	}
 	var foundRW bool
 	found := sets.String{}
@@ -762,13 +762,13 @@ func runMasterServiceTest(client *client.Client) {
 	if foundRW {
 		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes")
 		if err != nil {
-			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
+			glog.Fatalf("Unexpected error listing endpoints for kubernetes service: %v", err)
 		}
 		if countEndpoints(ep) == 0 {
-			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
+			glog.Fatalf("No endpoints for kubernetes service: %v", ep)
 		}
 	} else {
-		glog.Errorf("no RW service found: %v", found)
+		glog.Errorf("No RW service found: %v", found)
 		glog.Fatal("Kubernetes service test failed")
 	}
 	glog.Infof("Master service test passed.")
