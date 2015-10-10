@@ -34,7 +34,7 @@ import (
 var _ = Describe("ServiceAccounts", func() {
 	f := NewFramework("svcaccounts")
 
-	It("should mount an API token into pods", func() {
+	It("should mount an API token into pods [Conformance]", func() {
 		var tokenName string
 		var tokenContent string
 		var rootCAContent string
