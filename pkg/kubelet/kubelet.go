@@ -150,6 +150,7 @@ func NewMainKubelet(
 	containerGCPolicy kubecontainer.ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	registerNode bool,
+	registerSchedulable bool,
 	standaloneMode bool,
 	clusterDomain string,
 	clusterDNS net.IP,
@@ -176,6 +177,7 @@ func NewMainKubelet(
 	systemContainer string,
 	configureCBR0 bool,
 	podCIDR string,
+	reconcileCIDR bool,
 	pods int,
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
@@ -258,6 +260,7 @@ func NewMainKubelet(
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		registerNode:                   registerNode,
+		registerSchedulable:            registerSchedulable,
 		standaloneMode:                 standaloneMode,
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
@@ -284,6 +287,7 @@ func NewMainKubelet(
 		writer:                         writer,
 		configureCBR0:                  configureCBR0,
 		podCIDR:                        podCIDR,
+		reconcileCIDR:                  reconcileCIDR,
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
@@ -469,6 +473,8 @@ type Kubelet struct {
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
+	// Set to true to have the node register itself as schedulable.
+	registerSchedulable bool
 	// for internal book keeping; access only from within registerWithApiserver
 	registrationCompleted bool
 
@@ -578,6 +584,7 @@ type Kubelet struct {
 	// the correct state.
 	configureCBR0 bool
 	podCIDR       string
+	reconcileCIDR bool
 
 	// Number of Pods which can be run by this Kubelet
 	pods int
@@ -831,6 +838,9 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		ObjectMeta: api.ObjectMeta{
 			Name:   kl.nodeName,
 			Labels: map[string]string{"kubernetes.io/hostname": kl.hostname},
+		},
+		Spec: api.NodeSpec{
+			Unschedulable: !kl.registerSchedulable,
 		},
 	}
 	if kl.cloud != nil {
@@ -2467,7 +2477,9 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
 	kl.networkConfigMutex.Lock()
-	kl.podCIDR = node.Spec.PodCIDR
+	if kl.reconcileCIDR {
+		kl.podCIDR = node.Spec.PodCIDR
+	}
 	kl.networkConfigMutex.Unlock()
 
 	if err := kl.setNodeStatus(node); err != nil {
