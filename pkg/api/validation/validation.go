@@ -440,9 +440,12 @@ func validateHostPathVolumeSource(hostPath *api.HostPathVolumeSource) validation
 
 func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource) validation.ErrorList {
 	allErrs := validation.ErrorList{}
-	if gitRepo.Repository == "" {
+	if len(gitRepo.Repository) == 0 {
 		allErrs = append(allErrs, validation.NewRequiredError("repository"))
 	}
+
+	pathErrs := validateVolumeSourcePath(gitRepo.Directory, "directory")
+	allErrs = append(allErrs, pathErrs...)
 	return allErrs
 }
 
@@ -570,23 +573,34 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 		if len(downwardAPIVolumeFile.Path) == 0 {
 			allErrs = append(allErrs, validation.NewRequiredError("path"))
 		}
-		if path.IsAbs(downwardAPIVolumeFile.Path) {
-			allErrs = append(allErrs, validation.NewForbiddenError("path", "must not be an absolute path"))
-		}
-		items := strings.Split(downwardAPIVolumeFile.Path, string(os.PathSeparator))
-		for _, item := range items {
-			if item == ".." {
-				allErrs = append(allErrs, validation.NewInvalidError("path", downwardAPIVolumeFile.Path, "must not contain \"..\"."))
-			}
-		}
-		if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
-			allErrs = append(allErrs, validation.NewInvalidError("path", downwardAPIVolumeFile.Path, "must not start with \"..\"."))
-		}
+		allErrs = append(allErrs, validateVolumeSourcePath(downwardAPIVolumeFile.Path, "path")...)
 		allErrs = append(allErrs, validateObjectFieldSelector(&downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions).Prefix("FieldRef")...)
 	}
 	return allErrs
 }
 
+// This validate will make sure targetPath:
+// 1. is not abs path
+// 2. does not contain '..'
+// 3. does not start with '..'
+func validateVolumeSourcePath(targetPath string, field string) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	if path.IsAbs(targetPath) {
+		allErrs = append(allErrs, validation.NewForbiddenError(field, "must not be an absolute path"))
+	}
+	// TODO assume OS of api server & nodes are the same for now
+	items := strings.Split(targetPath, string(os.PathSeparator))
+
+	for _, item := range items {
+		if item == ".." {
+			allErrs = append(allErrs, validation.NewInvalidError(field, targetPath, "must not contain \"..\""))
+		}
+	}
+	if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
+		allErrs = append(allErrs, validation.NewInvalidError(field, targetPath, "must not start with \"..\""))
+	}
+	return allErrs
+}
 func validateRBD(rbd *api.RBDVolumeSource) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if len(rbd.CephMonitors) == 0 {
