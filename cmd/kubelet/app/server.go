@@ -119,6 +119,7 @@ type KubeletServer struct {
 	Port                           uint
 	ReadOnlyPort                   uint
 	RegisterNode                   bool
+	RegisterSchedulable            bool
 	RegistryBurst                  int
 	RegistryPullQPS                float64
 	ResolverConfig                 string
@@ -133,6 +134,7 @@ type KubeletServer struct {
 	SystemContainer                string
 	TLSCertFile                    string
 	TLSPrivateKeyFile              string
+	ReconcileCIDR                  bool
 
 	// Flags intended for testing
 	// Is the kubelet containerized?
@@ -192,16 +194,18 @@ func NewKubeletServer() *KubeletServer {
 		NodeStatusUpdateFrequency:   10 * time.Second,
 		OOMScoreAdj:                 qos.KubeletOOMScoreAdj,
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
-		Port:              ports.KubeletPort,
-		ReadOnlyPort:      ports.KubeletReadOnlyPort,
-		RegisterNode:      true, // will be ignored if no apiserver is configured
-		RegistryBurst:     10,
-		ResourceContainer: "/kubelet",
-		RktPath:           "",
-		RktStage1Image:    "",
-		RootDirectory:     defaultRootDir,
-		SyncFrequency:     10 * time.Second,
-		SystemContainer:   "",
+		Port:                ports.KubeletPort,
+		ReadOnlyPort:        ports.KubeletReadOnlyPort,
+		RegisterNode:        true, // will be ignored if no apiserver is configured
+		RegisterSchedulable: true,
+		RegistryBurst:       10,
+		ResourceContainer:   "/kubelet",
+		RktPath:             "",
+		RktStage1Image:      "",
+		RootDirectory:       defaultRootDir,
+		SyncFrequency:       10 * time.Second,
+		SystemContainer:     "",
+		ReconcileCIDR:       true,
 	}
 }
 
@@ -279,6 +283,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", 1000000, "Number of files that can be opened by Kubelet process. [default=1000000]")
+	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
+	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -386,10 +392,12 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		OOMAdjuster:               oom.NewOOMAdjuster(),
 		OSInterface:               kubecontainer.RealOS{},
 		PodCIDR:                   s.PodCIDR,
+		ReconcileCIDR:             s.ReconcileCIDR,
 		PodInfraContainerImage:    s.PodInfraContainerImage,
 		Port:                           s.Port,
 		ReadOnlyPort:                   s.ReadOnlyPort,
 		RegisterNode:                   s.RegisterNode,
+		RegisterSchedulable:            s.RegisterSchedulable,
 		RegistryBurst:                  s.RegistryBurst,
 		RegistryPullQPS:                s.RegistryPullQPS,
 		ResolverConfig:                 s.ResolverConfig,
@@ -645,17 +653,18 @@ func SimpleKubelet(client *client.Client,
 		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
 		OSInterface:               osInterface,
 		PodInfraContainerImage:    dockertools.PodInfraContainerImage,
-		Port:              port,
-		ReadOnlyPort:      readOnlyPort,
-		RegisterNode:      true,
-		ResolverConfig:    kubelet.ResolvConfDefault,
-		ResourceContainer: "/kubelet",
-		RootDirectory:     rootDir,
-		SyncFrequency:     syncFrequency,
-		SystemContainer:   "",
-		TLSOptions:        tlsOptions,
-		Writer:            &io.StdWriter{},
-		VolumePlugins:     volumePlugins,
+		Port:                port,
+		ReadOnlyPort:        readOnlyPort,
+		RegisterNode:        true,
+		RegisterSchedulable: true,
+		ResolverConfig:      kubelet.ResolvConfDefault,
+		ResourceContainer:   "/kubelet",
+		RootDirectory:       rootDir,
+		SyncFrequency:       syncFrequency,
+		SystemContainer:     "",
+		TLSOptions:          tlsOptions,
+		Writer:              &io.StdWriter{},
+		VolumePlugins:       volumePlugins,
 	}
 	return &kcfg
 }
@@ -829,12 +838,14 @@ type KubeletConfig struct {
 	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
+	ReconcileCIDR                  bool
 	PodConfig                      *config.PodConfig
 	PodInfraContainerImage         string
 	Port                           uint
 	ReadOnlyPort                   uint
 	Recorder                       record.EventRecorder
 	RegisterNode                   bool
+	RegisterSchedulable            bool
 	RegistryBurst                  int
 	RegistryPullQPS                float64
 	ResolverConfig                 string
@@ -892,6 +903,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		gcPolicy,
 		pc.SeenAllSources,
 		kc.RegisterNode,
+		kc.RegisterSchedulable,
 		kc.StandaloneMode,
 		kc.ClusterDomain,
 		kc.ClusterDNS,
@@ -918,6 +930,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
 		kc.PodCIDR,
+		kc.ReconcileCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
