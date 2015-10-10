@@ -121,7 +121,7 @@ As of June 4, 2015, the Kubernetes v1 API has been enabled by default. The v1bet
 
 ### v1 conversion tips (from v1beta3)
 
-We're working to convert all documentation and examples to v1. A simple [API conversion tool](admin/cluster-management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
+We're working to convert all documentation and examples to v1. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
 
 Changes to services are the most significant difference between v1beta3 and v1.
 
