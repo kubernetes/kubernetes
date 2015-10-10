@@ -123,7 +123,7 @@ var _ = Describe("Kubelet", func() {
 		for i := range density {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
-				"over %v with %d pods per node.", monitoringTime, podsPerNode)
+				"over %v with %d pods per node", monitoringTime, podsPerNode)
 			It(name, func() {
 				runResourceTrackingTest(framework, podsPerNode, nodeNames, resourceMonitor)
 			})
