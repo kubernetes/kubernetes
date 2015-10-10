@@ -24,12 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-var DefaultPredicate = RequireAllPredicate([]FitPredicate{
-	ValidationPredicate,
-	NodeSelectorPredicate,
-	PodFitsResourcesPredicate,
-	PortsPredicate,
-}).Fit
+func NewDefaultPredicate(c mresource.CPUShares, m mresource.MegaBytes) FitPredicate {
+	return RequireAllPredicate([]FitPredicate{
+		ValidationPredicate,
+		NodeSelectorPredicate,
+		NewPodFitsResourcesPredicate(c, m),
+		PortsPredicate,
+	}).Fit
+}
 
 // FitPredicate implementations determine if the given task "fits" into offered Mesos resources.
 // Neither the task or offer should be modified. Note that the node can be nil.
@@ -78,31 +80,33 @@ func PortsPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
 	return true
 }
 
-func PodFitsResourcesPredicate(t *T, offer *mesos.Offer, _ *api.Node) bool {
-	// find offered cpu and mem
-	var (
-		offeredCpus mresource.CPUShares
-		offeredMem  mresource.MegaBytes
-	)
-	for _, resource := range offer.Resources {
-		if resource.GetName() == "cpus" {
-			offeredCpus = mresource.CPUShares(*resource.GetScalar().Value)
+func NewPodFitsResourcesPredicate(c mresource.CPUShares, m mresource.MegaBytes) func(t *T, offer *mesos.Offer, _ *api.Node) bool {
+	return func(t *T, offer *mesos.Offer, _ *api.Node) bool {
+		// find offered cpu and mem
+		var (
+			offeredCpus mresource.CPUShares
+			offeredMem  mresource.MegaBytes
+		)
+		for _, resource := range offer.Resources {
+			if resource.GetName() == "cpus" {
+				offeredCpus = mresource.CPUShares(*resource.GetScalar().Value)
+			}
+
+			if resource.GetName() == "mem" {
+				offeredMem = mresource.MegaBytes(*resource.GetScalar().Value)
+			}
 		}
 
-		if resource.GetName() == "mem" {
-			offeredMem = mresource.MegaBytes(*resource.GetScalar().Value)
+		// calculate cpu and mem sum over all containers of the pod
+		// TODO (@sttts): also support pod.spec.resources.limit.request
+		// TODO (@sttts): take into account the executor resources
+		cpu := mresource.CPUForPod(&t.Pod, c)
+		mem := mresource.MemForPod(&t.Pod, m)
+		log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
+		if (cpu > offeredCpus) || (mem > offeredMem) {
+			log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
+			return false
 		}
+		return true
 	}
-
-	// calculate cpu and mem sum over all containers of the pod
-	// TODO (@sttts): also support pod.spec.resources.limit.request
-	// TODO (@sttts): take into account the executor resources
-	cpu := mresource.PodCPULimit(&t.Pod)
-	mem := mresource.PodMemLimit(&t.Pod)
-	log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
-	if (cpu > offeredCpus) || (mem > offeredMem) {
-		log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
-		return false
-	}
-	return true
 }
