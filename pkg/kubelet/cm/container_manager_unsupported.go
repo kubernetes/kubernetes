@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package cm
 
 import (
 	"fmt"
@@ -29,9 +29,9 @@ import (
 type unsupportedContainerManager struct {
 }
 
-var _ containerManager = &unsupportedContainerManager{}
+var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start() error {
+func (unsupportedContainerManager) Start(_ NodeConfig) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
@@ -39,6 +39,6 @@ func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 
-func newContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface, dockerDaemonContainer, systemContainer, kubeletContainer string) (containerManager, error) {
+func NewContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

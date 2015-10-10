@@ -19,25 +19,11 @@ package kubelet
 import (
 	"fmt"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
-
-func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) api.ResourceList {
-	c := api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
-			int64(info.NumCores*1000),
-			resource.DecimalSI),
-		api.ResourceMemory: *resource.NewQuantity(
-			info.MemoryCapacity,
-			resource.BinarySI),
-	}
-	return c
-}
 
 // Check whether we have the capabilities to run the specified pod.
 func canRunPod(pod *api.Pod) error {
