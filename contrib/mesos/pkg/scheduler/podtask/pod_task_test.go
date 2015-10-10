@@ -143,13 +143,11 @@ func TestEmptyOffer(t *testing.T) {
 		}},
 	}
 
-	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
-	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
-
-	if ok := DefaultPredicate(task, nil, nil); ok {
+	defaultPredicate := NewDefaultPredicate(mresource.DefaultDefaultContainerCPULimit, mresource.DefaultDefaultContainerMemLimit)
+	if ok := defaultPredicate(task, nil, nil); ok {
 		t.Fatalf("accepted nil offer")
 	}
-	if ok := DefaultPredicate(task, &mesos.Offer{}, nil); ok {
+	if ok := defaultPredicate(task, &mesos.Offer{}, nil); ok {
 		t.Fatalf("accepted empty offer")
 	}
 }
@@ -167,8 +165,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 		}},
 	}
 
-	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
-	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
+	defaultPredicate := NewDefaultPredicate(mresource.DefaultDefaultContainerCPULimit, mresource.DefaultDefaultContainerMemLimit)
 
 	offer := &mesos.Offer{
 		Resources: []*mesos.Resource{
@@ -176,7 +173,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", 0.001),
 		},
 	}
-	if ok := DefaultPredicate(task, offer, nil); ok {
+	if ok := defaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
@@ -186,7 +183,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 			mutil.NewScalarResource("mem", t_min_mem),
 		},
 	}
-	if ok := DefaultPredicate(task, offer, nil); !ok {
+	if ok := defaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 }
@@ -196,6 +193,8 @@ func TestAcceptOfferPorts(t *testing.T) {
 	task, _ := fakePodTask("foo")
 	pod := &task.Pod
 
+	defaultPredicate := NewDefaultPredicate(mresource.DefaultDefaultContainerCPULimit, mresource.DefaultDefaultContainerMemLimit)
+
 	offer := &mesos.Offer{
 		Resources: []*mesos.Resource{
 			mutil.NewScalarResource("cpus", t_min_cpu),
@@ -203,7 +202,7 @@ func TestAcceptOfferPorts(t *testing.T) {
 			rangeResource("ports", []uint64{1, 1}),
 		},
 	}
-	if ok := DefaultPredicate(task, offer, nil); !ok {
+	if ok := defaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -215,20 +214,17 @@ func TestAcceptOfferPorts(t *testing.T) {
 		}},
 	}
 
-	mresource.LimitPodCPU(&task.Pod, mresource.DefaultDefaultContainerCPULimit)
-	mresource.LimitPodMem(&task.Pod, mresource.DefaultDefaultContainerMemLimit)
-
-	if ok := DefaultPredicate(task, offer, nil); ok {
+	if ok := defaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := DefaultPredicate(task, offer, nil); !ok {
+	if ok := defaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 0
-	if ok := DefaultPredicate(task, offer, nil); !ok {
+	if ok := defaultPredicate(task, offer, nil); !ok {
 		t.Fatalf("did not accepted offer %v:", offer)
 	}
 
@@ -236,12 +232,12 @@ func TestAcceptOfferPorts(t *testing.T) {
 		mutil.NewScalarResource("cpus", t_min_cpu),
 		mutil.NewScalarResource("mem", t_min_mem),
 	}
-	if ok := DefaultPredicate(task, offer, nil); ok {
+	if ok := defaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 
 	pod.Spec.Containers[0].Ports[0].HostPort = 1
-	if ok := DefaultPredicate(task, offer, nil); ok {
+	if ok := defaultPredicate(task, offer, nil); ok {
 		t.Fatalf("accepted offer %v:", offer)
 	}
 }
@@ -326,6 +322,8 @@ func TestNodeSelector(t *testing.T) {
 		{map[string]string{"some.other/label": "43"}, node3, true, "non-slave attribute matches"},
 	}
 
+	defaultPredicate := NewDefaultPredicate(mresource.DefaultDefaultContainerCPULimit, mresource.DefaultDefaultContainerMemLimit)
+
 	for _, ts := range tests {
 		task, _ := fakePodTask("foo")
 		task.Pod.Spec.NodeSelector = ts.selector
@@ -336,7 +334,7 @@ func TestNodeSelector(t *testing.T) {
 			},
 			Hostname: &ts.node.Name,
 		}
-		if got, want := DefaultPredicate(task, offer, ts.node), ts.ok; got != want {
+		if got, want := defaultPredicate(task, offer, ts.node), ts.ok; got != want {
 			t.Fatalf("expected acceptance of offer for selector %v to be %v, got %v: %q", ts.selector, want, got, ts.desc)
 		}
 	}
