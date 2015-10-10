@@ -10,6 +10,14 @@
     "description": "get available API versions"
    },
    {
+    "path": "/apis/experimental/v1alpha1",
+    "description": "API at /apis/experimental/v1alpha1"
+   },
+   {
+    "path": "/apis/experimental/",
+    "description": "get information of a group"
+   },
+   {
     "path": "/apis",
     "description": "get available API versions"
    },
