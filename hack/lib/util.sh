@@ -242,7 +242,7 @@ kube::util::analytics-link() {
 
 # Takes a group/version and returns the path to its location on disk, sans
 # "pkg". E.g.:
-# * default behavior: experimental/v1alpha1 -> apis/experimental/v1alpha1
+# * default behavior: extensions/v1beta1 -> apis/extensions/v1beta1
 # * default behavior for only a group: experimental -> apis/experimental
 # * Special handling for empty group: v1 -> api/v1, unversioned -> api/unversioned
 # * Very special handling for when both group and version are "": / -> api

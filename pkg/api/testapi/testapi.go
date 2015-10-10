@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/experimental/install"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -33,9 +33,9 @@ import (
 )
 
 var (
-	Groups       = make(map[string]TestGroup)
-	Default      TestGroup
-	Experimental TestGroup
+	Groups     = make(map[string]TestGroup)
+	Default    TestGroup
+	Extensions TestGroup
 )
 
 type TestGroup struct {
@@ -66,12 +66,12 @@ func init() {
 		// have multiple group support
 		Groups[""] = TestGroup{"", latest.GroupOrDie("").Version, latest.GroupOrDie("").GroupVersion}
 	}
-	if _, ok := Groups["experimental"]; !ok {
-		Groups["experimental"] = TestGroup{"experimental", latest.GroupOrDie("experimental").Version, latest.GroupOrDie("experimental").GroupVersion}
+	if _, ok := Groups["extensions"]; !ok {
+		Groups["extensions"] = TestGroup{"extensions", latest.GroupOrDie("extensions").Version, latest.GroupOrDie("extensions").GroupVersion}
 	}
 
 	Default = Groups[""]
-	Experimental = Groups["experimental"]
+	Extensions = Groups["extensions"]
 }
 
 // Version returns the API version to test against, as set by the KUBE_TEST_API env var.
@@ -97,8 +97,8 @@ func (g TestGroup) Codec() runtime.Codec {
 		}
 		return interfaces.Codec
 	}
-	if g.Group == "experimental" {
-		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.GroupVersionUnderTest)
+	if g.Group == "extensions" {
+		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.GroupVersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
@@ -118,8 +118,8 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 		}
 		return interfaces.ObjectConvertor
 	}
-	if g.Group == "experimental" {
-		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.VersionUnderTest)
+	if g.Group == "extensions" {
+		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
@@ -140,8 +140,8 @@ func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
 		}
 		return interfaces.MetadataAccessor
 	}
-	if g.Group == "experimental" {
-		interfaces, err := latest.GroupOrDie("experimental").InterfacesFor(g.VersionUnderTest)
+	if g.Group == "extensions" {
+		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}

@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -35,11 +35,11 @@ func TestListJobs(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
-			Body: &experimental.JobList{
-				Items: []experimental.Job{
+			Body: &extensions.JobList{
+				Items: []extensions.Job{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -48,7 +48,7 @@ func TestListJobs(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Spec: experimental.JobSpec{
+						Spec: extensions.JobSpec{
 							Template: &api.PodTemplateSpec{},
 						},
 					},
@@ -65,12 +65,12 @@ func TestGetJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Job{
+			Body: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -78,7 +78,7 @@ func TestGetJob(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.JobSpec{
+				Spec: extensions.JobSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -101,7 +101,7 @@ func TestGetJobWithNoName(t *testing.T) {
 
 func TestUpdateJob(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestJob := &experimental.Job{
+	requestJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -111,12 +111,12 @@ func TestUpdateJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Job{
+			Body: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -124,7 +124,7 @@ func TestUpdateJob(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.JobSpec{
+				Spec: extensions.JobSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -136,7 +136,7 @@ func TestUpdateJob(t *testing.T) {
 
 func TestUpdateJobStatus(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestJob := &experimental.Job{
+	requestJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -146,12 +146,12 @@ func TestUpdateJobStatus(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Job{
+			Body: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -159,10 +159,10 @@ func TestUpdateJobStatus(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.JobSpec{
+				Spec: extensions.JobSpec{
 					Template: &api.PodTemplateSpec{},
 				},
-				Status: experimental.JobStatus{
+				Status: extensions.JobStatus{
 					Active: 1,
 				},
 			},
@@ -177,7 +177,7 @@ func TestDeleteJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{StatusCode: 200},
@@ -188,7 +188,7 @@ func TestDeleteJob(t *testing.T) {
 
 func TestCreateJob(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestJob := &experimental.Job{
+	requestJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
@@ -197,13 +197,13 @@ func TestCreateJob(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Experimental.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
 			Body:   requestJob,
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Job{
+			Body: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -211,7 +211,7 @@ func TestCreateJob(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.JobSpec{
+				Spec: extensions.JobSpec{
 					Template: &api.PodTemplateSpec{},
 				},
 			},

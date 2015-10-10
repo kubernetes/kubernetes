@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -77,16 +77,16 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 
 	fakeClient := &testclient.Fake{}
 	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &experimental.HorizontalPodAutoscalerList{
-			Items: []experimental.HorizontalPodAutoscaler{
+		obj := &extensions.HorizontalPodAutoscalerList{
+			Items: []extensions.HorizontalPodAutoscaler{
 				{
 					ObjectMeta: api.ObjectMeta{
 						Name:      hpaName,
 						Namespace: namespace,
 						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 					},
-					Spec: experimental.HorizontalPodAutoscalerSpec{
-						ScaleRef: &experimental.SubresourceReference{
+					Spec: extensions.HorizontalPodAutoscalerSpec{
+						ScaleRef: &extensions.SubresourceReference{
 							Kind:        "replicationController",
 							Name:        rcName,
 							Namespace:   namespace,
@@ -94,7 +94,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 						},
 						MinReplicas: tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
-						Target:      experimental.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
+						Target:      extensions.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
 					},
 				},
 			},
@@ -103,15 +103,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	})
 
 	fakeClient.AddReactor("get", "replicationController", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &experimental.Scale{
+		obj := &extensions.Scale{
 			ObjectMeta: api.ObjectMeta{
 				Name:      rcName,
 				Namespace: namespace,
 			},
-			Spec: experimental.ScaleSpec{
+			Spec: extensions.ScaleSpec{
 				Replicas: tc.initialReplicas,
 			},
-			Status: experimental.ScaleStatus{
+			Status: extensions.ScaleStatus{
 				Replicas: tc.initialReplicas,
 				Selector: map[string]string{"name": podNamePrefix},
 			},
@@ -155,15 +155,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	})
 
 	fakeClient.AddReactor("update", "replicationController", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(testclient.UpdateAction).GetObject().(*experimental.Scale)
-		replicas := action.(testclient.UpdateAction).GetObject().(*experimental.Scale).Spec.Replicas
+		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
+		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
 		tc.scaleUpdated = true
 		return true, obj, nil
 	})
 
 	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(testclient.UpdateAction).GetObject().(*experimental.HorizontalPodAutoscaler)
+		obj := action.(testclient.UpdateAction).GetObject().(*extensions.HorizontalPodAutoscaler)
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)

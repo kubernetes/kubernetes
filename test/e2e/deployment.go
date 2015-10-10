@@ -19,7 +19,7 @@ package e2e
 import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
 
 	. "github.com/onsi/ginkgo"
@@ -46,11 +46,11 @@ func testNewDeployment(f *Framework) {
 	deploymentName := "nginx-deployment"
 	podLabels := map[string]string{"name": "nginx"}
 	Logf("Creating simple deployment %s", deploymentName)
-	_, err := c.Deployments(ns).Create(&experimental.Deployment{
+	_, err := c.Deployments(ns).Create(&extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Replicas:       1,
 			Selector:       podLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
@@ -139,11 +139,11 @@ func testRollingUpdateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	newDeployment := experimental.Deployment{
+	newDeployment := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Replicas:       3,
 			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
@@ -220,11 +220,11 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	newDeployment := experimental.Deployment{
+	newDeployment := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Replicas:       1,
 			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",

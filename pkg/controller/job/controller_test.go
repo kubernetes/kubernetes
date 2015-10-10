@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
@@ -34,13 +34,13 @@ import (
 
 var alwaysReady = func() bool { return true }
 
-func newJob(parallelism, completions int) *experimental.Job {
-	return &experimental.Job{
+func newJob(parallelism, completions int) *extensions.Job {
+	return &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foobar",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
 			Selector:    map[string]string{"foo": "bar"},
@@ -60,7 +60,7 @@ func newJob(parallelism, completions int) *experimental.Job {
 	}
 }
 
-func getKey(job *experimental.Job, t *testing.T) string {
+func getKey(job *extensions.Job, t *testing.T) string {
 	if key, err := controller.KeyFunc(job); err != nil {
 		t.Errorf("Unexpected error getting key for job %v: %v", job.Name, err)
 		return ""
@@ -70,7 +70,7 @@ func getKey(job *experimental.Job, t *testing.T) string {
 }
 
 // create count pods with the given phase for the given job
-func newPodList(count int, status api.PodPhase, job *experimental.Job) []api.Pod {
+func newPodList(count int, status api.PodPhase, job *extensions.Job) []api.Pod {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := api.Pod{
@@ -165,8 +165,8 @@ func TestControllerSyncJob(t *testing.T) {
 		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
-		var actual *experimental.Job
-		manager.updateHandler = func(job *experimental.Job) error {
+		var actual *extensions.Job
+		manager.updateHandler = func(job *extensions.Job) error {
 			actual = job
 			return nil
 		}
@@ -211,7 +211,7 @@ func TestControllerSyncJob(t *testing.T) {
 		if tc.expectedComplete {
 			completed := false
 			for _, v := range actual.Status.Conditions {
-				if v.Type == experimental.JobComplete && v.Status == api.ConditionTrue {
+				if v.Type == extensions.JobComplete && v.Status == api.ConditionTrue {
 					completed = true
 					break
 				}
@@ -229,7 +229,7 @@ func TestSyncJobDeleted(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
-	manager.updateHandler = func(job *experimental.Job) error { return nil }
+	manager.updateHandler = func(job *extensions.Job) error { return nil }
 	job := newJob(2, 2)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
@@ -249,7 +249,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
-	manager.updateHandler = func(job *experimental.Job) error { return fmt.Errorf("Fake error") }
+	manager.updateHandler = func(job *extensions.Job) error { return fmt.Errorf("Fake error") }
 	job := newJob(2, 2)
 	manager.jobStore.Store.Add(job)
 	err := manager.syncJob(getKey(job, t))
@@ -269,14 +269,14 @@ func TestJobPodLookup(t *testing.T) {
 	manager := NewJobController(client, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
-		job *experimental.Job
+		job *extensions.Job
 		pod *api.Pod
 
 		expectedName string
 	}{
 		// pods without labels don't match any job
 		{
-			job: &experimental.Job{
+			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "basic"},
 			},
 			pod: &api.Pod{
@@ -286,9 +286,9 @@ func TestJobPodLookup(t *testing.T) {
 		},
 		// matching labels, different namespace
 		{
-			job: &experimental.Job{
+			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Spec: experimental.JobSpec{
+				Spec: extensions.JobSpec{
 					Selector: map[string]string{"foo": "bar"},
 				},
 			},
@@ -303,9 +303,9 @@ func TestJobPodLookup(t *testing.T) {
 		},
 		// matching ns and labels returns
 		{
-			job: &experimental.Job{
+			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
-				Spec: experimental.JobSpec{
+				Spec: extensions.JobSpec{
 					Selector: map[string]string{"foo": "bar"},
 				},
 			},
@@ -350,7 +350,7 @@ func TestSyncJobExpectations(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
-	manager.updateHandler = func(job *experimental.Job) error { return nil }
+	manager.updateHandler = func(job *extensions.Job) error { return nil }
 
 	job := newJob(2, 2)
 	manager.jobStore.Store.Add(job)
@@ -386,7 +386,7 @@ func TestWatchJobs(t *testing.T) {
 	manager := NewJobController(client, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 
-	var testJob experimental.Job
+	var testJob extensions.Job
 	received := make(chan struct{})
 
 	// The update sent through the fakeWatcher should make its way into the workqueue,
@@ -397,7 +397,7 @@ func TestWatchJobs(t *testing.T) {
 		if !exists || err != nil {
 			t.Errorf("Expected to find job under key %v", key)
 		}
-		job := *obj.(*experimental.Job)
+		job := *obj.(*extensions.Job)
 		if !api.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("Expected %#v, but got %#v", testJob, job)
 		}
@@ -419,10 +419,10 @@ func TestWatchJobs(t *testing.T) {
 }
 
 func TestIsJobFinished(t *testing.T) {
-	job := &experimental.Job{
-		Status: experimental.JobStatus{
-			Conditions: []experimental.JobCondition{{
-				Type:   experimental.JobComplete,
+	job := &extensions.Job{
+		Status: extensions.JobStatus{
+			Conditions: []extensions.JobCondition{{
+				Type:   extensions.JobComplete,
 				Status: api.ConditionTrue,
 			}},
 		},
@@ -462,7 +462,7 @@ func TestWatchPods(t *testing.T) {
 		if !exists || err != nil {
 			t.Errorf("Expected to find job under key %v", key)
 		}
-		job := obj.(*experimental.Job)
+		job := obj.(*extensions.Job)
 		if !api.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testJob, job)
 		}

@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,44 +31,44 @@ type FakeIngress struct {
 	Namespace string
 }
 
-func (c *FakeIngress) Get(name string) (*experimental.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("ingress", c.Namespace, name), &experimental.Ingress{})
+func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("ingress", c.Namespace, name), &extensions.Ingress{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Ingress), err
+	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) List(label labels.Selector, fields fields.Selector) (*experimental.IngressList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("ingress", c.Namespace, label, nil), &experimental.IngressList{})
+func (c *FakeIngress) List(label labels.Selector, fields fields.Selector) (*extensions.IngressList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("ingress", c.Namespace, label, nil), &extensions.IngressList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.IngressList), err
+	return obj.(*extensions.IngressList), err
 }
 
-func (c *FakeIngress) Create(ingress *experimental.Ingress) (*experimental.Ingress, error) {
+func (c *FakeIngress) Create(ingress *extensions.Ingress) (*extensions.Ingress, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("ingress", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Ingress), err
+	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) Update(ingress *experimental.Ingress) (*experimental.Ingress, error) {
+func (c *FakeIngress) Update(ingress *extensions.Ingress) (*extensions.Ingress, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction("ingress", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Ingress), err
+	return obj.(*extensions.Ingress), err
 }
 
 func (c *FakeIngress) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("ingress", c.Namespace, name), &experimental.Ingress{})
+	_, err := c.Fake.Invokes(NewDeleteAction("ingress", c.Namespace, name), &extensions.Ingress{})
 	return err
 }
 
@@ -76,11 +76,11 @@ func (c *FakeIngress) Watch(label labels.Selector, field fields.Selector, resour
 	return c.Fake.InvokesWatch(NewWatchAction("ingress", c.Namespace, label, field, resourceVersion))
 }
 
-func (c *FakeIngress) UpdateStatus(ingress *experimental.Ingress) (result *experimental.Ingress, err error) {
+func (c *FakeIngress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("ingress", "status", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Ingress), err
+	return obj.(*extensions.Ingress), err
 }

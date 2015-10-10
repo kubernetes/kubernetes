@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -50,7 +50,7 @@ func (deploymentStrategy) PrepareForCreate(obj runtime.Object) {
 
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx api.Context, obj runtime.Object) errs.ValidationErrorList {
-	deployment := obj.(*experimental.Deployment)
+	deployment := obj.(*extensions.Deployment)
 	return validation.ValidateDeployment(deployment)
 }
 
@@ -65,7 +65,7 @@ func (deploymentStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (deploymentStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
-	return validation.ValidateDeploymentUpdate(old.(*experimental.Deployment), obj.(*experimental.Deployment))
+	return validation.ValidateDeploymentUpdate(old.(*extensions.Deployment), obj.(*extensions.Deployment))
 }
 
 func (deploymentStrategy) AllowUnconditionalUpdate() bool {
@@ -73,7 +73,7 @@ func (deploymentStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // DeploymentToSelectableFields returns a field set that represents the object.
-func DeploymentToSelectableFields(deployment *experimental.Deployment) fields.Set {
+func DeploymentToSelectableFields(deployment *extensions.Deployment) fields.Set {
 	return fields.Set{
 		"metadata.name": deployment.Name,
 	}
@@ -87,7 +87,7 @@ func MatchDeployment(label labels.Selector, field fields.Selector) generic.Match
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			deployment, ok := obj.(*experimental.Deployment)
+			deployment, ok := obj.(*extensions.Deployment)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not a deployment.")
 			}

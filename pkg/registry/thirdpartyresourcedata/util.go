@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func convertToCamelCase(input string) string {
@@ -40,7 +40,7 @@ func convertToCamelCase(input string) string {
 	return result
 }
 
-func ExtractApiGroupAndKind(rsrc *experimental.ThirdPartyResource) (kind string, group string, err error) {
+func ExtractApiGroupAndKind(rsrc *extensions.ThirdPartyResource) (kind string, group string, err error) {
 	parts := strings.Split(rsrc.Name, ".")
 	if len(parts) < 3 {
 		return "", "", fmt.Errorf("unexpectedly short resource name: %s, expected at least <kind>.<domain>.<tld>", rsrc.Name)

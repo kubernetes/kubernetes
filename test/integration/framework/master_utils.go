@@ -131,14 +131,14 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
-		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, latest.GroupOrDie("experimental").GroupVersion, etcdtest.PathPrefix())
-		storageVersions["experimental"] = latest.GroupOrDie("experimental").GroupVersion
+		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, latest.GroupOrDie("extensions").GroupVersion, etcdtest.PathPrefix())
+		storageVersions["extensions"] = latest.GroupOrDie("extensions").GroupVersion
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
 		storageDestinations := master.NewStorageDestinations()
 		storageDestinations.AddAPIGroup("", etcdStorage)
-		storageDestinations.AddAPIGroup("experimental", expEtcdStorage)
+		storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 
 		masterConfig = &master.Config{
 			StorageDestinations:  storageDestinations,
@@ -275,14 +275,14 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("experimental").InterfacesFor, testapi.Experimental.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("experimental", expEtcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 
 	m := master.New(&master.Config{
 		StorageDestinations: storageDestinations,

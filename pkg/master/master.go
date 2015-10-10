@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
-	expapi "k8s.io/kubernetes/pkg/apis/experimental"
+	expapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -653,7 +653,7 @@ func (m *Master) init(c *Config) {
 	// allGroups records all supported groups at /apis
 	allGroups := []api.APIGroup{}
 	if m.exp {
-		m.thirdPartyStorage = c.StorageDestinations.APIGroups["experimental"].Default
+		m.thirdPartyStorage = c.StorageDestinations.APIGroups["extensions"].Default
 		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
 
 		expVersion := m.experimental(c)
@@ -661,7 +661,7 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		g, err := latest.Group("experimental")
+		g, err := latest.Group("extensions")
 		if err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
@@ -680,7 +680,7 @@ func (m *Master) init(c *Config) {
 			Versions:         expAPIVersions,
 			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group+"/", group)
 		allGroups = append(allGroups, group)
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), []string{expVersion.Version})
 	}
@@ -1023,9 +1023,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:        thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version, group),
-		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
-		Linker:        latest.GroupOrDie("experimental").SelfLinker,
+		Mapper:        thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
+		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
+		Linker:        latest.GroupOrDie("extensions").SelfLinker,
 		Storage:       storage,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
@@ -1040,7 +1040,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.get("", "replicationControllers"))
 	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.get("experimental", resource)
+		return c.StorageDestinations.get("extensions", resource)
 	}
 	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"))
@@ -1074,7 +1074,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("ingress"):                      ingressStorage,
 	}
 
-	expMeta := latest.GroupOrDie("experimental")
+	expMeta := latest.GroupOrDie("extensions")
 
 	return &apiserver.APIGroupVersion{
 		Root: m.apiGroupPrefix,

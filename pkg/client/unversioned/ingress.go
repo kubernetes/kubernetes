@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,13 +31,13 @@ type IngressNamespacer interface {
 
 // IngressInterface exposes methods to work on Ingress resources.
 type IngressInterface interface {
-	List(label labels.Selector, field fields.Selector) (*experimental.IngressList, error)
-	Get(name string) (*experimental.Ingress, error)
-	Create(ingress *experimental.Ingress) (*experimental.Ingress, error)
-	Update(ingress *experimental.Ingress) (*experimental.Ingress, error)
+	List(label labels.Selector, field fields.Selector) (*extensions.IngressList, error)
+	Get(name string) (*extensions.Ingress, error)
+	Create(ingress *extensions.Ingress) (*extensions.Ingress, error)
+	Update(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	UpdateStatus(ingress *experimental.Ingress) (*experimental.Ingress, error)
+	UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error)
 }
 
 // ingress implements IngressNamespacer interface
@@ -52,29 +52,29 @@ func newIngress(c *ExperimentalClient, namespace string) *ingress {
 }
 
 // List returns a list of ingress that match the label and field selectors.
-func (c *ingress) List(label labels.Selector, field fields.Selector) (result *experimental.IngressList, err error) {
-	result = &experimental.IngressList{}
+func (c *ingress) List(label labels.Selector, field fields.Selector) (result *extensions.IngressList, err error) {
+	result = &extensions.IngressList{}
 	err = c.r.Get().Namespace(c.ns).Resource("ingress").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular ingress.
-func (c *ingress) Get(name string) (result *experimental.Ingress, err error) {
-	result = &experimental.Ingress{}
+func (c *ingress) Get(name string) (result *extensions.Ingress, err error) {
+	result = &extensions.Ingress{}
 	err = c.r.Get().Namespace(c.ns).Resource("ingress").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new ingress.
-func (c *ingress) Create(ingress *experimental.Ingress) (result *experimental.Ingress, err error) {
-	result = &experimental.Ingress{}
+func (c *ingress) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+	result = &extensions.Ingress{}
 	err = c.r.Post().Namespace(c.ns).Resource("ingress").Body(ingress).Do().Into(result)
 	return
 }
 
 // Update updates an existing ingress.
-func (c *ingress) Update(ingress *experimental.Ingress) (result *experimental.Ingress, err error) {
-	result = &experimental.Ingress{}
+func (c *ingress) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+	result = &extensions.Ingress{}
 	err = c.r.Put().Namespace(c.ns).Resource("ingress").Name(ingress.Name).Body(ingress).Do().Into(result)
 	return
 }
@@ -105,8 +105,8 @@ func (c *ingress) Watch(label labels.Selector, field fields.Selector, resourceVe
 }
 
 // UpdateStatus takes the name of the ingress and the new status.  Returns the server's representation of the ingress, and an error, if it occurs.
-func (c *ingress) UpdateStatus(ingress *experimental.Ingress) (result *experimental.Ingress, err error) {
-	result = &experimental.Ingress{}
+func (c *ingress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+	result = &extensions.Ingress{}
 	err = c.r.Put().Namespace(c.ns).Resource("ingress").Name(ingress.Name).SubResource("status").Body(ingress).Do().Into(result)
 	return
 }

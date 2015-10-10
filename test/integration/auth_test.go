@@ -852,7 +852,7 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		expectedAttributes authorizer.Attributes
 	}{
 		"prefix/version/resource":       {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: "", Resource: "pods"}},
-		"prefix/group/version/resource": {"GET", "/apis/experimental/v1/pods", authorizer.AttributesRecord{APIGroup: "experimental", Resource: "pods"}},
+		"prefix/group/version/resource": {"GET", "/apis/extensions/v1/pods", authorizer.AttributesRecord{APIGroup: "extensions", Resource: "pods"}},
 	}
 
 	currentAuthorizationAttributesIndex := 0

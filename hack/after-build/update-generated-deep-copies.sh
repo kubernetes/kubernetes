@@ -57,6 +57,6 @@ function generate_deep_copies() {
 }
 
 # v1 is in the group ""
-DEFAULT_VERSIONS="/ v1 experimental/ experimental/v1alpha1"
+DEFAULT_VERSIONS="/ v1 extensions/ extensions/v1beta1"
 VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
 generate_deep_copies "$VERSIONS"
