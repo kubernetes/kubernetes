@@ -147,7 +147,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "test",
-						Image: "gcr.io/google_containers/pause",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -172,7 +172,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/pause",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
