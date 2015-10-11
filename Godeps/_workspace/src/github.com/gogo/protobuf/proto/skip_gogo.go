@@ -80,7 +80,7 @@ func Skip(data []byte) (n int, err error) {
 			return index, nil
 		case 3:
 			for {
-				var innerWire uint64
+				var wire uint64
 				var start int = index
 				for shift := uint(0); ; shift += 7 {
 					if index >= l {
@@ -88,13 +88,13 @@ func Skip(data []byte) (n int, err error) {
 					}
 					b := data[index]
 					index++
-					innerWire |= (uint64(b) & 0x7F) << shift
+					wire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
+				wireType := int(wire & 0x7)
+				if wireType == 4 {
 					break
 				}
 				next, err := Skip(data[start:])

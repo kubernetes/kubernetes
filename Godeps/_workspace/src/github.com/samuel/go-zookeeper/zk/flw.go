@@ -49,16 +49,14 @@ func FLWSrvr(servers []string, timeout time.Duration) ([]*ServerStats, bool) {
 			continue
 		}
 
-		matches := re.FindAllStringSubmatch(string(response), -1)
+		match := re.FindAllStringSubmatch(string(response), -1)[0][1:]
 
-		if matches == nil {
+		if match == nil {
 			err := fmt.Errorf("unable to parse fields from zookeeper response (no regex matches)")
 			ss[i] = &ServerStats{Error: err}
 			imOk = false
 			continue
 		}
-
-		match := matches[0][1:]
 
 		// determine current server
 		var srvrMode Mode

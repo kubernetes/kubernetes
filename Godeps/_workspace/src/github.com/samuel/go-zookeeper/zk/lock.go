@@ -8,13 +8,10 @@ import (
 )
 
 var (
-	// ErrDeadlock is returned by Lock when trying to lock twice without unlocking first
-	ErrDeadlock = errors.New("zk: trying to acquire a lock twice")
-	// ErrNotLocked is returned by Unlock when trying to release a lock that has not first be acquired.
+	ErrDeadlock  = errors.New("zk: trying to acquire a lock twice")
 	ErrNotLocked = errors.New("zk: not locked")
 )
 
-// Lock is a mutual exclusion lock.
 type Lock struct {
 	c        *Conn
 	path     string
@@ -23,9 +20,6 @@ type Lock struct {
 	seq      int
 }
 
-// NewLock creates a new lock instance using the provided connection, path, and acl.
-// The path must be a node that is only used by this lock. A lock instances starts
-// unlocked until Lock() is called.
 func NewLock(c *Conn, path string, acl []ACL) *Lock {
 	return &Lock{
 		c:    c,
@@ -39,9 +33,6 @@ func parseSeq(path string) (int, error) {
 	return strconv.Atoi(parts[len(parts)-1])
 }
 
-// Lock attempts to acquire the lock. It will wait to return until the lock
-// is acquired or an error occurs. If this instance already has the lock
-// then ErrDeadlock is returned.
 func (l *Lock) Lock() error {
 	if l.lockPath != "" {
 		return ErrDeadlock
@@ -127,8 +118,6 @@ func (l *Lock) Lock() error {
 	return nil
 }
 
-// Unlock releases an acquired lock. If the lock is not currently acquired by
-// this Lock instance than ErrNotLocked is returned.
 func (l *Lock) Unlock() error {
 	if l.lockPath == "" {
 		return ErrNotLocked
