@@ -338,17 +338,12 @@ func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool,
 	return s, false, s.contentType, s.err
 }
 
-type SimpleConnectHandler struct {
+type OutputConnect struct {
 	response string
-	err      error
 }
 
-func (h *SimpleConnectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (h *OutputConnect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte(h.response))
-}
-
-func (h *SimpleConnectHandler) RequestError() error {
-	return h.err
 }
 
 func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
@@ -448,10 +443,13 @@ func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (
 
 // Implement Connecter
 type ConnecterRESTStorage struct {
-	connectHandler         rest.ConnectHandler
+	connectHandler http.Handler
+	handlerFunc    func() http.Handler
+
 	emptyConnectOptions    runtime.Object
 	receivedConnectOptions runtime.Object
 	receivedID             string
+	receivedResponder      rest.Responder
 	takesPath              string
 }
 
@@ -462,9 +460,13 @@ func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &apiservertesting.Simple{}
 }
 
-func (s *ConnecterRESTStorage) Connect(ctx api.Context, id string, options runtime.Object) (rest.ConnectHandler, error) {
+func (s *ConnecterRESTStorage) Connect(ctx api.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
 	s.receivedConnectOptions = options
 	s.receivedID = id
+	s.receivedResponder = responder
+	if s.handlerFunc != nil {
+		return s.handlerFunc(), nil
+	}
 	return s.connectHandler, nil
 }
 
@@ -1287,7 +1289,7 @@ func TestConnect(t *testing.T) {
 	responseText := "Hello World"
 	itemID := "theID"
 	connectStorage := &ConnecterRESTStorage{
-		connectHandler: &SimpleConnectHandler{
+		connectHandler: &OutputConnect{
 			response: responseText,
 		},
 	}
@@ -1320,9 +1322,92 @@ func TestConnect(t *testing.T) {
 	}
 }
 
+func TestConnectResponderObject(t *testing.T) {
+	itemID := "theID"
+	simple := &apiservertesting.Simple{Other: "foo"}
+	connectStorage := &ConnecterRESTStorage{}
+	connectStorage.handlerFunc = func() http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			connectStorage.receivedResponder.Object(http.StatusCreated, simple)
+		})
+	}
+	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("unexpected response: %#v", resp)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if connectStorage.receivedID != itemID {
+		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
+	}
+	obj, err := codec.Decode(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !api.Semantic.DeepEqual(obj, simple) {
+		t.Errorf("Unexpected response: %#v", obj)
+	}
+}
+
+func TestConnectResponderError(t *testing.T) {
+	itemID := "theID"
+	connectStorage := &ConnecterRESTStorage{}
+	connectStorage.handlerFunc = func() http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			connectStorage.receivedResponder.Error(apierrs.NewForbidden("simple", itemID, errors.New("you are terminated")))
+		})
+	}
+	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("unexpected response: %#v", resp)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if connectStorage.receivedID != itemID {
+		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
+	}
+	obj, err := codec.Decode(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj.(*unversioned.Status).Code != http.StatusForbidden {
+		t.Errorf("Unexpected response: %#v", obj)
+	}
+}
+
 func TestConnectWithOptionsRouteParams(t *testing.T) {
 	connectStorage := &ConnecterRESTStorage{
-		connectHandler:      &SimpleConnectHandler{},
+		connectHandler:      &OutputConnect{},
 		emptyConnectOptions: &apiservertesting.SimpleGetOptions{},
 	}
 	storage := map[string]rest.Storage{
@@ -1351,7 +1436,7 @@ func TestConnectWithOptions(t *testing.T) {
 	responseText := "Hello World"
 	itemID := "theID"
 	connectStorage := &ConnecterRESTStorage{
-		connectHandler: &SimpleConnectHandler{
+		connectHandler: &OutputConnect{
 			response: responseText,
 		},
 		emptyConnectOptions: &apiservertesting.SimpleGetOptions{},
@@ -1383,6 +1468,9 @@ func TestConnectWithOptions(t *testing.T) {
 	if string(body) != responseText {
 		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
 	}
+	if connectStorage.receivedResponder == nil {
+		t.Errorf("Unexpected responder")
+	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
 		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
@@ -1397,7 +1485,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	itemID := "theID"
 	testPath := "a/b/c/def"
 	connectStorage := &ConnecterRESTStorage{
-		connectHandler: &SimpleConnectHandler{
+		connectHandler: &OutputConnect{
 			response: responseText,
 		},
 		emptyConnectOptions: &apiservertesting.SimpleGetOptions{},
