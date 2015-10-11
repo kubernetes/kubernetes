@@ -69,19 +69,31 @@ For a list of those images, see the `build-and-push` shell script - it builds an
 
 modify the dockerhub user name in it accordingly.
 
-## Get started with the WEBAPP
+## Hacking, extending, and locally testing on the k8petstore
 
 The web app is written in Go, and borrowed from the original Guestbook example by brendan burns.
+
+K8petstore is built to be expanded, and aims to attract developers interested in building and maintaining a polyglot, non-trivial kubernetes app as a community.
+
+It can be a simple way to get started with kuberentes or golang application development.
+
+Thus we've tried to make it easy to hack on, even without kubernetes.  Just run the containers and glue them together using docker IP addresses !
 
 We have extended it to do some error reporting, persisting of JSON petstore transactions (not much different then guestbook entries),
 
 and supporting of additional REST calls, like LLEN, which returns the total # of transactions in the database.
 
-To work on the app, just cd to the `dev` directory, and follow the instructions.  You can easily edit it in your local machine, by installing
-
-redis and go.  Then you can use the `Vagrantfile` in this top level directory to launch a minimal version of the app in pure docker containers.
-
 If that is all working, you can finally run `k8petstore.sh` in any Kubernetes cluster, and run the app at scale.
+
+### MAC USERS
+
+To develop against k8petstore, simply run the docker-machine-dev.sh script, which is built for mac users.
+
+### LINUX USERS
+
+For now, modify the docker-machine-dev.sh script as necessary to use the provider of your choice.  Most linux/docker users are savvy enough to do this easily.
+
+If you need help, just ask on the mailing list.
 
 ## Set up the data generator (optional)
 
@@ -125,22 +137,33 @@ You might want to change it to point to your customized Go image, if you chose t
 
 So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
 
-Note that at the top of the script there are a few self explanatory parameters to set, among which the Public IPs parameter is where you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
+## Should we use PublicIP, NodePort, Cloud loadbalancers ?
 
-In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](../../docs/user-guide/services.md#external-services).
+The original k8petstore used PUBLIC_IP fields to bind the web app to an IP.
+
+However... because the public IP was deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](../../docs/user-guide/services.md#external-services).
+
+We will continue to try to update k8petstore to use the idiomatic networking tools that kubernetes supports, if we fall behind, please create an issue !
 
 ## Future
 
-In the future, we plan to add cassandra support.  Redis is a fabulous in memory data store, but it is not meant for truly available and resilient storage.
+Future development ideas include, adding a persistent k/v store like cassandra/hbase/..., using kafka/activeMQ for the data sink (with redis as a consumer).
 
-Thus we plan to add another tier of queueing, which empties the REDIS transactions into a cassandra store which persists.
+Additionally, adding analytics and meaningful streaming queries to the richly patterned data would also be interesting.
+
+We are open to other ways of expanding the coverage and realism of the k8petstore application.
+
+Reach out with ideas, pull requests, and so on!
+
+The end goal is to support polyglot, real world, data-intensive application on kuberenetes which can be used both to learn how to maintain kubernetes applications
+
+as well as for scale and functionality testing.
 
 ## Questions
 
 For questions on running this app, you can ask on [Slack](../../docs/troubleshooting.md#slack).
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()
