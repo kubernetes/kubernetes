@@ -78,7 +78,7 @@ type ShortcutExpander struct {
 // VersionAndKindForResource implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
 // mapper.
 func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
-	exp := "experimental"
+	ext := "extensions"
 	parts := strings.Split(resource, "/")
 	// group/kind or group/kind-shortcut
 	if len(parts) > 1 {
@@ -90,8 +90,8 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 			return
 		}
 		// kind that should be experimental/kind
-		if group, err2 := e.GroupForResource(resource); err2 == nil && group == exp {
-			err = fmt.Errorf("%s resource %q should be specified explicitly; use %s/%s instead", exp, resource, exp, resource)
+		if group, err2 := e.GroupForResource(resource); err2 == nil && group == ext {
+			err = fmt.Errorf("in-development resource %q should be specified explicitly; use %s/%s instead", resource, ext, resource)
 		}
 	}
 	return

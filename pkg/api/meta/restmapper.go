@@ -311,9 +311,9 @@ func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string,
 func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	for _, t := range m {
 		defaultVersion, kind, err = t.VersionAndKindForResource(resource)
-		// If "resource" is an experimental resource without specifying "experimental/",
+		// If "resource" is an in-development resource without specifying "extensions/",
 		// version, kind, and error will all be returned.
-		// (We need to stop here otherwise mapper will try to find experimental resource in other groups.)
+		// (We need to stop here otherwise mapper will try to find in-development resource in other groups.)
 		if len(defaultVersion) > 0 && len(kind) > 0 {
 			return
 		}
