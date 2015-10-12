@@ -34,29 +34,38 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
   echo ""
-  echo "${0} [-M|-N|-P] -l | <release or continuous integration version> | [latest_stable|latest_release|latest_ci]"
+  echo "${0} [-M|-N|-P] -l | <version number or publication>"
   echo "  Upgrades master and nodes by default"
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
   echo "  -P:  Node upgrade prerequisites only (create a new instance template)"
   echo "  -l:  Use local(dev) binaries"
   echo ""
+  echo '  Version number or publication is either a proper version number'
+  echo '  (e.g. "v1.0.6", "v1.2.0-alpha.1.881+376438b69c7612") or a version'
+  echo '  publication of the form <bucket>/<version> (e.g. "release/stable",'
+  echo '  "ci/latest-1").  Some common ones are:'
+  echo '    - "release/stable"'
+  echo '    - "release/latest"'
+  echo '    - "ci/latest"'
+  echo '  See the docs on getting builds for more information about version publication.'
+  echo ""
   echo "(... Fetching current release versions ...)"
   echo ""
 
   # NOTE: IF YOU CHANGE THE FOLLOWING LIST, ALSO UPDATE test/e2e/cluster_upgrade.go
-  local latest_release
-  local latest_stable
-  local latest_ci
+  local release_stable
+  local release_latest
+  local ci_latest
 
-  latest_stable=$(gsutil cat gs://kubernetes-release/release/stable.txt)
-  latest_release=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-  latest_ci=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
+  release_stable=$(gsutil cat gs://kubernetes-release/release/stable.txt)
+  release_latest=$(gsutil cat gs://kubernetes-release/release/latest.txt)
+  ci_latest=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
 
-  echo "To upgrade to:"
-  echo "  latest stable:  ${0} ${latest_stable}"
-  echo "  latest release: ${0} ${latest_release}"
-  echo "  latest ci:      ${0} ${latest_ci}"
+  echo "Right now, versions are as follows:"
+  echo "  release/stable: ${0} ${release_stable}"
+  echo "  release/latest: ${0} ${release_latest}"
+  echo "  ci/latest:      ${0} ${ci_latest}"
 }
 
 function upgrade-master() {
