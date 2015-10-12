@@ -121,11 +121,16 @@ start_k8s(){
             fi
             ifconfig docker0 down
             yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
+        ;;
         ubuntu|debian)
             DOCKER_CONF="/etc/default/docker"
             echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
             ifconfig docker0 down
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
+        ;;
+        *)
+            echo "Unsupported operations system $lsb_dist"
+            exit 1
         ;;
     esac
 
