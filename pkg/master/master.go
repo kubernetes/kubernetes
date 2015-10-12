@@ -87,6 +87,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
@@ -149,13 +150,13 @@ func (s *StorageDestinations) backends() []string {
 	backends := sets.String{}
 	for _, group := range s.APIGroups {
 		if group.Default != nil {
-			for _, backend := range group.Default.Backends() {
+			for _, backend := range group.Default.Backends(context.TODO()) {
 				backends.Insert(backend)
 			}
 		}
 		if group.Overrides != nil {
 			for _, storage := range group.Overrides {
-				for _, backend := range storage.Backends() {
+				for _, backend := range storage.Backends(context.TODO()) {
 					backends.Insert(backend)
 				}
 			}

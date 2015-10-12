@@ -30,14 +30,17 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
+
+	"golang.org/x/net/context"
 )
 
 func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Set(ctx, key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := client.Get(key, false, false)
@@ -58,6 +61,7 @@ func TestSet(t *testing.T) {
 func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		coded, err := testapi.Default.Codec().Encode(&testObject)
@@ -69,7 +73,7 @@ func TestGet(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := api.ServiceAccount{}
-		if err := etcdStorage.Get(key, &result, false); err != nil {
+		if err := etcdStorage.Get(ctx, key, &result, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Propagate ResourceVersion (it is set automatically).
@@ -83,13 +87,14 @@ func TestGet(t *testing.T) {
 func TestWriteTTL(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), "")
+	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Set(ctx, key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := &api.ServiceAccount{}
-		err := etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		err := etcdStorage.GuaranteedUpdate(ctx, key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "foo" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
@@ -111,7 +116,7 @@ func TestWriteTTL(t *testing.T) {
 		}
 
 		result = &api.ServiceAccount{}
-		err = etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		err = etcdStorage.GuaranteedUpdate(ctx, key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "out" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
@@ -136,6 +141,7 @@ func TestWriteTTL(t *testing.T) {
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := etcd.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
 		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
@@ -145,7 +151,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := etcdStorage.Watch(key, 0, storage.Everything)
+		w, err := etcdStorage.Watch(ctx, key, 0, storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}

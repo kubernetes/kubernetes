@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 // CacherConfig contains the configuration for a given Cache.
@@ -152,8 +153,8 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Backends() []string {
-	return c.storage.Backends()
+func (c *Cacher) Backends(ctx context.Context) []string {
+	return c.storage.Backends(ctx)
 }
 
 // Implements storage.Interface.
@@ -162,22 +163,22 @@ func (c *Cacher) Versioner() Versioner {
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Create(key string, obj, out runtime.Object, ttl uint64) error {
-	return c.storage.Create(key, obj, out, ttl)
+func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	return c.storage.Create(ctx, key, obj, out, ttl)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Set(key string, obj, out runtime.Object, ttl uint64) error {
-	return c.storage.Set(key, obj, out, ttl)
+func (c *Cacher) Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	return c.storage.Set(ctx, key, obj, out, ttl)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Delete(key string, out runtime.Object) error {
-	return c.storage.Delete(key, out)
+func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object) error {
+	return c.storage.Delete(ctx, key, out)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
 	// Do NOT allow Watch to start when the underlying structures are not propagated.
 	c.usable.RLock()
 	defer c.usable.RUnlock()
@@ -203,23 +204,23 @@ func (c *Cacher) Watch(key string, resourceVersion uint64, filter FilterFunc) (w
 }
 
 // Implements storage.Interface.
-func (c *Cacher) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	return c.Watch(key, resourceVersion, filter)
+func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	return c.Watch(ctx, key, resourceVersion, filter)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Get(key string, objPtr runtime.Object, ignoreNotFound bool) error {
-	return c.storage.Get(key, objPtr, ignoreNotFound)
+func (c *Cacher) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
+	return c.storage.Get(ctx, key, objPtr, ignoreNotFound)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) GetToList(key string, filter FilterFunc, listObj runtime.Object) error {
-	return c.storage.GetToList(key, filter, listObj)
+func (c *Cacher) GetToList(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error {
+	return c.storage.GetToList(ctx, key, filter, listObj)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) List(key string, filter FilterFunc, listObj runtime.Object) error {
-	return c.storage.List(key, filter, listObj)
+func (c *Cacher) List(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error {
+	return c.storage.List(ctx, key, filter, listObj)
 }
 
 // ListFromMemory implements list operation (the same signature as List method)
@@ -263,8 +264,8 @@ func (c *Cacher) ListFromMemory(key string, listObj runtime.Object) error {
 }
 
 // Implements storage.Interface.
-func (c *Cacher) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error {
-	return c.storage.GuaranteedUpdate(key, ptrToType, ignoreNotFound, tryUpdate)
+func (c *Cacher) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error {
+	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, tryUpdate)
 }
 
 // Implements storage.Interface.
@@ -343,7 +344,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 	list := lw.newListFunc()
-	if err := lw.storage.List(lw.resourcePrefix, Everything, list); err != nil {
+	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, Everything, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -355,7 +356,7 @@ func (lw *cacherListerWatcher) Watch(resourceVersion string) (watch.Interface, e
 	if err != nil {
 		return nil, err
 	}
-	return lw.storage.WatchList(lw.resourcePrefix, version, Everything)
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, version, Everything)
 }
 
 // cacherWatch implements watch.Interface

@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"golang.org/x/net/context"
 )
 
 var versioner = APIObjectVersioner{}
@@ -223,7 +225,7 @@ func TestWatchEtcdError(t *testing.T) {
 	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
 	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch("/some/key", 4, storage.Everything)
+	watching, err := h.Watch(context.TODO(), "/some/key", 4, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -253,7 +255,7 @@ func TestWatch(t *testing.T) {
 	fakeClient.ExpectNotFoundGet(prefixedKey)
 	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -428,7 +430,7 @@ func TestWatchEtcdState(t *testing.T) {
 		}
 
 		h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
-		watching, err := h.Watch(baseKey, testCase.From, storage.Everything)
+		watching, err := h.Watch(context.TODO(), baseKey, testCase.From, storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -502,7 +504,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		fakeClient.Data[prefixedKey] = testCase.Response
 		h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-		watching, err := h.Watch(key, 0, storage.Everything)
+		watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -563,7 +565,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	}
 	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.WatchList(key, 0, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -603,7 +605,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.WatchList(key, 1, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, 1, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -656,7 +658,7 @@ func TestWatchFromNotFound(t *testing.T) {
 	}
 	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -683,7 +685,7 @@ func TestWatchFromOtherError(t *testing.T) {
 	}
 	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -719,7 +721,7 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	fakeClient.ExpectNotFoundGet(prefixedKey)
 
 	// Test purposeful shutdown
-	watching, err := h.Watch(key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
