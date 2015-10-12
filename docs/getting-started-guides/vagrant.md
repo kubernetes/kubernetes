@@ -84,7 +84,7 @@ export KUBERNETES_PROVIDER=vagrant
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
-By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-minion-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space).
+By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-node-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space).
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
 
@@ -102,14 +102,14 @@ To access the master or any node:
 
 ```sh
 vagrant ssh master
-vagrant ssh minion-1
+vagrant ssh node-1
 ```
 
 If you are running more than one node, you can access the others by:
 
 ```sh
-vagrant ssh minion-2
-vagrant ssh minion-3
+vagrant ssh node-2
+vagrant ssh node-3
 ```
 
 Each node in the cluster installs the docker daemon and the kubelet.
@@ -136,7 +136,7 @@ To view the service status and/or logs on the kubernetes-master:
 To view the services on any of the nodes:
 
 ```console
-[vagrant@kubernetes-master ~] $ vagrant ssh minion-1
+[vagrant@kubernetes-master ~] $ vagrant ssh node-1
 [vagrant@kubernetes-master ~] $ sudo su
 
 [root@kubernetes-master ~] $ systemctl status kubelet
@@ -253,8 +253,8 @@ my-nginx-xql4j   0/1       Pending   0          10s
 You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
 ```console
-$ vagrant ssh minion-1 -c 'sudo docker images'
-kubernetes-minion-1:
+$ vagrant ssh node-1 -c 'sudo docker images'
+kubernetes-node-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
     <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
     google/cadvisor     latest              e0575e677c50        13 days ago         12.64 MB
@@ -264,8 +264,8 @@ kubernetes-minion-1:
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
 ```console
-$ vagrant ssh minion-1 -c 'sudo docker ps'
-kubernetes-minion-1:
+$ vagrant ssh node-1 -c 'sudo docker ps'
+kubernetes-node-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
     dbe79bf6e25b        nginx:latest              "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
     fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
@@ -382,7 +382,7 @@ To set up a vagrant cluster for hacking, follow the [vagrant developer guide](..
 
 #### I have brought Vagrant up but the nodes cannot validate!
 
-Log on to one of the nodes (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Log on to one of the nodes (`vagrant ssh node-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
 #### I want to change the number of nodes!
 
