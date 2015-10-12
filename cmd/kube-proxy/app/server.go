@@ -64,6 +64,8 @@ type ProxyServerConfig struct {
 	nodeRef            *api.ObjectReference // Reference to this node.
 	MasqueradeAll      bool
 	CleanupAndExit     bool
+	KubeApiQps         float32
+	KubeApiBurst       int
 }
 
 type ProxyServer struct {
@@ -88,6 +90,8 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", s.SyncPeriod, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
 	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
+	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
 const (
@@ -112,6 +116,8 @@ func NewProxyConfig() *ProxyServerConfig {
 		OOMScoreAdj:        qos.KubeProxyOOMScoreAdj,
 		ResourceContainer:  "/kube-proxy",
 		SyncPeriod:         30 * time.Second,
+		KubeApiQps:         5.0,
+		KubeApiBurst:       10,
 	}
 }
 
@@ -180,6 +186,11 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = config.KubeApiQps
+	kubeconfig.Burst = config.KubeApiBurst
+
 	client, err := kubeclient.New(kubeconfig)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)

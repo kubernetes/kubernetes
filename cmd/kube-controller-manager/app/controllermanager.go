@@ -97,8 +97,10 @@ type CMServer struct {
 	EnableProfiling    bool
 	EnableExperimental bool
 
-	Master     string
-	Kubeconfig string
+	Master       string
+	Kubeconfig   string
+	KubeApiQps   float32
+	KubeApiBurst int
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -128,6 +130,8 @@ func NewCMServer() *CMServer {
 			PersistentVolumeRecyclerMinimumTimeoutHostPath:   60,
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 		},
+		KubeApiQps:   20.0,
+		KubeApiBurst: 30,
 	}
 	return &s
 }
@@ -193,6 +197,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.BoolVar(&s.EnableExperimental, "enable-experimental", s.EnableExperimental, "Enables experimental controllers (requires enabling experimental API on apiserver).")
+	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
 func (s *CMServer) resyncPeriod() time.Duration {
@@ -215,8 +221,9 @@ func (s *CMServer) Run(_ []string) error {
 		return err
 	}
 
-	kubeconfig.QPS = 20.0
-	kubeconfig.Burst = 30
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = s.KubeApiQps
+	kubeconfig.Burst = s.KubeApiBurst
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
