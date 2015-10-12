@@ -35,18 +35,10 @@
 						{"containerPort": 10250},
 						{"containerPort": 10255}
 					],
-					"env": [
-						{
-							"name": "MASTER_IP",
-							"value": ##masterip##
-						}
-					],
 					"command": [
 						"./kubemark.sh"
 					],
 					"args": [
-						"--server=$(MASTER_IP)",
-						"--api-server-port=8080",
 						"--v=3"
 					],
 					"volumeMounts": [
