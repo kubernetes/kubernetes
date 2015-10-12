@@ -51,7 +51,7 @@ type Interface interface {
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
 	SwaggerSchemaInterface
-	Experimental() ExtensionsInterface
+	Extensions() ExtensionsInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -243,6 +243,6 @@ func IsTimeout(err error) bool {
 	return false
 }
 
-func (c *Client) Experimental() ExtensionsInterface {
+func (c *Client) Extensions() ExtensionsInterface {
 	return c.ExtensionsClient
 }

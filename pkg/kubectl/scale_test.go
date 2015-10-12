@@ -83,7 +83,7 @@ type ErrorExtensionsClient struct {
 	invalid bool
 }
 
-func (c *ErrorExtensionsClient) Experimental() client.ExtensionsInterface {
+func (c *ErrorExtensionsClient) Extensions() client.ExtensionsInterface {
 	return &ErrorJobClient{testclient.FakeExperimental{&c.Fake}, c.invalid}
 }
 
