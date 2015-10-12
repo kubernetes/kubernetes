@@ -59,7 +59,6 @@ import (
 )
 
 func init() {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	util.ReallyCrash = true
 }
 
