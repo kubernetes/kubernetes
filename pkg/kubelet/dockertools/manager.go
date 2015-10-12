@@ -1832,13 +1832,21 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = dm.createPodInfraContainer(pod)
-
-		// Call the networking plugin
-		if err == nil {
-			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
-		}
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
+			return err
+		}
+
+		// Call the networking plugin
+		err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
+		if err != nil {
+			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
+			// Delete infra container
+			if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
+				ID:   string(podInfraContainerID),
+				Type: "docker"}, nil, pod); delErr != nil {
+				glog.Warningf("Clear infra container failed for pod %q: %v", podFullName, delErr)
+			}
 			return err
 		}
 
