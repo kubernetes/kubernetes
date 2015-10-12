@@ -41,12 +41,12 @@ type DeploymentInterface interface {
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	client *ExperimentalClient
+	client *ExtensionsClient
 	ns     string
 }
 
 // newDeployments returns a Deployments
-func newDeployments(c *ExperimentalClient, namespace string) *deployments {
+func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	return &deployments{
 		client: c,
 		ns:     namespace,

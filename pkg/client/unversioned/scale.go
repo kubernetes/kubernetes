@@ -33,12 +33,12 @@ type ScaleInterface interface {
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
 type scales struct {
-	client *ExperimentalClient
+	client *ExtensionsClient
 	ns     string
 }
 
 // newHorizontalPodAutoscalers returns a horizontalPodAutoscalers
-func newScales(c *ExperimentalClient, namespace string) *scales {
+func newScales(c *ExtensionsClient, namespace string) *scales {
 	return &scales{
 		client: c,
 		ns:     namespace,
