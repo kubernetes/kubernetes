@@ -71,7 +71,6 @@ duration-sec
 e2e-verify-service-account
 e2e-output-dir
 enable-debugging-handlers
-enable-experimental
 enable-server
 etcd-config
 etcd-prefix

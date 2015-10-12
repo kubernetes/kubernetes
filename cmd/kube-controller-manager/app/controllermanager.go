@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -91,11 +92,10 @@ type CMServer struct {
 	ServiceAccountKeyFile             string
 	RootCAFile                        string
 
-	ClusterName        string
-	ClusterCIDR        net.IPNet
-	AllocateNodeCIDRs  bool
-	EnableProfiling    bool
-	EnableExperimental bool
+	ClusterName       string
+	ClusterCIDR       net.IPNet
+	AllocateNodeCIDRs bool
+	EnableProfiling   bool
 
 	Master       string
 	Kubeconfig   string
@@ -196,7 +196,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
-	fs.BoolVar(&s.EnableExperimental, "enable-experimental", s.EnableExperimental, "Enables experimental controllers (requires enabling experimental API on apiserver).")
 	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
 }
@@ -287,20 +286,47 @@ func (s *CMServer) Run(_ []string) error {
 
 	resourcequotacontroller.NewResourceQuotaController(kubeClient).Run(s.ResourceQuotaSyncPeriod)
 
-	namespacecontroller.NewNamespaceController(kubeClient, s.EnableExperimental, s.NamespaceSyncPeriod).Run()
+	versionStrings, err := client.ServerAPIVersions(kubeconfig)
+	if err != nil {
+		glog.Fatalf("Failed to get api versions from server: %v", err)
+	}
+	versions := &api.APIVersions{Versions: versionStrings}
 
-	if s.EnableExperimental {
-		go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
-			Run(s.ConcurrentDSCSyncs, util.NeverStop)
+	resourceMap, err := kubeClient.SupportedResources()
+	if err != nil {
+		glog.Fatalf("Failed to get supported resources from server: %v", err)
+	}
 
-		go job.NewJobController(kubeClient, s.resyncPeriod).
-			Run(s.ConcurrentJobSyncs, util.NeverStop)
+	namespacecontroller.NewNamespaceController(kubeClient, versions, s.NamespaceSyncPeriod).Run()
 
-		podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient)).
-			Run(s.HorizontalPodAutoscalerSyncPeriod)
+	groupVersion := "extensions/v1beta1"
+	resources, found := resourceMap[groupVersion]
+	// TODO: this needs to be dynamic so users don't have to restart their controller manager if they change the apiserver
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "horizontalpodautoscalers") {
+			glog.Infof("Starting horizontal pod controller.")
+			podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient)).
+				Run(s.HorizontalPodAutoscalerSyncPeriod)
+		}
 
-		deployment.New(kubeClient).
-			Run(s.DeploymentControllerSyncPeriod)
+		if containsResource(resources, "daemonsets") {
+			glog.Infof("Starting daemon set controller")
+			go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
+				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+		}
+
+		if containsResource(resources, "jobs") {
+			glog.Infof("Starting job controller")
+			go job.NewJobController(kubeClient, s.resyncPeriod).
+				Run(s.ConcurrentJobSyncs, util.NeverStop)
+		}
+
+		if containsResource(resources, "deployments") {
+			glog.Infof("Starting deployment controller")
+			deployment.New(kubeClient).
+				Run(s.DeploymentControllerSyncPeriod)
+		}
 	}
 
 	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
@@ -347,4 +373,23 @@ func (s *CMServer) Run(_ []string) error {
 	).Run()
 
 	select {}
+}
+
+func containsVersion(versions *api.APIVersions, version string) bool {
+	for ix := range versions.Versions {
+		if versions.Versions[ix] == version {
+			return true
+		}
+	}
+	return false
+}
+
+func containsResource(resources *api.APIResourceList, resourceName string) bool {
+	for ix := range resources.APIResources {
+		resource := resources.APIResources[ix]
+		if resource.Name == resourceName {
+			return true
+		}
+	}
+	return false
 }
