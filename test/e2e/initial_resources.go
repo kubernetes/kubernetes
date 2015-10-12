@@ -28,7 +28,7 @@ import (
 var _ = Describe("Initial Resources", func() {
 	f := NewFramework("initial-resources")
 
-	It("[Skipped] should set initial resources based on historical data", func() {
+	It("[Skipped][Autoscaling Suite] should set initial resources based on historical data", func() {
 		cpu := 100
 		mem := 200
 		for i := 0; i < 10; i++ {

@@ -228,6 +228,7 @@ case ${JOB_NAME} in
     # Override GCE default for cluster size autoscaling purposes.
     ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ENABLE_HORIZONTAL_POD_AUTOSCALER="true"
+    ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
     ;;
 
   # Runs the flaky tests on GCE, sequentially.
@@ -832,6 +833,8 @@ export MINION_SIZE=${MINION_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
 export PROJECT=${PROJECT:-}
 export JENKINS_PUBLISHED_VERSION=${JENKINS_PUBLISHED_VERSION:-'ci/latest'}
+
+export KUBE_ADMISSION_CONTROL=${ADMISSION_CONTROL:-}
 
 export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}
 export PATH=${PATH}:/usr/local/go/bin
