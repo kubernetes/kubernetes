@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -45,59 +44,14 @@ const (
 	versionURLFmt = "https://storage.googleapis.com/kubernetes-release/%s/%s.txt"
 )
 
-// realVersion turns a version constant s--one accepted by cluster/gce/upgrade.sh--
-// into a deployable version string. If the s is not known to be a version
-// constant, it will assume it is already a valid version, and return s directly.
-//
-// NOTE: KEEP THIS LIST UP-TO-DATE WITH THE CODE BELOW.
-// The version strings supported are:
-// - "latest_stable"   (returns a string like "0.18.2")
-// - "latest_release"  (returns a string like "0.19.1")
-// - "latest_ci"       (returns a string like "0.19.1-669-gabac8c8")
+// realVersion turns a version constant s into a version string deployable on
+// GKE.  See hack/get-build.sh for more information.
 func realVersion(s string) (string, error) {
-	bucket, file := "", ""
-	switch s {
-	// NOTE: IF YOU CHANGE THE FOLLOWING LIST, ALSO UPDATE cluster/gce/upgrade.sh
-	case "latest_stable":
-		bucket, file = "release", "stable"
-	case "latest_release":
-		bucket, file = "release", "latest"
-	case "latest_ci":
-		bucket, file = "ci", "latest"
-	default:
-		// If we don't match one of the above, we assume that the passed version
-		// is already valid (such as "0.19.1" or "0.19.1-669-gabac8c8").
-		Logf("Assuming %q is already a valid version.", s)
-		return s, nil
+	v, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/get-build.sh"), "-v", s)
+	if err != nil {
+		return v, err
 	}
-
-	url := fmt.Sprintf(versionURLFmt, bucket, file)
-	var v string
-	Logf("Fetching version from %s", url)
-	c := &http.Client{Timeout: 2 * time.Second}
-	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
-		r, err := c.Get(url)
-		if err != nil {
-			Logf("Error reaching %s: %v", url, err)
-			return false, nil
-		}
-		if r.StatusCode != http.StatusOK {
-			Logf("Bad response; status: %d, response: %v", r.StatusCode, r)
-			return false, nil
-		}
-		defer r.Body.Close()
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			Logf("Could not read response body: %v", err)
-			return false, nil
-		}
-		v = strings.TrimSpace(string(b))
-		return true, nil
-	}); err != nil {
-		return "", fmt.Errorf("failed to fetch real version from %s", url)
-	}
-	// Versions start with "v", so remove that.
-	return strings.TrimPrefix(v, "v"), nil
+	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
 }
 
 // The following upgrade functions are passed into the framework below and used
@@ -207,7 +161,7 @@ var _ = Describe("Skipped", func() {
 			var err error
 			v, err = realVersion(testContext.UpgradeTarget)
 			expectNoError(err)
-			Logf("Version for %q is %s", testContext.UpgradeTarget, v)
+			Logf("Version for %q is %q", testContext.UpgradeTarget, v)
 
 			By("Setting up the service, RC, and pods")
 			f.beforeEach()
