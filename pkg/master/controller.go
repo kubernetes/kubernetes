@@ -274,7 +274,7 @@ func (c *Controller) SetEndpoints(serviceName string, ip net.IP, endpointPorts [
 }
 
 // Determine if the endpoint is in the format SetEndpoints expect (one subset,
-// one port, N IP addresses); and if the specified IP address is present and
+// correct ports, N IP addresses); and if the specified IP address is present and
 // the correct number of ip addresses are found.
 func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int) (formatCorrect, ipCorrect bool) {
 	if len(e.Subsets) != 1 {
@@ -284,9 +284,14 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 	if len(sub.Ports) != len(ports) {
 		return false, false
 	}
-	for i, p := range ports {
-		ep := &sub.Ports[i]
-		if p.Port != ep.Port || p.Protocol != ep.Protocol || p.Name != ep.Name {
+	for _, port := range ports {
+		contains := false
+		for _, subPort := range sub.Ports {
+			if port == subPort {
+				contains = true
+			}
+		}
+		if !contains {
 			return false, false
 		}
 	}

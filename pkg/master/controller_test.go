@@ -292,6 +292,29 @@ func TestSetEndpoints(t *testing.T) {
 			},
 		},
 		{
+			testName:    "existing endpoints extra un-ordered service ports satisfy",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			endpointPorts: []api.EndpointPort{
+				{Name: "baz", Port: 1010, Protocol: "TCP"},
+				{Name: "foo", Port: 8080, Protocol: "TCP"},
+				{Name: "bar", Port: 1000, Protocol: "TCP"},
+			},
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports: []api.EndpointPort{
+							{Name: "bar", Port: 1000, Protocol: "TCP"},
+							{Name: "foo", Port: 8080, Protocol: "TCP"},
+							{Name: "baz", Port: 1010, Protocol: "TCP"},
+						},
+					}},
+				}},
+			},
+		},
+		{
 			testName:    "existing endpoints extra service ports missing port",
 			serviceName: "foo",
 			ip:          "1.2.3.4",
