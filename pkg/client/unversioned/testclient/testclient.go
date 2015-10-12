@@ -255,7 +255,7 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
-func (c *Fake) Experimental() client.ExperimentalInterface {
+func (c *Fake) Experimental() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
 

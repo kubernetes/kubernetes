@@ -34,7 +34,7 @@ import (
 
 type DeploymentController struct {
 	client        client.Interface
-	expClient     client.ExperimentalInterface
+	expClient     client.ExtensionsInterface
 	eventRecorder record.EventRecorder
 }
 
