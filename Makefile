@@ -43,6 +43,7 @@ all:
 verify:
 	hack/verify-gofmt.sh
 	hack/verify-boilerplate.sh
+	hack/verify-codecgen.sh
 	hack/verify-description.sh
 	hack/verify-generated-conversions.sh
 	hack/verify-generated-deep-copies.sh
