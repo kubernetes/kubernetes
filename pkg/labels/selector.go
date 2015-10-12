@@ -146,6 +146,20 @@ func (r *Requirement) Matches(ls Labels) bool {
 	}
 }
 
+func (r *Requirement) Key() string {
+	return r.key
+}
+func (r *Requirement) Operator() Operator {
+	return r.operator
+}
+func (r *Requirement) Values() sets.String {
+	ret := sets.String{}
+	for k := range r.strValues {
+		ret.Insert(k)
+	}
+	return ret
+}
+
 // Return true if the LabelSelector doesn't restrict selection space
 func (lsel LabelSelector) Empty() bool {
 	if lsel == nil {
