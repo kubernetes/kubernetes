@@ -124,7 +124,7 @@ type APIStatus interface {
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
-	*ExperimentalClient
+	*ExtensionsClient
 }
 
 // ServerVersion retrieves and parses the server's version.
@@ -197,5 +197,5 @@ func IsTimeout(err error) bool {
 }
 
 func (c *Client) Experimental() ExtensionsInterface {
-	return c.ExperimentalClient
+	return c.ExtensionsClient
 }

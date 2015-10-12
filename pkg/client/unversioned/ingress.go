@@ -42,12 +42,12 @@ type IngressInterface interface {
 
 // ingress implements IngressNamespacer interface
 type ingress struct {
-	r  *ExperimentalClient
+	r  *ExtensionsClient
 	ns string
 }
 
 // newIngress returns a ingress
-func newIngress(c *ExperimentalClient, namespace string) *ingress {
+func newIngress(c *ExtensionsClient, namespace string) *ingress {
 	return &ingress{c, namespace}
 }
 
