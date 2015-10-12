@@ -46,7 +46,7 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	portRange := util.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
-	storage := NewStorage(registry, endpointRegistry, r, portAllocator)
+	storage := NewStorage(registry, endpointRegistry, r, portAllocator, nil)
 
 	return storage, registry
 }
@@ -488,6 +488,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Unexpected nil: %v", location)
 	}
 	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a scheme + name + port.
+	location, _, err = redirector.ResourceLocation(ctx, "https:foo:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "https://1.2.3.4:93", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 

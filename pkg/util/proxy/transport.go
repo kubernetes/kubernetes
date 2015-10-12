@@ -31,6 +31,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -116,6 +117,12 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	return t.rewriteResponse(req, resp)
+}
+
+var _ = util.RoundTripperWrapper(&Transport{})
+
+func (rt *Transport) WrappedRoundTripper() http.RoundTripper {
+	return rt.RoundTripper
 }
 
 // rewriteURL rewrites a single URL to go through the proxy, if the URL refers

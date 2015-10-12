@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -305,6 +306,21 @@ func TestProxyUpgrade(t *testing.T) {
 			},
 			ProxyTransport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: localhostPool}},
 		},
+		"https (valid hostname + RootCAs + custom dialer)": {
+			ServerFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+				if err != nil {
+					t.Errorf("https (valid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			ProxyTransport: &http.Transport{Dial: net.Dial, TLSClientConfig: &tls.Config{RootCAs: localhostPool}},
+		},
 	}
 
 	for k, tc := range testcases {
@@ -388,7 +404,7 @@ func TestDefaultProxyTransport(t *testing.T) {
 		h := UpgradeAwareProxyHandler{
 			Location: locURL,
 		}
-		result := h.defaultProxyTransport(URL)
+		result := h.defaultProxyTransport(URL, nil)
 		transport := result.(*corsRemovingTransport).RoundTripper.(*proxy.Transport)
 		if transport.Scheme != test.expectedScheme {
 			t.Errorf("%s: unexpected scheme. Actual: %s, Expected: %s", test.name, transport.Scheme, test.expectedScheme)

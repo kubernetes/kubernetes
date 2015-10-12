@@ -31,7 +31,8 @@ import (
 
 type REST struct {
 	*etcdgeneric.Etcd
-	connection client.ConnectionInfoGetter
+	connection     client.ConnectionInfoGetter
+	proxyTransport http.RoundTripper
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
@@ -49,7 +50,7 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewREST returns a RESTStorage object that will work against nodes.
-func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
 	prefix := "/minions"
 
 	storageInterface := s
@@ -91,7 +92,7 @@ func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionIn
 	statusStore := *store
 	statusStore.UpdateStrategy = node.StatusStrategy
 
-	return &REST{store, connection}, &StatusREST{store: &statusStore}
+	return &REST{store, connection, proxyTransport}, &StatusREST{store: &statusStore}
 }
 
 // Implement Redirector.
@@ -99,5 +100,5 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return node.ResourceLocation(r, r.connection, ctx, id)
+	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
 }
