@@ -459,13 +459,6 @@ func deepCopy_api_PersistentVolumeClaimVolumeSource(in api.PersistentVolumeClaim
 	return nil
 }
 
-func deepCopy_api_PodSecurityContext(in api.PodSecurityContext, out *api.PodSecurityContext, c *conversion.Cloner) error {
-	out.HostNetwork = in.HostNetwork
-	out.HostPID = in.HostPID
-	out.HostIPC = in.HostIPC
-	return nil
-}
-
 func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner) error {
 	if in.Volumes != nil {
 		out.Volumes = make([]api.Volume, len(in.Volumes))
@@ -511,14 +504,9 @@ func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(api.PodSecurityContext)
-		if err := deepCopy_api_PodSecurityContext(*in.SecurityContext, out.SecurityContext, c); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -845,55 +833,6 @@ func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.Typ
 func deepCopy_extensions_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.APIGroup = in.APIGroup
-	return nil
-}
-
-func deepCopy_extensions_ClusterAutoscaler(in ClusterAutoscaler, out *ClusterAutoscaler, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_extensions_ClusterAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func deepCopy_extensions_ClusterAutoscalerList(in ClusterAutoscalerList, out *ClusterAutoscalerList, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ClusterAutoscaler, len(in.Items))
-		for i := range in.Items {
-			if err := deepCopy_extensions_ClusterAutoscaler(in.Items[i], &out.Items[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func deepCopy_extensions_ClusterAutoscalerSpec(in ClusterAutoscalerSpec, out *ClusterAutoscalerSpec, c *conversion.Cloner) error {
-	out.MinNodes = in.MinNodes
-	out.MaxNodes = in.MaxNodes
-	if in.TargetUtilization != nil {
-		out.TargetUtilization = make([]NodeUtilization, len(in.TargetUtilization))
-		for i := range in.TargetUtilization {
-			if err := deepCopy_extensions_NodeUtilization(in.TargetUtilization[i], &out.TargetUtilization[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.TargetUtilization = nil
-	}
 	return nil
 }
 
@@ -1340,14 +1279,8 @@ func deepCopy_extensions_JobStatus(in JobStatus, out *JobStatus, c *conversion.C
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Succeeded = in.Succeeded
-	out.Failed = in.Failed
-	return nil
-}
-
-func deepCopy_extensions_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
-	out.Resource = in.Resource
-	out.Value = in.Value
+	out.Successful = in.Successful
+	out.Unsuccessful = in.Unsuccessful
 	return nil
 }
 
@@ -1537,7 +1470,6 @@ func init() {
 		deepCopy_api_ObjectFieldSelector,
 		deepCopy_api_ObjectMeta,
 		deepCopy_api_PersistentVolumeClaimVolumeSource,
-		deepCopy_api_PodSecurityContext,
 		deepCopy_api_PodSpec,
 		deepCopy_api_PodTemplateSpec,
 		deepCopy_api_Probe,
@@ -1555,9 +1487,6 @@ func init() {
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_extensions_APIVersion,
-		deepCopy_extensions_ClusterAutoscaler,
-		deepCopy_extensions_ClusterAutoscalerList,
-		deepCopy_extensions_ClusterAutoscalerSpec,
 		deepCopy_extensions_DaemonSet,
 		deepCopy_extensions_DaemonSetList,
 		deepCopy_extensions_DaemonSetSpec,
@@ -1585,7 +1514,6 @@ func init() {
 		deepCopy_extensions_JobList,
 		deepCopy_extensions_JobSpec,
 		deepCopy_extensions_JobStatus,
-		deepCopy_extensions_NodeUtilization,
 		deepCopy_extensions_ReplicationControllerDummy,
 		deepCopy_extensions_ResourceConsumption,
 		deepCopy_extensions_RollingUpdateDeployment,
