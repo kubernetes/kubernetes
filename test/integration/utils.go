@@ -18,9 +18,11 @@ package integration
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -91,4 +93,18 @@ func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	}))
 
 	return m, s
+}
+
+func MakeTempDirOrDie(prefix string, baseDir string) string {
+	if baseDir == "" {
+		baseDir = "/tmp"
+	}
+	tempDir, err := ioutil.TempDir(baseDir, prefix)
+	if err != nil {
+		glog.Fatalf("Can't make a temp rootdir: %v", err)
+	}
+	if err = os.MkdirAll(tempDir, 0750); err != nil {
+		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
+	}
+	return tempDir
 }
