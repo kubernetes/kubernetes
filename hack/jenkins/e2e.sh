@@ -131,6 +131,8 @@ GCE_FLAKY_TESTS=(
     "should\srelease\sthe\sload\sbalancer\swhen\sType\sgoes\sfrom\sLoadBalancer" # timeouts in 20 minutes in last builds. #14424
     "should\scorrectly\sserve\sidentically\snamed\sservices\sin\sdifferent\snamespaces\son\sdifferent\sexternal\sIP\saddresses" # same as above
     "should\sbe\sable\sto\screate\sa\sfunctioning\sexternal\sload\sbalancer" # same as above, also catches "...with user-provided balancer ip"
+    "pod\sw/two\sRW\sPDs\sboth\smounted\sto\sone\scontainer,\swrite\sto\sPD" # file: pd.go, issue: #15382 
+    "pod\sw/\sa\sreadonly\sPD\son\stwo\shosts,\sthen\sremove\sboth" # file: pd.go, issue: #15382
     )
 
 # The following tests are known to be slow running (> 2 min), and are
