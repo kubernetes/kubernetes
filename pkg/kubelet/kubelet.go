@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -393,7 +394,7 @@ func NewMainKubelet(
 	klet.lastTimestampRuntimeUp = time.Now()
 
 	klet.runner = klet.containerRuntime
-	klet.podManager = newBasicPodManager(klet.kubeClient)
+	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
 	klet.prober = prober.New(klet.runner, containerRefManager, recorder)
 	klet.probeManager = prober.NewManager(
@@ -455,7 +456,7 @@ type Kubelet struct {
 	// safe and should only be access by the main kubelet syncloop goroutine.
 	sourcesSeen sets.String
 
-	podManager podManager
+	podManager kubepod.Manager
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -1271,7 +1272,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
-		if isStaticPod(pod) && mirrorPod == nil {
+		if kubepod.IsStaticPod(pod) && mirrorPod == nil {
 			// No need to cache the status because the mirror pod does not
 			// exist yet.
 			return
@@ -1398,7 +1399,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}
 
-	if isStaticPod(pod) {
+	if kubepod.IsStaticPod(pod) {
 		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 			// The mirror pod is semantically different from the static pod. Remove
 			// it. The mirror pod will get recreated later.
@@ -2015,7 +2016,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 	sort.Sort(podsByCreationTime(pods))
 	for _, pod := range pods {
 		kl.podManager.AddPod(pod)
-		if isMirrorPod(pod) {
+		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -2040,7 +2041,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
 	start := time.Now()
 	for _, pod := range pods {
 		kl.podManager.UpdatePod(pod)
-		if isMirrorPod(pod) {
+		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -2055,7 +2056,7 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 	start := time.Now()
 	for _, pod := range pods {
 		kl.podManager.DeletePod(pod)
-		if isMirrorPod(pod) {
+		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}

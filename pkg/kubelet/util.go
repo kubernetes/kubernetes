@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -82,7 +83,7 @@ func canRunPod(pod *api.Pod) error {
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostNetwork(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
 	}
@@ -96,7 +97,7 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostPID(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
 	}
@@ -110,7 +111,7 @@ func allowHostPID(pod *api.Pod) (bool, error) {
 
 // Determined whether the specified pod is allowed to use host ipc
 func allowHostIPC(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
 	}
