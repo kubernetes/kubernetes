@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 const (
@@ -380,12 +380,12 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 
 func TestHelperGetServerAPIVersions(t *testing.T) {
 	expect := []string{"v1", "v2", "v3"}
-	APIVersions := api.APIVersions{Versions: expect}
+	APIVersions := unversioned.APIVersions{Versions: expect}
 	expect = append(expect, "group1/v1", "group1/v2", "group2/v1", "group2/v2")
-	APIGroupList := api.APIGroupList{
-		Groups: []api.APIGroup{
+	APIGroupList := unversioned.APIGroupList{
+		Groups: []unversioned.APIGroup{
 			{
-				Versions: []api.GroupVersion{
+				Versions: []unversioned.GroupVersion{
 					{
 						GroupVersion: "group1/v1",
 					},
@@ -395,7 +395,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 				},
 			},
 			{
-				Versions: []api.GroupVersion{
+				Versions: []unversioned.GroupVersion{
 					{
 						GroupVersion: "group2/v1",
 					},

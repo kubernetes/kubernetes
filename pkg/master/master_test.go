@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/emicklei/go-restful"
 	"github.com/stretchr/testify/assert"
 )
 
