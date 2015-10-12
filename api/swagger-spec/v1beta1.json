@@ -1312,6 +1312,65 @@
     ]
    },
    {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}/status",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Ingress",
+      "method": "PUT",
+      "summary": "replace status of the specified Ingress",
+      "nickname": "replaceNamespacedIngressStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Ingress",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Ingress",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Ingress"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/jobs",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [

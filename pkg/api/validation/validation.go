@@ -1983,3 +1983,24 @@ func ValidatePodLogOptions(opts *api.PodLogOptions) errs.ValidationErrorList {
 	}
 	return allErrs
 }
+
+// ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
+func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for _, ingress := range status.Ingress {
+		if len(ingress.IP) > 0 {
+			if isIP := (net.ParseIP(ingress.IP) != nil); !isIP {
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.ip", ingress.IP, "must be an IP address"))
+			}
+		}
+		if len(ingress.Hostname) > 0 {
+			if valid, errMsg := NameIsDNSSubdomain(ingress.Hostname, false); !valid {
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, errMsg))
+			}
+			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, "must be a DNS name, not ip address"))
+			}
+		}
+	}
+	return allErrs
+}

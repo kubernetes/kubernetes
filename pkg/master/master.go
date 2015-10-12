@@ -1097,8 +1097,9 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		storage["jobs/status"] = jobStatusStorage
 	}
 	if isEnabled("ingress") {
-		ingressStorage := ingressetcd.NewREST(dbClient("ingress"))
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingress"))
 		storage["ingress"] = ingressStorage
+		storage["ingress/status"] = ingressStatusStorage
 	}
 
 	extensionsGroup := latest.GroupOrDie("extensions")
