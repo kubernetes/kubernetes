@@ -49,7 +49,7 @@ var _ = Describe("Etcd failure", func() {
 			Client:    framework.Client,
 			Name:      "baz",
 			Namespace: framework.Namespace.Name,
-			Image:     "gcr.io/google_containers/nginx",
+			Image:     "beta.gcr.io/google_containers/pause:2.0",
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})
