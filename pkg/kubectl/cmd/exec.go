@@ -66,6 +66,8 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 		},
 	}
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", "", "Pod name")
+	cmd.Flags().MarkDeprecated("pod", "please use exec POD instead")
+	cmd.Flags().MarkShorthandDeprecated("pod", "please use exec POD instead")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
@@ -114,7 +116,6 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		return cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 	if len(p.PodName) != 0 {
-		printDeprecationWarning("exec POD", "-p POD")
 		if len(argsIn) < 1 {
 			return cmdutil.UsageError(cmd, "COMMAND is required for exec")
 		}
