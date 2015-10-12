@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -35,11 +36,12 @@ type ExposeOptions struct {
 }
 
 const (
-	expose_long = `Take a replication controller, service or pod and expose it as a new Kubernetes Service.
+	expose_long = `Take a replication controller, service, or pod and expose it as a new Kubernetes service.
 
-Looks up a replication controller, service or pod by name and uses the selector for that resource as the
-selector for a new Service on the specified port. If no labels are specified, the new service will
-re-use the labels from the resource it exposes.`
+Looks up a replication controller, service, or pod by name and uses the selector for that resource as the
+selector for a new service on the specified port. Note that if no port is specified via --port and the 
+exposed resource has multiple ports, all will be re-used by the new service. Also if no labels are specified,
+the new service will re-use the labels from the resource it exposes.`
 
 	expose_example = `# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx --port=80 --target-port=8000
@@ -163,7 +165,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		case 1:
 			params["port"] = ports[0]
 		default:
-			return cmdutil.UsageError(cmd, fmt.Sprintf("multiple ports to choose from: %v, please explicitly specify a port using the --port flag.", ports))
+			params["ports"] = strings.Join(ports, ",")
 		}
 	}
 	if kubectl.IsZero(params["labels"]) {
