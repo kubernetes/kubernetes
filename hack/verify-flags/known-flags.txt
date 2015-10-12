@@ -129,6 +129,8 @@ ir-user
 jenkins-host
 jenkins-jobs
 km-path
+kube-api-burst
+kube-api-qps
 kubectl-path
 kubelet-cadvisor-port
 kubelet-certificate-authority
