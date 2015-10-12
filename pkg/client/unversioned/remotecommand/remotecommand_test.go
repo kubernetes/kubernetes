@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -183,12 +184,17 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		url, _ := url.ParseRequestURI(server.URL)
 		c := client.NewRESTClient(url, "x", nil, -1, -1)
 		req := c.Post().Resource("testing")
-
+		req.Param("command", "ls")
+		req.Param("command", "/")
 		conf := &client.Config{
 			Host: server.URL,
 		}
-		e := New(req, conf, []string{"ls", "/"}, strings.NewReader(strings.Repeat(testCase.Stdin, testCase.MessageCount)), localOut, localErr, testCase.Tty)
-		err := e.Execute()
+		e, err := NewExecutor(conf, "POST", req.URL())
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		err = e.Stream(strings.NewReader(strings.Repeat(testCase.Stdin, testCase.MessageCount)), localOut, localErr, testCase.Tty)
 		hasErr := err != nil
 
 		if len(testCase.Error) > 0 {
@@ -263,8 +269,12 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		conf := &client.Config{
 			Host: server.URL,
 		}
-		e := NewAttach(req, conf, strings.NewReader(testCase.Stdin), localOut, localErr, testCase.Tty)
-		err := e.Execute()
+		e, err := NewExecutor(conf, "POST", req.URL())
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		err = e.Stream(strings.NewReader(testCase.Stdin), localOut, localErr, testCase.Tty)
 		hasErr := err != nil
 
 		if len(testCase.Error) > 0 {
@@ -299,5 +309,68 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		}
 
 		server.Close()
+	}
+}
+
+type fakeUpgrader struct {
+	req           *http.Request
+	resp          *http.Response
+	conn          httpstream.Connection
+	err, connErr  error
+	checkResponse bool
+
+	t *testing.T
+}
+
+func (u *fakeUpgrader) RoundTrip(req *http.Request) (*http.Response, error) {
+	u.req = req
+	return u.resp, u.err
+}
+
+func (u *fakeUpgrader) NewConnection(resp *http.Response) (httpstream.Connection, error) {
+	if u.checkResponse && u.resp != resp {
+		u.t.Errorf("response objects passed did not match: %#v", resp)
+	}
+	return u.conn, u.connErr
+}
+
+type fakeConnection struct {
+	httpstream.Connection
+}
+
+// Dial is the common functionality between any stream based upgrader, regardless of protocol.
+// This method ensures that someone can use a generic stream executor without being dependent
+// on the core Kube client config behavior.
+func TestDial(t *testing.T) {
+	upgrader := &fakeUpgrader{
+		t:             t,
+		checkResponse: true,
+		conn:          &fakeConnection{},
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(&bytes.Buffer{}),
+		},
+	}
+	var called bool
+	testFn := func(rt http.RoundTripper) http.RoundTripper {
+		if rt != upgrader {
+			t.Fatalf("unexpected round tripper: %#v", rt)
+		}
+		called = true
+		return rt
+	}
+	exec, err := NewStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := exec.Dial()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn != upgrader.conn {
+		t.Errorf("unexpected connection: %#v", conn)
+	}
+	if !called {
+		t.Errorf("wrapper not called")
 	}
 }
