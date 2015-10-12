@@ -50,6 +50,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -144,6 +145,23 @@ func NewAPIServer() *APIServer {
 	}
 
 	return &s
+}
+
+// NewAPIServerCommand creates a *cobra.Command object with default parameters
+func NewAPIServerCommand() *cobra.Command {
+	s := NewAPIServer()
+	s.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use: "kube-apiserver",
+		Long: `The Kubernetes API server validates and configures data
+for the api objects which include pods, services, replicationcontrollers, and
+others. The API Server services REST operations and provides the frontend to the
+cluster's shared state through which all other components interact.`,
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet

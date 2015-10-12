@@ -162,11 +162,18 @@ kube::util::gen-docs() {
 
   # Find binary
   gendocs=$(kube::util::find-binary "gendocs")
+  genkubedocs=$(kube::util::find-binary "genkubedocs")
   genman=$(kube::util::find-binary "genman")
   genbashcomp=$(kube::util::find-binary "genbashcomp")
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
   "${gendocs}" "${dest}/docs/user-guide/kubectl/"
+  mkdir -p "${dest}/docs/admin/"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
+  "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/"
   mkdir -p "${dest}/contrib/completions/bash/"

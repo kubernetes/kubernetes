@@ -42,6 +42,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -66,6 +67,26 @@ func NewSchedulerServer() *SchedulerServer {
 		AlgorithmProvider: factory.DefaultProvider,
 	}
 	return &s
+}
+
+// NewSchedulerCommand creates a *cobra.Command object with default parameters
+func NewSchedulerCommand() *cobra.Command {
+	s := NewSchedulerServer()
+	s.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use: "kube-scheduler",
+		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
+workload-specific function that significantly impacts availability, performance,
+and capacity. The scheduler needs to take into account individual and collective
+resource requirements, quality of service requirements, hardware/software/policy
+constraints, affinity and anti-affinity specifications, data locality, inter-workload
+interference, deadlines, and so on. Workload-specific requirements will be exposed
+through the API as necessary.`,
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
