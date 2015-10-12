@@ -446,7 +446,7 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deleteHorizontalPodAutoscalers(expClient client.ExperimentalInterface, ns string) error {
+func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns string) error {
 	items, err := expClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
@@ -460,7 +460,7 @@ func deleteHorizontalPodAutoscalers(expClient client.ExperimentalInterface, ns s
 	return nil
 }
 
-func deleteDaemonSets(expClient client.ExperimentalInterface, ns string) error {
+func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
 	items, err := expClient.DaemonSets(ns).List(labels.Everything())
 	if err != nil {
 		return err
@@ -474,7 +474,7 @@ func deleteDaemonSets(expClient client.ExperimentalInterface, ns string) error {
 	return nil
 }
 
-func deleteJobs(expClient client.ExperimentalInterface, ns string) error {
+func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
 	items, err := expClient.Jobs(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
@@ -488,7 +488,7 @@ func deleteJobs(expClient client.ExperimentalInterface, ns string) error {
 	return nil
 }
 
-func deleteDeployments(expClient client.ExperimentalInterface, ns string) error {
+func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
 	items, err := expClient.Deployments(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
@@ -502,7 +502,7 @@ func deleteDeployments(expClient client.ExperimentalInterface, ns string) error 
 	return nil
 }
 
-func deleteIngress(expClient client.ExperimentalInterface, ns string) error {
+func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
 	items, err := expClient.Ingress(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
