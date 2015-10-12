@@ -122,7 +122,7 @@ Documentation for other releases can be found at
 
 2. Spelling the URL:
 
-  The URL is in the form of prefix/group/version/. The prefix is hard-coded in the client/unversioned.Config (see [here](../../pkg/client/unversioned/experimental.go#L101)). The client should be able to figure out `group` and `version` using the RESTMapper. For a third-party client which does not have access to the RESTMapper, it should discover the mapping of `group`, `version` and `kind` by querying the server as described in point 2 of #server-side-implementation.
+  The URL is in the form of prefix/group/version/. The prefix is hard-coded in the client/unversioned.Config. The client should be able to figure out `group` and `version` using the RESTMapper. For a third-party client which does not have access to the RESTMapper, it should discover the mapping of `group`, `version` and `kind` by querying the server as described in point 2 of #server-side-implementation.
 
 3. kubectl:
 
