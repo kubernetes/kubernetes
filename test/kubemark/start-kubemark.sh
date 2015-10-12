@@ -174,8 +174,7 @@ contexts:
 current-context: kubemark-context
 EOF
 
-sed "s/##masterip##/\"${MASTER_IP}\"/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
-sed -i'' -e "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
+sed "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 kubectl create -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json
 kubectl create -f ${KUBECONFIG_SECRET} --namespace="kubemark"
