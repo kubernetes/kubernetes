@@ -41,10 +41,15 @@ import (
 )
 
 // The temp dir where test plugins will be stored.
-const testNetworkConfigPath = "/tmp/fake/plugins/net/cni"
-const testVendorCNIDirPrefix = "/tmp"
+func tmpDirOrDie() string {
+	dir, err := ioutil.TempDir(os.TempDir(), "cni-test")
+	if err != nil {
+		panic(fmt.Sprintf("error creating tmp dir: %v", err))
+	}
+	return dir
+}
 
-func installPluginUnderTest(t *testing.T, vendorName string, plugName string) {
+func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
 	pluginDir := path.Join(testNetworkConfigPath, plugName)
 	err := os.MkdirAll(pluginDir, 0777)
 	if err != nil {
@@ -102,13 +107,8 @@ echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 	f.Close()
 }
 
-func tearDownPlugin(plugName string, vendorName string) {
-	err := os.RemoveAll(testNetworkConfigPath)
-	if err != nil {
-		fmt.Printf("Error in cleaning up test: %v", err)
-	}
-	vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, testVendorCNIDirPrefix, vendorName)
-	err = os.RemoveAll(vendorCNIDir)
+func tearDownPlugin(tmpDir string) {
+	err := os.RemoveAll(tmpDir)
 	if err != nil {
 		fmt.Printf("Error in cleaning up test: %v", err)
 	}
@@ -166,8 +166,12 @@ func TestCNIPlugin(t *testing.T) {
 	// install some random plugin
 	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
 	vendorName := fmt.Sprintf("test_vendor%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName, vendorName)
-	installPluginUnderTest(t, vendorName, pluginName)
+
+	tmpDir := tmpDirOrDie()
+	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
+	testVendorCNIDirPrefix := tmpDir
+	defer tearDownPlugin(tmpDir)
+	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
 
 	np := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), testVendorCNIDirPrefix)
 	plug, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil))

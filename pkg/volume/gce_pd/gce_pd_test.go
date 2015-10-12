@@ -17,7 +17,9 @@ limitations under the License.
 package gce_pd
 
 import (
+	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -29,8 +31,13 @@ import (
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -48,8 +55,13 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -100,8 +112,13 @@ func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
 }
 
 func TestPlugin(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -126,8 +143,9 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Builder")
 	}
 
+	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~gce-pd/vol1")
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~gce-pd/vol1" {
+	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
@@ -208,8 +226,13 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := &testclient.Fake{}
 	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
