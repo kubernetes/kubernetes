@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
@@ -169,7 +170,6 @@ func TestExampleObjects(t *testing.T) {
 }
 
 func TestBindingWithExamples(t *testing.T) {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, api.Scheme); err != nil {
 		t.Fatal(err)
@@ -186,11 +186,13 @@ func TestBindingWithExamples(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error getting PV from client: %v", err)
 	}
+	pv.ObjectMeta.SelfLink = testapi.Default.SelfLink("pv", "")
 
 	claim, error := client.PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
 		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}
+	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", "")
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{
@@ -273,7 +275,6 @@ func TestBindingWithExamples(t *testing.T) {
 }
 
 func TestMissingFromIndex(t *testing.T) {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, api.Scheme); err != nil {
 		t.Fatal(err)
@@ -289,11 +290,13 @@ func TestMissingFromIndex(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error getting PV from client: %v", err)
 	}
+	pv.ObjectMeta.SelfLink = testapi.Default.SelfLink("pv", "")
 
 	claim, error := client.PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
 		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}
+	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", "")
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{
