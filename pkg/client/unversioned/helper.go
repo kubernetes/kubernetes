@@ -145,7 +145,7 @@ func New(c *Config) (*Client, error) {
 		return &Client{RESTClient: client, ExtensionsClient: nil}, nil
 	}
 	experimentalConfig := *c
-	experimentalClient, err := NewExperimental(&experimentalConfig)
+	experimentalClient, err := NewExtensions(&experimentalConfig)
 	if err != nil {
 		return nil, err
 	}

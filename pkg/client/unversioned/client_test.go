@@ -92,7 +92,7 @@ func (c *testClient) Setup(t *testing.T) *testClient {
 		if len(version) == 0 {
 			version = testapi.Extensions.Version()
 		}
-		c.ExtensionsClient = NewExperimentalOrDie(&Config{
+		c.ExtensionsClient = NewExtensionsOrDie(&Config{
 			Host:    c.server.URL,
 			Version: version,
 		})
