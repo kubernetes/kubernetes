@@ -148,7 +148,7 @@ func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
 	return nil
 }
 
-// IsReadOnly func to fullfill volume.Builder interface
+// IsReadOnly func to fulfill volume.Builder interface
 func (d *downwardAPIVolume) IsReadOnly() bool {
 	return true
 }
@@ -170,7 +170,7 @@ func (d *downwardAPIVolume) collectData() (map[string]string, error) {
 	return data, utilErrors.NewAggregate(errlist)
 }
 
-// isDataChanged iterate over all the entries to check wether at least one
+// isDataChanged iterate over all the entries to check whether at least one
 // file needs to be updated.
 func (d *downwardAPIVolume) isDataChanged(data map[string]string) bool {
 	for fileName, values := range data {
