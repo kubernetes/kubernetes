@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package pod
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -27,8 +25,7 @@ import (
 )
 
 // Mirror client is used to create/delete a mirror pod.
-
-type mirrorClient interface {
+type MirrorClient interface {
 	CreateMirrorPod(*api.Pod) error
 	DeleteMirrorPod(string) error
 }
@@ -39,7 +36,7 @@ type basicMirrorClient struct {
 	apiserverClient client.Interface
 }
 
-func newBasicMirrorClient(apiserverClient client.Interface) *basicMirrorClient {
+func NewBasicMirrorClient(apiserverClient client.Interface) MirrorClient {
 	return &basicMirrorClient{apiserverClient: apiserverClient}
 }
 
@@ -78,22 +75,12 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
-// Helper functions.
-func getPodSource(pod *api.Pod) (string, error) {
-	if pod.Annotations != nil {
-		if source, ok := pod.Annotations[kubetypes.ConfigSourceAnnotationKey]; ok {
-			return source, nil
-		}
-	}
-	return "", fmt.Errorf("cannot get source of pod %q", pod.UID)
-}
-
-func isStaticPod(pod *api.Pod) bool {
-	source, err := getPodSource(pod)
+func IsStaticPod(pod *api.Pod) bool {
+	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
-func isMirrorPod(pod *api.Pod) bool {
+func IsMirrorPod(pod *api.Pod) bool {
 	if value, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; !ok {
 		return false
 	} else {

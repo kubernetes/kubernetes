@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -80,7 +81,7 @@ type TestKubelet struct {
 	fakeRuntime      *kubecontainer.FakeRuntime
 	fakeCadvisor     *cadvisor.Mock
 	fakeKubeClient   *testclient.Fake
-	fakeMirrorClient *fakeMirrorClient
+	fakeMirrorClient *kubepod.FakeMirrorClient
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
@@ -116,8 +117,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.daemonEndpoints = &api.NodeDaemonEndpoints{}
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
-	podManager, fakeMirrorClient := newFakePodManager()
-	kubelet.podManager = podManager
+	fakeMirrorClient := kubepod.NewFakeMirrorClient()
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
