@@ -21,12 +21,18 @@ import (
 	// This should probably be part of some configuration fed into the build for a
 	// given binary target.
 
+	"fmt"
+
 	//Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
 
@@ -51,7 +57,7 @@ func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin
 		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutHostPath,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := attemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, &hostPathConfig); err != nil {
+	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, &hostPathConfig); err != nil {
 		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, err)
 	}
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
@@ -61,18 +67,49 @@ func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin
 		RecyclerTimeoutIncrement: flags.PersistentVolumeRecyclerIncrementTimeoutNFS,
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
-	if err := attemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, &nfsConfig); err != nil {
+	if err := AttemptToLoadRecycler(flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, &nfsConfig); err != nil {
 		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", flags.PersistentVolumeRecyclerPodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
+	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+
 	return allPlugins
 }
 
-// attemptToLoadRecycler tries decoding a pod from a filepath for use as a recycler for a volume.
+// NewVolumeProvisioner returns a volume provisioner to use when running in a cloud or development environment.
+// The beta implementation of provisioning allows 1 implied provisioner per cloud, until we allow configuration of many.
+// We explicitly map clouds to volume plugins here which allows us to configure many later without backwards compatibility issues.
+// Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
+func NewVolumeProvisioner(cloud cloudprovider.Interface, flags VolumeConfigFlags) (volume.ProvisionableVolumePlugin, error) {
+	switch {
+	case cloud == nil && flags.EnableHostPathProvisioning:
+		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
+		//	case cloud != nil && aws.ProviderName == cloud.ProviderName():
+		//		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
+		//	case cloud != nil && gce.ProviderName == cloud.ProviderName():
+		//		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
+		//	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
+		//		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
+	}
+	return nil, nil
+}
+
+func getProvisionablePluginFromVolumePlugins(plugins []volume.VolumePlugin) (volume.ProvisionableVolumePlugin, error) {
+	for _, plugin := range plugins {
+		if provisonablePlugin, ok := plugin.(volume.ProvisionableVolumePlugin); ok {
+			return provisonablePlugin, nil
+		}
+	}
+	return nil, fmt.Errorf("ProvisionablePlugin expected but not found in %#v: ", plugins)
+}
+
+// AttemptToLoadRecycler tries decoding a pod from a filepath for use as a recycler for a volume.
 // If successful, this method will set the recycler on the config.
-// If unsucessful, an error is returned.
-func attemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
+// If unsuccessful, an error is returned. Function is exported for reuse downstream.
+func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 	if path != "" {
 		recyclerPod, err := io.LoadPodFromFile(path)
 		if err != nil {
