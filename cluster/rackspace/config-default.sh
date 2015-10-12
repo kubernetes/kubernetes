@@ -16,7 +16,7 @@
 
 # Sane defaults for dev environments. The following variables can be easily overriden
 # by setting each as a ENV variable ahead of time:
-# KUBE_IMAGE, KUBE_MASTER_FLAVOR, KUBE_MINION_FLAVOR, NUM_MINIONS, NOVA_NETWORK and SSH_KEY_NAME
+# KUBE_IMAGE, KUBE_MASTER_FLAVOR, KUBE_NODE_FLAVOR, NUM_MINIONS, NOVA_NETWORK and SSH_KEY_NAME
 
 # Shared
 KUBE_IMAGE="${KUBE_IMAGE-f2a71670-ced3-4274-80b6-0efcd0f8f91b}" # CoreOS(Beta)
@@ -30,11 +30,11 @@ KUBE_MASTER_FLAVOR="${KUBE_MASTER_FLAVOR-general1-1}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="tags=${INSTANCE_PREFIX}-master"
 
-# Minion
-KUBE_MINION_FLAVOR="${KUBE_MINION_FLAVOR-general1-2}"
+# Node
+KUBE_NODE_FLAVOR="${KUBE_NODE_FLAVOR-general1-2}"
 NUM_MINIONS="${NUM_MINIONS-4}"
-MINION_TAG="tags=${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+NODE_TAG="tags=${INSTANCE_PREFIX}-node"
+NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-node-{1..${NUM_MINIONS}}))
 KUBE_NETWORK="10.240.0.0/16"
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
