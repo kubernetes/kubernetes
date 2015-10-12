@@ -189,7 +189,7 @@ A feature of PD is that they can be mounted as read-only by multiple consumers
 simultaneously.  This means that you can pre-populate a PD with your dataset
 and then serve it in parallel from as many pods as you need.  Unfortunately,
 PDs can only be mounted by a single consumer in read-write mode - no
-simultaneous readers allowed.
+simultaneous writers allowed.
 
 Using a PD on a pod controlled by a ReplicationController will fail unless
 the PD is read-only or the replica count is 0 or 1.
@@ -315,7 +315,7 @@ A feature of iSCSI is that it can be mounted as read-only by multiple consumers
 simultaneously.  This means that you can pre-populate a volume with your dataset
 and then serve it in parallel from as many pods as you need.  Unfortunately,
 iSCSI volumes can only be mounted by a single consumer in read-write mode - no
-simultaneous readers allowed.
+simultaneous writers allowed.
 
 See the [iSCSI example](../../examples/iscsi/) for more details.
 
