@@ -30,6 +30,7 @@ function stop-proxy()
 {
   [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
   PROXY_PID=
+  PROXY_PORT=
 }
 
 # Starts "kubect proxy" to test the client proxy. You may pass options, e.g.
@@ -39,9 +40,18 @@ function start-proxy()
   stop-proxy
 
   kube::log::status "Starting kubectl proxy"
-  # the --www and --www-prefix are just to make something definitely show up for
-  # wait_for_url to see.
-  kubectl proxy -p ${PROXY_PORT} --www=. --www-prefix=/healthz "$@" 1>&2 &
+
+  for retry in $(seq 1 3); do
+    PROXY_PORT=$(kube::util::get_random_port)
+    kube::log::status "On try ${retry}, use proxy port ${PROXY_PORT} if it's free"
+    if kube::util::test_host_port_free "127.0.0.1" "${PROXY_PORT}"; then
+      # the --www and --www-prefix are just to make something definitely show up for
+      # wait_for_url to see.
+      kubectl proxy -p ${PROXY_PORT} --www=. --www-prefix=/healthz "$@" 1>&2 & break
+    fi
+    sleep 1;
+  done
+
   PROXY_PID=$!
   kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy $@"
 }
@@ -86,7 +96,6 @@ API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
-PROXY_PORT=${PROXY_PORT:-8001}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
 # ensure ~/.kube/config isn't loaded by tests
