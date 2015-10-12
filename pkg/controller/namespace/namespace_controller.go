@@ -43,7 +43,7 @@ type NamespaceController struct {
 }
 
 // NewNamespaceController creates a new NamespaceController
-func NewNamespaceController(kubeClient client.Interface, experimentalMode bool, resyncPeriod time.Duration) *NamespaceController {
+func NewNamespaceController(kubeClient client.Interface, versions *api.APIVersions, resyncPeriod time.Duration) *NamespaceController {
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
@@ -59,7 +59,7 @@ func NewNamespaceController(kubeClient client.Interface, experimentalMode bool, 
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*api.Namespace)
-				if err := syncNamespace(kubeClient, experimentalMode, namespace); err != nil {
+				if err := syncNamespace(kubeClient, versions, namespace); err != nil {
 					if estimate, ok := err.(*contentRemainingError); ok {
 						go func() {
 							// Estimate is the aggregate total of TerminationGracePeriodSeconds, which defaults to 30s
@@ -81,7 +81,7 @@ func NewNamespaceController(kubeClient client.Interface, experimentalMode bool, 
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				namespace := newObj.(*api.Namespace)
-				if err := syncNamespace(kubeClient, experimentalMode, namespace); err != nil {
+				if err := syncNamespace(kubeClient, versions, namespace); err != nil {
 					if estimate, ok := err.(*contentRemainingError); ok {
 						go func() {
 							t := estimate.Estimate/2 + 1
@@ -154,7 +154,7 @@ func (e *contentRemainingError) Error() string {
 // deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
 // of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
 // are guaranteed to be gone.
-func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namespace string, before unversioned.Time) (estimate int64, err error) {
+func deleteAllContent(kubeClient client.Interface, versions *api.APIVersions, namespace string, before unversioned.Time) (estimate int64, err error) {
 	err = deleteServiceAccounts(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
@@ -192,26 +192,41 @@ func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namesp
 		return estimate, err
 	}
 	// If experimental mode, delete all experimental resources for the namespace.
-	if experimentalMode {
-		err = deleteHorizontalPodAutoscalers(kubeClient.Extensions(), namespace)
+	if containsVersion(versions, "extensions/v1beta1") {
+		resources, err := kubeClient.SupportedResourcesForGroupVersion("extensions/v1beta1")
+		glog.Errorf("%v", resources)
 		if err != nil {
 			return estimate, err
 		}
-		err = deleteDaemonSets(kubeClient.Extensions(), namespace)
-		if err != nil {
-			return estimate, err
+		if containsResource(resources, "horizontalpodautoscalers") {
+			err = deleteHorizontalPodAutoscalers(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
 		}
-		err = deleteJobs(kubeClient.Extensions(), namespace)
-		if err != nil {
-			return estimate, err
+		if containsResource(resources, "ingress") {
+			err = deleteIngress(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
 		}
-		err = deleteDeployments(kubeClient.Extensions(), namespace)
-		if err != nil {
-			return estimate, err
+		if containsResource(resources, "daemonsets") {
+			err = deleteDaemonSets(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
 		}
-		err = deleteIngress(kubeClient.Extensions(), namespace)
-		if err != nil {
-			return estimate, err
+		if containsResource(resources, "jobs") {
+			err = deleteJobs(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
+		}
+		if containsResource(resources, "deployments") {
+			err = deleteDeployments(kubeClient.Extensions(), namespace)
+			if err != nil {
+				return estimate, err
+			}
 		}
 	}
 	return estimate, nil
@@ -253,7 +268,7 @@ func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Names
 }
 
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(kubeClient client.Interface, experimentalMode bool, namespace *api.Namespace) (err error) {
+func syncNamespace(kubeClient client.Interface, versions *api.APIVersions, namespace *api.Namespace) (err error) {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -279,7 +294,7 @@ func syncNamespace(kubeClient client.Interface, experimentalMode bool, namespace
 	}
 
 	// there may still be content for us to remove
-	estimate, err := deleteAllContent(kubeClient, experimentalMode, namespace.Name, *namespace.DeletionTimestamp)
+	estimate, err := deleteAllContent(kubeClient, versions, namespace.Name, *namespace.DeletionTimestamp)
 	if err != nil {
 		return err
 	}
@@ -513,4 +528,28 @@ func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
 		}
 	}
 	return nil
+}
+
+// TODO: this is duplicated logic.  Move it somewhere central?
+func containsVersion(versions *api.APIVersions, version string) bool {
+	for ix := range versions.Versions {
+		if versions.Versions[ix] == version {
+			return true
+		}
+	}
+	return false
+}
+
+// TODO: this is duplicated logic.  Move it somewhere central?
+func containsResource(resources *api.APIResourceList, resourceName string) bool {
+	if resources == nil {
+		return false
+	}
+	for ix := range resources.APIResources {
+		resource := resources.APIResources[ix]
+		if resource.Name == resourceName {
+			return true
+		}
+	}
+	return false
 }
