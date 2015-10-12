@@ -1032,7 +1032,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"))
 	deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
 	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"))
-	ingressStorage := ingressetcd.NewREST(dbClient("ingress"))
+	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingress"))
 
 	thirdPartyControl := ThirdPartyController{
 		master: m,
@@ -1058,6 +1058,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("jobs"):                            jobStorage,
 		strings.ToLower("jobs/status"):                     jobStatusStorage,
 		strings.ToLower("ingress"):                         ingressStorage,
+		strings.ToLower("ingress/status"):                  ingressStatusStorage,
 	}
 
 	expMeta := latest.GroupOrDie("extensions")
