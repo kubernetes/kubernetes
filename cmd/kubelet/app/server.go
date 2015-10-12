@@ -143,6 +143,9 @@ type KubeletServer struct {
 	ChaosChance float64
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
+
+	KubeApiQps   float32
+	KubeApiBurst int
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -206,6 +209,8 @@ func NewKubeletServer() *KubeletServer {
 		SyncFrequency:       10 * time.Second,
 		SystemContainer:     "",
 		ReconcileCIDR:       true,
+		KubeApiQps:          5.0,
+		KubeApiBurst:        10,
 	}
 }
 
@@ -285,6 +290,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", 1000000, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
+	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -580,6 +587,11 @@ func (s *KubeletServer) CreateAPIServerClientConfig() (*client.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Override kubeconfig qps/burst settings from flags
+	clientConfig.QPS = s.KubeApiQps
+	clientConfig.Burst = s.KubeApiBurst
+
 	s.addChaosToClientConfig(clientConfig)
 	return clientConfig, nil
 }
