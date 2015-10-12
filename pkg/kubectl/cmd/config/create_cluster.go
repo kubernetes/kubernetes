@@ -31,13 +31,14 @@ import (
 )
 
 type createClusterOptions struct {
-	configAccess          ConfigAccess
-	name                  string
-	server                util.StringFlag
-	apiVersion            util.StringFlag
-	insecureSkipTLSVerify util.BoolFlag
-	certificateAuthority  util.StringFlag
-	embedCAData           util.BoolFlag
+	configAccess           ConfigAccess
+	name                   string
+	server                 util.StringFlag
+	apiVersion             util.StringFlag
+	preferredGroupVersions util.StringSliceFlag
+	insecureSkipTLSVerify  util.BoolFlag
+	certificateAuthority   util.StringFlag
+	embedCAData            util.BoolFlag
 }
 
 const (
@@ -57,7 +58,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=apiversion] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagAPIVersion, clientcmd.FlagInsecure),
+		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=preferredVersions] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagPreferredGroupVersions, clientcmd.FlagInsecure),
 		Short:   "Sets a cluster entry in kubeconfig",
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
@@ -77,11 +78,15 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 
 	options.insecureSkipTLSVerify.Default(false)
 
-	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.embedCAData, clientcmd.FlagEmbedCerts, clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
+	msg := " for the cluster entry in kubeconfig"
+	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+msg)
+	// TODO: remove --api-version flag on or after Oct. 5, 2016
+	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+msg)
+	cmd.Flags().Var(&options.preferredGroupVersions, clientcmd.FlagPreferredGroupVersions, clientcmd.FlagPreferredGroupVersions+msg)
+	cmd.Flags().MarkDeprecated(clientcmd.FlagAPIVersion, fmt.Sprintf("use --%s instead", clientcmd.FlagPreferredGroupVersions))
+	cmd.Flags().Var(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, clientcmd.FlagInsecure+msg)
+	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+msg)
+	cmd.Flags().Var(&options.embedCAData, clientcmd.FlagEmbedCerts, clientcmd.FlagEmbedCerts+msg)
 
 	return cmd
 }
@@ -117,6 +122,9 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
+	}
+	if o.preferredGroupVersions.Provided() {
+		modifiedCluster.PreferredGroupVersions = o.preferredGroupVersions.Value()
 	}
 	if o.apiVersion.Provided() {
 		modifiedCluster.APIVersion = o.apiVersion.Value()

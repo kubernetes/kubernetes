@@ -591,6 +591,23 @@ func TestAdditionalCluster(t *testing.T) {
 	test.run(t)
 }
 
+func TestAdditionalClusterPreferredGroupVersions(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	cluster := clientcmdapi.NewCluster()
+	cluster.PreferredGroupVersions = []string{testapi.Default.GroupAndVersion()}
+	cluster.CertificateAuthority = "/ca-location"
+	cluster.InsecureSkipTLSVerify = false
+	cluster.Server = "serverlocation"
+	expectedConfig.Clusters["different-cluster"] = cluster
+	test := configCommandTest{
+		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=false", "--" + clientcmd.FlagCAFile + "=/ca-location", "--" + clientcmd.FlagPreferredGroupVersions + "=" + testapi.Default.GroupAndVersion()},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
 func TestOverwriteExistingCluster(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	cluster := clientcmdapi.NewCluster()

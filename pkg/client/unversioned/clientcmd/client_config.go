@@ -98,7 +98,14 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 		u.Fragment = ""
 		clientConfig.Host = u.String()
 	}
-	clientConfig.Version = configClusterInfo.APIVersion
+	// TODO: (@janetkuo, @caesarxuchao) clientConfig.Version now contains mutiple versions, we'll need to modify related code for version negotiation
+	if len(configClusterInfo.PreferredGroupVersions) > 0 {
+		// TODO: (@janetkuo, @caesarxuchao) set clientConfig.Version = preferredGroupVersions once we change Version's type from string to []string,
+		//       see https://github.com/kubernetes/kubernetes/pull/14383#issuecomment-145154514
+		clientConfig.Version = configClusterInfo.PreferredGroupVersions[0]
+	} else {
+		clientConfig.Version = configClusterInfo.APIVersion
+	}
 
 	// only try to read the auth information if we are secure
 	if client.IsConfigTransportTLS(*clientConfig) {

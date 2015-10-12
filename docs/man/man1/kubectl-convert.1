@@ -47,7 +47,7 @@ to change to output destination.
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given version (default preferred\-versions).
 
 .PP
 \fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
@@ -78,7 +78,7 @@ to change to output destination.
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    The API version to use when talking to the server.
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -137,8 +137,12 @@ to change to output destination.
     Password for basic authentication to the API server.
 
 .PP
+\fB\-\-preferred\-versions\fP=[]
+    Preferred API versions to use when talking to the server.
+
+.PP
 \fB\-s\fP, \fB\-\-server\fP=""
-    The address and port of the Kubernetes API server
+    The address and port of the Kubernetes API server.
 
 .PP
 \fB\-\-stderrthreshold\fP=2

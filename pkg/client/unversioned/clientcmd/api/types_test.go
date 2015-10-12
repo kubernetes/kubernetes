@@ -43,15 +43,15 @@ func ExampleOfOptionsConfig() {
 	defaultConfig := NewConfig()
 	defaultConfig.Preferences.Colors = true
 	defaultConfig.Clusters["alfa"] = &Cluster{
-		Server:                "https://alfa.org:8080",
-		APIVersion:            "v1beta2",
-		InsecureSkipTLSVerify: true,
-		CertificateAuthority:  "path/to/my/cert-ca-filename",
+		Server:                 "https://alfa.org:8080",
+		PreferredGroupVersions: []string{"experimental/v1alpha1"},
+		InsecureSkipTLSVerify:  true,
+		CertificateAuthority:   "path/to/my/cert-ca-filename",
 	}
 	defaultConfig.Clusters["bravo"] = &Cluster{
-		Server:                "https://bravo.org:8080",
-		APIVersion:            "v1beta1",
-		InsecureSkipTLSVerify: false,
+		Server:                 "https://bravo.org:8080",
+		PreferredGroupVersions: []string{"experimental/v1alpha1", "v1"},
+		InsecureSkipTLSVerify:  false,
 	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
 		ClientCertificate: "path/to/my/client-cert-filename",
@@ -86,13 +86,16 @@ func ExampleOfOptionsConfig() {
 	// clusters:
 	//   alfa:
 	//     LocationOfOrigin: ""
-	//     api-version: v1beta2
 	//     certificate-authority: path/to/my/cert-ca-filename
 	//     insecure-skip-tls-verify: true
+	//     preferred-versions:
+	//     - experimental/v1alpha1
 	//     server: https://alfa.org:8080
 	//   bravo:
 	//     LocationOfOrigin: ""
-	//     api-version: v1beta1
+	//     preferred-versions:
+	//     - experimental/v1alpha1
+	//     - v1
 	//     server: https://bravo.org:8080
 	// contexts:
 	//   alfa-as-black-mage:

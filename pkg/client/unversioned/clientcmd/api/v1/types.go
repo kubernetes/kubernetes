@@ -54,8 +54,13 @@ type Preferences struct {
 type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
-	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
+	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
+	//  Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
+	//  a single value for the cluster version. Deprecate replace it with PreferredGroupVersions. It will be ignored if it is present.
 	APIVersion string `json:"api-version,omitempty"`
+	// PreferredGroupVersions takes a string slice of multiple group/version pairs (separated by comma), and informs version negotiation.
+	// It contains preferred group/versions for communicating with the kubernetes cluster (g1/v1, g2/v2, etc).
+	PreferredGroupVersions []string `json:"preferred-versions,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
 	// CertificateAuthority is the path to a cert file for the certificate authority.

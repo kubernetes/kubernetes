@@ -50,7 +50,7 @@ existing replication controller and overwrite at least one (common) label in its
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given version (default preferred\-versions).
 
 .PP
 \fB\-\-poll\-interval\fP=3s
@@ -97,7 +97,7 @@ existing replication controller and overwrite at least one (common) label in its
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    The API version to use when talking to the server.
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -156,8 +156,12 @@ existing replication controller and overwrite at least one (common) label in its
     Password for basic authentication to the API server.
 
 .PP
+\fB\-\-preferred\-versions\fP=[]
+    Preferred API versions to use when talking to the server.
+
+.PP
 \fB\-s\fP, \fB\-\-server\fP=""
-    The address and port of the Kubernetes API server
+    The address and port of the Kubernetes API server.
 
 .PP
 \fB\-\-stderrthreshold\fP=2
