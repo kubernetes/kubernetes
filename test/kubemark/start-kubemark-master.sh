@@ -32,9 +32,9 @@ ulimit -n 65536
 
 tar xzf kubernetes-server-linux-amd64.tar.gz
 
-kubernetes/server/bin/kube-controller-manager --master=127.0.0.1:8080 --service-account-private-key-file=/srv/kubernetes/server.key --root-ca-file=/srv/kubernetes/ca.crt --v=2 &> /tmp/kube-controller-manager.log &
+kubernetes/server/bin/kube-controller-manager --master=127.0.0.1:8080 --service-account-private-key-file=/srv/kubernetes/server.key --root-ca-file=/srv/kubernetes/ca.crt --v=2 &> /var/log/kube-controller-manager.log &
 
-kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 --v=2 &> /tmp/kube-scheduler.log &
+kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 --v=2 &> /var/log/kube-scheduler.log &
 
 kubernetes/server/bin/kube-apiserver \
 	--portal-net=10.0.0.1/24 \
@@ -48,6 +48,6 @@ kubernetes/server/bin/kube-apiserver \
 	--client-ca-file=/srv/kubernetes/ca.crt \
 	--token-auth-file=/srv/kubernetes/known_tokens.csv \
 	--secure-port=443 \
-	--basic-auth-file=/srv/kubernetes/basic_auth.csv &> /tmp/kube-apiserver.log &
+	--basic-auth-file=/srv/kubernetes/basic_auth.csv &> /var/log/kube-apiserver.log &
 
 rm -rf kubernetes
