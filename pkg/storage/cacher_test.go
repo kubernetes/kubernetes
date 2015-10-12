@@ -24,7 +24,6 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -39,6 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
+	
+	"golang.org/x/net/context"
 )
 
 func newTestCacher(client tools.EtcdClient) *storage.Cacher {

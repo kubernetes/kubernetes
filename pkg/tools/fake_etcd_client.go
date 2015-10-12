@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"runtime"
 	"time"
 
 	etcd "github.com/coreos/etcd/client"
@@ -77,7 +78,7 @@ func (f *FakeWatcher) Next(ctx context.Context) (*etcd.Response, error) {
 	if f.Client.WatchImmediateError != nil {
 		return nil, f.Client.WatchImmediateError
 	}
-
+	
 	select {
 	case <-ctx.Done():
 		return nil, EtcdErrWatchStoppedByUser
@@ -378,9 +379,11 @@ func (f *FakeEtcdClient) Delete(ctx context.Context, key string, opts *etcd.Dele
 }
 
 func (f *FakeEtcdClient) WaitForWatchCompletion() {
-	// This client really needs to get thrown out.
-	// There is broken behavior that the tests rely on 
-	// and it no longer applies.
+	<-f.watchCompletedChan
+	// NOTE: b/c of the differences in the client interfaces, 
+	// we should ensure the .Next method has a chance to get called. 
+	// IMHO this entire client library should never be exposed, NEVER!
+	runtime.Gosched()
 }
 
 func (f *FakeEtcdClient) Watcher(key string, opts *etcd.WatcherOptions) etcd.Watcher {
@@ -393,6 +396,10 @@ func (f *FakeEtcdClient) Watcher(key string, opts *etcd.WatcherOptions) etcd.Wat
 		Key:    key,
 		Opts:   *opts,
 		Client: *f,
+	}
+
+	if f.WatchImmediateError == nil {
+		f.watchCompletedChan <- true
 	}
 
 	return &watcher

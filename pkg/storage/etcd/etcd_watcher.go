@@ -137,23 +137,29 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client tools.EtcdClient, ke
 		Recursive:  w.list,
 		AfterIndex: resourceVersion,
 	}
-
-	fmt.Printf("STARTING ACTUAL WATCH ok key=%v with opts=%v\n", key, opts)
 	watcher := client.Watcher(key, &opts)
 	w.ctx, w.cancel = context.WithCancel(ctx)
 
 	for {
+		
+		fmt.Printf("WATCHING ok key=%v with opts=%v\n", key, opts)
 		resp, err := watcher.Next(w.ctx)
 		fmt.Printf("Got watch response=%v err=%v\n", resp, err)
 		if resp != nil {
 			w.etcdIncoming <- resp
+			if err != nil {
+				w.etcdError <- err
+				fmt.Printf("ENDING WATCH\n")
+				return
+			}
+			continue
 		}
-		if err != nil {
-			w.etcdError <- err
-			return
-		}
+		
+		// In testing cleanup occurs on injection of nil-errors.
+		w.etcdError <- err
+		fmt.Printf("ENDING WATCH\n")
+		return
 	}
-
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
@@ -276,7 +282,7 @@ func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 	}
 	obj, err := w.decodeObject(res.Node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.Node.Value), res, res.Node)
+		glog.Errorf("failure to decode api object(%v): '%v' from %#v %#v", err, string(res.Node.Value), res, res.Node)
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -305,7 +311,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	}
 	curObj, err := w.decodeObject(res.Node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.Node.Value), res, res.Node)
+		glog.Errorf("failure to decode api object(%v): '%v' from %#v %#v", err, string(res.Node.Value), res, res.Node)
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -360,7 +366,7 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 	}
 	obj, err := w.decodeObject(&node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.PrevNode.Value), res, res.PrevNode)
+		glog.Errorf("failure to decode api object(%v): '%v' from %#v %#v", err, string(res.PrevNode.Value), res, res.PrevNode)
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.

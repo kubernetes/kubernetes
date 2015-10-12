@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -28,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
+
+	"golang.org/x/net/context"
 )
 
 func newStorage(t *testing.T) (*Etcd, *tools.FakeEtcdClient, allocator.Interface) {

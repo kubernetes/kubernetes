@@ -259,6 +259,7 @@ func TestWatch(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
+	fakeClient.WaitForWatchCompletion()
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -499,6 +500,8 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 
+		fakeClient.WaitForWatchCompletion()
+
 		// the existing node is detected and the index set
 		event := <-watching.ResultChan()
 		if e, a := testCase.ExpectedType, event.Type; e != a {
@@ -639,6 +642,7 @@ func TestWatchFromNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	fakeClient.WaitForWatchCompletion()
 
 	watching.Stop()
 }

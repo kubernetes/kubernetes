@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sync"
 
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	k8serr "k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
@@ -30,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+
+	"golang.org/x/net/context"
 )
 
 var (
@@ -187,9 +188,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
 	if err := e.storage.Get(context.TODO(), e.baseKey, existing, true); err != nil {
-		err := etcderr.InterpretGetError(err, e.kind, "")
-		fmt.Printf("REINTERPRETED ERROR = %v", err) 
-		return nil, err
+		return nil, etcderr.InterpretGetError(err, e.kind, "")
 	}
 	return existing, nil
 }
@@ -207,6 +206,7 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
+					fmt.Printf("***** FUBAR!!! snapshot.ResourceVersion=%v existing.ResourceVersion=%v\n", snapshot.ResourceVersion, existing.ResourceVersion)
 					return nil, k8serr.NewConflict(e.kind, "", fmt.Errorf("the provided resource version does not match"))
 				}
 			case len(existing.ResourceVersion) != 0:

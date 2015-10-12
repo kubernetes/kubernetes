@@ -19,6 +19,7 @@ package etcd
 import (
 	"strconv"
 	"time"
+	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -33,6 +34,9 @@ type APIObjectVersioner struct{}
 // UpdateObject implements Versioner
 func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error {
 	objectMeta, err := api.ObjectMetaFor(obj)
+	
+	fmt.Printf("Updating Resource ... ")
+
 	if err != nil {
 		return err
 	}
@@ -44,6 +48,9 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Ti
 		versionString = strconv.FormatUint(resourceVersion, 10)
 	}
 	objectMeta.ResourceVersion = versionString
+
+	fmt.Printf("NEW RESOURCE VALUE=%v\n", objectMeta)
+
 	return nil
 }
 

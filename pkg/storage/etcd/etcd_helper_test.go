@@ -406,7 +406,7 @@ func TestGet(t *testing.T) {
 	}
 	fakeClient.Set(context.TODO(), key, runtime.EncodeOrDie(testapi.Default.Codec(), &expect), nil)
 	var got api.Pod
-	err := helper.Get(context.TODO(), "/some/key", &got, false)
+	err := helper.Get("/some/key", &got, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

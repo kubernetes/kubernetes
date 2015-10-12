@@ -106,36 +106,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.installSSHKey, config.InstallSSHKey)
 }
 
-// TestNewEtcdStorage verifies that the usage of NewEtcdStorage reacts properly when
-// the correct data is input
-// TODO: This test won't work without cleaning up the abstraction around etcd given the new interface.
-func TestNewEtcdStorage(t *testing.T) {
-	assert := assert.New(t)
-	fakeClient := tools.NewFakeEtcdClient(t)
-	// Pass case
-	_, err := NewEtcdStorage(nil, fakeClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
-	assert.NoError(err, "Unable to create etcdstorage: %s", err)
-
-	// Fail case
-	errorFunc := func(apiVersion string) (*meta.VersionInterfaces, error) { return nil, errors.New("ERROR") }
-	_, err = NewEtcdStorage(nil, fakeClient, errorFunc, testapi.Default.Version(), etcdtest.PathPrefix())
-	assert.Error(err, "NewEtcdStorage should have failed")
-
-}
-
-// TestGetServersToValidate verifies the unexported getServersToValidate function
-/*func TestGetServersToValidate(t *testing.T) {
-	master, config, assert := setUp(t)
-	servers := master.getServersToValidate(&config)
-
-	assert.Equal(5, len(servers), "unexpected server list: %#v", servers)
-
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0", "etcd-1", "etcd-2"} {
-		if _, ok := servers[server]; !ok {
-			t.Errorf("server list missing: %s", server)
-		}
-	}
-}*/
 
 // TestFindExternalAddress verifies both pass and fail cases for the unexported
 // findExternalAddress function

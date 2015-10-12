@@ -51,15 +51,14 @@ func IsEtcdWatchStoppedByUser(err error) bool {
 // isEtcdErrorNum returns true if and only if err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
 
-	// NOTE: This only exists b/c of the plethora of weird passing 
-	// that exists in the code and clients and how it has shifted in etcd 2.2
-	//if 
-	etcdError, ok := err.(etcd.Error) //; ok {
-	return ok && etcdError.Code == errorCode
-	/*} else {
-		etcdError, ok := err.(*etcd.Error)
-		return ok && etcdError != nil && etcdError.Code == errorCode
-	}*/
+	if err != nil {
+		if etcdError, ok := err.(etcd.Error); ok {
+			return etcdError.Code == errorCode
+		}
+		fmt.Printf("INTERPRET ERROR=%v\n", err)
+	}
+
+	return false
 }
 
 // etcdErrorIndex returns the index associated with the error message and whether the
@@ -67,11 +66,10 @@ func isEtcdErrorNum(err error, errorCode int) bool {
 func etcdErrorIndex(err error) (uint64, bool) {
 	if etcdError, ok := err.(etcd.Error); ok {
 		return etcdError.Index, true
-	} /*else {
-		if etcdError, ok := err.(*etcd.Error); ok {
-			return etcdError.Index, true
-		} 
-	}*/
+	}
+	
+	fmt.Printf("ERROR=%v\n", err)
+	panic("THIS SHOULD NOT HAPPEN2")
 	return 0, false
 }
 
