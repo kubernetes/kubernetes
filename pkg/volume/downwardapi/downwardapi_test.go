@@ -31,8 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 )
 
-const basePath = "/tmp/fake"
-
 func formatMap(m map[string]string) (fmtstr string) {
 	for key, value := range m {
 		fmtstr += fmt.Sprintf("%v=%q\n", key, value)
@@ -41,7 +39,7 @@ func formatMap(m map[string]string) (fmtstr string) {
 	return
 }
 
-func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
+func newTestHost(t *testing.T, client client.Interface, basePath string) volume.VolumeHost {
 	tempDir, err := ioutil.TempDir(basePath, "downwardApi_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -50,8 +48,13 @@ func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
 }
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, nil))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, nil, tmpDir))
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -100,8 +103,14 @@ func TestLabels(t *testing.T) {
 			Labels:    labels,
 		},
 	})
+
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -174,8 +183,13 @@ func TestAnnotations(t *testing.T) {
 		},
 	})
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -234,8 +248,13 @@ func TestName(t *testing.T) {
 		},
 	})
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -295,8 +314,13 @@ func TestNamespace(t *testing.T) {
 		},
 	})
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -349,8 +373,13 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 			Labels:    labels,
 		},
 	})
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -433,8 +462,13 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 			Labels:    labels,
 		},
 	})
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -537,8 +571,13 @@ func TestWriteWithUnixPath(t *testing.T) {
 		},
 	})
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -611,8 +650,13 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		},
 	})
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "downwardapiTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir")
+	}
+	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
