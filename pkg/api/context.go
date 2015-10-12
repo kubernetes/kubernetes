@@ -18,14 +18,32 @@ package api
 
 import (
 	stderrs "errors"
+	"time"
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // Context carries values across API boundaries.
+// This context matches the context.Context interface
+// (https://blog.golang.org/context), for the purposes
+// of passing the api.Context through to the storage tier.
+// TODO: Determine the extent that this abstraction+interface
+// is used by the api, and whether we can remove.
 type Context interface {
+	// Value returns the value associated with key or nil if none.
 	Value(key interface{}) interface{}
+
+	// Deadline returns the time when this Context will be canceled, if any.
+	Deadline() (deadline time.Time, ok bool)
+
+	// Done returns a channel that is closed when this Context is canceled
+	// or times out.
+	Done() <-chan struct{}
+
+	// Err indicates why this context was canceled, after the Done channel
+	// is closed.
+	Err() error
 }
 
 // The key type is unexported to prevent collisions

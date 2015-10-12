@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
@@ -78,7 +79,10 @@ func (h *etcdHelper) Codec() runtime.Codec {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Backends() []string {
+func (h *etcdHelper) Backends(ctx context.Context) []string {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	return h.client.GetCluster()
 }
 
@@ -88,7 +92,10 @@ func (h *etcdHelper) Versioner() storage.Versioner {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	key = h.prefixEtcdKey(key)
 	data, err := h.codec.Encode(obj)
 	if err != nil {
@@ -116,7 +123,10 @@ func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) err
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	var response *etcd.Response
 	data, err := h.codec.Encode(obj)
 	if err != nil {
@@ -157,7 +167,10 @@ func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error 
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Delete(key string, out runtime.Object) error {
+func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	key = h.prefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
 		panic("unable to convert output object to pointer")
@@ -176,7 +189,10 @@ func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(h.client, key, resourceVersion)
@@ -184,7 +200,10 @@ func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.Fi
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(h.client, key, resourceVersion)
@@ -192,15 +211,21 @@ func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter storag
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Get(key string, objPtr runtime.Object, ignoreNotFound bool) error {
+func (h *etcdHelper) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	key = h.prefixEtcdKey(key)
-	_, _, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	_, _, _, err := h.bodyAndExtractObj(ctx, key, objPtr, ignoreNotFound)
 	return err
 }
 
 // bodyAndExtractObj performs the normal Get path to etcd, returning the parsed node and response for additional information
 // about the response, like the current etcd index and the ttl.
-func (h *etcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
+func (h *etcdHelper) bodyAndExtractObj(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	startTime := time.Now()
 	response, err := h.client.Get(key, false, false)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
@@ -243,7 +268,10 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GetToList(key string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.FilterFunc, listObj runtime.Object) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	trace := util.NewTrace("GetToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
@@ -321,7 +349,10 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (h *etcdHelper) List(ctx context.Context, key string, filter storage.FilterFunc, listObj runtime.Object) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	trace := util.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
@@ -331,7 +362,7 @@ func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
 	trace.Step("About to list etcd node")
-	nodes, index, err := h.listEtcdNode(key)
+	nodes, index, err := h.listEtcdNode(ctx, key)
 	metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node listed")
 	if err != nil {
@@ -349,7 +380,10 @@ func (h *etcdHelper) List(key string, filter storage.FilterFunc, listObj runtime
 	return nil
 }
 
-func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
+func (h *etcdHelper) listEtcdNode(ctx context.Context, key string) ([]*etcd.Node, uint64, error) {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	result, err := h.client.Get(key, true, true)
 	if err != nil {
 		index, ok := etcdErrorIndex(err)
@@ -367,7 +401,10 @@ func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.UpdateFunc) error {
+func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.UpdateFunc) error {
+	if ctx == nil {
+		glog.Errorf("Context is nil")
+	}
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
@@ -376,7 +413,7 @@ func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 	key = h.prefixEtcdKey(key)
 	for {
 		obj := reflect.New(v.Type()).Interface().(runtime.Object)
-		origBody, node, res, err := h.bodyAndExtractObj(key, obj, ignoreNotFound)
+		origBody, node, res, err := h.bodyAndExtractObj(ctx, key, obj, ignoreNotFound)
 		if err != nil {
 			return err
 		}
