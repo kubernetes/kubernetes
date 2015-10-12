@@ -31,7 +31,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -280,9 +280,9 @@ func (s *CMServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Failed to get api versions from server: %v", err)
 	}
-	versions := &api.APIVersions{Versions: versionStrings}
+	versions := &unversioned.APIVersions{Versions: versionStrings}
 
-	resourceMap, err := kubeClient.SupportedResources()
+	resourceMap, err := client.SupportedResources(kubeClient, kubeconfig)
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
@@ -365,7 +365,7 @@ func (s *CMServer) Run(_ []string) error {
 	select {}
 }
 
-func containsVersion(versions *api.APIVersions, version string) bool {
+func containsVersion(versions *unversioned.APIVersions, version string) bool {
 	for ix := range versions.Versions {
 		if versions.Versions[ix] == version {
 			return true
@@ -374,7 +374,7 @@ func containsVersion(versions *api.APIVersions, version string) bool {
 	return false
 }
 
-func containsResource(resources *api.APIResourceList, resourceName string) bool {
+func containsResource(resources *unversioned.APIResourceList, resourceName string) bool {
 	for ix := range resources.APIResources {
 		resource := resources.APIResources[ix]
 		if resource.Name == resourceName {

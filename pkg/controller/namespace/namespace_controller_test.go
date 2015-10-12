@@ -73,7 +73,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	}
 }
 
-func testSyncNamespaceThatIsTerminating(t *testing.T, versions *api.APIVersions) {
+func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIVersions) {
 	mockClient := &testclient.Fake{}
 	now := unversioned.Now()
 	testNamespace := &api.Namespace{
@@ -91,11 +91,11 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *api.APIVersions)
 	}
 
 	if containsVersion(versions, "extensions/v1beta1") {
-		resources := []api.APIResource{}
+		resources := []unversioned.APIResource{}
 		for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingress"} {
-			resources = append(resources, api.APIResource{Name: resource})
+			resources = append(resources, unversioned.APIResource{Name: resource})
 		}
-		mockClient.Resources = []api.APIResourceList{
+		mockClient.Resources = []unversioned.APIResourceList{
 			{
 				GroupVersion: "extensions/v1beta1",
 				APIResources: resources,
@@ -166,11 +166,11 @@ func TestRetryOnConflictError(t *testing.T) {
 }
 
 func TestSyncNamespaceThatIsTerminatingNonExperimental(t *testing.T) {
-	testSyncNamespaceThatIsTerminating(t, &api.APIVersions{})
+	testSyncNamespaceThatIsTerminating(t, &unversioned.APIVersions{})
 }
 
 func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
-	testSyncNamespaceThatIsTerminating(t, &api.APIVersions{Versions: []string{"extensions/v1beta1"}})
+	testSyncNamespaceThatIsTerminating(t, &unversioned.APIVersions{Versions: []string{"extensions/v1beta1"}})
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
@@ -187,7 +187,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	err := syncNamespace(mockClient, &api.APIVersions{}, testNamespace)
+	err := syncNamespace(mockClient, &unversioned.APIVersions{}, testNamespace)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
@@ -199,7 +199,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 func TestRunStop(t *testing.T) {
 	mockClient := &testclient.Fake{}
 
-	nsController := NewNamespaceController(mockClient, &api.APIVersions{}, 1*time.Second)
+	nsController := NewNamespaceController(mockClient, &unversioned.APIVersions{}, 1*time.Second)
 
 	if nsController.StopEverything != nil {
 		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)

@@ -270,24 +270,24 @@ func TestGetServerVersion(t *testing.T) {
 }
 
 func TestGetServerResources(t *testing.T) {
-	stable := api.APIResourceList{
+	stable := unversioned.APIResourceList{
 		GroupVersion: "v1",
-		APIResources: []api.APIResource{
+		APIResources: []unversioned.APIResource{
 			{"pods", true},
 			{"services", true},
 			{"namespaces", false},
 		},
 	}
-	beta := api.APIResourceList{
+	beta := unversioned.APIResourceList{
 		GroupVersion: "extensions/v1",
-		APIResources: []api.APIResource{
+		APIResources: []unversioned.APIResource{
 			{"deployments", true},
 			{"ingress", true},
 			{"jobs", true},
 		},
 	}
 	tests := []struct {
-		resourcesList *api.APIResourceList
+		resourcesList *unversioned.APIResourceList
 		path          string
 		request       string
 		expectErr     bool
@@ -319,10 +319,19 @@ func TestGetServerResources(t *testing.T) {
 		case "/apis/extensions/v1beta1":
 			list = &beta
 		case "/api":
-			list = &api.APIVersions{
+			list = &unversioned.APIVersions{
 				Versions: []string{
 					"v1",
-					"extensions/v1beta1",
+				},
+			}
+		case "/apis":
+			list = &unversioned.APIGroupList{
+				Groups: []unversioned.APIGroup{
+					{
+						Versions: []unversioned.GroupVersion{
+							{GroupVersion: "extensions/v1beta1"},
+						},
+					},
 				},
 			}
 		default:
@@ -357,7 +366,7 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	resourceMap, err := client.SupportedResources()
+	resourceMap, err := SupportedResources(client, &Config{Host: server.URL})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

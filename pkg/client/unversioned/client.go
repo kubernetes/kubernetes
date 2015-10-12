@@ -118,8 +118,7 @@ type VersionInterface interface {
 
 // ResourcesInterface has methods for obtaining supported resources on the API server
 type ResourcesInterface interface {
-	SupportedResourcesForGroupVersion(groupVersion string) (*api.APIResourceList, error)
-	SupportedResources() (map[string]*api.APIResourceList, error)
+	SupportedResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error)
 }
 
 // APIStatus is exposed by errors that can be converted to an api.Status object
@@ -149,7 +148,7 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 }
 
 // SupportedResourcesForGroupVersion retrieves the list of resources supported by the API server for a group version.
-func (c *Client) SupportedResourcesForGroupVersion(groupVersion string) (*api.APIResourceList, error) {
+func (c *Client) SupportedResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
 	var prefix string
 	if groupVersion == "v1" {
 		prefix = "/api"
@@ -160,7 +159,7 @@ func (c *Client) SupportedResourcesForGroupVersion(groupVersion string) (*api.AP
 	if err != nil {
 		return nil, err
 	}
-	resources := api.APIResourceList{}
+	resources := unversioned.APIResourceList{}
 	if err := json.Unmarshal(body, &resources); err != nil {
 		return nil, err
 	}
@@ -168,13 +167,13 @@ func (c *Client) SupportedResourcesForGroupVersion(groupVersion string) (*api.AP
 }
 
 // SupportedResources gets all supported resources for all group versions.  The key in the map is an API groupVersion.
-func (c *Client) SupportedResources() (map[string]*api.APIResourceList, error) {
-	apis, err := c.ServerAPIVersions()
+func SupportedResources(c Interface, cfg *Config) (map[string]*unversioned.APIResourceList, error) {
+	apis, err := ServerAPIVersions(cfg)
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]*api.APIResourceList{}
-	for _, groupVersion := range apis.Versions {
+	result := map[string]*unversioned.APIResourceList{}
+	for _, groupVersion := range apis {
 		resources, err := c.SupportedResourcesForGroupVersion(groupVersion)
 		if err != nil {
 			return nil, err
