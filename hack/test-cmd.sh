@@ -811,8 +811,7 @@ __EOF__
     kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
     kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
     # Command
-    # TODO: remove --validate=false when PR "Add validate support for list kind #14726" is merged
-    kubectl create -f "${file}" --validate=false "${kube_flags[@]}"
+    kubectl create -f "${file}" "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) is running
     if [ "$has_svc" = true ]; then
       if [ "$two_svcs" = true ]; then
@@ -834,8 +833,7 @@ __EOF__
     kubectl get -f "${file}" "${kube_flags[@]}"
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
-    # TODO: remove --validate=false when PR "Add validate support for list kind #14726" is merged
-    kubectl replace -f $replace_file --force --validate=false "${kube_flags[@]}"
+    kubectl replace -f $replace_file --force "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'

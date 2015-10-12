@@ -3,6 +3,8 @@
    "apiVersion":"v1",
    "items":[
       {
+         "kind":"ReplicationController",
+         "apiVersion":"v1",
          "metadata":{
             "name":"mock",
             "labels":{
@@ -35,6 +37,8 @@
          }
       },
       {
+        "kind":"ReplicationController",
+        "apiVersion":"v1",
         "metadata":{
           "name":"mock2",
           "labels":{
