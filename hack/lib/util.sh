@@ -48,6 +48,32 @@ kube::util::wait_for_url() {
   return 1
 }
 
+# returns a random port
+kube::util::get_random_port() {
+  awk -v min=1 -v max=65535 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'
+}
+
+# use netcat to check if the host($1):port($2) is free (return 0 means free, 1 means used)
+kube::util::test_host_port_free() {
+  local host=$1
+  local port=$2
+  local success=0
+  local fail=1
+
+  which nc >/dev/null || {
+    kube::log::usage "netcat isn't installed, can't verify if ${host}:${port} is free, skipping the check..."
+    return ${success}
+  }
+
+  if [ ! $(nc -vz "${host} ${port}") ]; then
+    kube::log::status "${host}:${port} is free, proceeding..."
+    return ${success}
+  else
+    kube::log::status "${host}:${port} is already used"
+    return ${fail}
+  fi
+}
+
 # Example:  kube::util::trap_add 'echo "in trap DEBUG"' DEBUG
 # See: http://stackoverflow.com/questions/3338030/multiple-bash-traps-for-the-same-signal
 kube::util::trap_add() {
