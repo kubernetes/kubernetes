@@ -183,7 +183,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
-	ds, err := reaper.Experimental().DaemonSets(namespace).Get(name)
+	ds, err := reaper.Extensions().DaemonSets(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -212,13 +212,13 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
 
-	if ds, err = reaper.Experimental().DaemonSets(namespace).Update(ds); err != nil {
+	if ds, err = reaper.Extensions().DaemonSets(namespace).Update(ds); err != nil {
 		return "", err
 	}
 
 	// Wait for the daemon set controller to kill all the daemon pods.
 	if err := wait.Poll(reaper.pollInterval, reaper.timeout, func() (bool, error) {
-		updatedDS, err := reaper.Experimental().DaemonSets(namespace).Get(name)
+		updatedDS, err := reaper.Extensions().DaemonSets(namespace).Get(name)
 		if err != nil {
 			return false, nil
 		}
@@ -227,14 +227,14 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return "", err
 	}
 
-	if err := reaper.Experimental().DaemonSets(namespace).Delete(name); err != nil {
+	if err := reaper.Extensions().DaemonSets(namespace).Delete(name); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%s stopped", name), nil
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
-	jobs := reaper.Experimental().Jobs(namespace)
+	jobs := reaper.Extensions().Jobs(namespace)
 	scaler, err := ScalerFor("Job", *reaper)
 	if err != nil {
 		return "", err

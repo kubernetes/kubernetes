@@ -48,7 +48,7 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 func JobHasDesiredParallelism(c Interface, job *extensions.Job) wait.ConditionFunc {
 
 	return func() (bool, error) {
-		job, err := c.Experimental().Jobs(job.Namespace).Get(job.Name)
+		job, err := c.Extensions().Jobs(job.Namespace).Get(job.Name)
 		if err != nil {
 			return false, err
 		}

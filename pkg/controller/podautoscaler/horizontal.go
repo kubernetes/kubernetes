@@ -71,7 +71,7 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
 
-	scale, err := a.client.Experimental().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+	scale, err := a.client.Extensions().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
@@ -125,7 +125,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.client.Experimental().Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+		_, err = a.client.Extensions().Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
 		if err != nil {
 			a.eventRecorder.Eventf(&hpa, "FailedRescale", "New size: %d; error: %v", desiredReplicas, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
@@ -145,7 +145,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		hpa.Status.LastScaleTimestamp = &now
 	}
 
-	_, err = a.client.Experimental().HorizontalPodAutoscalers(hpa.Namespace).Update(&hpa)
+	_, err = a.client.Extensions().HorizontalPodAutoscalers(hpa.Namespace).Update(&hpa)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
@@ -155,7 +155,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 func (a *HorizontalController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
-	list, err := a.client.Experimental().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	list, err := a.client.Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}

@@ -193,23 +193,23 @@ func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namesp
 	}
 	// If experimental mode, delete all experimental resources for the namespace.
 	if experimentalMode {
-		err = deleteHorizontalPodAutoscalers(kubeClient.Experimental(), namespace)
+		err = deleteHorizontalPodAutoscalers(kubeClient.Extensions(), namespace)
 		if err != nil {
 			return estimate, err
 		}
-		err = deleteDaemonSets(kubeClient.Experimental(), namespace)
+		err = deleteDaemonSets(kubeClient.Extensions(), namespace)
 		if err != nil {
 			return estimate, err
 		}
-		err = deleteJobs(kubeClient.Experimental(), namespace)
+		err = deleteJobs(kubeClient.Extensions(), namespace)
 		if err != nil {
 			return estimate, err
 		}
-		err = deleteDeployments(kubeClient.Experimental(), namespace)
+		err = deleteDeployments(kubeClient.Extensions(), namespace)
 		if err != nil {
 			return estimate, err
 		}
-		err = deleteIngress(kubeClient.Experimental(), namespace)
+		err = deleteIngress(kubeClient.Extensions(), namespace)
 		if err != nil {
 			return estimate, err
 		}
