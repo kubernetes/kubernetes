@@ -33,6 +33,23 @@ Documentation for other releases can be found at
 
 # Labels
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Labels](#labels)
+  - [Motivation](#motivation)
+  - [Syntax and character set](#syntax-and-character-set)
+  - [Label selectors](#label-selectors)
+    - [_Equality-based_ requirement](#equality-based-requirement)
+    - [_Set-based_ requirement](#set-based-requirement)
+  - [API](#api)
+    - [LIST and WATCH filtering](#list-and-watch-filtering)
+    - [Set references in API objects](#set-references-in-api-objects)
+      - [Service and ReplicationController](#service-and-replicationcontroller)
+      - [Job and other new resources](#job-and-other-new-resources)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 _Labels_ are key/value pairs that are attached to objects, such as pods.
 Labels are intended to be used to specify identifying attributes of objects that are meaningful and relevant to users, but which do not directly imply semantics to the core system.
 Labels can be used to organize and to select subsets of objects.  Labels can be attached to objects at creation time and subsequently added and modified at any time.
@@ -56,14 +73,13 @@ Service deployments and batch processing pipelines are often multi-dimensional e
 
 Example labels:
 
-   * `"release" : "stable"`, `"release" : "canary"`, ...
+   * `"release" : "stable"`, `"release" : "canary"`
    * `"environment" : "dev"`, `"environment" : "qa"`, `"environment" : "production"`
-   * `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "middleware"`
-   * `"partition" : "customerA"`, `"partition" : "customerB"`, ...
+   * `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "cache"`
+   * `"partition" : "customerA"`, `"partition" : "customerB"`
    * `"track" : "daily"`, `"track" : "weekly"`
 
 These are just examples; you are free to develop your own conventions.
-
 
 ## Syntax and character set
 
@@ -83,10 +99,12 @@ A label selector can be made of multiple _requirements_ which are comma-separate
 
 An empty label selector (that is, one with zero requirements) selects every object in the collection.
 
+A null label selector (which is only possible for optional selector fields) selects no objects.
+
 ### _Equality-based_ requirement
 
-_Equality-_ or _inequality-based_ requirements allow filtering by label keys and values. Matching objects must have all of the specified labels (both keys and values), though they may have additional labels as well.
-Three kinds of operators are admitted `=`,`==`,`!=`. The first two represent _equality_ and are simply synonyms. While the latter represents _inequality_. For example:
+_Equality-_ or _inequality-based_ requirements allow filtering by label keys and values. Matching objects must satisfy all of the specified label constraints, though they may have additional labels as well.
+Three kinds of operators are admitted `=`,`==`,`!=`. The first two represent _equality_ (and are simply synonyms), while the latter represents _inequality_. For example:
 
 ```
 environment = production
@@ -94,23 +112,25 @@ tier != frontend
 ```
 
 The former selects all resources with key equal to `environment` and value equal to `production`.
-The latter selects all resources with key equal to `tier` and value distinct from `frontend`.
+The latter selects all resources with key equal to `tier` and value distinct from `frontend`, and all resources with no labels with the `tier` key.
 One could filter for resources in `production` excluding `frontend` using the comma operator: `environment=production,tier!=frontend`
 
 
 ### _Set-based_ requirement
 
-_Set-based_ label requirements allow filtering keys according to a set of values. Matching objects must have all of the specified labels (i.e. all keys and at least one of the values specified for each key). Three kinds of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
+_Set-based_ label requirements allow filtering keys according to a set of values. Three kinds of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
 
 ```
 environment in (production, qa)
 tier notin (frontend, backend)
 partition
+!partition
 ```
 
 The first example selects all resources with key equal to `environment` and value equal to `production` or `qa`.
-The second example selects all resources with key equal to `tier` and values other than `frontend` and `backend`.
+The second example selects all resources with key equal to `tier` and values other than `frontend` and `backend`, and all resources with no labels with the `tier` key.
 The third example selects all resources including a label with key `partition`; no values are checked.
+The fourth example selects all resources without a label with key `partition`; no values are checked.
 Similarly the comma separator acts as an _AND_ operator. So filtering resources with a `partition` key (no matter the value) and with `environment` different than  `qa` can be achieved using `partition,environment notin (qa)`.
 The _set-based_ label selector is a general form of equality since `environment=production` is equivalent to `environment in (production)`; similarly for `!=` and `notin`.
 
@@ -119,6 +139,8 @@ _Set-based_ requirements can be mixed with _equality-based_ requirements. For ex
 
 ## API
 
+### LIST and WATCH filtering
+
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
 
     * _equality-based_ requirements: `?labelSelector=environment%3Dproduction,tier%3Dfrontend`
@@ -126,38 +148,41 @@ LIST and WATCH operations may specify label selectors to filter the sets of obje
 
 Both label selector styles can be used to list or watch resources via a REST client. For example targetting `apiserver` with `kubectl` and using _equality-based_ one may write:
 
-```shell
+```console
 $ kubectl get pods -l environment=production,tier=frontend
 ```
 
 or using _set-based_ requirements:
 
-```
-$kubectl get pods -l 'environment in (production),tier in (frontend)'
+```console
+$ kubectl get pods -l 'environment in (production),tier in (frontend)'
 ```
 
-As already mentioned _set-based_ requirements are more expressive.  For instance, they can implement the _OR_ operator:
+As already mentioned _set-based_ requirements are more expressive.  For instance, they can implement the _OR_ operator on values:
 
-```shell
-$kubectl get pods -l 'environment in (production, qa)'
+```console
+$ kubectl get pods -l 'environment in (production, qa)'
 ```
 
 or restricting negative matching via _exists_ operator:
 
-```shell
-$kubectl get pods -l 'environment,environment notin (frontend)'
+```console
+$ kubectl get pods -l 'environment,environment notin (frontend)'
 ```
 
-Kubernetes also supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
+### Set references in API objects
 
-* `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
-* `replicationcontroller`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
+Some Kubernetes objects, such as [`service`s](services.md) and [`replicationcontroller`s](replication-controller.md), also use label selectors to specify sets of other resources, such as [pods](pods.md).
 
-The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationcontroller` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationcontrollers` may themselves have labels and would generally carry the labels their corresponding pods have in common. Labels selectors for both objects are defined in `json` or `yaml` files using `map` and only _equality-based_ requirement selectors are supported:
+#### Service and ReplicationController
+
+The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationcontroller` should manage is also defined with a label selector.
+
+Labels selectors for both objects are defined in `json` or `yaml` files using maps, and only _equality-based_ requirement selectors are supported:
 
 ```json
 "selector": {
-    "name" : "redis",
+    "component" : "redis",
 }
 ```
 
@@ -165,26 +190,25 @@ or
 
 ```yaml
 selector:
-    name: redis
+    component: redis
 ```
 
-this selector (respectively in `json` or `yaml` format) is equivalent to `name=redis` or `name in (redis)`. At the moment in `json` or `yaml` format there is no way to represent inequalities or existence operators see [#341](https://github.com/kubernetes/kubernetes/issues/341).
+this selector (respectively in `json` or `yaml` format) is equivalent to `component=redis` or `component in (redis)`.
 
-For example [redis-controller.yaml](../../examples/redis/redis-controller.yaml)`redis` `replicationcontroller` will monitor pods selected by the `name=redis` _equality-based_ requirement.
+#### Job and other new resources
 
-Similarly for [redis-sentinel-service.yaml](../../examples/redis/redis-sentinel-service.yaml) `redis-sentinel` `service` will target pods selected by the `redis-sentinel=true` _equality-based_ requirement.
+Newer resources, such as [job](jobs.md), support _set-based_ requirements as well.
 
-Sets identified by labels could be overlapping (think Venn diagrams). For instance, a service might target all pods with `"tier": "frontend"` and  `"environment" : "prod"`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationcontroller` (with `replicas` set to 9) for the bulk of the replicas with labels `"tier" : "frontend"` and `"environment" : "prod"` and `"track" : "stable"` and another `replicationcontroller` (with `replicas` set to 1) for the canary with labels `"tier" : "frontend"` and  `"environment" : "prod"` and `"track" : "canary"`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationcontrollers` separately to test things out, monitor the results, etc.
+```yaml
+selector:
+  matchLabels:
+    component: redis
+  matchExpressions:
+    - {key: tier, operator: In, values: [cache]}
+    - {key: environment, operator: NotIn, values: [dev]}
+```
 
-Note that the superset described in the previous example is also heterogeneous. In long-lived, highly available, horizontally scaled, distributed, continuously evolving service applications, heterogeneity is inevitable, due to canaries, incremental rollouts, live reconfiguration, simultaneous updates and auto-scaling, hardware upgrades, and so on.
-
-Pods (and other objects) may belong to multiple sets simultaneously, which enables representation of service substructure and/or superstructure. In particular, labels are intended to facilitate the creation of non-hierarchical, multi-dimensional deployment structures. They are useful for a variety of management purposes (e.g., configuration, deployment) and for application introspection and analysis (e.g., logging, monitoring, alerting, analytics). Without the ability to form sets by intersecting labels, many implicitly related, overlapping flat sets would need to be created, for each subset and/or superset desired, which would lose semantic information and be difficult to keep consistent. Purely hierarchically nested sets wouldn't readily support slicing sets across different dimensions.
-
-
-## Future developments
-
-Concerning API: we may extend such filtering to DELETE operations in the future.
-
+`matchLabels` is a map of `{key,value}` pairs. A single `{key,value}` in the `matchLabels` map is equivalent to an element of `matchExpressions`, whose `key` field is "key", the `operator` is "In", and the `values` array contains only "value". `matchExpressions` is a list of pod selector requirements. Valid operators include In, NotIn, Exists, and DoesNotExist. The values set must be non-empty in the case of In and NotIn. All of the requirements, from both `matchLabels` and `matchExpressions` are ANDed together -- they must all be satisfied in order to match.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/labels.md?pixel)]()
