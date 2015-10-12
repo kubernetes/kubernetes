@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -132,4 +133,10 @@ func (rt *DebuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	return response, err
+}
+
+var _ = util.RoundTripperWrapper(&DebuggingRoundTripper{})
+
+func (rt *DebuggingRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.delegatedRoundTripper
 }
