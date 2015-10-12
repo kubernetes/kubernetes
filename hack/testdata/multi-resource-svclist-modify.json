@@ -3,6 +3,8 @@
   "apiVersion":"v1",
   "items":[
     {
+      "kind":"Service",
+      "apiVersion":"v1",
       "metadata":{
         "name":"mock",
         "labels":{
@@ -22,6 +24,8 @@
       }
     },
     {
+      "kind":"Service",
+      "apiVersion":"v1",
       "metadata":{
         "name":"mock2",
         "labels":{
