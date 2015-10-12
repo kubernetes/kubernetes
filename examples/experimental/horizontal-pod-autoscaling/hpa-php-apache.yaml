@@ -1,0 +1,15 @@
+apiVersion: experimental/v1alpha1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: php-apache
+  namespace: default
+spec:
+  maxReplicas: 10
+  minReplicas: 1
+  scaleRef:
+    kind: ReplicationController
+    name: php-apache
+    namespace: default
+  target:
+    quantity: 100m
+    resource: cpu
