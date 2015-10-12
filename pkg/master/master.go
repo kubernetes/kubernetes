@@ -1042,7 +1042,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	dbClient := func(resource string) storage.Interface {
 		return c.StorageDestinations.get("extensions", resource)
 	}
-	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
+	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"))
 	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"))
 	deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
@@ -1061,17 +1061,18 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		}, 10*time.Second)
 	}()
 	storage := map[string]rest.Storage{
-		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
-		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
-		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
-		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
-		strings.ToLower("daemonsets"):                   daemonSetStorage,
-		strings.ToLower("daemonsets/status"):            daemonSetStatusStorage,
-		strings.ToLower("deployments"):                  deploymentStorage.Deployment,
-		strings.ToLower("deployments/scale"):            deploymentStorage.Scale,
-		strings.ToLower("jobs"):                         jobStorage,
-		strings.ToLower("jobs/status"):                  jobStatusStorage,
-		strings.ToLower("ingress"):                      ingressStorage,
+		strings.ToLower("replicationControllers"):          controllerStorage.ReplicationController,
+		strings.ToLower("replicationControllers/scale"):    controllerStorage.Scale,
+		strings.ToLower("horizontalpodautoscalers"):        autoscalerStorage,
+		strings.ToLower("horizontalpodautoscalers/status"): autoscalerStatusStorage,
+		strings.ToLower("thirdpartyresources"):             thirdPartyResourceStorage,
+		strings.ToLower("daemonsets"):                      daemonSetStorage,
+		strings.ToLower("daemonsets/status"):               daemonSetStatusStorage,
+		strings.ToLower("deployments"):                     deploymentStorage.Deployment,
+		strings.ToLower("deployments/scale"):               deploymentStorage.Scale,
+		strings.ToLower("jobs"):                            jobStorage,
+		strings.ToLower("jobs/status"):                     jobStatusStorage,
+		strings.ToLower("ingress"):                         ingressStorage,
 	}
 
 	expMeta := latest.GroupOrDie("extensions")

@@ -147,7 +147,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		hpa.Status.LastScaleTimestamp = &now
 	}
 
-	_, err = a.client.Experimental().HorizontalPodAutoscalers(hpa.Namespace).Update(&hpa)
+	_, err = a.client.Experimental().HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(&hpa)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
