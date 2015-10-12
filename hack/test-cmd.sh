@@ -84,6 +84,24 @@ function check-curl-proxy-code()
   echo "For address ${full_address}, got ${status} but wanted ${desired}"
   return 1
 }
+
+# TODO: Remove this function when we do the retry inside the kubectl commands. See #15333.
+function kubectl-with-retry()
+{
+  ERROR_FILE="${KUBE_TEMP}/kubectl-error"
+  for count in $(seq 0 3); do
+    kubectl "$@" 2> ${ERROR_FILE} || true
+    if grep -q "the object has been modified" "${ERROR_FILE}"; then
+      kube::log::status "retry $1, error: $(cat ${ERROR_FILE})"
+      rm "${ERROR_FILE}"
+      sleep $((2**count))
+    else
+      rm "${ERROR_FILE}"
+      break
+    fi
+  done
+}
+
 kube::util::trap_add cleanup EXIT SIGINT
 
 kube::util::ensure-temp-dir
@@ -832,7 +850,10 @@ __EOF__
       fi
     fi
     # Command
-    kubectl label -f "${file}" labeled=true "${kube_flags[@]}"
+    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label" 
+    # fails on some, but not all, of the resources, retries will fail because it tries to modify
+    # existing labels.
+    kubectl-with-retry label -f $file labeled=true --overwrite "${kube_flags[@]}"
     # Post-condition: mock service and mock rc (and mock2) are labeled
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field}.labeled}}" 'true'
@@ -847,7 +868,11 @@ __EOF__
       fi
     fi
     # Command
-    kubectl annotate -f "${file}" annotated=true "${kube_flags[@]}"
+    # Command
+    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate" 
+    # fails on some, but not all, of the resources, retries will fail because it tries to modify
+    # existing annotations.
+    kubectl-with-retry annotate -f $file annotated=true --overwrite "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are annotated
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${annotations_field}.annotated}}" 'true'
