@@ -1833,8 +1833,7 @@ func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
 		return false, false
 	}
 	capacity := CapacityFromMachineInfo(info)
-	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, capacity)
-	return len(notFittingCPU) > 0, len(notFittingMemory) > 0
+	return predicates.CheckPodsExceedingFreeResources(pods, capacity)
 }
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
@@ -1894,10 +1893,10 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	if !kl.matchesNodeSelector(pod) {
 		return false, "NodeSelectorMismatching", "cannot be started due to node selector mismatch"
 	}
-	cpu, memory := kl.hasInsufficientfFreeResources(pods)
-	if cpu {
+	cpuNotFit, memoryNotFit := kl.hasInsufficientfFreeResources(pods)
+	if cpuNotFit {
 		return false, "InsufficientFreeCPU", "cannot start the pod due to insufficient free CPU."
-	} else if memory {
+	} else if memoryNotFit {
 		return false, "InsufficientFreeMemory", "cannot be started due to insufficient free memory"
 	}
 	if kl.isOutOfDisk() {
