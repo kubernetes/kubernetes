@@ -400,15 +400,16 @@ case ${JOB_NAME} in
   # or flaky test list on the release branch, you'll need to propose a
   # pull request directly to the release branch itself.
   kubernetes-e2e-gce-rc)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-rc"}
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release-1.1"}
     : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="gce-e2e-rc"}
+    : ${E2E_NETWORK:="gce-e2e-1-1"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-rc"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-1-1"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.1"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     : ${ENABLE_DEPLOYMENTS:=true}
     ;;
