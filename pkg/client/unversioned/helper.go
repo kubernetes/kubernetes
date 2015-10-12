@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -179,7 +180,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	return nil
 }
 
-func extractGroupVersions(l *api.APIGroupList) []string {
+func extractGroupVersions(l *unversioned.APIGroupList) []string {
 	var groupVersions []string
 	for _, g := range l.Groups {
 		for _, gv := range g.Versions {
@@ -213,7 +214,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	var v api.APIVersions
+	var v unversioned.APIVersions
 	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(&v)
 	if err != nil {
@@ -227,7 +228,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	var apiGroupList api.APIGroupList
+	var apiGroupList unversioned.APIGroupList
 	defer resp2.Body.Close()
 	err = json.NewDecoder(resp2.Body).Decode(&apiGroupList)
 	if err != nil {
