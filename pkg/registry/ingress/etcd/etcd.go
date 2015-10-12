@@ -38,7 +38,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Ingress{} },
 
@@ -72,6 +72,21 @@ func NewREST(s storage.Interface) *REST {
 
 		Storage: s,
 	}
+	statusStore := *store
+	statusStore.UpdateStrategy = ingress.StatusStrategy
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
 
-	return &REST{store}
+// StatusREST implements the REST endpoint for changing the status of an ingress
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &extensions.Ingress{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }
