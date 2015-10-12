@@ -56,6 +56,8 @@ type Fake struct {
 	WatchReactionChain []WatchReactor
 	// ProxyReactionChain is the list of proxy reactors that will be attempted for every request in the order they are tried
 	ProxyReactionChain []ProxyReactor
+
+	Resources []api.APIResourceList
 }
 
 // Reactor is an interface to allow the composition of reaction functions.
@@ -258,6 +260,35 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 
 func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
+}
+
+func (c *Fake) SupportedResources() (map[string]*api.APIResourceList, error) {
+	action := ActionImpl{
+		Verb:     "get",
+		Resource: "resources",
+	}
+	c.Invokes(action, nil)
+	result := map[string]*api.APIResourceList{}
+	for _, resource := range c.Resources {
+		result[resource.GroupVersion] = &api.APIResourceList{
+			APIResources: resource.APIResources,
+		}
+	}
+	return result, nil
+}
+
+func (c *Fake) SupportedResourcesForGroupVersion(version string) (*api.APIResourceList, error) {
+	action := ActionImpl{
+		Verb:     "get",
+		Resource: "resource",
+	}
+	c.Invokes(action, nil)
+	for _, resource := range c.Resources {
+		if resource.GroupVersion == version {
+			return &resource, nil
+		}
+	}
+	return nil, nil
 }
 
 func (c *Fake) ServerVersion() (*version.Info, error) {
