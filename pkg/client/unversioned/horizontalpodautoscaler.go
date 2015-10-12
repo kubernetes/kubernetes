@@ -42,12 +42,12 @@ type HorizontalPodAutoscalerInterface interface {
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
 type horizontalPodAutoscalers struct {
-	client *ExperimentalClient
+	client *ExtensionsClient
 	ns     string
 }
 
 // newHorizontalPodAutoscalers returns a horizontalPodAutoscalers
-func newHorizontalPodAutoscalers(c *ExperimentalClient, namespace string) *horizontalPodAutoscalers {
+func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
 		client: c,
 		ns:     namespace,
