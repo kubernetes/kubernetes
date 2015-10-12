@@ -22,9 +22,11 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
+
+	"github.com/golang/glog"
 )
 
 // Sorting printer sorts list types before delegating to another printer.
@@ -61,6 +63,17 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	}
 	parser := jsonpath.New("sorting")
 	parser.Parse(s.SortField)
+
+	for ix := range objs {
+		item := objs[ix]
+		switch u := item.(type) {
+		case *runtime.Unknown:
+			var err error
+			if objs[ix], err = api.Codec.Decode(u.RawJSON); err != nil {
+				return err
+			}
+		}
+	}
 	values, err := parser.FindResults(reflect.ValueOf(objs[0]).Elem().Interface())
 	if err != nil {
 		return err
