@@ -383,10 +383,6 @@ func (ec2 *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressIn
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVpcsInput) ([]*ec2.Vpc, error) {
-	panic("Not implemented")
-}
-
 func (ec2 *FakeEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
 	ec2.DescribeSubnetsInput = request
 	return ec2.Subnets, nil
@@ -474,7 +470,6 @@ func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGrou
 func mockInstancesResp(instances []*ec2.Instance) *AWSCloud {
 	awsServices := NewFakeAWSServices().withInstances(instances)
 	return &AWSCloud{
-		awsServices:      awsServices,
 		ec2:              awsServices.ec2,
 		availabilityZone: awsServices.availabilityZone,
 	}
@@ -483,7 +478,6 @@ func mockInstancesResp(instances []*ec2.Instance) *AWSCloud {
 func mockAvailabilityZone(region string, availabilityZone string) *AWSCloud {
 	awsServices := NewFakeAWSServices().withAz(availabilityZone)
 	return &AWSCloud{
-		awsServices:      awsServices,
 		ec2:              awsServices.ec2,
 		availabilityZone: awsServices.availabilityZone,
 		region:           region,
@@ -730,9 +724,6 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	}
 
 	vpcID := "vpc-deadbeef"
-	vpc := &ec2.Vpc{
-		VpcId: &vpcID,
-	}
 
 	// test with 3 subnets from 3 different AZs
 	subnets := make(map[int]map[string]string)
@@ -747,7 +738,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	subnets[2]["az"] = "af-south-1c"
 	awsServices.ec2.Subnets = constructSubnets(subnets)
 
-	result, err := c.listSubnetIDsinVPC(vpc)
+	result, err := c.listSubnetIDsinVPC(vpcID)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
@@ -777,7 +768,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	subnets[3]["az"] = "af-south-1c"
 	awsServices.ec2.Subnets = constructSubnets(subnets)
 
-	result, err = c.listSubnetIDsinVPC(vpc)
+	result, err = c.listSubnetIDsinVPC(vpcID)
 	if err != nil {
 		t.Errorf("Error listing subnets: %v", err)
 		return
