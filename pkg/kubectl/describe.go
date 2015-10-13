@@ -151,11 +151,11 @@ func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.ResourceQuotas(name).List(labels.Everything())
+	resourceQuotaList, err := d.ResourceQuotas(name).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return "", err
 	}
-	limitRangeList, err := d.LimitRanges(name).List(labels.Everything())
+	limitRangeList, err := d.LimitRanges(name).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return "", err
 	}
@@ -1451,7 +1451,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
-	dss, err := c.List(labels.Everything())
+	dss, err := c.List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("error getting daemon set: %v", err)
 	}
@@ -1474,7 +1474,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 func getReplicationControllersForLabels(c client.ReplicationControllerInterface, labelsToMatch labels.Labels) ([]api.ReplicationController, error) {
 	// Get all replication controllers.
 	// TODO this needs a namespace scope as argument
-	rcs, err := c.List(labels.Everything())
+	rcs, err := c.List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}

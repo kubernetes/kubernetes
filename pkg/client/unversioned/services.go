@@ -30,7 +30,7 @@ type ServicesNamespacer interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	List(selector labels.Selector) (*api.ServiceList, error)
+	List(label labels.Selector, field fields.Selector) (*api.ServiceList, error)
 	Get(name string) (*api.Service, error)
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
@@ -51,12 +51,13 @@ func newServices(c *Client, namespace string) *services {
 }
 
 // List takes a selector, and returns the list of services that match that selector
-func (c *services) List(selector labels.Selector) (result *api.ServiceList, err error) {
+func (c *services) List(label labels.Selector, field fields.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
-		LabelsSelectorParam(selector).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 	return

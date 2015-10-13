@@ -97,7 +97,7 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything())
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)

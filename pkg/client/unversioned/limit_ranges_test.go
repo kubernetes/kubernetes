@@ -122,7 +122,7 @@ func TestLimitRangeList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: limitRangeList},
 	}
-	response, err := c.Setup(t).LimitRanges(ns).List(labels.Everything())
+	response, err := c.Setup(t).LimitRanges(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 

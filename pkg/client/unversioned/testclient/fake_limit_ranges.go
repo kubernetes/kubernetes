@@ -39,8 +39,8 @@ func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
 	return obj.(*api.LimitRange), err
 }
 
-func (c *FakeLimitRanges) List(label labels.Selector) (*api.LimitRangeList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, label, nil), &api.LimitRangeList{})
+func (c *FakeLimitRanges) List(label labels.Selector, field fields.Selector) (*api.LimitRangeList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, label, field), &api.LimitRangeList{})
 	if obj == nil {
 		return nil, err
 	}
