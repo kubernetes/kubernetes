@@ -211,6 +211,35 @@ func TestNewBootstrapController(t *testing.T) {
 	assert.Equal(controller.PublicServicePort, master.publicReadWritePort)
 }
 
+// TestControllerServicePorts verifies master extraServicePorts are
+// correctly copied into controller
+func TestControllerServicePorts(t *testing.T) {
+	master, _, assert := setUp(t)
+	master.namespaceRegistry = namespace.NewRegistry(nil)
+	master.serviceRegistry = registrytest.NewServiceRegistry()
+	master.endpointRegistry = endpoint.NewRegistry(nil)
+
+	master.extraServicePorts = []api.ServicePort{
+		{
+			Name:       "additional-port-1",
+			Port:       1000,
+			Protocol:   api.ProtocolTCP,
+			TargetPort: util.NewIntOrStringFromInt(1000),
+		},
+		{
+			Name:       "additional-port-2",
+			Port:       1010,
+			Protocol:   api.ProtocolTCP,
+			TargetPort: util.NewIntOrStringFromInt(1010),
+		},
+	}
+
+	controller := master.NewBootstrapController()
+
+	assert.Equal(1000, controller.ExtraServicePorts[0].Port)
+	assert.Equal(1010, controller.ExtraServicePorts[1].Port)
+}
+
 // TestNewHandlerContainer verifies that NewHandlerContainer uses the
 // mux provided
 func TestNewHandlerContainer(t *testing.T) {
