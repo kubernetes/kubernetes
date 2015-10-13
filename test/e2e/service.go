@@ -532,20 +532,12 @@ var _ = Describe("Services", func() {
 		testNotReachable(ip, nodePort1)
 
 		By("hitting the pod through the service's LoadBalancer")
-		i := 1
-		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(3 * time.Second) {
-			service, err = waitForLoadBalancerIngress(f.Client, serviceName, f.Namespace.Name)
-			Expect(err).NotTo(HaveOccurred())
+		service, err = waitForLoadBalancerIngress(f.Client, serviceName, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
 
-			ingress2 := service.Status.LoadBalancer.Ingress[0]
-			if testLoadBalancerReachableInTime(ingress2, 80, 5*time.Second) {
-				break
-			}
-
-			if i%5 == 0 {
-				Logf("Waiting for load-balancer changes (%v elapsed, will retry)", time.Since(start))
-			}
-			i++
+		ingress2 := service.Status.LoadBalancer.Ingress[0]
+		if !testLoadBalancerReachable(ingress2, 80) {
+			Failf("Failed to reach load balancer at ingress: %+v", service)
 		}
 
 		By("changing service " + serviceName + " back to type=ClusterIP")
