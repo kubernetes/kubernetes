@@ -163,7 +163,6 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	models := s.api.Models
-	// TODO: handle required fields here too.
 	model, ok := models.At(typeName)
 	if !ok {
 		return append(allErrs, fmt.Errorf("couldn't find type: %s", typeName))
