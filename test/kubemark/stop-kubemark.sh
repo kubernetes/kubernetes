@@ -19,10 +19,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
+source "${KUBE_ROOT}/cluster/kube-env.sh"
 
 detect-project &> /dev/null
 
-MASTER_NAME="${INSTANCE_PREFIX:-"default"}-kubemark-master"
+MASTER_NAME="${INSTANCE_PREFIX}-kubemark-master"
 
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
@@ -32,10 +33,13 @@ gcloud compute instances delete "${MASTER_NAME}" \
     --quiet \
     --zone "${ZONE}" || true
 
-gcloud compute disks delete \
+gcloud compute disks delete "${MASTER_NAME}"-pd \
       --project "${PROJECT}" \
       --quiet \
-      --zone "${ZONE}" \
-      "${MASTER_NAME}"-pd || true
+      --zone "${ZONE}" \ || true
+
+gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
+	  --project "${PROJECT}" \
+	  --quiet || true
 
 rm -rf "${KUBE_ROOT}/test/kubemark/kubeconfig.loc" &> /dev/null || true

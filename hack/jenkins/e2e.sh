@@ -833,6 +833,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    KUBE_GCE_INSTANCE_PREFIX="kubemark100"
     NUM_MINIONS="10"
     MASTER_SIZE="n1-standard-2"
     MINION_SIZE="n1-standard-1"
@@ -856,6 +857,7 @@ case ${JOB_NAME} in
     MINION_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
     #                                     so NUM_MINIONS x cores_per_minion should
     #                                     be set accordingly.
+    KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
     E2E_ZONE="asia-east1-a"
     KUBEMARK_MASTER_SIZE="n1-standard-16"
     KUBEMARK_NUM_MINIONS="1000"
@@ -1079,7 +1081,7 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   NUM_MINIONS=${KUBEMARK_NUM_MINIONS:-$NUM_MINIONS}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   ./test/kubemark/start-kubemark.sh
-  ./test/kubemark/run-scalability-test.sh && exitcode=0 || exitcode=$?
+  ./test/kubemark/run-e2e-tests.sh && exitcode=0 || exitcode=$?
   ./test/kubemark/stop-kubemark.sh
   NUM_MINIONS=${NUM_MINIONS_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
