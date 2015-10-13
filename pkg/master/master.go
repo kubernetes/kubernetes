@@ -83,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilSets "k8s.io/kubernetes/pkg/util/sets"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
@@ -168,6 +169,15 @@ func (s *StorageDestinations) backends() []string {
 	return backends.List()
 }
 
+// Specifies the overrides for various API group versions.
+// This can be used to enable/disable entire group versions or specific resources.
+type APIGroupVersionOverride struct {
+	// Whether to enable or disable this group version.
+	Disable bool
+	// List of overrides for individual resources in this group version.
+	ResourceOverrides map[string]bool
+}
+
 // Config is a structure used to configure a Master.
 type Config struct {
 	StorageDestinations StorageDestinations
@@ -182,9 +192,8 @@ type Config struct {
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow api versions to be conditionally disabled
-	DisableV1 bool
-	EnableExp bool
+	// Allows api group versions or specific resources to be conditionally enabled/disabled.
+	APIGroupVersionOverrides map[string]APIGroupVersionOverride
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -257,26 +266,25 @@ type Master struct {
 	cacheTimeout          time.Duration
 	minRequestTimeout     time.Duration
 
-	mux                   apiserver.Mux
-	muxHelper             *apiserver.MuxHelper
-	handlerContainer      *restful.Container
-	rootWebService        *restful.WebService
-	enableCoreControllers bool
-	enableLogsSupport     bool
-	enableUISupport       bool
-	enableSwaggerSupport  bool
-	enableProfiling       bool
-	enableWatchCache      bool
-	apiPrefix             string
-	apiGroupPrefix        string
-	corsAllowedOriginList []string
-	authenticator         authenticator.Request
-	authorizer            authorizer.Authorizer
-	admissionControl      admission.Interface
-	masterCount           int
-	v1                    bool
-	exp                   bool
-	requestContextMapper  api.RequestContextMapper
+	mux                      apiserver.Mux
+	muxHelper                *apiserver.MuxHelper
+	handlerContainer         *restful.Container
+	rootWebService           *restful.WebService
+	enableCoreControllers    bool
+	enableLogsSupport        bool
+	enableUISupport          bool
+	enableSwaggerSupport     bool
+	enableProfiling          bool
+	enableWatchCache         bool
+	apiPrefix                string
+	apiGroupPrefix           string
+	corsAllowedOriginList    []string
+	authenticator            authenticator.Request
+	authorizer               authorizer.Authorizer
+	admissionControl         admission.Interface
+	masterCount              int
+	apiGroupVersionOverrides map[string]APIGroupVersionOverride
+	requestContextMapper     api.RequestContextMapper
 
 	// External host is the name that should be used in external (public internet) URLs for this master
 	externalHost string
@@ -421,24 +429,23 @@ func New(c *Config) *Master {
 	}
 
 	m := &Master{
-		serviceClusterIPRange: c.ServiceClusterIPRange,
-		serviceNodePortRange:  c.ServiceNodePortRange,
-		rootWebService:        new(restful.WebService),
-		enableCoreControllers: c.EnableCoreControllers,
-		enableLogsSupport:     c.EnableLogsSupport,
-		enableUISupport:       c.EnableUISupport,
-		enableSwaggerSupport:  c.EnableSwaggerSupport,
-		enableProfiling:       c.EnableProfiling,
-		enableWatchCache:      c.EnableWatchCache,
-		apiPrefix:             c.APIPrefix,
-		apiGroupPrefix:        c.APIGroupPrefix,
-		corsAllowedOriginList: c.CorsAllowedOriginList,
-		authenticator:         c.Authenticator,
-		authorizer:            c.Authorizer,
-		admissionControl:      c.AdmissionControl,
-		v1:                    !c.DisableV1,
-		exp:                   c.EnableExp,
-		requestContextMapper:  c.RequestContextMapper,
+		serviceClusterIPRange:    c.ServiceClusterIPRange,
+		serviceNodePortRange:     c.ServiceNodePortRange,
+		rootWebService:           new(restful.WebService),
+		enableCoreControllers:    c.EnableCoreControllers,
+		enableLogsSupport:        c.EnableLogsSupport,
+		enableUISupport:          c.EnableUISupport,
+		enableSwaggerSupport:     c.EnableSwaggerSupport,
+		enableProfiling:          c.EnableProfiling,
+		enableWatchCache:         c.EnableWatchCache,
+		apiPrefix:                c.APIPrefix,
+		apiGroupPrefix:           c.APIGroupPrefix,
+		corsAllowedOriginList:    c.CorsAllowedOriginList,
+		authenticator:            c.Authenticator,
+		authorizer:               c.Authorizer,
+		admissionControl:         c.AdmissionControl,
+		apiGroupVersionOverrides: c.APIGroupVersionOverrides,
+		requestContextMapper:     c.RequestContextMapper,
 
 		cacheTimeout:      c.CacheTimeout,
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
@@ -636,7 +643,8 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{}
-	if m.v1 {
+	// Install v1 unless disabled.
+	if !m.apiGroupVersionOverrides["api/v1"].Disable {
 		if err := m.api_v1().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1: %v", err)
 		}
@@ -651,7 +659,8 @@ func (m *Master) init(c *Config) {
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
-	if m.exp {
+	// Install extensions unless disabled.
+	if !m.apiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups["extensions"].Default
 		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
 
@@ -1029,44 +1038,70 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 // experimental returns the resources and codec for the experimental api
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
-	controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.get("", "replicationControllers"))
+	// All resources except these are disabled by default.
+	enabledResources := utilSets.NewString("jobs", "horizontalpodautoscalers", "ingress")
+	resourceOverrides := m.apiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		enabled, ok := resourceOverrides[resource]
+		if !ok {
+			return enabledResources.Has(resource)
+		}
+		return enabled
+	}
 	dbClient := func(resource string) storage.Interface {
 		return c.StorageDestinations.get("extensions", resource)
 	}
-	autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
-	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"))
-	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"))
-	deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
-	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"))
-	ingressStorage := ingressetcd.NewREST(dbClient("ingress"))
 
-	thirdPartyControl := ThirdPartyController{
-		master: m,
-		thirdPartyResourceRegistry: thirdPartyResourceStorage,
+	storage := map[string]rest.Storage{}
+	if isEnabled("replicationcontrollers") {
+		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.get("", "replicationControllers"))
+		storage["replicationcontrollers"] = controllerStorage.ReplicationController
+		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
-	go func() {
-		util.Forever(func() {
-			if err := thirdPartyControl.SyncResources(); err != nil {
-				glog.Warningf("third party resource sync failed: %v", err)
-			}
-		}, 10*time.Second)
-	}()
-	storage := map[string]rest.Storage{
-		strings.ToLower("replicationControllers"):          controllerStorage.ReplicationController,
-		strings.ToLower("replicationControllers/scale"):    controllerStorage.Scale,
-		strings.ToLower("horizontalpodautoscalers"):        autoscalerStorage,
-		strings.ToLower("horizontalpodautoscalers/status"): autoscalerStatusStorage,
-		strings.ToLower("thirdpartyresources"):             thirdPartyResourceStorage,
-		strings.ToLower("daemonsets"):                      daemonSetStorage,
-		strings.ToLower("daemonsets/status"):               daemonSetStatusStorage,
-		strings.ToLower("deployments"):                     deploymentStorage.Deployment,
-		strings.ToLower("deployments/scale"):               deploymentStorage.Scale,
-		strings.ToLower("jobs"):                            jobStorage,
-		strings.ToLower("jobs/status"):                     jobStatusStorage,
-		strings.ToLower("ingress"):                         ingressStorage,
+	if isEnabled("horizontalpodautoscalers") {
+		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
+		storage["horizontalpodautoscalers"] = autoscalerStorage
+		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
+	}
+	if isEnabled("thirdpartyresources") {
+		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"))
+		thirdPartyControl := ThirdPartyController{
+			master: m,
+			thirdPartyResourceRegistry: thirdPartyResourceStorage,
+		}
+		go func() {
+			util.Forever(func() {
+				if err := thirdPartyControl.SyncResources(); err != nil {
+					glog.Warningf("third party resource sync failed: %v", err)
+				}
+			}, 10*time.Second)
+		}()
+
+		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
-	expMeta := latest.GroupOrDie("extensions")
+	if isEnabled("daemonsets") {
+		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"))
+		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if isEnabled("deployments") {
+		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/scale"] = deploymentStorage.Scale
+	}
+	if isEnabled("jobs") {
+		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"))
+		storage["jobs"] = jobStorage
+		storage["jobs/status"] = jobStatusStorage
+	}
+	if isEnabled("ingress") {
+		ingressStorage := ingressetcd.NewREST(dbClient("ingress"))
+		storage["ingress"] = ingressStorage
+	}
+
+	extensionsGroup := latest.GroupOrDie("extensions")
 
 	return &apiserver.APIGroupVersion{
 		Root: m.apiGroupPrefix,
@@ -1075,11 +1110,11 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:        expMeta.RESTMapper,
-		Codec:         expMeta.Codec,
-		Linker:        expMeta.SelfLinker,
+		Mapper:        extensionsGroup.RESTMapper,
+		Codec:         extensionsGroup.Codec,
+		Linker:        extensionsGroup.SelfLinker,
 		Storage:       storage,
-		Version:       expMeta.GroupVersion,
+		Version:       extensionsGroup.GroupVersion,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Admit:   m.admissionControl,

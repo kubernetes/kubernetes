@@ -154,3 +154,96 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestParseRuntimeConfig(t *testing.T) {
+	testCases := []struct {
+		runtimeConfig            map[string]string
+		apiGroupVersionOverrides map[string]master.APIGroupVersionOverride
+		err                      bool
+	}{
+		{
+			runtimeConfig:            map[string]string{},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{},
+			err: false,
+		},
+		{
+			// Cannot override v1 resources.
+			runtimeConfig: map[string]string{
+				"api/v1/pods": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{},
+			err: true,
+		},
+		{
+			// Disable v1.
+			runtimeConfig: map[string]string{
+				"api/v1": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"api/v1": {
+					Disable: true,
+				},
+			},
+			err: false,
+		},
+		{
+			// Disable extensions.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"extensions/v1beta1": {
+					Disable: true,
+				},
+			},
+			err: false,
+		},
+		{
+			// Disable deployments.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"extensions/v1beta1": {
+					ResourceOverrides: map[string]bool{
+						"deployments": false,
+					},
+				},
+			},
+			err: false,
+		},
+		{
+			// Enable deployments and disable jobs.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "true",
+				"extensions/v1beta1/jobs":        "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"extensions/v1beta1": {
+					ResourceOverrides: map[string]bool{
+						"deployments": true,
+						"jobs":        false,
+					},
+				},
+			},
+			err: false,
+		},
+	}
+	for _, test := range testCases {
+		s := &APIServer{
+			RuntimeConfig: test.runtimeConfig,
+		}
+		apiGroupVersionOverrides, err := s.parseRuntimeConfig()
+
+		if err == nil && test.err {
+			t.Fatalf("expected error for test: %q", test)
+		} else if err != nil && !test.err {
+			t.Fatalf("unexpected error: %s, for test: %q", err, test)
+		}
+
+		if err == nil && !reflect.DeepEqual(apiGroupVersionOverrides, test.apiGroupVersionOverrides) {
+			t.Fatalf("unexpected apiGroupVersionOverrides. Actual: %q, expected: %q", apiGroupVersionOverrides, test.apiGroupVersionOverrides)
+		}
+	}
+
+}

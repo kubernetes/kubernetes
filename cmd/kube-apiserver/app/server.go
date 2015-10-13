@@ -374,29 +374,10 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
-	// "api/all=false" allows users to selectively enable specific api versions.
-	disableAllAPIs := false
-	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
-	if ok && allAPIFlagValue == "false" {
-		disableAllAPIs = true
+	apiGroupVersionOverrides, err := s.parseRuntimeConfig()
+	if err != nil {
+		glog.Fatalf("error in parsing runtime-config: %s", err)
 	}
-
-	// "api/legacy=false" allows users to disable legacy api versions.
-	disableLegacyAPIs := false
-	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
-	if ok && legacyAPIFlagValue == "false" {
-		disableLegacyAPIs = true
-	}
-	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
-
-	// "api/v1={true|false} allows users to enable/disable v1 API.
-	// This takes preference over api/all and api/legacy, if specified.
-	disableV1 := disableAllAPIs
-	disableV1 = !s.getRuntimeConfigValue("api/v1", !disableV1)
-
-	// "extensions/v1beta1={true|false} allows users to enable/disable the experimental API.
-	// This takes preference over api/all, if specified.
-	enableExp := s.getRuntimeConfigValue("extensions/v1beta1", false)
 
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -424,17 +405,17 @@ func (s *APIServer) Run(_ []string) error {
 	}
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
-	if enableExp {
+	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		expGroup, err := latest.Group("extensions")
 		if err != nil {
-			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
 		if _, found := storageVersions[expGroup.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.Group, storageVersions)
 		}
 		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.Group], s.EtcdPathPrefix)
 		if err != nil {
-			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
 		storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 	}
@@ -508,37 +489,36 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 	config := &master.Config{
-		StorageDestinations:    storageDestinations,
-		StorageVersions:        storageVersions,
-		EventTTL:               s.EventTTL,
-		KubeletClient:          kubeletClient,
-		ServiceClusterIPRange:  &n,
-		EnableCoreControllers:  true,
-		EnableLogsSupport:      s.EnableLogsSupport,
-		EnableUISupport:        true,
-		EnableSwaggerSupport:   true,
-		EnableProfiling:        s.EnableProfiling,
-		EnableWatchCache:       s.EnableWatchCache,
-		EnableIndex:            true,
-		APIPrefix:              s.APIPrefix,
-		APIGroupPrefix:         s.APIGroupPrefix,
-		CorsAllowedOriginList:  s.CorsAllowedOriginList,
-		ReadWritePort:          s.SecurePort,
-		PublicAddress:          s.AdvertiseAddress,
-		Authenticator:          authenticator,
-		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
-		Authorizer:             authorizer,
-		AdmissionControl:       admissionController,
-		DisableV1:              disableV1,
-		EnableExp:              enableExp,
-		MasterServiceNamespace: s.MasterServiceNamespace,
-		ClusterName:            s.ClusterName,
-		ExternalHost:           s.ExternalHost,
-		MinRequestTimeout:      s.MinRequestTimeout,
-		SSHUser:                s.SSHUser,
-		SSHKeyfile:             s.SSHKeyfile,
-		InstallSSHKey:          installSSH,
-		ServiceNodePortRange:   s.ServiceNodePortRange,
+		StorageDestinations:      storageDestinations,
+		StorageVersions:          storageVersions,
+		EventTTL:                 s.EventTTL,
+		KubeletClient:            kubeletClient,
+		ServiceClusterIPRange:    &n,
+		EnableCoreControllers:    true,
+		EnableLogsSupport:        s.EnableLogsSupport,
+		EnableUISupport:          true,
+		EnableSwaggerSupport:     true,
+		EnableProfiling:          s.EnableProfiling,
+		EnableWatchCache:         s.EnableWatchCache,
+		EnableIndex:              true,
+		APIPrefix:                s.APIPrefix,
+		APIGroupPrefix:           s.APIGroupPrefix,
+		CorsAllowedOriginList:    s.CorsAllowedOriginList,
+		ReadWritePort:            s.SecurePort,
+		PublicAddress:            s.AdvertiseAddress,
+		Authenticator:            authenticator,
+		SupportsBasicAuth:        len(s.BasicAuthFile) > 0,
+		Authorizer:               authorizer,
+		AdmissionControl:         admissionController,
+		APIGroupVersionOverrides: apiGroupVersionOverrides,
+		MasterServiceNamespace:   s.MasterServiceNamespace,
+		ClusterName:              s.ClusterName,
+		ExternalHost:             s.ExternalHost,
+		MinRequestTimeout:        s.MinRequestTimeout,
+		SSHUser:                  s.SSHUser,
+		SSHKeyfile:               s.SSHKeyfile,
+		InstallSSHKey:            installSSH,
+		ServiceNodePortRange:     s.ServiceNodePortRange,
 	}
 	m := master.New(config)
 
@@ -649,4 +629,62 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		return boolValue
 	}
 	return defaultValue
+}
+
+// Parses the given runtime-config and formats it into map[string]ApiGroupVersionOverride
+func (s *APIServer) parseRuntimeConfig() (map[string]master.APIGroupVersionOverride, error) {
+	// "api/all=false" allows users to selectively enable specific api versions.
+	disableAllAPIs := false
+	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
+	if ok && allAPIFlagValue == "false" {
+		disableAllAPIs = true
+	}
+
+	// "api/legacy=false" allows users to disable legacy api versions.
+	disableLegacyAPIs := false
+	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
+	if ok && legacyAPIFlagValue == "false" {
+		disableLegacyAPIs = true
+	}
+	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
+
+	// "api/v1={true|false} allows users to enable/disable v1 API.
+	// This takes preference over api/all and api/legacy, if specified.
+	disableV1 := disableAllAPIs
+	v1GroupVersion := "api/v1"
+	disableV1 = !s.getRuntimeConfigValue(v1GroupVersion, !disableV1)
+	apiGroupVersionOverrides := map[string]master.APIGroupVersionOverride{}
+	if disableV1 {
+		apiGroupVersionOverrides[v1GroupVersion] = master.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
+
+	// "extensions/v1beta1={true|false} allows users to enable/disable the extensions API.
+	// This takes preference over api/all, if specified.
+	disableExtensions := disableAllAPIs
+	extensionsGroupVersion := "extensions/v1beta1"
+	// TODO: Make this a loop over all group/versions when there are more of them.
+	disableExtensions = !s.getRuntimeConfigValue(extensionsGroupVersion, !disableExtensions)
+	if disableExtensions {
+		apiGroupVersionOverrides[extensionsGroupVersion] = master.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
+
+	for key := range s.RuntimeConfig {
+		if strings.HasPrefix(key, v1GroupVersion+"/") {
+			return nil, fmt.Errorf("api/v1 resources cannot be enabled/disabled individually")
+		} else if strings.HasPrefix(key, extensionsGroupVersion+"/") {
+			resource := strings.TrimPrefix(key, extensionsGroupVersion+"/")
+
+			apiGroupVersionOverride := apiGroupVersionOverrides[extensionsGroupVersion]
+			if apiGroupVersionOverride.ResourceOverrides == nil {
+				apiGroupVersionOverride.ResourceOverrides = map[string]bool{}
+			}
+			apiGroupVersionOverride.ResourceOverrides[resource] = s.getRuntimeConfigValue(key, false)
+			apiGroupVersionOverrides[extensionsGroupVersion] = apiGroupVersionOverride
+		}
+	}
+	return apiGroupVersionOverrides, nil
 }
