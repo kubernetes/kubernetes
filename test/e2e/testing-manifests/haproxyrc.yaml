@@ -16,8 +16,6 @@ spec:
         app: service-loadbalancer
         version: v1
     spec:
-      nodeSelector:
-        role: loadbalancer
       containers:
       - image: gcr.io/google_containers/servicelb:0.1
         imagePullPolicy: Always
