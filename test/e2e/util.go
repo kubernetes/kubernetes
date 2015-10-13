@@ -55,6 +55,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
 const (
@@ -1080,10 +1082,29 @@ func tryKill(cmd *exec.Cmd) {
 	}
 }
 
-// testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
-// the exact container log and searches for lines of expected output.
-func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
+// testContainerOutput runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a substring matcher.
+func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
+	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, ContainSubstring)
+}
+
+// testContainerOutputRegexp runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a regexp matcher.
+func testContainerOutputRegexp(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
+	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, MatchRegexp)
+}
+
+// testContainerOutputMatcher runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using the given matcher.
+func testContainerOutputMatcher(scenarioName string,
+	c *client.Client,
+	pod *api.Pod,
+	containerIndex int,
+	expectedOutput []string, ns string,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name, api.NewDeleteOptions(0))
@@ -1139,7 +1160,7 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 	}
 
 	for _, m := range expectedOutput {
-		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
+		Expect(string(logs)).To(matcher(m), "%q in container output", m)
 	}
 }
 
