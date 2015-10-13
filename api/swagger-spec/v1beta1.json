@@ -2076,7 +2076,7 @@
   "models": {
    "v1beta1.HorizontalPodAutoscalerList": {
     "id": "v1beta1.HorizontalPodAutoscalerList",
-    "description": "HorizontalPodAutoscalerList is a list of HorizontalPodAutoscalers.",
+    "description": "list of horizontal pod autoscaler objects.",
     "required": [
      "items"
     ],
@@ -2098,7 +2098,7 @@
       "items": {
        "$ref": "v1beta1.HorizontalPodAutoscaler"
       },
-      "description": "Items is the list of HorizontalPodAutoscalers."
+      "description": "list of horizontal pod autoscaler objects."
      }
     }
    },
@@ -2118,7 +2118,7 @@
    },
    "v1beta1.HorizontalPodAutoscaler": {
     "id": "v1beta1.HorizontalPodAutoscaler",
-    "description": "HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.",
+    "description": "configuration of a horizontal pod autoscaler.",
     "properties": {
      "kind": {
       "type": "string",
@@ -2134,11 +2134,11 @@
      },
      "spec": {
       "$ref": "v1beta1.HorizontalPodAutoscalerSpec",
-      "description": "Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
      },
      "status": {
       "$ref": "v1beta1.HorizontalPodAutoscalerStatus",
-      "description": "Status represents the current information about the autoscaler."
+      "description": "current information about the autoscaler."
      }
     }
    },
@@ -2200,31 +2200,29 @@
    },
    "v1beta1.HorizontalPodAutoscalerSpec": {
     "id": "v1beta1.HorizontalPodAutoscalerSpec",
-    "description": "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
+    "description": "specification of a horizontal pod autoscaler.",
     "required": [
      "scaleRef",
-     "minReplicas",
-     "maxReplicas",
-     "target"
+     "maxReplicas"
     ],
     "properties": {
      "scaleRef": {
       "$ref": "v1beta1.SubresourceReference",
-      "description": "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec."
+      "description": "reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modifying its spec."
      },
      "minReplicas": {
       "type": "integer",
       "format": "int32",
-      "description": "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler."
+      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
      },
      "maxReplicas": {
       "type": "integer",
       "format": "int32",
-      "description": "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas."
+      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
      },
-     "target": {
-      "$ref": "v1beta1.ResourceConsumption",
-      "description": "Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Currently two types of resources are supported: \"cpu\" and \"memory\"."
+     "cpuUtilization": {
+      "$ref": "v1beta1.CPUTargetUtilization",
+      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified it defaults to the target CPU utilization at 80% of the requested resources."
      }
     }
    },
@@ -2254,46 +2252,50 @@
      }
     }
    },
-   "v1beta1.ResourceConsumption": {
-    "id": "v1beta1.ResourceConsumption",
-    "description": "ResourceConsumption is an object for specifying average resource consumption of a particular resource.",
+   "v1beta1.CPUTargetUtilization": {
+    "id": "v1beta1.CPUTargetUtilization",
+    "required": [
+     "targetPercentage"
+    ],
     "properties": {
-     "resource": {
-      "type": "string",
-      "description": "Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status."
-     },
-     "quantity": {
-      "type": "string",
-      "description": "Quantity specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status."
+     "targetPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use."
      }
     }
    },
    "v1beta1.HorizontalPodAutoscalerStatus": {
     "id": "v1beta1.HorizontalPodAutoscalerStatus",
-    "description": "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
+    "description": "current status of a horizontal pod autoscaler",
     "required": [
      "currentReplicas",
-     "desiredReplicas",
-     "currentConsumption"
+     "desiredReplicas"
     ],
     "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "most recent generation observed by this autoscaler."
+     },
+     "lastScaleTime": {
+      "type": "string",
+      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
+     },
      "currentReplicas": {
       "type": "integer",
       "format": "int32",
-      "description": "CurrentReplicas is the number of replicas of pods managed by this autoscaler."
+      "description": "current number of replicas of pods managed by this autoscaler."
      },
      "desiredReplicas": {
       "type": "integer",
       "format": "int32",
-      "description": "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler."
+      "description": "desired number of replicas of pods managed by this autoscaler."
      },
-     "currentConsumption": {
-      "$ref": "v1beta1.ResourceConsumption",
-      "description": "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\"."
-     },
-     "lastScaleTimestamp": {
-      "type": "string",
-      "description": "LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to controll how often the number of pods is changed."
+     "currentCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
      }
     }
    },

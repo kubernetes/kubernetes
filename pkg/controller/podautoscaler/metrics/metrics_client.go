@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,85 +39,110 @@ const (
 
 var heapsterQueryStart = -5 * time.Minute
 
-// An interface for getting metrics for pods.
+// MetricsClient is an interface for getting metrics for pods.
 type MetricsClient interface {
-	ResourceConsumption(namespace string) ResourceConsumptionClient
+	// GetCPUUtilization returns average utilization over all pods
+	// represented as a percent of requested CPU, e.g. 70 means that
+	// an average pod uses 70% of the requested CPU.
+	GetCPUUtilization(namespace string, selector map[string]string) (*int, error)
 }
 
-type ResourceConsumptionClient interface {
-	// Gets average resource consumption for pods under the given selector.
-	Get(resourceName api.ResourceName, selector map[string]string) (*extensions.ResourceConsumption, error)
+// ResourceConsumption specifies consumption of a particular resource.
+type ResourceConsumption struct {
+	Resource api.ResourceName
+	Quantity resource.Quantity
 }
 
 // Aggregates results into ResourceConsumption. Also returns number of
 // pods included in the aggregation.
-type metricAggregator func(heapster.MetricResultList) (extensions.ResourceConsumption, int)
+type metricAggregator func(heapster.MetricResultList) (ResourceConsumption, int)
 
 type metricDefinition struct {
 	name       string
 	aggregator metricAggregator
 }
 
-// Heapster-based implementation of MetricsClient
+// HeapsterMetricsClient is Heapster-based implementation of MetricsClient
 type HeapsterMetricsClient struct {
-	client client.Interface
-}
-
-type HeapsterResourceConsumptionClient struct {
-	namespace           string
 	client              client.Interface
 	resourceDefinitions map[api.ResourceName]metricDefinition
 }
 
-func NewHeapsterMetricsClient(client client.Interface) *HeapsterMetricsClient {
-	return &HeapsterMetricsClient{client: client}
-}
-
 var heapsterMetricDefinitions = map[api.ResourceName]metricDefinition{
 	api.ResourceCPU: {"cpu-usage",
-		func(metrics heapster.MetricResultList) (extensions.ResourceConsumption, int) {
+		func(metrics heapster.MetricResultList) (ResourceConsumption, int) {
 			sum, count := calculateSumFromLatestSample(metrics)
 			value := "0"
 			if count > 0 {
 				// assumes that cpu usage is in millis
 				value = fmt.Sprintf("%dm", sum/uint64(count))
 			}
-			return extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(value)}, count
+			return ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(value)}, count
 		}},
 	api.ResourceMemory: {"memory-usage",
-		func(metrics heapster.MetricResultList) (extensions.ResourceConsumption, int) {
+		func(metrics heapster.MetricResultList) (ResourceConsumption, int) {
 			sum, count := calculateSumFromLatestSample(metrics)
 			value := int64(0)
 			if count > 0 {
 				value = int64(sum) / int64(count)
 			}
-			return extensions.ResourceConsumption{Resource: api.ResourceMemory, Quantity: *resource.NewQuantity(value, resource.DecimalSI)}, count
+			return ResourceConsumption{Resource: api.ResourceMemory, Quantity: *resource.NewQuantity(value, resource.DecimalSI)}, count
 		}},
 }
 
-func (h *HeapsterMetricsClient) ResourceConsumption(namespace string) ResourceConsumptionClient {
-	return &HeapsterResourceConsumptionClient{
-		namespace:           namespace,
-		client:              h.client,
+// NewHeapsterMetricsClient returns a new instance of Heapster-based implementation of MetricsClient interface.
+func NewHeapsterMetricsClient(client client.Interface) *HeapsterMetricsClient {
+	return &HeapsterMetricsClient{
+		client:              client,
 		resourceDefinitions: heapsterMetricDefinitions,
 	}
 }
 
-func (h *HeapsterResourceConsumptionClient) Get(resourceName api.ResourceName, selector map[string]string) (*extensions.ResourceConsumption, error) {
-	podList, err := h.client.Pods(h.namespace).
+func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map[string]string) (*int, error) {
+	consumption, request, err := h.GetResourceConsumptionAndRequest(api.ResourceCPU, namespace, selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CPU consumption and request: %v", err)
+	}
+	utilization := new(int)
+	*utilization = int(float64(consumption.Quantity.MilliValue()) / float64(request.MilliValue()) * 100)
+	return utilization, nil
+}
+
+func (h *HeapsterMetricsClient) GetResourceConsumptionAndRequest(resourceName api.ResourceName, namespace string, selector map[string]string) (consumption *ResourceConsumption, request *resource.Quantity, err error) {
+	podList, err := h.client.Pods(namespace).
 		List(labels.SelectorFromSet(labels.Set(selector)), fields.Everything())
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod list: %v", err)
+		return nil, nil, fmt.Errorf("failed to get pod list: %v", err)
 	}
 	podNames := []string{}
+	sum := resource.MustParse("0")
+	missing := false
 	for _, pod := range podList.Items {
 		podNames = append(podNames, pod.Name)
+		for _, container := range pod.Spec.Containers {
+			containerRequest := container.Resources.Requests[resourceName]
+			if containerRequest.Amount != nil {
+				sum.Add(containerRequest)
+			} else {
+				missing = true
+			}
+		}
 	}
-	return h.getForPods(resourceName, podNames)
+	if missing || sum.Cmp(resource.MustParse("0")) == 0 {
+		return nil, nil, fmt.Errorf("some pods do not have request for %s", resourceName)
+	}
+	glog.Infof("Sum of %s requested: %v", resourceName, sum)
+	avg := resource.MustParse(fmt.Sprintf("%dm", sum.MilliValue()/int64(len(podList.Items))))
+	request = &avg
+	consumption, err = h.getForPods(resourceName, namespace, podNames)
+	if err != nil {
+		return nil, nil, err
+	}
+	return consumption, request, nil
 }
 
-func (h *HeapsterResourceConsumptionClient) getForPods(resourceName api.ResourceName, podNames []string) (*extensions.ResourceConsumption, error) {
+func (h *HeapsterMetricsClient) getForPods(resourceName api.ResourceName, namespace string, podNames []string) (*ResourceConsumption, error) {
 	metricSpec, metricDefined := h.resourceDefinitions[resourceName]
 	if !metricDefined {
 		return nil, fmt.Errorf("heapster metric not defined for %v", resourceName)
@@ -127,7 +151,7 @@ func (h *HeapsterResourceConsumptionClient) getForPods(resourceName api.Resource
 
 	startTime := now.Add(heapsterQueryStart)
 	metricPath := fmt.Sprintf("/api/v1/model/namespaces/%s/pod-list/%s/metrics/%s",
-		h.namespace,
+		namespace,
 		strings.Join(podNames, ","),
 		metricSpec.name)
 

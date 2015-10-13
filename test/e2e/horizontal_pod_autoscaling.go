@@ -17,10 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -34,7 +31,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	f := NewFramework("horizontal-pod-autoscaling")
 
 	// CPU tests
-	It("[Skipped][Autoscaling Suite] should scale from 1 pod to 3 pods and from 3 to 5 (scale resource: CPU)", func() {
+	It("[Skipped] should scale from 1 pod to 3 pods and from 3 to 5 (scale resource: CPU)", func() {
 		rc = NewDynamicResourceConsumer("rc", 1, 250, 0, 400, 100, f)
 		defer rc.CleanUp()
 		createCPUHorizontalPodAutoscaler(rc, "0.1")
@@ -43,7 +40,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 		rc.WaitForReplicas(5)
 	})
 
-	It("[Skipped][Autoscaling Suite] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: CPU)", func() {
+	It("[Skipped] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: CPU)", func() {
 		rc = NewDynamicResourceConsumer("rc", 5, 700, 0, 200, 100, f)
 		defer rc.CleanUp()
 		createCPUHorizontalPodAutoscaler(rc, "0.3")
@@ -53,7 +50,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	})
 
 	// Memory tests
-	It("[Skipped][Autoscaling Suite] should scale from 1 pod to 3 pods and from 3 to 5 (scale resource: Memory)", func() {
+	It("[Skipped] should scale from 1 pod to 3 pods and from 3 to 5 (scale resource: Memory)", func() {
 		rc = NewDynamicResourceConsumer("rc", 1, 0, 2200, 100, 2500, f)
 		defer rc.CleanUp()
 		createMemoryHorizontalPodAutoscaler(rc, "1000")
@@ -62,7 +59,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 		rc.WaitForReplicas(5)
 	})
 
-	It("[Skipped][Autoscaling Suite] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: Memory)", func() {
+	It("[Skipped] should scale from 5 pods to 3 pods and from 3 to 1 (scale resource: Memory)", func() {
 		rc = NewDynamicResourceConsumer("rc", 5, 0, 2200, 100, 2500, f)
 		defer rc.CleanUp()
 		createMemoryHorizontalPodAutoscaler(rc, "1000")
@@ -152,46 +149,12 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 })
 
 func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
-	hpa := &extensions.HorizontalPodAutoscaler{
-		ObjectMeta: api.ObjectMeta{
-			Name:      rc.name,
-			Namespace: rc.framework.Namespace.Name,
-		},
-		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: &extensions.SubresourceReference{
-				Kind:        kind,
-				Name:        rc.name,
-				Namespace:   rc.framework.Namespace.Name,
-				Subresource: subresource,
-			},
-			MinReplicas: 1,
-			MaxReplicas: 5,
-			Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
-		},
-	}
-	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
-	expectNoError(errHPA)
+	glog.Fatal("createCPUHorizontalPodAutoscaler not implemented!")
+	// TODO: reimplemente e2e tests for the new API.
 }
 
 // argument memory is in megabytes
 func createMemoryHorizontalPodAutoscaler(rc *ResourceConsumer, memory string) {
-	hpa := &extensions.HorizontalPodAutoscaler{
-		ObjectMeta: api.ObjectMeta{
-			Name:      rc.name,
-			Namespace: rc.framework.Namespace.Name,
-		},
-		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: &extensions.SubresourceReference{
-				Kind:        kind,
-				Name:        rc.name,
-				Namespace:   rc.framework.Namespace.Name,
-				Subresource: subresource,
-			},
-			MinReplicas: 1,
-			MaxReplicas: 5,
-			Target:      extensions.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
-		},
-	}
-	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
-	expectNoError(errHPA)
+	glog.Fatal("createMemoryHorizontalPodAutoscaler not implemented!")
+	// TODO: reimplemente e2e tests for the new API.
 }

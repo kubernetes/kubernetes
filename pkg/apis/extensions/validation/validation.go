@@ -51,37 +51,19 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 	return apivalidation.ValidateReplicationControllerName(name, prefix)
 }
 
-func validateResourceConsumption(consumption *extensions.ResourceConsumption, fieldName string) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
-	resource := consumption.Resource.String()
-	if resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
-		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".resource", resource, "resource not supported by autoscaler"))
-	}
-	quantity := consumption.Quantity.Value()
-	if quantity < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".quantity", quantity, "must be non-negative"))
-	}
-	return allErrs
-}
-
 func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if autoscaler.MinReplicas < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, isNegativeErrorMsg))
+	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, `must be bigger or equal to 1`))
 	}
-	if autoscaler.MaxReplicas < autoscaler.MinReplicas {
+	if autoscaler.MaxReplicas < 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to 1`))
+	}
+	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
-	if autoscaler.ScaleRef == nil {
-		allErrs = append(allErrs, errs.NewFieldRequired("scaleRef"))
-	}
-	resource := autoscaler.Target.Resource.String()
-	if resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("target.resource", resource, "resource not supported by autoscaler"))
-	}
-	quantity := autoscaler.Target.Quantity.Value()
-	if quantity < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("target.quantity", quantity, isNegativeErrorMsg))
+	if autoscaler.CPUUtilization != nil && autoscaler.CPUUtilization.TargetPercentage < 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, isNegativeErrorMsg))
 	}
 	return allErrs
 }
@@ -107,9 +89,6 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *exte
 	status := controller.Status
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentReplicas), "currentReplicas")...)
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredReplicas), "desiredReplicas")...)
-	if status.CurrentConsumption != nil {
-		allErrs = append(allErrs, validateResourceConsumption(status.CurrentConsumption, "currentConsumption")...)
-	}
 	return allErrs
 }
 

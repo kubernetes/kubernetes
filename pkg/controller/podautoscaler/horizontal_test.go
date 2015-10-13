@@ -58,12 +58,13 @@ type testCase struct {
 	maxReplicas     int
 	initialReplicas int
 	desiredReplicas int
-	targetResource  api.ResourceName
-	targetLevel     resource.Quantity
-	reportedLevels  []uint64
-	scaleUpdated    bool
-	eventCreated    bool
-	verifyEvents    bool
+	// CPU target utilization as a percentage of the requested resources.
+	CPUTarget           int
+	reportedLevels      []uint64
+	reportedCPURequests []resource.Quantity
+	scaleUpdated        bool
+	eventCreated        bool
+	verifyEvents        bool
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
@@ -86,18 +87,20 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 					},
 					Spec: extensions.HorizontalPodAutoscalerSpec{
-						ScaleRef: &extensions.SubresourceReference{
+						ScaleRef: extensions.SubresourceReference{
 							Kind:        "replicationController",
 							Name:        rcName,
 							Namespace:   namespace,
 							Subresource: "scale",
 						},
-						MinReplicas: tc.minReplicas,
+						MinReplicas: &tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
-						Target:      extensions.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
 					},
 				},
 			},
+		}
+		if tc.CPUTarget > 0.0 {
+			obj.Items[0].Spec.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: tc.CPUTarget}
 		}
 		return true, obj, nil
 	})
@@ -121,7 +124,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 
 	fakeClient.AddReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &api.PodList{}
-		for i := 0; i < tc.initialReplicas; i++ {
+		for i := 0; i < len(tc.reportedCPURequests); i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := api.Pod{
 				Status: api.PodStatus{
@@ -132,6 +135,17 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 					Namespace: namespace,
 					Labels: map[string]string{
 						"name": podNamePrefix,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: tc.reportedCPURequests[i],
+								},
+							},
+						},
 					},
 				},
 			}
@@ -202,160 +216,148 @@ func (tc *testCase) runTest(t *testing.T) {
 	tc.verifyResults(t)
 }
 
-func TestCPU(t *testing.T) {
-	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 1,
-		desiredReplicas: 2,
-		targetResource:  api.ResourceCPU,
-		targetLevel:     resource.MustParse("0.1"),
-		reportedLevels:  []uint64{200},
-	}
-	tc.runTest(t)
-}
-
-func TestMemory(t *testing.T) {
-	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 1,
-		desiredReplicas: 2,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{2000},
-	}
-	tc.runTest(t)
-}
-
 func TestScaleUp(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     6,
-		initialReplicas: 3,
-		desiredReplicas: 5,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("3k"),
-		reportedLevels:  []uint64{3000, 5000, 7000},
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     3,
+		desiredReplicas:     5,
+		CPUTarget:           30,
+		reportedLevels:      []uint64{300, 500, 700},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
 }
 
 func TestScaleDown(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     6,
-		initialReplicas: 5,
-		desiredReplicas: 3,
-		targetResource:  api.ResourceCPU,
-		targetLevel:     resource.MustParse("0.5"),
-		reportedLevels:  []uint64{100, 300, 500, 250, 250},
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     5,
+		desiredReplicas:     3,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
 }
 
 func TestTolerance(t *testing.T) {
 	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 3,
-		desiredReplicas: 3,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{1010, 1030, 1020},
+		minReplicas:         1,
+		maxReplicas:         5,
+		initialReplicas:     3,
+		desiredReplicas:     3,
+		CPUTarget:           100,
+		reportedLevels:      []uint64{1010, 1030, 1020},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 	}
 	tc.runTest(t)
 }
 
 func TestMinReplicas(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     5,
-		initialReplicas: 3,
-		desiredReplicas: 2,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{10, 95, 10},
+		minReplicas:         2,
+		maxReplicas:         5,
+		initialReplicas:     3,
+		desiredReplicas:     2,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{10, 95, 10},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 	}
 	tc.runTest(t)
 }
 
 func TestMaxReplicas(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     5,
-		initialReplicas: 3,
-		desiredReplicas: 5,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{8000, 9500, 1000},
+		minReplicas:         2,
+		maxReplicas:         5,
+		initialReplicas:     3,
+		desiredReplicas:     5,
+		CPUTarget:           90,
+		reportedLevels:      []uint64{8000, 9500, 1000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 	}
 	tc.runTest(t)
 }
 
 func TestSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     6,
-		initialReplicas: 4,
-		desiredReplicas: 4,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{4000, 9500, 3000, 7000, 3200, 2000},
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     4,
+		desiredReplicas:     4,
+		CPUTarget:           100,
+		reportedLevels:      []uint64{4000, 9500, 3000, 7000, 3200, 2000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
 }
 
 func TestMissingMetrics(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     6,
-		initialReplicas: 4,
-		desiredReplicas: 4,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{400, 95},
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     4,
+		desiredReplicas:     4,
+		CPUTarget:           100,
+		reportedLevels:      []uint64{400, 95},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
 }
 
 func TestEmptyMetrics(t *testing.T) {
 	tc := testCase{
-		minReplicas:     2,
-		maxReplicas:     6,
-		initialReplicas: 4,
-		desiredReplicas: 4,
-		targetResource:  api.ResourceMemory,
-		targetLevel:     resource.MustParse("1k"),
-		reportedLevels:  []uint64{},
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     4,
+		desiredReplicas:     4,
+		CPUTarget:           100,
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
+func TestEmptyCPURequest(t *testing.T) {
+	tc := testCase{
+		minReplicas:     1,
+		maxReplicas:     5,
+		initialReplicas: 1,
+		desiredReplicas: 1,
+		CPUTarget:       100,
+		reportedLevels:  []uint64{200},
 	}
 	tc.runTest(t)
 }
 
 func TestEventCreated(t *testing.T) {
 	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 1,
-		desiredReplicas: 2,
-		targetResource:  api.ResourceCPU,
-		targetLevel:     resource.MustParse("0.1"),
-		reportedLevels:  []uint64{200},
-		verifyEvents:    true,
+		minReplicas:         1,
+		maxReplicas:         5,
+		initialReplicas:     1,
+		desiredReplicas:     2,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{200},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.2")},
+		verifyEvents:        true,
 	}
 	tc.runTest(t)
 }
 
 func TestEventNotCreated(t *testing.T) {
 	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 2,
-		desiredReplicas: 2,
-		targetResource:  api.ResourceCPU,
-		targetLevel:     resource.MustParse("0.2"),
-		reportedLevels:  []uint64{200, 200},
-		verifyEvents:    true,
+		minReplicas:         1,
+		maxReplicas:         5,
+		initialReplicas:     2,
+		desiredReplicas:     2,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{200, 200},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.4"), resource.MustParse("0.4")},
+		verifyEvents:        true,
 	}
 	tc.runTest(t)
 }
+
+// TODO: add more tests
