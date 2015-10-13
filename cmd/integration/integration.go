@@ -44,9 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/endpoint"
-	"k8s.io/kubernetes/pkg/controller/node"
-	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
+	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
+	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
+	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -203,7 +203,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		Run(3, util.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	go replicationControllerPkg.NewReplicationManager(cl, controller.NoResyncPeriodFunc, replicationControllerPkg.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(cl, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
 		Run(3, util.NeverStop)
 
 	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),

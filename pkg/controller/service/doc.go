@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package servicecontroller contains code for syncing cloud load balancers
+// Package service contains code for syncing cloud load balancers
 // with the service registry.
-package servicecontroller
+package service

@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/persistentvolume"
+	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/volume"
@@ -46,11 +46,11 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 	testClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 
-	binder := volumeclaimbinder.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
+	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
 	binder.Run()
 	defer binder.Stop()
 
-	recycler, _ := volumeclaimbinder.NewPersistentVolumeRecycler(recyclerClient, 1*time.Second, []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", volume.NewFakeVolumeHost("/tmp/fake", nil, nil)}})
+	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 1*time.Second, []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", volume.NewFakeVolumeHost("/tmp/fake", nil, nil)}})
 	recycler.Run()
 	defer recycler.Stop()
 
