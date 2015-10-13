@@ -23,7 +23,14 @@ import (
 	"strings"
 )
 
-const sysctlBase = "/proc/sys"
+const (
+	sysctlBase         = "/proc/sys"
+	VmOvercommitMemory = "vm/overcommit_memory"
+	VmPanicOnOOM       = "vm/panic_on_oom"
+
+	VmOvercommitMemoryAlways    = 1 // kernel performs no memory over-commit handling
+	VmPanicOnOOMInvokeOOMKiller = 0 // kernel calls the oom_killer function when OOM occurs
+)
 
 // GetSysctl returns the value for the specified sysctl setting
 func GetSysctl(sysctl string) (int, error) {
