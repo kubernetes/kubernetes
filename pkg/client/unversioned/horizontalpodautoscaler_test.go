@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -33,7 +33,7 @@ func getHorizontalPodAutoscalersResoureName() string {
 
 func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -42,7 +42,7 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Experimental.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, ""),
 			Query:  buildQueryValues(nil),
 			Body:   &horizontalPodAutoscaler,
 		},
@@ -58,7 +58,7 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 
 func TestHorizontalPodAutoscalerGet(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
@@ -67,7 +67,7 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"),
+			Path:   testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
@@ -80,8 +80,8 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 
 func TestHorizontalPodAutoscalerList(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscalerList := &experimental.HorizontalPodAutoscalerList{
-		Items: []experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscalerList := &extensions.HorizontalPodAutoscalerList{
+		Items: []extensions.HorizontalPodAutoscaler{
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
@@ -93,7 +93,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, ""),
 			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
@@ -105,7 +105,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 
 func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 	ns := api.NamespaceDefault
-	horizontalPodAutoscaler := &experimental.HorizontalPodAutoscaler{
+	horizontalPodAutoscaler := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,
@@ -113,7 +113,7 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.Experimental.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 	}
 	response, err := c.Setup(t).Experimental().HorizontalPodAutoscalers(ns).Update(horizontalPodAutoscaler)
@@ -123,7 +123,7 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 func TestHorizontalPodAutoscalerDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Experimental.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Experimental().HorizontalPodAutoscalers(ns).Delete("foo", nil)
@@ -134,7 +134,7 @@ func TestHorizontalPodAutoscalerWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePathWithPrefix("watch", getHorizontalPodAutoscalersResoureName(), "", ""),
+			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getHorizontalPodAutoscalersResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}

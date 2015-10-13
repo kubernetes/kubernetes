@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -42,7 +42,7 @@ func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
-func getKey(ds *experimental.DaemonSet, t *testing.T) string {
+func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 	if key, err := controller.KeyFunc(ds); err != nil {
 		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
 		return ""
@@ -51,14 +51,14 @@ func getKey(ds *experimental.DaemonSet, t *testing.T) string {
 	}
 }
 
-func newDaemonSet(name string) *experimental.DaemonSet {
-	return &experimental.DaemonSet{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Experimental.Version()},
+func newDaemonSet(name string) *extensions.DaemonSet {
+	return &extensions.DaemonSet{
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Extensions.Version()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: experimental.DaemonSetSpec{
+		Spec: extensions.DaemonSetSpec{
 			Selector: simpleDaemonSetLabel,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -146,7 +146,7 @@ func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodCont
 	}
 }
 
-func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *experimental.DaemonSet, podControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *extensions.DaemonSet, podControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")

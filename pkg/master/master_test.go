@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -67,10 +67,10 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	storageVersions := make(map[string]string)
 	storageDestinations := NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix()))
-	storageDestinations.AddAPIGroup("experimental", etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix()))
+	storageDestinations.AddAPIGroup("extensions", etcdstorage.NewEtcdStorage(fakeClient, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
 	storageVersions[""] = testapi.Default.Version()
-	storageVersions["experimental"] = testapi.Experimental.GroupAndVersion()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -293,10 +293,10 @@ func TestExpapi(t *testing.T) {
 
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
-	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("experimental").RESTMapper)
-	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("experimental").Codec)
-	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("experimental").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("experimental").GroupVersion)
+	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("extensions").RESTMapper)
+	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("extensions").Codec)
+	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("extensions").SelfLinker)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("extensions").GroupVersion)
 }
 
 // TestSecondsSinceSync verifies that proper results are returned
@@ -471,16 +471,16 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectGroupName := "experimental"
+	expectGroupName := "extensions"
 	expectVersions := []api.GroupVersion{
 		{
-			GroupVersion: testapi.Experimental.GroupAndVersion(),
-			Version:      testapi.Experimental.Version(),
+			GroupVersion: testapi.Extensions.GroupAndVersion(),
+			Version:      testapi.Extensions.Version(),
 		},
 	}
 	expectPreferredVersion := api.GroupVersion{
-		GroupVersion: config.StorageVersions["experimental"],
-		Version:      apiutil.GetVersion(config.StorageVersions["experimental"]),
+		GroupVersion: config.StorageVersions["extensions"],
+		Version:      apiutil.GetVersion(config.StorageVersions["extensions"]),
 	}
 	assert.Equal(expectGroupName, groupList.Groups[0].Name)
 	assert.Equal(expectVersions, groupList.Groups[0].Versions)
@@ -507,11 +507,11 @@ type FooList struct {
 func initThirdParty(t *testing.T, version string) (*Master, *tools.FakeEtcdClient, *httptest.Server, *assert.Assertions) {
 	master, _, assert := setUp(t)
 	master.thirdPartyResources = map[string]*thirdpartyresourcedatastorage.REST{}
-	api := &experimental.ThirdPartyResource{
+	api := &extensions.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo.company.com",
 		},
-		Versions: []experimental.APIVersion{
+		Versions: []extensions.APIVersion{
 			{
 				APIGroup: "group",
 				Name:     version,
@@ -522,7 +522,7 @@ func initThirdParty(t *testing.T, version string) (*Master, *tools.FakeEtcdClien
 
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Experimental.Codec(), etcdtest.PathPrefix())
+	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(fakeClient, testapi.Extensions.Codec(), etcdtest.PathPrefix())
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
 		t.FailNow()
@@ -630,11 +630,11 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	thirdPartyData := experimental.ThirdPartyResourceData{
+	thirdPartyData := extensions.ThirdPartyResourceData{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return testapi.Experimental.Codec().Encode(&thirdPartyData)
+	return testapi.Extensions.Codec().Encode(&thirdPartyData)
 }
 
 func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {
@@ -774,11 +774,11 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		t.FailNow()
 	}
 
-	obj, err := testapi.Experimental.Codec().Decode([]byte(etcdResp.Node.Value))
+	obj, err := testapi.Extensions.Codec().Decode([]byte(etcdResp.Node.Value))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	thirdPartyObj, ok := obj.(*experimental.ThirdPartyResourceData)
+	thirdPartyObj, ok := obj.(*extensions.ThirdPartyResourceData)
 	if !ok {
 		t.Errorf("unexpected object: %v", obj)
 	}

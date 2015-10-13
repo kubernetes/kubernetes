@@ -18,7 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -36,9 +36,9 @@ type REST struct {
 func NewREST(s storage.Interface) *REST {
 	prefix := "/horizontalpodautoscalers"
 	store := &etcdgeneric.Etcd{
-		NewFunc: func() runtime.Object { return &experimental.HorizontalPodAutoscaler{} },
+		NewFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscaler{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &experimental.HorizontalPodAutoscalerList{} },
+		NewListFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} },
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -51,7 +51,7 @@ func NewREST(s storage.Interface) *REST {
 		},
 		// Retrieve the name field of an autoscaler
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*experimental.HorizontalPodAutoscaler).Name, nil
+			return obj.(*extensions.HorizontalPodAutoscaler).Name, nil
 		},
 		// Used to match objects based on labels/fields for list
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {

@@ -21,7 +21,7 @@ import (
 	"hash/adler32"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -29,7 +29,7 @@ import (
 )
 
 // Returns the old RCs targetted by the given Deployment.
-func GetOldRCs(deployment experimental.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
+func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
 	podList, err := c.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector), fields.Everything())
@@ -65,7 +65,7 @@ func GetOldRCs(deployment experimental.Deployment, c client.Interface) ([]*api.R
 
 // Returns an RC that matches the intent of the given deployment.
 // Returns nil if the new RC doesnt exist yet.
-func GetNewRC(deployment experimental.Deployment, c client.Interface) (*api.ReplicationController, error) {
+func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	rcList, err := c.ReplicationControllers(namespace).List(labels.Everything())
 	if err != nil {
@@ -84,7 +84,7 @@ func GetNewRC(deployment experimental.Deployment, c client.Interface) (*api.Repl
 }
 
 // Returns the desired PodTemplateSpec for the new RC corresponding to the given RC.
-func GetNewRCTemplate(deployment experimental.Deployment) *api.PodTemplateSpec {
+func GetNewRCTemplate(deployment extensions.Deployment) *api.PodTemplateSpec {
 	// newRC will have the same template as in deployment spec, plus a unique label in some cases.
 	newRCTemplate := &api.PodTemplateSpec{
 		ObjectMeta: deployment.Spec.Template.ObjectMeta,

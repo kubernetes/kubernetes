@@ -21,8 +21,8 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -46,16 +46,16 @@ func (ingressStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of an Ingress before creation.
 func (ingressStrategy) PrepareForCreate(obj runtime.Object) {
-	ingress := obj.(*experimental.Ingress)
-	ingress.Status = experimental.IngressStatus{}
+	ingress := obj.(*extensions.Ingress)
+	ingress.Status = extensions.IngressStatus{}
 
 	ingress.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newIngress := obj.(*experimental.Ingress)
-	oldIngress := old.(*experimental.Ingress)
+	newIngress := obj.(*extensions.Ingress)
+	oldIngress := old.(*extensions.Ingress)
 	//TODO: Clear Ingress status once we have a sub-resource.
 
 	// Any changes to the spec increment the generation number, any changes to the
@@ -69,7 +69,7 @@ func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // Validate validates a new Ingress.
 func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	ingress := obj.(*experimental.Ingress)
+	ingress := obj.(*extensions.Ingress)
 	err := validation.ValidateIngress(ingress)
 	return err
 }
@@ -81,8 +81,8 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateIngress(obj.(*experimental.Ingress))
-	updateErrorList := validation.ValidateIngressUpdate(old.(*experimental.Ingress), obj.(*experimental.Ingress))
+	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
+	updateErrorList := validation.ValidateIngressUpdate(old.(*extensions.Ingress), obj.(*extensions.Ingress))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -92,7 +92,7 @@ func (ingressStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // IngressToSelectableFields returns a label set that represents the object.
-func IngressToSelectableFields(ingress *experimental.Ingress) fields.Set {
+func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
 	return fields.Set{
 		"metadata.name": ingress.Name,
 	}
@@ -106,7 +106,7 @@ func MatchIngress(label labels.Selector, field fields.Selector) generic.Matcher 
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			ingress, ok := obj.(*experimental.Ingress)
+			ingress, ok := obj.(*extensions.Ingress)
 			if !ok {
 				return nil, nil, fmt.Errorf("Given object is not an Ingress.")
 			}

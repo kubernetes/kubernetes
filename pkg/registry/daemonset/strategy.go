@@ -21,8 +21,8 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	"k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -46,16 +46,16 @@ func (daemonSetStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a daemon set before creation.
 func (daemonSetStrategy) PrepareForCreate(obj runtime.Object) {
-	daemonSet := obj.(*experimental.DaemonSet)
-	daemonSet.Status = experimental.DaemonSetStatus{}
+	daemonSet := obj.(*extensions.DaemonSet)
+	daemonSet.Status = extensions.DaemonSetStatus{}
 
 	daemonSet.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (daemonSetStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newDaemonSet := obj.(*experimental.DaemonSet)
-	oldDaemonSet := old.(*experimental.DaemonSet)
+	newDaemonSet := obj.(*extensions.DaemonSet)
+	oldDaemonSet := old.(*extensions.DaemonSet)
 
 	// update is not allowed to set status
 	newDaemonSet.Status = oldDaemonSet.Status
@@ -78,7 +78,7 @@ func (daemonSetStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // Validate validates a new daemon set.
 func (daemonSetStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	daemonSet := obj.(*experimental.DaemonSet)
+	daemonSet := obj.(*extensions.DaemonSet)
 	return validation.ValidateDaemonSet(daemonSet)
 }
 
@@ -90,8 +90,8 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (daemonSetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateDaemonSet(obj.(*experimental.DaemonSet))
-	updateErrorList := validation.ValidateDaemonSetUpdate(old.(*experimental.DaemonSet), obj.(*experimental.DaemonSet))
+	validationErrorList := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
+	updateErrorList := validation.ValidateDaemonSetUpdate(old.(*extensions.DaemonSet), obj.(*extensions.DaemonSet))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -101,7 +101,7 @@ func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // DaemonSetToSelectableFields returns a field set that represents the object.
-func DaemonSetToSelectableFields(daemon *experimental.DaemonSet) fields.Set {
+func DaemonSetToSelectableFields(daemon *extensions.DaemonSet) fields.Set {
 	return fields.Set{
 		"metadata.name": daemon.Name,
 	}
@@ -115,7 +115,7 @@ func MatchDaemonSet(label labels.Selector, field fields.Selector) generic.Matche
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			ds, ok := obj.(*experimental.DaemonSet)
+			ds, ok := obj.(*extensions.DaemonSet)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not a ds.")
 			}
@@ -131,11 +131,11 @@ type daemonSetStatusStrategy struct {
 var StatusStrategy = daemonSetStatusStrategy{Strategy}
 
 func (daemonSetStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newDaemonSet := obj.(*experimental.DaemonSet)
-	oldDaemonSet := old.(*experimental.DaemonSet)
+	newDaemonSet := obj.(*extensions.DaemonSet)
+	oldDaemonSet := old.(*extensions.DaemonSet)
 	newDaemonSet.Spec = oldDaemonSet.Spec
 }
 
 func (daemonSetStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateDaemonSetStatusUpdate(obj.(*experimental.DaemonSet), old.(*experimental.DaemonSet))
+	return validation.ValidateDaemonSetStatusUpdate(obj.(*extensions.DaemonSet), old.(*extensions.DaemonSet))
 }

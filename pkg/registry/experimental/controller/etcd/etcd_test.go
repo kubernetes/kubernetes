@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -66,12 +66,12 @@ var validController = api.ReplicationController{
 	Spec:       validControllerSpec,
 }
 
-var validScale = experimental.Scale{
+var validScale = extensions.Scale{
 	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-	Spec: experimental.ScaleSpec{
+	Spec: extensions.ScaleSpec{
 		Replicas: validReplicas,
 	},
-	Status: experimental.ScaleStatus{
+	Status: extensions.ScaleStatus{
 		Replicas: 0,
 		Selector: validPodTemplate.Template.Labels,
 	},
@@ -88,7 +88,7 @@ func TestGet(t *testing.T) {
 
 	expect := &validScale
 	obj, err := storage.Get(ctx, "foo")
-	scale := obj.(*experimental.Scale)
+	scale := obj.(*extensions.Scale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -106,9 +106,9 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
-	update := experimental.Scale{
+	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-		Spec: experimental.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},
 	}
@@ -122,7 +122,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	var controller api.ReplicationController
-	testapi.Experimental.Codec().DecodeInto([]byte(response.Node.Value), &controller)
+	testapi.Extensions.Codec().DecodeInto([]byte(response.Node.Value), &controller)
 	if controller.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, controller.Spec.Replicas)
 	}

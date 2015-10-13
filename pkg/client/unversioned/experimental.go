@@ -130,7 +130,7 @@ func NewExperimentalOrDie(c *Config) *ExperimentalClient {
 
 func setExperimentalDefaults(config *Config) error {
 	// if experimental group is not registered, return an error
-	g, err := latest.Group("experimental")
+	g, err := latest.Group("extensions")
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func setExperimentalDefaults(config *Config) error {
 	versionInterfaces, err := g.InterfacesFor(config.Version)
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(latest.GroupOrDie("experimental").Versions, ", "))
+			config.Version, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

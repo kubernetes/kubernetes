@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,44 +31,44 @@ type FakeJobs struct {
 	Namespace string
 }
 
-func (c *FakeJobs) Get(name string) (*experimental.Job, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("jobs", c.Namespace, name), &experimental.Job{})
+func (c *FakeJobs) Get(name string) (*extensions.Job, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("jobs", c.Namespace, name), &extensions.Job{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Job), err
+	return obj.(*extensions.Job), err
 }
 
-func (c *FakeJobs) List(label labels.Selector, fields fields.Selector) (*experimental.JobList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, label, nil), &experimental.JobList{})
+func (c *FakeJobs) List(label labels.Selector, fields fields.Selector) (*extensions.JobList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, label, nil), &extensions.JobList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.JobList), err
+	return obj.(*extensions.JobList), err
 }
 
-func (c *FakeJobs) Create(job *experimental.Job) (*experimental.Job, error) {
+func (c *FakeJobs) Create(job *extensions.Job) (*extensions.Job, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("jobs", c.Namespace, job), job)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Job), err
+	return obj.(*extensions.Job), err
 }
 
-func (c *FakeJobs) Update(job *experimental.Job) (*experimental.Job, error) {
+func (c *FakeJobs) Update(job *extensions.Job) (*extensions.Job, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction("jobs", c.Namespace, job), job)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Job), err
+	return obj.(*extensions.Job), err
 }
 
 func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("jobs", c.Namespace, name), &experimental.Job{})
+	_, err := c.Fake.Invokes(NewDeleteAction("jobs", c.Namespace, name), &extensions.Job{})
 	return err
 }
 
@@ -76,11 +76,11 @@ func (c *FakeJobs) Watch(label labels.Selector, field fields.Selector, resourceV
 	return c.Fake.InvokesWatch(NewWatchAction("jobs", c.Namespace, label, field, resourceVersion))
 }
 
-func (c *FakeJobs) UpdateStatus(job *experimental.Job) (result *experimental.Job, err error) {
+func (c *FakeJobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
 	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("jobs", "status", c.Namespace, job), job)
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*experimental.Job), err
+	return obj.(*extensions.Job), err
 }

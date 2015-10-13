@@ -42,7 +42,7 @@ func NewDefaultRESTMapper(group string, versions []string, interfacesFunc meta.V
 	for _, version := range versions {
 		for kind, oType := range Scheme.KnownTypes(version) {
 			// TODO: Remove import path prefix check.
-			// We check the import path prefix because we currently stuff both "api" and "experimental" objects
+			// We check the import path prefix because we currently stuff both "api" and "extensions" objects
 			// into the same group within Scheme since Scheme has no notion of groups yet.
 			if !strings.HasPrefix(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
 				continue

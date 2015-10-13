@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -1236,22 +1236,22 @@ func TestTranslateTimestamp(t *testing.T) {
 
 func TestPrintDeployment(t *testing.T) {
 	tests := []struct {
-		deployment experimental.Deployment
+		deployment extensions.Deployment
 		expect     string
 	}{
 		{
-			experimental.Deployment{
+			extensions.Deployment{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: experimental.DeploymentSpec{
+				Spec: extensions.DeploymentSpec{
 					Replicas: 5,
 					Template: &api.PodTemplateSpec{
 						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
 					},
 				},
-				Status: experimental.DeploymentStatus{
+				Status: extensions.DeploymentStatus{
 					Replicas:        10,
 					UpdatedReplicas: 2,
 				},

@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -35,11 +35,11 @@ func TestListIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
 		},
 		Response: Response{StatusCode: 200,
-			Body: &experimental.IngressList{
-				Items: []experimental.Ingress{
+			Body: &extensions.IngressList{
+				Items: []extensions.Ingress{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -48,8 +48,8 @@ func TestListIngress(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Spec: experimental.IngressSpec{
-							Rules: []experimental.IngressRule{},
+						Spec: extensions.IngressSpec{
+							Rules: []extensions.IngressRule{},
 						},
 					},
 				},
@@ -65,12 +65,12 @@ func TestGetIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Ingress{
+			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -78,8 +78,8 @@ func TestGetIngress(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.IngressSpec{
-					Rules: []experimental.IngressRule{},
+				Spec: extensions.IngressSpec{
+					Rules: []extensions.IngressRule{},
 				},
 			},
 		},
@@ -101,7 +101,7 @@ func TestGetIngressWithNoName(t *testing.T) {
 
 func TestUpdateIngress(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestIngress := &experimental.Ingress{
+	requestIngress := &extensions.Ingress{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -111,12 +111,12 @@ func TestUpdateIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Ingress{
+			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -124,8 +124,8 @@ func TestUpdateIngress(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.IngressSpec{
-					Rules: []experimental.IngressRule{},
+				Spec: extensions.IngressSpec{
+					Rules: []extensions.IngressRule{},
 				},
 			},
 		},
@@ -141,25 +141,25 @@ func TestUpdateIngressStatus(t *testing.T) {
 			{IP: "127.0.0.1"},
 		},
 	}
-	requestIngress := &experimental.Ingress{
+	requestIngress := &extensions.Ingress{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Status: experimental.IngressStatus{
+		Status: extensions.IngressStatus{
 			LoadBalancer: lbStatus,
 		},
 	}
 	c := &testClient{
 		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo") + "/status",
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Ingress{
+			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -167,10 +167,10 @@ func TestUpdateIngressStatus(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.IngressSpec{
-					Rules: []experimental.IngressRule{},
+				Spec: extensions.IngressSpec{
+					Rules: []extensions.IngressRule{},
 				},
-				Status: experimental.IngressStatus{
+				Status: extensions.IngressStatus{
 					LoadBalancer: lbStatus,
 				},
 			},
@@ -185,7 +185,7 @@ func TestDeleteIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{StatusCode: 200},
@@ -196,7 +196,7 @@ func TestDeleteIngress(t *testing.T) {
 
 func TestCreateIngress(t *testing.T) {
 	ns := api.NamespaceDefault
-	requestIngress := &experimental.Ingress{
+	requestIngress := &extensions.Ingress{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
@@ -205,13 +205,13 @@ func TestCreateIngress(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Experimental.ResourcePath(getIngressResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
 			Body:   requestIngress,
 			Query:  buildQueryValues(nil),
 		},
 		Response: Response{
 			StatusCode: 200,
-			Body: &experimental.Ingress{
+			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -219,8 +219,8 @@ func TestCreateIngress(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				Spec: experimental.IngressSpec{
-					Rules: []experimental.IngressRule{},
+				Spec: extensions.IngressSpec{
+					Rules: []extensions.IngressRule{},
 				},
 			},
 		},

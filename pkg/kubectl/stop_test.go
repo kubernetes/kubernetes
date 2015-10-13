@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -286,23 +286,23 @@ func TestJobStop(t *testing.T) {
 		{
 			Name: "OnlyOneJob",
 			Objs: []runtime.Object{
-				&experimental.Job{ // GET
+				&extensions.Job{ // GET
 					ObjectMeta: api.ObjectMeta{
 						Name:      name,
 						Namespace: ns,
 					},
-					Spec: experimental.JobSpec{
+					Spec: extensions.JobSpec{
 						Parallelism: &zero,
 						Selector:    map[string]string{"k1": "v1"}},
 				},
-				&experimental.JobList{ // LIST
-					Items: []experimental.Job{
+				&extensions.JobList{ // LIST
+					Items: []extensions.Job{
 						{
 							ObjectMeta: api.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
-							Spec: experimental.JobSpec{
+							Spec: extensions.JobSpec{
 								Parallelism: &zero,
 								Selector:    map[string]string{"k1": "v1"}},
 						},
