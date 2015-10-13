@@ -311,16 +311,59 @@ type containerStatusResult struct {
 	err    error
 }
 
+const podIPDownwardAPISelector = "status.podIP"
+
+// podDependsOnIP returns whether any containers in a pod depend on using the pod IP via
+// the downward API.
+func podDependsOnPodIP(pod *api.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil &&
+				env.ValueFrom.FieldRef != nil &&
+				env.ValueFrom.FieldRef.FieldPath == podIPDownwardAPISelector {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// determineContainerIP determines the IP address of the given container.  It is expected
+// that the container passed is the infrastructure container of a pod and the responsibility
+// of the caller to ensure that the correct container is passed.
+func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *docker.Container) string {
+	result := ""
+
+	if container.NetworkSettings != nil {
+		result = container.NetworkSettings.IPAddress
+	}
+
+	if dm.networkPlugin.Name() != network.DefaultPluginName {
+		netStatus, err := dm.networkPlugin.Status(podNamespace, podName, kubetypes.DockerID(container.ID))
+		if err != nil {
+			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
+		} else if netStatus != nil {
+			result = netStatus.IP.String()
+		}
+	}
+
+	return result
+}
+
 func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string, pod *api.Pod) *containerStatusResult {
 	result := containerStatusResult{api.ContainerStatus{}, "", nil}
 
 	inspectResult, err := dm.client.InspectContainer(dockerID)
-
 	if err != nil {
 		result.err = err
 		return &result
 	}
+	// NOTE (pmorie): this is a seriously fishy if statement.  A nil result from
+	// InspectContainer seems like it should should always be paired with a
+	// non-nil error in the result of InspectContainer.
 	if inspectResult == nil {
+		glog.Errorf("Received a nil result from InspectContainer without receiving an error for container ID %v", dockerID)
 		// Why did we not get an error?
 		return &result
 	}
@@ -338,18 +381,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 			StartedAt: unversioned.NewTime(inspectResult.State.StartedAt),
 		}
 		if containerName == PodInfraContainerName {
-			if inspectResult.NetworkSettings != nil {
-				result.ip = inspectResult.NetworkSettings.IPAddress
-			}
-			// override the above if a network plugin exists
-			if dm.networkPlugin.Name() != network.DefaultPluginName {
-				netStatus, err := dm.networkPlugin.Status(pod.Namespace, pod.Name, kubetypes.DockerID(dockerID))
-				if err != nil {
-					glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), pod.Name, err)
-				} else if netStatus != nil {
-					result.ip = netStatus.IP.String()
-				}
-			}
+			result.ip = dm.determineContainerIP(pod.Namespace, pod.Name, inspectResult)
 		}
 	} else if !inspectResult.State.FinishedAt.IsZero() || inspectResult.State.ExitCode != 0 {
 		// When a container fails to start State.ExitCode is non-zero, FinishedAt and StartedAt are both zero
@@ -1859,6 +1891,12 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
 			glog.Warningf("Hairpin setup failed for pod %q: %v", podFullName, err)
 		}
+		if podDependsOnPodIP(pod) {
+			// Find the pod IP after starting the infra container in order to expose
+			// it safely via the downward API without a race.
+			pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		}
+
 	}
 
 	// Start everything
