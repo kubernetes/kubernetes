@@ -133,7 +133,7 @@ func TestHorizontalPodAutoscalerUpdateStatus(t *testing.T) {
 		Request:  testRequest{Method: "PUT", Path: testapi.Extensions.ResourcePath(getHorizontalPodAutoscalersResoureName(), ns, "abc") + "/status", Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 	}
-	response, err := c.Setup(t).Experimental().HorizontalPodAutoscalers(ns).UpdateStatus(horizontalPodAutoscaler)
+	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).UpdateStatus(horizontalPodAutoscaler)
 	c.Validate(t, response, err)
 }
 
