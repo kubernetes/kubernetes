@@ -340,7 +340,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
 		// ensure they are also checked.
-		rcList, err := c.ReplicationControllers(ns).List(labels.Everything())
+		rcList, err := c.ReplicationControllers(ns).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			return false, nil

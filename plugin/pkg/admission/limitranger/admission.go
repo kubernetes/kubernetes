@@ -100,7 +100,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return client.LimitRanges(api.NamespaceAll).List(labels.Everything())
+			return client.LimitRanges(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
