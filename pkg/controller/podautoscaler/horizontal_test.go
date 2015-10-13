@@ -58,7 +58,7 @@ type testCase struct {
 	maxReplicas     int
 	initialReplicas int
 	desiredReplicas int
-	targetResource  api.ResourceName
+	targetMetric    extensions.MetricName
 	targetLevel     resource.Quantity
 	reportedLevels  []uint64
 	scaleUpdated    bool
@@ -86,15 +86,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 					},
 					Spec: extensions.HorizontalPodAutoscalerSpec{
-						ScaleRef: &extensions.SubresourceReference{
+						ScaleRef: extensions.SubresourceReference{
 							Kind:        "replicationController",
 							Name:        rcName,
 							Namespace:   namespace,
 							Subresource: "scale",
 						},
-						MinReplicas: tc.minReplicas,
-						MaxReplicas: tc.maxReplicas,
-						Target:      extensions.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
+						MinReplicas:              tc.minReplicas,
+						MaxReplicas:              tc.maxReplicas,
+						TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: tc.targetMetric, Utilization: tc.targetLevel}},
 					},
 				},
 			},
@@ -208,7 +208,7 @@ func TestCPU(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 1,
 		desiredReplicas: 2,
-		targetResource:  api.ResourceCPU,
+		targetMetric:    extensions.MetricCPUUsage,
 		targetLevel:     resource.MustParse("0.1"),
 		reportedLevels:  []uint64{200},
 	}
@@ -221,7 +221,7 @@ func TestMemory(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 1,
 		desiredReplicas: 2,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{2000},
 	}
@@ -234,7 +234,7 @@ func TestScaleUp(t *testing.T) {
 		maxReplicas:     6,
 		initialReplicas: 3,
 		desiredReplicas: 5,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("3k"),
 		reportedLevels:  []uint64{3000, 5000, 7000},
 	}
@@ -247,7 +247,7 @@ func TestScaleDown(t *testing.T) {
 		maxReplicas:     6,
 		initialReplicas: 5,
 		desiredReplicas: 3,
-		targetResource:  api.ResourceCPU,
+		targetMetric:    extensions.MetricCPUUsage,
 		targetLevel:     resource.MustParse("0.5"),
 		reportedLevels:  []uint64{100, 300, 500, 250, 250},
 	}
@@ -260,7 +260,7 @@ func TestTolerance(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 3,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{1010, 1030, 1020},
 	}
@@ -273,7 +273,7 @@ func TestMinReplicas(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 2,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{10, 95, 10},
 	}
@@ -286,7 +286,7 @@ func TestMaxReplicas(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 5,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{8000, 9500, 1000},
 	}
@@ -299,7 +299,7 @@ func TestSuperfluousMetrics(t *testing.T) {
 		maxReplicas:     6,
 		initialReplicas: 4,
 		desiredReplicas: 4,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{4000, 9500, 3000, 7000, 3200, 2000},
 	}
@@ -312,7 +312,7 @@ func TestMissingMetrics(t *testing.T) {
 		maxReplicas:     6,
 		initialReplicas: 4,
 		desiredReplicas: 4,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{400, 95},
 	}
@@ -325,7 +325,7 @@ func TestEmptyMetrics(t *testing.T) {
 		maxReplicas:     6,
 		initialReplicas: 4,
 		desiredReplicas: 4,
-		targetResource:  api.ResourceMemory,
+		targetMetric:    extensions.MetricMemoryUsage,
 		targetLevel:     resource.MustParse("1k"),
 		reportedLevels:  []uint64{},
 	}
@@ -338,7 +338,7 @@ func TestEventCreated(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 1,
 		desiredReplicas: 2,
-		targetResource:  api.ResourceCPU,
+		targetMetric:    extensions.MetricCPUUsage,
 		targetLevel:     resource.MustParse("0.1"),
 		reportedLevels:  []uint64{200},
 		verifyEvents:    true,
@@ -352,7 +352,7 @@ func TestEventNotCreated(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 2,
 		desiredReplicas: 2,
-		targetResource:  api.ResourceCPU,
+		targetMetric:    extensions.MetricCPUUsage,
 		targetLevel:     resource.MustParse("0.2"),
 		reportedLevels:  []uint64{200, 200},
 		verifyEvents:    true,

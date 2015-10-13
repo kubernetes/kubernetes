@@ -36,12 +36,12 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas:              1,
+				MaxReplicas:              5,
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 			},
 		},
 	}
@@ -58,12 +58,12 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: -1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas:              -1,
+				MaxReplicas:              5,
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 			},
 		},
 		"must be bigger or equal to minReplicas": {
@@ -72,12 +72,12 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 7,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas:              7,
+				MaxReplicas:              5,
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 			},
 		},
 		"invalid value": {
@@ -86,37 +86,43 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
+				MinReplicas:              1,
+				MaxReplicas:              5,
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("-0.8")}},
 			},
 		},
-		"resource not supported": {
+		"metric not supported": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
+				MinReplicas:              1,
+				MaxReplicas:              5,
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricName("NotSupportedMetric"), Utilization: resource.MustParse("0.8")}},
 			},
 		},
-		"required value": {
+		"must containe exactly 1 element": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
+				ScaleRef: extensions.SubresourceReference{
+					Subresource: "scale",
+				},
 				MinReplicas: 1,
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				TargetMetricUtilizations: []extensions.MetricUtilization{
+					{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")},
+					{Metric: extensions.MetricMemoryUsage, Utilization: resource.MustParse("100M")},
+				},
 			},
 		},
 	}

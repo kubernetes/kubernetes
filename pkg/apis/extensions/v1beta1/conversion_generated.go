@@ -2507,18 +2507,20 @@ func autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPod
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.HorizontalPodAutoscalerSpec))(in)
 	}
-	if in.ScaleRef != nil {
-		out.ScaleRef = new(SubresourceReference)
-		if err := convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in.ScaleRef, out.ScaleRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.ScaleRef = nil
+	if err := convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(&in.ScaleRef, &out.ScaleRef, s); err != nil {
+		return err
 	}
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
-	if err := convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
-		return err
+	if in.TargetMetricUtilizations != nil {
+		out.TargetMetricUtilizations = make([]MetricUtilization, len(in.TargetMetricUtilizations))
+		for i := range in.TargetMetricUtilizations {
+			if err := convert_extensions_MetricUtilization_To_v1beta1_MetricUtilization(&in.TargetMetricUtilizations[i], &out.TargetMetricUtilizations[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TargetMetricUtilizations = nil
 	}
 	return nil
 }
@@ -2531,15 +2533,11 @@ func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalP
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.HorizontalPodAutoscalerStatus))(in)
 	}
-	out.CurrentReplicas = in.CurrentReplicas
-	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentConsumption != nil {
-		out.CurrentConsumption = new(ResourceConsumption)
-		if err := convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
-			return err
-		}
+	if in.ObserveGeneration != nil {
+		out.ObserveGeneration = new(int64)
+		*out.ObserveGeneration = *in.ObserveGeneration
 	} else {
-		out.CurrentConsumption = nil
+		out.ObserveGeneration = nil
 	}
 	if in.LastScaleTimestamp != nil {
 		if err := s.Convert(&in.LastScaleTimestamp, &out.LastScaleTimestamp, 0); err != nil {
@@ -2547,6 +2545,18 @@ func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalP
 		}
 	} else {
 		out.LastScaleTimestamp = nil
+	}
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
+	if in.CurrentMetricUtilizations != nil {
+		out.CurrentMetricUtilizations = make([]MetricUtilization, len(in.CurrentMetricUtilizations))
+		for i := range in.CurrentMetricUtilizations {
+			if err := convert_extensions_MetricUtilization_To_v1beta1_MetricUtilization(&in.CurrentMetricUtilizations[i], &out.CurrentMetricUtilizations[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.CurrentMetricUtilizations = nil
 	}
 	return nil
 }
@@ -2845,6 +2855,21 @@ func convert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus,
 	return autoconvert_extensions_JobStatus_To_v1beta1_JobStatus(in, out, s)
 }
 
+func autoconvert_extensions_MetricUtilization_To_v1beta1_MetricUtilization(in *extensions.MetricUtilization, out *MetricUtilization, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.MetricUtilization))(in)
+	}
+	out.Metric = MetricName(in.Metric)
+	if err := s.Convert(&in.Utilization, &out.Utilization, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_extensions_MetricUtilization_To_v1beta1_MetricUtilization(in *extensions.MetricUtilization, out *MetricUtilization, s conversion.Scope) error {
+	return autoconvert_extensions_MetricUtilization_To_v1beta1_MetricUtilization(in, out, s)
+}
+
 func autoconvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization(in *extensions.NodeUtilization, out *NodeUtilization, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.NodeUtilization))(in)
@@ -2870,21 +2895,6 @@ func autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationCon
 
 func convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in *extensions.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	return autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in, out, s)
-}
-
-func autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in *extensions.ResourceConsumption, out *ResourceConsumption, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.ResourceConsumption))(in)
-	}
-	out.Resource = v1.ResourceName(in.Resource)
-	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in *extensions.ResourceConsumption, out *ResourceConsumption, s conversion.Scope) error {
-	return autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in, out, s)
 }
 
 func autoconvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
@@ -3429,18 +3439,20 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPod
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerSpec))(in)
 	}
-	if in.ScaleRef != nil {
-		out.ScaleRef = new(extensions.SubresourceReference)
-		if err := convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in.ScaleRef, out.ScaleRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.ScaleRef = nil
+	if err := convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(&in.ScaleRef, &out.ScaleRef, s); err != nil {
+		return err
 	}
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
-	if err := convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
-		return err
+	if in.TargetMetricUtilizations != nil {
+		out.TargetMetricUtilizations = make([]extensions.MetricUtilization, len(in.TargetMetricUtilizations))
+		for i := range in.TargetMetricUtilizations {
+			if err := convert_v1beta1_MetricUtilization_To_extensions_MetricUtilization(&in.TargetMetricUtilizations[i], &out.TargetMetricUtilizations[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TargetMetricUtilizations = nil
 	}
 	return nil
 }
@@ -3453,15 +3465,11 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalP
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerStatus))(in)
 	}
-	out.CurrentReplicas = in.CurrentReplicas
-	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentConsumption != nil {
-		out.CurrentConsumption = new(extensions.ResourceConsumption)
-		if err := convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
-			return err
-		}
+	if in.ObserveGeneration != nil {
+		out.ObserveGeneration = new(int64)
+		*out.ObserveGeneration = *in.ObserveGeneration
 	} else {
-		out.CurrentConsumption = nil
+		out.ObserveGeneration = nil
 	}
 	if in.LastScaleTimestamp != nil {
 		if err := s.Convert(&in.LastScaleTimestamp, &out.LastScaleTimestamp, 0); err != nil {
@@ -3469,6 +3477,18 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalP
 		}
 	} else {
 		out.LastScaleTimestamp = nil
+	}
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
+	if in.CurrentMetricUtilizations != nil {
+		out.CurrentMetricUtilizations = make([]extensions.MetricUtilization, len(in.CurrentMetricUtilizations))
+		for i := range in.CurrentMetricUtilizations {
+			if err := convert_v1beta1_MetricUtilization_To_extensions_MetricUtilization(&in.CurrentMetricUtilizations[i], &out.CurrentMetricUtilizations[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.CurrentMetricUtilizations = nil
 	}
 	return nil
 }
@@ -3767,6 +3787,21 @@ func convert_v1beta1_JobStatus_To_extensions_JobStatus(in *JobStatus, out *exten
 	return autoconvert_v1beta1_JobStatus_To_extensions_JobStatus(in, out, s)
 }
 
+func autoconvert_v1beta1_MetricUtilization_To_extensions_MetricUtilization(in *MetricUtilization, out *extensions.MetricUtilization, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*MetricUtilization))(in)
+	}
+	out.Metric = extensions.MetricName(in.Metric)
+	if err := s.Convert(&in.Utilization, &out.Utilization, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1beta1_MetricUtilization_To_extensions_MetricUtilization(in *MetricUtilization, out *extensions.MetricUtilization, s conversion.Scope) error {
+	return autoconvert_v1beta1_MetricUtilization_To_extensions_MetricUtilization(in, out, s)
+}
+
 func autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeUtilization))(in)
@@ -3792,21 +3827,6 @@ func autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationCon
 
 func convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in *ReplicationControllerDummy, out *extensions.ReplicationControllerDummy, s conversion.Scope) error {
 	return autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in, out, s)
-}
-
-func autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in *ResourceConsumption, out *extensions.ResourceConsumption, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ResourceConsumption))(in)
-	}
-	out.Resource = api.ResourceName(in.Resource)
-	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in *ResourceConsumption, out *extensions.ResourceConsumption, s conversion.Scope) error {
-	return autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in, out, s)
 }
 
 func autoconvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
@@ -4066,9 +4086,9 @@ func init() {
 		autoconvert_extensions_JobSpec_To_v1beta1_JobSpec,
 		autoconvert_extensions_JobStatus_To_v1beta1_JobStatus,
 		autoconvert_extensions_Job_To_v1beta1_Job,
+		autoconvert_extensions_MetricUtilization_To_v1beta1_MetricUtilization,
 		autoconvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization,
 		autoconvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy,
-		autoconvert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption,
 		autoconvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		autoconvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
 		autoconvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
@@ -4149,9 +4169,9 @@ func init() {
 		autoconvert_v1beta1_JobSpec_To_extensions_JobSpec,
 		autoconvert_v1beta1_JobStatus_To_extensions_JobStatus,
 		autoconvert_v1beta1_Job_To_extensions_Job,
+		autoconvert_v1beta1_MetricUtilization_To_extensions_MetricUtilization,
 		autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization,
 		autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy,
-		autoconvert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption,
 		autoconvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		autoconvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec,
 		autoconvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,

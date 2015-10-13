@@ -70,6 +70,10 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
+	if len(hpa.Spec.TargetMetricUtilizations) != 1 {
+		return fmt.Errorf("multiple metrics not implemented: %v", hpa.Spec.TargetMetricUtilizations)
+	}
+	target := hpa.Spec.TargetMetricUtilizations[0]
 
 	scale, err := a.client.Extensions().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
@@ -79,7 +83,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	currentReplicas := scale.Status.Replicas
 	currentConsumption, err := a.metricsClient.
 		ResourceConsumption(hpa.Spec.ScaleRef.Namespace).
-		Get(hpa.Spec.Target.Resource, scale.Status.Selector)
+		Get(target.Metric, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -87,7 +91,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		return fmt.Errorf("failed to get metrics for %s: %v", reference, err)
 	}
 
-	usageRatio := float64(currentConsumption.Quantity.MilliValue()) / float64(hpa.Spec.Target.Quantity.MilliValue())
+	usageRatio := float64(currentConsumption.Utilization.MilliValue()) / float64(target.Utilization.MilliValue())
 	desiredReplicas := int(math.Ceil(usageRatio * float64(currentReplicas)))
 
 	if desiredReplicas < hpa.Spec.MinReplicas {
@@ -138,9 +142,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	}
 
 	hpa.Status = extensions.HorizontalPodAutoscalerStatus{
-		CurrentReplicas:    currentReplicas,
-		DesiredReplicas:    desiredReplicas,
-		CurrentConsumption: currentConsumption,
+		ObserveGeneration:         &hpa.Generation,
+		CurrentReplicas:           currentReplicas,
+		DesiredReplicas:           desiredReplicas,
+		CurrentMetricUtilizations: []extensions.MetricUtilization{*currentConsumption},
 	}
 	if rescale {
 		now := unversioned.NewTime(now)

@@ -203,11 +203,11 @@ func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerSpec = map[string]string{
-	"":            "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
-	"scaleRef":    "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec.",
-	"minReplicas": "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.",
-	"maxReplicas": "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
-	"target":      "Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Currently two types of resources are supported: \"cpu\" and \"memory\".",
+	"":                         "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
+	"scaleRef":                 "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec.",
+	"minReplicas":              "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.",
+	"maxReplicas":              "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
+	"targetMetricUtilizations": "Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Currently two types of resources are supported: \"cpu\" and \"memory\".",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
@@ -215,11 +215,11 @@ func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerStatus = map[string]string{
-	"":                   "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
-	"currentReplicas":    "CurrentReplicas is the number of replicas of pods managed by this autoscaler.",
-	"desiredReplicas":    "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.",
-	"currentConsumption": "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\".",
-	"lastScaleTimestamp": "LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to controll how often the number of pods is changed.",
+	"":                          "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
+	"lastScaleTime":             "LastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to controll how often the number of pods is changed.",
+	"currentReplicas":           "CurrentReplicas is the number of replicas of pods managed by this autoscaler.",
+	"desiredReplicas":           "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.",
+	"currentMetricUtilizations": "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\".",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
@@ -355,6 +355,16 @@ func (JobStatus) SwaggerDoc() map[string]string {
 	return map_JobStatus
 }
 
+var map_MetricUtilization = map[string]string{
+	"":            "ResourceConsumption is an object for specifying average resource consumption of a particular resource.",
+	"metric":      "Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status.",
+	"utilization": "Utilization specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status.",
+}
+
+func (MetricUtilization) SwaggerDoc() map[string]string {
+	return map_MetricUtilization
+}
+
 var map_NodeUtilization = map[string]string{
 	"":      "NodeUtilization describes what percentage of a particular resource is used on a node.",
 	"value": "The accepted values are from 0 to 1.",
@@ -370,16 +380,6 @@ var map_ReplicationControllerDummy = map[string]string{
 
 func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerDummy
-}
-
-var map_ResourceConsumption = map[string]string{
-	"":         "ResourceConsumption is an object for specifying average resource consumption of a particular resource.",
-	"resource": "Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status.",
-	"quantity": "Quantity specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status.",
-}
-
-func (ResourceConsumption) SwaggerDoc() map[string]string {
-	return map_ResourceConsumption
 }
 
 var map_RollingUpdateDeployment = map[string]string{

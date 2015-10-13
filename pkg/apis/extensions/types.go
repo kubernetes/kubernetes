@@ -35,22 +35,22 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-// ScaleSpec describes the attributes a Scale subresource
+// ScaleSpec describes the attributes of a Scale subresource
 type ScaleSpec struct {
-	// Replicas is the number of desired replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
+	// Replicas is the number of desired replicas. Setting this number will set the number of the desired replicas in the underlying ReplicationController/Deployment.
 	Replicas int `json:"replicas,omitempty"`
 }
 
 // ScaleStatus represents the current status of a Scale subresource.
 type ScaleStatus struct {
-	// Replicas is the number of actual replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// Replicas is the number of actual replicas in the underlying ReplicationController/Deployment.
 	Replicas int `json:"replicas"`
 
-	// Selector is a label query over pods that should match the replicas count. If it is empty, it is defaulted to labels on Pod template; More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// Selector is a label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
-// Scale subresource, applicable to ReplicationControllers and (in future) Deployment.
+// Scale subresource, applicable to ReplicationControllers and Deployments.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
@@ -82,29 +82,48 @@ type SubresourceReference struct {
 	Subresource string `json:"subresource,omitempty"`
 }
 
-// ResourceConsumption is an object for specifying average resource consumption of a particular resource.
-type ResourceConsumption struct {
-	Resource api.ResourceName  `json:"resource,omitempty"`
-	Quantity resource.Quantity `json:"quantity,omitempty"`
+// MetricName is an identifier of a Heapster metric.
+type MetricName string
+
+const (
+	// Heapster metric representing CPU usage of a pod (in milli-cores).
+	MetricCPUUsage MetricName = "kubernetes.io:cpu-usage"
+	// Heapster metric representing Memory usage of a pod (in bytes).
+	MetricMemoryUsage MetricName = "kubernetes.io:memory-usage"
+)
+
+// MetricUtilization is an object for specifying the arthmetic mean utilization of a particular resource.
+type MetricUtilization struct {
+	// Metric specifies either the identifier of the target metric when present in the spec, or the identifier of the observed metric when present in the status.
+	Metric MetricName `json:"metric"`
+	// Utilization specifies either the target arthmetic mean utilization of the metric when present in the spec, or the observed arthmetic mean utilization when present in the status.
+	Utilization resource.Quantity `json:"utilization"`
 }
 
 // HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
 	// and will set the desired number of pods by modyfying its spec.
-	ScaleRef *SubresourceReference `json:"scaleRef"`
+	ScaleRef SubresourceReference `json:"scaleRef"`
 	// MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.
 	MinReplicas int `json:"minReplicas"`
 	// MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
 	MaxReplicas int `json:"maxReplicas"`
-	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
-	// Currently two types of resources are supported: "cpu" and "memory".
-	Target ResourceConsumption `json:"target"`
+	// TargetMetricUtilizations are the target arthmetic mean utilizations of the given metrics that the autoscaler will try to maintain by adjusting the desired number of pods.
+	// Currently two types of metrics are supported: "kubernetes.io:cpu-usage" and "kubernetes.io:memory-usage".
+	// Currently this array must contain exactly one element.
+	TargetMetricUtilizations []MetricUtilization `json:"targetMetricUtilizations"`
 }
 
 // HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatus struct {
-	// TODO: Consider if it is needed.
+	// ObservedGeneration is the most recent generation observed by this autoscaler.
+	ObserveGeneration *int64 `json:"observedGeneration,omitempty"`
+
+	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
+	// This is used by the autoscaler to controll how often the number of pods is changed.
+	LastScaleTimestamp *unversioned.Time `json:"lastScaleTimestamp,omitempty"`
+
 	// CurrentReplicas is the number of replicas of pods managed by this autoscaler.
 	CurrentReplicas int `json:"currentReplicas"`
 
@@ -114,11 +133,7 @@ type HorizontalPodAutoscalerStatus struct {
 	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
 	// try to maintain by adjusting the desired number of pods.
 	// Two types of resources are supported: "cpu" and "memory".
-	CurrentConsumption *ResourceConsumption `json:"currentConsumption"`
-
-	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
-	// This is used by the autoscaler to controll how often the number of pods is changed.
-	LastScaleTimestamp *unversioned.Time `json:"lastScaleTimestamp,omitempty"`
+	CurrentMetricUtilizations []MetricUtilization `json:"currentMetricUtilizations"`
 }
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
