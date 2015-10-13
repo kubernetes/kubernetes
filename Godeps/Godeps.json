@@ -108,8 +108,8 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v2.0.0-13-g4cceaf7",
-			"Rev": "4cceaf7283b76f27c4a732b20730dcdb61053bf5"
+			"Comment": "v2.0.0-34-gde3514f",
+			"Rev": "de3514f25635bbfb024fdaf2a8d5f67378492675"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/http",
@@ -559,7 +559,7 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "821cda7e48749cacf7cad2c6ed01e96457ca7e9d"
+			"Rev": "2f4b94206aae781e63846a9bf02ad83c387d5296"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",

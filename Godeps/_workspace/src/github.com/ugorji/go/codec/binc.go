@@ -1,10 +1,11 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
 import (
 	"math"
+	"reflect"
 	"time"
 )
 
@@ -69,7 +70,15 @@ func (e *bincEncDriver) IsBuiltinType(rt uintptr) bool {
 
 func (e *bincEncDriver) EncodeBuiltin(rt uintptr, v interface{}) {
 	if rt == timeTypId {
-		bs := encodeTime(v.(time.Time))
+		var bs []byte
+		switch x := v.(type) {
+		case time.Time:
+			bs = encodeTime(x)
+		case *time.Time:
+			bs = encodeTime(*x)
+		default:
+			e.e.errorf("binc error encoding builtin: expect time.Time, received %T", v)
+		}
 		e.w.writen1(bincVdTimestamp<<4 | uint8(len(bs)))
 		e.w.writeb(bs)
 	}
@@ -895,6 +904,10 @@ func (h *BincHandle) newEncDriver(e *Encoder) encDriver {
 
 func (h *BincHandle) newDecDriver(d *Decoder) decDriver {
 	return &bincDecDriver{d: d, r: d.r, h: h, br: d.bytes}
+}
+
+func (h *BincHandle) SetBytesExt(rt reflect.Type, tag uint64, ext BytesExt) (err error) {
+	return h.SetExt(rt, tag, &setExtWrapper{b: ext})
 }
 
 var _ decDriver = (*bincDecDriver)(nil)
