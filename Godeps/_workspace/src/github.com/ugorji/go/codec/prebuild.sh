@@ -54,7 +54,7 @@ _build() {
 
     cat > gen.generated.go <<EOF
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -90,8 +90,8 @@ func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool { return false
 type fastpathE struct {
 	rtid uintptr
 	rt reflect.Type 
-	encfn func(encFnInfo, reflect.Value)
-	decfn func(decFnInfo, reflect.Value)
+	encfn func(*encFnInfo, reflect.Value)
+	decfn func(*decFnInfo, reflect.Value)
 }
 type fastpathA [0]fastpathE
 func (x fastpathA) index(rtid uintptr) int { return -1 }
@@ -135,16 +135,18 @@ EOF
 
 _codegenerators() {
     if [[ $zforce == "1" || 
-                "1" == $( _needgen "values_msgp${zsfx}" ) 
-                || "1" == $( _needgen "values_codecgen${zsfx}" ) ]] 
+                "1" == $( _needgen "values_codecgen${zsfx}" ) ||
+                "1" == $( _needgen "values_msgp${zsfx}" ) ||
+                "1" == $( _needgen "values_ffjson${zsfx}" ) ||
+                1 == 0 ]] 
     then
         true && \
+            echo "codecgen - !unsafe ... " && \
+            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} -d 1978 $zfin && \
+            echo "codecgen - unsafe ... " && \
+            codecgen  -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} -d 1978 $zfin && \
             echo "msgp ... " && \
             msgp -tests=false -pkg=codec -o=values_msgp${zsfx} -file=$zfin && \
-            echo "codecgen - !unsafe ... " && \
-            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} $zfin && \
-            echo "codecgen - unsafe ... " && \
-            codecgen -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} $zfin && \
             echo "ffjson ... " && \
             ffjson -w values_ffjson${zsfx} $zfin && \
             # remove (M|Unm)arshalJSON implementations, so they don't conflict with encoding/json bench \
