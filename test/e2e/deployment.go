@@ -255,6 +255,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
+	waitForEvents(c, ns, deployment, 2)
 	events, err := c.Events(ns).Search(deployment)
 	if err != nil {
 		Logf("error in listing events: %s", err)
