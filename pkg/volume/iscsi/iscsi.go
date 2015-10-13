@@ -18,6 +18,7 @@ package iscsi
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -94,12 +95,16 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	}
 
 	lun := strconv.Itoa(iscsi.Lun)
+	portal := iscsi.TargetPortal
+	if !strings.Contains(portal, ":") {
+		portal = iscsi.TargetPortal + ":3260"
+	}
 
 	return &iscsiDiskBuilder{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
 			volName: spec.Name(),
-			portal:  iscsi.TargetPortal,
+			portal:  portal,
 			iqn:     iscsi.IQN,
 			lun:     lun,
 			manager: manager,
