@@ -1730,19 +1730,17 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 		}
 
 		result, err := dm.prober.ProbeLiveness(pod, podStatus, container, c.ID, c.Created)
-		if err != nil {
-			// TODO(vmarmol): examine this logic.
-			glog.V(2).Infof("probe no-error: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
 		if result == probe.Success {
 			glog.V(4).Infof("probe success: %q", container.Name)
 			containersToKeep[containerID] = index
 			continue
 		}
 		if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-			glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+			if err != nil {
+				glog.Infof("pod %q container %q probe error: %v, it will be killed and re-created.", podFullName, container.Name, err)
+			} else {
+				glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+			}
 			containersToStart[index] = empty{}
 		}
 	}
