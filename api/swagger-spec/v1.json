@@ -560,7 +560,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1184,7 +1184,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1808,7 +1808,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2392,7 +2392,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2920,7 +2920,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3761,7 +3761,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4404,7 +4404,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4921,7 +4921,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7088,7 +7088,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7712,7 +7712,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8395,7 +8395,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9078,7 +9078,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9702,7 +9702,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -10326,7 +10326,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "unversioned.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -11414,8 +11414,9 @@
      }
     }
    },
-   "api.Patch": {
-    "id": "api.Patch",
+   "unversioned.Patch": {
+    "id": "unversioned.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
     "properties": {}
    },
    "unversioned.Status": {

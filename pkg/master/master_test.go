@@ -292,7 +292,7 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 }
 
 // TestExpapi verifies that the unexported exapi creates
-// the an experimental api APIGroupVersion.
+// the an experimental unversioned.APIGroupVersion.
 func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
@@ -367,20 +367,20 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	groupList := api.APIGroupList{}
+	groupList := unversioned.APIGroupList{}
 	assert.NoError(decodeResponse(resp, &groupList))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	expectGroupName := "extensions"
-	expectVersions := []api.GroupVersion{
+	expectVersions := []unversioned.GroupVersion{
 		{
 			GroupVersion: testapi.Extensions.GroupAndVersion(),
 			Version:      testapi.Extensions.Version(),
 		},
 	}
-	expectPreferredVersion := api.GroupVersion{
+	expectPreferredVersion := unversioned.GroupVersion{
 		GroupVersion: config.StorageVersions["extensions"],
 		Version:      apiutil.GetVersion(config.StorageVersions["extensions"]),
 	}

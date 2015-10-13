@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/metrics"
@@ -372,7 +371,7 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 		r.err = err
 		return r
 	}
-	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s2.String())
+	return r.setParam(unversioned.FieldSelectorQueryParam(r.apiVersion), s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
@@ -386,7 +385,7 @@ func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(api.LabelSelectorQueryParam(r.apiVersion), s.String())
+	return r.setParam(unversioned.LabelSelectorQueryParam(r.apiVersion), s.String())
 }
 
 // UintParam creates a query parameter with the given value.
