@@ -1400,9 +1400,11 @@ func RunRC(config RCConfig) error {
 	}
 
 	if oldRunning != config.Replicas {
-		if pods, err := config.Client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+		// List only pods from a given replication controller.
+		if pods, err := config.Client.Pods(api.NamespaceAll).List(label, fields.Everything()); err == nil {
+
 			for _, pod := range pods.Items {
-				Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+				Logf("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
 			}
 		} else {
 			Logf("Can't list pod debug info: %v", err)
