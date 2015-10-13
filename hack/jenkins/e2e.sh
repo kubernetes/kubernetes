@@ -109,7 +109,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Nodes"
     "Etcd\sFailure"
     "MasterCerts"
-    "Daemon\sset"
+    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
     "Deployment"
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
     "Shell"
