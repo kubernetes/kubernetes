@@ -24,8 +24,8 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	unversioned_api "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
@@ -90,10 +90,10 @@ func TestNegotiateVersion(t *testing.T) {
 			Codec: codec,
 			Resp: &http.Response{
 				StatusCode: 200,
-				Body:       objBody(&api.APIVersions{Versions: test.serverVersions}),
+				Body:       objBody(&unversioned_api.APIVersions{Versions: test.serverVersions}),
 			},
 			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 200, Body: objBody(&api.APIVersions{Versions: test.serverVersions})}, nil
+				return &http.Response{StatusCode: 200, Body: objBody(&unversioned_api.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
 		c := unversioned.NewOrDie(test.config)
