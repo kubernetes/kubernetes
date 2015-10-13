@@ -3244,6 +3244,21 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 
+	fractionalComputeSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100m"),
+		},
+	}
+
+	fractionalPodSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourcePods:                   resource.MustParse(".1"),
+			api.ResourceServices:               resource.MustParse(".5"),
+			api.ResourceReplicationControllers: resource.MustParse("1.25"),
+			api.ResourceQuotas:                 resource.MustParse("2.5"),
+		},
+	}
+
 	successCases := []api.ResourceQuota{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -3251,6 +3266,13 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: spec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: fractionalComputeSpec,
 		},
 	}
 
@@ -3283,6 +3305,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"negative-limits": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
 			isNegativeErrorMsg,
+		},
+		"fractional-api-resource": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
+			isNotIntegerErrorMsg,
 		},
 	}
 	for k, v := range errorCases {

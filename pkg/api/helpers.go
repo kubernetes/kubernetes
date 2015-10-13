@@ -80,18 +80,34 @@ var Semantic = conversion.EqualitiesOrDie(
 )
 
 var standardResources = sets.NewString(
-	string(ResourceMemory),
 	string(ResourceCPU),
+	string(ResourceMemory),
 	string(ResourcePods),
 	string(ResourceQuotas),
 	string(ResourceServices),
 	string(ResourceReplicationControllers),
 	string(ResourceSecrets),
 	string(ResourcePersistentVolumeClaims),
-	string(ResourceStorage))
+	string(ResourceStorage),
+)
 
+// IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)
+}
+
+var integerResources = sets.NewString(
+	string(ResourcePods),
+	string(ResourceQuotas),
+	string(ResourceServices),
+	string(ResourceReplicationControllers),
+	string(ResourceSecrets),
+	string(ResourcePersistentVolumeClaims),
+)
+
+// IsIntegerResourceName returns true if the resource is measured in integer values
+func IsIntegerResourceName(str string) bool {
+	return integerResources.Has(str)
 }
 
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
