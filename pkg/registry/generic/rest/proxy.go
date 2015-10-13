@@ -44,30 +44,32 @@ type UpgradeAwareProxyHandler struct {
 	WrapTransport  bool
 	FlushInterval  time.Duration
 	MaxBytesPerSec int64
-	err            error
+	Responder      ErrorResponder
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
 
-// NewUpgradeAwareProxyHandler creates a new proxy handler with a default flush interval
-func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool) *UpgradeAwareProxyHandler {
+// ErrorResponder abstracts error reporting to the proxy handler to remove the need to hardcode a particular
+// error format.
+type ErrorResponder interface {
+	Error(err error)
+}
+
+// NewUpgradeAwareProxyHandler creates a new proxy handler with a default flush interval. Responder is required for returning
+// errors to the caller.
+func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder ErrorResponder) *UpgradeAwareProxyHandler {
 	return &UpgradeAwareProxyHandler{
 		Location:        location,
 		Transport:       transport,
 		WrapTransport:   wrapTransport,
 		UpgradeRequired: upgradeRequired,
 		FlushInterval:   defaultFlushInterval,
+		Responder:       responder,
 	}
-}
-
-// RequestError returns an error that occurred while handling request
-func (h *UpgradeAwareProxyHandler) RequestError() error {
-	return h.err
 }
 
 // ServeHTTP handles the proxy request
 func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	h.err = nil
 	if len(h.Location.Scheme) == 0 {
 		h.Location.Scheme = "http"
 	}
@@ -75,7 +77,7 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 	if h.UpgradeRequired {
-		h.err = errors.NewBadRequest("Upgrade request required")
+		h.Responder.Error(errors.NewBadRequest("Upgrade request required"))
 		return
 	}
 
@@ -108,7 +110,7 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 
 	newReq, err := http.NewRequest(req.Method, loc.String(), req.Body)
 	if err != nil {
-		h.err = err
+		h.Responder.Error(err)
 		return
 	}
 	newReq.Header = req.Header
@@ -127,27 +129,27 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 
 	backendConn, err := proxy.DialURL(h.Location, h.Transport)
 	if err != nil {
-		h.err = err
+		h.Responder.Error(err)
 		return true
 	}
 	defer backendConn.Close()
 
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		h.err = err
+		h.Responder.Error(err)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	newReq, err := http.NewRequest(req.Method, h.Location.String(), req.Body)
 	if err != nil {
-		h.err = err
+		h.Responder.Error(err)
 		return true
 	}
 	newReq.Header = req.Header
 
 	if err = newReq.Write(backendConn); err != nil {
-		h.err = err
+		h.Responder.Error(err)
 		return true
 	}
 

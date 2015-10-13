@@ -26,12 +26,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"golang.org/x/net/websocket"
 
 	"k8s.io/kubernetes/pkg/util/proxy"
 )
+
+type fakeResponder struct {
+	called bool
+	err    error
+}
+
+func (r *fakeResponder) Error(err error) {
+	if r.called {
+		panic("called twice")
+	}
+	r.called = true
+	r.err = err
+}
 
 type SimpleBackendHandler struct {
 	requestURL     url.URL
@@ -110,12 +124,23 @@ func TestServeHTTP(t *testing.T) {
 		responseHeader        map[string]string
 		expectedRespHeader    map[string]string
 		notExpectedRespHeader []string
+		upgradeRequired       bool
+		expectError           func(err error) bool
 	}{
 		{
 			name:         "root path, simple get",
 			method:       "GET",
 			requestPath:  "/",
 			expectedPath: "/",
+		},
+		{
+			name:            "no upgrade header sent",
+			method:          "GET",
+			requestPath:     "/",
+			upgradeRequired: true,
+			expectError: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "Upgrade request required")
+			},
 		},
 		{
 			name:         "simple path, get",
@@ -163,7 +188,7 @@ func TestServeHTTP(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		func() {
 			backendResponse := "<html><head></head><body><a href=\"/test/path\">Hello</a></body></html>"
 			backendResponseHeader := test.responseHeader
@@ -179,10 +204,13 @@ func TestServeHTTP(t *testing.T) {
 			backendServer := httptest.NewServer(backendHandler)
 			defer backendServer.Close()
 
+			responder := &fakeResponder{}
 			backendURL, _ := url.Parse(backendServer.URL)
 			backendURL.Path = test.requestPath
 			proxyHandler := &UpgradeAwareProxyHandler{
-				Location: backendURL,
+				Location:        backendURL,
+				Responder:       responder,
+				UpgradeRequired: test.upgradeRequired,
 			}
 			proxyServer := httptest.NewServer(proxyHandler)
 			defer proxyServer.Close()
@@ -212,6 +240,17 @@ func TestServeHTTP(t *testing.T) {
 			res, err := client.Do(req)
 			if err != nil {
 				t.Errorf("Error from proxy request: %v", err)
+			}
+
+			if test.expectError != nil {
+				if !responder.called {
+					t.Errorf("%d: responder was not invoked", i)
+					return
+				}
+				if !test.expectError(responder.err) {
+					t.Errorf("%d: unexpected error: %v", i, responder.err)
+				}
+				return
 			}
 
 			// Validate backend request
@@ -253,9 +292,8 @@ func TestServeHTTP(t *testing.T) {
 			}
 
 			// Error
-			err = proxyHandler.RequestError()
-			if err != nil {
-				t.Errorf("Unexpected proxy handler error: %v", err)
+			if responder.called {
+				t.Errorf("Unexpected proxy handler error: %v", responder.err)
 			}
 		}()
 	}

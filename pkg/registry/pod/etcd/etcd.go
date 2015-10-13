@@ -283,7 +283,7 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 }
 
 // Connect returns a handler for the pod proxy
-func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (rest.ConnectHandler, error) {
+func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	proxyOpts, ok := opts.(*api.PodProxyOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
@@ -294,7 +294,7 @@ func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (re
 	}
 	location.Path = path.Join(location.Path, proxyOpts.Path)
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
 }
 
 // Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
@@ -316,7 +316,7 @@ func (r *AttachREST) New() runtime.Object {
 }
 
 // Connect returns a handler for the pod exec proxy
-func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
+func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	attachOpts, ok := opts.(*api.PodAttachOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
@@ -325,7 +325,7 @@ func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object) 
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -354,16 +354,16 @@ func (r *ExecREST) New() runtime.Object {
 }
 
 // Connect returns a handler for the pod exec proxy
-func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
+func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	execOpts, ok := opts.(*api.PodExecOptions)
 	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
 	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts)
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -402,16 +402,16 @@ func (r *PortForwardREST) ConnectMethods() []string {
 }
 
 // Connect returns a handler for the pod portforward proxy
-func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
+func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	location, transport, err := pod.PortForwardLocation(r.store, r.kubeletConn, ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
-func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool) *genericrest.UpgradeAwareProxyHandler {
-	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, wrapTransport, upgradeRequired)
+func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
+	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, wrapTransport, upgradeRequired, responder)
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
