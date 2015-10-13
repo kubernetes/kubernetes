@@ -95,7 +95,7 @@ func getRequestedCPU(pod api.Pod) int64 {
 	return result
 }
 
-func verifyResult(c *client.Client, podName string, ns string, oldNotScheduled int) {
+func verifyResult(c *client.Client, podName string, ns string) {
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
@@ -121,7 +121,7 @@ func verifyResult(c *client.Client, podName string, ns string, oldNotScheduled i
 		}
 	}
 
-	Expect(len(notScheduledPods)).To(Equal(1+oldNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	Expect(len(notScheduledPods)).To(Equal(1), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
 	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
@@ -133,6 +133,29 @@ func cleanupPods(c *client.Client, ns string) {
 	for _, p := range pods.Items {
 		expectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
 	}
+}
+
+// Waits until all existing pods are scheduled and returns their amount.
+func waitForStableCluster(c *client.Client) int {
+	timeout := 10 * time.Minute
+	startTime := time.Now()
+
+	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	expectNoError(err)
+	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
+	for len(currentlyNotScheduledPods) != 0 {
+		time.Sleep(2 * time.Second)
+
+		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		expectNoError(err)
+		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
+
+		if startTime.Add(timeout).Before(time.Now()) {
+			Failf("Timed out after %v waiting for stable cluster.", timeout)
+			break
+		}
+	}
+	return len(scheduledPods)
 }
 
 var _ = Describe("SchedulerPredicates", func() {
@@ -175,10 +198,8 @@ var _ = Describe("SchedulerPredicates", func() {
 			Logf("Node: %v", node)
 		}
 
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
-		expectNoError(err)
-		currentlyScheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
-		podsNeededForSaturation := int(totalPodCapacity) - len(currentlyScheduledPods)
+		currentlyScheduledPods := waitForStableCluster(c)
+		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
@@ -201,7 +222,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		})
 
 		podName := "additional-pod"
-		_, err = c.Pods(ns).Create(&api.Pod{
+		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -224,7 +245,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, len(currentlyNotScheduledPods))
+		verifyResult(c, podName, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -238,18 +259,16 @@ var _ = Describe("SchedulerPredicates", func() {
 			Expect(found).To(Equal(true))
 			nodeToCapacityMap[node.Name] = capacity.MilliValue()
 		}
+		waitForStableCluster(c)
 
 		pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		var currentlyDeadPods int
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
 			Expect(found).To(Equal(true))
 			if pod.Status.Phase == api.PodRunning {
 				Logf("Pod %v requesting capacity %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
-			} else {
-				currentlyDeadPods += 1
 			}
 		}
 
@@ -314,7 +333,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, currentlyDeadPods)
+		verifyResult(c, podName, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -324,11 +343,9 @@ var _ = Describe("SchedulerPredicates", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
-		expectNoError(err)
-		_, currentlyNotScheduledPods := getPodsScheduled(allPods)
+		waitForStableCluster(c)
 
-		_, err = c.Pods(ns).Create(&api.Pod{
+		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -354,7 +371,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, len(currentlyNotScheduledPods))
+		verifyResult(c, podName, ns)
 		cleanupPods(c, ns)
 	})
 
