@@ -401,7 +401,7 @@ case ${JOB_NAME} in
   # sequentially. As a reminder, if you need to change the skip list
   # or flaky test list on the release branch, you'll need to propose a
   # pull request directly to the release branch itself.
-  kubernetes-e2e-gce-rc)
+  kubernetes-e2e-gce-release-1.1)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release-1.1"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gce-e2e-1-1"}
