@@ -89,6 +89,16 @@ func GetValidatedSources(sources []string) ([]string, error) {
 	return validated, nil
 }
 
+// GetPodSource returns the source of the pod based on the annotation.
+func GetPodSource(pod *api.Pod) (string, error) {
+	if pod.Annotations != nil {
+		if source, ok := pod.Annotations[ConfigSourceAnnotationKey]; ok {
+			return source, nil
+		}
+	}
+	return "", fmt.Errorf("cannot get source of pod %q", pod.UID)
+}
+
 // SyncPodType classifies pod updates, eg: create, update.
 type SyncPodType int
 
