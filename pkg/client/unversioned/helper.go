@@ -147,14 +147,14 @@ func New(c *Config) (*Client, error) {
 	}
 
 	if _, err := latest.Group("extensions"); err != nil {
-		return &Client{RESTClient: client, ExperimentalClient: nil}, nil
+		return &Client{RESTClient: client, ExtensionsClient: nil}, nil
 	}
 	experimentalConfig := *c
-	experimentalClient, err := NewExperimental(&experimentalConfig)
+	experimentalClient, err := NewExtensions(&experimentalConfig)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{RESTClient: client, ExperimentalClient: experimentalClient}, nil
+	return &Client{RESTClient: client, ExtensionsClient: experimentalClient}, nil
 }
 
 // MatchesServerVersion queries the server to compares the build version

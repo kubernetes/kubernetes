@@ -136,7 +136,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	cl.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Extensions.GroupAndVersion()})
+	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Extensions.GroupAndVersion()})
 
 	storageVersions := make(map[string]string)
 	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
@@ -986,7 +986,7 @@ func main() {
 	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Default.GroupAndVersion()})
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	kubeClient.ExperimentalClient = client.NewExperimentalOrDie(&client.Config{Host: apiServerURL, Version: testapi.Extensions.GroupAndVersion()})
+	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, Version: testapi.Extensions.GroupAndVersion()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

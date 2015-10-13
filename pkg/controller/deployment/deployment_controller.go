@@ -34,7 +34,7 @@ import (
 
 type DeploymentController struct {
 	client        client.Interface
-	expClient     client.ExperimentalInterface
+	expClient     client.ExtensionsInterface
 	eventRecorder record.EventRecorder
 }
 
@@ -45,7 +45,7 @@ func New(client client.Interface) *DeploymentController {
 
 	return &DeploymentController{
 		client:        client,
-		expClient:     client.Experimental(),
+		expClient:     client.Extensions(),
 		eventRecorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),
 	}
 }
@@ -275,5 +275,5 @@ func (d *DeploymentController) scaleRC(rc *api.ReplicationController, newScale i
 
 func (d *DeploymentController) updateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	// TODO: Using client for now, update to use store when it is ready.
-	return d.client.Experimental().Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
+	return d.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
 }

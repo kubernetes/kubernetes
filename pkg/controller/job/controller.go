@@ -86,10 +86,10 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 	jm.jobStore.Store, jm.jobController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return jm.kubeClient.Experimental().Jobs(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return jm.kubeClient.Experimental().Jobs(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
 			},
 		},
 		&extensions.Job{},
@@ -431,7 +431,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ex
 }
 
 func (jm *JobController) updateJobStatus(job *extensions.Job) error {
-	_, err := jm.kubeClient.Experimental().Jobs(job.Namespace).UpdateStatus(job)
+	_, err := jm.kubeClient.Extensions().Jobs(job.Namespace).UpdateStatus(job)
 	return err
 }
 

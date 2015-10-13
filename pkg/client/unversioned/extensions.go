@@ -28,9 +28,9 @@ import (
 
 // Interface holds the experimental methods for clients of Kubernetes
 // to allow mock testing.
-// Experimental features are not supported and may be changed or removed in
+// Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
-type ExperimentalInterface interface {
+type ExtensionsInterface interface {
 	VersionInterface
 	HorizontalPodAutoscalersNamespacer
 	ScaleNamespacer
@@ -40,15 +40,15 @@ type ExperimentalInterface interface {
 	IngressNamespacer
 }
 
-// ExperimentalClient is used to interact with experimental Kubernetes features.
-// Experimental features are not supported and may be changed or removed in
+// ExtensionsClient is used to interact with experimental Kubernetes features.
+// Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
-type ExperimentalClient struct {
+type ExtensionsClient struct {
 	*RESTClient
 }
 
 // ServerVersion retrieves and parses the server's version.
-func (c *ExperimentalClient) ServerVersion() (*version.Info, error) {
+func (c *ExtensionsClient) ServerVersion() (*version.Info, error) {
 	body, err := c.Get().AbsPath("/version").Do().Raw()
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (c *ExperimentalClient) ServerVersion() (*version.Info, error) {
 
 // ServerAPIVersions retrieves and parses the list of experimental API versions the
 // server supports.
-func (c *ExperimentalClient) ServerAPIVersions() (*unversioned.APIVersions, error) {
+func (c *ExtensionsClient) ServerAPIVersions() (*unversioned.APIVersions, error) {
 	body, err := c.Get().UnversionedPath("").Do().Raw()
 	if err != nil {
 		return nil, err
@@ -76,59 +76,59 @@ func (c *ExperimentalClient) ServerAPIVersions() (*unversioned.APIVersions, erro
 	return &v, nil
 }
 
-func (c *ExperimentalClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
+func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
 	return newHorizontalPodAutoscalers(c, namespace)
 }
 
-func (c *ExperimentalClient) Scales(namespace string) ScaleInterface {
+func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
 }
 
-func (c *ExperimentalClient) DaemonSets(namespace string) DaemonSetInterface {
+func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
 	return newDaemonSets(c, namespace)
 }
 
-func (c *ExperimentalClient) Deployments(namespace string) DeploymentInterface {
+func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
 }
 
-func (c *ExperimentalClient) Jobs(namespace string) JobInterface {
+func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
 }
 
-func (c *ExperimentalClient) Ingress(namespace string) IngressInterface {
+func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {
 	return newIngress(c, namespace)
 }
 
-// NewExperimental creates a new ExperimentalClient for the given config. This client
+// NewExtensions creates a new ExtensionsClient for the given config. This client
 // provides access to experimental Kubernetes features.
-// Experimental features are not supported and may be changed or removed in
+// Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
-func NewExperimental(c *Config) (*ExperimentalClient, error) {
+func NewExtensions(c *Config) (*ExtensionsClient, error) {
 	config := *c
-	if err := setExperimentalDefaults(&config); err != nil {
+	if err := setExtensionsDefaults(&config); err != nil {
 		return nil, err
 	}
 	client, err := RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
-	return &ExperimentalClient{client}, nil
+	return &ExtensionsClient{client}, nil
 }
 
-// NewExperimentalOrDie creates a new ExperimentalClient for the given config and
+// NewExtensionsOrDie creates a new ExtensionsClient for the given config and
 // panics if there is an error in the config.
-// Experimental features are not supported and may be changed or removed in
+// Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
-func NewExperimentalOrDie(c *Config) *ExperimentalClient {
-	client, err := NewExperimental(c)
+func NewExtensionsOrDie(c *Config) *ExtensionsClient {
+	client, err := NewExtensions(c)
 	if err != nil {
 		panic(err)
 	}
 	return client
 }
 
-func setExperimentalDefaults(config *Config) error {
+func setExtensionsDefaults(config *Config) error {
 	// if experimental group is not registered, return an error
 	g, err := latest.Group("extensions")
 	if err != nil {
@@ -145,7 +145,7 @@ func setExperimentalDefaults(config *Config) error {
 
 	versionInterfaces, err := g.InterfacesFor(config.Version)
 	if err != nil {
-		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
+		return fmt.Errorf("Extensions API version '%s' is not recognized (valid values: %s)",
 			config.Version, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
 	}
 	config.Codec = versionInterfaces.Codec

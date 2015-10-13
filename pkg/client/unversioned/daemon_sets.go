@@ -40,11 +40,11 @@ type DaemonSetInterface interface {
 
 // daemonSets implements DaemonsSetsNamespacer interface
 type daemonSets struct {
-	r  *ExperimentalClient
+	r  *ExtensionsClient
 	ns string
 }
 
-func newDaemonSets(c *ExperimentalClient, namespace string) *daemonSets {
+func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	return &daemonSets{c, namespace}
 }
 

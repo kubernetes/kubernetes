@@ -43,12 +43,12 @@ type JobInterface interface {
 
 // jobs implements JobsNamespacer interface
 type jobs struct {
-	r  *ExperimentalClient
+	r  *ExtensionsClient
 	ns string
 }
 
 // newJobs returns a jobs
-func newJobs(c *ExperimentalClient, namespace string) *jobs {
+func newJobs(c *ExtensionsClient, namespace string) *jobs {
 	return &jobs{c, namespace}
 }
 
