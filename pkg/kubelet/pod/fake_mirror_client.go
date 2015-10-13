@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package pod
 
 import (
 	"sync"
-	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-type fakeMirrorClient struct {
+type FakeMirrorClient struct {
 	mirrorPodLock sync.RWMutex
 	// Note that a real mirror manager does not store the mirror pods in
 	// itself. This fake manager does this to track calls.
@@ -34,7 +33,15 @@ type fakeMirrorClient struct {
 	deleteCounts map[string]int
 }
 
-func (fmc *fakeMirrorClient) CreateMirrorPod(pod *api.Pod) error {
+func NewFakeMirrorClient() *FakeMirrorClient {
+	m := FakeMirrorClient{}
+	m.mirrorPods = sets.NewString()
+	m.createCounts = make(map[string]int)
+	m.deleteCounts = make(map[string]int)
+	return &m
+}
+
+func (fmc *FakeMirrorClient) CreateMirrorPod(pod *api.Pod) error {
 	fmc.mirrorPodLock.Lock()
 	defer fmc.mirrorPodLock.Unlock()
 	podFullName := kubecontainer.GetPodFullName(pod)
@@ -43,7 +50,7 @@ func (fmc *fakeMirrorClient) CreateMirrorPod(pod *api.Pod) error {
 	return nil
 }
 
-func (fmc *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
+func (fmc *FakeMirrorClient) DeleteMirrorPod(podFullName string) error {
 	fmc.mirrorPodLock.Lock()
 	defer fmc.mirrorPodLock.Unlock()
 	fmc.mirrorPods.Delete(podFullName)
@@ -51,65 +58,26 @@ func (fmc *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
-func newFakeMirrorClient() *fakeMirrorClient {
-	m := fakeMirrorClient{}
-	m.mirrorPods = sets.NewString()
-	m.createCounts = make(map[string]int)
-	m.deleteCounts = make(map[string]int)
-	return &m
-}
-
-func (fmc *fakeMirrorClient) HasPod(podFullName string) bool {
+func (fmc *FakeMirrorClient) HasPod(podFullName string) bool {
 	fmc.mirrorPodLock.RLock()
 	defer fmc.mirrorPodLock.RUnlock()
 	return fmc.mirrorPods.Has(podFullName)
 }
 
-func (fmc *fakeMirrorClient) NumOfPods() int {
+func (fmc *FakeMirrorClient) NumOfPods() int {
 	fmc.mirrorPodLock.RLock()
 	defer fmc.mirrorPodLock.RUnlock()
 	return fmc.mirrorPods.Len()
 }
 
-func (fmc *fakeMirrorClient) GetPods() []string {
+func (fmc *FakeMirrorClient) GetPods() []string {
 	fmc.mirrorPodLock.RLock()
 	defer fmc.mirrorPodLock.RUnlock()
 	return fmc.mirrorPods.List()
 }
 
-func (fmc *fakeMirrorClient) GetCounts(podFullName string) (int, int) {
+func (fmc *FakeMirrorClient) GetCounts(podFullName string) (int, int) {
 	fmc.mirrorPodLock.RLock()
 	defer fmc.mirrorPodLock.RUnlock()
 	return fmc.createCounts[podFullName], fmc.deleteCounts[podFullName]
-}
-
-func TestParsePodFullName(t *testing.T) {
-	type nameTuple struct {
-		Name      string
-		Namespace string
-	}
-	successfulCases := map[string]nameTuple{
-		"bar_foo":         {Name: "bar", Namespace: "foo"},
-		"bar.org_foo.com": {Name: "bar.org", Namespace: "foo.com"},
-		"bar-bar_foo":     {Name: "bar-bar", Namespace: "foo"},
-	}
-	failedCases := []string{"barfoo", "bar_foo_foo", ""}
-
-	for podFullName, expected := range successfulCases {
-		name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
-		if err != nil {
-			t.Errorf("unexpected error when parsing the full name: %v", err)
-			continue
-		}
-		if name != expected.Name || namespace != expected.Namespace {
-			t.Errorf("expected name %q, namespace %q; got name %q, namespace %q",
-				expected.Name, expected.Namespace, name, namespace)
-		}
-	}
-	for _, podFullName := range failedCases {
-		_, _, err := kubecontainer.ParsePodFullName(podFullName)
-		if err == nil {
-			t.Errorf("expected error when parsing the full name, got none")
-		}
-	}
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package pod
 
 import (
 	"reflect"
@@ -25,11 +25,10 @@ import (
 )
 
 // Stub out mirror client for testing purpose.
-func newFakePodManager() (*basicPodManager, *fakeMirrorClient) {
-	podManager := newBasicPodManager(nil)
-	fakeMirrorClient := newFakeMirrorClient()
-	podManager.mirrorClient = fakeMirrorClient
-	return podManager, fakeMirrorClient
+func newTestManager() (*basicManager, *FakeMirrorClient) {
+	fakeMirrorClient := NewFakeMirrorClient()
+	manager := NewBasicPodManager(fakeMirrorClient).(*basicManager)
+	return manager, fakeMirrorClient
 }
 
 // Tests that pods/maps are properly set after the pod update, and the basic
@@ -67,7 +66,7 @@ func TestGetSetPods(t *testing.T) {
 		staticPod,
 	}
 	updates := append(expectedPods, mirrorPod)
-	podManager, _ := newFakePodManager()
+	podManager, _ := newTestManager()
 	podManager.SetPods(updates)
 
 	// Tests that all regular pods are recorded corrrectly.
