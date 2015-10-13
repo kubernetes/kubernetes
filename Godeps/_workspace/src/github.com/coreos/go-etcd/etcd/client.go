@@ -192,7 +192,7 @@ func (c *Client) Close() {
 // initHTTPClient initializes a HTTP client for etcd client
 func (c *Client) initHTTPClient() {
 	c.transport = &http.Transport{
-		Dial: c.dial,
+		Dial: c.DefaultDial,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
@@ -216,12 +216,12 @@ func (c *Client) initHTTPSClient(cert, key string) error {
 		InsecureSkipVerify: true,
 	}
 
-	tr := &http.Transport{
+	c.transport = &http.Transport{
 		TLSClientConfig: tlsConfig,
-		Dial:            c.dial,
+		Dial:            c.DefaultDial,
 	}
 
-	c.httpClient = &http.Client{Transport: tr}
+	c.httpClient = &http.Client{Transport: c.transport}
 	return nil
 }
 
@@ -391,29 +391,15 @@ func (c *Client) createHttpPath(serverName string, _path string) string {
 	return u.String()
 }
 
-// dial attempts to open a TCP connection to the provided address, explicitly
+// DefaultDial attempts to open a TCP connection to the provided address, explicitly
 // enabling keep-alives with a one-second interval.
-func (c *Client) dial(network, addr string) (net.Conn, error) {
-	conn, err := net.DialTimeout(network, addr, c.config.DialTimeout)
-	if err != nil {
-		return nil, err
+func (c *Client) DefaultDial(network, addr string) (net.Conn, error) {
+	dialer := net.Dialer{
+		Timeout:   c.config.DialTimeout,
+		KeepAlive: time.Second,
 	}
 
-	tcpConn, ok := conn.(*net.TCPConn)
-	if !ok {
-		return nil, errors.New("Failed type-assertion of net.Conn as *net.TCPConn")
-	}
-
-	// Keep TCP alive to check whether or not the remote machine is down
-	if err = tcpConn.SetKeepAlive(true); err != nil {
-		return nil, err
-	}
-
-	if err = tcpConn.SetKeepAlivePeriod(time.Second); err != nil {
-		return nil, err
-	}
-
-	return tcpConn, nil
+	return dialer.Dial(network, addr)
 }
 
 func (c *Client) OpenCURL() {
