@@ -22,7 +22,7 @@ source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 detect-project &> /dev/null
 
-MASTER_NAME="hollow-cluster-master"
+MASTER_NAME="${INSTANCE_PREFIX:-"default"}-kubemark-master"
 
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
