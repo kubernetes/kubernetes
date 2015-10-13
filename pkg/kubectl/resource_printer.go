@@ -46,11 +46,11 @@ import (
 )
 
 const (
-	tabwriterMinWidth = 10
-	tabwriterWidth    = 4
-	tabwriterPadding  = 3
-	tabwriterPadChar  = ' '
-	tabwriterFlags    = 0
+	TabwriterMinWidth = 10
+	TabwriterWidth    = 4
+	TabwriterPadding  = 3
+	TabwriterPadChar  = ' '
+	TabwriterFlags    = 0
 )
 
 // GetPrinter takes a format type, an optional format argument. It will return true
@@ -1477,8 +1477,11 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
-	w := tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
-	defer w.Flush()
+	w, found := output.(*tabwriter.Writer)
+	if !found {
+		w = tabwriter.NewWriter(output, TabwriterMinWidth, TabwriterWidth, TabwriterPadding, TabwriterPadChar, TabwriterFlags)
+		defer w.Flush()
+	}
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
 		if !h.noHeaders && t != h.lastType {
