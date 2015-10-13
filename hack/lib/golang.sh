@@ -70,7 +70,7 @@ kube::golang::test_targets() {
     cmd/genconversion
     cmd/gendeepcopy
     cmd/genswaggertypedocs
-    examples/k8petstore/web-server
+    examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
