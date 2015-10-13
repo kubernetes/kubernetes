@@ -49,7 +49,7 @@ spec:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
       - name: skydns
-        image: gcr.io/google_containers/skydns:2015-03-11-001
+        image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
         resources:
           limits:
             cpu: 100m
@@ -58,7 +58,7 @@ spec:
         # command = "/skydns"
         - -machines=http://localhost:4001
         - -addr=0.0.0.0:53
-        - -rtimeout=1s
+        - -ns-rotate=false
         - -domain={{ pillar['dns_domain'] }}.
         ports:
         - containerPort: 53
