@@ -169,7 +169,7 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
 			Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
 		},
 	}
-	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	expectNoError(errHPA)
 }
 
@@ -192,6 +192,6 @@ func createMemoryHorizontalPodAutoscaler(rc *ResourceConsumer, memory string) {
 			Target:      extensions.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
 		},
 	}
-	_, errHPA := rc.framework.Client.Experimental().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	expectNoError(errHPA)
 }

@@ -97,10 +97,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Experimental().DaemonSets(api.NamespaceAll).List(labels.Everything())
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return dsc.kubeClient.Experimental().DaemonSets(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
 			},
 		},
 		&extensions.DaemonSet{},
@@ -460,7 +460,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 		}
 	}
 
-	err = storeDaemonSetStatus(dsc.kubeClient.Experimental().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled)
+	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled)
 	if err != nil {
 		glog.Errorf("Error storing status for daemon set %+v: %v", ds, err)
 	}

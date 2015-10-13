@@ -202,7 +202,7 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 
 // ScaleSimple is responsible for updating job's parallelism.
 func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
-	job, err := scaler.c.Experimental().Jobs(namespace).Get(name)
+	job, err := scaler.c.Extensions().Jobs(namespace).Get(name)
 	if err != nil {
 		return ControllerScaleError{ControllerScaleGetFailure, "Unknown", err}
 	}
@@ -213,7 +213,7 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	}
 	parallelism := int(newSize)
 	job.Spec.Parallelism = &parallelism
-	if _, err := scaler.c.Experimental().Jobs(namespace).Update(job); err != nil {
+	if _, err := scaler.c.Extensions().Jobs(namespace).Update(job); err != nil {
 		if errors.IsInvalid(err) {
 			return ControllerScaleError{ControllerScaleUpdateInvalidFailure, job.ResourceVersion, err}
 		}
@@ -239,7 +239,7 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 		return err
 	}
 	if waitForReplicas != nil {
-		job, err := scaler.c.Experimental().Jobs(namespace).Get(name)
+		job, err := scaler.c.Extensions().Jobs(namespace).Get(name)
 		if err != nil {
 			return err
 		}

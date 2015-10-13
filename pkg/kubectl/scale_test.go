@@ -78,12 +78,12 @@ func (c *ErrorJobClient) Jobs(namespace string) client.JobInterface {
 	return &ErrorJobs{testclient.FakeJobs{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
 }
 
-type ErrorExperimentalClient struct {
+type ErrorExtensionsClient struct {
 	testclient.Fake
 	invalid bool
 }
 
-func (c *ErrorExperimentalClient) Experimental() client.ExperimentalInterface {
+func (c *ErrorExtensionsClient) Extensions() client.ExtensionsInterface {
 	return &ErrorJobClient{testclient.FakeExperimental{&c.Fake}, c.invalid}
 }
 
@@ -287,7 +287,7 @@ func TestValidateReplicationController(t *testing.T) {
 }
 
 func TestJobScaleRetry(t *testing.T) {
-	fake := &ErrorExperimentalClient{Fake: testclient.Fake{}, invalid: false}
+	fake := &ErrorExtensionsClient{Fake: testclient.Fake{}, invalid: false}
 	scaler := JobScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -331,7 +331,7 @@ func TestJobScale(t *testing.T) {
 }
 
 func TestJobScaleInvalid(t *testing.T) {
-	fake := &ErrorExperimentalClient{Fake: testclient.Fake{}, invalid: true}
+	fake := &ErrorExtensionsClient{Fake: testclient.Fake{}, invalid: true}
 	scaler := JobScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
