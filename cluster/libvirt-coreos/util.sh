@@ -51,6 +51,16 @@ function detect-minions {
   KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
+# Creates apiserver parameter for apis extension support.
+# If RUNTIME_CONFIG contains extensions/v1beta1 modify parameter for api-server
+RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
+function detect-api-extension {
+    API_VERSION="api/v1"
+    if [[ $RUNTIME_CONFIG = *extensions/v1beta1* ]]; then
+        API_VERSION="extensions/v1beta1"
+    fi
+}
+
 # Verify prereqs on host machine
 function verify-prereqs {
   if ! which virsh >/dev/null; then
@@ -181,6 +191,7 @@ function wait-cluster-readiness {
 
 # Instantiate a kubernetes cluster
 function kube-up {
+  detect-api-extension
   detect-master
   detect-minions
   gen-kube-bearertoken
