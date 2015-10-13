@@ -428,6 +428,39 @@ runTests() {
   # Post-condition: valid-pod POD has image kubernetes/pause
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'kubernetes/pause:'
 
+  ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
+  ERROR_FILE="${KUBE_TEMP}/conflict-error"
+  ## If the resourceVersion is the same as the one stored in the server, the patch will be applied.
+  # Command
+  # Needs to retry because other party may change the resource.
+  for count in $(seq 0 3); do
+    resourceVersion=$(kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
+    kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'$resourceVersion'"}}' 2> "${ERROR_FILE}" || true
+    if grep -q "the object has been modified" "${ERROR_FILE}"; then
+      kube::log::status "retry $1, error: $(cat ${ERROR_FILE})"
+      rm "${ERROR_FILE}"
+      sleep $((2**count))
+    else
+      rm "${ERROR_FILE}"
+      kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+      break
+    fi
+  done
+
+  ## If the resourceVersion is the different from the one stored in the server, the patch will be rejected.
+  resourceVersion=$(kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
+  ((resourceVersion+=100))
+  # Command
+  kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'$resourceVersion'"}}' 2> "${ERROR_FILE}" || true
+  # Post-condition: should get an error reporting the conflict
+  if grep -q "please apply your changes to the latest version and try again" "${ERROR_FILE}"; then
+    kube::log::status "\"kubectl patch with resourceVersion $resourceVersion\" returns error as expected: $(cat ${ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl patch with resourceVersion $resourceVersion\" returns unexpected error or non-error: $(cat ${ERROR_FILE})"
+    exit 1
+  fi
+  rm "${ERROR_FILE}"
+
   ## --force replace pod can change other field, e.g., spec.container.name
   # Command
   kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
@@ -438,7 +471,7 @@ runTests() {
   rm /tmp/tmp-valid-pod.json
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e '#!/bin/bash\nsed -i "s/kubernetes\/pause/gcr.io\/google_containers\/serve_hostname/g" $1' > /tmp/tmp-editor.sh
+  echo -e '#!/bin/bash\nsed -i "s/nginx/gcr.io\/google_containers\/serve_hostname/g" $1' > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
   # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
