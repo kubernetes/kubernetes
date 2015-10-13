@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // namespace contains a controller that handles namespace lifecycle
-package namespacecontroller
+package namespace
