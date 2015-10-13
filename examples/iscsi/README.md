@@ -50,7 +50,7 @@ GCE does not provide preconfigured Fedora 21 image, so I set up the iSCSI target
 
 ## Step 2. Creating the pod with iSCSI persistent storage
 
-Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on my example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean.
+Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on my example *iscsi.yaml*. In the pod YAML, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean.
 
 **Note:** If you have followed the instructions in the links above you
 may have partitioned the device, the iSCSI volume plugin does not
@@ -65,13 +65,13 @@ mkfs.ext4 /dev/<name of device>
 Once your pod is created, run it on the Kubernetes master:
 
 ```console
-kubectl create -f ./your_new_pod.json
+kubectl create -f ./your_new_pod.yaml
 ```
 
 Here is my command and output:
 
 ```console
-# kubectl create -f examples/iscsi/iscsi.json
+# kubectl create -f examples/iscsi/iscsi.yaml
 # kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 iscsipd   2/2       RUNNING   0           2m
