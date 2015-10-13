@@ -109,5 +109,14 @@ func addDefaultingFuncs() {
 				obj.Spec.Parallelism = obj.Spec.Completions
 			}
 		},
+		func(obj *HorizontalPodAutoscaler) {
+			if obj.Spec.MinReplicas == nil {
+				minReplicas := 1
+				obj.Spec.MinReplicas = &minReplicas
+			}
+			if obj.Spec.CPUUtilization == nil {
+				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
+			}
+		},
 	)
 }

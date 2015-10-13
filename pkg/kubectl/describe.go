@@ -1250,17 +1250,14 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 			hpa.Spec.ScaleRef.Namespace,
 			hpa.Spec.ScaleRef.Name,
 			hpa.Spec.ScaleRef.Subresource)
-		fmt.Fprintf(out, "Target resource consumption:\t%s %s\n",
-			hpa.Spec.Target.Quantity.String(),
-			hpa.Spec.Target.Resource)
-		fmt.Fprintf(out, "Current resource consumption:\t")
-
-		if hpa.Status.CurrentConsumption != nil {
-			fmt.Fprintf(out, "%s %s\n",
-				hpa.Status.CurrentConsumption.Quantity.String(),
-				hpa.Status.CurrentConsumption.Resource)
-		} else {
-			fmt.Fprintf(out, "<not available>\n")
+		if hpa.Spec.CPUUtilization != nil {
+			fmt.Fprintf(out, "Target CPU utilization:\t%d%%\n", hpa.Spec.CPUUtilization.TargetPercentage)
+			fmt.Fprintf(out, "Current CPU utilization:\t")
+			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
+				fmt.Fprintf(out, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
+			} else {
+				fmt.Fprintf(out, "<not available>\n")
+			}
 		}
 		fmt.Fprintf(out, "Min pods:\t%d\n", hpa.Spec.MinReplicas)
 		fmt.Fprintf(out, "Max pods:\t%d\n", hpa.Spec.MaxReplicas)
