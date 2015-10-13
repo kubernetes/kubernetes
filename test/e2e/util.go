@@ -20,14 +20,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/prometheus/client_golang/extraction"
-	"github.com/prometheus/client_golang/model"
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -1858,187 +1853,6 @@ func filterNodes(nodeList *api.NodeList, fn func(node api.Node) bool) {
 		}
 	}
 	nodeList.Items = l
-}
-
-// LatencyMetrics stores data about request latency at a given quantile
-// broken down by verb (e.g. GET, PUT, LIST) and resource (e.g. pods, services).
-type LatencyMetric struct {
-	Verb     string
-	Resource string
-	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
-	Quantile float64
-	Latency  time.Duration
-}
-
-// latencyMetricIngestor implements extraction.Ingester
-type latencyMetricIngester []LatencyMetric
-
-func (l *latencyMetricIngester) Ingest(samples model.Samples) error {
-	for _, sample := range samples {
-		// Example line:
-		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
-			continue
-		}
-
-		resource := string(sample.Metric["resource"])
-		verb := string(sample.Metric["verb"])
-		latency := sample.Value
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return err
-		}
-		*l = append(*l, LatencyMetric{
-			verb,
-			resource,
-			quantile,
-			time.Duration(int64(latency)) * time.Microsecond,
-		})
-	}
-	return nil
-}
-
-// LatencyMetricByLatency implements sort.Interface for []LatencyMetric based on
-// the latency field.
-type LatencyMetricByLatency []LatencyMetric
-
-func (a LatencyMetricByLatency) Len() int           { return len(a) }
-func (a LatencyMetricByLatency) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a LatencyMetricByLatency) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
-
-func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
-	body, err := getMetrics(c)
-	if err != nil {
-		return nil, err
-	}
-	var ingester latencyMetricIngester
-	err = extraction.Processor004.ProcessSingle(strings.NewReader(body), &ingester, &extraction.ProcessOptions{})
-	return ingester, err
-}
-
-// Prints summary metrics for request types with latency above threshold
-// and returns number of such request types.
-func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResources sets.String) (int, error) {
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
-
-	metrics, err := ReadLatencyMetrics(c)
-	if err != nil {
-		return 0, err
-	}
-	sort.Sort(sort.Reverse(LatencyMetricByLatency(metrics)))
-	var badMetrics []LatencyMetric
-	top := 5
-	for _, metric := range metrics {
-		if ignoredResources.Has(metric.Resource) || ignoredVerbs.Has(metric.Verb) {
-			continue
-		}
-		isBad := false
-		if metric.Latency > threshold &&
-			// We are only interested in 99%tile, but for logging purposes
-			// it's useful to have all the offending percentiles.
-			metric.Quantile <= 0.99 {
-			badMetrics = append(badMetrics, metric)
-			isBad = true
-		}
-		if top > 0 || isBad {
-			top--
-			prefix := ""
-			if isBad {
-				prefix = "WARNING "
-			}
-			Logf("%vTop latency metric: %+v", prefix, metric)
-		}
-	}
-
-	return len(badMetrics), nil
-}
-
-// Reset latency metrics in apiserver.
-func resetMetrics(c *client.Client) error {
-	Logf("Resetting latency metrics in apiserver...")
-	body, err := c.Get().AbsPath("/resetMetrics").DoRaw()
-	if err != nil {
-		return err
-	}
-	if string(body) != "metrics reset\n" {
-		return fmt.Errorf("Unexpected response: %q", string(body))
-	}
-	return nil
-}
-
-// Retrieve metrics information
-func getMetrics(c *client.Client) (string, error) {
-	body, err := c.Get().AbsPath("/metrics").DoRaw()
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
-}
-
-// Retrieve debug information
-func getDebugInfo(c *client.Client) (map[string]string, error) {
-	data := make(map[string]string)
-	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
-		resp, err := http.Get(c.Get().AbsPath(fmt.Sprintf("debug/pprof/%s", key)).URL().String() + "?debug=2")
-		if err != nil {
-			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			Logf("Warning: Error trying to read %s debug data: %v", key, err)
-		}
-		data[key] = string(body)
-	}
-	return data, nil
-}
-
-func writePerfData(c *client.Client, dirName string, postfix string) error {
-	fname := fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix)
-
-	handler, err := os.Create(fname)
-	if err != nil {
-		return fmt.Errorf("Error creating file '%s': %v", fname, err)
-	}
-
-	metrics, err := getMetrics(c)
-	if err != nil {
-		return fmt.Errorf("Error retrieving metrics: %v", err)
-	}
-
-	_, err = handler.WriteString(metrics)
-	if err != nil {
-		return fmt.Errorf("Error writing metrics: %v", err)
-	}
-
-	err = handler.Close()
-	if err != nil {
-		return fmt.Errorf("Error closing '%s': %v", fname, err)
-	}
-
-	debug, err := getDebugInfo(c)
-	if err != nil {
-		return fmt.Errorf("Error retrieving debug information: %v", err)
-	}
-
-	for key, value := range debug {
-		fname := fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix)
-		handler, err = os.Create(fname)
-		if err != nil {
-			return fmt.Errorf("Error creating file '%s': %v", fname, err)
-		}
-		_, err = handler.WriteString(value)
-		if err != nil {
-			return fmt.Errorf("Error writing %s: %v", key, err)
-		}
-
-		err = handler.Close()
-		if err != nil {
-			return fmt.Errorf("Error closing '%s': %v", fname, err)
-		}
-	}
-	return nil
 }
 
 // parseKVLines parses output that looks like lines containing "<key>: <val>"
