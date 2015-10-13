@@ -333,6 +333,30 @@ function wait-for-jobs {
   fi
 }
 
+# Robustly try to create a static ip.
+# $1: The name of the ip to create
+# $2: The name of the region to create the ip in.
+function create-static-ip {
+  detect-project
+  local attempt=0
+  local REGION="$2"
+  while true; do
+    if ! gcloud compute addresses create "$1" \
+      --project "${PROJECT}" \
+      --region "${REGION}" -q > /dev/null; then
+      if (( attempt > 4 )); then
+        echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
+        exit 2
+      fi
+      attempt=$(($attempt+1)) 
+      echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
+      sleep $(($attempt * 5))
+    else
+      break
+    fi
+  done
+}
+
 # Robustly try to create a firewall rule.
 # $1: The name of firewall rule.
 # $2: IP ranges.
@@ -347,12 +371,13 @@ function create-firewall-rule {
       --source-ranges "$2" \
       --target-tags "$3" \
       --allow tcp,udp,icmp,esp,ah,sctp; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
+      if (( attempt > 4 )); then
+        echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}" >&2
+        exit 2
+      fi
+      echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
+      attempt=$(($attempt+1))
+      sleep $(($attempt * 5))
     else
         break
     fi
@@ -654,7 +679,8 @@ function kube-up {
   # so extract the region name, which is the same as the zone but with the final
   # dash and characters trailing the dash removed.
   local REGION=${ZONE%-*}
-  MASTER_RESERVED_IP=$(gcloud compute addresses create "${MASTER_NAME}-ip" \
+  create-static-ip "${MASTER_NAME}-ip" "${REGION}"
+  MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
     --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
 
