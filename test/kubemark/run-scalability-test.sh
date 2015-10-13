@@ -25,8 +25,7 @@ ABSOLUTE_ROOT=$(readlink -f ${KUBE_ROOT})
 source ${KUBE_ROOT}/cluster/kubemark/util.sh
 source ${KUBE_ROOT}/cluster/kubemark/config-default.sh
 
-echo ${KUBERNETES_PROVIDER}
-echo ${MASTER_NAME}
+echo "Kubemark master name: ${MASTER_NAME}"
 
 detect-master
 
