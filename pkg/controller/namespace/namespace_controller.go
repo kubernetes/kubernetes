@@ -43,7 +43,7 @@ type NamespaceController struct {
 }
 
 // NewNamespaceController creates a new NamespaceController
-func NewNamespaceController(kubeClient client.Interface, versions *api.APIVersions, resyncPeriod time.Duration) *NamespaceController {
+func NewNamespaceController(kubeClient client.Interface, versions *unversioned.APIVersions, resyncPeriod time.Duration) *NamespaceController {
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
@@ -155,7 +155,7 @@ func (e *contentRemainingError) Error() string {
 // deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
 // of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
 // are guaranteed to be gone.
-func deleteAllContent(kubeClient client.Interface, versions *api.APIVersions, namespace string, before unversioned.Time) (estimate int64, err error) {
+func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVersions, namespace string, before unversioned.Time) (estimate int64, err error) {
 	err = deleteServiceAccounts(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
@@ -195,7 +195,6 @@ func deleteAllContent(kubeClient client.Interface, versions *api.APIVersions, na
 	// If experimental mode, delete all experimental resources for the namespace.
 	if containsVersion(versions, "extensions/v1beta1") {
 		resources, err := kubeClient.SupportedResourcesForGroupVersion("extensions/v1beta1")
-		glog.Errorf("%v", resources)
 		if err != nil {
 			return estimate, err
 		}
@@ -269,7 +268,7 @@ func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Names
 }
 
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(kubeClient client.Interface, versions *api.APIVersions, namespace *api.Namespace) (err error) {
+func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) (err error) {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -532,7 +531,7 @@ func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
 }
 
 // TODO: this is duplicated logic.  Move it somewhere central?
-func containsVersion(versions *api.APIVersions, version string) bool {
+func containsVersion(versions *unversioned.APIVersions, version string) bool {
 	for ix := range versions.Versions {
 		if versions.Versions[ix] == version {
 			return true
@@ -542,7 +541,7 @@ func containsVersion(versions *api.APIVersions, version string) bool {
 }
 
 // TODO: this is duplicated logic.  Move it somewhere central?
-func containsResource(resources *api.APIResourceList, resourceName string) bool {
+func containsResource(resources *unversioned.APIResourceList, resourceName string) bool {
 	if resources == nil {
 		return false
 	}
