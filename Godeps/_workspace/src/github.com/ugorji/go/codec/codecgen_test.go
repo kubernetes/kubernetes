@@ -8,6 +8,7 @@ import (
 )
 
 func TestCodecgenJson1(t *testing.T) {
+	// This is just a simplistic test for codecgen.
 	const callCodecgenDirect bool = true
 	v := newTestStruc(2, false, !testSkipIntf, false)
 	var bs []byte
