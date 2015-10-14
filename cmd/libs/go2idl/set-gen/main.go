@@ -104,7 +104,7 @@ limitations under the License.
 			// Make a separate file for the Empty type, since it's shared by every type.
 			generator.DefaultGen{
 				OptionalName: "empty",
-				OptionalBody: []byte(emptyTypeDecl),
+				Body:         []byte(emptyTypeDecl),
 			},
 		}
 		// Since we want a file per type that we generate a set for, we
