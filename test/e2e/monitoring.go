@@ -132,6 +132,24 @@ func getAllNodesInCluster(c *client.Client) ([]string, error) {
 	return result, nil
 }
 
+func getInfluxdbClient(c *client.Client) (*influxdb.Client, error) {
+	kubeMasterHttpClient, ok := c.Client.(*http.Client)
+	if !ok {
+		Failf("failed to get master http client")
+	}
+	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/%s/services/%s:api/", getMasterHost(), api.NamespaceSystem, influxdbService)
+	config := &influxdb.ClientConfig{
+		Host: proxyUrl,
+		// TODO(vishh): Infer username and pw from the Pod spec.
+		Username:   influxdbUser,
+		Password:   influxdbPW,
+		Database:   influxdbDatabaseName,
+		HttpClient: kubeMasterHttpClient,
+		IsSecure:   true,
+	}
+	return influxdb.NewClient(config)
+}
+
 func getInfluxdbData(c *influxdb.Client, query string) (map[string]bool, error) {
 	series, err := c.Query(query, influxdb.Second)
 	if err != nil {
@@ -204,21 +222,8 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	expectNoError(err)
 	expectNoError(expectedServicesExist(c))
 	// TODO: Wait for all pods and services to be running.
-	kubeMasterHttpClient, ok := c.Client.(*http.Client)
-	if !ok {
-		Failf("failed to get master http client")
-	}
-	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/%s/services/%s:api/", getMasterHost(), api.NamespaceSystem, influxdbService)
-	config := &influxdb.ClientConfig{
-		Host: proxyUrl,
-		// TODO(vishh): Infer username and pw from the Pod spec.
-		Username:   influxdbUser,
-		Password:   influxdbPW,
-		Database:   influxdbDatabaseName,
-		HttpClient: kubeMasterHttpClient,
-		IsSecure:   true,
-	}
-	influxdbClient, err := influxdb.NewClient(config)
+
+	influxdbClient, err := getInfluxdbClient(c)
 	expectNoError(err, "failed to create influxdb client")
 
 	expectedNodes, err := getAllNodesInCluster(c)

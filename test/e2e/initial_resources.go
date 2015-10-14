@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	influxdb "github.com/influxdb/influxdb/client"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
@@ -28,7 +29,15 @@ import (
 var _ = Describe("Initial Resources", func() {
 	f := NewFramework("initial-resources")
 
-	It("[Skipped] should set initial resources based on historical data", func() {
+	It("[Skipped][Autoscaling Suite] should set initial resources based on historical data", func() {
+		// Cleanup data in InfluxDB that left from previous tests.
+		influxdbClient, err := getInfluxdbClient(f.Client)
+		expectNoError(err, "failed to create influxdb client")
+		_, err = influxdbClient.Query("drop series autoscaling.cpu.usage.2m", influxdb.Second)
+		expectNoError(err)
+		_, err = influxdbClient.Query("drop series autoscaling.memory.usage.2m", influxdb.Second)
+		expectNoError(err)
+
 		cpu := 100
 		mem := 200
 		for i := 0; i < 10; i++ {
