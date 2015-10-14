@@ -109,7 +109,7 @@ func TestClient(t *testing.T) {
 }
 
 func TestSingleWatch(t *testing.T) {
-	_, s := runAMaster(t)
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	ns := "blargh"

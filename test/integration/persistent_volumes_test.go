@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func init() {
@@ -38,7 +39,7 @@ func init() {
 }
 
 func TestPersistentVolumeRecycler(t *testing.T) {
-	_, s := runAMaster(t)
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	deleteAllEtcdKeys()
