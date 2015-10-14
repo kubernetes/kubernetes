@@ -75,7 +75,7 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := latest.GroupOrDie("extensions").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "extensions/v1beta1" || k != "HorizontalPodAutoscaler" {
+	if v, k, err := latest.GroupOrDie("extensions").RESTMapper.VersionAndKindForResource("extensions/horizontalpodautoscalers"); err != nil || v != "extensions/v1beta1" || k != "HorizontalPodAutoscaler" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 

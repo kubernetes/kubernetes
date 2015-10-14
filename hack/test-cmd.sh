@@ -163,6 +163,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
+  --runtime_config="extensions/v1beta1=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -986,6 +987,25 @@ __EOF__
   kubectl patch "${kube_flags[@]}" nodes "127.0.0.1" -p='{"spec":{"unschedulable":null}}'
   # Post-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+
+
+  ###########################
+  # In-development resource #
+  ###########################
+
+  ### Create and delete a deployment example
+  # Pre-condition: no persistent deployment currently exist
+  kube::test::get_object_assert extensions/deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/experimental/deployment.yaml
+  # Post-condition: deployment "nginx-deployment" is created
+  kube::test::get_object_assert extensions/deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  # Clean up
+  kubectl delete extensions/deployment nginx-deployment
+  ### Get in-development resource via shortname
+  kubectl get extensions/hpa
+  ### Get in-development resource via shortname implicitly should fail
+  ! kubectl get hpa
 
 
   #####################
