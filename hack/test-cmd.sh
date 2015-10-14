@@ -32,18 +32,25 @@ function stop-proxy()
   PROXY_PID=
 }
 
-# Starts "kubect proxy" to test the client proxy. You may pass options, e.g.
-# --api-prefix.
+# Starts "kubect proxy" to test the client proxy. $1: api_prefix
 function start-proxy()
 {
   stop-proxy
 
   kube::log::status "Starting kubectl proxy"
-  # the --www and --www-prefix are just to make something definitely show up for
-  # wait_for_url to see.
-  kubectl proxy -p ${PROXY_PORT} --www=. --www-prefix=/healthz "$@" 1>&2 &
+
+  if [ $# -eq 0 ]; then
+    kubectl proxy -p ${PROXY_PORT} --www=. 1>&2 & break
+  else
+    kubectl proxy -p ${PROXY_PORT} --www=. --api-prefix="$1" 1>&2 & break
+  fi
+
   PROXY_PID=$!
-  kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy $@"
+  if [ $# -eq 0 ]; then
+    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy"
+  else
+    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/$1/healthz" "kubectl proxy --api-prefix=$1"
+  fi
 }
 
 function cleanup()
@@ -198,7 +205,7 @@ runTests() {
   if [[ -n "${version}" ]]; then
     check-curl-proxy-code /api/${version}/namespaces 200
   fi
-  check-curl-proxy-code /healthz/ 200
+  check-curl-proxy-code /static/ 200
   stop-proxy
 
   # Make sure the in-development api is accessible by default
@@ -208,7 +215,7 @@ runTests() {
   stop-proxy
 
   # Custom paths let you see everything.
-  start-proxy --api-prefix=/custom
+  start-proxy /custom
   check-curl-proxy-code /custom/ui 301
   check-curl-proxy-code /custom/metrics 200
   if [[ -n "${version}" ]]; then
