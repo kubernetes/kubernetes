@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -232,13 +234,31 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			}
 			outputObj = info.Object
 		} else {
-			outputObj, err = cmdutil.UpdateObject(info, func(obj runtime.Object) error {
-				err := labelFunc(obj, overwrite, resourceVersion, lbls, remove)
-				if err != nil {
-					return err
-				}
-				return nil
-			})
+			name, namespace, obj := info.Name, info.Namespace, info.Object
+			oldData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			if err := labelFunc(obj, overwrite, resourceVersion, lbls, remove); err != nil {
+				return err
+			}
+			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			if err != nil {
+				return err
+			}
+
+			mapping := info.ResourceMapping()
+			client, err := f.RESTClient(mapping)
+			if err != nil {
+				return err
+			}
+			helper := resource.NewHelper(client, mapping)
+
+			outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
 			if err != nil {
 				return err
 			}
