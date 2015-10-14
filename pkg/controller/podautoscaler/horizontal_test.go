@@ -58,6 +58,8 @@ type testCase struct {
 	maxReplicas     int
 	initialReplicas int
 	desiredReplicas int
+	CPUTarget       extensions.Utilization
+	CPURequest      resource.Quantity
 	targetResource  api.ResourceName
 	targetLevel     resource.Quantity
 	reportedLevels  []uint64
@@ -94,10 +96,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 						},
 						MinReplicas: tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
-						Target:      extensions.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel},
 					},
 				},
 			},
+		}
+		if len(tc.targetResource) > 0 {
+			obj.Items[0].Spec.Target = extensions.ResourceConsumption{Resource: tc.targetResource, Quantity: tc.targetLevel}
+		}
+		if tc.CPUTarget > 0.0 {
+			obj.Items[0].Spec.CPUUtilization = &extensions.CPUTargetUtilization{UtilizationTarget: tc.CPUTarget}
 		}
 		return true, obj, nil
 	})
@@ -132,6 +139,17 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 					Namespace: namespace,
 					Labels: map[string]string{
 						"name": podNamePrefix,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: tc.CPURequest,
+								},
+							},
+						},
 					},
 				},
 			}
@@ -356,6 +374,44 @@ func TestEventNotCreated(t *testing.T) {
 		targetLevel:     resource.MustParse("0.2"),
 		reportedLevels:  []uint64{200, 200},
 		verifyEvents:    true,
+	}
+	tc.runTest(t)
+}
+
+func TestCPUUtilization(t *testing.T) {
+	tc := testCase{
+		minReplicas:     1,
+		maxReplicas:     5,
+		initialReplicas: 1,
+		desiredReplicas: 2,
+		CPUTarget:       0.5,
+		CPURequest:      resource.MustParse("0.2"),
+		reportedLevels:  []uint64{200},
+	}
+	tc.runTest(t)
+}
+
+func TestMissingCPURequest(t *testing.T) {
+	tc := testCase{
+		minReplicas:     1,
+		maxReplicas:     5,
+		initialReplicas: 1,
+		desiredReplicas: 1,
+		CPUTarget:       0.5,
+		reportedLevels:  []uint64{200},
+	}
+	tc.runTest(t)
+}
+
+func TestCPUUtilizationTolerance(t *testing.T) {
+	tc := testCase{
+		minReplicas:     1,
+		maxReplicas:     5,
+		initialReplicas: 1,
+		desiredReplicas: 1,
+		CPUTarget:       0.5,
+		CPURequest:      resource.MustParse("0.2"),
+		reportedLevels:  []uint64{105, 109, 107},
 	}
 	tc.runTest(t)
 }

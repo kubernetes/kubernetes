@@ -2145,6 +2145,18 @@ func convert_extensions_APIVersion_To_v1beta1_APIVersion(in *extensions.APIVersi
 	return autoconvert_extensions_APIVersion_To_v1beta1_APIVersion(in, out, s)
 }
 
+func autoconvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in *extensions.CPUTargetUtilization, out *CPUTargetUtilization, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.CPUTargetUtilization))(in)
+	}
+	out.UtilizationTarget = Utilization(in.UtilizationTarget)
+	return nil
+}
+
+func convert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in *extensions.CPUTargetUtilization, out *CPUTargetUtilization, s conversion.Scope) error {
+	return autoconvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in, out, s)
+}
+
 func autoconvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler(in *extensions.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.ClusterAutoscaler))(in)
@@ -2517,6 +2529,14 @@ func autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPod
 	}
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	if in.CPUUtilization != nil {
+		out.CPUUtilization = new(CPUTargetUtilization)
+		if err := convert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization(in.CPUUtilization, out.CPUUtilization, s); err != nil {
+			return err
+		}
+	} else {
+		out.CPUUtilization = nil
+	}
 	if err := convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -2533,6 +2553,12 @@ func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalP
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
+	if in.CurrentCPUUtilization != nil {
+		out.CurrentCPUUtilization = new(Utilization)
+		*out.CurrentCPUUtilization = Utilization(*in.CurrentCPUUtilization)
+	} else {
+		out.CurrentCPUUtilization = nil
+	}
 	if in.CurrentConsumption != nil {
 		out.CurrentConsumption = new(ResourceConsumption)
 		if err := convert_extensions_ResourceConsumption_To_v1beta1_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
@@ -3087,6 +3113,18 @@ func convert_v1beta1_APIVersion_To_extensions_APIVersion(in *APIVersion, out *ex
 	return autoconvert_v1beta1_APIVersion_To_extensions_APIVersion(in, out, s)
 }
 
+func autoconvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in *CPUTargetUtilization, out *extensions.CPUTargetUtilization, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*CPUTargetUtilization))(in)
+	}
+	out.UtilizationTarget = extensions.Utilization(in.UtilizationTarget)
+	return nil
+}
+
+func convert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in *CPUTargetUtilization, out *extensions.CPUTargetUtilization, s conversion.Scope) error {
+	return autoconvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in, out, s)
+}
+
 func autoconvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler(in *ClusterAutoscaler, out *extensions.ClusterAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ClusterAutoscaler))(in)
@@ -3439,6 +3477,14 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPod
 	}
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	if in.CPUUtilization != nil {
+		out.CPUUtilization = new(extensions.CPUTargetUtilization)
+		if err := convert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization(in.CPUUtilization, out.CPUUtilization, s); err != nil {
+			return err
+		}
+	} else {
+		out.CPUUtilization = nil
+	}
 	if err := convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -3455,6 +3501,12 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalP
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
+	if in.CurrentCPUUtilization != nil {
+		out.CurrentCPUUtilization = new(extensions.Utilization)
+		*out.CurrentCPUUtilization = extensions.Utilization(*in.CurrentCPUUtilization)
+	} else {
+		out.CurrentCPUUtilization = nil
+	}
 	if in.CurrentConsumption != nil {
 		out.CurrentConsumption = new(extensions.ResourceConsumption)
 		if err := convert_v1beta1_ResourceConsumption_To_extensions_ResourceConsumption(in.CurrentConsumption, out.CurrentConsumption, s); err != nil {
@@ -4036,6 +4088,7 @@ func init() {
 		autoconvert_api_VolumeSource_To_v1_VolumeSource,
 		autoconvert_api_Volume_To_v1_Volume,
 		autoconvert_extensions_APIVersion_To_v1beta1_APIVersion,
+		autoconvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization,
 		autoconvert_extensions_ClusterAutoscalerList_To_v1beta1_ClusterAutoscalerList,
 		autoconvert_extensions_ClusterAutoscalerSpec_To_v1beta1_ClusterAutoscalerSpec,
 		autoconvert_extensions_ClusterAutoscaler_To_v1beta1_ClusterAutoscaler,
@@ -4120,6 +4173,7 @@ func init() {
 		autoconvert_v1_VolumeSource_To_api_VolumeSource,
 		autoconvert_v1_Volume_To_api_Volume,
 		autoconvert_v1beta1_APIVersion_To_extensions_APIVersion,
+		autoconvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization,
 		autoconvert_v1beta1_ClusterAutoscalerList_To_extensions_ClusterAutoscalerList,
 		autoconvert_v1beta1_ClusterAutoscalerSpec_To_extensions_ClusterAutoscalerSpec,
 		autoconvert_v1beta1_ClusterAutoscaler_To_extensions_ClusterAutoscaler,

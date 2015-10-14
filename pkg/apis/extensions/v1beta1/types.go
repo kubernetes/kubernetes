@@ -78,6 +78,14 @@ type ResourceConsumption struct {
 	Quantity resource.Quantity `json:"quantity,omitempty"`
 }
 
+type Utilization float64
+
+type CPUTargetUtilization struct {
+	// Utilization target defines fraction of the requested CPU that should be utilized/used,
+	// e.g. 0.7 means that 70% of the requested CPU should be in use.
+	UtilizationTarget Utilization `json:"utilizationTarget"`
+}
+
 // HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
@@ -87,6 +95,8 @@ type HorizontalPodAutoscalerSpec struct {
 	MinReplicas int `json:"minReplicas"`
 	// MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
 	MaxReplicas int `json:"maxReplicas"`
+	// CPU utilization is the target average CPU utilization (represented as a fraction of requested CPU) over all the pods.
+	CPUUtilization *CPUTargetUtilization `json:"cpuUtilization,omitempty"`
 	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
 	// Currently two types of resources are supported: "cpu" and "memory".
 	Target ResourceConsumption `json:"target"`
@@ -99,6 +109,10 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.
 	DesiredReplicas int `json:"desiredReplicas"`
+
+	// Current average CPU utilization over all pods, represented as a fraction of requtested CPU,
+	// e.g. 0.7 means that and average pod is using now 70% of its requested CPU.
+	CurrentCPUUtilization *Utilization `json:"currentCPUUtilization"`
 
 	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
 	// try to maintain by adjusting the desired number of pods.

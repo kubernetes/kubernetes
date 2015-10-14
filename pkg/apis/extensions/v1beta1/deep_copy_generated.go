@@ -850,6 +850,11 @@ func deepCopy_v1beta1_APIVersion(in APIVersion, out *APIVersion, c *conversion.C
 	return nil
 }
 
+func deepCopy_v1beta1_CPUTargetUtilization(in CPUTargetUtilization, out *CPUTargetUtilization, c *conversion.Cloner) error {
+	out.UtilizationTarget = in.UtilizationTarget
+	return nil
+}
+
 func deepCopy_v1beta1_ClusterAutoscaler(in ClusterAutoscaler, out *ClusterAutoscaler, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1121,6 +1126,14 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec
 	}
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	if in.CPUUtilization != nil {
+		out.CPUUtilization = new(CPUTargetUtilization)
+		if err := deepCopy_v1beta1_CPUTargetUtilization(*in.CPUUtilization, out.CPUUtilization, c); err != nil {
+			return err
+		}
+	} else {
+		out.CPUUtilization = nil
+	}
 	if err := deepCopy_v1beta1_ResourceConsumption(in.Target, &out.Target, c); err != nil {
 		return err
 	}
@@ -1130,6 +1143,12 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec
 func deepCopy_v1beta1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
+	if in.CurrentCPUUtilization != nil {
+		out.CurrentCPUUtilization = new(Utilization)
+		*out.CurrentCPUUtilization = *in.CurrentCPUUtilization
+	} else {
+		out.CurrentCPUUtilization = nil
+	}
 	if in.CurrentConsumption != nil {
 		out.CurrentConsumption = new(ResourceConsumption)
 		if err := deepCopy_v1beta1_ResourceConsumption(*in.CurrentConsumption, out.CurrentConsumption, c); err != nil {
@@ -1577,6 +1596,7 @@ func init() {
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,
 		deepCopy_v1beta1_APIVersion,
+		deepCopy_v1beta1_CPUTargetUtilization,
 		deepCopy_v1beta1_ClusterAutoscaler,
 		deepCopy_v1beta1_ClusterAutoscalerList,
 		deepCopy_v1beta1_ClusterAutoscalerSpec,

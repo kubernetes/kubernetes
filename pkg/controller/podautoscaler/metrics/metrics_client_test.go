@@ -138,7 +138,7 @@ func (tc *testCase) verifyResults(t *testing.T, val *extensions.ResourceConsumpt
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient)
-	val, err := metricsClient.ResourceConsumption(tc.namespace).Get(tc.targetResource, tc.selector)
+	val, err := metricsClient.GetResourceConsumption(tc.targetResource, tc.namespace, tc.selector)
 	tc.verifyResults(t, val, err)
 }
 

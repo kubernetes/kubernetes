@@ -75,8 +75,14 @@ func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAuto
 	if autoscaler.ScaleRef == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired("scaleRef"))
 	}
+	if autoscaler.CPUUtilization != nil {
+		cpuTarget := autoscaler.CPUUtilization.UtilizationTarget
+		if cpuTarget < 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("cpuUtilization.utilizationTagget", cpuTarget, isNegativeErrorMsg))
+		}
+	}
 	resource := autoscaler.Target.Resource.String()
-	if resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
+	if len(resource) > 0 && resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("target.resource", resource, "resource not supported by autoscaler"))
 	}
 	quantity := autoscaler.Target.Quantity.Value()
