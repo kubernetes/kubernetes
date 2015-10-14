@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests
@@ -48,5 +48,5 @@ func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request
 		}
 	}
 
-	return nil, false, errors.NewAggregate(errlist)
+	return nil, false, utilerrors.NewAggregate(errlist)
 }

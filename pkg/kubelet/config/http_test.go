@@ -30,7 +30,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
@@ -286,7 +286,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		}
 		for _, pod := range update.Pods {
 			if errs := validation.ValidatePod(pod); len(errs) != 0 {
-				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errors.NewAggregate(errs))
+				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, utilerrors.NewAggregate(errs))
 			}
 		}
 	}

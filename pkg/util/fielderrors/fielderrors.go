@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -174,7 +174,7 @@ func (list ValidationErrorList) PrefixIndex(index int) ValidationErrorList {
 
 // NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
 // if the provided error is a ValidationError and has the provided ValidationErrorType.
-func NewValidationErrorTypeMatcher(t ValidationErrorType) errors.Matcher {
+func NewValidationErrorTypeMatcher(t ValidationErrorType) utilerrors.Matcher {
 	return func(err error) bool {
 		if e, ok := err.(*ValidationError); ok {
 			return e.Type == t
@@ -186,7 +186,7 @@ func NewValidationErrorTypeMatcher(t ValidationErrorType) errors.Matcher {
 // NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
 // if the provided error is a ValidationError and has a field with the provided
 // prefix.
-func NewValidationErrorFieldPrefixMatcher(prefix string) errors.Matcher {
+func NewValidationErrorFieldPrefixMatcher(prefix string) utilerrors.Matcher {
 	return func(err error) bool {
 		if e, ok := err.(*ValidationError); ok {
 			return strings.HasPrefix(e.Field, prefix)
@@ -196,12 +196,12 @@ func NewValidationErrorFieldPrefixMatcher(prefix string) errors.Matcher {
 }
 
 // Filter removes items from the ValidationErrorList that match the provided fns.
-func (list ValidationErrorList) Filter(fns ...errors.Matcher) ValidationErrorList {
-	err := errors.FilterOut(errors.NewAggregate(list), fns...)
+func (list ValidationErrorList) Filter(fns ...utilerrors.Matcher) ValidationErrorList {
+	err := utilerrors.FilterOut(utilerrors.NewAggregate(list), fns...)
 	if err == nil {
 		return nil
 	}
 	// FilterOut that takes an Aggregate returns an Aggregate
-	agg := err.(errors.Aggregate)
+	agg := err.(utilerrors.Aggregate)
 	return ValidationErrorList(agg.Errors())
 }
