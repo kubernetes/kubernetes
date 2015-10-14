@@ -250,3 +250,12 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		t.Errorf("Expected true for builder.IsReadOnly")
 	}
 }
+
+func TestPortalBuilder(t *testing.T) {
+	if portal := portalBuilder("127.0.0.1"); portal != "127.0.0.1:3260" {
+		t.Errorf("wrong portal: %s", portal)
+	}
+	if portal := portalBuilder("127.0.0.1:3260"); portal != "127.0.0.1:3260" {
+		t.Errorf("wrong portal: %s", portal)
+	}
+}

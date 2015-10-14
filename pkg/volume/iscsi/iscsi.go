@@ -95,10 +95,7 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	}
 
 	lun := strconv.Itoa(iscsi.Lun)
-	portal := iscsi.TargetPortal
-	if !strings.Contains(portal, ":") {
-		portal = iscsi.TargetPortal + ":3260"
-	}
+	portal := portalBuilder(iscsi.TargetPortal)
 
 	return &iscsiDiskBuilder{
 		iscsiDisk: &iscsiDisk{
@@ -192,4 +189,11 @@ func (c *iscsiDiskCleaner) TearDown() error {
 
 func (c *iscsiDiskCleaner) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
+}
+
+func portalBuilder(portal string) string {
+	if !strings.Contains(portal, ":") {
+		portal = portal + ":3260"
+	}
+	return portal
 }
