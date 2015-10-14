@@ -411,7 +411,7 @@ func (e *jsonEncDriver) quoteStr(s string) {
 //--------------------------------
 
 type jsonNum struct {
-	bytes            []byte // may have [+-.eE0-9]
+	// bytes            []byte // may have [+-.eE0-9]
 	mantissa         uint64 // where mantissa ends, and maybe dot begins.
 	exponent         int16  // exponent value.
 	manOverflow      bool
@@ -421,7 +421,6 @@ type jsonNum struct {
 }
 
 func (x *jsonNum) reset() {
-	x.bytes = x.bytes[:0]
 	x.manOverflow = false
 	x.neg = false
 	x.dot = false
@@ -454,29 +453,26 @@ func (x *jsonNum) uintExp() (n uint64, overflow bool) {
 	// return
 }
 
-func (x *jsonNum) floatVal() (f float64) {
+// these constants are only used withn floatVal.
+// They are brought out, so that floatVal can be inlined.
+const (
+	jsonUint64MantissaBits = 52
+	jsonMaxExponent        = int16(len(jsonFloat64Pow10)) - 1
+)
+
+func (x *jsonNum) floatVal() (f float64, parseUsingStrConv bool) {
 	// We do not want to lose precision.
 	// Consequently, we will delegate to strconv.ParseFloat if any of the following happen:
 	//    - There are more digits than in math.MaxUint64: 18446744073709551615 (20 digits)
 	//      We expect up to 99.... (19 digits)
 	//    - The mantissa cannot fit into a 52 bits of uint64
 	//    - The exponent is beyond our scope ie beyong 22.
-	const uint64MantissaBits = 52
-	const maxExponent = int16(len(jsonFloat64Pow10)) - 1
+	parseUsingStrConv = x.manOverflow ||
+		x.exponent > jsonMaxExponent ||
+		(x.exponent < 0 && -(x.exponent) > jsonMaxExponent) ||
+		x.mantissa>>jsonUint64MantissaBits != 0
 
-	parseUsingStrConv := x.manOverflow ||
-		x.exponent > maxExponent ||
-		(x.exponent < 0 && -(x.exponent) > maxExponent) ||
-		x.mantissa>>uint64MantissaBits != 0
 	if parseUsingStrConv {
-		var err error
-		if f, err = strconv.ParseFloat(stringView(x.bytes), 64); err != nil {
-			panic(fmt.Errorf("parse float: %s, %v", x.bytes, err))
-			return
-		}
-		if x.neg {
-			f = -f
-		}
 		return
 	}
 
@@ -500,8 +496,9 @@ type jsonDecDriver struct {
 	r    decReader // *bytesDecReader decReader
 	ct   valueType // container type. one of unset, array or map.
 	bstr [8]byte   // scratch used for string \UXXX parsing
-	b    [64]byte  // scratch
-	b2   [64]byte
+	b    [64]byte  // scratch, used for parsing strings or numbers
+	b2   [64]byte  // scratch, used only for decodeBytes (after base64)
+	bs   []byte    // scratch. Initialized from b. Used for parsing strings or numbers.
 
 	wsSkipped bool // whitespace skipped
 
@@ -662,8 +659,6 @@ func (d *jsonDecDriver) IsContainerType(vt valueType) bool {
 }
 
 func (d *jsonDecDriver) decNum(storeBytes bool) {
-	// storeBytes = true // TODO: remove.
-
 	// If it is has a . or an e|E, decode as a float; else decode as an int.
 	b := d.skipWhitespace(false)
 	if !(b == '+' || b == '-' || b == '.' || (b >= '0' && b <= '9')) {
@@ -674,10 +669,9 @@ func (d *jsonDecDriver) decNum(storeBytes bool) {
 	const cutoff = (1<<64-1)/uint64(10) + 1 // cutoff64(base)
 	const jsonNumUintMaxVal = 1<<uint64(64) - 1
 
-	// var n jsonNum // create stack-copy jsonNum, and set to pointer at end.
-	// n.bytes = d.n.bytes[:0]
 	n := &d.n
 	n.reset()
+	d.bs = d.bs[:0]
 
 	// The format of a number is as below:
 	// parsing:     sign? digit* dot? digit* e?  sign? digit*
@@ -773,7 +767,7 @@ LOOP:
 			break LOOP
 		}
 		if storeBytes {
-			n.bytes = append(n.bytes, b)
+			d.bs = append(d.bs, b)
 		}
 		b, eof = d.r.readn1eof()
 	}
@@ -834,10 +828,25 @@ func (d *jsonDecDriver) DecodeInt(bitsize uint8) (i int64) {
 		i = -i
 	}
 	if chkOvf.Int(i, bitsize) {
-		d.d.errorf("json: overflow %v bits: %s", bitsize, n.bytes)
+		d.d.errorf("json: overflow %v bits: %s", bitsize, d.bs)
 		return
 	}
 	// fmt.Printf("DecodeInt: %v\n", i)
+	return
+}
+
+// floatVal MUST only be called after a decNum, as d.bs now contains the bytes of the number
+func (d *jsonDecDriver) floatVal() (f float64) {
+	f, useStrConv := d.n.floatVal()
+	if useStrConv {
+		var err error
+		if f, err = strconv.ParseFloat(stringView(d.bs), 64); err != nil {
+			panic(fmt.Errorf("parse float: %s, %v", d.bs, err))
+		}
+		if d.n.neg {
+			f = -f
+		}
+	}
 	return
 }
 
@@ -868,7 +877,7 @@ func (d *jsonDecDriver) DecodeUint(bitsize uint8) (u uint64) {
 		}
 	}
 	if chkOvf.Uint(u, bitsize) {
-		d.d.errorf("json: overflow %v bits: %s", bitsize, n.bytes)
+		d.d.errorf("json: overflow %v bits: %s", bitsize, d.bs)
 		return
 	}
 	// fmt.Printf("DecodeUint: %v\n", u)
@@ -880,10 +889,9 @@ func (d *jsonDecDriver) DecodeFloat(chkOverflow32 bool) (f float64) {
 		d.expectChar(c)
 	}
 	d.decNum(true)
-	n := &d.n
-	f = n.floatVal()
+	f = d.floatVal()
 	if chkOverflow32 && chkOvf.Float32(f) {
-		d.d.errorf("json: overflow float32: %v, %s", f, n.bytes)
+		d.d.errorf("json: overflow float32: %v, %s", f, d.bs)
 		return
 	}
 	return
@@ -916,12 +924,13 @@ func (d *jsonDecDriver) DecodeBytes(bs []byte, isstring, zerocopy bool) (bsOut [
 	if c := d.s.sc.sep(); c != 0 {
 		d.expectChar(c)
 	}
-	bs0 := d.appendStringAsBytes(d.b[:0])
+	d.appendStringAsBytes()
 	// if isstring, then just return the bytes, even if it is using the scratch buffer.
 	// the bytes will be converted to a string as needed.
 	if isstring {
-		return bs0
+		return d.bs
 	}
+	bs0 := d.bs
 	slen := base64.StdEncoding.DecodedLen(len(bs0))
 	if slen <= cap(bs) {
 		bsOut = bs[:slen]
@@ -945,13 +954,23 @@ func (d *jsonDecDriver) DecodeString() (s string) {
 	if c := d.s.sc.sep(); c != 0 {
 		d.expectChar(c)
 	}
-	return string(d.appendStringAsBytes(d.b[:0]))
+	return d.decString()
 }
 
-func (d *jsonDecDriver) appendStringAsBytes(v []byte) []byte {
+func (d *jsonDecDriver) decString() (s string) {
+	d.appendStringAsBytes()
+	if x := d.s.sc; x != nil && x.st == '}' && x.so { // map key
+		return d.d.string(d.bs)
+	}
+	return string(d.bs)
+}
+
+func (d *jsonDecDriver) appendStringAsBytes() {
 	d.expectChar('"')
+	v := d.bs[:0]
+	var c uint8
 	for {
-		c := d.r.readn1()
+		c = d.r.readn1()
 		if c == '"' {
 			break
 		} else if c == '\\' {
@@ -979,7 +998,6 @@ func (d *jsonDecDriver) appendStringAsBytes(v []byte) []byte {
 				v = append(v, d.bstr[:w2]...)
 			default:
 				d.d.errorf("json: unsupported escaped value: %c", c)
-				return nil
 			}
 		} else {
 			v = append(v, c)
@@ -988,7 +1006,7 @@ func (d *jsonDecDriver) appendStringAsBytes(v []byte) []byte {
 	if jsonTrackSkipWhitespace {
 		d.wsSkipped = false
 	}
-	return v
+	d.bs = v
 }
 
 func (d *jsonDecDriver) jsonU4(checkSlashU bool) rune {
@@ -1040,7 +1058,7 @@ func (d *jsonDecDriver) DecodeNaked() (v interface{}, vt valueType, decodeFurthe
 		decodeFurther = true
 	case '"':
 		vt = valueTypeString
-		v = string(d.appendStringAsBytes(d.b[:0])) // same as d.DecodeString(), but skipping sep() call.
+		v = d.decString() // same as d.DecodeString(), but skipping sep() call.
 	default: // number
 		d.decNum(true)
 		n := &d.n
@@ -1048,7 +1066,7 @@ func (d *jsonDecDriver) DecodeNaked() (v interface{}, vt valueType, decodeFurthe
 		switch {
 		case n.explicitExponent, n.dot, n.exponent < 0, n.manOverflow:
 			vt = valueTypeFloat
-			v = n.floatVal()
+			v = d.floatVal()
 		case n.exponent == 0:
 			u := n.mantissa
 			switch {
@@ -1067,7 +1085,7 @@ func (d *jsonDecDriver) DecodeNaked() (v interface{}, vt valueType, decodeFurthe
 			switch {
 			case overflow:
 				vt = valueTypeFloat
-				v = n.floatVal()
+				v = d.floatVal()
 			case n.neg:
 				vt = valueTypeInt
 				v = -int64(u)
@@ -1122,8 +1140,8 @@ func (h *JsonHandle) newEncDriver(e *Encoder) encDriver {
 func (h *JsonHandle) newDecDriver(d *Decoder) decDriver {
 	// d := jsonDecDriver{r: r.(*bytesDecReader), h: h}
 	hd := jsonDecDriver{d: d, r: d.r, h: h}
+	hd.bs = hd.b[:0]
 	hd.se.i = h.RawBytesExt
-	hd.n.bytes = d.b[:]
 	return &hd
 }
 

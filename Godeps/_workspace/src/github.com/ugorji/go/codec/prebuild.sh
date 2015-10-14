@@ -99,6 +99,14 @@ var fastpathAV fastpathA
 
 EOF
 
+    cat > gen-from-tmpl.codec.generated.go <<EOF
+package codec 
+import "io"
+func GenInternalGoFile(r io.Reader, w io.Writer, safe bool) error {
+return genInternalGoFile(r, w, safe)
+}
+EOF
+    
     cat > gen-from-tmpl.generated.go <<EOF
 //+build ignore
 
@@ -130,7 +138,7 @@ run("gen-helper.go.tmpl", "gen-helper.generated.go", false)
 
 EOF
     go run gen-from-tmpl.generated.go && \
-        rm -f gen-from-tmpl.generated.go 
+        rm -f gen-from-tmpl.*generated.go 
 }
 
 _codegenerators() {
@@ -140,15 +148,26 @@ _codegenerators() {
                 "1" == $( _needgen "values_ffjson${zsfx}" ) ||
                 1 == 0 ]] 
     then
-        true && \
-            echo "codecgen - !unsafe ... " && \
-            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} -d 1978 $zfin && \
-            echo "codecgen - unsafe ... " && \
-            codecgen  -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} -d 1978 $zfin && \
-            echo "msgp ... " && \
-            msgp -tests=false -pkg=codec -o=values_msgp${zsfx} -file=$zfin && \
-            echo "ffjson ... " && \
-            ffjson -w values_ffjson${zsfx} $zfin && \
+        # codecgen creates some temporary files in the directory (main, pkg).
+        # Consequently, we should start msgp and ffjson first, and also put a small time latency before
+        # starting codecgen.
+        # Without this, ffjson chokes on one of the temporary files from codecgen.
+        echo "ffjson ... " && \
+            ffjson -w values_ffjson${zsfx} $zfin &
+        zzzIdFF=$!
+        echo "msgp ... " && \
+            msgp -tests=false -pkg=codec -o=values_msgp${zsfx} -file=$zfin &
+        zzzIdMsgp=$!
+
+        sleep 1 # give ffjson and msgp some buffer time. see note above.
+
+        echo "codecgen - !unsafe ... " && \
+            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} -d 19780 $zfin &
+        zzzIdC=$!
+        echo "codecgen - unsafe ... " && \
+            codecgen  -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} -d 19781 $zfin &
+        zzzIdCU=$!
+        wait $zzzIdC $zzzIdCU $zzzIdMsgp $zzzIdFF && \
             # remove (M|Unm)arshalJSON implementations, so they don't conflict with encoding/json bench \
             sed -i 's+ MarshalJSON(+ _MarshalJSON(+g' values_ffjson${zsfx} && \
             sed -i 's+ UnmarshalJSON(+ _UnmarshalJSON(+g' values_ffjson${zsfx} && \
