@@ -53,8 +53,6 @@ AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
 AWS_ASG_CMD="aws --output json autoscaling"
 
-INTERNAL_IP_BASE=172.20.0
-MASTER_IP_SUFFIX=.9
 MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
