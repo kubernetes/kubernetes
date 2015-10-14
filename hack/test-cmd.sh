@@ -804,7 +804,6 @@ __EOF__
   ######################
 
   kube::log::status "Testing kubectl(${version}:multiple resources)"
-  # TODO: add test for types like ReplicationControllerList, ServiceList
 
   FILES="hack/testdata/multi-resource-yaml
   hack/testdata/multi-resource-list
@@ -862,8 +861,13 @@ __EOF__
       fi
     fi
     # Command
-    # kubectl create -f "${file}" "${kube_flags[@]}" # test fails here now
     kubectl get -f "${file}" "${kube_flags[@]}"
+    # Command: watching multiple resources should return "not supported" error
+    WATCH_ERROR_FILE="${KUBE_TEMP}/kubectl-watch-error"
+    kubectl get -f "${file}" "${kube_flags[@]}" "--watch" 2> ${WATCH_ERROR_FILE} || true
+    if ! grep -q "watch is only supported on individual resources and resource collections" "${WATCH_ERROR_FILE}"; then
+      kube::log::error_exit "kubectl watch multiple resource returns unexpected error or non-error: $(cat ${WATCH_ERROR_FILE})" "1"
+    fi
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
     kubectl replace -f $replace_file --force "${kube_flags[@]}"

@@ -199,7 +199,7 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 			return nil, err
 		}
 		if len(info) != 1 {
-			return nil, fmt.Errorf("watch is only supported on a single resource - %d resources were found", len(info))
+			return nil, fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(info))
 		}
 		return info[0].Watch(resourceVersion)
 	}
