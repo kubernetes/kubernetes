@@ -231,7 +231,7 @@ function start_apiserver {
       --admission-control="${ADMISSION_CONTROL}" \
       --insecure-bind-address="${API_HOST}" \
       --insecure-port="${API_PORT}" \
-      --etcd-servers="http://127.0.0.1:4001" \
+      --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!

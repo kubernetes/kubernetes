@@ -112,8 +112,6 @@ kube::util::trap_add cleanup EXIT SIGINT
 kube::util::ensure-temp-dir
 kube::etcd::start
 
-ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
