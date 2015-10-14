@@ -108,7 +108,7 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything())
+				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)

@@ -39,8 +39,8 @@ func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationControlle
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) List(label labels.Selector) (*api.ReplicationControllerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, label, nil), &api.ReplicationControllerList{})
+func (c *FakeReplicationControllers) List(label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, label, field), &api.ReplicationControllerList{})
 	if obj == nil {
 		return nil, err
 	}

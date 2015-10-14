@@ -30,7 +30,7 @@ type ReplicationControllersNamespacer interface {
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	List(selector labels.Selector) (*api.ReplicationControllerList, error)
+	List(label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error)
 	Get(name string) (*api.ReplicationController, error)
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
@@ -51,9 +51,9 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 }
 
 // List takes a selector, and returns the list of replication controllers that match that selector.
-func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(label labels.Selector, field fields.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

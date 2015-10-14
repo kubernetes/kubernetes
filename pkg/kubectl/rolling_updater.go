@@ -718,7 +718,7 @@ func updateWithRetries(rcClient client.ReplicationControllerInterface, rc *api.R
 }
 
 func FindSourceController(r client.ReplicationControllersNamespacer, namespace, name string) (*api.ReplicationController, error) {
-	list, err := r.ReplicationControllers(namespace).List(labels.Everything())
+	list, err := r.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
 	}

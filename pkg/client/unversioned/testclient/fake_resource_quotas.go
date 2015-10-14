@@ -39,8 +39,8 @@ func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(label labels.Selector) (*api.ResourceQuotaList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, label, nil), &api.ResourceQuotaList{})
+func (c *FakeResourceQuotas) List(label labels.Selector, field fields.Selector) (*api.ResourceQuotaList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, label, field), &api.ResourceQuotaList{})
 	if obj == nil {
 		return nil, err
 	}

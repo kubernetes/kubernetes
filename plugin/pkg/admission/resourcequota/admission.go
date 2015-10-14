@@ -51,7 +51,7 @@ type quota struct {
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
+			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)

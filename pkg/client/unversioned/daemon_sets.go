@@ -29,7 +29,7 @@ type DaemonSetsNamespacer interface {
 }
 
 type DaemonSetInterface interface {
-	List(selector labels.Selector) (*extensions.DaemonSetList, error)
+	List(label labels.Selector, field fields.Selector) (*extensions.DaemonSetList, error)
 	Get(name string) (*extensions.DaemonSet, error)
 	Create(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Update(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
@@ -51,9 +51,9 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 // Ensure statically that daemonSets implements DaemonSetsInterface.
 var _ DaemonSetInterface = &daemonSets{}
 
-func (c *daemonSets) List(selector labels.Selector) (result *extensions.DaemonSetList, err error) {
+func (c *daemonSets) List(label labels.Selector, field fields.Selector) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

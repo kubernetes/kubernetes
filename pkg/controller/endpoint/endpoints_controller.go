@@ -62,7 +62,7 @@ func NewEndpointController(client *client.Client, resyncPeriod controller.Resync
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Services(api.NamespaceAll).List(labels.Everything())
+				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
 				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)

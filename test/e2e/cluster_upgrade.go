@@ -461,7 +461,7 @@ func runCmd(command string, args ...string) (string, string, error) {
 func validate(f Framework, svcNameWant, rcNameWant string, ingress api.LoadBalancerIngress, podsWant int) error {
 	Logf("Beginning cluster validation")
 	// Verify RC.
-	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(labels.Everything())
+	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing RCs: %v", err)
 	}

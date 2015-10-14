@@ -42,8 +42,8 @@ func (c *FakeDaemonSets) Get(name string) (*extensions.DaemonSet, error) {
 	return obj.(*extensions.DaemonSet), err
 }
 
-func (c *FakeDaemonSets) List(label labels.Selector) (*extensions.DaemonSetList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, label, nil), &extensions.DaemonSetList{})
+func (c *FakeDaemonSets) List(label labels.Selector, field fields.Selector) (*extensions.DaemonSetList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, label, field), &extensions.DaemonSetList{})
 	if obj == nil {
 		return nil, err
 	}
