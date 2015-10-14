@@ -159,13 +159,10 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	// deliver update notifications
 	switch s.mode {
 	case PodConfigNotificationIncremental:
-		if firstSet {
-			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
-		}
 		if len(deletes.Pods) > 0 {
 			s.updates <- *deletes
 		}
-		if len(adds.Pods) > 0 {
+		if len(adds.Pods) > 0 || firstSet {
 			s.updates <- *adds
 		}
 		if len(updates.Pods) > 0 {
