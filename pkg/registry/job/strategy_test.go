@@ -32,10 +32,12 @@ func TestJobStrategy(t *testing.T) {
 		t.Errorf("Job should not allow create on update")
 	}
 
-	validSelector := map[string]string{"a": "b"}
+	validSelector := &extensions.PodSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
 	validPodTemplateSpec := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector,
+			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -95,10 +97,12 @@ func TestJobStatusStrategy(t *testing.T) {
 	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("Job should not allow create on update")
 	}
-	validSelector := map[string]string{"a": "b"}
+	validSelector := &extensions.PodSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
 	validPodTemplateSpec := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector,
+			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
