@@ -1,28 +1,297 @@
-{
-  "swaggerVersion": "1.2",
-  "apiVersion": "",
-  "basePath": "https://10.10.10.10:6443",
-  "resourcePath": "/api",
-  "apis": [
-   {
-    "path": "/api",
-    "description": "get available API versions",
-    "operations": [
-     {
-      "type": "void",
-      "method": "GET",
-      "summary": "get available API versions",
-      "nickname": "getAPIVersions",
-      "parameters": [],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "application/json"
-      ]
-     }
-    ]
-   }
-  ],
-  "models": {}
- }
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=7" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="keywords" content="MWG,Proxy" />
+<title>Huawei Proxy Notification</title>
+<style type=text/css>
+body {
+	float: none;
+	background-color: #CCCCCC;
+	text-align: center;
+	font-size: 0.75em;
+	padding-top: 20px;
+	margin: 0 auto;
+}
+a:link {
+	COLOR: #000;
+	TEXT-DECORATION: none;
+}
+
+a:visited {
+	COLOR: #000;
+	TEXT-DECORATION: none;
+}
+
+a:hover {
+	COLOR: #900;
+	TEXT-DECORATION: underline;
+}
+
+a:active {
+	COLOR: #900;
+	TEXT-DECORATION: underline;
+}
+#top {
+	border-bottom: 1px #d5d5d5 solid;
+	border-right: 1px #d5d5d5 solid;
+	height: 79px;
+	width: 900px;
+	text-align:left;
+	background-image: url(/mwg-internal/de5fs23hu73ds/files/default/images/head.jpg);
+	background-repeat: repeat-x;
+	margin: 0 auto;
+}
+
+#top h1 {
+	font-size: 1.75em;
+	font-family: Arial, Helvetica, sans-serif;
+	color: #FF0000;
+	font-weight: bold;
+	margin: 0;
+}
+
+#top p {
+	padding-right: 5px;
+	margin: 10px 10px 8px auto;
+	font-family: Arial, Helvetica, sans-serif;
+}
+#mid {
+	width: 900px;
+	text-align:left;
+	font-family: Arial, Helvetica, sans-serif;
+	padding: 0px;
+	margin: 0 auto;
+}
+
+table.frm {
+	margin: 2px auto 0 0;
+}
+.show {
+	padding: 20px;
+	margin: 100px;
+	height: auto;
+	width: auto;
+	left: auto;
+	top: auto;
+	right: auto;
+	bottom: auto;
+}
+.right {
+	padding: 40px 13px 0 0;
+	width: 165px;
+}
+#mid h1 {
+	font-size: 1.00em;
+	color: #900;
+	font-weight: bold;
+	margin: 5px;
+}
+#mid p {
+	margin: 5px;
+}
+
+#mid td.tb-tl {
+	width: 6px;
+	height: 22px;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/fd_left.gif) no-repeat;
+}
+
+#mid td.tb-tm {
+	font-weight: bold;
+	color: #666;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/homebg1.jpg) no-repeat left top;
+}
+
+#mid td.tb-tr {
+	width: 5px;
+	height: 22px;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/homebg1.jpg) no-repeat right top;
+}
+
+#mid td.tb-l {
+	width: 6px;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/homebg2.jpg) repeat-y -4px;
+}
+
+#mid td.tb-m {
+	font-family: Arial, Helvetica, sans-serif;
+	padding-top: 10px;
+	padding-bottom: 10px;
+	background-color: white;
+}
+
+#mid td.tb-r {
+	width: 5px;	
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/homebg2.jpg) repeat-y right;
+}
+
+#mid td.tb-bl {
+	width: 6px;
+	height: 6px;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/fd_left1.gif) no-repeat;
+}
+
+#mid td.tb-bm {
+	background-image: url(/mwg-internal/de5fs23hu73ds/files/default/images/homebg3.jpg);
+	background-repeat: repeat-x;
+	background-position: bottom;
+}
+
+#mid td.tb-br {
+	width: 5px;
+	height: 6px;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/fd_right1.gif) no-repeat left top;
+}
+/*------------------Tab-----------------*/
+.tab {
+	clear: both;
+	width: 100%;
+	font-size: 100%;
+	margin: 0;
+	padding:0;
+	background-image: url(/mwg-internal/de5fs23hu73ds/files/default/images/homebg3.jpg);
+	background-repeat: repeat-x;
+	background-position: 0 23px;
+}
+
+#secTable {
+	margin: 5px auto 0 auto;
+	line-height:20px;
+}
+#secTable td {
+	text-decoration: none;
+	background-image: url(/mwg-internal/de5fs23hu73ds/files/default/images/c_1.jpg);
+	background-repeat: no-repeat;
+	background-position: 5px 1px;
+	height:21px;
+	padding-left:4px;
+	border-bottom: 1px solid #ccc;
+}
+#secTable td span {
+	padding: 4px 8px 4px 2px;
+	margin: 0 0 0 7px;
+	background: url(/mwg-internal/de5fs23hu73ds/files/default/images/c_2.jpg) no-repeat right top;
+}
+#secTable td.sec1 {}
+#secTable td.sec2 {
+	background-position: 5px -21px;
+	border-bottom:1px solid #fff;
+}
+#secTable td.sec2 span {
+	background-position: right -21px;
+	font-weight:bold;
+}
+.main_tab {border: #ccc 1px solid;border-top:0;}
+.main_tab td {padding: 10px;}
+/*--------------Tab end--------------------*/
+#bottom {
+	border-top: #ccc 1px solid;
+	width: 900px;
+	background-color: #000000;
+	padding: 0px;
+	text-align: center;
+	margin: 0 auto;
+}
+
+#bottom p {
+	line-height: 20px;
+	font-family: Arial, Helvetica, sans-serif;
+	text-align: right;
+	margin: 0;
+}
+.STYLE8 {font-size: 10px}
+.STYLE12 {color: #000000; font-size: 12px; }
+.STYLE14 {
+	color: #FFFFFF;
+	font-size: x-small;
+}
+.STYLE16 {font-size: 10px; color: #FFFFFF; }
+.STYLE18 {color: #FF0000}
+</style>
+<!--JavaScript-->
+<SCRIPT language=javascript>
+function secBoard(n)
+  {
+    for(i=0;i<secTable.cells.length;i++)
+      secTable.cells
+
+.className="sec1";
+    secTable.cells.className="sec2";
+    for(i=0;i<mainTable.tBodies.length;i++)
+      mainTable.tBodies
+
+.style.display="none";
+    mainTable.tBodies
+
+.style.display="block";
+  }
+
+</SCRIPT>
+</head>
+
+<body>
+<!--HTML-->
+<div style="width:100%;">
+<div align="center" id="top" style="">
+  <table width="900" border="0" cellspacing="0" cellpadding="0">
+    <tr>
+      <td width="91"><img src="/mwg-internal/de5fs23hu73ds/files/default/images/tubiao.gif" width="90" height="79" /></td>
+      <td width="700"><h1 align="left" class="STYLE18">Object moved</h1></td>
+      <td width="100" align="right" valign="bottom"><p> </p>
+      <p> </p></td>
+    </tr>
+  </table>
+</div><div align="center" id="mid">
+  
+  <div align="left">
+    <table width="900" height="266" border="0" cellpadding="0" cellspacing="20" bgcolor="#FFFFFF" class="frm">
+      <tr>
+        <td width="600" valign="top" bgcolor="#FFFFFF" class="show"><h1>Object has moved to another place, please enable redirects in your browser.</h1>
+
+
+<p>
+        
+</p>
+
+
+          <p>&nbsp;</p>
+          <p class="STYLE12">&nbsp;</p>
+          <p class="STYLE12">Any question, you can use:</p>
+          <p class="STYLE8"> (1) "<a href="http://w3.huawei.com/it/"><u>IT Service Platform</u></a> " to search the solutions. <a href="http://w3.huawei.com/it/"></a></p>
+          <p class="STYLE8"> (2) Submit it on "<a href="http://w3.huawei.com/itonline/post!default.jspa?forumID=114"><u>IT Online Support</u></a>". <a href="http://w3.huawei.com/itonline/post!default.jspa?forumID=114"></a></p>
+          <p class="STYLE8"> (3) Contact IT Hotline for help.</p>
+          <p class="STYLE8">(4) You can get FAQ and Proxy setting tool at &quot;<a href="http://nshelp.huawei.com/nshelp/index.do?method=list&amp;productType=35" target="_blank"><U>ProxyPortal</U></a>&quot;.</p>
+          <p class="STYLE8">&nbsp;</p>
+
+	      <form id="hwnotification" name="hwnotification">
+		     <input type="hidden" name="host" value="hkgmwg05-ga" />
+
+          <p class="STYLE16">The error code is 0X<script language="JavaScript" type="text/javascript">
+		  var str1;
+		  var str2;
+		  var str3;
+		  var str4;
+		  var errorhost=document.hwnotification.host.value;
+		  str2=errorhost.substring(6,8);
+		  str3=errorhost.substring(2,3);
+		  document.write(str3.charCodeAt(0));
+		  document.write(str2);
+		    </script>
+          E35.</p></form></td>
+
+      </tr>
+    </table>
+  </div>
+<div align="center"></div></div>
+<div align="center" id="bottom">
+  <p align="left" class="STYLE14">Copyright @ Huawei Technologies Co., Ltd. 1998-2010. All rights reserved. &nbsp;</p>
+</div>
+</div>
+
+</form>
+
+</body>
+
+</html>
