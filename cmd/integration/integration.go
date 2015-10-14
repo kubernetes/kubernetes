@@ -79,6 +79,7 @@ var (
 	longTestTimeout = time.Second * 300
 
 	maxTestTimeout = time.Minute * 10
+	etcdServer     string
 )
 
 type fakeKubeletClient struct{}
@@ -102,6 +103,9 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func startComponents(firstManifestURL, secondManifestURL string) (string, string) {
 	// Setup
 	servers := []string{}
+	if etcdServer != "" {
+		servers = append(servers, etcdServer)
+	}
 	glog.Infof("Creating etcd client pointing to %v", servers)
 
 	handler := delegateHandler{}
@@ -955,6 +959,7 @@ type testFunc func(*client.Client)
 func addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(
 		&maxConcurrency, "max-concurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
+	fs.StringVar(&etcdServer, "etcd-server", "", "etcd server URL.")
 }
 
 func main() {

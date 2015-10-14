@@ -59,7 +59,7 @@ const (
 )
 
 func init() {
-	requireEtcd()
+	framework.RequireEtcd()
 }
 
 func TestServiceAccountAutoCreate(t *testing.T) {
@@ -337,7 +337,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config, func()) {
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// Etcd
 	etcdStorage, err := framework.NewEtcdStorage()

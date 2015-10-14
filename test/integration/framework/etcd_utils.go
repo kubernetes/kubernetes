@@ -19,6 +19,7 @@ package framework
 import (
 	"fmt"
 	"math/rand"
+	"os"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -36,8 +37,14 @@ func init() {
 	RequireEtcd()
 }
 
+// NewEtcdClient creates a new etcd client, defaulting to server http://127.0.0.1:4001.
+// If ETCD_HOST and ETCD_PORT are set in the environment, these are used as the address for the etcd server instead.
 func NewEtcdClient() *etcd.Client {
-	return etcd.NewClient([]string{})
+	servers := []string{}
+	if os.Getenv("ETCD_HOST") != "" && os.Getenv("ETCD_PORT") != "" {
+		servers = append(servers, fmt.Sprintf("http://%s:%s", os.Getenv("ETCD_HOST"), os.Getenv("ETCD_PORT")))
+	}
+	return etcd.NewClient(servers)
 }
 
 func NewEtcdStorage() (storage.Interface, error) {

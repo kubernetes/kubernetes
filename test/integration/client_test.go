@@ -113,7 +113,7 @@ func TestSingleWatch(t *testing.T) {
 	defer s.Close()
 
 	ns := "blargh"
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 
 	mkEvent := func(i int) *api.Event {
