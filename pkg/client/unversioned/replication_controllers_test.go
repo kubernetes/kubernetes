@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -55,7 +56,7 @@ func TestListControllers(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup(t).ReplicationControllers(ns).List(labels.Everything())
+	receivedControllerList, err := c.Setup(t).ReplicationControllers(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, receivedControllerList, err)
 
 }

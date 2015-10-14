@@ -306,7 +306,7 @@ func syncNamespace(kubeClient client.Interface, experimentalMode bool, namespace
 }
 
 func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(labels.Everything())
+	items, err := kubeClient.LimitRanges(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -320,7 +320,7 @@ func deleteLimitRanges(kubeClient client.Interface, ns string) error {
 }
 
 func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything())
+	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(labels.Everything())
+	items, err := kubeClient.Services(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func deleteServices(kubeClient client.Interface, ns string) error {
 }
 
 func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything())
+	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -461,7 +461,7 @@ func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns str
 }
 
 func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.DaemonSets(ns).List(labels.Everything())
+	items, err := expClient.DaemonSets(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}

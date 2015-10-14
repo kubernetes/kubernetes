@@ -527,7 +527,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
 
-	svcList, err := services.List(labels.Everything())
+	svcList, err := services.List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
@@ -748,7 +748,7 @@ func runPatchTest(c *client.Client) {
 
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
-	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything())
+	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Fatalf("Unexpected error listing services: %v", err)
 	}
@@ -875,7 +875,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
 	}
 
-	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything())
+	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Fatalf("Failed to list services across namespaces: %v", err)
 	}
