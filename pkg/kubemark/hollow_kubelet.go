@@ -72,6 +72,7 @@ func NewHollowKubelet(
 			10*time.Second,         /* SyncFrequency */
 			40,                     /* MaxPods */
 			containerManager,
+			nil,
 		),
 	}
 }
