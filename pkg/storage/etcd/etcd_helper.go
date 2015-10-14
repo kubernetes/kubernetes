@@ -323,8 +323,9 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 			trace.Step("Decoding dir " + node.Key + " END")
 			continue
 		}
-		if obj, found := h.getFromCache(node.ModifiedIndex); found {
-			if filter(obj) {
+		if obj, found := h.getFromCache(node.ModifiedIndex, filter); found {
+			// obj != nil iff it matches the filter function.
+			if obj != nil {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
 		} else {
@@ -498,7 +499,7 @@ func (h *etcdHelper) prefixEtcdKey(key string) string {
 // their Node.ModifiedIndex, which is unique across all types.
 // All implementations must be thread-safe.
 type etcdCache interface {
-	getFromCache(index uint64) (runtime.Object, bool)
+	getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool)
 	addToCache(index uint64, obj runtime.Object)
 }
 
@@ -508,18 +509,22 @@ func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()
 }
 
-func (h *etcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
+func (h *etcdHelper) getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool) {
 	startTime := time.Now()
 	defer func() {
 		metrics.ObserveGetCache(startTime)
 	}()
 	obj, found := h.cache.Get(index)
 	if found {
+		if !filter(obj.(runtime.Object)) {
+			return nil, true
+		}
 		// We should not return the object itself to avoid polluting the cache if someone
 		// modifies returned values.
 		objCopy, err := h.copier.Copy(obj.(runtime.Object))
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
+			// We can't return a copy, thus we report the object as not found.
 			return nil, false
 		}
 		metrics.ObserveCacheHit()
