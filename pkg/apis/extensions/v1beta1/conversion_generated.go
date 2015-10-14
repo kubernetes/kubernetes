@@ -2510,7 +2510,12 @@ func autoconvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPod
 	if err := convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(&in.ScaleRef, &out.ScaleRef, s); err != nil {
 		return err
 	}
-	out.MinReplicas = in.MinReplicas
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int)
+		*out.MinReplicas = *in.MinReplicas
+	} else {
+		out.MinReplicas = nil
+	}
 	out.MaxReplicas = in.MaxReplicas
 	if in.TargetMetricUtilizations != nil {
 		out.TargetMetricUtilizations = make([]MetricUtilization, len(in.TargetMetricUtilizations))
@@ -2539,12 +2544,12 @@ func autoconvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalP
 	} else {
 		out.ObserveGeneration = nil
 	}
-	if in.LastScaleTimestamp != nil {
-		if err := s.Convert(&in.LastScaleTimestamp, &out.LastScaleTimestamp, 0); err != nil {
+	if in.LastScaleTime != nil {
+		if err := s.Convert(&in.LastScaleTime, &out.LastScaleTime, 0); err != nil {
 			return err
 		}
 	} else {
-		out.LastScaleTimestamp = nil
+		out.LastScaleTime = nil
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
@@ -2859,7 +2864,7 @@ func autoconvert_extensions_MetricUtilization_To_v1beta1_MetricUtilization(in *e
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.MetricUtilization))(in)
 	}
-	out.Metric = MetricName(in.Metric)
+	out.Name = MetricName(in.Name)
 	if err := s.Convert(&in.Utilization, &out.Utilization, 0); err != nil {
 		return err
 	}
@@ -3442,7 +3447,12 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPod
 	if err := convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(&in.ScaleRef, &out.ScaleRef, s); err != nil {
 		return err
 	}
-	out.MinReplicas = in.MinReplicas
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int)
+		*out.MinReplicas = *in.MinReplicas
+	} else {
+		out.MinReplicas = nil
+	}
 	out.MaxReplicas = in.MaxReplicas
 	if in.TargetMetricUtilizations != nil {
 		out.TargetMetricUtilizations = make([]extensions.MetricUtilization, len(in.TargetMetricUtilizations))
@@ -3471,12 +3481,12 @@ func autoconvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalP
 	} else {
 		out.ObserveGeneration = nil
 	}
-	if in.LastScaleTimestamp != nil {
-		if err := s.Convert(&in.LastScaleTimestamp, &out.LastScaleTimestamp, 0); err != nil {
+	if in.LastScaleTime != nil {
+		if err := s.Convert(&in.LastScaleTime, &out.LastScaleTime, 0); err != nil {
 			return err
 		}
 	} else {
-		out.LastScaleTimestamp = nil
+		out.LastScaleTime = nil
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
@@ -3791,7 +3801,7 @@ func autoconvert_v1beta1_MetricUtilization_To_extensions_MetricUtilization(in *M
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*MetricUtilization))(in)
 	}
-	out.Metric = extensions.MetricName(in.Metric)
+	out.Name = extensions.MetricName(in.Name)
 	if err := s.Convert(&in.Utilization, &out.Utilization, 0); err != nil {
 		return err
 	}

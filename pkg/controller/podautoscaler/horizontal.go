@@ -83,7 +83,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	currentReplicas := scale.Status.Replicas
 	currentConsumption, err := a.metricsClient.
 		ResourceConsumption(hpa.Spec.ScaleRef.Namespace).
-		Get(target.Metric, scale.Status.Selector)
+		Get(target.Name, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -94,8 +94,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	usageRatio := float64(currentConsumption.Utilization.MilliValue()) / float64(target.Utilization.MilliValue())
 	desiredReplicas := int(math.Ceil(usageRatio * float64(currentReplicas)))
 
-	if desiredReplicas < hpa.Spec.MinReplicas {
-		desiredReplicas = hpa.Spec.MinReplicas
+	if hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas {
+		desiredReplicas = *hpa.Spec.MinReplicas
 	}
 
 	// TODO: remove when pod ideling is done.
@@ -113,16 +113,16 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// Going down only if the usageRatio dropped significantly below the target
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas && usageRatio < (1-tolerance) &&
-			(hpa.Status.LastScaleTimestamp == nil ||
-				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
+			(hpa.Status.LastScaleTime == nil ||
+				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
 
 		// Going up only if the usage ratio increased significantly above the target
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas && usageRatio > (1+tolerance) &&
-			(hpa.Status.LastScaleTimestamp == nil ||
-				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
+			(hpa.Status.LastScaleTime == nil ||
+				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
 	}
@@ -149,7 +149,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	}
 	if rescale {
 		now := unversioned.NewTime(now)
-		hpa.Status.LastScaleTimestamp = &now
+		hpa.Status.LastScaleTime = &now
 	}
 
 	_, err = a.client.Extensions().HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(&hpa)

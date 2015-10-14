@@ -1114,7 +1114,12 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec
 	if err := deepCopy_v1beta1_SubresourceReference(in.ScaleRef, &out.ScaleRef, c); err != nil {
 		return err
 	}
-	out.MinReplicas = in.MinReplicas
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int)
+		*out.MinReplicas = *in.MinReplicas
+	} else {
+		out.MinReplicas = nil
+	}
 	out.MaxReplicas = in.MaxReplicas
 	if in.TargetMetricUtilizations != nil {
 		out.TargetMetricUtilizations = make([]MetricUtilization, len(in.TargetMetricUtilizations))
@@ -1136,13 +1141,13 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerSt
 	} else {
 		out.ObserveGeneration = nil
 	}
-	if in.LastScaleTimestamp != nil {
-		out.LastScaleTimestamp = new(unversioned.Time)
-		if err := deepCopy_unversioned_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
+	if in.LastScaleTime != nil {
+		out.LastScaleTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.LastScaleTime, out.LastScaleTime, c); err != nil {
 			return err
 		}
 	} else {
-		out.LastScaleTimestamp = nil
+		out.LastScaleTime = nil
 	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
@@ -1368,7 +1373,7 @@ func deepCopy_v1beta1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clon
 }
 
 func deepCopy_v1beta1_MetricUtilization(in MetricUtilization, out *MetricUtilization, c *conversion.Cloner) error {
-	out.Metric = in.Metric
+	out.Name = in.Name
 	if err := deepCopy_resource_Quantity(in.Utilization, &out.Utilization, c); err != nil {
 		return err
 	}

@@ -75,16 +75,16 @@ type MetricName string
 
 const (
 	// Heapster metric representing CPU usage of a pod (in milli-cores).
-	MetricCPUUsage MetricName = "kubernetes.io:cpu-usage"
+	MetricCPUUsage MetricName = "cpu-usage"
 	// Heapster metric representing Memory usage of a pod (in bytes).
-	MetricMemoryUsage MetricName = "kubernetes.io:memory-usage"
+	MetricMemoryUsage MetricName = "memory-usage"
 )
 
-// ResourceConsumption is an object for specifying average resource consumption of a particular resource.
+// MetricUtilization is an object for specifying the arithmetic mean utilization of a particular metric.
 type MetricUtilization struct {
-	// Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status.
-	Metric MetricName `json:"metric"`
-	// Utilization specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status.
+	// Name specifies either the identifier of the target metric when present in the spec, or the identifier of the observed metric when present in the status.
+	Name MetricName `json:"name"`
+	// Utilization specifies either the target arithmetic mean utilization of the metric when present in the spec, or the observed arithmetic mean utilization when present in the status.
 	Utilization resource.Quantity `json:"utilization"`
 }
 
@@ -93,14 +93,15 @@ type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
 	// and will set the desired number of pods by modyfying its spec.
 	ScaleRef SubresourceReference `json:"scaleRef"`
-	// MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.
-	MinReplicas int `json:"minReplicas"`
+	// MinReplicas is the lower limit for the number of pods that can be set by the autoscaler, default 1.
+	MinReplicas *int `json:"minReplicas"`
 	// MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
 	MaxReplicas int `json:"maxReplicas"`
-	// TargetMetricUtilizations are the target arthmetic mean utilizations of the given metrics that the autoscaler will try to maintain by adjusting the desired number of pods.
-	// Currently two types of metrics are supported: "kubernetes.io:cpu-usage" and "kubernetes.io:memory-usage".
+	// TargetMetricUtilizations are the target arithmetic mean utilizations of the latest samles of the given metrics gathered accross pods.
+	// The autoscaler will try to maintain the target by adjusting the desired number of pods.
+	// Currently two types of metrics are supported: "cpu-usage" and "memory-usage".
 	// Currently this array must contain exactly one element.
-	TargetMetricUtilizations []MetricUtilization `json:"targetMetricUtilizations"`
+	TargetMetricUtilizations []MetricUtilization `json:"targetMetricUtilizations" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
@@ -108,9 +109,9 @@ type HorizontalPodAutoscalerStatus struct {
 	// ObservedGeneration is the most recent generation observed by this autoscaler.
 	ObserveGeneration *int64 `json:"observedGeneration,omitempty"`
 
-	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
-	// This is used by the autoscaler to controll how often the number of pods is changed.
-	LastScaleTimestamp *unversioned.Time `json:"lastScaleTimestamp,omitempty"`
+	// LastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods.
+	// This is used by the autoscaler to control how often the number of pods is changed.
+	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
 
 	// CurrentReplicas is the number of replicas of pods managed by this autoscaler.
 	CurrentReplicas int `json:"currentReplicas"`
@@ -121,7 +122,7 @@ type HorizontalPodAutoscalerStatus struct {
 	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
 	// try to maintain by adjusting the desired number of pods.
 	// Two types of resources are supported: "cpu" and "memory".
-	CurrentMetricUtilizations []MetricUtilization `json:"currentMetricUtilizations"`
+	CurrentMetricUtilizations []MetricUtilization `json:"currentMetricUtilizations" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.

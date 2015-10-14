@@ -56,9 +56,9 @@ func validateMetricUtilizations(utilizations []extensions.MetricUtilization, fie
 	if len(utilizations) != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, len(utilizations), "must containe exactly 1 element"))
 	} else {
-		metric := utilizations[0].Metric
-		if string(metric) != string(extensions.MetricCPUUsage) && string(metric) != string(extensions.MetricMemoryUsage) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".metric", metric, "metric not supported by autoscaler"))
+		name := utilizations[0].Name
+		if string(name) != string(extensions.MetricCPUUsage) && string(name) != string(extensions.MetricMemoryUsage) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".name", name, "metric not supported by autoscaler"))
 		}
 		utilization := utilizations[0].Utilization.Value()
 		if utilization < 0 {
@@ -70,10 +70,13 @@ func validateMetricUtilizations(utilizations []extensions.MetricUtilization, fie
 
 func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if autoscaler.MinReplicas < 0 {
+	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, isNegativeErrorMsg))
 	}
-	if autoscaler.MaxReplicas < autoscaler.MinReplicas {
+	if autoscaler.MaxReplicas < 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to 1`))
+	}
+	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
 	allErrs = append(allErrs, validateMetricUtilizations(autoscaler.TargetMetricUtilizations, "targetMetricUtilizations")...)

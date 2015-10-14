@@ -1257,13 +1257,13 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 			hpa.Spec.ScaleRef.Subresource)
 		fmt.Fprintf(out, "Target resource consumption:\t%s %s\n",
 			hpa.Spec.TargetMetricUtilizations[0].Utilization.String(),
-			hpa.Spec.TargetMetricUtilizations[0].Metric)
+			hpa.Spec.TargetMetricUtilizations[0].Name)
 		fmt.Fprintf(out, "Current resource consumption:\t")
 
 		if len(hpa.Status.CurrentMetricUtilizations) == 1 {
 			fmt.Fprintf(out, "%s %s\n",
 				hpa.Status.CurrentMetricUtilizations[0].Utilization.String(),
-				hpa.Status.CurrentMetricUtilizations[0].Metric)
+				hpa.Status.CurrentMetricUtilizations[0].Name)
 		} else {
 			fmt.Fprintf(out, "<not available>\n")
 		}

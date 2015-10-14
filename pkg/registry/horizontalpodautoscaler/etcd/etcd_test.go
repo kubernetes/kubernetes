@@ -47,9 +47,8 @@ func validNewHorizontalPodAutoscaler(name string) *extensions.HorizontalPodAutos
 			ScaleRef: extensions.SubresourceReference{
 				Subresource: "scale",
 			},
-			MinReplicas:              1,
 			MaxReplicas:              5,
-			TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
+			TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 		},
 	}
 }

@@ -39,9 +39,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas:              1,
+				MinReplicas:              newInt(1),
 				MaxReplicas:              5,
-				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 			},
 		},
 	}
@@ -61,9 +61,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas:              -1,
+				MinReplicas:              newInt(-1),
 				MaxReplicas:              5,
-				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 			},
 		},
 		"must be bigger or equal to minReplicas": {
@@ -75,9 +75,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas:              7,
+				MinReplicas:              newInt(7),
 				MaxReplicas:              5,
-				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")}},
 			},
 		},
 		"invalid value": {
@@ -89,9 +89,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas:              1,
+				MinReplicas:              newInt(1),
 				MaxReplicas:              5,
-				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("-0.8")}},
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse("-0.8")}},
 			},
 		},
 		"metric not supported": {
@@ -103,9 +103,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas:              1,
+				MinReplicas:              newInt(1),
 				MaxReplicas:              5,
-				TargetMetricUtilizations: []extensions.MetricUtilization{{Metric: extensions.MetricName("NotSupportedMetric"), Utilization: resource.MustParse("0.8")}},
+				TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricName("NotSupportedMetric"), Utilization: resource.MustParse("0.8")}},
 			},
 		},
 		"must containe exactly 1 element": {
@@ -117,11 +117,11 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
+				MinReplicas: newInt(1),
 				MaxReplicas: 5,
 				TargetMetricUtilizations: []extensions.MetricUtilization{
-					{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")},
-					{Metric: extensions.MetricMemoryUsage, Utilization: resource.MustParse("100M")},
+					{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse("0.8")},
+					{Name: extensions.MetricMemoryUsage, Utilization: resource.MustParse("100M")},
 				},
 			},
 		},
@@ -1069,4 +1069,10 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
 		}
 	}
+}
+
+func newInt(val int) *int {
+	p := new(int)
+	*p = val
+	return p
 }

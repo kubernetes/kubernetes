@@ -82,7 +82,7 @@ var heapsterMetricDefinitions = map[extensions.MetricName]metricDefinition{
 				// assumes that cpu usage is in millis
 				value = fmt.Sprintf("%dm", sum/uint64(count))
 			}
-			return extensions.MetricUtilization{Metric: extensions.MetricCPUUsage, Utilization: resource.MustParse(value)}, count
+			return extensions.MetricUtilization{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse(value)}, count
 		}},
 	extensions.MetricMemoryUsage: {"memory-usage",
 		func(metrics heapster.MetricResultList) (extensions.MetricUtilization, int) {
@@ -91,7 +91,7 @@ var heapsterMetricDefinitions = map[extensions.MetricName]metricDefinition{
 			if count > 0 {
 				value = int64(sum) / int64(count)
 			}
-			return extensions.MetricUtilization{Metric: extensions.MetricMemoryUsage, Utilization: *resource.NewQuantity(value, resource.DecimalSI)}, count
+			return extensions.MetricUtilization{Name: extensions.MetricMemoryUsage, Utilization: *resource.NewQuantity(value, resource.DecimalSI)}, count
 		}},
 }
 
