@@ -64,7 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	utilErrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -1483,7 +1483,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, runningPods []*kubeco
 			errlist = append(errlist, err)
 		}
 	}
-	return utilErrors.NewAggregate(errlist)
+	return utilerrors.NewAggregate(errlist)
 }
 
 func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {

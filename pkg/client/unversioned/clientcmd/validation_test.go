@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
@@ -326,14 +326,14 @@ func (c configValidationTest) testContext(contextName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
+			if len(errs) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, utilerrors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
+			t.Errorf("Unexpected error: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 }
@@ -386,14 +386,14 @@ func (c configValidationTest) testCluster(clusterName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
+			if len(errs) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, utilerrors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
+			t.Errorf("Unexpected error: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 }
@@ -406,14 +406,14 @@ func (c configValidationTest) testAuthInfo(authInfoName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
+			if len(errs) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, utilerrors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
+			t.Errorf("Unexpected error: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 }

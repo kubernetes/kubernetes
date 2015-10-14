@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
@@ -179,7 +179,7 @@ func NewInvalid(kind, name string, errs fielderrors.ValidationErrorList) error {
 			Name:   name,
 			Causes: causes,
 		},
-		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, errors.NewAggregate(errs)),
+		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, utilerrors.NewAggregate(errs)),
 	}}
 }
 
