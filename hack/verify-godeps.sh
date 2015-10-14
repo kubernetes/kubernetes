@@ -92,7 +92,9 @@ fi
 # Godeps/_workstapces/src/github.com/fsouza/go-dockerclient/testing/data/symlink'
 # is an intentionally broken symlink. Linux can use --no-dereference. OS X cannot.
 # So we --exclude='symlink' so diff -r doesn't die following a bad symlink.
-if ! _out="$(diff -Naupr --exclude='symlink' ${KUBE_ROOT}/Godeps/_workspace/src ${_kubetmp}/Godeps/_workspace/src)"; then
+# godep doesn't include test files by default or when using `godep update` so
+# let's disable checks for those too.
+if ! _out="$(diff -Naupr --exclude='symlink' --exclude='*_test.go' --exclude='testdata' ${KUBE_ROOT}/Godeps/_workspace/src ${_kubetmp}/Godeps/_workspace/src)"; then
   echo "Your godeps changes are not reproducable"
   echo "${_out}"
   exit 1
