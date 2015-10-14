@@ -74,14 +74,16 @@ var _ = Describe("Load capacity", func() {
 
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
+		// We can't call it explicitly at the end, because it will not be called
+		// if Expect() fails.
+		defer framework.afterEach()
+
 		deleteAllRC(configs)
 
 		// Verify latency metrics
 		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
-
-		framework.afterEach()
 	})
 
 	type Load struct {
