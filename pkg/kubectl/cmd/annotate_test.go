@@ -433,7 +433,7 @@ func TestAnnotateObject(t *testing.T) {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
 				}
-			case "PUT":
+			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
@@ -458,7 +458,7 @@ func TestAnnotateObject(t *testing.T) {
 	if err := options.Validate(args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(); err != nil {
+	if err := options.RunAnnotate(f); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -480,7 +480,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
 				}
-			case "PUT":
+			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/cassandra":
 					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
@@ -506,7 +506,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	if err := options.Validate(args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(); err != nil {
+	if err := options.RunAnnotate(f); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -528,7 +528,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
 				}
-			case "PUT":
+			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
@@ -556,7 +556,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	if err := options.Validate(args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(); err != nil {
+	if err := options.RunAnnotate(f); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
