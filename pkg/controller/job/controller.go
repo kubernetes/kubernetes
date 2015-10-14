@@ -316,7 +316,8 @@ func (jm *JobController) syncJob(key string) error {
 		return err
 	}
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
-	podList, err := jm.podStore.Pods(job.Namespace).List(labels.Set(job.Spec.Selector).AsSelector())
+	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
+	podList, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
 		glog.Errorf("Error getting pods for job %q: %v", key, err)
 		jm.queue.Add(key)
@@ -363,7 +364,7 @@ func getStatus(pods []api.Pod) (succeeded, failed int) {
 	return
 }
 
-func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *experimental.Job) int {
+func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *extensions.Job) int {
 	var activeLock sync.Mutex
 	active := len(activePods)
 	parallelism := *job.Spec.Parallelism

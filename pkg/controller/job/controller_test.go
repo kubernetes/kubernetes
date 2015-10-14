@@ -49,7 +49,9 @@ func newJob(parallelism, completions int) *extensions.Job {
 		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
-			Selector:    map[string]string{"foo": "bar"},
+			Selector: &extensions.PodSelector{
+				MatchLabels: map[string]string{"foo": "bar"},
+			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -82,7 +84,7 @@ func newPodList(count int, status api.PodPhase, job *extensions.Job) []api.Pod {
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%v", unversioned.Now().UnixNano()),
-				Labels:    job.Spec.Selector,
+				Labels:    job.Spec.Selector.MatchLabels,
 				Namespace: job.Namespace,
 			},
 			Status: api.PodStatus{Phase: status},
@@ -304,7 +306,9 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: extensions.JobSpec{
-					Selector: map[string]string{"foo": "bar"},
+					Selector: &extensions.PodSelector{
+						MatchLabels: map[string]string{"foo": "bar"},
+					},
 				},
 			},
 			pod: &api.Pod{
@@ -321,7 +325,15 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: extensions.JobSpec{
-					Selector: map[string]string{"foo": "bar"},
+					Selector: &extensions.PodSelector{
+						MatchExpressions: []extensions.PodSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: extensions.PodSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
 				},
 			},
 			pod: &api.Pod{

@@ -293,7 +293,10 @@ func TestJobStop(t *testing.T) {
 					},
 					Spec: extensions.JobSpec{
 						Parallelism: &zero,
-						Selector:    map[string]string{"k1": "v1"}},
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"k1": "v1"},
+						},
+					},
 				},
 				&extensions.JobList{ // LIST
 					Items: []extensions.Job{
@@ -304,7 +307,10 @@ func TestJobStop(t *testing.T) {
 							},
 							Spec: extensions.JobSpec{
 								Parallelism: &zero,
-								Selector:    map[string]string{"k1": "v1"}},
+								Selector: &extensions.PodSelector{
+									MatchLabels: map[string]string{"k1": "v1"},
+								},
+							},
 						},
 					},
 				},

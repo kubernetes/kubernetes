@@ -729,11 +729,13 @@ func printJob(job *extensions.Job, w io.Writer, withNamespace bool, wide bool, s
 	if len(containers) > 0 {
 		firstContainer = containers[0]
 	}
+
+	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
 		job.Name,
 		firstContainer.Name,
 		firstContainer.Image,
-		labels.FormatLabels(job.Spec.Selector),
+		selector.String(),
 		job.Status.Succeeded)
 	if err != nil {
 		return err
