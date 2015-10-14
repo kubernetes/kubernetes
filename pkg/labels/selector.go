@@ -52,6 +52,7 @@ func Everything() Selector {
 type Operator string
 
 const (
+	DoesNotExistOperator Operator = "!"
 	EqualsOperator       Operator = "="
 	DoubleEqualsOperator Operator = "=="
 	InOperator           Operator = "in"
@@ -85,10 +86,11 @@ type Requirement struct {
 
 // NewRequirement is the constructor for a Requirement.
 // If any of these rules is violated, an error is returned:
-// (1) The operator can only be In, NotIn or Exists.
-// (2) If the operator is In or NotIn, the values set must
-//     be non-empty.
-// (3) The key is invalid due to its length, or sequence
+// (1) The operator can only be In, NotIn, Equals, DoubleEquals, NotEquals, Exists, or DoesNotExist.
+// (2) If the operator is In or NotIn, the values set must be non-empty.
+// (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
+// (4) If the operator is Exists or DoesNotExist, the value set must be empty.
+// (5) The key is invalid due to its length, or sequence
 //     of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
@@ -103,9 +105,12 @@ func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, er
 		}
 	case EqualsOperator, DoubleEqualsOperator, NotEqualsOperator:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("exact match compatibility requires one single value")
+			return nil, fmt.Errorf("exact-match compatibility requires one single value")
 		}
-	case ExistsOperator:
+	case ExistsOperator, DoesNotExistOperator:
+		if len(vals) != 0 {
+			return nil, fmt.Errorf("values set must be empty for exists and does not exist")
+		}
 	default:
 		return nil, fmt.Errorf("operator '%v' is not recognized", op)
 	}
@@ -125,7 +130,7 @@ func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, er
 //     value for that key is in Requirement's value set.
 // (3) The operator is NotIn, Labels has the Requirement's key and
 //     Labels' value for that key is not in Requirement's value set.
-// (4) The operator is NotIn and Labels does not have the
+// (4) The operator is DoesNotExist or NotIn and Labels does not have the
 //     Requirement's key.
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
@@ -141,6 +146,8 @@ func (r *Requirement) Matches(ls Labels) bool {
 		return !r.strValues.Has(ls.Get(r.key))
 	case ExistsOperator:
 		return ls.Has(r.key)
+	case DoesNotExistOperator:
+		return !ls.Has(r.key)
 	default:
 		return false
 	}
@@ -173,6 +180,9 @@ func (lsel LabelSelector) Empty() bool {
 // returned. See NewRequirement for creating a valid Requirement.
 func (r *Requirement) String() string {
 	var buffer bytes.Buffer
+	if r.operator == DoesNotExistOperator {
+		buffer.WriteString("!")
+	}
 	buffer.WriteString(r.key)
 
 	switch r.operator {
@@ -186,7 +196,7 @@ func (r *Requirement) String() string {
 		buffer.WriteString(" in ")
 	case NotInOperator:
 		buffer.WriteString(" notin ")
-	case ExistsOperator:
+	case ExistsOperator, DoesNotExistOperator:
 		return buffer.String()
 	}
 
@@ -249,6 +259,7 @@ const (
 	EndOfStringToken
 	ClosedParToken
 	CommaToken
+	DoesNotExistToken
 	DoubleEqualsToken
 	EqualsToken
 	IdentifierToken // to represent keys and values
@@ -263,6 +274,7 @@ const (
 var string2token = map[string]Token{
 	")":     ClosedParToken,
 	",":     CommaToken,
+	"!":     DoesNotExistToken,
 	"==":    DoubleEqualsToken,
 	"=":     EqualsToken,
 	"in":    InToken,
@@ -457,7 +469,7 @@ func (p *Parser) parse() ([]Requirement, error) {
 	for {
 		tok, lit := p.lookahead(Values)
 		switch tok {
-		case IdentifierToken:
+		case IdentifierToken, DoesNotExistToken:
 			r, err := p.parseRequirement()
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse requirement: %v", err)
@@ -469,7 +481,7 @@ func (p *Parser) parse() ([]Requirement, error) {
 				return requirements, nil
 			case CommaToken:
 				t2, l2 := p.lookahead(Values)
-				if t2 != IdentifierToken {
+				if t2 != IdentifierToken && t2 != DoesNotExistToken {
 					return nil, fmt.Errorf("found '%s', expected: identifier after ','", l2)
 				}
 			default:
@@ -478,7 +490,7 @@ func (p *Parser) parse() ([]Requirement, error) {
 		case EndOfStringToken:
 			return requirements, nil
 		default:
-			return nil, fmt.Errorf("found '%s', expected: identifier or 'end of string'", lit)
+			return nil, fmt.Errorf("found '%s', expected: !, identifier, or 'end of string'", lit)
 		}
 	}
 }
@@ -488,7 +500,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if operator == ExistsOperator { // operator Exists found lookahead set checked
+	if operator == ExistsOperator || operator == DoesNotExistOperator { // operator found lookahead set checked
 		return NewRequirement(key, operator, nil)
 	}
 	operator, err = p.parseOperator()
@@ -510,10 +522,15 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 }
 
 // parseKeyAndInferOperator parse literals.
-// in case of no operator 'in, notin, ==, =, !=' are found
-// the 'exists' operattor is inferred
+// in case of no operator '!, in, notin, ==, =, !=' are found
+// the 'exists' operator is inferred
 func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
+	var operator Operator
 	tok, literal := p.consume(Values)
+	if tok == DoesNotExistToken {
+		operator = DoesNotExistOperator
+		tok, literal = p.consume(Values)
+	}
 	if tok != IdentifierToken {
 		err := fmt.Errorf("found '%s', expected: identifier", literal)
 		return "", "", err
@@ -521,9 +538,10 @@ func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
 	if err := validateLabelKey(literal); err != nil {
 		return "", "", err
 	}
-	var operator Operator
 	if t, _ := p.lookahead(Values); t == EndOfStringToken || t == CommaToken {
-		operator = ExistsOperator
+		if operator != DoesNotExistOperator {
+			operator = ExistsOperator
+		}
 	}
 	return literal, operator, nil
 }
@@ -533,6 +551,7 @@ func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
 func (p *Parser) parseOperator() (op Operator, err error) {
 	tok, lit := p.consume(KeyAndOperator)
 	switch tok {
+	// DoesNotExistToken shouldn't be here because it's a unary operator, not a binary operator
 	case InToken:
 		op = InOperator
 	case EqualsToken:
@@ -633,7 +652,7 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 // The input will cause an error if it does not follow this form:
 //
 // <selector-syntax> ::= <requirement> | <requirement> "," <selector-syntax> ]
-// <requirement> ::= KEY [ <set-based-restriction> | <exact-match-restriction>
+// <requirement> ::= [!] KEY [ <set-based-restriction> | <exact-match-restriction> ]
 // <set-based-restriction> ::= "" | <inclusion-exclusion> <value-set>
 // <inclusion-exclusion> ::= <inclusion> | <exclusion>
 //           <exclusion> ::= "notin"
@@ -648,13 +667,14 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //  "x in (foo,,baz),y,z notin ()"
 //
 // Note:
-//  (1) Inclusion - " in " - denotes that the KEY is equal to any of the
+//  (1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
 //      VALUEs in its requirement
 //  (2) Exclusion - " notin " - denotes that the KEY is not equal to any
-//      of the VALUEs in its requirement
+//      of the VALUEs in its requirement or does not exist
 //  (3) The empty string is a valid VALUE
 //  (4) A requirement with just a KEY - as in "y" above - denotes that
 //      the KEY exists and can be any VALUE.
+//  (5) A requirement with just !KEY requires that the KEY not exist.
 //
 func Parse(selector string) (Selector, error) {
 	p := &Parser{l: &Lexer{s: selector, pos: 0}}
