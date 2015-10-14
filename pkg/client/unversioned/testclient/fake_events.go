@@ -87,6 +87,20 @@ func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
 	return obj.(*api.Event), err
 }
 
+// Patch patches an existing event. Returns the copy of the event the server returns, or an error.
+func (c *FakeEvents) Patch(event *api.Event, data []byte) (*api.Event, error) {
+	action := NewRootPatchAction("events", event)
+	if c.Namespace != "" {
+		action = NewPatchAction("events", c.Namespace, event)
+	}
+	obj, err := c.Fake.Invokes(action, event)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.Event), err
+}
+
 func (c *FakeEvents) Delete(name string) error {
 	action := NewRootDeleteAction("events", name)
 	if c.Namespace != "" {
