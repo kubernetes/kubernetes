@@ -61,11 +61,13 @@ var _ = Describe("Autoscaling", func() {
 		setUpAutoscaler("cpu/node_utilization", 0.4, nodeCount, nodeCount+1)
 
 		// Consume 50% CPU
-		millicoresPerReplica := 500
-		rc := NewStaticResourceConsumer("cpu-utilization", nodeCount*coresPerNode, millicoresPerReplica*nodeCount*coresPerNode, 0, int64(millicoresPerReplica), 100, f)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout))
+		rcs := createConsumingRCs(f, "cpu-utilization", nodeCount*coresPerNode, 500, 0)
+		err := waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout)
+		for _, rc := range rcs {
+			rc.CleanUp()
+		}
+		expectNoError(err)
 
-		rc.CleanUp()
 		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
@@ -84,10 +86,13 @@ var _ = Describe("Autoscaling", func() {
 
 		// Consume 60% of total memory capacity
 		megabytesPerReplica := int(memCapacityMb * 6 / 10 / coresPerNode)
-		rc := NewStaticResourceConsumer("mem-utilization", nodeCount*coresPerNode, 0, megabytesPerReplica*nodeCount*coresPerNode, 100, int64(megabytesPerReplica+100), f)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout))
+		rcs := createConsumingRCs(f, "mem-utilization", nodeCount*coresPerNode, 0, megabytesPerReplica)
+		err := waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout)
+		for _, rc := range rcs {
+			rc.CleanUp()
+		}
+		expectNoError(err)
 
-		rc.CleanUp()
 		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
@@ -114,6 +119,15 @@ func setUpAutoscaler(metric string, target float64, min, max int) {
 		fmt.Sprintf("--max-num-replicas=%v", max),
 	).CombinedOutput()
 	expectNoError(err, "Output: "+string(out))
+}
+
+func createConsumingRCs(f *Framework, name string, count, cpuPerReplica, memPerReplica int) []*ResourceConsumer {
+	var res []*ResourceConsumer
+	for i := 1; i <= count; i++ {
+		name := fmt.Sprintf("%s-%d", name, i)
+		res = append(res, NewStaticResourceConsumer(name, 1, cpuPerReplica, memPerReplica, int64(cpuPerReplica), int64(memPerReplica+100), f))
+	}
+	return res
 }
 
 func cleanUpAutoscaler() {
