@@ -38,7 +38,6 @@ type SortingPrinter struct {
 
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	if !runtime.IsListType(obj) {
-		fmt.Fprintf(out, "Not a list, skipping: %#v\n", obj)
 		return s.Delegate.PrintObj(obj, out)
 	}
 
