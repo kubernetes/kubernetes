@@ -57,7 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -1966,13 +1966,13 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		kl.addSource(u.Source)
 		switch u.Op {
 		case kubetypes.ADD:
-			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, kubeletUtil.FormatPodNames(u.Pods))
+			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, kubeletutil.FormatPodNames(u.Pods))
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
-			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, kubeletUtil.FormatPodNames(u.Pods))
+			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, kubeletutil.FormatPodNames(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
-			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, kubeletUtil.FormatPodNames(u.Pods))
+			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, kubeletutil.FormatPodNames(u.Pods))
 			handler.HandlePodDeletions(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
@@ -2063,7 +2063,7 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
 		if err := kl.deletePod(pod.UID); err != nil {
-			glog.V(2).Infof("Failed to delete pod %q, err: %v", kubeletUtil.FormatPodName(pod), err)
+			glog.V(2).Infof("Failed to delete pod %q, err: %v", kubeletutil.FormatPodName(pod), err)
 		}
 		kl.probeManager.RemovePod(pod)
 	}

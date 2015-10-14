@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
-	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -102,14 +102,14 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 	status, ok := m.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
-		glog.V(3).Infof("No status for pod: %v", kubeutil.FormatPodName(w.pod))
+		glog.V(3).Infof("No status for pod: %v", kubeletutil.FormatPodName(w.pod))
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == api.PodFailed || status.Phase == api.PodSucceeded {
 		glog.V(3).Infof("Pod %v %v, exiting probe worker",
-			kubeutil.FormatPodName(w.pod), status.Phase)
+			kubeletutil.FormatPodName(w.pod), status.Phase)
 		return false
 	}
 
@@ -117,7 +117,7 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 	if !ok {
 		// Either the container has not been created yet, or it was deleted.
 		glog.V(3).Infof("Non-existant container probed: %v - %v",
-			kubeutil.FormatPodName(w.pod), w.container.Name)
+			kubeletutil.FormatPodName(w.pod), w.container.Name)
 		return true // Wait for more information.
 	}
 
@@ -130,7 +130,7 @@ func doProbe(m *manager, w *worker) (keepGoing bool) {
 
 	if c.State.Running == nil {
 		glog.V(3).Infof("Non-running container probed: %v - %v",
-			kubeutil.FormatPodName(w.pod), w.container.Name)
+			kubeletutil.FormatPodName(w.pod), w.container.Name)
 		m.readinessCache.Set(w.containerID, results.Failure)
 		// Abort if the container will not be restarted.
 		return c.State.Terminated == nil ||

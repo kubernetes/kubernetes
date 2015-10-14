@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
-	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
@@ -459,7 +459,7 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 
 	volumeMap, ok := r.volumeGetter.GetVolumes(pod.UID)
 	if !ok {
-		return nil, fmt.Errorf("cannot get the volumes for pod %q", kubeletUtil.FormatPodName(pod))
+		return nil, fmt.Errorf("cannot get the volumes for pod %q", kubeletutil.FormatPodName(pod))
 	}
 
 	// Set global volumes.
@@ -615,7 +615,7 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	}
 	units = append(units, newUnitOption(unitKubernetesSection, unitRestartCount, strconv.Itoa(restartCount)))
 
-	glog.V(4).Infof("rkt: Creating service file %q for pod %q", serviceName, kubeletUtil.FormatPodName(pod))
+	glog.V(4).Infof("rkt: Creating service file %q for pod %q", serviceName, kubeletutil.FormatPodName(pod))
 	serviceFile, err := os.Create(serviceFilePath(serviceName))
 	if err != nil {
 		return "", nil, err
@@ -674,7 +674,7 @@ func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, f
 // RunPod first creates the unit file for a pod, and then
 // starts the unit over d-bus.
 func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
-	glog.V(4).Infof("Rkt starts to run pod: name %q.", kubeletUtil.FormatPodName(pod))
+	glog.V(4).Infof("Rkt starts to run pod: name %q.", kubeletutil.FormatPodName(pod))
 
 	name, runtimePod, prepareErr := r.preparePod(pod, pullSecrets)
 
@@ -684,7 +684,7 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	for i, c := range pod.Spec.Containers {
 		ref, err := kubecontainer.GenerateContainerRef(pod, &c)
 		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %q, container %v: '%v'", kubeletUtil.FormatPodName(pod), c.Name, err)
+			glog.Errorf("Couldn't make a ref to pod %q, container %v: '%v'", kubeletutil.FormatPodName(pod), c.Name, err)
 			continue
 		}
 		if prepareErr != nil {
@@ -979,7 +979,7 @@ func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 
 // SyncPod syncs the running pod to match the specified desired pod.
 func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
-	podFullName := kubeletUtil.FormatPodName(pod)
+	podFullName := kubeletutil.FormatPodName(pod)
 
 	// Add references to all containers.
 	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.Container)
