@@ -360,6 +360,32 @@ function kube::release::parse_and_validate_release_version() {
   }
 }
 
+# Validate a ci version
+#
+# Globals:
+#   None
+# Arguments:
+#   version
+# Returns:
+#   If version is a valid ci version
+# Sets:
+#  BASH_REMATCH, so you can do something like:
+#    local -r version_major="${BASH_REMATCH[1]}"
+#    local -r version_minor="${BASH_REMATCH[2]}"
+#    local -r version_patch="${BASH_REMATCH[3]}"
+#    local -r version_prerelease="${BASH_REMATCH[4]}"
+#    local -r version_alpha_rev="${BASH_REMATCH[5]}"
+#    local -r version_build_info="${BASH_REMATCH[6]}"
+#    local -r version_commits="${BASH_REMATCH[7]}"
+function kube::release::parse_and_validate_ci_version() {
+  # Accept things like "v1.2.3-alpha.0.456+abcd789-dirty" or "v1.2.3-beta.456"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha\\.(0|[1-9][0-9]*))(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+  local -r version="${1-}"
+  [[ "${version}" =~ ${version_regex} ]] || {
+    kube::log::error "Invalid ci version: '${version}'"
+    return 1
+  }
+}
 
 # ---------------------------------------------------------------------------
 # Building
@@ -1039,7 +1065,19 @@ function kube::release::gcs::copy_release_artifacts() {
 #   Success
 function kube::release::gcs::publish_ci() {
   kube::release::gcs::verify_release_files || return 1
-  kube::release::gcs::publish 'ci/latest.txt' || return 1
+
+  kube::release::parse_and_validate_ci_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
+
+  local -r publish_files=(ci/latest.txt ci/latest-${version_major}.txt ci/latest-${version_major}.${version_minor}.txt)
+
+  for publish_file in ${publish_files[*]}; do
+    # If there's a version that's above the one we're trying to release, don't
+    # do anything, and just try the next one.
+    kube::release::gcs::verify_ci_ge "${publish_file}" || continue
+    kube::release::gcs::publish "${publish_file}" || return 1
+  done
 }
 
 # Publish a new official version, (latest or stable,) but only if the release
@@ -1130,15 +1168,15 @@ function kube::release::gcs::verify_release_gt() {
     local -r gcs_version_patch="${BASH_REMATCH[3]}"
 
     local greater=true
-    if [[ "${gcs_version_major}" -gt "${version_major}" ]]; then
+    if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
       greater=false
-    elif [[ "${gcs_version_major}" -lt "${version_major}" ]]; then
+    elif [[ "${version_major}" -gt "${gcs_version_major}" ]]; then
       : # fall out
-    elif [[ "${gcs_version_minor}" -gt "${version_minor}" ]]; then
+    elif [[ "${version_minor}" -lt "${gcs_version_minor}" ]]; then
       greater=false
-    elif [[ "${gcs_version_minor}" -lt "${version_minor}" ]]; then
+    elif [[ "${version_minor}" -gt "${gcs_version_minor}" ]]; then
       : # fall out
-    elif [[ "${gcs_version_patch}" -ge "${version_patch}" ]]; then
+    elif [[ "${version_patch}" -le "${gcs_version_patch}" ]]; then
       greater=false
     fi
 
@@ -1150,6 +1188,88 @@ function kube::release::gcs::verify_release_gt() {
     fi
   else  # gsutil cat failed; file does not exist
     kube::log::error "Release file '${publish_file_dst}' does not exist.  Continuing."
+    return 0
+  fi
+}
+
+# Check if the new version is greater than or equal to the version currently
+# published on GCS.  (Ignore the build; if it's different, overwrite anyway.)
+#
+# Globals:
+#   KUBE_GCS_PUBLISH_VERSION
+#   KUBE_GCS_RELEASE_BUCKET
+# Arguments:
+#   publish_file: the GCS location to look in
+# Returns:
+#   If new version is greater than the GCS version
+function kube::release::gcs::verify_ci_ge() {
+  local -r publish_file="${1-}"
+  local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
+  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  kube::release::parse_and_validate_ci_version "${new_version}" || return 1
+
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_patch="${BASH_REMATCH[3]}"
+  local -r version_prerelease="${BASH_REMATCH[4]}"
+  local -r version_alpha_rev="${BASH_REMATCH[5]}"
+  local -r version_commits="${BASH_REMATCH[7]}"
+
+  local gcs_version
+  if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
+    kube::release::parse_and_validate_ci_version "${gcs_version}" || {
+      kube::log::error "${publish_file_dst} contains invalid ci version, can't compare: '${gcs_version}'"
+      return 1
+    }
+
+    local -r gcs_version_major="${BASH_REMATCH[1]}"
+    local -r gcs_version_minor="${BASH_REMATCH[2]}"
+    local -r gcs_version_patch="${BASH_REMATCH[3]}"
+    local -r gcs_version_prerelease="${BASH_REMATCH[4]}"
+    local -r gcs_version_alpha_rev="${BASH_REMATCH[5]}"
+    local -r gcs_version_commits="${BASH_REMATCH[7]}"
+
+    local greater=true
+    if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
+      greater=false
+    elif [[ "${version_major}" -gt "${gcs_version_major}" ]]; then
+      : # fall out
+    elif [[ "${version_minor}" -lt "${gcs_version_minor}" ]]; then
+      greater=false
+    elif [[ "${version_minor}" -gt "${gcs_version_minor}" ]]; then
+      : # fall out
+    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
+      greater=false
+    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+      : # fall out
+    elif [[ "${version_prerelease}" =~ alpha.* && "${gcs_version_prerelease}" == "beta" ]]; then
+      greater=false
+    elif [[ "${version_prerelease}" == "beta" && "${gcs_version_prerelease}" =~ alpha.* ]]; then
+      : # fall out
+    # Check the alpha revision; if they are both beta, this is just comparing empty strings.
+    elif [[ "${version_alpha_rev}" -lt "${gcs_version_alpha_rev}" ]]; then
+      greater=false
+    elif [[ "${version_alpha_rev}" -gt "${gcs_version_alpha_rev}" ]]; then
+      : # fall out
+    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
+      greater=false
+    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+      : # fall out
+    # If either version_commits is empty, it will be considered less-than, as
+    # expected, (e.g. 1.2.3-beta < 1.2.3-beta.1).
+    elif [[ "${version_commits}" -lt "${gcs_version_commits}" ]]; then
+      greater=false
+    fi
+
+    if [[ "${greater}" != "true" ]]; then
+      kube::log::status "${new_version} (just uploaded) < ${gcs_version} (latest on GCS), not updating ${publish_file_dst}"
+      return 1
+    else
+      kube::log::status "${new_version} (just uploaded) >= ${gcs_version} (latest on GCS), updating ${publish_file_dst}"
+    fi
+  else  # gsutil cat failed; file does not exist
+    kube::log::error "File '${publish_file_dst}' does not exist.  Continuing."
     return 0
   fi
 }
