@@ -47,6 +47,18 @@ func Everything() Selector {
 	return LabelSelector{}
 }
 
+type nothingSelector struct{}
+
+func (n nothingSelector) Matches(_ Labels) bool                         { return false }
+func (n nothingSelector) Empty() bool                                   { return false }
+func (n nothingSelector) String() string                                { return "<null>" }
+func (n nothingSelector) Add(_ string, _ Operator, _ []string) Selector { return n }
+
+// Nothing returns a selector that matches no labels
+func Nothing() Selector {
+	return nothingSelector{}
+}
+
 // Operator represents a key's relationship
 // to a set of values in a Requirement.
 type Operator string
