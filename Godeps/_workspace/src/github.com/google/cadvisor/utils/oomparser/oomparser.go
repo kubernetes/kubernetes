@@ -164,7 +164,7 @@ func (self *OomParser) StreamOoms(outStream chan *OomInstance) {
 }
 
 func callJournalctl() (io.ReadCloser, error) {
-	cmd := exec.Command("journalctl", "-f")
+	cmd := exec.Command("journalctl", "-k", "-f")
 	readcloser, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
