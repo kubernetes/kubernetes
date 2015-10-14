@@ -29,7 +29,7 @@ import (
 var _ = Describe("Initial Resources", func() {
 	f := NewFramework("initial-resources")
 
-	It("[Skipped][Autoscaling Suite] should set initial resources based on historical data", func() {
+	It("[Skipped] should set initial resources based on historical data", func() {
 		// Cleanup data in InfluxDB that left from previous tests.
 		influxdbClient, err := getInfluxdbClient(f.Client)
 		expectNoError(err, "failed to create influxdb client")
