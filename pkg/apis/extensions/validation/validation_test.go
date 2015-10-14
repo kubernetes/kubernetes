@@ -192,7 +192,6 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
-
 }
 
 func TestValidateDaemonSetUpdate(t *testing.T) {
@@ -725,10 +724,12 @@ func TestValidateDeployment(t *testing.T) {
 }
 
 func TestValidateJob(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
+	validSelector := &extensions.PodSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
 	validPodTemplateSpec := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector,
+			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -783,11 +784,10 @@ func TestValidateJob(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.JobSpec{
-				Selector: map[string]string{},
 				Template: validPodTemplateSpec,
 			},
 		},
-		"spec.template.labels:selector does not match template": {
+		"spec.template.metadata.labels: invalid value 'map[y:z]', Details: selector does not match template": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -815,7 +815,7 @@ func TestValidateJob(t *testing.T) {
 				Selector: validSelector,
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
+						Labels: validSelector.MatchLabels,
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyAlways,
