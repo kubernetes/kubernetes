@@ -72,4 +72,4 @@ done
 $SED -ri -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
 
 ${KUBE_ROOT}/hack/update-generated-docs.sh
-${KUBE_ROOT}/hack/update-swagger-spec.sh
+${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
