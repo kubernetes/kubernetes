@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"io/ioutil"
 	"testing"
 	"time"
 
@@ -37,8 +38,14 @@ func TestRunOnce(t *testing.T) {
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &kubecontainer.FakeRuntime{}
 
+	basePath, err := ioutil.TempDir("/tmp", "kubelet")
+	if err != nil {
+		t.Fatalf("can't make a temp rootdir")
+	}
+	defer os.RemoveAll(basePath)
+
 	kb := &Kubelet{
-		rootDirectory:       "/tmp/kubelet",
+		rootDirectory:       basePath,
 		recorder:            &record.FakeRecorder{},
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
@@ -53,7 +60,7 @@ func TestRunOnce(t *testing.T) {
 	kb.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), cadvisor, "", "", "")
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	if err := kb.setupDataDirs(); err != nil {
+	if err = kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
 
