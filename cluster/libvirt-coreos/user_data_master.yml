@@ -18,6 +18,7 @@ coreos:
         --insecure-port=8080 \
         --etcd-servers=http://127.0.0.1:2379 \
         --kubelet-port=10250 \
+        --runtime-config=${API_VERSION} \
         --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}
         Restart=always
         RestartSec=2

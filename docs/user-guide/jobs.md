@@ -243,7 +243,7 @@ value is `Always`.)
 
 Job is part of the experimental API group, so it is not subject to the same compatibility
 guarantees as objects in the main API.  It may not be enabled.  Enable by setting
-`--runtime-config=experimental/v1alpha1` on the apiserver.
+`--runtime-config=extensions/v1beta1` on the apiserver.
 
 ## Future work
 
