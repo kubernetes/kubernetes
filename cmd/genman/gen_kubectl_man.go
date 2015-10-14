@@ -78,12 +78,16 @@ func printFlags(out *bytes.Buffer, flags *pflag.FlagSet) {
 			// put quotes on the value
 			format = "**--%s**=%q\n\t%s\n\n"
 		}
-		if len(flag.Shorthand) > 0 {
+
+		// Todo, when we mark a shorthand is deprecated, but specify an empty message.
+		// The flag.ShorthandDeprecated is empty as the shorthand is deprecated.
+		// Using len(flag.ShorthandDeprecated) > 0 can't handle this, others are ok.
+		if !(len(flag.ShorthandDeprecated) > 0) && len(flag.Shorthand) > 0 {
 			format = "**-%s**, " + format
+			fmt.Fprintf(out, format, flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
 		} else {
-			format = "%s" + format
+			fmt.Fprintf(out, format, flag.Name, flag.DefValue, flag.Usage)
 		}
-		fmt.Fprintf(out, format, flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
 	})
 }
 
