@@ -122,6 +122,10 @@ var _ = Describe("Density", func() {
 	})
 
 	AfterEach(func() {
+		// We can't call it explicitly at the end, because it will not be called
+		// if Expect() fails.
+		defer framework.afterEach()
+
 		// Remove any remaining pods from this test if the
 		// replication controller still exists and the replica count
 		// isn't 0.  This means the controller wasn't cleaned up
@@ -146,8 +150,6 @@ var _ = Describe("Density", func() {
 		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
-
-		framework.afterEach()
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
