@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -224,7 +223,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
-	w := tabwriter.NewWriter(out, kubectl.TabwriterMinWidth, kubectl.TabwriterWidth, kubectl.TabwriterPadding, kubectl.TabwriterPadChar, kubectl.TabwriterFlags)
+	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
 	return b.Flatten().Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
