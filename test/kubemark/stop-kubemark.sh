@@ -36,7 +36,7 @@ gcloud compute instances delete "${MASTER_NAME}" \
 gcloud compute disks delete "${MASTER_NAME}"-pd \
       --project "${PROJECT}" \
       --quiet \
-      --zone "${ZONE}" \ || true
+      --zone "${ZONE}" || true
 
 gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
 	  --project "${PROJECT}" \
