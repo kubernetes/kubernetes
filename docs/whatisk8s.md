@@ -62,6 +62,9 @@ Kubernetes is not a PaaS (Platform as a Service).
 Kubernetes is not a mere "orchestration system"; it eliminates the need for orchestration:
 * The technical definition of "orchestration" is execution of a defined workflow: do A, then B, then C. In contrast, Kubernetes is comprised of a set of control processes that continuously drive current state towards the provided desired state. It shouldn't matter how you get from A to C: make it so. This results in a system that is easier to use and more powerful, robust, and resilient.
 
+#### What does *Kubernetes* mean? K8s?
+
+The name **Kubernetes** originates from Greek, meaning "helmsman" or "pilot", and is the root of "governor" and ["cybernetic"](http://www.etymonline.com/index.php?term=cybernetics). **K8s** is an abbreviation derived by replacing the 8 letters "ubernete" with 8.
 
 
 
