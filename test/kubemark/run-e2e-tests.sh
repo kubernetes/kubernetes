@@ -34,9 +34,9 @@ export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/kubeconfig.loc"
 export E2E_MIN_STARTUP_PODS=0
 
 if [ -z "$@" ]; then
-	ARGS="--ginkgo.focus=\"should\sallow\sstarting\s30\spods\sper\snode\""
+	ARGS='--ginkgo.focus=should\sallow\sstarting\s30\spods\sper\snode'
 else
 	ARGS=$@
 fi
 
-${KUBE_ROOT}/hack/ginkgo-e2e.sh --e2e-verify-service-account=false $ARGS
+${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "$ARGS"
