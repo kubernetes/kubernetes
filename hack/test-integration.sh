@@ -46,9 +46,6 @@ runTests() {
 
   kube::log::status "Running integration test cases"
 
-  # These are read by the integration test
-  export ETCD_HOST
-  export ETCD_PORT
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
   # KUBE_RACE="-race"
   KUBE_GOFLAGS="-tags 'integration no-docker' " \
@@ -56,12 +53,13 @@ runTests() {
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
     KUBE_API_VERSIONS="v1,extensions/v1beta1" \
+    KUBE_TEST_ARGS="--etcd-servers=http://${ETCD_HOST}:${ETCD_PORT}" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
   kube::log::status "Running integration test scenario"
 
   KUBE_API_VERSIONS="v1,extensions/v1beta1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
-    --etcd-server="http://${ETCD_HOST}:${ETCD_PORT}" \
+    --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
