@@ -122,7 +122,7 @@ tail -f /dev/null
 
 1. 'war' container only contains the `war` file of your app
 2. 'war' container's CMD tries to copy `sample.war` to the `emptyDir` volume path
-3. The last line of `tailf -f` is just used to hold the container, as Replication Controller does not support one-off task
+3. The last line of `tail -f` is just used to hold the container, as Replication Controller does not support one-off task
 4. 'tomcat' container will load the `sample.war` from volume path
 
 What's more, if you don't want to enclose a build-in `mv.sh` script in the `war` container, you can use Pod lifecycle handler to do the copy work, here's a example [javaweb-2.yaml](javaweb-2.yaml):
