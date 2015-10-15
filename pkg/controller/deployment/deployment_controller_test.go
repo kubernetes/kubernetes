@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func TestDeploymentController_scaleUp(t *testing.T) {
+func TestDeploymentController_reconcileNewRC(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
 		maxSurge            util.IntOrString
@@ -38,6 +38,7 @@ func TestDeploymentController_scaleUp(t *testing.T) {
 		expectedNewReplicas int
 	}{
 		{
+			// Should not scale up.
 			deploymentReplicas: 10,
 			maxSurge:           util.NewIntOrStringFromInt(0),
 			oldReplicas:        10,
@@ -67,6 +68,15 @@ func TestDeploymentController_scaleUp(t *testing.T) {
 			newReplicas:        2,
 			scaleExpected:      false,
 		},
+		{
+			// Should scale down.
+			deploymentReplicas:  10,
+			maxSurge:            util.NewIntOrStringFromInt(2),
+			oldReplicas:         2,
+			newReplicas:         11,
+			scaleExpected:       true,
+			expectedNewReplicas: 10,
+		},
 	}
 
 	for i, test := range tests {
@@ -80,7 +90,7 @@ func TestDeploymentController_scaleUp(t *testing.T) {
 			client:        fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleUp(allRcs, newRc, deployment)
+		scaled, err := controller.reconcileNewRC(allRcs, newRc, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -106,7 +116,7 @@ func TestDeploymentController_scaleUp(t *testing.T) {
 	}
 }
 
-func TestDeploymentController_scaleDown(t *testing.T) {
+func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
 		maxUnavailable      util.IntOrString
@@ -180,7 +190,7 @@ func TestDeploymentController_scaleDown(t *testing.T) {
 			client:        fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDown(allRcs, oldRcs, nil, deployment)
+		scaled, err := controller.reconcileOldRCs(allRcs, oldRcs, nil, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
