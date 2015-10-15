@@ -41,7 +41,7 @@ $ kubectl logs nginx
 $ kubectl logs -p -c ruby web-1
 
 # Begin streaming the logs of the ruby container in pod web-1
-$ kubectl logs -f -c ruby web-1
+$ kubectl logs --follow -c ruby web-1
 
 # Display only the most recent 20 lines of output in pod nginx
 $ kubectl logs --tail=20 nginx
@@ -91,6 +91,7 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Aliases: []string{"log"},
 	}
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
+	cmd.Flags().MarkShorthandDeprecated("follow", "please use --follow instead")
 	cmd.Flags().Bool("timestamps", false, "Include timestamps on each line in the log output")
 	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
 	cmd.Flags().BoolP("previous", "p", false, "If true, print the logs for the previous instance of the container in a pod if it exists.")
