@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -58,6 +59,7 @@ func startHTTPServer(httpPort int) {
 	http.HandleFunc("/shutdown", shutdownHandler)
 	http.HandleFunc("/hostName", hostNameHandler)
 	http.HandleFunc("/shell", shellHandler)
+	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/dial", dialHandler)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
 }
@@ -191,6 +193,7 @@ func dialUDP(request string, remoteAddress *net.UDPAddr) (string, error) {
 
 func shellHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.FormValue("shellCommand"))
+	log.Printf("%s %s %s\n", shellPath, "-c", r.FormValue("shellCommand"))
 	cmdOut, err := exec.Command(shellPath, "-c", r.FormValue("shellCommand")).CombinedOutput()
 	output := map[string]string{}
 	if len(cmdOut) > 0 {
@@ -199,12 +202,73 @@ func shellHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		output["error"] = fmt.Sprintf("%v", err)
 	}
+	log.Printf("Output: %s", output)
 	bytes, err := json.Marshal(output)
 	if err == nil {
 		fmt.Fprintf(w, string(bytes))
 	} else {
 		http.Error(w, fmt.Sprintf("response could not be serialized. %v", err), http.StatusExpectationFailed)
 	}
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	result := map[string]string{}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		result["error"] = "Unable to upload file."
+		bytes, err := json.Marshal(result)
+		if err == nil {
+			fmt.Fprintf(w, string(bytes))
+		} else {
+			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
+		}
+		log.Printf("Unable to upload file: %s", err)
+		return
+	}
+	defer file.Close()
+
+	f, err := ioutil.TempFile("/uploads", "upload")
+	if err != nil {
+		result["error"] = "Unable to open file for write"
+		bytes, err := json.Marshal(result)
+		if err == nil {
+			fmt.Fprintf(w, string(bytes))
+		} else {
+			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
+		}
+		log.Printf("Unable to open file for write: %s", err)
+		return
+	}
+	defer f.Close()
+	if _, err = io.Copy(f, file); err != nil {
+		result["error"] = "Unable to write file."
+		bytes, err := json.Marshal(result)
+		if err == nil {
+			fmt.Fprintf(w, string(bytes))
+		} else {
+			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
+		}
+		log.Printf("Unable to write file: %s", err)
+		return
+	}
+
+	UploadFile := f.Name()
+	if err := os.Chmod(UploadFile, 0700); err != nil {
+		result["error"] = "Unable to chmod file."
+		bytes, err := json.Marshal(result)
+		if err == nil {
+			fmt.Fprintf(w, string(bytes))
+		} else {
+			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
+		}
+		log.Printf("Unable to chmod file: %s", err)
+		return
+	}
+	log.Printf("Wrote upload to %s", UploadFile)
+	result["output"] = UploadFile
+	w.WriteHeader(http.StatusCreated)
+	bytes, err := json.Marshal(result)
+	fmt.Fprintf(w, string(bytes))
 }
 
 func hostNameHandler(w http.ResponseWriter, r *http.Request) {

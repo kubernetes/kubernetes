@@ -832,6 +832,9 @@ function kube::release::package_test_tarball() {
       "${release_stage}/platforms/${platform}"
   done
 
+  # Add the test image files
+  mkdir -p "${release_stage}/test/images"
+  cp -fR "${KUBE_ROOT}/test/images" "${release_stage}/test/"
   tar c ${KUBE_TEST_PORTABLE[@]} | tar x -C ${release_stage}
 
   kube::release::clean_cruft
