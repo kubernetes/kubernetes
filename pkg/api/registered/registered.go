@@ -50,7 +50,7 @@ func init() {
 		valid, ok := validAPIVersions[version]
 		if !ok || !valid {
 			// Not a valid API version.
-			glog.Fatalf("Invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
+			glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
 				version, os.Getenv("KUBE_API_VERSIONS"), validAPIVersions)
 		}
 		RegisteredVersions = append(RegisteredVersions, version)
