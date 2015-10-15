@@ -52,6 +52,7 @@ cors-allowed-origins
 create-external-load-balancer
 current-release-pr
 current-replicas
+cpu-percent
 default-container-cpu-limit
 default-container-mem-limit
 delay-shutdown
