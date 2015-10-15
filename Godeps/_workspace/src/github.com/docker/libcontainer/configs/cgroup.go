@@ -19,6 +19,8 @@ type Cgroup struct {
 
 	AllowedDevices []*Device `json:"allowed_devices"`
 
+	DeniedDevices []*Device `json:"denied_devices"`
+
 	// Memory limit (in bytes)
 	Memory int64 `json:"memory"`
 
@@ -42,6 +44,18 @@ type Cgroup struct {
 
 	// MEM to use
 	CpusetMems string `json:"cpuset_mems"`
+
+	// IO read rate limit per cgroup per device, bytes per second.
+	BlkioThrottleReadBpsDevice string `json:"blkio_throttle_read_bps_device"`
+
+	// IO write rate limit per cgroup per divice, bytes per second.
+	BlkioThrottleWriteBpsDevice string `json:"blkio_throttle_write_bps_device"`
+
+	// IO read rate limit per cgroup per device, IO per second.
+	BlkioThrottleReadIOpsDevice string `json:"blkio_throttle_read_iops_device"`
+
+	// IO write rate limit per cgroup per device, IO per second.
+	BlkioThrottleWriteIOpsDevice string `json:"blkio_throttle_write_iops_device"`
 
 	// Specifies per cgroup weight, range is from 10 to 1000.
 	BlkioWeight int64 `json:"blkio_weight"`
