@@ -97,10 +97,11 @@ func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.
 func JobToSelectableFields(job *extensions.Job) fields.Set {
-	return fields.Set{
-		"metadata.name":     job.Name,
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(job.ObjectMeta)
+	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(job.Status.Succeeded),
 	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
 
 // MatchJob is the filter used by the generic etcd backend to route
