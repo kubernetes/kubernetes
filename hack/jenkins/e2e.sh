@@ -120,6 +120,16 @@ AWS_REQUIRED_SKIP_TESTS=(
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
 )
 
+
+# Tests which kills or restarts components and/or nodes.
+DISRUPTIVE_TESTS=(
+    "DaemonRestart"
+    "Etcd\sfailure"
+    "Nodes\sResize"
+    "Reboot"
+    "Services.*restarting"
+)
+
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
@@ -153,15 +163,12 @@ GCE_SLOW_TESTS=(
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
-    "Etcd"
-    "NetworkingNew"
     "Nodes\sNetwork"
-    "Nodes\sResize"
     "MaxPods"
     "Resource\susage\sof\ssystem\scontainers"
     "SchedulerPredicates"
-    "Services.*restarting"
     "resource\susage\stracking"
+    "${DISRUPTIVE_TESTS[@]}"
     )
 
 # Tests which are known to be flaky when run in parallel.
@@ -184,11 +191,11 @@ GCE_PARALLEL_FLAKY_TESTS=(
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
     "Density.*30\spods"
     "Elasticsearch"
-    "Etcd.*SIGKILL"
     "external\sload\sbalancer"
     "identically\snamed\sservices"
     "network\spartition"
     "Services.*Type\sgoes\sfrom"
+    "${DISRUPTIVE_TESTS[@]}"       # avoid component restarts.
     )
 
 GCE_RELEASE_SKIP_TESTS=(
