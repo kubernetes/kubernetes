@@ -1652,6 +1652,25 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 	})
 }
 
+// Waits for the number of events on the given object to reach a desired count.
+func waitForEvents(c *client.Client, ns string, objOrRef runtime.Object, desiredEventsCount int) error {
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+		events, err := c.Events(ns).Search(objOrRef)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		eventsCount := len(events.Items)
+		if eventsCount == desiredEventsCount {
+			return true, nil
+		}
+		if eventsCount < desiredEventsCount {
+			return false, nil
+		}
+		// Number of events has exceeded the desired count.
+		return false, fmt.Errorf("number of events has exceeded the desired count, eventsCount: %d, desiredCount: %d", eventsCount, desiredEventsCount)
+	})
+}
+
 // Convenient wrapper around listing nodes supporting retries.
 func listNodes(c *client.Client, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	var nodes *api.NodeList
