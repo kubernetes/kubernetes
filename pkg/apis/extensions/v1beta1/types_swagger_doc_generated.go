@@ -37,6 +37,14 @@ func (APIVersion) SwaggerDoc() map[string]string {
 	return map_APIVersion
 }
 
+var map_CPUTargetUtilization = map[string]string{
+	"utilizationTarget": "Utilization target defines fraction of the requested CPU that should be utilized/used, e.g. 0.7 means that 70% of the requested CPU should be in use.",
+}
+
+func (CPUTargetUtilization) SwaggerDoc() map[string]string {
+	return map_CPUTargetUtilization
+}
+
 var map_ClusterAutoscaler = map[string]string{
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata For now (experimental api) it is required that the name is set to \"ClusterAutoscaler\" and namespace is \"default\".",
 	"spec":     "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
@@ -203,11 +211,12 @@ func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerSpec = map[string]string{
-	"":            "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
-	"scaleRef":    "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec.",
-	"minReplicas": "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.",
-	"maxReplicas": "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
-	"target":      "Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Currently two types of resources are supported: \"cpu\" and \"memory\".",
+	"":               "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
+	"scaleRef":       "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec.",
+	"minReplicas":    "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.",
+	"maxReplicas":    "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
+	"cpuUtilization": "CPU utilization is the target average CPU utilization (represented as a fraction of requested CPU) over all the pods.",
+	"target":         "Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Currently two types of resources are supported: \"cpu\" and \"memory\".",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
@@ -215,11 +224,12 @@ func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerStatus = map[string]string{
-	"":                   "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
-	"currentReplicas":    "CurrentReplicas is the number of replicas of pods managed by this autoscaler.",
-	"desiredReplicas":    "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.",
-	"currentConsumption": "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\".",
-	"lastScaleTimestamp": "LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to controll how often the number of pods is changed.",
+	"":                      "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
+	"currentReplicas":       "CurrentReplicas is the number of replicas of pods managed by this autoscaler.",
+	"desiredReplicas":       "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.",
+	"currentCPUUtilization": "Current average CPU utilization over all pods, represented as a fraction of requtested CPU, e.g. 0.7 means that and average pod is using now 70% of its requested CPU.",
+	"currentConsumption":    "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\".",
+	"lastScaleTimestamp":    "LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to controll how often the number of pods is changed.",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {

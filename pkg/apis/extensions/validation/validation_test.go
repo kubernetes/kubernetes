@@ -44,6 +44,20 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myautoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.HorizontalPodAutoscalerSpec{
+				ScaleRef: &extensions.SubresourceReference{
+					Subresource: "scale",
+				},
+				MinReplicas:    1,
+				MaxReplicas:    5,
+				CPUUtilization: &extensions.CPUTargetUtilization{UtilizationTarget: 0.7},
+			},
+		},
 	}
 	for _, successCase := range successCases {
 		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
@@ -117,6 +131,21 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				MinReplicas: 1,
 				MaxReplicas: 5,
 				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+			},
+		},
+		// TODO: we can't reuse the same key, yet two problems may have the same detailed error message.
+		"must be non-neg": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myautoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.HorizontalPodAutoscalerSpec{
+				ScaleRef: &extensions.SubresourceReference{
+					Subresource: "scale",
+				},
+				MinReplicas:    1,
+				MaxReplicas:    5,
+				CPUUtilization: &extensions.CPUTargetUtilization{UtilizationTarget: -0.7},
 			},
 		},
 	}
