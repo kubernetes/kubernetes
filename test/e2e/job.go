@@ -191,7 +191,7 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
 				},
