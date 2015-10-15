@@ -30,6 +30,7 @@ mesosslave:
   hostname: mesosslave
   privileged: true
   image: mesosphere/mesos-slave-dind:mesos-0.24.0_dind-0.2_docker-1.8.2_ubuntu-14.04.3
+  ports: [ "10248","10249" ]
   entrypoint:
   - bash
   - -xc
