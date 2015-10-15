@@ -38,6 +38,10 @@ import (
 	"github.com/golang/glog"
 )
 
+// TODO: delete this global variable when we enable the validation of common
+// fields by default.
+var RepairMalformedUpdates bool = true
+
 const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNegativeErrorMsg string = `must be non-negative`
 
@@ -231,6 +235,7 @@ func ValidatePositiveQuantity(value resource.Quantity, fieldName string) errs.Va
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
+// TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
@@ -273,23 +278,32 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
+	if !RepairMalformedUpdates && new.UID != old.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, "field is immutable"))
+	}
 	// in the event it is left empty, set it, to allow clients more flexibility
-	if len(new.UID) == 0 {
-		new.UID = old.UID
+	// TODO: remove the following code that repairs the update request when we retire the clients that modify the immutable fields.
+	// Please do not copy this pattern elsewhere; validation functions should not be modifying the objects they are passed!
+	if RepairMalformedUpdates {
+		if len(new.UID) == 0 {
+			new.UID = old.UID
+		}
+		// ignore changes to timestamp
+		if old.CreationTimestamp.IsZero() {
+			old.CreationTimestamp = new.CreationTimestamp
+		} else {
+			new.CreationTimestamp = old.CreationTimestamp
+		}
+		// an object can never remove a deletion timestamp or clear/change grace period seconds
+		if !old.DeletionTimestamp.IsZero() {
+			new.DeletionTimestamp = old.DeletionTimestamp
+		}
+		if old.DeletionGracePeriodSeconds != nil && new.DeletionGracePeriodSeconds == nil {
+			new.DeletionGracePeriodSeconds = old.DeletionGracePeriodSeconds
+		}
 	}
-	// ignore changes to timestamp
-	if old.CreationTimestamp.IsZero() {
-		old.CreationTimestamp = new.CreationTimestamp
-	} else {
-		new.CreationTimestamp = old.CreationTimestamp
-	}
-	// an object can never remove a deletion timestamp or clear/change grace period seconds
-	if !old.DeletionTimestamp.IsZero() {
-		new.DeletionTimestamp = old.DeletionTimestamp
-	}
-	if old.DeletionGracePeriodSeconds != nil && new.DeletionGracePeriodSeconds == nil {
-		new.DeletionGracePeriodSeconds = old.DeletionGracePeriodSeconds
-	}
+
+	// TODO: needs to check if new==nil && old !=nil after the repair logic is removed.
 	if new.DeletionGracePeriodSeconds != nil && old.DeletionGracePeriodSeconds != nil && *new.DeletionGracePeriodSeconds != *old.DeletionGracePeriodSeconds {
 		allErrs = append(allErrs, errs.NewFieldInvalid("deletionGracePeriodSeconds", new.DeletionGracePeriodSeconds, "field is immutable; may only be changed via deletion"))
 	}
