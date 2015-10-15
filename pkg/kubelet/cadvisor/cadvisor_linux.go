@@ -79,7 +79,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 	// Register the handlers regardless as this registers the prometheus
 	// collector properly.
 	mux := http.NewServeMux()
-	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "", "/metrics")
+	err := cadvisorHttp.RegisterHandlers(mux, cc.Manager, "", "", "", "", "/metrics")
 	if err != nil {
 		return err
 	}
@@ -160,4 +160,8 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorApiV2.FsInfo, error) 
 
 func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return cc.WatchForEvents(request)
+}
+
+func (cc *cadvisorClient) GetContainerInfoV2(containerName string, options cadvisorApiV2.RequestOptions) (map[string]cadvisorApiV2.ContainerInfo, error) {
+	return cc.V2().GetContainerInfo(containerName, options)
 }

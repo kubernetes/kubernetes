@@ -35,6 +35,7 @@ import (
 
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -2786,6 +2787,13 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 	return &ci, nil
 }
 
+// Returns stats (from Cadvisor) for all local containers.
+func (kl *Kubelet) GetContainerInfos(options cadvisorv2.RequestOptions) (map[string]cadvisorv2.ContainerInfo, error) {
+	options.IdType = cadvisorv2.TypeName
+	options.Recursive = true
+	return kl.cadvisor.GetContainerInfoV2("", options)
+}
+
 // Returns stats (from Cadvisor) for a non-Kubernetes container.
 func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
 	if subcontainers {
@@ -2825,6 +2833,10 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 // is exported to simplify integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
+}
+
+func (kl *Kubelet) GetStatusManager() status.Manager {
+	return kl.statusManager
 }
 
 // Proxy prober calls through the Kubelet to break the circular dependency between the runtime &
