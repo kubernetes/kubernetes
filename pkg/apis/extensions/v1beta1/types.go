@@ -412,7 +412,7 @@ type JobSpec struct {
 
 	// Selector is a label query over pods that should match the pod count.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector *PodSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
@@ -657,3 +657,40 @@ type ClusterAutoscalerList struct {
 
 	Items []ClusterAutoscaler `json:"items"`
 }
+
+// A pod selector is a label query over a set of pods. The result of matchLabels and
+// matchExpressions are ANDed. An empty pod selector matches all objects. A null
+// pod selector matches no objects.
+type PodSelector struct {
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+	// map is equivalent to an element of matchExpressions, whose key field is "key", the
+	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+	// matchExpressions is a list of pod selector requirements. The requirements are ANDed.
+	MatchExpressions []PodSelectorRequirement `json:"matchExpressions,omitempty"`
+}
+
+// A pod selector requirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
+type PodSelectorRequirement struct {
+	// key is the label key that the selector applies to.
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key"`
+	// operator represents a key's relationship to a set of values.
+	// Valid operators ard In, NotIn, Exists and DoesNotExist.
+	Operator PodSelectorOperator `json:"operator"`
+	// values is an array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty. This array is replaced during a strategic
+	// merge patch.
+	Values []string `json:"values,omitempty"`
+}
+
+// A pod selector operator is the set of operators that can be used in a selector requirement.
+type PodSelectorOperator string
+
+const (
+	PodSelectorOpIn           PodSelectorOperator = "In"
+	PodSelectorOpNotIn        PodSelectorOperator = "NotIn"
+	PodSelectorOpExists       PodSelectorOperator = "Exists"
+	PodSelectorOpDoesNotExist PodSelectorOperator = "DoesNotExist"
+)
