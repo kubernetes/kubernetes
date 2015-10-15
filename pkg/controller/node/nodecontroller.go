@@ -258,7 +258,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		for _, node := range nodes.Items {
 			observedSet.Insert(node.Name)
 		}
-		for nodeName, _ := range nc.nodeStatusMap {
+		for nodeName := range nc.nodeStatusMap {
 			if !observedSet.Has(nodeName) {
 				glog.V(1).Infof("NodeController observed a Node deletion: %v", nodeName)
 				nc.recordNodeEvent(nodeName, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", nodeName))
