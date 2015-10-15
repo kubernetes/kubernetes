@@ -202,8 +202,14 @@ func (p *AttachOptions) Run() error {
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
-		SubResource("attach").
-		Param("container", p.GetContainerName(pod))
+		SubResource("attach")
+	req.VersionedParams(&api.PodAttachOptions{
+		Container: p.GetContainerName(pod),
+		Stdin:     stdin != nil,
+		Stdout:    p.Out != nil,
+		Stderr:    p.Err != nil,
+		TTY:       tty,
+	}, api.Scheme)
 
 	return p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
 }
