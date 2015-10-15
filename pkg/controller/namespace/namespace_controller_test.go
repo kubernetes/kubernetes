@@ -95,8 +95,8 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingress"} {
 			resources = append(resources, unversioned.APIResource{Name: resource})
 		}
-		mockClient.Resources = []unversioned.APIResourceList{
-			{
+		mockClient.Resources = map[string]*unversioned.APIResourceList{
+			"extensions/v1beta1": {
 				GroupVersion: "extensions/v1beta1",
 				APIResources: resources,
 			},
