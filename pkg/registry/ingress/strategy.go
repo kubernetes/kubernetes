@@ -47,6 +47,7 @@ func (ingressStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears the status of an Ingress before creation.
 func (ingressStrategy) PrepareForCreate(obj runtime.Object) {
 	ingress := obj.(*extensions.Ingress)
+	// create cannot set status
 	ingress.Status = extensions.IngressStatus{}
 
 	ingress.Generation = 1
@@ -56,7 +57,8 @@ func (ingressStrategy) PrepareForCreate(obj runtime.Object) {
 func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newIngress := obj.(*extensions.Ingress)
 	oldIngress := old.(*extensions.Ingress)
-	//TODO: Clear Ingress status once we have a sub-resource.
+	// Update is not allowed to set status
+	newIngress.Status = oldIngress.Status
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
@@ -113,4 +115,23 @@ func MatchIngress(label labels.Selector, field fields.Selector) generic.Matcher 
 			return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), nil
 		},
 	}
+}
+
+type ingressStatusStrategy struct {
+	ingressStrategy
+}
+
+var StatusStrategy = ingressStatusStrategy{Strategy}
+
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
+func (ingressStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newIngress := obj.(*extensions.Ingress)
+	oldIngress := old.(*extensions.Ingress)
+	// status changes are not allowed to update spec
+	newIngress.Spec = oldIngress.Spec
+}
+
+// ValidateUpdate is the default update validation for an end user updating status
+func (ingressStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateIngressStatusUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 }
