@@ -42,6 +42,10 @@ var DockerNamespace = "docker"
 var dockerRootDir = flag.String("docker_root", "/var/lib/docker", "Absolute path to the Docker state root directory (default: /var/lib/docker)")
 var dockerRunDir = flag.String("docker_run", "/var/run/docker", "Absolute path to the Docker run directory (default: /var/run/docker)")
 
+// Regexp that identifies docker cgroups, containers started with
+// --cgroup-parent have another prefix than 'docker'
+var dockerCgroupRegexp = regexp.MustCompile(`.+-([a-z0-9]{64})\.scope$`)
+
 // TODO(vmarmol): Export run dir too for newer Dockers.
 // Directory holding Docker container state information.
 func DockerStateDir() string {
@@ -119,27 +123,30 @@ func ContainerNameToDockerId(name string) string {
 
 	// Turn systemd cgroup name into Docker ID.
 	if UseSystemd() {
-		id = strings.TrimPrefix(id, "docker-")
-		id = strings.TrimSuffix(id, ".scope")
+		if matches := dockerCgroupRegexp.FindStringSubmatch(id); matches != nil {
+			id = matches[1]
+		}
 	}
 
 	return id
 }
 
-// Returns a full container name for the specified Docker ID.
-func FullContainerName(dockerId string) string {
-	// Add the full container name.
+func isContainerName(name string) bool {
 	if UseSystemd() {
-		return path.Join("/system.slice", fmt.Sprintf("docker-%s.scope", dockerId))
-	} else {
-		return path.Join("/docker", dockerId)
+		return dockerCgroupRegexp.MatchString(path.Base(name))
 	}
+	return true
 }
 
 // Docker handles all containers under /docker
 func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	// docker factory accepts all containers it can handle.
 	canAccept := true
+
+	if !isContainerName(name) {
+		return false, canAccept, fmt.Errorf("invalid container name")
+	}
+
 	// Check if the container is known to docker and it is active.
 	id := ContainerNameToDockerId(name)
 

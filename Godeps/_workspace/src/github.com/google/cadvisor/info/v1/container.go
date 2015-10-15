@@ -312,6 +312,8 @@ type MemoryStats struct {
 	// Units: Bytes.
 	WorkingSet uint64 `json:"working_set"`
 
+	Failcnt uint64 `json:"failcnt"`
+
 	ContainerData    MemoryStatsMemoryData `json:"container_data,omitempty"`
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
 }
@@ -345,6 +347,35 @@ type InterfaceStats struct {
 type NetworkStats struct {
 	InterfaceStats `json:",inline"`
 	Interfaces     []InterfaceStats `json:"interfaces,omitempty"`
+	// TCP connection stats (Established, Listen...)
+	Tcp TcpStat `json:"tcp"`
+	// TCP6 connection stats (Established, Listen...)
+	Tcp6 TcpStat `json:"tcp6"`
+}
+
+type TcpStat struct {
+	//Count of TCP connections in state "Established"
+	Established uint64
+	//Count of TCP connections in state "Syn_Sent"
+	SynSent uint64
+	//Count of TCP connections in state "Syn_Recv"
+	SynRecv uint64
+	//Count of TCP connections in state "Fin_Wait1"
+	FinWait1 uint64
+	//Count of TCP connections in state "Fin_Wait2"
+	FinWait2 uint64
+	//Count of TCP connections in state "Time_Wait
+	TimeWait uint64
+	//Count of TCP connections in state "Close"
+	Close uint64
+	//Count of TCP connections in state "Close_Wait"
+	CloseWait uint64
+	//Count of TCP connections in state "Listen_Ack"
+	LastAck uint64
+	//Count of TCP connections in state "Listen"
+	Listen uint64
+	//Count of TCP connections in state "Closing"
+	Closing uint64
 }
 
 type FsStats struct {
