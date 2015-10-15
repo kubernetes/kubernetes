@@ -506,11 +506,11 @@ case ${JOB_NAME} in
   # This suite:
   #
   # 1. launches a cluster at release/latest,
-  # 2. upgrades the master to HEAD,
+  # 2. upgrades the master to ci/latest,
   # 3. runs release/latest e2es,
   # 4. upgrades the rest of the cluster,
   # 5. runs release/latest e2es again, then
-  # 6. runs HEAD e2es and tears down the cluster.
+  # 6. runs ci/latest e2es and tears down the cluster.
 
   kubernetes-upgrade-gke-step1-deploy)
     : ${DOGFOOD_GCLOUD:="true"}
@@ -598,7 +598,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade"}
     : ${E2E_NETWORK:="gke-upgrade"}
     # TODO(15011): these really shouldn't be (very) version skewed, but because
-    # we have to rebuild, it could get slightly out of whack.
+    # we have to get ci/latest again, it could get slightly out of whack.
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
@@ -618,16 +618,11 @@ case ${JOB_NAME} in
   # This suite:
   #
   # 1. launches a cluster at release/latest-1.0,
-  # 2. upgrades the master to ci/v1.1.0-alpha.1,
+  # 2. upgrades the master to ci/latest-1.1
   # 3. runs release/latest-1.0 e2es,
   # 4. upgrades the rest of the cluster,
   # 5. runs release/latest-1.0 e2es again, then
-  # 6. runs ci/v1.1.0-alpha.1 e2es and tears down the cluster.
-  #
-  # TODO(13339): this suite should be upgrading to release/latest-1.1, or some
-  # other release candidate published version, not ci/v1.1.0-alpha.1, but
-  # because 1.1 is only an alpha release, and we haven't figured out alpha
-  # release mechanics, that target doesn't yet exist.
+  # 6. runs ci/latest-1.1 e2es and tears down the cluster.
 
   kubernetes-upgrade-1.0-1.1-gke-step1-deploy)
     : ${DOGFOOD_GCLOUD:="true"}
@@ -647,13 +642,14 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
     : ${E2E_OPT:="--check_version_skew=false"}
+    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
+    # get the latest upgrade logic.
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.0-alpha.1"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=ci/latest-1.1"}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gke-step3-e2e-old)
@@ -682,13 +678,14 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
     : ${E2E_OPT:="--check_version_skew=false"}
+    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
+    # get the latest upgrade logic.
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.0-alpha.1"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=ci/latest-1.1"}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gke-step5-e2e-old)
@@ -717,7 +714,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.0-alpha.1"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -729,6 +726,17 @@ case ${JOB_NAME} in
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     ;;
+
+  # kubernetes-upgrade-gce
+  #
+  # This suite:
+  #
+  # 1. launches a cluster at release/latest,
+  # 2. upgrades the master to ci/latest,
+  # 3. runs release/latest e2es,
+  # 4. upgrades the rest of the cluster,
+  # 5. runs release/latest e2es again, then
+  # 6. runs ci/latest e2es and tears down the cluster.
 
   kubernetes-upgrade-gce-step1-deploy)
     : ${E2E_CLUSTER_NAME:="gce-upgrade"}
@@ -814,7 +822,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gce-upgrade"}
     : ${E2E_NETWORK:="gce-upgrade"}
     # TODO(15011): these really shouldn't be (very) version skewed, but because
-    # we have to rebuild, it could get slightly out of whack.
+    # we have to get ci/latest again, it could get slightly out of whack.
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
