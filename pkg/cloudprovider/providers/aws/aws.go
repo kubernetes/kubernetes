@@ -1249,7 +1249,7 @@ func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup
 
 	groups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
 	if err != nil {
-		glog.Warning("error retrieving security group", err)
+		glog.Warning("Error retrieving security group", err)
 		return nil, err
 	}
 
@@ -1325,7 +1325,7 @@ func isEqualIPPermission(l, r *ec2.IpPermission, compareGroupUserIDs bool) bool 
 func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
-		glog.Warning("error retrieving security group", err)
+		glog.Warning("Error retrieving security group", err)
 		return false, err
 	}
 
@@ -1366,7 +1366,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 	request.IpPermissions = changes
 	_, err = s.ec2.AuthorizeSecurityGroupIngress(request)
 	if err != nil {
-		glog.Warning("error authorizing security group ingress", err)
+		glog.Warning("Error authorizing security group ingress", err)
 		return false, err
 	}
 
@@ -1379,12 +1379,12 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IpPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
-		glog.Warning("error retrieving security group", err)
+		glog.Warning("Error retrieving security group", err)
 		return false, err
 	}
 
 	if group == nil {
-		glog.Warning("security group not found: ", securityGroupId)
+		glog.Warning("Security group not found: ", securityGroupId)
 		return false, nil
 	}
 
@@ -1421,7 +1421,7 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 	request.IpPermissions = changes
 	_, err = s.ec2.RevokeSecurityGroupIngress(request)
 	if err != nil {
-		glog.Warning("error revoking security group ingress", err)
+		glog.Warning("Error revoking security group ingress", err)
 		return false, err
 	}
 
@@ -1543,7 +1543,7 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 
 	subnets, err := s.ec2.DescribeSubnets(request)
 	if err != nil {
-		glog.Error("error describing subnets: ", err)
+		glog.Error("Error describing subnets: ", err)
 		return nil, err
 	}
 
@@ -1587,13 +1587,14 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 	vpcId, err := s.findVPCID()
 	if err != nil {
+		glog.Error("Error finding VPC", err)
 		return nil, err
 	}
 
 	// Construct list of configured subnets
 	subnetIDs, err := s.listSubnetIDsinVPC(vpcId)
 	if err != nil {
-		glog.Error("error listing subnets in VPC", err)
+		glog.Error("Error listing subnets in VPC", err)
 		return nil, err
 	}
 
@@ -1828,7 +1829,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 				return err
 			}
 			if !changed {
-				glog.Warning("allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
+				glog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
 			}
 		} else {
 			changed, err := s.removeSecurityGroupIngress(instanceSecurityGroupId, permissions)
@@ -1836,7 +1837,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 				return err
 			}
 			if !changed {
-				glog.Warning("revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
+				glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
 			}
 		}
 	}
@@ -1910,7 +1911,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 					ignore := false
 					if awsError, ok := err.(awserr.Error); ok {
 						if awsError.Code() == "DependencyViolation" {
-							glog.V(2).Infof("ignoring DependencyViolation while deleting load-balancer security group (%s), assuming because LB is in process of deleting", securityGroupID)
+							glog.V(2).Infof("Ignoring DependencyViolation while deleting load-balancer security group (%s), assuming because LB is in process of deleting", securityGroupID)
 							ignore = true
 						}
 					}
@@ -1921,7 +1922,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 			}
 
 			if len(securityGroupIDs) == 0 {
-				glog.V(2).Info("deleted all security groups for load balancer: ", name)
+				glog.V(2).Info("Deleted all security groups for load balancer: ", name)
 				break
 			}
 
@@ -1929,7 +1930,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 				return fmt.Errorf("timed out waiting for load-balancer deletion: %s", name)
 			}
 
-			glog.V(2).Info("waiting for load-balancer to delete so we can delete security groups: ", name)
+			glog.V(2).Info("Waiting for load-balancer to delete so we can delete security groups: ", name)
 
 			time.Sleep(5 * time.Second)
 		}
