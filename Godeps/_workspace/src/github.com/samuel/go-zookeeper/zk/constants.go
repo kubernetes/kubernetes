@@ -57,6 +57,7 @@ const (
 	StateUnknown           = State(-1)
 	StateDisconnected      = State(0)
 	StateConnecting        = State(1)
+	StateSyncConnected     = State(3)
 	StateAuthFailed        = State(4)
 	StateConnectedReadOnly = State(5)
 	StateSaslAuthenticated = State(6)
@@ -76,6 +77,7 @@ var (
 	stateNames = map[State]string{
 		StateUnknown:           "StateUnknown",
 		StateDisconnected:      "StateDisconnected",
+		StateSyncConnected:     "StateSyncConnected",
 		StateConnectedReadOnly: "StateConnectedReadOnly",
 		StateSaslAuthenticated: "StateSaslAuthenticated",
 		StateExpired:           "StateExpired",

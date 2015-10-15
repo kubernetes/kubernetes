@@ -104,36 +104,7 @@ func setTestEnv(t *testing.T) {
 	assert.NoError(t, os.Setenv("MESOS_EXECUTOR_ID", executorID))
 }
 
-type integrationTestDriver struct {
-	*MesosExecutorDriver
-}
-
-func (i *integrationTestDriver) setConnected(b bool) {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	i.connected = b
-}
-
-// connectionListener returns a signal chan that closes once driver.connected == true.
-func (i *integrationTestDriver) connectionListener() chan struct{} {
-	connected := make(chan struct{})
-	go func() {
-		i.lock.Lock()
-		defer i.lock.Unlock()
-		for !i.connected {
-			select {
-			case <-i.stopCh:
-				return
-			default:
-				i.cond.Wait()
-			}
-		}
-		close(connected)
-	}()
-	return connected
-}
-
-func newIntegrationTestDriver(t *testing.T, exec Executor) *integrationTestDriver {
+func newIntegrationTestDriver(t *testing.T, exec Executor) *MesosExecutorDriver {
 	dconfig := DriverConfig{
 		Executor: exec,
 	}
@@ -141,12 +112,12 @@ func newIntegrationTestDriver(t *testing.T, exec Executor) *integrationTestDrive
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &integrationTestDriver{driver}
+	return driver
 }
 
 func TestExecutorDriverRegisterExecutorMessage(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
 		assert.NoError(t, err)
@@ -175,23 +146,23 @@ func TestExecutorDriverRegisterExecutorMessage(t *testing.T) {
 	exec.ch = ch
 
 	driver := newIntegrationTestDriver(t, exec)
-	assert.False(t, driver.Running())
+	assert.True(t, driver.stopped)
 
 	stat, err := driver.Start()
 	assert.NoError(t, err)
-	assert.True(t, driver.Running())
+	assert.False(t, driver.stopped)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 }
 
 func TestExecutorDriverExecutorRegisteredEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -211,29 +182,28 @@ func TestExecutorDriverExecutorRegisteredEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	defer driver.Stop()
 
 	//simulate sending ExecutorRegisteredMessage from server to exec pid.
 	pbMsg := &mesos.ExecutorRegisteredMessage{
-		ExecutorInfo:  util.NewExecutorInfo(util.NewExecutorID(executorID), util.NewCommandInfo("ls -l")),
+		ExecutorInfo:  util.NewExecutorInfo(util.NewExecutorID(executorID), nil),
 		FrameworkId:   util.NewFrameworkID(frameworkID),
 		FrameworkInfo: util.NewFrameworkInfo("test", "test-framework", util.NewFrameworkID(frameworkID)),
 		SlaveId:       util.NewSlaveID(slaveID),
 		SlaveInfo:     &mesos.SlaveInfo{Hostname: proto.String("localhost")},
 	}
 	c := testutil.NewMockMesosClient(t, server.PID)
-	connected := driver.connectionListener()
 	c.SendMessage(driver.self, pbMsg)
+	assert.True(t, driver.Connected())
 	select {
-	case <-connected:
-	case <-time.After(time.Second * 1):
+	case <-ch:
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 }
 
 func TestExecutorDriverExecutorReregisteredEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -253,7 +223,6 @@ func TestExecutorDriverExecutorReregisteredEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	defer driver.Stop()
 
 	//simulate sending ExecutorRegisteredMessage from server to exec pid.
 	pbMsg := &mesos.ExecutorReregisteredMessage{
@@ -261,18 +230,18 @@ func TestExecutorDriverExecutorReregisteredEvent(t *testing.T) {
 		SlaveInfo: &mesos.SlaveInfo{Hostname: proto.String("localhost")},
 	}
 	c := testutil.NewMockMesosClient(t, server.PID)
-	connected := driver.connectionListener()
 	c.SendMessage(driver.self, pbMsg)
+	assert.True(t, driver.connected)
 	select {
-	case <-connected:
-	case <-time.After(time.Second * 1):
+	case <-ch:
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 }
 
 func TestExecutorDriverReconnectEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -302,8 +271,7 @@ func TestExecutorDriverReconnectEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	driver.setConnected(true)
-	defer driver.Stop()
+	driver.connected = true
 
 	// send "reconnect" event to driver
 	pbMsg := &mesos.ReconnectExecutorMessage{
@@ -314,7 +282,7 @@ func TestExecutorDriverReconnectEvent(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 2):
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 
@@ -322,7 +290,7 @@ func TestExecutorDriverReconnectEvent(t *testing.T) {
 
 func TestExecutorDriverRunTaskEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -342,8 +310,7 @@ func TestExecutorDriverRunTaskEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	driver.setConnected(true)
-	defer driver.Stop()
+	driver.connected = true
 
 	// send runtask event to driver
 	pbMsg := &mesos.RunTaskMessage{
@@ -368,7 +335,7 @@ func TestExecutorDriverRunTaskEvent(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 2):
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 
@@ -376,7 +343,7 @@ func TestExecutorDriverRunTaskEvent(t *testing.T) {
 
 func TestExecutorDriverKillTaskEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -396,8 +363,7 @@ func TestExecutorDriverKillTaskEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	driver.setConnected(true)
-	defer driver.Stop()
+	driver.connected = true
 
 	// send runtask event to driver
 	pbMsg := &mesos.KillTaskMessage{
@@ -410,14 +376,14 @@ func TestExecutorDriverKillTaskEvent(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 2):
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 }
 
 func TestExecutorDriverStatusUpdateAcknowledgement(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -437,8 +403,7 @@ func TestExecutorDriverStatusUpdateAcknowledgement(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	driver.setConnected(true)
-	defer driver.Stop()
+	driver.connected = true
 
 	// send ACK from server
 	pbMsg := &mesos.StatusUpdateAcknowledgementMessage{
@@ -450,12 +415,12 @@ func TestExecutorDriverStatusUpdateAcknowledgement(t *testing.T) {
 
 	c := testutil.NewMockMesosClient(t, server.PID)
 	c.SendMessage(driver.self, pbMsg)
-	<-time.After(time.Second * 1)
+	<-time.After(time.Millisecond * 2)
 }
 
 func TestExecutorDriverFrameworkToExecutorMessageEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -475,8 +440,7 @@ func TestExecutorDriverFrameworkToExecutorMessageEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	driver.setConnected(true)
-	defer driver.Stop()
+	driver.connected = true
 
 	// send runtask event to driver
 	pbMsg := &mesos.FrameworkToExecutorMessage{
@@ -491,14 +455,14 @@ func TestExecutorDriverFrameworkToExecutorMessageEvent(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Millisecond * 2):
 		log.Errorf("Tired of waiting...")
 	}
 }
 
 func TestExecutorDriverShutdownEvent(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
+	ch := make(chan bool)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -518,7 +482,7 @@ func TestExecutorDriverShutdownEvent(t *testing.T) {
 	stat, err := driver.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, mesos.Status_DRIVER_RUNNING, stat)
-	driver.setConnected(true)
+	driver.connected = true
 
 	// send runtask event to driver
 	pbMsg := &mesos.ShutdownExecutorMessage{}
@@ -528,17 +492,16 @@ func TestExecutorDriverShutdownEvent(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Millisecond * 5):
 		log.Errorf("Tired of waiting...")
 	}
 
-	<-time.After(time.Second * 1) // wait for shutdown to finish.
+	<-time.After(time.Millisecond * 5) // wait for shutdown to finish.
 	assert.Equal(t, mesos.Status_DRIVER_STOPPED, driver.Status())
 }
 
 func TestExecutorDriverError(t *testing.T) {
 	setTestEnv(t)
-	ch := make(chan bool, 2)
 	// Mock Slave process to respond to registration event.
 	server := testutil.NewMockSlaveHttpServer(t, func(rsp http.ResponseWriter, req *http.Request) {
 		reqPath, err := url.QueryUnescape(req.URL.String())
@@ -547,6 +510,7 @@ func TestExecutorDriverError(t *testing.T) {
 		rsp.WriteHeader(http.StatusAccepted)
 	})
 
+	ch := make(chan bool)
 	exec := newTestExecutor(t)
 	exec.ch = ch
 	exec.t = t
@@ -561,7 +525,7 @@ func TestExecutorDriverError(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Millisecond * 5):
 		log.Errorf("Tired of waiting...")
 	}
 }

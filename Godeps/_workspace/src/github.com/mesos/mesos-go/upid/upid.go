@@ -49,7 +49,10 @@ func Parse(input string) (*UPID, error) {
 }
 
 // String returns the string representation.
-func (u UPID) String() string {
+func (u *UPID) String() string {
+	if u == nil {
+		return ""
+	}
 	return fmt.Sprintf("%s@%s:%s", u.ID, u.Host, u.Port)
 }
 
