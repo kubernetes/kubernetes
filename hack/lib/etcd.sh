@@ -16,37 +16,51 @@
 
 # A set of helpers for starting/running etcd for tests
 
-# Sets ETCD_HOST and ETCD_PORT if not already set.
+# Sets ETCD_HOST, ETCD_PORT, and ETCD_PEER_PORT if not already set.
 # Also sets ETCD_PID and ETCD_DIR and installs an EXIT trap for cleanup.
 kube::etcd::start() {
   ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-  ETCD_PORT=${ETCD_PORT:-$(kube::util::get_random_port)}
 
   if [[ -n "${ETCD_PID-}" ]]; then
     kube::log::error "etcd already started with pid ${ETCD_PID}!"
-    exit 1
+    return 2
   fi
 
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
-    exit 1
+    return 2
   }
 
   version=$(etcd -version | cut -d " " -f 3)
   if [[ "${version}" < "2.0.0" ]]; then
    kube::log::usage "etcd version 2.0.0 or greater required."
-   exit 1
+   return 2
   fi
 
-  # Start etcd
-  ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
-  kube::log::info "Starting etcd with data-dir ${ETCD_DIR} and bind-addr ${ETCD_HOST}:${ETCD_PORT}"
-  etcd -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null &
-  ETCD_PID=$!
-  kube::util::trap_add kube::etcd::cleanup EXIT
+  local -r etcd_start_attempts=3
+  for etcd_attempt in $(seq ${etcd_start_attempts}); do
+    local client_port=${ETCD_PORT:-$(kube::util::get_random_port)}
+    local peer_port=${ETCD_PEER_PORT:-$(kube::util::get_random_port)}
+    # Start etcd
+    ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
+    kube::log::info "Starting etcd with data-dir ${ETCD_DIR}, addr ${ETCD_HOST}:${client_port}, peer addr ${ETCD_HOST}:${peer_port} (attempt ${etcd_attempt}/${etcd_start_attempts})"
+    etcd -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${client_port} --peer-bind-addr ${ETCD_HOST}:${peer_port} >/dev/null 2>/dev/null &
+    ETCD_PID=$!
 
-  echo "Waiting for etcd to come up."
-  kube::util::wait_for_url "http://${ETCD_HOST}:${ETCD_PORT}/v2/machines" "etcd: " 0.25 80
+    echo "Waiting for etcd to come up."
+    if kube::util::wait_for_url "http://${ETCD_HOST}:${client_port}/v2/machines" "etcd: " 0.25 80; then
+      break
+    fi
+    # Failed to start up: clean up and try again.
+    kube::etcd::cleanup
+    if [[ ${etcd_attempt} -ge 3 ]]; then
+      kube::log::error "etcd failed to start in ${etcd_attempt} attempts"
+      return 1
+    fi
+  done
+  kube::util::trap_add kube::etcd::cleanup EXIT
+  ETCD_PORT=${client_port}
+  ETCD_PEER_PORT=${peer_port}
   curl -fs -X PUT "http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/_test"
 }
 
