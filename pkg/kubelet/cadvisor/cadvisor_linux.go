@@ -21,6 +21,7 @@ package cadvisor
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/golang/glog"
@@ -79,10 +80,23 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 	// Register the handlers regardless as this registers the prometheus
 	// collector properly.
 	mux := http.NewServeMux()
-	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "", "/metrics")
+	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "")
 	if err != nil {
 		return err
 	}
+
+	re := regexp.MustCompile(`^k8s_(?P<kubernetes_container_name>[^_\.]+)[^_]+_(?P<kubernetes_pod_name>[^_]+)_(?P<kubernetes_namespace>[^_]+)`)
+	reCaptureNames := re.SubexpNames()
+	cadvisorHttp.RegisterPrometheusHandler(mux, cc, "/metrics", func(name string) map[string]string {
+		extraLabels := map[string]string{}
+		matches := re.FindStringSubmatch(name)
+		for i, match := range matches {
+			if len(reCaptureNames[i]) > 0 {
+				extraLabels[re.SubexpNames()[i]] = match
+			}
+		}
+		return extraLabels
+	})
 
 	// Only start the http server if port > 0
 	if port > 0 {
