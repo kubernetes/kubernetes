@@ -69,12 +69,6 @@ func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
 	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
 }
 
-func printLatencies(latencies []podLatencyData, header string) {
-	metrics := extractLatencyMetrics(latencies)
-	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:len(latencies)])
-	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
-}
-
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -328,7 +322,10 @@ var _ = Describe("Density", func() {
 				wg.Wait()
 
 				Logf("Waiting for all Pods begin observed by the watch...")
-				for start := time.Now(); len(watchTimes) < nodeCount && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
+				for start := time.Now(); len(watchTimes) < nodeCount; time.Sleep(10 * time.Second) {
+					if time.Since(start) < timeout {
+						Failf("Timeout reached waiting for all Pods being observed by the watch.")
+					}
 				}
 				close(stopCh)
 
