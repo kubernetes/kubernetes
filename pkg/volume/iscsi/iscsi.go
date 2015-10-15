@@ -18,6 +18,7 @@ package iscsi
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -94,16 +95,17 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	}
 
 	lun := strconv.Itoa(iscsi.Lun)
+	portal := portalBuilder(iscsi.TargetPortal)
 
 	return &iscsiDiskBuilder{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
 			volName: spec.Name(),
-			portal:  iscsi.TargetPortal,
+			portal:  portal,
 			iqn:     iscsi.IQN,
 			lun:     lun,
 			manager: manager,
-			mounter: mounter,
+			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 			plugin:  plugin},
 		fsType:   iscsi.FSType,
 		readOnly: readOnly,
@@ -187,4 +189,11 @@ func (c *iscsiDiskCleaner) TearDown() error {
 
 func (c *iscsiDiskCleaner) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
+}
+
+func portalBuilder(portal string) string {
+	if !strings.Contains(portal, ":") {
+		portal = portal + ":3260"
+	}
+	return portal
 }
