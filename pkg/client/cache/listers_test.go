@@ -278,6 +278,175 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 	}
 }
 
+func TestStoreToJobLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	lister := StoreToJobLister{store}
+	testCases := []struct {
+		inJobs      []*extensions.Job
+		list        func() ([]extensions.Job, error)
+		outJobNames sets.String
+		expectErr   bool
+		msg         string
+	}{
+		// Basic listing
+		{
+			inJobs: []*extensions.Job{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			},
+			list: func() ([]extensions.Job, error) {
+				return lister.List()
+			},
+			outJobNames: sets.NewString("basic"),
+			msg:         "basic listing failed",
+		},
+		// Listing multiple jobs
+		{
+			inJobs: []*extensions.Job{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
+				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
+			},
+			list: func() ([]extensions.Job, error) {
+				return lister.List()
+			},
+			outJobNames: sets.NewString("basic", "complex", "complex2"),
+			msg:         "listing multiple jobs failed",
+		},
+		// No pod labels
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: extensions.JobSpec{
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"foo": "baz"},
+						},
+					},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{Name: "pod", Namespace: "ns"},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			outJobNames: sets.NewString(),
+			expectErr:   true,
+			msg:         "listing jobs failed when pod has no labels: expected error, got none",
+		},
+		// No Job selectors
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod",
+						Namespace: "ns",
+						Labels:    map[string]string{"foo": "bar"},
+					},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			outJobNames: sets.NewString(),
+			expectErr:   true,
+			msg:         "listing jobs failed when job has no selector: expected error, got none",
+		},
+		// Matching labels to selectors and namespace
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Spec: extensions.JobSpec{
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"foo": "bar"},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: extensions.JobSpec{
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"foo": "bar"},
+						},
+					},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod",
+						Labels:    map[string]string{"foo": "bar"},
+						Namespace: "ns",
+					},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			outJobNames: sets.NewString("bar"),
+			msg:         "listing jobs with namespace and selector failed",
+		},
+		// Matching labels to selectors and namespace, error case
+		{
+			inJobs: []*extensions.Job{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
+					Spec: extensions.JobSpec{
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"foo": "bar"},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
+					Spec: extensions.JobSpec{
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"foo": "bar"},
+						},
+					},
+				},
+			},
+			list: func() ([]extensions.Job, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod",
+						Labels:    map[string]string{"foo": "bar"},
+						Namespace: "baz",
+					},
+				}
+				return lister.GetPodJobs(pod)
+			},
+			expectErr: true,
+			msg:       "listing jobs with namespace and selector failed: expected error, got none",
+		},
+	}
+	for _, c := range testCases {
+		for _, r := range c.inJobs {
+			store.Add(r)
+		}
+
+		Jobs, err := c.list()
+		if err != nil && c.expectErr {
+			continue
+		} else if c.expectErr {
+			t.Errorf("%v", c.msg)
+			continue
+		} else if err != nil {
+			t.Errorf("Unexpected error %#v", err)
+			continue
+		}
+		JobNames := make([]string, len(Jobs))
+		for ix := range Jobs {
+			JobNames[ix] = Jobs[ix].Name
+		}
+		if !c.outJobNames.HasAll(JobNames...) || len(JobNames) != len(c.outJobNames) {
+			t.Errorf("%v : expected %v, got %v", c.msg, JobNames, c.outJobNames)
+		}
+	}
+}
+
 func TestStoreToPodLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	ids := []string{"foo", "bar", "baz"}
