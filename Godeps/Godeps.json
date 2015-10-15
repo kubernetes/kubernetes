@@ -216,8 +216,8 @@
 		},
 		{
 			"ImportPath": "github.com/docker/libcontainer",
-			"Comment": "v1.4.0-446-gae812bd",
-			"Rev": "ae812bdca78084dc322037225d170e1883521d87"
+			"Comment": "v1.4.0-501-ga1fe3f1",
+			"Rev": "a1fe3f1c7ad2e8eebe6d59e573f04d2b10961cf6"
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",

@@ -32,6 +32,17 @@ func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
 				return err
 			}
 		}
+		return nil
+	}
+
+	if err := writeFile(path, "devices.allow", "a"); err != nil {
+		return err
+	}
+
+	for _, dev := range cgroup.DeniedDevices {
+		if err := writeFile(path, "devices.deny", dev.CgroupString()); err != nil {
+			return err
+		}
 	}
 
 	return nil

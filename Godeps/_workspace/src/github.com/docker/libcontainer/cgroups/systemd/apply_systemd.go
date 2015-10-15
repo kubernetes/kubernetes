@@ -38,6 +38,7 @@ var subsystems = map[string]subsystem{
 	"cpuset":     &fs.CpusetGroup{},
 	"cpuacct":    &fs.CpuacctGroup{},
 	"blkio":      &fs.BlkioGroup{},
+	"hugetlb":    &fs.HugetlbGroup{},
 	"perf_event": &fs.PerfEventGroup{},
 	"freezer":    &fs.FreezerGroup{},
 }
@@ -235,8 +236,13 @@ func (m *Manager) Apply(pid int) error {
 		}
 		paths[sysname] = subsystemPath
 	}
-
 	m.Paths = paths
+
+	if paths["cpu"] != "" {
+		if err := fs.CheckCpushares(paths["cpu"], c.CpuShares); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -357,7 +363,17 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
-	panic("not implemented")
+	for name, path := range m.Paths {
+		sys, ok := subsystems[name]
+		if !ok || !cgroups.PathExists(path) {
+			continue
+		}
+		if err := sys.Set(path, container.Cgroups); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func getUnitName(c *configs.Cgroup) string {
@@ -369,7 +385,7 @@ func getUnitName(c *configs.Cgroup) string {
 // * Support for wildcards to allow /dev/pts support
 //
 // The second is available in more recent systemd as "char-pts", but not in e.g. v208 which is
-// in wide use. When both these are availalable we will be able to switch, but need to keep the old
+// in wide use. When both these are available we will be able to switch, but need to keep the old
 // implementation for backwards compat.
 //
 // Note: we can't use systemd to set up the initial limits, and then change the cgroup
@@ -382,17 +398,7 @@ func joinDevices(c *configs.Cgroup, pid int) error {
 	}
 
 	devices := subsystems["devices"]
-	if err := devices.Set(path, c); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Symmetrical public function to update device based cgroups.  Also available
-// in the fs implementation.
-func ApplyDevices(c *configs.Cgroup, pid int) error {
-	return joinDevices(c, pid)
+	return devices.Set(path, c)
 }
 
 func joinMemory(c *configs.Cgroup, pid int) error {
@@ -435,6 +441,26 @@ func joinBlkio(c *configs.Cgroup, pid int) error {
 	}
 	if c.BlkioWeightDevice != "" {
 		if err := writeFile(path, "blkio.weight_device", c.BlkioWeightDevice); err != nil {
+			return err
+		}
+	}
+	if c.BlkioThrottleReadBpsDevice != "" {
+		if err := writeFile(path, "blkio.throttle.read_bps_device", c.BlkioThrottleReadBpsDevice); err != nil {
+			return err
+		}
+	}
+	if c.BlkioThrottleWriteBpsDevice != "" {
+		if err := writeFile(path, "blkio.throttle.write_bps_device", c.BlkioThrottleWriteBpsDevice); err != nil {
+			return err
+		}
+	}
+	if c.BlkioThrottleReadIOpsDevice != "" {
+		if err := writeFile(path, "blkio.throttle.read_iops_device", c.BlkioThrottleReadIOpsDevice); err != nil {
+			return err
+		}
+	}
+	if c.BlkioThrottleWriteIOpsDevice != "" {
+		if err := writeFile(path, "blkio.throttle.write_iops_device", c.BlkioThrottleWriteIOpsDevice); err != nil {
 			return err
 		}
 	}

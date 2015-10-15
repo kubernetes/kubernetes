@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-func (logger *Logger) Writer() (*io.PipeWriter) {
+func (logger *Logger) Writer() *io.PipeWriter {
 	reader, writer := io.Pipe()
 
 	go logger.writerScanner(reader)
