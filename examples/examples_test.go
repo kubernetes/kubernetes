@@ -363,7 +363,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/fibre_channel": {
 			"fc": &api.Pod{},
 		},
-		"../examples/experimental": {
+		"../examples/extensions": {
 			"deployment": &extensions.Deployment{},
 		},
 		"../examples/javaweb-tomcat-sidecar": {
