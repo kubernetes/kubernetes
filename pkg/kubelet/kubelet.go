@@ -88,8 +88,8 @@ const (
 	// Location of container logs.
 	containerLogsDir = "/var/log/containers"
 
-	// max backoff period
-	maxContainerBackOff = 300 * time.Second
+	// max backoff period, exported for the e2e test
+	MaxContainerBackOff = 300 * time.Second
 
 	// Capacity of the channel for storing pods to kill. A small number should
 	// suffice because a goroutine is dedicated to check the channel and does
@@ -308,7 +308,7 @@ func NewMainKubelet(
 	}
 
 	procFs := procfs.NewProcFs()
-	imageBackOff := util.NewBackOff(resyncInterval, maxContainerBackOff)
+	imageBackOff := util.NewBackOff(resyncInterval, MaxContainerBackOff)
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -425,7 +425,7 @@ func NewMainKubelet(
 		}
 	}
 
-	klet.backOff = util.NewBackOff(resyncInterval, maxContainerBackOff)
+	klet.backOff = util.NewBackOff(resyncInterval, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
 
 	klet.sourcesSeen = sets.NewString()
