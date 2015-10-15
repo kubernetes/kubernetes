@@ -64,6 +64,13 @@ func (l *linuxStandardInit) Init() error {
 	if err := label.SetProcessLabel(l.config.Config.ProcessLabel); err != nil {
 		return err
 	}
+
+	for key, value := range l.config.Config.SystemProperties {
+		if err := writeSystemProperty(key, value); err != nil {
+			return err
+		}
+	}
+
 	for _, path := range l.config.Config.ReadonlyPaths {
 		if err := remountReadonly(path); err != nil {
 			return err

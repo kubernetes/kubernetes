@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/configs"
 	"github.com/docker/libcontainer/label"
 )
@@ -24,8 +27,19 @@ func setupRootfs(config *configs.Config, console *linuxConsole) (err error) {
 		return newSystemError(err)
 	}
 	for _, m := range config.Mounts {
+		for _, precmd := range m.PremountCmds {
+			if err := mountCmd(precmd); err != nil {
+				return newSystemError(err)
+			}
+		}
 		if err := mountToRootfs(m, config.Rootfs, config.MountLabel); err != nil {
 			return newSystemError(err)
+		}
+
+		for _, postcmd := range m.PostmountCmds {
+			if err := mountCmd(postcmd); err != nil {
+				return newSystemError(err)
+			}
 		}
 	}
 	if err := createDevices(config); err != nil {
@@ -59,6 +73,18 @@ func setupRootfs(config *configs.Config, console *linuxConsole) (err error) {
 		}
 	}
 	syscall.Umask(0022)
+	return nil
+}
+
+func mountCmd(cmd configs.Command) error {
+
+	command := exec.Command(cmd.Path, cmd.Args[:]...)
+	command.Env = cmd.Env
+	command.Dir = cmd.Dir
+	if out, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("%#v failed: %s: %v", cmd, string(out), err)
+	}
+
 	return nil
 }
 
@@ -131,6 +157,37 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 		}
 		if m.Flags&syscall.MS_PRIVATE != 0 {
 			if err := syscall.Mount("", dest, "none", uintptr(syscall.MS_PRIVATE), ""); err != nil {
+				return err
+			}
+		}
+	case "cgroup":
+		mounts, err := cgroups.GetCgroupMounts()
+		if err != nil {
+			return err
+		}
+		var binds []*configs.Mount
+		for _, mm := range mounts {
+			dir, err := mm.GetThisCgroupDir()
+			if err != nil {
+				return err
+			}
+			binds = append(binds, &configs.Mount{
+				Device:      "bind",
+				Source:      filepath.Join(mm.Mountpoint, dir),
+				Destination: filepath.Join(m.Destination, strings.Join(mm.Subsystems, ",")),
+				Flags:       syscall.MS_BIND | syscall.MS_REC | syscall.MS_RDONLY,
+			})
+		}
+		tmpfs := &configs.Mount{
+			Device:      "tmpfs",
+			Destination: m.Destination,
+			Flags:       syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV,
+		}
+		if err := mountToRootfs(tmpfs, rootfs, mountLabel); err != nil {
+			return err
+		}
+		for _, b := range binds {
+			if err := mountToRootfs(b, rootfs, mountLabel); err != nil {
 				return err
 			}
 		}
@@ -248,9 +305,9 @@ func mknodDevice(dest string, node *configs.Device) error {
 }
 
 func prepareRoot(config *configs.Config) error {
-	flag := syscall.MS_PRIVATE | syscall.MS_REC
-	if config.NoPivotRoot {
-		flag = syscall.MS_SLAVE | syscall.MS_REC
+	flag := syscall.MS_SLAVE | syscall.MS_REC
+	if config.Privatefs {
+		flag = syscall.MS_PRIVATE | syscall.MS_REC
 	}
 	if err := syscall.Mount("", "/", "", uintptr(flag), ""); err != nil {
 		return err
@@ -362,4 +419,11 @@ func maskFile(path string) error {
 		return err
 	}
 	return nil
+}
+
+// writeSystemProperty writes the value to a path under /proc/sys as determined from the key.
+// For e.g. net.ipv4.ip_forward translated to /proc/sys/net/ipv4/ip_forward.
+func writeSystemProperty(key, value string) error {
+	keyPath := strings.Replace(key, ".", "/", -1)
+	return ioutil.WriteFile(path.Join("/proc/sys", keyPath), []byte(value), 0644)
 }
