@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/leaky"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -48,9 +49,25 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, conta
 // ModifyHostConfig is called before the Docker runContainer call.
 // The security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-// An error is returned if it's not possible to secure the container as requested
-// with a security context.
 func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
+	// Apply pod security context
+	if pod.Spec.SecurityContext != nil {
+		// We skip application of supplemental groups to the
+		// infra container to work around a runc issue which
+		// requires containers to have the '/etc/group'. For
+		// more information see:
+		// https://github.com/opencontainers/runc/pull/313
+		// This can be removed once the fix makes it into the
+		// required version of docker.
+		if pod.Spec.SecurityContext.SupplementalGroups != nil && container.Name != leaky.PodInfraContainerName {
+			hostConfig.GroupAdd = make([]string, len(pod.Spec.SecurityContext.SupplementalGroups))
+			for i, group := range pod.Spec.SecurityContext.SupplementalGroups {
+				hostConfig.GroupAdd[i] = strconv.FormatInt(group, 10)
+			}
+		}
+	}
+
+	// Apply container security context
 	if container.SecurityContext == nil {
 		return
 	}
