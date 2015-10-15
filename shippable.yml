@@ -32,7 +32,7 @@ before_install:
   - if [[ $SHIPPABLE_GO_VERSION == "tip" ]]; then gvm install tip; gvm use tip; fi
   - if [[ $SHIPPABLE_GO_VERSION == *release* ]]; then gvm install release; gvm use release; fi
   - if [[ $SHIPPABLE_GO_VERSION =~ [0-9].[0-9] ]]; then gvm install go$SHIPPABLE_GO_VERSION; gvm use go$SHIPPABLE_GO_VERSION; fi
-  - ./hack/travis/install-etcd.sh
+  - ./hack/install-etcd.sh
   - export GOPATH=$SHIPPABLE_GOPATH
   - mkdir -p /root/workspace/src/k8s.io; mv /root/workspace/src/github.com/kubernetes/kubernetes /root/workspace/src/k8s.io/kubernetes
   - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
@@ -44,7 +44,7 @@ install:
   - go get github.com/jstemmer/go-junit-report
   - ./hack/build-go.sh
   - godep go install ./...
-  - ./hack/travis/install-etcd.sh
+  - ./hack/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/verify-description.sh
