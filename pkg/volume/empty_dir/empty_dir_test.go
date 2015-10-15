@@ -42,7 +42,12 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 }
 
 func TestCanSupport(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", "/tmp/fake")
+	tmpDir, err := ioutil.TempDir("/tmp", "fake")
+	if err != nil {
+		t.Fatalf("can't make a temp dir")
+	}
+	defer os.RemoveAll(tmpDir)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	if plug.Name() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
@@ -139,6 +144,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir")
 	}
+	defer os.RemoveAll(basePath)
 
 	var (
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
@@ -281,7 +287,12 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	basePath := "/tmp/fake"
+	basePath, err := ioutil.TempDir("/tmp", "fake")
+	if err != nil {
+		t.Fatalf("can't make a temp dir")
+	}
+	defer os.RemoveAll(basePath)
+
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
 	spec := &api.Volume{
