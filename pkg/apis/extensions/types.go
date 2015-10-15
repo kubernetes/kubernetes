@@ -409,7 +409,7 @@ type JobSpec struct {
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	Template *api.PodTemplateSpec `json:"template"`
+	Template api.PodTemplateSpec `json:"template"`
 }
 
 // JobStatus represents the current state of a Job.

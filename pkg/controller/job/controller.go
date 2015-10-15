@@ -417,7 +417,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := jm.podControl.CreatePods(job.Namespace, job.Spec.Template, job); err != nil {
+				if err := jm.podControl.CreatePods(job.Namespace, &job.Spec.Template, job); err != nil {
 					defer util.HandleError(err)
 					// Decrement the expected number of creates because the informer won't observe this pod
 					jm.expectations.CreationObserved(jobKey)

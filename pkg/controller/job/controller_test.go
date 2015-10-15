@@ -50,7 +50,7 @@ func newJob(parallelism, completions int) *extensions.Job {
 			Parallelism: &parallelism,
 			Completions: &completions,
 			Selector:    map[string]string{"foo": "bar"},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
