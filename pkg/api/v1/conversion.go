@@ -413,6 +413,8 @@ func convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurity
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodSecurityContext))(in)
 	}
+
+	out.SupplementalGroups = in.SupplementalGroups
 	return nil
 }
 
@@ -420,5 +422,7 @@ func convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodSecurityContext))(in)
 	}
+
+	out.SupplementalGroups = in.SupplementalGroups
 	return nil
 }

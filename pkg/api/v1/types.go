@@ -1258,6 +1258,11 @@ type PodSpec struct {
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
 type PodSecurityContext struct {
+	// SupplementalGroups can be used to specify a list of
+	// additional groups which the main container process will run
+	// as. This will be applied to all containers in the pod in
+	// addition to the primary group of the container.
+	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
