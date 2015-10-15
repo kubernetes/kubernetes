@@ -360,9 +360,9 @@ func (s *StoreToJobLister) Exists(job *extensions.Job) (bool, error) {
 }
 
 // StoreToJobLister lists all jobs in the store.
-func (s *StoreToJobLister) List() (jobs []extensions.Job, err error) {
+func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
 	for _, c := range s.Store.List() {
-		jobs = append(jobs, *(c.(*extensions.Job)))
+		jobs.Items = append(jobs.Items, *(c.(*extensions.Job)))
 	}
 	return jobs, nil
 }
