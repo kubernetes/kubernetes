@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -147,9 +148,9 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case api.LabelSelectorQueryParam(testapi.Default.Version()):
+			case unversioned.LabelSelectorQueryParam(testapi.Default.Version()):
 				validator = validateLabels
-			case api.FieldSelectorQueryParam(testapi.Default.Version()):
+			case unversioned.FieldSelectorQueryParam(testapi.Default.Version()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }
@@ -270,7 +271,7 @@ func TestGetServerVersion(t *testing.T) {
 
 func TestGetServerAPIVersions(t *testing.T) {
 	versions := []string{"v1", "v2", "v3"}
-	expect := api.APIVersions{Versions: versions}
+	expect := unversioned.APIVersions{Versions: versions}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		output, err := json.Marshal(expect)
 		if err != nil {
