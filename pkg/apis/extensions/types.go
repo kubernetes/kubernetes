@@ -405,7 +405,7 @@ type JobSpec struct {
 	Completions *int `json:"completions,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
-	Selector map[string]string `json:"selector"`
+	Selector *PodSelector `json:"selector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
@@ -661,7 +661,7 @@ type PodSelector struct {
 	MatchExpressions []PodSelectorRequirement `json:"matchExpressions,omitempty"`
 }
 
-// A pod selector requirement is a selector that contains values, a key and an operator that
+// A pod selector requirement is a selector that contains values, a key, and an operator that
 // relates the key and values.
 type PodSelectorRequirement struct {
 	// key is the label key that the selector applies to.
@@ -669,10 +669,11 @@ type PodSelectorRequirement struct {
 	// operator represents a key's relationship to a set of values.
 	// Valid operators ard In, NotIn, Exists and DoesNotExist.
 	Operator PodSelectorOperator `json:"operator"`
-	// values is a set of string values. If the operator is In or NotIn,
-	// the values set must be non-empty. This array is replaced during a
-	// strategic merge patch.
-	Values []string `json:"stringValues,omitempty"`
+	// values is an array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty. This array is replaced during a strategic
+	// merge patch.
+	Values []string `json:"values,omitempty"`
 }
 
 // A pod selector operator is the set of operators that can be used in a selector requirement.
