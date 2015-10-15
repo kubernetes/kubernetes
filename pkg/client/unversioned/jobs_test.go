@@ -49,7 +49,7 @@ func TestListJobs(t *testing.T) {
 							},
 						},
 						Spec: extensions.JobSpec{
-							Template: &api.PodTemplateSpec{},
+							Template: api.PodTemplateSpec{},
 						},
 					},
 				},
@@ -79,7 +79,7 @@ func TestGetJob(t *testing.T) {
 					},
 				},
 				Spec: extensions.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -125,7 +125,7 @@ func TestUpdateJob(t *testing.T) {
 					},
 				},
 				Spec: extensions.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -160,7 +160,7 @@ func TestUpdateJobStatus(t *testing.T) {
 					},
 				},
 				Spec: extensions.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 				Status: extensions.JobStatus{
 					Active: 1,
@@ -212,7 +212,7 @@ func TestCreateJob(t *testing.T) {
 					},
 				},
 				Spec: extensions.JobSpec{
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},

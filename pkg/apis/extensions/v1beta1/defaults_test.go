@@ -207,7 +207,7 @@ func TestSetDefaultJob(t *testing.T) {
 		// selector from template labels, completions and parallelism - default
 		{
 			Spec: JobSpec{
-				Template: &v1.PodTemplateSpec{
+				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels: map[string]string{"job": "selector"},
 					},
@@ -218,7 +218,7 @@ func TestSetDefaultJob(t *testing.T) {
 		{
 			Spec: JobSpec{
 				Completions: newInt(1),
-				Template: &v1.PodTemplateSpec{
+				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels: map[string]string{"job": "selector"},
 					},
@@ -229,7 +229,7 @@ func TestSetDefaultJob(t *testing.T) {
 		{
 			Spec: JobSpec{
 				Parallelism: newInt(1),
-				Template: &v1.PodTemplateSpec{
+				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels: map[string]string{"job": "selector"},
 					},
