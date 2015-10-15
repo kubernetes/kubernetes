@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -168,7 +168,7 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 		m.podStatuses[pod.UID] = status
 		m.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {
-		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletUtil.FormatPodName(pod), status)
+		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletutil.FormatPodName(pod), status)
 	}
 }
 
@@ -186,7 +186,7 @@ func (m *manager) TerminatePods(pods []*api.Pod) bool {
 		case m.podStatusChannel <- podStatusSyncRequest{pod, pod.Status}:
 		default:
 			sent = false
-			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", kubeletUtil.FormatPodName(pod))
+			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", kubeletutil.FormatPodName(pod))
 		}
 	}
 	return sent
@@ -228,14 +228,14 @@ func (m *manager) syncBatch() error {
 	}
 	if err == nil {
 		if len(pod.UID) > 0 && statusPod.UID != pod.UID {
-			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", kubeletUtil.FormatPodName(pod))
+			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", kubeletutil.FormatPodName(pod))
 			return nil
 		}
 		statusPod.Status = status
 		// TODO: handle conflict as a retry, make that easier too.
 		statusPod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
 		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully", kubeletUtil.FormatPodName(pod))
+			glog.V(3).Infof("Status for pod %q updated successfully", kubeletutil.FormatPodName(pod))
 
 			if pod.DeletionTimestamp == nil {
 				return nil
@@ -260,7 +260,7 @@ func (m *manager) syncBatch() error {
 	// to clear the channel. Even if this delete never runs subsequent container
 	// changes on the node should trigger updates.
 	go m.DeletePodStatus(pod.UID)
-	return fmt.Errorf("error updating status for pod %q: %v", kubeletUtil.FormatPodName(pod), err)
+	return fmt.Errorf("error updating status for pod %q: %v", kubeletutil.FormatPodName(pod), err)
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
