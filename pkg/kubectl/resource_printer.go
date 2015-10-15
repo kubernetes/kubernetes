@@ -1475,10 +1475,19 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 	return nil
 }
 
+// GetNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.
+func GetNewTabWriter(output io.Writer) *tabwriter.Writer {
+	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
+}
+
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
-	w := tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
-	defer w.Flush()
+	// if output is a tabwriter (when it's called by kubectl get), we use it; create a new tabwriter otherwise
+	w, found := output.(*tabwriter.Writer)
+	if !found {
+		w = GetNewTabWriter(output)
+		defer w.Flush()
+	}
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
 		if !h.noHeaders && t != h.lastType {
