@@ -1099,40 +1099,55 @@ func deepCopy_extensions_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerL
 }
 
 func deepCopy_extensions_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
-	if in.ScaleRef != nil {
-		out.ScaleRef = new(SubresourceReference)
-		if err := deepCopy_extensions_SubresourceReference(*in.ScaleRef, out.ScaleRef, c); err != nil {
-			return err
+	if err := deepCopy_extensions_SubresourceReference(in.ScaleRef, &out.ScaleRef, c); err != nil {
+		return err
+	}
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int)
+		*out.MinReplicas = *in.MinReplicas
+	} else {
+		out.MinReplicas = nil
+	}
+	out.MaxReplicas = in.MaxReplicas
+	if in.TargetMetricUtilizations != nil {
+		out.TargetMetricUtilizations = make([]MetricUtilization, len(in.TargetMetricUtilizations))
+		for i := range in.TargetMetricUtilizations {
+			if err := deepCopy_extensions_MetricUtilization(in.TargetMetricUtilizations[i], &out.TargetMetricUtilizations[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
-		out.ScaleRef = nil
-	}
-	out.MinReplicas = in.MinReplicas
-	out.MaxReplicas = in.MaxReplicas
-	if err := deepCopy_extensions_ResourceConsumption(in.Target, &out.Target, c); err != nil {
-		return err
+		out.TargetMetricUtilizations = nil
 	}
 	return nil
 }
 
 func deepCopy_extensions_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
+	if in.ObserveGeneration != nil {
+		out.ObserveGeneration = new(int64)
+		*out.ObserveGeneration = *in.ObserveGeneration
+	} else {
+		out.ObserveGeneration = nil
+	}
+	if in.LastScaleTime != nil {
+		out.LastScaleTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.LastScaleTime, out.LastScaleTime, c); err != nil {
+			return err
+		}
+	} else {
+		out.LastScaleTime = nil
+	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentConsumption != nil {
-		out.CurrentConsumption = new(ResourceConsumption)
-		if err := deepCopy_extensions_ResourceConsumption(*in.CurrentConsumption, out.CurrentConsumption, c); err != nil {
-			return err
+	if in.CurrentMetricUtilizations != nil {
+		out.CurrentMetricUtilizations = make([]MetricUtilization, len(in.CurrentMetricUtilizations))
+		for i := range in.CurrentMetricUtilizations {
+			if err := deepCopy_extensions_MetricUtilization(in.CurrentMetricUtilizations[i], &out.CurrentMetricUtilizations[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
-		out.CurrentConsumption = nil
-	}
-	if in.LastScaleTimestamp != nil {
-		out.LastScaleTimestamp = new(unversioned.Time)
-		if err := deepCopy_unversioned_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTimestamp = nil
+		out.CurrentMetricUtilizations = nil
 	}
 	return nil
 }
@@ -1340,6 +1355,14 @@ func deepCopy_extensions_JobStatus(in JobStatus, out *JobStatus, c *conversion.C
 	return nil
 }
 
+func deepCopy_extensions_MetricUtilization(in MetricUtilization, out *MetricUtilization, c *conversion.Cloner) error {
+	out.Name = in.Name
+	if err := deepCopy_resource_Quantity(in.Utilization, &out.Utilization, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_extensions_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
 	out.Resource = in.Resource
 	out.Value = in.Value
@@ -1348,14 +1371,6 @@ func deepCopy_extensions_NodeUtilization(in NodeUtilization, out *NodeUtilizatio
 
 func deepCopy_extensions_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func deepCopy_extensions_ResourceConsumption(in ResourceConsumption, out *ResourceConsumption, c *conversion.Cloner) error {
-	out.Resource = in.Resource
-	if err := deepCopy_resource_Quantity(in.Quantity, &out.Quantity, c); err != nil {
 		return err
 	}
 	return nil
@@ -1580,9 +1595,9 @@ func init() {
 		deepCopy_extensions_JobList,
 		deepCopy_extensions_JobSpec,
 		deepCopy_extensions_JobStatus,
+		deepCopy_extensions_MetricUtilization,
 		deepCopy_extensions_NodeUtilization,
 		deepCopy_extensions_ReplicationControllerDummy,
-		deepCopy_extensions_ResourceConsumption,
 		deepCopy_extensions_RollingUpdateDeployment,
 		deepCopy_extensions_Scale,
 		deepCopy_extensions_ScaleSpec,

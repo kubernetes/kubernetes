@@ -203,11 +203,11 @@ func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerSpec = map[string]string{
-	"":            "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
-	"scaleRef":    "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec.",
-	"minReplicas": "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.",
-	"maxReplicas": "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
-	"target":      "Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Currently two types of resources are supported: \"cpu\" and \"memory\".",
+	"":                         "HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.",
+	"scaleRef":                 "ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modyfying its spec.",
+	"minReplicas":              "MinReplicas is the lower limit for the number of pods that can be set by the autoscaler, default 1.",
+	"maxReplicas":              "MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
+	"targetMetricUtilizations": "TargetMetricUtilizations are the target arithmetic mean utilizations of the latest samles of the given metrics gathered accross pods. The autoscaler will try to maintain the target by adjusting the desired number of pods. Currently two types of metrics are supported: \"cpu-usage\" and \"memory-usage\". Currently this array must contain exactly one element.",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
@@ -215,11 +215,12 @@ func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerStatus = map[string]string{
-	"":                   "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
-	"currentReplicas":    "CurrentReplicas is the number of replicas of pods managed by this autoscaler.",
-	"desiredReplicas":    "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.",
-	"currentConsumption": "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\".",
-	"lastScaleTimestamp": "LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to controll how often the number of pods is changed.",
+	"":                          "HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler",
+	"observedGeneration":        "ObservedGeneration is the most recent generation observed by this autoscaler.",
+	"lastScaleTime":             "LastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods. This is used by the autoscaler to control how often the number of pods is changed.",
+	"currentReplicas":           "CurrentReplicas is the number of replicas of pods managed by this autoscaler.",
+	"desiredReplicas":           "DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.",
+	"currentMetricUtilizations": "CurrentConsumption is the current average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods. Two types of resources are supported: \"cpu\" and \"memory\".",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
@@ -354,6 +355,16 @@ func (JobStatus) SwaggerDoc() map[string]string {
 	return map_JobStatus
 }
 
+var map_MetricUtilization = map[string]string{
+	"":            "MetricUtilization is an object for specifying the arithmetic mean utilization of a particular metric.",
+	"name":        "Name specifies either the identifier of the target metric when present in the spec, or the identifier of the observed metric when present in the status.",
+	"utilization": "Utilization specifies either the target arithmetic mean utilization of the metric when present in the spec, or the observed arithmetic mean utilization when present in the status.",
+}
+
+func (MetricUtilization) SwaggerDoc() map[string]string {
+	return map_MetricUtilization
+}
+
 var map_NodeUtilization = map[string]string{
 	"":      "NodeUtilization describes what percentage of a particular resource is used on a node.",
 	"value": "The accepted values are from 0 to 1.",
@@ -371,16 +382,6 @@ func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerDummy
 }
 
-var map_ResourceConsumption = map[string]string{
-	"":         "ResourceConsumption is an object for specifying average resource consumption of a particular resource.",
-	"resource": "Resource specifies either the name of the target resource when present in the spec, or the name of the observed resource when present in the status.",
-	"quantity": "Quantity specifies either the target average consumption of the resource when present in the spec, or the observed average consumption when present in the status.",
-}
-
-func (ResourceConsumption) SwaggerDoc() map[string]string {
-	return map_ResourceConsumption
-}
-
 var map_RollingUpdateDeployment = map[string]string{
 	"":                "Spec to control the desired behavior of rolling update.",
 	"maxUnavailable":  "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
@@ -393,7 +394,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 }
 
 var map_Scale = map[string]string{
-	"":         "Scale subresource, applicable to ReplicationControllers and (in future) Deployment.",
+	"":         "Scale subresource, applicable to ReplicationControllers and Deployments.",
 	"metadata": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
 	"spec":     "Spec defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
 	"status":   "Status represents the current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.",
@@ -404,8 +405,8 @@ func (Scale) SwaggerDoc() map[string]string {
 }
 
 var map_ScaleSpec = map[string]string{
-	"":         "ScaleSpec describes the attributes a Scale subresource",
-	"replicas": "Replicas is the number of desired replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller\"",
+	"":         "ScaleSpec describes the attributes of a Scale subresource",
+	"replicas": "Replicas is the number of desired replicas. Setting this number will set the number of the desired replicas in the underlying ReplicationController/Deployment.",
 }
 
 func (ScaleSpec) SwaggerDoc() map[string]string {
@@ -414,8 +415,8 @@ func (ScaleSpec) SwaggerDoc() map[string]string {
 
 var map_ScaleStatus = map[string]string{
 	"":         "ScaleStatus represents the current status of a Scale subresource.",
-	"replicas": "Replicas is the number of actual replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
-	"selector": "Selector is a label query over pods that should match the replicas count. If it is empty, it is defaulted to labels on Pod template; More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
+	"replicas": "Replicas is the number of actual replicas in the underlying ReplicationController/Deployment.",
+	"selector": "Selector is a label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
 }
 
 func (ScaleStatus) SwaggerDoc() map[string]string {

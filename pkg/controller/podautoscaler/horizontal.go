@@ -70,6 +70,10 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
+	if len(hpa.Spec.TargetMetricUtilizations) != 1 {
+		return fmt.Errorf("multiple metrics not implemented: %v", hpa.Spec.TargetMetricUtilizations)
+	}
+	target := hpa.Spec.TargetMetricUtilizations[0]
 
 	scale, err := a.client.Extensions().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
@@ -79,7 +83,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	currentReplicas := scale.Status.Replicas
 	currentConsumption, err := a.metricsClient.
 		ResourceConsumption(hpa.Spec.ScaleRef.Namespace).
-		Get(hpa.Spec.Target.Resource, scale.Status.Selector)
+		Get(target.Name, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -87,11 +91,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		return fmt.Errorf("failed to get metrics for %s: %v", reference, err)
 	}
 
-	usageRatio := float64(currentConsumption.Quantity.MilliValue()) / float64(hpa.Spec.Target.Quantity.MilliValue())
+	usageRatio := float64(currentConsumption.Utilization.MilliValue()) / float64(target.Utilization.MilliValue())
 	desiredReplicas := int(math.Ceil(usageRatio * float64(currentReplicas)))
 
-	if desiredReplicas < hpa.Spec.MinReplicas {
-		desiredReplicas = hpa.Spec.MinReplicas
+	if hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas {
+		desiredReplicas = *hpa.Spec.MinReplicas
 	}
 
 	// TODO: remove when pod ideling is done.
@@ -109,16 +113,16 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// Going down only if the usageRatio dropped significantly below the target
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas && usageRatio < (1-tolerance) &&
-			(hpa.Status.LastScaleTimestamp == nil ||
-				hpa.Status.LastScaleTimestamp.Add(downscaleForbiddenWindow).Before(now)) {
+			(hpa.Status.LastScaleTime == nil ||
+				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
 
 		// Going up only if the usage ratio increased significantly above the target
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas && usageRatio > (1+tolerance) &&
-			(hpa.Status.LastScaleTimestamp == nil ||
-				hpa.Status.LastScaleTimestamp.Add(upscaleForbiddenWindow).Before(now)) {
+			(hpa.Status.LastScaleTime == nil ||
+				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(now)) {
 			rescale = true
 		}
 	}
@@ -138,13 +142,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	}
 
 	hpa.Status = extensions.HorizontalPodAutoscalerStatus{
-		CurrentReplicas:    currentReplicas,
-		DesiredReplicas:    desiredReplicas,
-		CurrentConsumption: currentConsumption,
+		ObserveGeneration:         &hpa.Generation,
+		CurrentReplicas:           currentReplicas,
+		DesiredReplicas:           desiredReplicas,
+		CurrentMetricUtilizations: []extensions.MetricUtilization{*currentConsumption},
 	}
 	if rescale {
 		now := unversioned.NewTime(now)
-		hpa.Status.LastScaleTimestamp = &now
+		hpa.Status.LastScaleTime = &now
 	}
 
 	_, err = a.client.Extensions().HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(&hpa)

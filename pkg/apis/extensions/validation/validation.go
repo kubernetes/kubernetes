@@ -51,38 +51,35 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 	return apivalidation.ValidateReplicationControllerName(name, prefix)
 }
 
-func validateResourceConsumption(consumption *extensions.ResourceConsumption, fieldName string) errs.ValidationErrorList {
+func validateMetricUtilizations(utilizations []extensions.MetricUtilization, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	resource := consumption.Resource.String()
-	if resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
-		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".resource", resource, "resource not supported by autoscaler"))
-	}
-	quantity := consumption.Quantity.Value()
-	if quantity < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".quantity", quantity, "must be non-negative"))
+	if len(utilizations) != 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, len(utilizations), "must containe exactly 1 element"))
+	} else {
+		name := utilizations[0].Name
+		if string(name) != string(extensions.MetricCPUUsage) && string(name) != string(extensions.MetricMemoryUsage) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".name", name, "metric not supported by autoscaler"))
+		}
+		utilization := utilizations[0].Utilization.Value()
+		if utilization < 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".utilization", utilization, isNegativeErrorMsg))
+		}
 	}
 	return allErrs
 }
 
 func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if autoscaler.MinReplicas < 0 {
+	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, isNegativeErrorMsg))
 	}
-	if autoscaler.MaxReplicas < autoscaler.MinReplicas {
+	if autoscaler.MaxReplicas < 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to 1`))
+	}
+	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
-	if autoscaler.ScaleRef == nil {
-		allErrs = append(allErrs, errs.NewFieldRequired("scaleRef"))
-	}
-	resource := autoscaler.Target.Resource.String()
-	if resource != string(api.ResourceMemory) && resource != string(api.ResourceCPU) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("target.resource", resource, "resource not supported by autoscaler"))
-	}
-	quantity := autoscaler.Target.Quantity.Value()
-	if quantity < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("target.quantity", quantity, isNegativeErrorMsg))
-	}
+	allErrs = append(allErrs, validateMetricUtilizations(autoscaler.TargetMetricUtilizations, "targetMetricUtilizations")...)
 	return allErrs
 }
 
@@ -107,8 +104,8 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *exte
 	status := controller.Status
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentReplicas), "currentReplicas")...)
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredReplicas), "desiredReplicas")...)
-	if status.CurrentConsumption != nil {
-		allErrs = append(allErrs, validateResourceConsumption(status.CurrentConsumption, "currentConsumption")...)
+	if len(status.CurrentMetricUtilizations) > 0 {
+		allErrs = append(allErrs, validateMetricUtilizations(status.CurrentMetricUtilizations, "currentMetricUtilizations")...)
 	}
 	return allErrs
 }

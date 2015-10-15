@@ -61,7 +61,7 @@ type testCase struct {
 	replicas              int
 	desiredValue          int64
 	desiredError          error
-	targetResource        api.ResourceName
+	targetMetric          extensions.MetricName
 	reportedMetricsPoints [][]metricPoint
 	namespace             string
 	selector              map[string]string
@@ -122,23 +122,23 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	return fakeClient
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *extensions.ResourceConsumption, err error) {
+func (tc *testCase) verifyResults(t *testing.T, val *extensions.MetricUtilization, err error) {
 	assert.Equal(t, tc.desiredError, err)
 	if tc.desiredError != nil {
 		return
 	}
-	if tc.targetResource == api.ResourceCPU {
-		assert.Equal(t, tc.desiredValue, val.Quantity.MilliValue())
+	if tc.targetMetric == extensions.MetricCPUUsage {
+		assert.Equal(t, tc.desiredValue, val.Utilization.MilliValue())
 	}
-	if tc.targetResource == api.ResourceMemory {
-		assert.Equal(t, tc.desiredValue, val.Quantity.Value())
+	if tc.targetMetric == extensions.MetricMemoryUsage {
+		assert.Equal(t, tc.desiredValue, val.Utilization.Value())
 	}
 }
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient)
-	val, err := metricsClient.ResourceConsumption(tc.namespace).Get(tc.targetResource, tc.selector)
+	val, err := metricsClient.ResourceConsumption(tc.namespace).Get(tc.targetMetric, tc.selector)
 	tc.verifyResults(t, val, err)
 }
 
@@ -146,7 +146,7 @@ func TestCPU(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
 		desiredValue:          5000,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		reportedMetricsPoints: [][]metricPoint{{{5000, 1}}, {{5000, 1}}, {{5000, 1}}},
 	}
 	tc.runTest(t)
@@ -156,7 +156,7 @@ func TestMemory(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
 		desiredValue:          5000,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		reportedMetricsPoints: [][]metricPoint{{{5000, 1}}, {{5000, 2}}, {{5000, 4}}},
 	}
 	tc.runTest(t)
@@ -166,7 +166,7 @@ func TestCPUSumEqualZero(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
 		desiredValue:          0,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		reportedMetricsPoints: [][]metricPoint{{{0, 0}}, {{0, 0}}, {{0, 0}}},
 	}
 	tc.runTest(t)
@@ -176,7 +176,7 @@ func TestMemorySumEqualZero(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
 		desiredValue:          0,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		reportedMetricsPoints: [][]metricPoint{{{0, 0}}, {{0, 0}}, {{0, 0}}},
 	}
 	tc.runTest(t)
@@ -184,9 +184,9 @@ func TestMemorySumEqualZero(t *testing.T) {
 
 func TestCPUMoreMetrics(t *testing.T) {
 	tc := testCase{
-		replicas:       5,
-		desiredValue:   5000,
-		targetResource: api.ResourceCPU,
+		replicas:     5,
+		desiredValue: 5000,
+		targetMetric: extensions.MetricCPUUsage,
 		reportedMetricsPoints: [][]metricPoint{
 			{{0, 3}, {0, 6}, {5, 4}, {9000, 10}},
 			{{5000, 2}, {10, 5}, {66, 1}, {0, 10}},
@@ -199,9 +199,9 @@ func TestCPUMoreMetrics(t *testing.T) {
 
 func TestMemoryMoreMetrics(t *testing.T) {
 	tc := testCase{
-		replicas:       5,
-		desiredValue:   5000,
-		targetResource: api.ResourceMemory,
+		replicas:     5,
+		desiredValue: 5000,
+		targetMetric: extensions.MetricMemoryUsage,
 		reportedMetricsPoints: [][]metricPoint{
 			{{0, 3}, {0, 6}, {5, 4}, {9000, 10}},
 			{{5000, 2}, {10, 5}, {66, 1}, {0, 10}},
@@ -216,7 +216,7 @@ func TestCPUResultIsFloat(t *testing.T) {
 	tc := testCase{
 		replicas:              6,
 		desiredValue:          4783,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}, {{9500, 4}}, {{3000, 4}}, {{7000, 4}}, {{3200, 4}}, {{2000, 4}}},
 	}
 	tc.runTest(t)
@@ -226,7 +226,7 @@ func TestMemoryResultIsFloat(t *testing.T) {
 	tc := testCase{
 		replicas:              6,
 		desiredValue:          4783,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}, {{9500, 4}}, {{3000, 4}}, {{7000, 4}}, {{3200, 4}}, {{2000, 4}}},
 	}
 	tc.runTest(t)
@@ -234,9 +234,9 @@ func TestMemoryResultIsFloat(t *testing.T) {
 
 func TestCPUSamplesWithRandomTimestamps(t *testing.T) {
 	tc := testCase{
-		replicas:       3,
-		desiredValue:   3000,
-		targetResource: api.ResourceCPU,
+		replicas:     3,
+		desiredValue: 3000,
+		targetMetric: extensions.MetricCPUUsage,
 		reportedMetricsPoints: [][]metricPoint{
 			{{1, 1}, {3000, 3}, {2, 2}},
 			{{2, 2}, {1, 1}, {3000, 3}},
@@ -247,9 +247,9 @@ func TestCPUSamplesWithRandomTimestamps(t *testing.T) {
 
 func TestMemorySamplesWithRandomTimestamps(t *testing.T) {
 	tc := testCase{
-		replicas:       3,
-		desiredValue:   3000,
-		targetResource: api.ResourceMemory,
+		replicas:     3,
+		desiredValue: 3000,
+		targetMetric: extensions.MetricMemoryUsage,
 		reportedMetricsPoints: [][]metricPoint{
 			{{1, 1}, {3000, 3}, {2, 2}},
 			{{2, 2}, {1, 1}, {3000, 3}},
@@ -270,7 +270,7 @@ func TestErrorMetricNotDefined(t *testing.T) {
 func TestCPUMissingMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 1/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}},
 	}
@@ -280,7 +280,7 @@ func TestCPUMissingMetrics(t *testing.T) {
 func TestMemoryMissingMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 1/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}},
 	}
@@ -290,7 +290,7 @@ func TestMemoryMissingMetrics(t *testing.T) {
 func TestCPUSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 6/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{1000, 1}}, {{2000, 4}}, {{2000, 1}}, {{4000, 5}}, {{2000, 1}}, {{4000, 4}}},
 	}
@@ -300,7 +300,7 @@ func TestCPUSuperfluousMetrics(t *testing.T) {
 func TestMemorySuperfluousMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 6/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{1000, 1}}, {{2000, 4}}, {{2000, 1}}, {{4000, 5}}, {{2000, 1}}, {{4000, 4}}},
 	}
@@ -310,7 +310,7 @@ func TestMemorySuperfluousMetrics(t *testing.T) {
 func TestCPUEmptyMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 0/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{},
 	}
@@ -320,7 +320,7 @@ func TestCPUEmptyMetrics(t *testing.T) {
 func TestMemoryEmptyMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 0/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{},
 	}
@@ -330,7 +330,7 @@ func TestMemoryEmptyMetrics(t *testing.T) {
 func TestCPUZeroReplicas(t *testing.T) {
 	tc := testCase{
 		replicas:              0,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		desiredValue:          0,
 		reportedMetricsPoints: [][]metricPoint{},
 	}
@@ -340,7 +340,7 @@ func TestCPUZeroReplicas(t *testing.T) {
 func TestMemoryZeroReplicas(t *testing.T) {
 	tc := testCase{
 		replicas:              0,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		desiredValue:          0,
 		reportedMetricsPoints: [][]metricPoint{},
 	}
@@ -350,7 +350,7 @@ func TestMemoryZeroReplicas(t *testing.T) {
 func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceCPU,
+		targetMetric:          extensions.MetricCPUUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 2/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{}, {{100, 1}}, {{400, 2}, {300, 3}}},
 	}
@@ -360,7 +360,7 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 func TestMemoryEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceMemory,
+		targetMetric:          extensions.MetricMemoryUsage,
 		desiredError:          fmt.Errorf("metrics obtained for 2/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{}, {{100, 1}}, {{400, 2}, {300, 3}}},
 	}

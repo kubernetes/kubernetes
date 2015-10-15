@@ -158,15 +158,14 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu string) {
 			Namespace: rc.framework.Namespace.Name,
 		},
 		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: &extensions.SubresourceReference{
+			ScaleRef: extensions.SubresourceReference{
 				Kind:        kind,
 				Name:        rc.name,
 				Namespace:   rc.framework.Namespace.Name,
 				Subresource: subresource,
 			},
-			MinReplicas: 1,
-			MaxReplicas: 5,
-			Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse(cpu)},
+			MaxReplicas:              5,
+			TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricCPUUsage, Utilization: resource.MustParse(cpu)}},
 		},
 	}
 	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
@@ -181,15 +180,14 @@ func createMemoryHorizontalPodAutoscaler(rc *ResourceConsumer, memory string) {
 			Namespace: rc.framework.Namespace.Name,
 		},
 		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: &extensions.SubresourceReference{
+			ScaleRef: extensions.SubresourceReference{
 				Kind:        kind,
 				Name:        rc.name,
 				Namespace:   rc.framework.Namespace.Name,
 				Subresource: subresource,
 			},
-			MinReplicas: 1,
-			MaxReplicas: 5,
-			Target:      extensions.ResourceConsumption{Resource: api.ResourceMemory, Quantity: resource.MustParse(memory + "M")},
+			MaxReplicas:              5,
+			TargetMetricUtilizations: []extensions.MetricUtilization{{Name: extensions.MetricMemoryUsage, Utilization: resource.MustParse(memory + "M")}},
 		},
 	}
 	_, errHPA := rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
