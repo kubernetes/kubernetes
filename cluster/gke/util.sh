@@ -63,8 +63,8 @@ function detect-project() {
 # Execute prior to running tests to build a release if required for env.
 function test-build-release() {
   echo "... in gke:test-build-release()" >&2
-  # We currently use the Kubernetes version that GKE supports (not testing
-  # bleeding-edge builds).
+  echo "... We currently use the Kubernetes version that GKE supports,"
+  echo "... not bleeding-edge builds."
 }
 
 # Verify needed binaries exist.
