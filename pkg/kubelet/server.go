@@ -34,6 +34,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -46,7 +47,9 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/kubelet/api/handlers"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -139,6 +142,7 @@ type AuthInterface interface {
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetContainerRuntimeVersion() (kubecontainer.Version, error)
+	GetContainerInfos(options cadvisorv2.RequestOptions) (map[string]cadvisorv2.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() []*api.Pod
@@ -154,6 +158,7 @@ type HostInterface interface {
 	ResyncInterval() time.Duration
 	GetHostname() string
 	LatestLoopEntryTime() time.Time
+	GetStatusManager() status.Manager // FIXME
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -167,6 +172,7 @@ func NewServer(host HostInterface, auth AuthInterface, enableDebuggingHandlers b
 		server.InstallAuthFilter()
 	}
 	server.InstallDefaultHandlers()
+	server.InstallApiHandlers()
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 	}
@@ -343,6 +349,18 @@ func (s *Server) InstallDebuggingHandlers() {
 	ws.Route(ws.GET("").
 		To(s.getRunningPods).
 		Operation("getRunningPods"))
+	s.restfulCont.Add(ws)
+}
+
+// InstallApiHandlers registers the HTTP request patterns that serve the kubelet versioned api.
+func (s *Server) InstallApiHandlers() {
+	ws := new(restful.WebService).
+		Path("/api/v1/").
+		Consumes(restful.MIME_JSON).
+		Produces(restful.MIME_JSON)
+
+	ws.Route(ws.GET("rawMetrics").To(handlers.RawMetricsHandler(s.host, s.host.GetStatusManager())))
+
 	s.restfulCont.Add(ws)
 }
 

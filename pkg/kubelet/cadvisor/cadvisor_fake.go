@@ -63,3 +63,7 @@ func (c *Fake) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
 func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return new(events.EventChannel), nil
 }
+
+func (c *Fake) GetContainerInfoV2(containerName string, options cadvisorApiV2.RequestOptions) (map[string]cadvisorApiV2.ContainerInfo, error) {
+	return map[string]cadvisorApiV2.ContainerInfo{}, nil
+}

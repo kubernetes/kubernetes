@@ -72,3 +72,7 @@ func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
 func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return nil, unsupportedErr
 }
+
+func (cu *cadvisorUnsupported) GetContainerInfoV2(containerName string, options cadvisorApiV2.RequestOptions) (map[string]cadvisorApiV2.ContainerInfo, error) {
+	return nil, unsupportedErr
+}

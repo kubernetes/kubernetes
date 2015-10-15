@@ -76,3 +76,8 @@ func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error
 	args := c.Called()
 	return args.Get(0).(*events.EventChannel), args.Error(1)
 }
+
+func (c *Mock) GetContainerInfoV2(containerName string, options cadvisorApiV2.RequestOptions) (map[string]cadvisorApiV2.ContainerInfo, error) {
+	args := c.Called()
+	return args.Get(0).(map[string]cadvisorApiV2.ContainerInfo), args.Error(1)
+}

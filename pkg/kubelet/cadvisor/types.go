@@ -40,4 +40,7 @@ type Interface interface {
 
 	// Get events streamed through passedChannel that fit the request.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)
+
+	// Gets info for all containers based on request options (v2 API).
+	GetContainerInfoV2(containerName string, options cadvisorApiV2.RequestOptions) (map[string]cadvisorApiV2.ContainerInfo, error)
 }
