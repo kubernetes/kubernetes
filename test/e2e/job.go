@@ -97,7 +97,7 @@ var _ = Describe("Job", func() {
 
 		By("Ensuring job shows many failures")
 		err = wait.Poll(poll, jobTimeout, func() (bool, error) {
-			curr, err := f.Client.Experimental().Jobs(f.Namespace.Name).Get(job.Name)
+			curr, err := f.Client.Extensions().Jobs(f.Namespace.Name).Get(job.Name)
 			if err != nil {
 				return false, err
 			}
@@ -176,7 +176,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
-		_, err = f.Client.Experimental().Jobs(f.Namespace.Name).Get(job.Name)
+		_, err = f.Client.Extensions().Jobs(f.Namespace.Name).Get(job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
@@ -224,11 +224,11 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 }
 
 func createJob(c *client.Client, ns string, job *extensions.Job) (*extensions.Job, error) {
-	return c.Experimental().Jobs(ns).Create(job)
+	return c.Extensions().Jobs(ns).Create(job)
 }
 
 func deleteJob(c *client.Client, ns, name string) error {
-	return c.Experimental().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
+	return c.Extensions().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
@@ -252,7 +252,7 @@ func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int
 // Wait for job to reach completions.
 func waitForJobFinish(c *client.Client, ns, jobName string, completions int) error {
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {
-		curr, err := c.Experimental().Jobs(ns).Get(jobName)
+		curr, err := c.Extensions().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
 		}

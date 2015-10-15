@@ -56,7 +56,7 @@ func TestListIngress(t *testing.T) {
 			},
 		},
 	}
-	receivedIngressList, err := c.Setup(t).Experimental().Ingress(ns).List(labels.Everything(), fields.Everything())
+	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, receivedIngressList, err)
 }
 
@@ -84,14 +84,14 @@ func TestGetIngress(t *testing.T) {
 			},
 		},
 	}
-	receivedIngress, err := c.Setup(t).Experimental().Ingress(ns).Get("foo")
+	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("foo")
 	c.Validate(t, receivedIngress, err)
 }
 
 func TestGetIngressWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{Error: true}
-	receivedIngress, err := c.Setup(t).Experimental().Ingress(ns).Get("")
+	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}
@@ -130,7 +130,7 @@ func TestUpdateIngress(t *testing.T) {
 			},
 		},
 	}
-	receivedIngress, err := c.Setup(t).Experimental().Ingress(ns).Update(requestIngress)
+	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Update(requestIngress)
 	c.Validate(t, receivedIngress, err)
 }
 
@@ -176,7 +176,7 @@ func TestUpdateIngressStatus(t *testing.T) {
 			},
 		},
 	}
-	receivedIngress, err := c.Setup(t).Experimental().Ingress(ns).UpdateStatus(requestIngress)
+	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).UpdateStatus(requestIngress)
 	c.Validate(t, receivedIngress, err)
 }
 
@@ -190,7 +190,7 @@ func TestDeleteIngress(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup(t).Experimental().Ingress(ns).Delete("foo", nil)
+	err := c.Setup(t).Extensions().Ingress(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
 }
 
@@ -225,6 +225,6 @@ func TestCreateIngress(t *testing.T) {
 			},
 		},
 	}
-	receivedIngress, err := c.Setup(t).Experimental().Ingress(ns).Create(requestIngress)
+	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Create(requestIngress)
 	c.Validate(t, receivedIngress, err)
 }
