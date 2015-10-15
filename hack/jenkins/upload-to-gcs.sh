@@ -74,6 +74,5 @@ function upload_logs_to_gcs() {
   done
 }
 
-
 # Automatically upload logs to GCS on exit or timeout.
 trap upload_logs_to_gcs EXIT SIGTERM SIGINT
