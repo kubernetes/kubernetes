@@ -130,8 +130,8 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
-		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, latest.GroupOrDie("extensions").GroupVersion, etcdtest.PathPrefix())
-		storageVersions["extensions"] = latest.GroupOrDie("extensions").GroupVersion
+		expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
+		storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
@@ -273,7 +273,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
