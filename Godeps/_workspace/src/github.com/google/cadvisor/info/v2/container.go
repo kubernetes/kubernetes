@@ -52,6 +52,14 @@ type MemorySpec struct {
 	SwapLimit uint64 `json:"swap_limit,omitempty"`
 }
 
+type ContainerInfo struct {
+	// Describes the container.
+	Spec ContainerSpec `json:"spec,omitempty"`
+
+	// Historical statistics gathered from the container.
+	Stats []*ContainerStats `json:"stats,omitempty"`
+}
+
 type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
@@ -189,6 +197,14 @@ type RequestOptions struct {
 	Count int `json:"count"`
 	// Whether to include stats for child subcontainers.
 	Recursive bool `json:"recursive"`
+
+	// Start time for which to query information.
+	// If ommitted, the beginning of time is assumed.
+	Start time.Time `json:"start,omitempty"`
+
+	// End time for which to query information.
+	// If ommitted, current time is assumed.
+	End time.Time `json:"end,omitempty"`
 }
 
 type ProcessInfo struct {

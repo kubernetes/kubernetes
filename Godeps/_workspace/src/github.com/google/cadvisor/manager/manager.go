@@ -70,13 +70,13 @@ type Manager interface {
 	// Gets information about a specific Docker container. The specified name is within the Docker namespace.
 	DockerContainer(dockerName string, query *info.ContainerInfoRequest) (info.ContainerInfo, error)
 
-	// Gets spec for all containers based on request options.
+	// Deprecated: Use V2().GetContainerSpec(...)
 	GetContainerSpec(containerName string, options v2.RequestOptions) (map[string]v2.ContainerSpec, error)
 
-	// Gets summary stats for all containers based on request options.
+	// Deprecated: Use V2().GetContainerSpec(...)
 	GetDerivedStats(containerName string, options v2.RequestOptions) (map[string]v2.DerivedStats, error)
 
-	// Get info for all requested containers based on the request options.
+	// Deprecatde: Use V2().GetContainerInfo(...)
 	GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*info.ContainerInfo, error)
 
 	// Returns true if the named container exists.
@@ -88,11 +88,10 @@ type Manager interface {
 	// Get version information about different components we depend on.
 	GetVersionInfo() (*info.VersionInfo, error)
 
-	// Get filesystem information for a given label.
-	// Returns information for all global filesystems if label is empty.
+	// Deprecated: Use V2().GetFsInfo(...)
 	GetFsInfo(label string) ([]v2.FsInfo, error)
 
-	// Get ps output for a container.
+	// Deprecated: Use V2().GetProcessList(...)
 	GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error)
 
 	// Get events streamed through passedChannel that fit the request.
@@ -111,6 +110,10 @@ type Manager interface {
 
 	// Returns debugging information. Map of lines per category.
 	DebugInfo() map[string][]string
+
+	// Gets the interface using the V2 API.
+	// TODO: expose a public interface when the API is ready.
+	V2() v2Manager
 }
 
 // New takes a memory storage and returns a new manager.
@@ -337,67 +340,11 @@ func (self *manager) getContainerData(containerName string) (*containerData, err
 }
 
 func (self *manager) GetDerivedStats(containerName string, options v2.RequestOptions) (map[string]v2.DerivedStats, error) {
-	conts, err := self.getRequestedContainers(containerName, options)
-	if err != nil {
-		return nil, err
-	}
-	stats := make(map[string]v2.DerivedStats)
-	for name, cont := range conts {
-		d, err := cont.DerivedStats()
-		if err != nil {
-			return nil, err
-		}
-		stats[name] = d
-	}
-	return stats, nil
+	return self.V2().GetDerivedStats(containerName, options)
 }
 
 func (self *manager) GetContainerSpec(containerName string, options v2.RequestOptions) (map[string]v2.ContainerSpec, error) {
-	conts, err := self.getRequestedContainers(containerName, options)
-	if err != nil {
-		return nil, err
-	}
-	specs := make(map[string]v2.ContainerSpec)
-	for name, cont := range conts {
-		cinfo, err := cont.GetInfo()
-		if err != nil {
-			return nil, err
-		}
-		spec := self.getV2Spec(cinfo)
-		specs[name] = spec
-	}
-	return specs, nil
-}
-
-// Get V2 container spec from v1 container info.
-func (self *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
-	specV1 := self.getAdjustedSpec(cinfo)
-	specV2 := v2.ContainerSpec{
-		CreationTime:     specV1.CreationTime,
-		HasCpu:           specV1.HasCpu,
-		HasMemory:        specV1.HasMemory,
-		HasFilesystem:    specV1.HasFilesystem,
-		HasNetwork:       specV1.HasNetwork,
-		HasDiskIo:        specV1.HasDiskIo,
-		HasCustomMetrics: specV1.HasCustomMetrics,
-		Image:            specV1.Image,
-	}
-	if specV1.HasCpu {
-		specV2.Cpu.Limit = specV1.Cpu.Limit
-		specV2.Cpu.MaxLimit = specV1.Cpu.MaxLimit
-		specV2.Cpu.Mask = specV1.Cpu.Mask
-	}
-	if specV1.HasMemory {
-		specV2.Memory.Limit = specV1.Memory.Limit
-		specV2.Memory.Reservation = specV1.Memory.Reservation
-		specV2.Memory.SwapLimit = specV1.Memory.SwapLimit
-	}
-	if specV1.HasCustomMetrics {
-		specV2.CustomMetrics = specV1.CustomMetrics
-	}
-	specV2.Aliases = cinfo.Aliases
-	specV2.Namespace = cinfo.Namespace
-	return specV2
+	return self.V2().GetContainerSpec(containerName, options)
 }
 
 func (self *manager) getAdjustedSpec(cinfo *containerInfo) info.ContainerSpec {
@@ -442,16 +389,6 @@ func (self *manager) containerDataToContainerInfo(cont *containerData, query *in
 		Stats:              stats,
 	}
 	return ret, nil
-}
-
-func (self *manager) getContainer(containerName string) (*containerData, error) {
-	self.containersLock.RLock()
-	defer self.containersLock.RUnlock()
-	cont, ok := self.containers[namespacedContainerName{Name: containerName}]
-	if !ok {
-		return nil, fmt.Errorf("unknown container %q", containerName)
-	}
-	return cont, nil
 }
 
 func (self *manager) getSubcontainers(containerName string) map[string]*containerData {
@@ -556,7 +493,7 @@ func (self *manager) containerDataSliceToContainerInfoSlice(containers []*contai
 }
 
 func (self *manager) GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*info.ContainerInfo, error) {
-	containers, err := self.getRequestedContainers(containerName, options)
+	containers, err := (*v2manager)(self).getRequestedContainers(containerName, options)
 	if err != nil {
 		return nil, err
 	}
@@ -575,80 +512,8 @@ func (self *manager) GetRequestedContainersInfo(containerName string, options v2
 	return containersMap, nil
 }
 
-func (self *manager) getRequestedContainers(containerName string, options v2.RequestOptions) (map[string]*containerData, error) {
-	containersMap := make(map[string]*containerData)
-	switch options.IdType {
-	case v2.TypeName:
-		if options.Recursive == false {
-			cont, err := self.getContainer(containerName)
-			if err != nil {
-				return containersMap, err
-			}
-			containersMap[cont.info.Name] = cont
-		} else {
-			containersMap = self.getSubcontainers(containerName)
-			if len(containersMap) == 0 {
-				return containersMap, fmt.Errorf("unknown container: %q", containerName)
-			}
-		}
-	case v2.TypeDocker:
-		if options.Recursive == false {
-			containerName = strings.TrimPrefix(containerName, "/")
-			cont, err := self.getDockerContainer(containerName)
-			if err != nil {
-				return containersMap, err
-			}
-			containersMap[cont.info.Name] = cont
-		} else {
-			if containerName != "/" {
-				return containersMap, fmt.Errorf("invalid request for docker container %q with subcontainers", containerName)
-			}
-			containersMap = self.getAllDockerContainers()
-		}
-	default:
-		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
-	}
-	return containersMap, nil
-}
-
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
-	var empty time.Time
-	// Get latest data from filesystems hanging off root container.
-	stats, err := self.memoryCache.RecentStats("/", empty, empty, 1)
-	if err != nil {
-		return nil, err
-	}
-	dev := ""
-	if len(label) != 0 {
-		dev, err = self.fsInfo.GetDeviceForLabel(label)
-		if err != nil {
-			return nil, err
-		}
-	}
-	fsInfo := []v2.FsInfo{}
-	for _, fs := range stats[0].Filesystem {
-		if len(label) != 0 && fs.Device != dev {
-			continue
-		}
-		mountpoint, err := self.fsInfo.GetMountpointForDevice(fs.Device)
-		if err != nil {
-			return nil, err
-		}
-		labels, err := self.fsInfo.GetLabelsForDevice(fs.Device)
-		if err != nil {
-			return nil, err
-		}
-		fi := v2.FsInfo{
-			Device:     fs.Device,
-			Mountpoint: mountpoint,
-			Capacity:   fs.Limit,
-			Usage:      fs.Usage,
-			Available:  fs.Available,
-			Labels:     labels,
-		}
-		fsInfo = append(fsInfo, fi)
-	}
-	return fsInfo, nil
+	return self.V2().GetFsInfo(label)
 }
 
 func (m *manager) GetMachineInfo() (*info.MachineInfo, error) {
@@ -680,24 +545,7 @@ func (m *manager) Exists(containerName string) bool {
 }
 
 func (m *manager) GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error) {
-	// override recursive. Only support single container listing.
-	options.Recursive = false
-	conts, err := m.getRequestedContainers(containerName, options)
-	if err != nil {
-		return nil, err
-	}
-	if len(conts) != 1 {
-		return nil, fmt.Errorf("Expected the request to match only one container")
-	}
-	// TODO(rjnagal): handle count? Only if we can do count by type (eg. top 5 cpu users)
-	ps := []v2.ProcessInfo{}
-	for _, cont := range conts {
-		ps, err = cont.GetProcessList(m.cadvisorContainer, m.inHostNamespace)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return ps, nil
+	return m.V2().GetProcessList(containerName, options)
 }
 
 func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *containerData) error {
@@ -1240,4 +1088,8 @@ func (m *manager) DebugInfo() map[string][]string {
 
 	debugInfo["Managed containers"] = lines
 	return debugInfo
+}
+
+func (m *manager) V2() v2Manager {
+	return (*v2manager)(m)
 }
