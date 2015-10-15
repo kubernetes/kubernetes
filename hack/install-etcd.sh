@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-ETCD_VERSION=${ETCD_VERSION:-v2.0.0}
+ETCD_VERSION=${ETCD_VERSION:-v2.0.12}
 
 cd "${KUBE_ROOT}/third_party"
-curl -sL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz \
+curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz \
   | tar xzf -
-ln -sF etcd-${ETCD_VERSION}-linux-amd64 etcd
+ln -fns etcd-${ETCD_VERSION}-linux-amd64 etcd
