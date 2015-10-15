@@ -197,7 +197,8 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 
-		It("should support exec through an HTTP proxy", func() {
+		// FIXME(ncdc) remove Skipped once we sort out the kubectl build issues in GCE
+		It("[Skipped] should support exec through an HTTP proxy", func() {
 			// Note: We are skipping local since we want to verify an apiserver with HTTPS.
 			// At this time local only supports plain HTTP.
 			SkipIfProviderIs("local")
