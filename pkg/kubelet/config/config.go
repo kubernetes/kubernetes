@@ -152,7 +152,9 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
+	seenBefore := s.sourcesSeen.Has(source)
 	adds, updates, deletes := s.merge(source, change)
+	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
 	switch s.mode {
@@ -160,7 +162,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		if len(deletes.Pods) > 0 {
 			s.updates <- *deletes
 		}
-		if len(adds.Pods) > 0 {
+		if len(adds.Pods) > 0 || firstSet {
 			s.updates <- *adds
 		}
 		if len(updates.Pods) > 0 {
@@ -168,15 +170,15 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		}
 
 	case PodConfigNotificationSnapshotAndUpdates:
+		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 || firstSet {
+			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
+		}
 		if len(updates.Pods) > 0 {
 			s.updates <- *updates
 		}
-		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
-		}
 
 	case PodConfigNotificationSnapshot:
-		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
+		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 || firstSet {
 			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
 		}
 
