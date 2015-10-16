@@ -277,6 +277,11 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
+
+	// Metadata represents metadata about the pod that should populate this volume
+	// Deprecated: Use downwardAPI instead.
+	// +genconversion=false
+	Metadata *DeprecatedDownwardAPIVolumeSource `json:"metadata,omitempty" protobuf:"-"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -3248,6 +3253,25 @@ type DownwardAPIVolumeFile struct {
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
+}
+
+// DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info.
+// This type is deprecated and should be replaced by use of the downwardAPI volume source.
+type DeprecatedDownwardAPIVolumeSource struct {
+	// Items is a list of downward API volume file
+	Items []DeprecatedDownwardAPIVolumeFile `json:"items,omitempty" protobuf:"-"`
+}
+
+// DeprecatedDownwardAPIVolumeFile represents information to create the file containing the pod field
+// This type is deprecated and should be replaced by use of the downwardAPI volume source.
+type DeprecatedDownwardAPIVolumeFile struct {
+	// Required: Name is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	Path string `json:"name" protobuf:"-"`
+	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"-"`
+	// Selects a resource of the container: only resources limits and requests
+	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"-"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
