@@ -19,7 +19,7 @@ package service
 import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 )
 
 type MesosCadvisor struct {
@@ -36,7 +36,7 @@ func NewMesosCadvisor(cores int, mem int64, port uint) (*MesosCadvisor, error) {
 	return &MesosCadvisor{c, cores, mem}, nil
 }
 
-func (mc *MesosCadvisor) MachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (mc *MesosCadvisor) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	mi, err := mc.Interface.MachineInfo()
 	if err != nil {
 		return nil, err
