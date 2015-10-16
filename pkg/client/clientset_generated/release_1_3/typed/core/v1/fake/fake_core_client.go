@@ -78,6 +78,10 @@ func (c *FakeCore) Secrets(namespace string) v1.SecretInterface {
 	return &FakeSecrets{c, namespace}
 }
 
+func (c *FakeCore) SecurityContextConstraints() v1.SecurityContextConstraintsInterface {
+	return &FakeSecurityContextConstraints{c}
+}
+
 func (c *FakeCore) Services(namespace string) v1.ServiceInterface {
 	return &FakeServices{c, namespace}
 }

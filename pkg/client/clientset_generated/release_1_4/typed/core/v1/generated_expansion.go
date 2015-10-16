@@ -38,4 +38,6 @@ type ResourceQuotaExpansion interface{}
 
 type SecretExpansion interface{}
 
+type SecurityContextConstraintsExpansion interface{}
+
 type ServiceAccountExpansion interface{}
