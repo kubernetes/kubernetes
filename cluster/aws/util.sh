@@ -441,6 +441,18 @@ function create-dhcp-option-set () {
 
 # Verify prereqs
 function verify-prereqs {
+  if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="experimental/v1alpha1=true"
+    else
+      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1alpha1=false" and appending "experimental/v1alpha1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+        exit 1
+      fi
+    fi
+  fi
+
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
@@ -830,6 +842,8 @@ function kube-up {
     echo "readonly ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "readonly ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI:-false}'"
+    echo "readonly ENABLE_EXPERIMENTAL_API='${ENABLE_EXPERIMENTAL_API:-false}'"
+    echo "readonly RUNTIME_CONFIG='${RUNTIME_CONFIG}'"
     echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"

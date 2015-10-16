@@ -58,6 +58,8 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # If set to auto, a new Elastic IP will be acquired
 # Otherwise amazon-given public ip will be used (it'll change with reboot).
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
+ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
@@ -85,6 +87,28 @@ DNS_REPLICAS=1
 
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+
+# Optional: Create autoscaler for cluster's nodes.
+ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
+if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  # TODO: actually configure ASG or similar
+  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
+  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
+  TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
+fi
+
+# Optional: Enable feature for autoscaling number of pods
+# Experimental feature, not ready for production use.
+ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
+if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+
+# Optional: Enable deployment experimental feature, not ready for production use.
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
+if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
