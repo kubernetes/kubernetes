@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,6 +101,8 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("Namespace"):             &NamespaceDescriber{c},
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
+
+		api.Kind("SecurityContextConstraints"): &SecurityContextConstraintsDescriber{c},
 
 		extensions.Kind("ReplicaSet"):               &ReplicaSetDescriber{c},
 		extensions.Kind("HorizontalPodAutoscaler"):  &HorizontalPodAutoscalerDescriber{c},
@@ -466,6 +469,126 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 	})
 }
 
+// SecurityContextConstraintsDescriber generates information about an SCC
+type SecurityContextConstraintsDescriber struct {
+	client.Interface
+}
+
+func (d *SecurityContextConstraintsDescriber) Describe(namespace, name string, s DescriberSettings) (string, error) {
+	scc, err := d.SecurityContextConstraints().Get(name)
+	if err != nil {
+		return "", err
+	}
+	return describeSecurityContextConstraints(scc)
+}
+
+func describeSecurityContextConstraints(scc *api.SecurityContextConstraints) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", scc.Name)
+
+		priority := ""
+		if scc.Priority != nil {
+			priority = fmt.Sprintf("%d", *scc.Priority)
+		}
+		fmt.Fprintf(out, "Priority:\t%s\n", stringOrNone(priority))
+
+		fmt.Fprintf(out, "Access:\t\n")
+		fmt.Fprintf(out, "  Users:\t%s\n", stringOrNone(strings.Join(scc.Users, ",")))
+		fmt.Fprintf(out, "  Groups:\t%s\n", stringOrNone(strings.Join(scc.Groups, ",")))
+
+		fmt.Fprintf(out, "Settings:\t\n")
+		fmt.Fprintf(out, "  Allow Privileged:\t%t\n", scc.AllowPrivilegedContainer)
+		fmt.Fprintf(out, "  Default Add Capabilities:\t%s\n", capsToString(scc.DefaultAddCapabilities))
+		fmt.Fprintf(out, "  Required Drop Capabilities:\t%s\n", capsToString(scc.RequiredDropCapabilities))
+		fmt.Fprintf(out, "  Allowed Capabilities:\t%s\n", capsToString(scc.AllowedCapabilities))
+		fmt.Fprintf(out, "  Allowed Volume Types:\t%s\n", fsTypeToString(scc.Volumes))
+		fmt.Fprintf(out, "  Allow Host Network:\t%t\n", scc.AllowHostNetwork)
+		fmt.Fprintf(out, "  Allow Host Ports:\t%t\n", scc.AllowHostPorts)
+		fmt.Fprintf(out, "  Allow Host PID:\t%t\n", scc.AllowHostPID)
+		fmt.Fprintf(out, "  Allow Host IPC:\t%t\n", scc.AllowHostIPC)
+		fmt.Fprintf(out, "  Read Only Root Filesystem:\t%t\n", scc.ReadOnlyRootFilesystem)
+
+		fmt.Fprintf(out, "  Run As User Strategy: %s\t\n", string(scc.RunAsUser.Type))
+		uid := ""
+		if scc.RunAsUser.UID != nil {
+			uid = strconv.FormatInt(*scc.RunAsUser.UID, 10)
+		}
+		fmt.Fprintf(out, "    UID:\t%s\n", stringOrNone(uid))
+
+		uidRangeMin := ""
+		if scc.RunAsUser.UIDRangeMin != nil {
+			uidRangeMin = strconv.FormatInt(*scc.RunAsUser.UIDRangeMin, 10)
+		}
+		fmt.Fprintf(out, "    UID Range Min:\t%s\n", stringOrNone(uidRangeMin))
+
+		uidRangeMax := ""
+		if scc.RunAsUser.UIDRangeMax != nil {
+			uidRangeMax = strconv.FormatInt(*scc.RunAsUser.UIDRangeMax, 10)
+		}
+		fmt.Fprintf(out, "    UID Range Max:\t%s\n", stringOrNone(uidRangeMax))
+
+		fmt.Fprintf(out, "  SELinux Context Strategy: %s\t\n", string(scc.SELinuxContext.Type))
+		var user, role, seLinuxType, level string
+		if scc.SELinuxContext.SELinuxOptions != nil {
+			user = scc.SELinuxContext.SELinuxOptions.User
+			role = scc.SELinuxContext.SELinuxOptions.Role
+			seLinuxType = scc.SELinuxContext.SELinuxOptions.Type
+			level = scc.SELinuxContext.SELinuxOptions.Level
+		}
+		fmt.Fprintf(out, "    User:\t%s\n", stringOrNone(user))
+		fmt.Fprintf(out, "    Role:\t%s\n", stringOrNone(role))
+		fmt.Fprintf(out, "    Type:\t%s\n", stringOrNone(seLinuxType))
+		fmt.Fprintf(out, "    Level:\t%s\n", stringOrNone(level))
+
+		fmt.Fprintf(out, "  FSGroup Strategy: %s\t\n", string(scc.FSGroup.Type))
+		fmt.Fprintf(out, "    Ranges:\t%s\n", idRangeToString(scc.FSGroup.Ranges))
+
+		fmt.Fprintf(out, "  Supplemental Groups Strategy: %s\t\n", string(scc.SupplementalGroups.Type))
+		fmt.Fprintf(out, "    Ranges:\t%s\n", idRangeToString(scc.SupplementalGroups.Ranges))
+
+		return nil
+	})
+}
+
+func stringOrNone(s string) string {
+	if len(s) > 0 {
+		return s
+	}
+	return "<none>"
+}
+
+func fsTypeToString(volumes []api.FSType) string {
+	strVolumes := []string{}
+	for _, v := range volumes {
+		strVolumes = append(strVolumes, string(v))
+	}
+	return stringOrNone(strings.Join(strVolumes, ","))
+}
+
+func idRangeToString(ranges []api.IDRange) string {
+	formattedString := ""
+	if ranges != nil {
+		strRanges := []string{}
+		for _, r := range ranges {
+			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
+		}
+		formattedString = strings.Join(strRanges, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
+func capsToString(caps []api.Capability) string {
+	formattedString := ""
+	if caps != nil {
+		strCaps := []string{}
+		for _, c := range caps {
+			strCaps = append(strCaps, string(c))
+		}
+		formattedString = strings.Join(strCaps, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
 // PodDescriber generates information about a pod and the replication controllers that
 // create it.
 type PodDescriber struct {
@@ -508,6 +631,9 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
+		if len(pod.Annotations["openshift.io/scc"]) > 0 {
+			fmt.Fprintf(out, "Security Policy:\t%s\n", pod.Annotations["openshift.io/scc"])
+		}
 		fmt.Fprintf(out, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		if pod.Status.StartTime != nil {
 			fmt.Fprintf(out, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
