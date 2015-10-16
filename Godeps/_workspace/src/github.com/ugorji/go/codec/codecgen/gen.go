@@ -41,24 +41,12 @@ package {{ $.PackageName }}
 
 import (
 	{{ if not .CodecPkgFiles }}{{ .CodecPkgName }} "{{ .CodecImportPath }}"{{ end }}
-{{/*
-	{{ if .Types }}"{{ .ImportPath }}"{{ end }}
-	"io"
-*/}}
 	"os"
 	"reflect"
 	"bytes"
 	"strings"
 	"go/format"
 )
-
-{{/* This is not used anymore. Remove it.
-func write(w io.Writer, s string) {
-	if _, err := io.WriteString(w, s); err != nil {
-		panic(err)
-	}
-}
-*/}}
 
 func CodecGenTempWrite{{ .RandString }}() {
 	fout, err := os.Create("{{ .OutFile }}")

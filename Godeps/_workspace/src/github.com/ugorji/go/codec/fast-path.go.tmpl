@@ -116,6 +116,7 @@ func fastpathEncodeTypeSwitch(iv interface{}, e *Encoder) bool {
 		fastpathTV.{{ .MethodNamePfx "Enc" false }}V(*v, fastpathCheckNilTrue, e)
 {{end}}{{end}}
 	default:
+		_ = v // TODO: workaround https://github.com/golang/go/issues/12927 (remove after go 1.6 release)
 		return false
 	}
 	return true
@@ -182,14 +183,50 @@ func (_ fastpathT) {{ .MethodNamePfx "Enc" false }}V(v map[{{ .MapKey }}]{{ .Ele
 		return
 	}
 	ee.EncodeMapStart(len(v))
-	{{if eq .MapKey "string"}}asSymbols := e.h.AsSymbols&AsSymbolMapStringKeysFlag != 0{{end}}
-	for k2, v2 := range v {
-		{{if eq .MapKey "string"}}if asSymbols {
-			ee.EncodeSymbol(k2)
-		} else {
-			ee.EncodeString(c_UTF8, k2)
-		}{{else}}{{ encmd .MapKey "k2"}}{{end}}
-		{{ encmd .Elem "v2"}}
+	{{if eq .MapKey "string"}}asSymbols := e.h.AsSymbols&AsSymbolMapStringKeysFlag != 0
+	{{end}}if e.h.Canonical {
+		{{if eq .MapKey "interface{}"}}{{/* out of band 
+		*/}}var mksv []byte = make([]byte, 0, len(v)*16) // temporary byte slice for the encoding
+		e2 := NewEncoderBytes(&mksv, e.hh)
+		v2 := make([]bytesI, len(v))
+		var i, l int
+		var vp *bytesI {{/* put loop variables outside. seems currently needed for better perf */}}
+		for k2, _ := range v {
+			l = len(mksv)
+			e2.MustEncode(k2)
+			vp = &v2[i]
+			vp.v = mksv[l:]
+			vp.i = k2 
+			i++
+		}
+		sort.Sort(bytesISlice(v2))
+		for j := range v2 {
+			e.asis(v2[j].v)
+			e.encode(v[v2[j].i])
+		} {{else}}{{ $x := sorttype .MapKey true}}v2 := make([]{{ $x }}, len(v))
+		var i int 
+		for k, _ := range v {
+			v2[i] = {{ $x }}(k)
+			i++
+		}
+		sort.Sort({{ sorttype .MapKey false}}(v2))
+		for _, k2 := range v2 {
+			{{if eq .MapKey "string"}}if asSymbols {
+				ee.EncodeSymbol(k2)
+			} else {
+				ee.EncodeString(c_UTF8, k2)
+			}{{else}}{{ $y := printf "%s(k2)" .MapKey }}{{ encmd .MapKey $y }}{{end}}
+			{{ $y := printf "v[%s(k2)]" .MapKey }}{{ encmd .Elem $y }}
+		} {{end}}
+	} else {
+		for k2, v2 := range v {
+			{{if eq .MapKey "string"}}if asSymbols {
+				ee.EncodeSymbol(k2)
+			} else {
+				ee.EncodeString(c_UTF8, k2)
+			}{{else}}{{ encmd .MapKey "k2"}}{{end}}
+			{{ encmd .Elem "v2"}}
+		}
 	}
 	ee.EncodeEnd()
 }
@@ -382,30 +419,31 @@ func (_ fastpathT) {{ .MethodNamePfx "Dec" false }}V(v map[{{ .MapKey }}]{{ .Ele
 		v = make(map[{{ .MapKey }}]{{ .Elem }}, xlen)
 		changed = true
 	}
+	{{ if eq .Elem "interface{}" }}mapGet := !d.h.MapValueReset && !d.h.InterfaceReset{{end}}
+	var mk {{ .MapKey }}
+	var mv {{ .Elem }}
 	if containerLen > 0 {
 		for j := 0; j < containerLen; j++ {
-			{{ if eq .MapKey "interface{}" }}var mk interface{}
+			{{ if eq .MapKey "interface{}" }}mk = nil 
 			d.decode(&mk)
 			if bv, bok := mk.([]byte); bok {
-				mk = string(bv) {{/* // maps cannot have []byte as key. switch to string. */}}
-			}{{ else }}mk := {{ decmd .MapKey }}{{ end }}
-			mv := v[mk]
-			{{ if eq .Elem "interface{}" }}d.decode(&mv)
-			{{ else }}mv = {{ decmd .Elem }}{{ end }}
+				mk = d.string(bv) {{/* // maps cannot have []byte as key. switch to string. */}}
+			}{{ else }}mk = {{ decmd .MapKey }}{{ end }}
+			{{ if eq .Elem "interface{}" }}if mapGet { mv = v[mk] } else { mv = nil }
+			d.decode(&mv){{ else }}mv = {{ decmd .Elem }}{{ end }}
 			if v != nil {
 				v[mk] = mv
 			}
 		}
 	} else if containerLen < 0 {
 		for j := 0; !dd.CheckBreak(); j++ {
-			{{ if eq .MapKey "interface{}" }}var mk interface{}
+			{{ if eq .MapKey "interface{}" }}mk = nil 
 			d.decode(&mk)
 			if bv, bok := mk.([]byte); bok {
-				mk = string(bv) {{/* // maps cannot have []byte as key. switch to string. */}}
-			}{{ else }}mk := {{ decmd .MapKey }}{{ end }}
-			mv := v[mk]
-			{{ if eq .Elem "interface{}" }}d.decode(&mv)
-			{{ else }}mv = {{ decmd .Elem }}{{ end }}
+				mk = d.string(bv) {{/* // maps cannot have []byte as key. switch to string. */}}
+			}{{ else }}mk = {{ decmd .MapKey }}{{ end }}
+			{{ if eq .Elem "interface{}" }}if mapGet { mv = v[mk] } else { mv = nil }
+			d.decode(&mv){{ else }}mv = {{ decmd .Elem }}{{ end }}
 			if v != nil {
 				v[mk] = mv
 			}
