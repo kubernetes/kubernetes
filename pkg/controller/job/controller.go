@@ -316,7 +316,8 @@ func (jm *JobController) syncJob(key string) error {
 		return err
 	}
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
-	podList, err := jm.podStore.Pods(job.Namespace).List(labels.Set(job.Spec.Selector).AsSelector())
+	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
+	podList, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
 		glog.Errorf("Error getting pods for job %q: %v", key, err)
 		jm.queue.Add(key)
@@ -325,20 +326,20 @@ func (jm *JobController) syncJob(key string) error {
 
 	activePods := controller.FilterActivePods(podList.Items)
 	active := len(activePods)
-	successful, unsuccessful := getStatus(podList.Items)
+	succeeded, failed := getStatus(podList.Items)
 	if jobNeedsSync {
-		active = jm.manageJob(activePods, successful, unsuccessful, &job)
+		active = jm.manageJob(activePods, succeeded, &job)
 	}
-	completions := successful
+	completions := succeeded
 	if completions == *job.Spec.Completions {
 		job.Status.Conditions = append(job.Status.Conditions, newCondition())
 	}
 
 	// no need to update the job if the status hasn't changed since last time
-	if job.Status.Active != active || job.Status.Successful != successful || job.Status.Unsuccessful != unsuccessful {
+	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed {
 		job.Status.Active = active
-		job.Status.Successful = successful
-		job.Status.Unsuccessful = unsuccessful
+		job.Status.Succeeded = succeeded
+		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
 			glog.Errorf("Failed to update job %v, requeuing.  Error: %v", job.Name, err)
@@ -357,13 +358,13 @@ func newCondition() extensions.JobCondition {
 	}
 }
 
-func getStatus(pods []api.Pod) (successful, unsuccessful int) {
-	successful = filterPods(pods, api.PodSucceeded)
-	unsuccessful = filterPods(pods, api.PodFailed)
+func getStatus(pods []api.Pod) (succeeded, failed int) {
+	succeeded = filterPods(pods, api.PodSucceeded)
+	failed = filterPods(pods, api.PodFailed)
 	return
 }
 
-func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessful int, job *extensions.Job) int {
+func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *extensions.Job) int {
 	var activeLock sync.Mutex
 	active := len(activePods)
 	parallelism := *job.Spec.Parallelism
@@ -402,7 +403,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, successful, unsuccessf
 
 	} else if active < parallelism {
 		// how many executions are left to run
-		diff := *job.Spec.Completions - successful
+		diff := *job.Spec.Completions - succeeded
 		// limit to parallelism and count active pods as well
 		if diff > parallelism {
 			diff = parallelism

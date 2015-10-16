@@ -58,7 +58,7 @@ func JobHasDesiredParallelism(c Interface, job *extensions.Job) wait.ConditionFu
 			return true, nil
 		}
 		// otherwise count successful
-		progress := *job.Spec.Completions - job.Status.Active - job.Status.Successful
+		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
 		return progress == 0, nil
 	}
 }

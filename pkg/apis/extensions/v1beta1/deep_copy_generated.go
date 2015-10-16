@@ -1245,9 +1245,9 @@ func deepCopy_v1beta1_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) er
 		out.Completions = nil
 	}
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(PodSelector)
+		if err := deepCopy_v1beta1_PodSelector(*in.Selector, out.Selector, c); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil
@@ -1286,8 +1286,44 @@ func deepCopy_v1beta1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clon
 		out.CompletionTime = nil
 	}
 	out.Active = in.Active
-	out.Successful = in.Successful
-	out.Unsuccessful = in.Unsuccessful
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
+	return nil
+}
+
+func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversion.Cloner) error {
+	if in.MatchLabels != nil {
+		out.MatchLabels = make(map[string]string)
+		for key, val := range in.MatchLabels {
+			out.MatchLabels[key] = val
+		}
+	} else {
+		out.MatchLabels = nil
+	}
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]PodSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := deepCopy_v1beta1_PodSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func deepCopy_v1beta1_PodSelectorRequirement(in PodSelectorRequirement, out *PodSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
 	return nil
 }
 
@@ -1531,6 +1567,8 @@ func init() {
 		deepCopy_v1beta1_JobList,
 		deepCopy_v1beta1_JobSpec,
 		deepCopy_v1beta1_JobStatus,
+		deepCopy_v1beta1_PodSelector,
+		deepCopy_v1beta1_PodSelectorRequirement,
 		deepCopy_v1beta1_ReplicationControllerDummy,
 		deepCopy_v1beta1_ResourceConsumption,
 		deepCopy_v1beta1_RollingUpdateDeployment,

@@ -192,7 +192,9 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestSetDefaultJob(t *testing.T) {
 	expected := &Job{
 		Spec: JobSpec{
-			Selector:    map[string]string{"job": "selector"},
+			Selector: &PodSelector{
+				MatchLabels: map[string]string{"job": "selector"},
+			},
 			Completions: newInt(1),
 			Parallelism: newInt(1),
 		},
@@ -201,7 +203,9 @@ func TestSetDefaultJob(t *testing.T) {
 		// selector set explicitly, completions and parallelism - default
 		{
 			Spec: JobSpec{
-				Selector: map[string]string{"job": "selector"},
+				Selector: &PodSelector{
+					MatchLabels: map[string]string{"job": "selector"},
+				},
 			},
 		},
 		// selector from template labels, completions and parallelism - default

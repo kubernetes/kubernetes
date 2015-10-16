@@ -49,7 +49,9 @@ func newJob(parallelism, completions int) *extensions.Job {
 		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
-			Selector:    map[string]string{"foo": "bar"},
+			Selector: &extensions.PodSelector{
+				MatchLabels: map[string]string{"foo": "bar"},
+			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -82,7 +84,7 @@ func newPodList(count int, status api.PodPhase, job *extensions.Job) []api.Pod {
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%v", unversioned.Now().UnixNano()),
-				Labels:    job.Spec.Selector,
+				Labels:    job.Spec.Selector.MatchLabels,
 				Namespace: job.Namespace,
 			},
 			Status: api.PodStatus{Phase: status},
@@ -101,16 +103,16 @@ func TestControllerSyncJob(t *testing.T) {
 		// pod setup
 		podControllerError error
 		activePods         int
-		successfulPods     int
-		unsuccessfulPods   int
+		succeededPods      int
+		failedPods         int
 
 		// expectations
-		expectedCreations    int
-		expectedDeletions    int
-		expectedActive       int
-		expectedSuccessful   int
-		expectedUnsuccessful int
-		expectedComplete     bool
+		expectedCreations int
+		expectedDeletions int
+		expectedActive    int
+		expectedSucceeded int
+		expectedFailed    int
+		expectedComplete  bool
 	}{
 		"job start": {
 			2, 5,
@@ -183,10 +185,10 @@ func TestControllerSyncJob(t *testing.T) {
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
 			manager.podStore.Store.Add(&pod)
 		}
-		for _, pod := range newPodList(tc.successfulPods, api.PodSucceeded, job) {
+		for _, pod := range newPodList(tc.succeededPods, api.PodSucceeded, job) {
 			manager.podStore.Store.Add(&pod)
 		}
-		for _, pod := range newPodList(tc.unsuccessfulPods, api.PodFailed, job) {
+		for _, pod := range newPodList(tc.failedPods, api.PodFailed, job) {
 			manager.podStore.Store.Add(&pod)
 		}
 
@@ -207,11 +209,11 @@ func TestControllerSyncJob(t *testing.T) {
 		if actual.Status.Active != tc.expectedActive {
 			t.Errorf("%s: unexpected number of active pods.  Expected %d, saw %d\n", name, tc.expectedActive, actual.Status.Active)
 		}
-		if actual.Status.Successful != tc.expectedSuccessful {
-			t.Errorf("%s: unexpected number of successful pods.  Expected %d, saw %d\n", name, tc.expectedSuccessful, actual.Status.Successful)
+		if actual.Status.Succeeded != tc.expectedSucceeded {
+			t.Errorf("%s: unexpected number of succeeded pods.  Expected %d, saw %d\n", name, tc.expectedSucceeded, actual.Status.Succeeded)
 		}
-		if actual.Status.Unsuccessful != tc.expectedUnsuccessful {
-			t.Errorf("%s: unexpected number of unsuccessful pods.  Expected %d, saw %d\n", name, tc.expectedUnsuccessful, actual.Status.Unsuccessful)
+		if actual.Status.Failed != tc.expectedFailed {
+			t.Errorf("%s: unexpected number of failed pods.  Expected %d, saw %d\n", name, tc.expectedFailed, actual.Status.Failed)
 		}
 		// validate conditions
 		if tc.expectedComplete {
@@ -304,7 +306,9 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: extensions.JobSpec{
-					Selector: map[string]string{"foo": "bar"},
+					Selector: &extensions.PodSelector{
+						MatchLabels: map[string]string{"foo": "bar"},
+					},
 				},
 			},
 			pod: &api.Pod{
@@ -321,7 +325,15 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: extensions.JobSpec{
-					Selector: map[string]string{"foo": "bar"},
+					Selector: &extensions.PodSelector{
+						MatchExpressions: []extensions.PodSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: extensions.PodSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
 				},
 			},
 			pod: &api.Pod{

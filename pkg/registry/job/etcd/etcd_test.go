@@ -47,7 +47,9 @@ func validNewJob() *extensions.Job {
 		Spec: extensions.JobSpec{
 			Completions: &completions,
 			Parallelism: &parallelism,
-			Selector:    map[string]string{"a": "b"},
+			Selector: &extensions.PodSelector{
+				MatchLabels: map[string]string{"a": "b"},
+			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -80,7 +82,7 @@ func TestCreate(t *testing.T) {
 		&extensions.Job{
 			Spec: extensions.JobSpec{
 				Completions: validJob.Spec.Completions,
-				Selector:    map[string]string{},
+				Selector:    &extensions.PodSelector{},
 				Template:    validJob.Spec.Template,
 			},
 		},
@@ -103,7 +105,7 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.Job)
-			object.Spec.Selector = map[string]string{}
+			object.Spec.Selector = &extensions.PodSelector{}
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {

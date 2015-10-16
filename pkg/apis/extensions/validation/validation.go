@@ -319,16 +319,19 @@ func ValidateJobSpec(spec *extensions.JobSpec) errs.ValidationErrorList {
 	if spec.Completions != nil && *spec.Completions < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, isNegativeErrorMsg))
 	}
-
-	selector := labels.Set(spec.Selector).AsSelector()
-	if selector.Empty() {
+	if spec.Selector == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
+	} else {
+		allErrs = append(allErrs, ValidatePodSelector(spec.Selector).Prefix("selector")...)
 	}
 
-	labels := labels.Set(spec.Template.Labels)
-	if !selector.Matches(labels) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
+	if selector, err := extensions.PodSelectorAsSelector(spec.Selector); err == nil {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+		}
 	}
+
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template).Prefix("template")...)
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
 		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
@@ -341,8 +344,8 @@ func ValidateJobSpec(spec *extensions.JobSpec) errs.ValidationErrorList {
 func ValidateJobStatus(status *extensions.JobStatus) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), "active")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Successful), "successful")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Unsuccessful), "unsuccessful")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Succeeded), "succeeded")...)
+	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Failed), "failed")...)
 	return allErrs
 }
 
@@ -495,5 +498,35 @@ func validateIngressBackend(backend *extensions.IngressBackend) errs.ValidationE
 	} else if !utilvalidation.IsValidPortNum(backend.ServicePort.IntVal) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort, portRangeErrorMsg))
 	}
+	return allErrs
+}
+
+func ValidatePodSelector(ps *extensions.PodSelector) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if ps == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, apivalidation.ValidateLabels(ps.MatchLabels, "matchLabels")...)
+	for i, expr := range ps.MatchExpressions {
+		allErrs = append(allErrs, ValidatePodSelectorRequirement(expr).Prefix(fmt.Sprintf("matchExpressions.[%v]", i))...)
+	}
+	return allErrs
+}
+
+func ValidatePodSelectorRequirement(sr extensions.PodSelectorRequirement) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	switch sr.Operator {
+	case extensions.PodSelectorOpIn, extensions.PodSelectorOpNotIn:
+		if len(sr.Values) == 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("values", sr.Values, "must be non-empty when operator is In or NotIn"))
+		}
+	case extensions.PodSelectorOpExists, extensions.PodSelectorOpDoesNotExist:
+		if len(sr.Values) > 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("values", sr.Values, "must be empty when operator is Exists or DoesNotExist"))
+		}
+	default:
+		allErrs = append(allErrs, errs.NewFieldInvalid("operator", sr.Operator, "not a valid pod selector operator"))
+	}
+	allErrs = append(allErrs, apivalidation.ValidateLabelName(sr.Key, "key")...)
 	return allErrs
 }

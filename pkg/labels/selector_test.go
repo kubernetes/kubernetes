@@ -29,17 +29,23 @@ func TestSelectorParse(t *testing.T) {
 		"x=a,y=b,z=c",
 		"",
 		"x!=a,y=b",
+		"x=",
+		"x= ",
+		"x=,z= ",
+		"x= ,z= ",
+		"!x",
 	}
 	testBadStrings := []string{
 		"x=a||y=b",
 		"x==a==b",
+		"!x=a",
 	}
 	for _, test := range testGoodStrings {
 		lq, err := Parse(test)
 		if err != nil {
 			t.Errorf("%v: error %v (%#v)\n", test, err, err)
 		}
-		if test != lq.String() {
+		if strings.Replace(test, " ", "", -1) != lq.String() {
 			t.Errorf("%v restring gave: %v\n", test, lq.String())
 		}
 	}
@@ -99,10 +105,14 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "x=y,z=w", Set{"x": "y", "z": "w"})
 	expectMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "a"})
 	expectMatch(t, "notin=in", Set{"notin": "in"}) // in and notin in exactMatch
+	expectMatch(t, "x", Set{"x": "z"})
+	expectMatch(t, "!x", Set{"y": "z"})
 	expectNoMatch(t, "x=z", Set{})
 	expectNoMatch(t, "x=y", Set{"x": "z"})
 	expectNoMatch(t, "x=y,z=w", Set{"x": "w", "z": "w"})
 	expectNoMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "w"})
+	expectNoMatch(t, "x", Set{"y": "z"})
+	expectNoMatch(t, "!x", Set{"x": "z"})
 
 	labelset := Set{
 		"foo": "bar",
@@ -174,11 +184,14 @@ func TestLexer(t *testing.T) {
 		{"in", InToken},
 		{"=", EqualsToken},
 		{"==", DoubleEqualsToken},
+		//Note that Lex returns the longest valid token found
+		{"!", DoesNotExistToken},
 		{"!=", NotEqualsToken},
 		{"(", OpenParToken},
 		{")", ClosedParToken},
+		//Non-"special" characters are considered part of an identifier
+		{"~", IdentifierToken},
 		{"||", IdentifierToken},
-		{"!", ErrorToken},
 	}
 	for _, v := range testcases {
 		l := &Lexer{s: v.s, pos: 0}
@@ -209,6 +222,7 @@ func TestLexerSequence(t *testing.T) {
 		{"key notin ( value )", []Token{IdentifierToken, NotInToken, OpenParToken, IdentifierToken, ClosedParToken}},
 		{"key in ( value1, value2 )", []Token{IdentifierToken, InToken, OpenParToken, IdentifierToken, CommaToken, IdentifierToken, ClosedParToken}},
 		{"key", []Token{IdentifierToken}},
+		{"!key", []Token{DoesNotExistToken, IdentifierToken}},
 		{"()", []Token{OpenParToken, ClosedParToken}},
 		{"x in (),y", []Token{IdentifierToken, InToken, OpenParToken, ClosedParToken, CommaToken, IdentifierToken}},
 		{"== != (), = notin", []Token{DoubleEqualsToken, NotEqualsToken, OpenParToken, ClosedParToken, CommaToken, EqualsToken, NotInToken}},
@@ -244,6 +258,7 @@ func TestParserLookahead(t *testing.T) {
 		{"key notin ( value )", []Token{IdentifierToken, NotInToken, OpenParToken, IdentifierToken, ClosedParToken, EndOfStringToken}},
 		{"key in ( value1, value2 )", []Token{IdentifierToken, InToken, OpenParToken, IdentifierToken, CommaToken, IdentifierToken, ClosedParToken, EndOfStringToken}},
 		{"key", []Token{IdentifierToken, EndOfStringToken}},
+		{"!key", []Token{DoesNotExistToken, IdentifierToken, EndOfStringToken}},
 		{"()", []Token{OpenParToken, ClosedParToken, EndOfStringToken}},
 		{"", []Token{EndOfStringToken}},
 		{"x in (),y", []Token{IdentifierToken, InToken, OpenParToken, ClosedParToken, CommaToken, IdentifierToken, EndOfStringToken}},
@@ -281,6 +296,7 @@ func TestRequirementConstructor(t *testing.T) {
 		{"x", InOperator, sets.NewString("foo"), true},
 		{"x", NotInOperator, sets.NewString("foo"), true},
 		{"x", ExistsOperator, nil, true},
+		{"x", DoesNotExistOperator, nil, true},
 		{"1foo", InOperator, sets.NewString("bar"), true},
 		{"1234", InOperator, sets.NewString("bar"), true},
 		{strings.Repeat("a", 254), ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 253
@@ -307,6 +323,11 @@ func TestToString(t *testing.T) {
 			getRequirement("z", ExistsOperator, nil, t)},
 			"x in (abc,def),y notin (jkl),z", true},
 		{&LabelSelector{
+			getRequirement("x", NotInOperator, sets.NewString("abc", "def"), t),
+			getRequirement("y", NotEqualsOperator, sets.NewString("jkl"), t),
+			getRequirement("z", DoesNotExistOperator, nil, t)},
+			"x notin (abc,def),y!=jkl,!z", true},
+		{&LabelSelector{
 			getRequirement("x", InOperator, sets.NewString("abc", "def"), t),
 			req}, // adding empty req for the trailing ','
 			"x in (abc,def),", false},
@@ -318,8 +339,9 @@ func TestToString(t *testing.T) {
 		{&LabelSelector{
 			getRequirement("x", EqualsOperator, sets.NewString("abc"), t),
 			getRequirement("y", DoubleEqualsOperator, sets.NewString("jkl"), t),
-			getRequirement("z", NotEqualsOperator, sets.NewString("a"), t)},
-			"x=abc,y==jkl,z!=a", true},
+			getRequirement("z", NotEqualsOperator, sets.NewString("a"), t),
+			getRequirement("z", ExistsOperator, nil, t)},
+			"x=abc,y==jkl,z!=a,z", true},
 	}
 	for _, ts := range toStringTests {
 		if out := ts.In.String(); out == "" && ts.Valid {
@@ -352,6 +374,14 @@ func TestRequirementLabelSelectorMatching(t *testing.T) {
 			getRequirement("x", NotInOperator, sets.NewString(""), t),
 			getRequirement("y", ExistsOperator, nil, t),
 		}, true},
+		{Set{"y": ""}, &LabelSelector{
+			getRequirement("x", DoesNotExistOperator, nil, t),
+			getRequirement("y", ExistsOperator, nil, t),
+		}, true},
+		{Set{"y": ""}, &LabelSelector{
+			getRequirement("x", NotInOperator, sets.NewString(""), t),
+			getRequirement("y", DoesNotExistOperator, nil, t),
+		}, false},
 		{Set{"y": "baz"}, &LabelSelector{
 			getRequirement("x", InOperator, sets.NewString(""), t),
 		}, false},

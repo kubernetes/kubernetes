@@ -99,7 +99,7 @@ func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 func JobToSelectableFields(job *extensions.Job) fields.Set {
 	return fields.Set{
 		"metadata.name":     job.Name,
-		"status.successful": strconv.Itoa(job.Status.Successful),
+		"status.successful": strconv.Itoa(job.Status.Succeeded),
 	}
 }
 

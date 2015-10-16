@@ -382,11 +382,9 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 		if job.Namespace != pod.Namespace {
 			continue
 		}
-		labelSet := labels.Set(job.Spec.Selector)
-		selector = labels.Set(job.Spec.Selector).AsSelector()
 
-		// Job with a nil or empty selector match nothing
-		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		selector, _ = extensions.PodSelectorAsSelector(job.Spec.Selector)
+		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		jobs = append(jobs, job)

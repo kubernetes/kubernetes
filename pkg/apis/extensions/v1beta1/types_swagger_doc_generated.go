@@ -318,12 +318,33 @@ var map_JobStatus = map[string]string{
 	"startTime":      "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 	"completionTime": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
 	"active":         "Active is the number of actively running pods.",
-	"successful":     "Successful is the number of pods which reached Phase Succeeded.",
-	"unsuccessful":   "Unsuccessful is the number of pods failures, this applies only to jobs created with RestartPolicyNever, otherwise this value will always be 0.",
+	"succeeded":      "Succeeded is the number of pods which reached Phase Succeeded.",
+	"failed":         "Failed is the number of pods which reached Phase Failed.",
 }
 
 func (JobStatus) SwaggerDoc() map[string]string {
 	return map_JobStatus
+}
+
+var map_PodSelector = map[string]string{
+	"":                 "A pod selector is a label query over a set of pods. The result of matchLabels and matchExpressions are ANDed. An empty pod selector matches all objects. A null pod selector matches no objects.",
+	"matchLabels":      "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+	"matchExpressions": "matchExpressions is a list of pod selector requirements. The requirements are ANDed.",
+}
+
+func (PodSelector) SwaggerDoc() map[string]string {
+	return map_PodSelector
+}
+
+var map_PodSelectorRequirement = map[string]string{
+	"":         "A pod selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+	"key":      "key is the label key that the selector applies to.",
+	"operator": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+	"values":   "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+}
+
+func (PodSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_PodSelectorRequirement
 }
 
 var map_ReplicationControllerDummy = map[string]string{
