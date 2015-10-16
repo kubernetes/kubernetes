@@ -30,36 +30,35 @@ package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 )
 
-// ScaleSpec describes the attributes a Scale subresource
+// describes the attributes of a scale subresource
 type ScaleSpec struct {
-	// Replicas is the number of desired replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
+	// desired number of instances for the scaled object.
 	Replicas int `json:"replicas,omitempty"`
 }
 
-// ScaleStatus represents the current status of a Scale subresource.
+// represents the current status of a scale subresource.
 type ScaleStatus struct {
-	// Replicas is the number of actual replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// actual number of observed instances of the scaled object.
 	Replicas int `json:"replicas"`
 
-	// Selector is a label query over pods that should match the replicas count. If it is empty, it is defaulted to labels on Pod template; More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
-// Scale subresource, applicable to ReplicationControllers and (in future) Deployment.
+// represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
 	api.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	Spec ScaleSpec `json:"spec,omitempty"`
 
-	// Status represents the current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
 	Status ScaleStatus `json:"status,omitempty"`
 }
 
@@ -82,63 +81,64 @@ type SubresourceReference struct {
 	Subresource string `json:"subresource,omitempty"`
 }
 
-// ResourceConsumption is an object for specifying average resource consumption of a particular resource.
-type ResourceConsumption struct {
-	Resource api.ResourceName  `json:"resource,omitempty"`
-	Quantity resource.Quantity `json:"quantity,omitempty"`
+type CPUTargetUtilization struct {
+	// fraction of the requested CPU that should be utilized/used,
+	// e.g. 70 means that 70% of the requested CPU should be in use.
+	TargetPercentage int `json:"targetPercentage"`
 }
 
-// HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.
+// specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpec struct {
-	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
-	// and will set the desired number of pods by modyfying its spec.
-	ScaleRef *SubresourceReference `json:"scaleRef"`
-	// MinReplicas is the lower limit for the number of pods that can be set by the autoscaler.
-	MinReplicas int `json:"minReplicas"`
-	// MaxReplicas is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
+	// reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status,
+	// and will set the desired number of pods by modifying its spec.
+	ScaleRef SubresourceReference `json:"scaleRef"`
+	// lower limit for the number of pods that can be set by the autoscaler, default 1.
+	MinReplicas *int `json:"minReplicas,omitempty"`
+	// upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
 	MaxReplicas int `json:"maxReplicas"`
-	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
-	// Currently two types of resources are supported: "cpu" and "memory".
-	Target ResourceConsumption `json:"target"`
+	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
+	// if not specified it defaults to the target CPU utilization at 80% of the requested resources.
+	CPUUtilization *CPUTargetUtilization `json:"cpuUtilization,omitempty"`
 }
 
-// HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
+// current status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatus struct {
-	// TODO: Consider if it is needed.
-	// CurrentReplicas is the number of replicas of pods managed by this autoscaler.
+	// most recent generation observed by this autoscaler.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+
+	// last time the HorizontalPodAutoscaler scaled the number of pods;
+	// used by the autoscaler to control how often the number of pods is changed.
+	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
+
+	// current number of replicas of pods managed by this autoscaler.
 	CurrentReplicas int `json:"currentReplicas"`
 
-	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.
+	// desired number of replicas of pods managed by this autoscaler.
 	DesiredReplicas int `json:"desiredReplicas"`
 
-	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
-	// try to maintain by adjusting the desired number of pods.
-	// Two types of resources are supported: "cpu" and "memory".
-	CurrentConsumption *ResourceConsumption `json:"currentConsumption"`
-
-	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
-	// This is used by the autoscaler to controll how often the number of pods is changed.
-	LastScaleTimestamp *unversioned.Time `json:"lastScaleTimestamp,omitempty"`
+	// current average CPU utilization over all pods, represented as a percentage of requested CPU,
+	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
+	CurrentCPUUtilizationPercentage *int `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
-// HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
+// configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`
 
-	// Spec defines the behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
 
-	// Status represents the current information about the autoscaler.
+	// current information about the autoscaler.
 	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
 }
 
-// HorizontalPodAutoscaler is a collection of pod autoscalers.
+// list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of horizontal pod autoscalers.
+	// list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items"`
 }
 
