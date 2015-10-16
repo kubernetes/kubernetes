@@ -1882,14 +1882,16 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			return err
 		}
 
-		// Setup the host interface (FIXME: move to networkPlugin when ready)
+		// Setup the host interface unless the pod is on the host's network (FIXME: move to networkPlugin when ready)
 		podInfraContainer, err := dm.client.InspectContainer(string(podInfraContainerID))
 		if err != nil {
 			glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
 		}
-		if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
-			glog.Warningf("Hairpin setup failed for pod %q: %v", podFullName, err)
+		if !(pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork) {
+			if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, "eth0"); err != nil {
+				glog.Warningf("Hairpin setup failed for pod %q: %v", podFullName, err)
+			}
 		}
 		if podDependsOnPodIP(pod) {
 			// Find the pod IP after starting the infra container in order to expose
