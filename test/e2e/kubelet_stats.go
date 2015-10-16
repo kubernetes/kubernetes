@@ -29,7 +29,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	cadvisor "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -149,7 +149,7 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 
 // getContainerInfo contacts kubelet for the container informaton. The "Stats"
 // in the returned ContainerInfo is subject to the requirements in statsRequest.
-func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisor.ContainerInfo, error) {
+func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsReque
 		Body(reqBody).
 		Do().Raw()
 
-	var containers map[string]cadvisor.ContainerInfo
+	var containers map[string]cadvisorapi.ContainerInfo
 	err = json.Unmarshal(data, &containers)
 	if err != nil {
 		return nil, err
@@ -332,7 +332,7 @@ func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
 	return result, nil
 }
 
-func computeContainerResourceUsage(name string, oldStats, newStats *cadvisor.ContainerStats) *containerResourceUsage {
+func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapi.ContainerStats) *containerResourceUsage {
 	return &containerResourceUsage{
 		Name:                    name,
 		Timestamp:               newStats.Timestamp,
@@ -371,7 +371,7 @@ func newResourceCollector(c *client.Client, nodeName string, containerNames []st
 func (r *resourceCollector) Start() {
 	r.stopCh = make(chan struct{}, 1)
 	// Keep the last observed stats for comparison.
-	oldStats := make(map[string]*cadvisor.ContainerStats)
+	oldStats := make(map[string]*cadvisorapi.ContainerStats)
 	go util.Until(func() { r.collectStats(oldStats) }, r.pollingInterval, r.stopCh)
 }
 
@@ -382,7 +382,7 @@ func (r *resourceCollector) Stop() {
 
 // collectStats gets the latest stats from kubelet's /stats/container, computes
 // the resource usage, and pushes it to the buffer.
-func (r *resourceCollector) collectStats(oldStats map[string]*cadvisor.ContainerStats) {
+func (r *resourceCollector) collectStats(oldStats map[string]*cadvisorapi.ContainerStats) {
 	infos, err := getContainerInfo(r.client, r.node, &kubelet.StatsRequest{
 		ContainerName: "/",
 		NumStats:      1,
