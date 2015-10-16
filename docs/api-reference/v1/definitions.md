@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/api-reference/definitions.md).
+[here](http://releases.k8s.io/release-1.0/docs/api-reference/v1/definitions.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -34,6 +34,8 @@ Documentation for other releases can be found at
 {% include definitions.html %}
 
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api-reference/definitions.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api-reference/v1/definitions.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
