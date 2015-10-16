@@ -66,7 +66,7 @@ func GetExistingContainerStatus(statuses []ContainerStatus, name string) Contain
 	return ContainerStatus{}
 }
 
-// IsPodReady retruns true if a pod is ready; false otherwise.
+// IsPodReady returns true if a pod is ready; false otherwise.
 func IsPodReady(pod *Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
 }
