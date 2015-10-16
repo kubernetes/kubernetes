@@ -260,10 +260,10 @@ function set_binary_version() {
 # use local dev binaries.
 #
 # Assumed vars:
+#   KUBE_VERSION
 #   KUBE_VERSION_REGEX
 #   KUBE_CI_VERSION_REGEX
 # Vars set:
-#   KUBE_TAR_URL
 #   KUBE_TAR_HASH
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
@@ -274,36 +274,27 @@ function tars_from_version() {
     find-release-tars
     upload-server-tars
   elif [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
-    KUBE_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes.tar.gz"
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-    KUBE_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes.tar.gz"
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
   else
     echo "Version doesn't match regexp" >&2
     exit 1
   fi
-  until KUBE_TAR_HASH=$(curl --fail --silent "${KUBE_TAR_URL}.sha1"); do
+  if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha1"); then
     echo "Failure trying to curl release .sha1"
-  done
-  until SERVER_BINARY_TAR_HASH=$(curl --fail --silent "${SERVER_BINARY_TAR_URL}.sha1"); do
-    echo "Failure trying to curl release .sha1"
-  done
-  until SALT_TAR_HASH=$(curl --fail --silent "${SALT_TAR_URL}.sha1"); do
-    echo "Failure trying to curl Salt tar .sha1"
-  done
-
-  if ! curl -Ss --range 0-1 "${KUBE_TAR_URL}" >&/dev/null; then
-    echo "Can't find release at ${KUBE_TAR_URL}" >&2
-    exit 1
   fi
-  if ! curl -Ss --range 0-1 "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
+  if ! SALT_TAR_HASH=$(curl -Ss --fail "${SALT_TAR_URL}.sha1"); then
+    echo "Failure trying to curl Salt tar .sha1"
+  fi
+
+  if ! curl -Ss --head "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
     echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
     exit 1
   fi
-  if ! curl -Ss --range 0-1 "${SALT_TAR_URL}" >&/dev/null; then
+  if ! curl -Ss --head "${SALT_TAR_URL}" >&/dev/null; then
     echo "Can't find Salt tar at ${SALT_TAR_URL}" >&2
     exit 1
   fi
