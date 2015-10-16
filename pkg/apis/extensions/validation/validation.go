@@ -63,7 +63,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAuto
 		allErrs = append(allErrs, errs.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
 	if autoscaler.CPUUtilization != nil && autoscaler.CPUUtilization.TargetPercentage < 1 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, isNegativeErrorMsg))
+		allErrs = append(allErrs, errs.NewFieldInvalid("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, `must be bigger or equal to 1`))
 	}
 	return allErrs
 }
