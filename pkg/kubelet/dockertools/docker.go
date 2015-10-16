@@ -130,7 +130,7 @@ func filterHTTPError(err error, image string) error {
 		jerr.Code == http.StatusServiceUnavailable ||
 		jerr.Code == http.StatusGatewayTimeout) {
 		glog.V(2).Infof("Pulling image %q failed: %v", image, err)
-		return fmt.Errorf("image pull failed for %s because the registry is temporarily unavailable.", image)
+		return kubecontainer.RegistryUnavailable
 	} else {
 		return err
 	}

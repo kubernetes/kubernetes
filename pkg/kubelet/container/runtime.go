@@ -45,6 +45,9 @@ var (
 
 	// Required Image is absent on host and PullPolicy is NeverPullImage
 	ErrImageNeverPull = errors.New("ErrImageNeverPull")
+
+	// Get http error when pulling image from registry
+	RegistryUnavailable = errors.New("RegistryUnavailable")
 )
 
 var ErrRunContainer = errors.New("RunContainerError")
