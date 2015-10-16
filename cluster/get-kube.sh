@@ -28,8 +28,6 @@
 #   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | bash
 #  Amazon EC2
 #   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
-#  Microsoft Azure
-#   * export KUBERNETES_PROVIDER=azure; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
