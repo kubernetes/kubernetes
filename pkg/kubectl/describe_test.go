@@ -694,3 +694,20 @@ func TestDescribeEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeSCC(t *testing.T) {
+	scc := &api.SecurityContextConstraints{
+		ObjectMeta: api.ObjectMeta{
+			Name: "bar",
+		},
+	}
+	fake := testclient.NewSimpleFake(scc)
+	d := SecurityContextConstraintsDescriber{fake}
+	out, err := d.Describe(scc.Namespace, scc.Name, DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "bar") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
