@@ -19,7 +19,7 @@ package kubelet
 import (
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/events"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -48,8 +48,8 @@ const systemOOMEvent = "SystemOOM"
 // Watches cadvisor for system oom's and records an event for every system oom encountered.
 func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 	request := events.Request{
-		EventType: map[cadvisorApi.EventType]bool{
-			cadvisorApi.EventOom: true,
+		EventType: map[cadvisorapi.EventType]bool{
+			cadvisorapi.EventOom: true,
 		},
 		ContainerName:        "/",
 		IncludeSubcontainers: false,

@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -32,7 +32,7 @@ import (
 
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
-	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &kubecontainer.FakeRuntime{}
