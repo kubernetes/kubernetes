@@ -42,6 +42,12 @@ opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 EOF
 
+if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_experimental_api: '$(echo "$ENABLE_EXPERIMENTAL_API" | sed -e "s/'/''/g")'
+EOF
+fi
+
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 if [ ! -e "${BASIC_AUTH_FILE}" ]; then
   mkdir -p /srv/salt-overlay/salt/kube-apiserver
