@@ -79,6 +79,6 @@ func (c *FakeReplicationControllers) Delete(name string) error {
 	return err
 }
 
-func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, label, field, resourceVersion))
+func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, label, field, opts))
 }

@@ -70,8 +70,8 @@ func (c *FakeNamespaces) Delete(name string) error {
 	return err
 }
 
-func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", label, field, resourceVersion))
+func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", label, field, opts))
 }
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {

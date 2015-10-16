@@ -72,8 +72,8 @@ func (c *FakeIngress) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeIngress) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("ingress", c.Namespace, label, field, resourceVersion))
+func (c *FakeIngress) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("ingress", c.Namespace, label, field, opts))
 }
 
 func (c *FakeIngress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {

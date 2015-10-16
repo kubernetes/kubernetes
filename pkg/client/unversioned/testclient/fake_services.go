@@ -72,8 +72,8 @@ func (c *FakeServices) Delete(name string) error {
 	return err
 }
 
-func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, label, field, resourceVersion))
+func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, label, field, opts))
 }
 
 func (c *FakeServices) ProxyGet(name, path string, params map[string]string) unversioned.ResponseWrapper {

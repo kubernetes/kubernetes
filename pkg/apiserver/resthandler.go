@@ -19,6 +19,7 @@ package apiserver
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/url"
 	gpath "path"
@@ -271,7 +272,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				errorJSON(err, scope.Codec, w)
 				return
 			}
-			serveWatch(watcher, scope, w, req, minRequestTimeout)
+			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
+			timeout := time.Duration(0)
+			if opts.TimeoutSeconds != nil {
+				timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+			}
+			if timeout == 0 && minRequestTimeout > 0 {
+				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+			}
+			serveWatch(watcher, scope, w, req, timeout)
 			return
 		}
 

@@ -36,7 +36,7 @@ type IngressInterface interface {
 	Create(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Update(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 	UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error)
 }
 
@@ -93,12 +93,13 @@ func (c *ingress) Delete(name string, options *api.DeleteOptions) (err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested ingress.
-func (c *ingress) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *ingress) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("ingress").
-		Param("resourceVersion", resourceVersion).
+		Param("resourceVersion", opts.ResourceVersion).
+		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()
