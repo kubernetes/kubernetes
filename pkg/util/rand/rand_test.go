@@ -22,6 +22,22 @@ import (
 	"testing"
 )
 
+func TestIntsn(t *testing.T) {
+	min := int(1)
+	total := int(10000)
+	max := int(30)
+
+	for _, r := range Intsn(min, total, max) {
+		if r < min || r > max {
+			t.Errorf("%v is not in range %v %v", r, min, max)
+		}
+	}
+
+	if l := len(Intsn(min, total, max)); l != total {
+		t.Errorf("Invalid return length : %v ", l, total)
+	}
+}
+
 func TestString(t *testing.T) {
 	valid := "0123456789abcdefghijklmnopqrstuvwxyz"
 	for _, l := range []int{0, 1, 2, 10, 123} {
