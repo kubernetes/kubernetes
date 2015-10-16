@@ -118,7 +118,7 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) errs.Validat
 // ValidateDaemonSet tests if required fields in the DaemonSet are set.
 func ValidateDaemonSet(controller *extensions.DaemonSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, ValidateDaemonSetName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
 	return allErrs
 }
