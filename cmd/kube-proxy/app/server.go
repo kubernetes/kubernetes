@@ -49,6 +49,7 @@ type ProxyServer struct {
 	Master             string
 	Kubeconfig         string
 	PortRange          util.PortRange
+	UDPIdleTimeout     time.Duration
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -59,6 +60,7 @@ func NewProxyServer() *ProxyServer {
 		HealthzBindAddress: util.IP(net.ParseIP("127.0.0.1")),
 		OOMScoreAdj:        -899,
 		ResourceContainer:  "/kube-proxy",
+		UDPIdleTimeout:     10 * time.Second,
 	}
 }
 
@@ -72,6 +74,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
+	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0.")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -96,7 +99,7 @@ func (s *ProxyServer) Run(_ []string) error {
 		protocol = iptables.ProtocolIpv6
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier, err := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.PortRange)
+	proxier, err := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.PortRange, s.UDPIdleTimeout)
 	if err != nil {
 		glog.Fatalf("Unable to create proxer: %v", err)
 	}
