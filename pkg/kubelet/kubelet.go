@@ -2513,7 +2513,11 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 					failed++
 				}
 			} else if containerStatus.State.Waiting != nil {
-				waiting++
+				if containerStatus.LastTerminationState.Terminated != nil {
+					stopped++
+				} else {
+					waiting++
+				}
 			} else {
 				unknown++
 			}
