@@ -100,8 +100,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.authenticator, config.Authenticator)
 	assert.Equal(master.authorizer, config.Authorizer)
 	assert.Equal(master.admissionControl, config.AdmissionControl)
-	assert.Equal(master.v1, !config.DisableV1)
-	assert.Equal(master.exp, config.EnableExp)
+	assert.Equal(master.apiGroupVersionOverrides, config.APIGroupVersionOverrides)
 	assert.Equal(master.requestContextMapper, config.RequestContextMapper)
 	assert.Equal(master.cacheTimeout, config.CacheTimeout)
 	assert.Equal(master.masterCount, config.MasterCount)
@@ -366,7 +365,6 @@ func TestGetNodeAddresses(t *testing.T) {
 
 func TestDiscoveryAtAPIS(t *testing.T) {
 	master, config, assert := setUp(t)
-	master.exp = true
 	// ================= preparation for master.init() ======================
 	portRange := util.PortRange{Base: 10, Size: 10}
 	master.serviceNodePortRange = portRange

@@ -58,7 +58,6 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --public-address-override="127.0.0.1" \
   --advertise-address="10.10.10.10" \
   --kubelet-port=${KUBELET_PORT} \
-  --runtime-config=api/v1 \
   --service-cluster-ip-range="10.0.0.0/24" >/dev/null 2>&1 &
 APISERVER_PID=$!
 
@@ -70,6 +69,7 @@ curl -fs ${SWAGGER_API_PATH} > ${SWAGGER_ROOT_DIR}/resourceListing.json
 curl -fs ${SWAGGER_API_PATH}version > ${SWAGGER_ROOT_DIR}/version.json
 curl -fs ${SWAGGER_API_PATH}api > ${SWAGGER_ROOT_DIR}/api.json
 curl -fs ${SWAGGER_API_PATH}api/v1 > ${SWAGGER_ROOT_DIR}/v1.json
+curl -fs ${SWAGGER_API_PATH}apis/extensions/v1beta1 > ${SWAGGER_ROOT_DIR}/v1beta1.json
 
 kube::log::status "SUCCESS"
 
