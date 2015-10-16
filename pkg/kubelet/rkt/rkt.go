@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -799,13 +800,20 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 		r.containerRefManager.ClearRef(c.ID)
 	}
 
+	// Touch the systemd service file to update the mod time so it will
+	// not be garbage collected too soon.
+	if err := os.Chtimes(serviceFilePath(serviceName), time.Now(), time.Now()); err != nil {
+		glog.Errorf("rkt: Failed to change the modification time of the service file %q: %v", serviceName, err)
+		return err
+	}
+
 	// Since all service file have 'KillMode=mixed', the processes in
 	// the unit's cgroup will receive a SIGKILL if the normal stop timeouts.
 	if _, err := r.systemd.StopUnit(serviceName, "replace"); err != nil {
+		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
 	}
-	// Remove the systemd service file as well.
-	return os.Remove(serviceFilePath(serviceName))
+	return nil
 }
 
 // getPodStatus reads the service file and invokes 'rkt status $UUID' to get the
@@ -1079,11 +1087,38 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 // just GC kubernetes pods.
 func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
 	if err := exec.Command("systemctl", "reset-failed").Run(); err != nil {
-		glog.Errorf("rkt: Failed to reset failed systemd services: %v", err)
+		glog.Errorf("rkt: Failed to reset failed systemd services: %v, continue to gc anyway...", err)
 	}
+
 	if _, err := r.runCommand("gc", "--grace-period="+gcPolicy.MinAge.String(), "--expire-prepared="+gcPolicy.MinAge.String()); err != nil {
 		glog.Errorf("rkt: Failed to gc: %v", err)
+	}
+
+	// GC all inactive systemd service files.
+	units, err := r.systemd.ListUnits()
+	if err != nil {
+		glog.Errorf("rkt: Failed to list units: %v", err)
 		return err
+	}
+	runningKubernetesUnits := sets.NewString()
+	for _, u := range units {
+		if strings.HasPrefix(u.Name, kubernetesUnitPrefix) && u.SubState == "running" {
+			runningKubernetesUnits.Insert(u.Name)
+		}
+	}
+
+	files, err := ioutil.ReadDir(systemdServiceDir)
+	if err != nil {
+		glog.Errorf("rkt: Failed to read the systemd service directory: %v", err)
+		return err
+	}
+	for _, f := range files {
+		if runningKubernetesUnits.Has(f.Name()) && f.ModTime().Before(time.Now().Add(-gcPolicy.MinAge)) {
+			glog.V(4).Infof("rkt: Removing inactive systemd service file: %v", f.Name())
+			if err := os.Remove(serviceFilePath(f.Name())); err != nil {
+				glog.Warningf("rkt: Failed to remove inactive systemd service file %v: %v", f.Name(), err)
+			}
+		}
 	}
 	return nil
 }
