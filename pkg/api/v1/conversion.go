@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -45,6 +46,9 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		Convert_v1_ServiceSpec_To_api_ServiceSpec,
 		Convert_v1_ResourceList_To_api_ResourceList,
+
+		Convert_api_VolumeSource_To_v1_VolumeSource,
+		Convert_v1_VolumeSource_To_api_VolumeSource,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -656,6 +660,59 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 		val.RoundUp(milliScale)
 
 		(*out)[api.ResourceName(key)] = val
+	}
+	return nil
+}
+
+// This will Convert our internal represantation of VolumeSource to its v1 representation
+// Used for keeping backwards compatibility for the Metadata field
+func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
+	if err := autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s); err != nil {
+		return err
+	}
+
+	// Metadata is a copy of DownwardAPI
+	if out.DownwardAPI != nil {
+		out.Metadata = &DeprecatedDownwardAPIVolumeSource{}
+		for _, item := range out.DownwardAPI.Items {
+			out.Metadata.Items = append(out.Metadata.Items, DeprecatedDownwardAPIVolumeFile{
+				Path:             item.Path,
+				FieldRef:         item.FieldRef,
+				ResourceFieldRef: item.ResourceFieldRef,
+			})
+		}
+	}
+
+	return nil
+}
+
+// This will Convert the v1 representation of VolumeSource to our internal representation
+// Used for keeping backwards compatibility for the Metadata field
+func Convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
+	if err := autoConvert_v1_VolumeSource_To_api_VolumeSource(in, out, s); err != nil {
+		return err
+	}
+
+	// Metadata overrides DownwardAPI
+	if in.Metadata != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: got metadata on volume source: %#v\n", in.Metadata)
+		out.DownwardAPI = &api.DownwardAPIVolumeSource{}
+		for _, item := range in.Metadata.Items {
+			file := api.DownwardAPIVolumeFile{Path: item.Path}
+			if item.FieldRef != nil {
+				file.FieldRef = new(api.ObjectFieldSelector)
+				if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(item.FieldRef, file.FieldRef, s); err != nil {
+					return err
+				}
+			}
+			if item.ResourceFieldRef != nil {
+				file.ResourceFieldRef = new(api.ResourceFieldSelector)
+				if err := Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(item.ResourceFieldRef, file.ResourceFieldRef, s); err != nil {
+					return err
+				}
+			}
+			out.DownwardAPI.Items = append(out.DownwardAPI.Items, file)
+		}
 	}
 	return nil
 }
