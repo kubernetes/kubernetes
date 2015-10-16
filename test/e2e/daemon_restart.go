@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -191,7 +191,7 @@ var _ = Describe("DaemonRestart", func() {
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config RCConfig
-	var controller *controllerFramework.Controller
+	var controller *controllerframework.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
@@ -222,7 +222,7 @@ var _ = Describe("DaemonRestart", func() {
 
 		stopCh = make(chan struct{})
 		tracker = newPodTracker()
-		newPods, controller = controllerFramework.NewInformer(
+		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func() (runtime.Object, error) {
 					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
@@ -233,7 +233,7 @@ var _ = Describe("DaemonRestart", func() {
 			},
 			&api.Pod{},
 			0,
-			controllerFramework.ResourceEventHandlerFuncs{
+			controllerframework.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					tracker.remember(obj.(*api.Pod), ADD)
 				},
