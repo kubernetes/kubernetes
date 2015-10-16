@@ -49,6 +49,7 @@ function upload_logs_to_gcs() {
       return
   fi
   local -r artifacts_path="${WORKSPACE}/_artifacts"
+  local -r filtered_console_log="${WORKSPACE}/console-log.txt"
   local -r gcs_job_path="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}"
   local -r gcs_build_path="${gcs_job_path}/${BUILD_NUMBER}"
   local -r gcs_acl="public-read"
@@ -59,7 +60,6 @@ function upload_logs_to_gcs() {
         -z log,txt,xml "${artifacts_path}" "${gcs_build_path}/artifacts" || continue
     fi
     # Remove ANSI escape sequences from the console log before uploading.
-    local -r filtered_console_log="${WORKSPACE}/console-log.txt"
     sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" \
       "${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log" \
       > "${filtered_console_log}"
@@ -72,6 +72,7 @@ function upload_logs_to_gcs() {
       cp -a "${gcs_acl}" - "${gcs_job_path}/latest-build.txt" || continue
     break  # all uploads succeeded if we hit this point
   done
+  rm -f "${filtered_console_log}"
 }
 
 # Automatically upload logs to GCS on exit or timeout.
