@@ -29,7 +29,7 @@ import (
 	"text/template"
 
 	docker "github.com/fsouza/go-dockerclient"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -151,7 +151,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		fakeRecorder,
 		prober.FakeProber{},
 		containerRefManager,
-		&cadvisorApi.MachineInfo{},
+		&cadvisorapi.MachineInfo{},
 		dockertools.PodInfraContainerImage,
 		0, 0, "",
 		kubecontainer.FakeOS{},
