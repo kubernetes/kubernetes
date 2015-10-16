@@ -39,3 +39,5 @@ type SecretExpansion interface{}
 type ServiceAccountExpansion interface{}
 
 type ConfigMapExpansion interface{}
+
+type SecurityContextConstraintsExpansion interface{}
