@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import json
-from mock import MagicMock, patch, call
+from mock import MagicMock, patch
 from path import Path
 import pytest
 import sys
@@ -24,6 +24,7 @@ d = Path('__file__').parent.abspath() / 'hooks'
 sys.path.insert(0, d.abspath())
 
 from lib.registrator import Registrator
+
 
 class TestRegistrator():
 
@@ -37,25 +38,23 @@ class TestRegistrator():
     @patch('json.loads')
     @patch('httplib.HTTPConnection')
     def test_register(self, httplibmock, jsonmock):
-        result = self.r.register('foo', 80, '/v1/test')
+        self.r.register('foo', 80, '/v1/test')
 
-        httplibmock.assert_called_with('foo', 80)
+        httplibmock.assert_called_with('foo', 80, timeout=12)
         requestmock = httplibmock().request
         requestmock.assert_called_with(
-                "POST", "/v1/test",
-                json.dumps(self.r.data),
-                {"Content-type": "application/json",
-                 "Accept": "application/json"})
-
+            "POST", "/v1/test",
+            json.dumps(self.r.data),
+            {"Content-type": "application/json",
+                "Accept": "application/json"})
 
     def test_command_succeeded(self):
         response = MagicMock()
-        result = json.loads('{"status": "Failure", "kind": "Status", "code": 409, "apiVersion": "v1", "reason": "AlreadyExists", "details": {"kind": "node", "name": "10.200.147.200"}, "message": "node \\"10.200.147.200\\" already exists", "creationTimestamp": null}')
+        result = json.loads('{"status": "Failure", "kind": "Status", "code": 409, "apiVersion": "v1", "reason": "AlreadyExists", "details": {"kind": "node", "name": "10.200.147.200"}, "message": "node \\"10.200.147.200\\" already exists", "creationTimestamp": null}')  # noqa
         response.status = 200
+        self.r.command_succeeded(response, result)
+        response.status = 409
         self.r.command_succeeded(response, result)
         response.status = 500
         with pytest.raises(RuntimeError):
-            self.r.command_succeeded(response, result)
-        response.status = 409
-        with pytest.raises(ValueError):
             self.r.command_succeeded(response, result)
