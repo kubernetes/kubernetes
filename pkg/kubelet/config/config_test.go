@@ -267,6 +267,31 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 		CreatePodUpdate(kubelet.UPDATE, TestSource, pod))
 }
 
+func TestInitialEmptySet(t *testing.T) {
+	for _, test := range []struct {
+		mode PodConfigNotificationMode
+		op   kubelet.PodOperation
+	}{
+		{PodConfigNotificationIncremental, kubelet.ADD},
+		{PodConfigNotificationSnapshot, kubelet.SET},
+		{PodConfigNotificationSnapshotAndUpdates, kubelet.SET},
+	} {
+		channel, ch, _ := createPodConfigTester(test.mode)
+
+		// should register an empty PodUpdate operation
+		podUpdate := CreatePodUpdate(kubelet.SET, TestSource)
+		channel <- podUpdate
+		expectPodUpdate(t, ch, CreatePodUpdate(test.op, TestSource))
+
+		// should ignore following empty sets
+		podUpdate = CreatePodUpdate(kubelet.SET, TestSource)
+		channel <- podUpdate
+		podUpdate = CreatePodUpdate(kubelet.ADD, TestSource, CreateValidPod("foo", "new"))
+		channel <- podUpdate
+		expectPodUpdate(t, ch, CreatePodUpdate(test.op, TestSource, CreateValidPod("foo", "new")))
+	}
+}
+
 func TestPodUpdateAnnotations(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
