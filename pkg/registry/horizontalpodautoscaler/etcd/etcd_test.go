@@ -31,9 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 )
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "extensions")
-	return NewREST(etcdStorage), fakeClient
+	storage, statusStorage := NewREST(etcdStorage)
+	return storage, statusStorage, fakeClient
 }
 
 func validNewHorizontalPodAutoscaler(name string) *extensions.HorizontalPodAutoscaler {
@@ -54,7 +55,7 @@ func validNewHorizontalPodAutoscaler(name string) *extensions.HorizontalPodAutos
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	autoscaler := validNewHorizontalPodAutoscaler("foo")
 	autoscaler.ObjectMeta = api.ObjectMeta{}
@@ -67,7 +68,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
@@ -82,25 +83,25 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestDelete(validNewHorizontalPodAutoscaler("foo"))
 }
 
 func TestGet(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewHorizontalPodAutoscaler("foo"))
 }
 
 func TestList(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestList(validNewHorizontalPodAutoscaler("foo"))
 }
 
 func TestWatch(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validNewHorizontalPodAutoscaler("foo"),
@@ -119,3 +120,5 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+// TODO TestUpdateStatus
