@@ -37,7 +37,7 @@ type HorizontalPodAutoscalerInterface interface {
 	Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
@@ -103,12 +103,13 @@ func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensi
 }
 
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *horizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("horizontalPodAutoscalers").
-		Param("resourceVersion", resourceVersion).
+		Param("resourceVersion", opts.ResourceVersion).
+		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

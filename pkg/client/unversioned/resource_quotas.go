@@ -36,7 +36,7 @@ type ResourceQuotaInterface interface {
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // resourceQuotas implements ResourceQuotasNamespacer interface
@@ -94,12 +94,12 @@ func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result 
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *resourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *resourceQuotas) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("resourceQuotas").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

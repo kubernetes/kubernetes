@@ -19,6 +19,7 @@ package testclient
 import (
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -149,21 +150,21 @@ func NewDeleteAction(resource, namespace, name string) DeleteActionImpl {
 	return action
 }
 
-func NewRootWatchAction(resource string, label labels.Selector, field fields.Selector, resourceVersion string) WatchActionImpl {
+func NewRootWatchAction(resource string, label labels.Selector, field fields.Selector, opts api.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
-	action.WatchRestrictions = WatchRestrictions{label, field, resourceVersion}
+	action.WatchRestrictions = WatchRestrictions{label, field, opts.ResourceVersion}
 
 	return action
 }
 
-func NewWatchAction(resource, namespace string, label labels.Selector, field fields.Selector, resourceVersion string) WatchActionImpl {
+func NewWatchAction(resource, namespace string, label labels.Selector, field fields.Selector, opts api.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
-	action.WatchRestrictions = WatchRestrictions{label, field, resourceVersion}
+	action.WatchRestrictions = WatchRestrictions{label, field, opts.ResourceVersion}
 
 	return action
 }

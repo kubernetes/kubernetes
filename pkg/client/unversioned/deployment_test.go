@@ -147,6 +147,6 @@ func TestDeploymentWatch(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
 	c.Validate(t, nil, err)
 }

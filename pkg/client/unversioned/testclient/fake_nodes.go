@@ -70,8 +70,8 @@ func (c *FakeNodes) Delete(name string) error {
 	return err
 }
 
-func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", label, field, resourceVersion))
+func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", label, field, opts))
 }
 
 func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {

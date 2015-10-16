@@ -459,6 +459,18 @@ func (r *Request) Timeout(d time.Duration) *Request {
 	return r
 }
 
+// Timeout makes the request use the given duration as a timeout. Sets the "timeoutSeconds"
+// parameter.
+func (r *Request) TimeoutSeconds(d time.Duration) *Request {
+	if r.err != nil {
+		return r
+	}
+	if d != 0 {
+		r.Param("timeoutSeconds", d.String())
+	}
+	return r
+}
+
 // Body makes the request use obj as the body. Optional.
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.

@@ -203,7 +203,8 @@ var _ = Describe("Density", func() {
 						return c.Events(ns).List(labels.Everything(), fields.Everything())
 					},
 					WatchFunc: func(rv string) (watch.Interface, error) {
-						return c.Events(ns).Watch(labels.Everything(), fields.Everything(), rv)
+						options := api.ListOptions{ResourceVersion: rv}
+						return c.Events(ns).Watch(labels.Everything(), fields.Everything(), options)
 					},
 				},
 				&api.Event{},
@@ -286,7 +287,8 @@ var _ = Describe("Density", func() {
 							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
 						},
 						WatchFunc: func(rv string) (watch.Interface, error) {
-							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), rv)
+							options := api.ListOptions{ResourceVersion: rv}
+							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), options)
 						},
 					},
 					&api.Pod{},

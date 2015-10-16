@@ -103,7 +103,8 @@ func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Inte
 			return client.LimitRanges(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
+			options := api.ListOptions{ResourceVersion: resourceVersion}
+			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)

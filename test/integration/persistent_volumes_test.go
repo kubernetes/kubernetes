@@ -74,7 +74,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 		},
 	}
 
-	w, _ := testClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "0")
+	w, _ := testClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
 	defer w.Stop()
 
 	_, _ = testClient.PersistentVolumes().Create(pv)
@@ -100,7 +100,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	// change the reclamation policy of the PV for the next test
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimDelete
 
-	w, _ = testClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "0")
+	w, _ = testClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
 	defer w.Stop()
 
 	_, _ = testClient.PersistentVolumes().Create(pv)

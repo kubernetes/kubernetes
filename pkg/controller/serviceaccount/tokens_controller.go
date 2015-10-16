@@ -66,7 +66,8 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 				return e.client.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return e.client.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return e.client.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -86,7 +87,8 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 				return e.client.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector)
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return e.client.Secrets(api.NamespaceAll).Watch(labels.Everything(), tokenSelector, rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return e.client.Secrets(api.NamespaceAll).Watch(labels.Everything(), tokenSelector, options)
 			},
 		},
 		&api.Secret{},

@@ -102,6 +102,7 @@ func addTestTypes() {
 		FieldSelector        string `json:"fields,omitempty"`
 		Watch                bool   `json:"watch,omitempty"`
 		ResourceVersion      string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(
 		testVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
@@ -117,6 +118,7 @@ func addNewTestTypes() {
 		FieldSelector        string `json:"fieldSelector,omitempty"`
 		Watch                bool   `json:"watch,omitempty"`
 		ResourceVersion      string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(
 		newVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},

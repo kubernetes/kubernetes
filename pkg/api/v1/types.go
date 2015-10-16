@@ -2047,6 +2047,8 @@ type ListOptions struct {
 	// When specified with a watch call, shows changes that occur after that particular version of a resource.
 	// Defaults to changes from the beginning of history.
 	ResourceVersion string `json:"resourceVersion,omitempty"`
+	// Timeout for the list/watch call.
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
 }
 
 // PodLogOptions is the query options for a Pod's logs REST call.

@@ -145,7 +145,8 @@ func newPodStore(c *client.Client, namespace string, label labels.Selector, fiel
 			return c.Pods(namespace).List(label, field)
 		},
 		WatchFunc: func(rv string) (watch.Interface, error) {
-			return c.Pods(namespace).Watch(label, field, rv)
+			options := api.ListOptions{ResourceVersion: rv}
+			return c.Pods(namespace).Watch(label, field, options)
 		},
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
