@@ -44,8 +44,8 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.6.1-30-gc928a0c",
-			"Rev": "c928a0c907c96034dfc0a69098b2179db5ae7e37"
+			"Comment": "v0.7.1",
+			"Rev": "818ac4d0073424f4e0a46f45abaa147ccc1b5a24"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
