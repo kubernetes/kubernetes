@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ "$#" -lt 1 ]; then
-    echo "Usage: run-gen-swagger-docs.sh <API version> <absolute output path, default to PWD>"
-    exit 
-fi
-OUTPUT=${2:-${PWD}}
+set -o errexit
+set -o nounset
+set -o pipefail
 
-docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1.1 https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/$1.json https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/$1/register.go
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+V1_PATH="$PWD/${KUBE_ROOT}/docs/api-reference/v1/"
+V1BETA1_PATH="$PWD/${KUBE_ROOT}/docs/api-reference/extensions/v1beta1"
+mkdir -p $V1_PATH
+mkdir -p $V1BETA1_PATH
+
+docker run -v $V1_PATH:/output gcr.io/google_containers/gen-swagger-docs:v2 \
+    v1 \
+    https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1.json \
+    https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
+
+docker run -v $V1BETA1_PATH:/output gcr.io/google_containers/gen-swagger-docs:v2 \
+    v1beta1 \
+    https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1beta1.json \
+    https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
