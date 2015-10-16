@@ -160,6 +160,7 @@ GCE_SLOW_TESTS=(
     "monotonically\sincreasing\srestart\scount"       # 1.5 to 5 min, file: pods.go,                 slow by design
     "Garbage\scollector\sshould"                      # 7 min,        file: garbage_collector.go,    slow by design
     "KubeProxy\sshould\stest\skube-proxy"             # 9 min 30 sec, file: kubeproxy.go,            issue: #14204
+    "cap\sback-off\sat\sMaxContainerBackOff"          # 20 mins       file: manager.go,              PR:    #12648
     )
 
 # Tests which are not able to be run in parallel.
