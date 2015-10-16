@@ -535,6 +535,16 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 	return map_FCVolumeSource
 }
 
+var map_FSGroupStrategyOptions = map[string]string{
+	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+	"type":   "Type is the strategy that will dictate what FSGroup is used in the SecurityContext.",
+	"ranges": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+}
+
+func (FSGroupStrategyOptions) SwaggerDoc() map[string]string {
+	return map_FSGroupStrategyOptions
+}
+
 var map_FlexVolumeSource = map[string]string{
 	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
 	"driver":    "Driver is the name of the driver to use for this volume.",
@@ -632,6 +642,16 @@ var map_HostPathVolumeSource = map[string]string{
 
 func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 	return map_HostPathVolumeSource
+}
+
+var map_IDRange = map[string]string{
+	"":    "IDRange provides a min/max of an allowed range of IDs.",
+	"min": "Min is the start of the range, inclusive.",
+	"max": "Max is the end of the range, inclusive.",
+}
+
+func (IDRange) SwaggerDoc() map[string]string {
+	return map_IDRange
 }
 
 var map_ISCSIVolumeSource = map[string]string{
@@ -1557,6 +1577,28 @@ func (ResourceRequirements) SwaggerDoc() map[string]string {
 	return map_ResourceRequirements
 }
 
+var map_RunAsUserStrategyOptions = map[string]string{
+	"":            "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"type":        "Type is the strategy that will dictate what RunAsUser is used in the SecurityContext.",
+	"uid":         "UID is the user id that containers must run as.  Required for the MustRunAs strategy if not using namespace/service account allocated uids.",
+	"uidRangeMin": "UIDRangeMin defines the min value for a strategy that allocates by range.",
+	"uidRangeMax": "UIDRangeMax defines the max value for a strategy that allocates by range.",
+}
+
+func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
+	return map_RunAsUserStrategyOptions
+}
+
+var map_SELinuxContextStrategyOptions = map[string]string{
+	"":               "SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"type":           "Type is the strategy that will dictate what SELinux context is used in the SecurityContext.",
+	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs",
+}
+
+func (SELinuxContextStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SELinuxContextStrategyOptions
+}
+
 var map_SELinuxOptions = map[string]string{
 	"":      "SELinuxOptions are the labels to be applied to the container",
 	"user":  "User is a SELinux user label that applies to the container.",
@@ -1623,6 +1665,41 @@ var map_SecurityContext = map[string]string{
 
 func (SecurityContext) SwaggerDoc() map[string]string {
 	return map_SecurityContext
+}
+
+var map_SecurityContextConstraints = map[string]string{
+	"":                         "SecurityContextConstraints governs the ability to make requests that affect the SecurityContext that will be applied to a container.",
+	"priority":                 "Priority influences the sort order of SCCs when evaluating which SCCs to try first for a given pod request based on access in the Users and Groups fields.  The higher the int, the higher priority.  If scores for multiple SCCs are equal they will be sorted by name.",
+	"allowPrivilegedContainer": "AllowPrivilegedContainer determines if a container can request to be run as privileged.",
+	"defaultAddCapabilities":   "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
+	"requiredDropCapabilities": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+	"allowedCapabilities":      "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field maybe added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+	"allowHostDirVolumePlugin": "AllowHostDirVolumePlugin determines if the policy allow containers to use the HostDir volume plugin",
+	"volumes":                  "Volumes is a white list of allowed volume plugins.  FSType corresponds directly with the field names of a VolumeSource (azureFile, configMap, emptyDir).  To allow all volumes you may use '*'.",
+	"allowHostNetwork":         "AllowHostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+	"allowHostPorts":           "AllowHostPorts determines if the policy allows host ports in the containers.",
+	"allowHostPID":             "AllowHostPID determines if the policy allows host pid in the containers.",
+	"allowHostIPC":             "AllowHostIPC determines if the policy allows host ipc in the containers.",
+	"seLinuxContext":           "SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.",
+	"runAsUser":                "RunAsUser is the strategy that will dictate what RunAsUser is used in the SecurityContext.",
+	"supplementalGroups":       "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
+	"fsGroup":                  "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
+	"readOnlyRootFilesystem":   "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the SCC should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+	"users":                    "The users who have permissions to use this security context constraints",
+	"groups":                   "The groups that have permission to use this security context constraints",
+	"seccompProfiles":          "SeccompProfiles lists the allowed profiles that may be set for the pod or container's seccomp annotations.  An unset (nil) or empty value means that no profiles may be specifid by the pod or container.\tThe wildcard '*' may be used to allow all profiles.  When used to generate a value for a pod the first non-wildcard profile will be used as the default.",
+}
+
+func (SecurityContextConstraints) SwaggerDoc() map[string]string {
+	return map_SecurityContextConstraints
+}
+
+var map_SecurityContextConstraintsList = map[string]string{
+	"": "SecurityContextConstraintsList is a list of SecurityContextConstraints objects",
+}
+
+func (SecurityContextConstraintsList) SwaggerDoc() map[string]string {
+	return map_SecurityContextConstraintsList
 }
 
 var map_SerializedReference = map[string]string{
@@ -1723,6 +1800,16 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_SupplementalGroupsStrategyOptions = map[string]string{
+	"":       "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+	"type":   "Type is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
+	"ranges": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+}
+
+func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SupplementalGroupsStrategyOptions
 }
 
 var map_TCPSocketAction = map[string]string{

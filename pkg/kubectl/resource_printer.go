@@ -495,6 +495,7 @@ var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS",
 var clusterColumns = []string{"NAME", "STATUS", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 var certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+var securityContextConstraintsColumns = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "PRIORITY", "READONLYROOTFS", "VOLUMES"}
 
 func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	reason := string(pod.Status.Phase)
@@ -598,6 +599,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequestList)
 	h.Handler(storageClassColumns, printStorageClass)
 	h.Handler(storageClassColumns, printStorageClassList)
+	h.Handler(securityContextConstraintsColumns, printSecurityContextConstraints)
+	h.Handler(securityContextConstraintsColumns, printSecurityContextConstraintsList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -2437,4 +2440,26 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (p *JSONPathPrinter) HandledResources() []string {
 	return []string{}
+}
+
+func printSecurityContextConstraints(item *api.SecurityContextConstraints, w io.Writer, options PrintOptions) error {
+	priority := "<none>"
+	if item.Priority != nil {
+		priority = fmt.Sprintf("%d", *item.Priority)
+	}
+
+	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%s\t%t\t%v\n", item.Name, item.AllowPrivilegedContainer,
+		item.AllowedCapabilities, item.SELinuxContext.Type,
+		item.RunAsUser.Type, item.FSGroup.Type, item.SupplementalGroups.Type, priority, item.ReadOnlyRootFilesystem, item.Volumes)
+	return err
+}
+
+func printSecurityContextConstraintsList(list *api.SecurityContextConstraintsList, w io.Writer, options PrintOptions) error {
+	for _, item := range list.Items {
+		if err := printSecurityContextConstraints(&item, w, options); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

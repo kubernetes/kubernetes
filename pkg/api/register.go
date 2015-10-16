@@ -124,6 +124,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+
+		&SecurityContextConstraints{},
+		&SecurityContextConstraintsList{},
 	)
 
 	// Register Unversioned types under their own special group
