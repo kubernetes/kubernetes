@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.5.1",
 	"Packages": [
 		"./..."
 	],
@@ -102,9 +102,143 @@
 			"Rev": "b965b613227fddccbfffe13eae360ed3fa822f8d"
 		},
 		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.0-119-g90fef38",
+			"Rev": "90fef389f98027ca55594edd7dbd6e7f3926fdad"
+		},
+		{
+			"ImportPath": "github.com/bradfitz/http2",
+			"Rev": "3e36af6d3af0e56fa3da71099f864933dea3d9fb"
+		},
+		{
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/client",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/discovery",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/error",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/crc",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/fileutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/httputil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/idutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/ioutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/netutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/pbutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/runtime",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/testutil",
+			"Comment": "v2.2.0-17-g45c86af",
+			"Rev": "45c86af0eb195f6f833cab6fb176a60fc8c47185"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/timeutil",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/transport",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/wait",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/raft",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/rafthttp",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/snap",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/storage",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/store",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/version",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/wal",
+			"Comment": "v2.2.1-1-g4dc835c",
+			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
@@ -133,7 +267,7 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",
-			"Rev": "6fe83ccda8fb9b7549c9ab4ba47f47858bc950aa"
+			"Rev": "d043ae190b3202550d026daf009359bb5d761672"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
@@ -142,6 +276,11 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
+			"Comment": "v2-27-g97e243d",
+			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-systemd/journal",
 			"Comment": "v2-27-g97e243d",
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
@@ -278,6 +417,10 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "7f07925444bb51fa4cf9dfe6f7661876f8852275"
+		},
+		{
+			"ImportPath": "github.com/google/btree",
+			"Rev": "cc6329d4279e3f025a53a83c397d2339b5705c45"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/api",
@@ -571,9 +714,21 @@
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
 		},
 		{
+			"ImportPath": "github.com/xiang90/probing",
+			"Rev": "6a0cc1ae81b4cc11db5e491e030e4b98fba79c19"
+		},
+		{
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/bcrypt",
+			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/blowfish",
+			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
@@ -630,6 +785,10 @@
 		{
 			"ImportPath": "google.golang.org/cloud/internal",
 			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc",
+			"Rev": "f5ebd86be717593ab029545492c93ddf8914832b"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
