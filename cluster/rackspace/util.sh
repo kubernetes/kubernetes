@@ -66,19 +66,6 @@ rax-ssh-key() {
   fi
 }
 
-find-release-tars() {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  RELEASE_DIR="${KUBE_ROOT}/server/"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-    RELEASE_DIR="${KUBE_ROOT}/_output/release-tars/"
-  fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
-    exit 1
-  fi
-}
-
 rackspace-set-vars() {
 
   CLOUDFILES_CONTAINER="kubernetes-releases-${OS_USERNAME}"
@@ -114,7 +101,7 @@ ensure_dev_container() {
 copy_dev_tarballs() {
 
   echo "cluster/rackspace/util.sh: Uploading to Cloud Files"
-  ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz \
+  ${SWIFTLY_CMD} put -i ${SERVER_BINARY_TAR} \
   ${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
 
   echo "Release pushed."
