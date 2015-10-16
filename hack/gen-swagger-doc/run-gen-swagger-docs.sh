@@ -14,10 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ "$#" -lt 1 ]; then
-    echo "Usage: run-gen-swagger-docs.sh <API version> <absolute output path, default to PWD>"
-    exit 
-fi
-OUTPUT=${2:-${PWD}}
+# Usage: run-gen-swagger-docs.sh <absolute output path, default to PWD>
 
-docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1.1 https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/$1.json https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/$1/register.go
+OUTPUT=${1:-${PWD}}
+
+docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1.1 https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1.json https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
+docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1.1 https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1beta1.json https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
