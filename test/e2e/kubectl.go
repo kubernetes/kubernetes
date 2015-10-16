@@ -246,9 +246,6 @@ var _ = Describe("Kubectl client", func() {
 		It("should check if v1 is in available api versions [Conformance]", func() {
 			By("validating api verions")
 			output := runKubectl("api-versions")
-			if !strings.Contains(output, "Available Server Api Versions:") {
-				Failf("Missing caption in kubectl api-versions")
-			}
 			if !strings.Contains(output, "v1") {
 				Failf("No v1 in kubectl api-versions")
 			}
