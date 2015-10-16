@@ -269,6 +269,114 @@ func TestGetServerVersion(t *testing.T) {
 	}
 }
 
+func TestGetServerResources(t *testing.T) {
+	stable := unversioned.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []unversioned.APIResource{
+			{"pods", true},
+			{"services", true},
+			{"namespaces", false},
+		},
+	}
+	beta := unversioned.APIResourceList{
+		GroupVersion: "extensions/v1",
+		APIResources: []unversioned.APIResource{
+			{"deployments", true},
+			{"ingress", true},
+			{"jobs", true},
+		},
+	}
+	tests := []struct {
+		resourcesList *unversioned.APIResourceList
+		path          string
+		request       string
+		expectErr     bool
+	}{
+		{
+			resourcesList: &stable,
+			path:          "/api/v1",
+			request:       "v1",
+			expectErr:     false,
+		},
+		{
+			resourcesList: &beta,
+			path:          "/apis/extensions/v1beta1",
+			request:       "extensions/v1beta1",
+			expectErr:     false,
+		},
+		{
+			resourcesList: &stable,
+			path:          "/api/v1",
+			request:       "foobar",
+			expectErr:     true,
+		},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var list interface{}
+		switch req.URL.Path {
+		case "/api/v1":
+			list = &stable
+		case "/apis/extensions/v1beta1":
+			list = &beta
+		case "/api":
+			list = &unversioned.APIVersions{
+				Versions: []string{
+					"v1",
+				},
+			}
+		case "/apis":
+			list = &unversioned.APIGroupList{
+				Groups: []unversioned.APIGroup{
+					{
+						Versions: []unversioned.GroupVersion{
+							{GroupVersion: "extensions/v1beta1"},
+						},
+					},
+				},
+			}
+		default:
+			t.Logf("unexpected request: %s", req.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		output, err := json.Marshal(list)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client := NewOrDie(&Config{Host: server.URL})
+	for _, test := range tests {
+		got, err := client.SupportedResourcesForGroupVersion(test.request)
+		if test.expectErr {
+			if err == nil {
+				t.Error("unexpected non-error")
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if !reflect.DeepEqual(got, test.resourcesList) {
+			t.Errorf("expected:\n%v\ngot:\n%v\n", test.resourcesList, got)
+		}
+	}
+
+	resourceMap, err := SupportedResources(client, &Config{Host: server.URL})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	for _, api := range []string{"v1", "extensions/v1beta1"} {
+		if _, found := resourceMap[api]; !found {
+			t.Errorf("missing expected api: %s", api)
+		}
+	}
+}
+
 func TestGetServerAPIVersions(t *testing.T) {
 	versions := []string{"v1", "v2", "v3"}
 	expect := unversioned.APIVersions{Versions: versions}

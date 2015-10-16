@@ -48,6 +48,7 @@ type Interface interface {
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
 	Extensions() ExtensionsInterface
+	ResourcesInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -115,6 +116,11 @@ type VersionInterface interface {
 	ServerAPIVersions() (*unversioned.APIVersions, error)
 }
 
+// ResourcesInterface has methods for obtaining supported resources on the API server
+type ResourcesInterface interface {
+	SupportedResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error)
+}
+
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
@@ -139,6 +145,42 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
+}
+
+// SupportedResourcesForGroupVersion retrieves the list of resources supported by the API server for a group version.
+func (c *Client) SupportedResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+	var prefix string
+	if groupVersion == "v1" {
+		prefix = "/api"
+	} else {
+		prefix = "/apis"
+	}
+	body, err := c.Get().AbsPath(prefix, groupVersion).Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	resources := unversioned.APIResourceList{}
+	if err := json.Unmarshal(body, &resources); err != nil {
+		return nil, err
+	}
+	return &resources, nil
+}
+
+// SupportedResources gets all supported resources for all group versions.  The key in the map is an API groupVersion.
+func SupportedResources(c Interface, cfg *Config) (map[string]*unversioned.APIResourceList, error) {
+	apis, err := ServerAPIVersions(cfg)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]*unversioned.APIResourceList{}
+	for _, groupVersion := range apis {
+		resources, err := c.SupportedResourcesForGroupVersion(groupVersion)
+		if err != nil {
+			return nil, err
+		}
+		result[groupVersion] = resources
+	}
+	return result, nil
 }
 
 // ServerAPIVersions retrieves and parses the list of API versions the server supports.

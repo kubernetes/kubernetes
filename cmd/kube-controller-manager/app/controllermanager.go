@@ -31,6 +31,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -89,12 +90,10 @@ type CMServer struct {
 	ServiceAccountKeyFile             string
 	RootCAFile                        string
 
-	ClusterName                   string
-	ClusterCIDR                   net.IPNet
-	AllocateNodeCIDRs             bool
-	EnableProfiling               bool
-	EnableHorizontalPodAutoscaler bool
-	EnableDeploymentController    bool
+	ClusterName       string
+	ClusterCIDR       net.IPNet
+	AllocateNodeCIDRs bool
+	EnableProfiling   bool
 
 	Master     string
 	Kubeconfig string
@@ -119,8 +118,6 @@ func NewCMServer() *CMServer {
 		RegisterRetryCount:                10,
 		PodEvictionTimeout:                5 * time.Minute,
 		ClusterName:                       "kubernetes",
-		EnableHorizontalPodAutoscaler:     false,
-		EnableDeploymentController:        false,
 		VolumeConfigFlags: VolumeConfigFlags{
 			// default values here
 			PersistentVolumeRecyclerMinimumTimeoutNFS:        300,
@@ -191,8 +188,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
-	fs.BoolVar(&s.EnableHorizontalPodAutoscaler, "enable-horizontal-pod-autoscaler", s.EnableHorizontalPodAutoscaler, "Enables horizontal pod autoscaler (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
-	fs.BoolVar(&s.EnableDeploymentController, "enable-deployment-controller", s.EnableDeploymentController, "Enables deployment controller (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
 }
 
 // Run runs the CMServer.  This should never exit.
@@ -281,18 +276,47 @@ func (s *CMServer) Run(_ []string) error {
 	resourceQuotaController := resourcequotacontroller.NewResourceQuotaController(kubeClient)
 	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
-	// An OR of all flags to enable/disable experimental features
-	experimentalMode := s.EnableHorizontalPodAutoscaler || s.EnableDeploymentController
-	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, experimentalMode, s.NamespaceSyncPeriod)
-	namespaceController.Run()
-
-	if s.EnableHorizontalPodAutoscaler {
-		horizontalPodAutoscalerController := podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient))
-		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
+	versionStrings, err := client.ServerAPIVersions(kubeconfig)
+	if err != nil {
+		glog.Fatalf("Failed to get api versions from server: %v", err)
 	}
-	if s.EnableDeploymentController {
-		deploymentController := deployment.New(kubeClient)
-		deploymentController.Run(s.DeploymentControllerSyncPeriod)
+	versions := &unversioned.APIVersions{Versions: versionStrings}
+
+	resourceMap, err := client.SupportedResources(kubeClient, kubeconfig)
+	if err != nil {
+		glog.Fatalf("Failed to get supported resources from server: %v", err)
+	}
+
+	namespacecontroller.NewNamespaceController(kubeClient, versions, s.NamespaceSyncPeriod).Run()
+
+	groupVersion := "extensions/v1beta1"
+	resources, found := resourceMap[groupVersion]
+	// TODO: this needs to be dynamic so users don't have to restart their controller manager if they change the apiserver
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "horizontalpodautoscalers") {
+			glog.Infof("Starting horizontal pod controller.")
+			podautoscaler.NewHorizontalController(kubeClient, metrics.NewHeapsterMetricsClient(kubeClient)).
+				Run(s.HorizontalPodAutoscalerSyncPeriod)
+		}
+
+		if containsResource(resources, "daemonsets") {
+			glog.Infof("Starting daemon set controller")
+			go daemon.NewDaemonSetsController(kubeClient).
+				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+		}
+
+		if containsResource(resources, "jobs") {
+			glog.Infof("Starting job controller")
+			go job.NewJobController(kubeClient).
+				Run(s.ConcurrentJobSyncs, util.NeverStop)
+		}
+
+		if containsResource(resources, "deployments") {
+			glog.Infof("Starting deployment controller")
+			deployment.New(kubeClient).
+				Run(s.DeploymentControllerSyncPeriod)
+		}
 	}
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
@@ -339,4 +363,23 @@ func (s *CMServer) Run(_ []string) error {
 	).Run()
 
 	select {}
+}
+
+func containsVersion(versions *unversioned.APIVersions, version string) bool {
+	for ix := range versions.Versions {
+		if versions.Versions[ix] == version {
+			return true
+		}
+	}
+	return false
+}
+
+func containsResource(resources *unversioned.APIResourceList, resourceName string) bool {
+	for ix := range resources.APIResources {
+		resource := resources.APIResources[ix]
+		if resource.Name == resourceName {
+			return true
+		}
+	}
+	return false
 }
