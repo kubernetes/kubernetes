@@ -255,7 +255,7 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	It("Controller Manager should not create/delete replicas across restart", func() {
-
+		SkipIfProviderIs("gke")
 		restarter := NewRestartConfig(
 			getMasterHost(), "kube-controller", ports.ControllerManagerPort, restartPollInterval, restartTimeout)
 		restarter.restart()
@@ -303,7 +303,7 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	It("Kubelet should not restart containers across restart", func() {
-
+		SkipIfProviderIs("gke")
 		// TODO: Enabale this test in GKE once experimental API there is switched on
 		SkipIfProviderIs("gke")
 
