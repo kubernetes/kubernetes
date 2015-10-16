@@ -405,27 +405,28 @@ func TestGetNotFoundErr(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	fakeClient := tools.NewFakeEtcdClient(t)
-	helper := newEtcdHelper(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix())
+	server := NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
 	err := helper.Create(context.TODO(), "/some/key", obj, returnedObj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := testapi.Default.Codec().Encode(obj)
+	_, err = testapi.Default.Codec().Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	key := etcdtest.AddPrefix("/some/key")
-	node := fakeClient.Data[key].R.Node
-	if e, a := string(data), node.Value; e != a {
-		t.Errorf("Wanted %v, got %v", e, a)
+	err = helper.Get(context.TODO(), "/some/key", returnedObj, false)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
 	}
-	if e, a := uint64(5), fakeClient.LastSetTTL; e != a {
-		t.Errorf("Wanted %v, got %v", e, a)
+	_, err = testapi.Default.Codec().Encode(returnedObj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
 	}
-	if obj.ResourceVersion != returnedObj.ResourceVersion || obj.Name != returnedObj.Name {
-		t.Errorf("If set was successful but returned object did not have correct resource version")
+	if obj.Name != returnedObj.Name {
+		t.Errorf("Wanted %v, got %v", obj.Name, returnedObj.Name)
 	}
 }
 
