@@ -44,6 +44,7 @@ var RepairMalformedUpdates bool = true
 
 const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNegativeErrorMsg string = `must be non-negative`
+const isNotIntegerErrorMsg string = `must be an integer`
 
 func intervalErrorMsg(lo, hi int) string {
 	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
@@ -1765,15 +1766,27 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 
 	for k, v := range resourceQuota.Spec.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
-		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	for k, v := range resourceQuota.Status.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
-		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	for k, v := range resourceQuota.Status.Used {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
-		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
+	}
+	return allErrs
+}
+
+// validateResourceQuantityValue enforces that specified quantity is valid for specified resource
+func validateResourceQuantityValue(resource string, value resource.Quantity) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidatePositiveQuantity(value, resource)...)
+	if api.IsIntegerResourceName(resource) {
+		if value.MilliValue()%int64(1000) != int64(0) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(resource, value, isNotIntegerErrorMsg))
+		}
 	}
 	return allErrs
 }
@@ -1783,8 +1796,9 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.ResourceQuota) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta).Prefix("metadata")...)
-	for k := range newResourceQuota.Spec.Hard {
+	for k, v := range newResourceQuota.Spec.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
@@ -1798,11 +1812,13 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 	if newResourceQuota.ResourceVersion == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
 	}
-	for k := range newResourceQuota.Status.Hard {
+	for k, v := range newResourceQuota.Status.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
-	for k := range newResourceQuota.Status.Used {
+	for k, v := range newResourceQuota.Status.Used {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	newResourceQuota.Spec = oldResourceQuota.Spec
 	return allErrs
