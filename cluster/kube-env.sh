@@ -18,7 +18,7 @@
 # You can override the default provider by exporting the KUBERNETES_PROVIDER
 # variable in your bashrc
 #
-# The valid values: 'gce', 'gke', 'aws', 'azure', 'vagrant', 'vsphere', 'libvirt-coreos', 'juju'
+# The valid values: 'gce', 'gke', 'aws', 'vagrant', 'vsphere', 'libvirt-coreos', 'juju'
 
 KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
 

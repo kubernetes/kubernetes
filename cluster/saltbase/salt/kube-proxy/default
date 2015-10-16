@@ -2,28 +2,20 @@
 {% if grains['os_family'] == 'RedHat' -%}
 	{% set daemon_args = "" -%}
 {% endif -%}
-{# TODO(azure-maintainer): add support for distributing kubeconfig with token to kube-proxy #}
-{# so it can use https #}
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' -%}
-  {% set api_servers = "--master=http://" + ips[0][0] -%}
-  {% set api_servers_with_port = api_servers + ":7080" -%}
-  {% set kubeconfig = "" -%}
+
+{% set kubeconfig = "--kubeconfig=/var/lib/kube-proxy/kubeconfig" -%}
+{% if grains.api_servers is defined -%}
+  {% set api_servers = "--master=https://" + grains.api_servers -%}
 {% else -%}
-  {% set kubeconfig = "--kubeconfig=/var/lib/kube-proxy/kubeconfig" -%}
-  {% if grains.api_servers is defined -%}
-    {% set api_servers = "--master=https://" + grains.api_servers -%}
-  {% else -%}
-    {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-    {% set api_servers = "--master=https://" + ips[0][0] -%}
-  {% endif -%}
+  {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
+  {% set api_servers = "--master=https://" + ips[0][0] -%}
+{% endif -%}
 
-  # TODO: remove nginx for other cloud providers.
-  {% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
-     {% set api_servers_with_port = api_servers -%}
-  {% else -%}
-    {% set api_servers_with_port = api_servers + ":6443" -%}
-  {% endif -%}
-
+# TODO: remove nginx for other cloud providers.
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
+   {% set api_servers_with_port = api_servers -%}
+{% else -%}
+  {% set api_servers_with_port = api_servers + ":6443" -%}
 {% endif -%}
 
 {% set test_args = "" -%}
