@@ -181,11 +181,6 @@
 			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
 		},
 		{
-			"ImportPath": "github.com/coreos/etcd/pkg/testutil",
-			"Comment": "v2.2.0-17-g45c86af",
-			"Rev": "45c86af0eb195f6f833cab6fb176a60fc8c47185"
-		},
-		{
 			"ImportPath": "github.com/coreos/etcd/pkg/timeutil",
 			"Comment": "v2.2.1-1-g4dc835c",
 			"Rev": "4dc835c718bbdbb9a1c36ef5cdf1921a423cbf70"
