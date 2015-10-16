@@ -12,28 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package schema
+package lastditch
 
 import (
-	"github.com/appc/spec/schema/types"
+	"encoding/json"
 )
 
-const (
-	// version represents the canonical version of the appc spec and tooling.
-	// For now, the schema and tooling is coupled with the spec itself, so
-	// this must be kept in sync with the VERSION file in the root of the repo.
-	version string = "0.7.1"
-)
+type Labels []Label
 
-var (
-	// AppContainerVersion is the SemVer representation of version
-	AppContainerVersion types.SemVer
-)
+// a type just to avoid a recursion during unmarshalling
+type labels Labels
 
-func init() {
-	v, err := types.NewSemVer(version)
-	if err != nil {
-		panic(err)
+type Label struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (l *Labels) UnmarshalJSON(data []byte) error {
+	var jl labels
+	if err := json.Unmarshal(data, &jl); err != nil {
+		return err
 	}
-	AppContainerVersion = *v
+	*l = Labels(jl)
+	return nil
 }

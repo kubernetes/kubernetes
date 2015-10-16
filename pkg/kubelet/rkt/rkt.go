@@ -52,8 +52,9 @@ import (
 )
 
 const (
-	acVersion             = "0.6.1"
-	rktMinimumVersion     = "0.8.1"
+	acVersion             = "0.7.1"
+	minimumRktVersion     = "0.9.0"
+	recommendRktVersion   = "0.9.0"
 	systemdMinimumVersion = "219"
 
 	systemdServiceDir = "/run/systemd/system"
@@ -155,13 +156,23 @@ func New(config *Config,
 	if err != nil {
 		return nil, err
 	}
-	result, err = version.Compare(rktMinimumVersion)
+	result, err = version.Compare(minimumRktVersion)
 	if err != nil {
 		return nil, err
 	}
 	if result < 0 {
-		return nil, fmt.Errorf("rkt: Version is too old, requires at least %v", rktMinimumVersion)
+		return nil, fmt.Errorf("rkt: version is too old, requires at least %v", minimumRktVersion)
 	}
+
+	result, err = version.Compare(recommendRktVersion)
+	if err != nil {
+		return nil, err
+	}
+	if result != 0 {
+		// TODO(yifan): Record an event to expose the information.
+		glog.Warningf("rkt: current version %q is not recommended (recommended version %q)", version, recommendRktVersion)
+	}
+
 	return rkt, nil
 }
 
@@ -581,9 +592,9 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 
 	var runPrepared string
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
-		runPrepared = fmt.Sprintf("%s run-prepared --mds-register=false %s", r.rktBinAbsPath, uuid)
+		runPrepared = fmt.Sprintf("%s run-prepared --mds-register=false --net=host %s", r.rktBinAbsPath, uuid)
 	} else {
-		runPrepared = fmt.Sprintf("%s run-prepared --mds-register=false --private-net %s", r.rktBinAbsPath, uuid)
+		runPrepared = fmt.Sprintf("%s run-prepared --mds-register=false %s", r.rktBinAbsPath, uuid)
 	}
 
 	// TODO handle pod.Spec.HostPID
@@ -1329,14 +1340,14 @@ func (r *Runtime) getImageByName(imageName string) (*kubecontainer.Image, error)
 
 // ListImages lists all the available appc images on the machine by invoking 'rkt image list'.
 func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
-	// Example output of 'rkt image list --fields=key,name':
+	// Example output of 'rkt image list --fields=id,name --full':
 	//
-	// KEY									        NAME
+	// ID									        NAME
 	// sha512-374770396f23dd153937cd66694fe705cf375bcec7da00cf87e1d9f72c192da7	nginx:latest
 	// sha512-bead9e0df8b1b4904d0c57ade2230e6d236e8473f62614a8bc6dcf11fc924123	coreos.com/rkt/stage1:0.8.1
 	//
 	// With '--no-legend=true' the fist line (KEY NAME) will be omitted.
-	output, err := r.runCommand("image", "list", "--no-legend=true", "--fields=key,name")
+	output, err := r.runCommand("image", "list", "--no-legend=true", "--fields=id,name", "--full")
 	if err != nil {
 		return nil, err
 	}
