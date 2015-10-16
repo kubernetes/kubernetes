@@ -53,9 +53,7 @@ AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
 AWS_ASG_CMD="aws --output json autoscaling"
 
-INTERNAL_IP_BASE=172.20.0
-MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+MASTER_INTERNAL_IP="${MASTER_INTERNAL_IP:-${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}}"
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
@@ -703,7 +701,9 @@ function kube-up {
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
     echo "Using existing CIDR $EXISTING_CIDR"
     INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
-    MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+    if [[ -z "$MASTER_INTERNAL_IP" ]]; then 
+      MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+    fi
   fi
 
   echo "Using subnet $SUBNET_ID"
