@@ -3336,3 +3336,188 @@ const (
 	// "default-scheduler" is the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"
 )
+
+// +genclient=true,nonNamespaced=true
+
+// SecurityContextConstraints governs the ability to make requests that affect the SecurityContext
+// that will be applied to a container.
+type SecurityContextConstraints struct {
+	unversioned.TypeMeta `json:",inline"`
+	ObjectMeta           `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Priority influences the sort order of SCCs when evaluating which SCCs to try first for
+	// a given pod request based on access in the Users and Groups fields.  The higher the int, the
+	// higher priority.  If scores for multiple SCCs are equal they will be sorted by name.
+	Priority *int32 `json:"priority" description:"determines which SCC is used when multiple SCCs allow a particular pod; higher priority SCCs are preferred" protobuf:"varint,2,opt,name=priority"`
+
+	// AllowPrivilegedContainer determines if a container can request to be run as privileged.
+	AllowPrivilegedContainer bool `json:"allowPrivilegedContainer" description:"allow containers to run as privileged" protobuf:"varint,3,opt,name=allowPrivilegedContainer"`
+	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
+	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// DefaultAddCapabilities and RequiredDropCapabilities.
+	DefaultAddCapabilities []Capability `json:"defaultAddCapabilities" description:"capabilities that are added by default but may be dropped" protobuf:"bytes,4,rep,name=defaultAddCapabilities,casttype=Capability"`
+	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+	// are required to be dropped and cannot be added.
+	RequiredDropCapabilities []Capability `json:"requiredDropCapabilities" description:"capabilities that will be dropped by default and may not be added" protobuf:"bytes,5,rep,name=requiredDropCapabilities,casttype=Capability"`
+	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+	// Capabilities in this field maybe added at the pod author's discretion.
+	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	AllowedCapabilities []Capability `json:"allowedCapabilities" description:"capabilities that are allowed to be added" protobuf:"bytes,6,rep,name=allowedCapabilities,casttype=Capability"`
+	// AllowHostDirVolumePlugin determines if the policy allow containers to use the HostDir volume plugin
+	// +genconversion=false
+	AllowHostDirVolumePlugin bool `json:"allowHostDirVolumePlugin" description:"allow the use of the host dir volume plugin" protobuf:"varint,7,opt,name=allowHostDirVolumePlugin"`
+	// Volumes is a white list of allowed volume plugins.  FSType corresponds directly with the field names
+	// of a VolumeSource (azureFile, configMap, emptyDir).  To allow all volumes you may use '*'.
+	Volumes []FSType `json:"volumes" protobuf:"bytes,8,rep,name=volumes,casttype=FSType"`
+	// AllowHostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
+	AllowHostNetwork bool `json:"allowHostNetwork" description:"allow the use of the hostNetwork in the pod spec" protobuf:"varint,9,opt,name=allowHostNetwork"`
+	// AllowHostPorts determines if the policy allows host ports in the containers.
+	AllowHostPorts bool `json:"allowHostPorts" description:"allow the use of the host ports in the containers" protobuf:"varint,10,opt,name=allowHostPorts"`
+	// AllowHostPID determines if the policy allows host pid in the containers.
+	AllowHostPID bool `json:"allowHostPID" description:"allow the use of the host pid in the containers" protobuf:"varint,11,opt,name=allowHostPID"`
+	// AllowHostIPC determines if the policy allows host ipc in the containers.
+	AllowHostIPC bool `json:"allowHostIPC" description:"allow the use of the host ipc in the containers" protobuf:"varint,12,opt,name=allowHostIPC"`
+	// SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.
+	SELinuxContext SELinuxContextStrategyOptions `json:"seLinuxContext,omitempty" description:"strategy used to generate SELinuxOptions" protobuf:"bytes,13,opt,name=seLinuxContext"`
+	// RunAsUser is the strategy that will dictate what RunAsUser is used in the SecurityContext.
+	RunAsUser RunAsUserStrategyOptions `json:"runAsUser,omitempty" description:"strategy used to generate RunAsUser" protobuf:"bytes,14,opt,name=runAsUser"`
+	// SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+	SupplementalGroups SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" description:"strategy used to generate supplemental groups" protobuf:"bytes,15,opt,name=supplementalGroups"`
+	// FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+	FSGroup FSGroupStrategyOptions `json:"fsGroup,omitempty" description:"strategy used to generate fsGroup" protobuf:"bytes,16,opt,name=fsGroup"`
+	// ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+	// system.  If the container specifically requests to run with a non-read only root file system
+	// the SCC should deny the pod.
+	// If set to false the container may run with a read only root file system if it wishes but it
+	// will not be forced to.
+	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem" description:"require containers to run with a read only root filesystem" protobuf:"varint,17,opt,name=readOnlyRootFilesystem"`
+
+	// The users who have permissions to use this security context constraints
+	Users []string `json:"users,omitempty" description:"users allowed to use this SecurityContextConstraints" protobuf:"bytes,18,rep,name=users"`
+	// The groups that have permission to use this security context constraints
+	Groups []string `json:"groups,omitempty" description:"groups allowed to use this SecurityContextConstraints" protobuf:"bytes,19,rep,name=groups"`
+}
+
+// FS Type gives strong typing to different file systems that are used by volumes.
+type FSType string
+
+var (
+	FSTypeAzureFile             FSType = "azureFile"
+	FSTypeFlocker               FSType = "flocker"
+	FSTypeFlexVolume            FSType = "flexVolume"
+	FSTypeHostPath              FSType = "hostPath"
+	FSTypeEmptyDir              FSType = "emptyDir"
+	FSTypeGCEPersistentDisk     FSType = "gcePersistentDisk"
+	FSTypeAWSElasticBlockStore  FSType = "awsElasticBlockStore"
+	FSTypeGitRepo               FSType = "gitRepo"
+	FSTypeSecret                FSType = "secret"
+	FSTypeNFS                   FSType = "nfs"
+	FSTypeISCSI                 FSType = "iscsi"
+	FSTypeGlusterfs             FSType = "glusterfs"
+	FSTypePersistentVolumeClaim FSType = "persistentVolumeClaim"
+	FSTypeRBD                   FSType = "rbd"
+	FSTypeCinder                FSType = "cinder"
+	FSTypeCephFS                FSType = "cephFS"
+	FSTypeDownwardAPI           FSType = "downwardAPI"
+	FSTypeFC                    FSType = "fc"
+	FSTypeConfigMap             FSType = "configMap"
+	FSTypeAll                   FSType = "*"
+)
+
+// SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.
+type SELinuxContextStrategyOptions struct {
+	// Type is the strategy that will dictate what SELinux context is used in the SecurityContext.
+	Type SELinuxContextStrategyType `json:"type,omitempty" description:"strategy used to generate the SELinux context" protobuf:"bytes,1,opt,name=type,casttype=SELinuxContextStrategyType"`
+	// seLinuxOptions required to run as; required for MustRunAs
+	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"seLinuxOptions required to run as; required for MustRunAs" protobuf:"bytes,2,opt,name=seLinuxOptions"`
+}
+
+// RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
+type RunAsUserStrategyOptions struct {
+	// Type is the strategy that will dictate what RunAsUser is used in the SecurityContext.
+	Type RunAsUserStrategyType `json:"type,omitempty" description:"strategy used to generate RunAsUser" protobuf:"bytes,1,opt,name=type,casttype=RunAsUserStrategyType"`
+	// UID is the user id that containers must run as.  Required for the MustRunAs strategy if not using
+	// namespace/service account allocated uids.
+	UID *int64 `json:"uid,omitempty" description:"the uid to always run as; required for MustRunAs" protobuf:"varint,2,opt,name=uid"`
+	// UIDRangeMin defines the min value for a strategy that allocates by range.
+	UIDRangeMin *int64 `json:"uidRangeMin,omitempty" description:"min value for range based allocators" protobuf:"varint,3,opt,name=uidRangeMin"`
+	// UIDRangeMax defines the max value for a strategy that allocates by range.
+	UIDRangeMax *int64 `json:"uidRangeMax,omitempty" description:"max value for range based allocators" protobuf:"varint,4,opt,name=uidRangeMax"`
+}
+
+// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+type FSGroupStrategyOptions struct {
+	// Type is the strategy that will dictate what FSGroup is used in the SecurityContext.
+	Type FSGroupStrategyType `json:"type,omitempty" description:"strategy used to generate fsGroup" protobuf:"bytes,1,opt,name=type,casttype=FSGroupStrategyType"`
+	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
+	// fs group then supply a single range with the same start and end.
+	Ranges []IDRange `json:"ranges,omitempty" description:"ranges of allowable IDs for fsGroup" protobuf:"bytes,2,rep,name=ranges"`
+}
+
+// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+type SupplementalGroupsStrategyOptions struct {
+	// Type is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+	Type SupplementalGroupsStrategyType `json:"type,omitempty" description:"strategy used to generate supplemental groups" protobuf:"bytes,1,opt,name=type,casttype=SupplementalGroupsStrategyType"`
+	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+	// supplemental group then supply a single range with the same start and end.
+	Ranges []IDRange `json:"ranges,omitempty" description:"ranges of allowable IDs for supplemental groups" protobuf:"bytes,2,rep,name=ranges"`
+}
+
+// IDRange provides a min/max of an allowed range of IDs.
+// TODO: this could be reused for UIDs.
+type IDRange struct {
+	// Min is the start of the range, inclusive.
+	Min int64 `json:"min,omitempty" description:"min value for the range" protobuf:"varint,1,opt,name=min"`
+	// Max is the end of the range, inclusive.
+	Max int64 `json:"max,omitempty" description:"min value for the range" protobuf:"varint,2,opt,name=max"`
+}
+
+// SELinuxContextStrategyType denotes strategy types for generating SELinux options for a
+// SecurityContext
+type SELinuxContextStrategyType string
+
+// RunAsUserStrategyType denotes strategy types for generating RunAsUser values for a
+// SecurityContext
+type RunAsUserStrategyType string
+
+// SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
+// groups for a SecurityContext.
+type SupplementalGroupsStrategyType string
+
+// FSGroupStrategyType denotes strategy types for generating FSGroup values for a
+// SecurityContext
+type FSGroupStrategyType string
+
+const (
+	// container must have SELinux labels of X applied.
+	SELinuxStrategyMustRunAs SELinuxContextStrategyType = "MustRunAs"
+	// container may make requests for any SELinux context labels.
+	SELinuxStrategyRunAsAny SELinuxContextStrategyType = "RunAsAny"
+
+	// container must run as a particular uid.
+	RunAsUserStrategyMustRunAs RunAsUserStrategyType = "MustRunAs"
+	// container must run as a particular uid.
+	RunAsUserStrategyMustRunAsRange RunAsUserStrategyType = "MustRunAsRange"
+	// container must run as a non-root uid
+	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategyType = "MustRunAsNonRoot"
+	// container may make requests for any uid.
+	RunAsUserStrategyRunAsAny RunAsUserStrategyType = "RunAsAny"
+
+	// container must have FSGroup of X applied.
+	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
+	// container may make requests for any FSGroup labels.
+	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
+
+	// container must run as a particular gid.
+	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
+	// container may make requests for any gid.
+	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
+)
+
+// SecurityContextConstraintsList is a list of SecurityContextConstraints objects
+type SecurityContextConstraintsList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Items []SecurityContextConstraints `json:"items" protobuf:"bytes,2,rep,name=items"`
+}

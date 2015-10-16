@@ -49,6 +49,9 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 
 		Convert_api_VolumeSource_To_v1_VolumeSource,
 		Convert_v1_VolumeSource_To_api_VolumeSource,
+
+		Convert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints,
+		Convert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -712,6 +715,27 @@ func Convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 				}
 			}
 			out.DownwardAPI.Items = append(out.DownwardAPI.Items, file)
+		}
+	}
+	return nil
+}
+
+func Convert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints(in *SecurityContextConstraints, out *api.SecurityContextConstraints, s conversion.Scope) error {
+	return autoConvert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints(in, out, s)
+}
+
+func Convert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints(in *api.SecurityContextConstraints, out *SecurityContextConstraints, s conversion.Scope) error {
+	if err := autoConvert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints(in, out, s); err != nil {
+		return err
+	}
+
+	if in.Volumes != nil {
+		for _, v := range in.Volumes {
+			// set the Allow* fields based on the existence in the volume slice
+			switch v {
+			case api.FSTypeHostPath, api.FSTypeAll:
+				out.AllowHostDirVolumePlugin = true
+			}
 		}
 	}
 	return nil
