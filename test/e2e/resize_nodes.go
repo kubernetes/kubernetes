@@ -34,7 +34,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 )
 
 const (
