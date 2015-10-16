@@ -6371,3 +6371,224 @@ func TestValidateHasLabel(t *testing.T) {
 		t.Errorf("expected failure")
 	}
 }
+
+func TestValidateSecurityContextConstraints(t *testing.T) {
+	var invalidUID int64 = -1
+	var invalidPriority int32 = -1
+	var validPriority int32 = 1
+
+	validSCC := func() *api.SecurityContextConstraints {
+		return &api.SecurityContextConstraints{
+			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			SELinuxContext: api.SELinuxContextStrategyOptions{
+				Type: api.SELinuxStrategyRunAsAny,
+			},
+			RunAsUser: api.RunAsUserStrategyOptions{
+				Type: api.RunAsUserStrategyRunAsAny,
+			},
+			FSGroup: api.FSGroupStrategyOptions{
+				Type: api.FSGroupStrategyRunAsAny,
+			},
+			SupplementalGroups: api.SupplementalGroupsStrategyOptions{
+				Type: api.SupplementalGroupsStrategyRunAsAny,
+			},
+			Priority: &validPriority,
+		}
+	}
+
+	noUserOptions := validSCC()
+	noUserOptions.RunAsUser.Type = ""
+
+	noSELinuxOptions := validSCC()
+	noSELinuxOptions.SELinuxContext.Type = ""
+
+	invalidUserStratType := validSCC()
+	invalidUserStratType.RunAsUser.Type = "invalid"
+
+	invalidSELinuxStratType := validSCC()
+	invalidSELinuxStratType.SELinuxContext.Type = "invalid"
+
+	invalidUIDSCC := validSCC()
+	invalidUIDSCC.RunAsUser.Type = api.RunAsUserStrategyMustRunAs
+	invalidUIDSCC.RunAsUser.UID = &invalidUID
+
+	missingObjectMetaName := validSCC()
+	missingObjectMetaName.ObjectMeta.Name = ""
+
+	noFSGroupOptions := validSCC()
+	noFSGroupOptions.FSGroup.Type = ""
+
+	invalidFSGroupStratType := validSCC()
+	invalidFSGroupStratType.FSGroup.Type = "invalid"
+
+	noSupplementalGroupsOptions := validSCC()
+	noSupplementalGroupsOptions.SupplementalGroups.Type = ""
+
+	invalidSupGroupStratType := validSCC()
+	invalidSupGroupStratType.SupplementalGroups.Type = "invalid"
+
+	invalidRangeMinGreaterThanMax := validSCC()
+	invalidRangeMinGreaterThanMax.FSGroup.Ranges = []api.IDRange{
+		{Min: 2, Max: 1},
+	}
+
+	invalidRangeNegativeMin := validSCC()
+	invalidRangeNegativeMin.FSGroup.Ranges = []api.IDRange{
+		{Min: -1, Max: 10},
+	}
+
+	invalidRangeNegativeMax := validSCC()
+	invalidRangeNegativeMax.FSGroup.Ranges = []api.IDRange{
+		{Min: 1, Max: -10},
+	}
+
+	negativePriority := validSCC()
+	negativePriority.Priority = &invalidPriority
+
+	requiredCapAddAndDrop := validSCC()
+	requiredCapAddAndDrop.DefaultAddCapabilities = []api.Capability{"foo"}
+	requiredCapAddAndDrop.RequiredDropCapabilities = []api.Capability{"foo"}
+
+	allowedCapListedInRequiredDrop := validSCC()
+	allowedCapListedInRequiredDrop.RequiredDropCapabilities = []api.Capability{"foo"}
+	allowedCapListedInRequiredDrop.AllowedCapabilities = []api.Capability{"foo"}
+
+	errorCases := map[string]struct {
+		scc         *api.SecurityContextConstraints
+		errorType   field.ErrorType
+		errorDetail string
+	}{
+		"no user options": {
+			scc:         noUserOptions,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid strategy type.  Valid values are MustRunAs, MustRunAsNonRoot, RunAsAny",
+		},
+		"no selinux options": {
+			scc:         noSELinuxOptions,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid strategy type.  Valid values are MustRunAs, RunAsAny",
+		},
+		"no fsgroup options": {
+			scc:         noFSGroupOptions,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"no sup group options": {
+			scc:         noSupplementalGroupsOptions,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid user strategy type": {
+			scc:         invalidUserStratType,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid strategy type.  Valid values are MustRunAs, MustRunAsNonRoot, RunAsAny",
+		},
+		"invalid selinux strategy type": {
+			scc:         invalidSELinuxStratType,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid strategy type.  Valid values are MustRunAs, RunAsAny",
+		},
+		"invalid sup group strategy type": {
+			scc:         invalidSupGroupStratType,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid fs group strategy type": {
+			scc:         invalidFSGroupStratType,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid uid": {
+			scc:         invalidUIDSCC,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "uid cannot be negative",
+		},
+		"missing object meta name": {
+			scc:         missingObjectMetaName,
+			errorType:   field.ErrorTypeRequired,
+			errorDetail: "name or generateName is required",
+		},
+		"invalid range min greater than max": {
+			scc:         invalidRangeMinGreaterThanMax,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "min cannot be greater than max",
+		},
+		"invalid range negative min": {
+			scc:         invalidRangeNegativeMin,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "min cannot be negative",
+		},
+		"invalid range negative max": {
+			scc:         invalidRangeNegativeMax,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "max cannot be negative",
+		},
+		"negative priority": {
+			scc:         negativePriority,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "priority cannot be negative",
+		},
+		"invalid required caps": {
+			scc:         requiredCapAddAndDrop,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "capability is listed in defaultAddCapabilities and requiredDropCapabilities",
+		},
+		"allowed cap listed in required drops": {
+			scc:         allowedCapListedInRequiredDrop,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "capability is listed in allowedCapabilities and requiredDropCapabilities",
+		},
+	}
+
+	for k, v := range errorCases {
+		if errs := ValidateSecurityContextConstraints(v.scc); len(errs) == 0 || errs[0].Type != v.errorType || errs[0].Detail != v.errorDetail {
+			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
+		}
+	}
+
+	var validUID int64 = 1
+
+	mustRunAs := validSCC()
+	mustRunAs.FSGroup.Type = api.FSGroupStrategyMustRunAs
+	mustRunAs.SupplementalGroups.Type = api.SupplementalGroupsStrategyMustRunAs
+	mustRunAs.RunAsUser.Type = api.RunAsUserStrategyMustRunAs
+	mustRunAs.RunAsUser.UID = &validUID
+	mustRunAs.SELinuxContext.Type = api.SELinuxStrategyMustRunAs
+
+	runAsNonRoot := validSCC()
+	runAsNonRoot.RunAsUser.Type = api.RunAsUserStrategyMustRunAsNonRoot
+
+	caseInsensitiveAddDrop := validSCC()
+	caseInsensitiveAddDrop.DefaultAddCapabilities = []api.Capability{"foo"}
+	caseInsensitiveAddDrop.RequiredDropCapabilities = []api.Capability{"FOO"}
+
+	caseInsensitiveAllowedDrop := validSCC()
+	caseInsensitiveAllowedDrop.RequiredDropCapabilities = []api.Capability{"FOO"}
+	caseInsensitiveAllowedDrop.AllowedCapabilities = []api.Capability{"foo"}
+
+	successCases := map[string]struct {
+		scc *api.SecurityContextConstraints
+	}{
+		"must run as": {
+			scc: mustRunAs,
+		},
+		"run as any": {
+			scc: validSCC(),
+		},
+		"run as non-root (user only)": {
+			scc: runAsNonRoot,
+		},
+		"comparison for add -> drop is case sensitive": {
+			scc: caseInsensitiveAddDrop,
+		},
+		"comparison for allowed -> drop is case sensitive": {
+			scc: caseInsensitiveAllowedDrop,
+		},
+	}
+
+	for k, v := range successCases {
+		if errs := ValidateSecurityContextConstraints(v.scc); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+}

@@ -84,6 +84,9 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+
+		&SecurityContextConstraints{},
+		&SecurityContextConstraintsList{},
 	)
 
 	// Add common types
