@@ -4,7 +4,6 @@
 package codec
 
 import (
-	"bytes"
 	"encoding"
 	"fmt"
 	"io"
@@ -80,17 +79,6 @@ type encNoSeparator struct{}
 
 func (_ encNoSeparator) EncodeEnd() {}
 
-type encStructFieldBytesV struct {
-	b []byte
-	v reflect.Value
-}
-
-type encStructFieldBytesVslice []encStructFieldBytesV
-
-func (p encStructFieldBytesVslice) Len() int           { return len(p) }
-func (p encStructFieldBytesVslice) Less(i, j int) bool { return bytes.Compare(p[i].b, p[j].b) == -1 }
-func (p encStructFieldBytesVslice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
 type ioEncWriterWriter interface {
 	WriteByte(c byte) error
 	WriteString(s string) (n int, err error)
@@ -109,8 +97,16 @@ type EncodeOptions struct {
 	// sequence of bytes.
 	//
 	// This only affects maps, as the iteration order for maps is random.
-	// In this case, the map keys will first be encoded into []byte, and then sorted,
-	// before writing the sorted keys and the corresponding map values to the stream.
+	//
+	// The implementation MAY use the natural sort order for the map keys if possible:
+	//
+	//     - If there is a natural sort order (ie for number, bool, string or []byte keys),
+	//       then the map keys are first sorted in natural order and then written
+	//       with corresponding map values to the strema.
+	//     - If there is no natural sort order, then the map keys will first be
+	//       encoded into []byte, and then sorted,
+	//       before writing the sorted keys and the corresponding map values to the stream.
+	//
 	Canonical bool
 
 	// AsSymbols defines what should be encoded as symbols.
@@ -493,27 +489,27 @@ func (f *encFnInfo) kStruct(rv reflect.Value) {
 		tisfi = fti.sfi
 	}
 	newlen = 0
-	var kv encStructFieldKV
+	var kv stringRv
 	for _, si := range tisfi {
-		kv.v = si.field(rv, false)
+		kv.r = si.field(rv, false)
 		// if si.i != -1 {
 		// 	rvals[newlen] = rv.Field(int(si.i))
 		// } else {
 		// 	rvals[newlen] = rv.FieldByIndex(si.is)
 		// }
 		if toMap {
-			if si.omitEmpty && isEmptyValue(kv.v) {
+			if si.omitEmpty && isEmptyValue(kv.r) {
 				continue
 			}
-			kv.k = si.encName
+			kv.v = si.encName
 		} else {
 			// use the zero value.
 			// if a reference or struct, set to nil (so you do not output too much)
-			if si.omitEmpty && isEmptyValue(kv.v) {
-				switch kv.v.Kind() {
+			if si.omitEmpty && isEmptyValue(kv.r) {
+				switch kv.r.Kind() {
 				case reflect.Struct, reflect.Interface, reflect.Ptr, reflect.Array,
 					reflect.Map, reflect.Slice:
-					kv.v = reflect.Value{} //encode as nil
+					kv.r = reflect.Value{} //encode as nil
 				}
 			}
 		}
@@ -532,17 +528,17 @@ func (f *encFnInfo) kStruct(rv reflect.Value) {
 		for j := 0; j < newlen; j++ {
 			kv = fkvs[j]
 			if asSymbols {
-				ee.EncodeSymbol(kv.k)
+				ee.EncodeSymbol(kv.v)
 			} else {
-				ee.EncodeString(c_UTF8, kv.k)
+				ee.EncodeString(c_UTF8, kv.v)
 			}
-			e.encodeValue(kv.v, nil)
+			e.encodeValue(kv.r, nil)
 		}
 	} else {
 		ee.EncodeArrayStart(newlen)
 		for j := 0; j < newlen; j++ {
 			kv = fkvs[j]
-			e.encodeValue(kv.v, nil)
+			e.encodeValue(kv.r, nil)
 		}
 	}
 	ee.EncodeEnd()
@@ -621,24 +617,9 @@ func (f *encFnInfo) kMap(rv reflect.Value) {
 	}
 	mks := rv.MapKeys()
 	// for j, lmks := 0, len(mks); j < lmks; j++ {
+
 	if e.h.Canonical {
-		// first encode each key to a []byte first, then sort them, then record
-		// println(">>>>>>>> CANONICAL <<<<<<<<")
-		var mksv []byte = make([]byte, 0, len(mks)*16) // temporary byte slice for the encoding
-		e2 := NewEncoderBytes(&mksv, e.hh)
-		mksbv := make([]encStructFieldBytesV, len(mks))
-		for i, k := range mks {
-			l := len(mksv)
-			e2.MustEncode(k)
-			mksbv[i].v = k
-			mksbv[i].b = mksv[l:]
-			// fmt.Printf(">>>>> %s\n", mksv[l:])
-		}
-		sort.Sort(encStructFieldBytesVslice(mksbv))
-		for j := range mksbv {
-			e.asis(mksbv[j].b)
-			e.encodeValue(rv.MapIndex(mksbv[j].v), valFn)
-		}
+		e.kMapCanonical(rtkeyid, rtkey, rv, mks, valFn, asSymbols)
 	} else {
 		for j := range mks {
 			if keyTypeIsString {
@@ -653,7 +634,126 @@ func (f *encFnInfo) kMap(rv reflect.Value) {
 			e.encodeValue(rv.MapIndex(mks[j]), valFn)
 		}
 	}
+
 	ee.EncodeEnd()
+}
+
+func (e *Encoder) kMapCanonical(rtkeyid uintptr, rtkey reflect.Type, rv reflect.Value, mks []reflect.Value, valFn *encFn, asSymbols bool) {
+	ee := e.e
+	// we previously did out-of-band if an extension was registered.
+	// This is not necessary, as the natural kind is sufficient for ordering.
+
+	if rtkeyid == uint8SliceTypId {
+		mksv := make([]bytesRv, len(mks))
+		for i, k := range mks {
+			v := &mksv[i]
+			v.r = k
+			v.v = k.Bytes()
+		}
+		sort.Sort(bytesRvSlice(mksv))
+		for i := range mksv {
+			ee.EncodeStringBytes(c_RAW, mksv[i].v)
+			e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+		}
+	} else {
+		switch rtkey.Kind() {
+		case reflect.Bool:
+			mksv := make([]boolRv, len(mks))
+			for i, k := range mks {
+				v := &mksv[i]
+				v.r = k
+				v.v = k.Bool()
+			}
+			sort.Sort(boolRvSlice(mksv))
+			for i := range mksv {
+				ee.EncodeBool(mksv[i].v)
+				e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+			}
+		case reflect.String:
+			mksv := make([]stringRv, len(mks))
+			for i, k := range mks {
+				v := &mksv[i]
+				v.r = k
+				v.v = k.String()
+			}
+			sort.Sort(stringRvSlice(mksv))
+			for i := range mksv {
+				if asSymbols {
+					ee.EncodeSymbol(mksv[i].v)
+				} else {
+					ee.EncodeString(c_UTF8, mksv[i].v)
+				}
+				e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+			}
+		case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint, reflect.Uintptr:
+			mksv := make([]uintRv, len(mks))
+			for i, k := range mks {
+				v := &mksv[i]
+				v.r = k
+				v.v = k.Uint()
+			}
+			sort.Sort(uintRvSlice(mksv))
+			for i := range mksv {
+				ee.EncodeUint(mksv[i].v)
+				e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+			}
+		case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int:
+			mksv := make([]intRv, len(mks))
+			for i, k := range mks {
+				v := &mksv[i]
+				v.r = k
+				v.v = k.Int()
+			}
+			sort.Sort(intRvSlice(mksv))
+			for i := range mksv {
+				ee.EncodeInt(mksv[i].v)
+				e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+			}
+		case reflect.Float32:
+			mksv := make([]floatRv, len(mks))
+			for i, k := range mks {
+				v := &mksv[i]
+				v.r = k
+				v.v = k.Float()
+			}
+			sort.Sort(floatRvSlice(mksv))
+			for i := range mksv {
+				ee.EncodeFloat32(float32(mksv[i].v))
+				e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+			}
+		case reflect.Float64:
+			mksv := make([]floatRv, len(mks))
+			for i, k := range mks {
+				v := &mksv[i]
+				v.r = k
+				v.v = k.Float()
+			}
+			sort.Sort(floatRvSlice(mksv))
+			for i := range mksv {
+				ee.EncodeFloat64(mksv[i].v)
+				e.encodeValue(rv.MapIndex(mksv[i].r), valFn)
+			}
+		default:
+			// out-of-band
+			// first encode each key to a []byte first, then sort them, then record
+			var mksv []byte = make([]byte, 0, len(mks)*16) // temporary byte slice for the encoding
+			e2 := NewEncoderBytes(&mksv, e.hh)
+			mksbv := make([]bytesRv, len(mks))
+			for i, k := range mks {
+				v := &mksbv[i]
+				l := len(mksv)
+				e2.MustEncode(k)
+				v.r = k
+				v.v = mksv[l:]
+				// fmt.Printf(">>>>> %s\n", mksv[l:])
+			}
+			sort.Sort(bytesRvSlice(mksbv))
+			for j := range mksbv {
+				e.asis(mksbv[j].v)
+				e.encodeValue(rv.MapIndex(mksbv[j].r), valFn)
+			}
+		}
+	}
 }
 
 // --------------------------------------------------
@@ -903,16 +1003,9 @@ func (e *Encoder) encode(iv interface{}) {
 		e.e.EncodeStringBytes(c_RAW, *v)
 
 	default:
-		// canonical mode is not supported for fastpath of maps (but is fine for slices)
 		const checkCodecSelfer1 = true // in case T is passed, where *T is a Selfer, still checkCodecSelfer
-		if e.h.Canonical {
-			if !fastpathEncodeTypeSwitchSlice(iv, e) {
-				e.encodeI(iv, false, checkCodecSelfer1)
-			}
-		} else {
-			if !fastpathEncodeTypeSwitch(iv, e) {
-				e.encodeI(iv, false, checkCodecSelfer1)
-			}
+		if !fastpathEncodeTypeSwitch(iv, e) {
+			e.encodeI(iv, false, checkCodecSelfer1)
 		}
 	}
 }
@@ -1019,8 +1112,7 @@ func (e *Encoder) getEncFn(rtid uintptr, rt reflect.Type, checkFastpath, checkCo
 		fn.f = (*encFnInfo).textMarshal
 	} else {
 		rk := rt.Kind()
-		// if fastpathEnabled && checkFastpath && (rk == reflect.Map || rk == reflect.Slice) {
-		if fastpathEnabled && checkFastpath && (rk == reflect.Slice || (rk == reflect.Map && !e.h.Canonical)) {
+		if fastpathEnabled && checkFastpath && (rk == reflect.Map || rk == reflect.Slice) {
 			if rt.PkgPath() == "" {
 				if idx := fastpathAV.index(rtid); idx != -1 {
 					fn.f = fastpathAV[idx].encfn
@@ -1114,11 +1206,6 @@ func (e *Encoder) errorf(format string, params ...interface{}) {
 
 // ----------------------------------------
 
-type encStructFieldKV struct {
-	k string
-	v reflect.Value
-}
-
 const encStructPoolLen = 5
 
 // encStructPool is an array of sync.Pool.
@@ -1133,33 +1220,33 @@ const encStructPoolLen = 5
 var encStructPool [encStructPoolLen]sync.Pool
 
 func init() {
-	encStructPool[0].New = func() interface{} { return new([8]encStructFieldKV) }
-	encStructPool[1].New = func() interface{} { return new([16]encStructFieldKV) }
-	encStructPool[2].New = func() interface{} { return new([32]encStructFieldKV) }
-	encStructPool[3].New = func() interface{} { return new([64]encStructFieldKV) }
-	encStructPool[4].New = func() interface{} { return new([128]encStructFieldKV) }
+	encStructPool[0].New = func() interface{} { return new([8]stringRv) }
+	encStructPool[1].New = func() interface{} { return new([16]stringRv) }
+	encStructPool[2].New = func() interface{} { return new([32]stringRv) }
+	encStructPool[3].New = func() interface{} { return new([64]stringRv) }
+	encStructPool[4].New = func() interface{} { return new([128]stringRv) }
 }
 
-func encStructPoolGet(newlen int) (p *sync.Pool, v interface{}, s []encStructFieldKV) {
+func encStructPoolGet(newlen int) (p *sync.Pool, v interface{}, s []stringRv) {
 	// if encStructPoolLen != 5 { // constant chec, so removed at build time.
 	// 	panic(errors.New("encStructPoolLen must be equal to 4")) // defensive, in case it is changed
 	// }
 	// idxpool := newlen / 8
 
 	// if pool == nil {
-	// 	fkvs = make([]encStructFieldKV, newlen)
+	// 	fkvs = make([]stringRv, newlen)
 	// } else {
 	// 	poolv = pool.Get()
 	// 	switch vv := poolv.(type) {
-	// 	case *[8]encStructFieldKV:
+	// 	case *[8]stringRv:
 	// 		fkvs = vv[:newlen]
-	// 	case *[16]encStructFieldKV:
+	// 	case *[16]stringRv:
 	// 		fkvs = vv[:newlen]
-	// 	case *[32]encStructFieldKV:
+	// 	case *[32]stringRv:
 	// 		fkvs = vv[:newlen]
-	// 	case *[64]encStructFieldKV:
+	// 	case *[64]stringRv:
 	// 		fkvs = vv[:newlen]
-	// 	case *[128]encStructFieldKV:
+	// 	case *[128]stringRv:
 	// 		fkvs = vv[:newlen]
 	// 	}
 	// }
@@ -1167,25 +1254,25 @@ func encStructPoolGet(newlen int) (p *sync.Pool, v interface{}, s []encStructFie
 	if newlen <= 8 {
 		p = &encStructPool[0]
 		v = p.Get()
-		s = v.(*[8]encStructFieldKV)[:newlen]
+		s = v.(*[8]stringRv)[:newlen]
 	} else if newlen <= 16 {
 		p = &encStructPool[1]
 		v = p.Get()
-		s = v.(*[16]encStructFieldKV)[:newlen]
+		s = v.(*[16]stringRv)[:newlen]
 	} else if newlen <= 32 {
 		p = &encStructPool[2]
 		v = p.Get()
-		s = v.(*[32]encStructFieldKV)[:newlen]
+		s = v.(*[32]stringRv)[:newlen]
 	} else if newlen <= 64 {
 		p = &encStructPool[3]
 		v = p.Get()
-		s = v.(*[64]encStructFieldKV)[:newlen]
+		s = v.(*[64]stringRv)[:newlen]
 	} else if newlen <= 128 {
 		p = &encStructPool[4]
 		v = p.Get()
-		s = v.(*[128]encStructFieldKV)[:newlen]
+		s = v.(*[128]stringRv)[:newlen]
 	} else {
-		s = make([]encStructFieldKV, newlen)
+		s = make([]stringRv, newlen)
 	}
 	return
 }

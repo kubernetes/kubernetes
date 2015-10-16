@@ -45,7 +45,7 @@ _run() {
 }
 
 # echo ">>>>>>> RUNNING VARIATIONS OF TESTS"    
-if [[ "x$@" = x ]]; then
+if [[ "x$@" = "x" ]]; then
     # r, x, g, gu
     _run "-rtcins"
     _run "-xtcins"

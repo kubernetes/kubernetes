@@ -101,6 +101,7 @@ package codec
 // check for these error conditions.
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/binary"
 	"errors"
@@ -975,3 +976,114 @@ func (_ checkOverflow) SignedInt(v uint64) (i int64, overflow bool) {
 	i = int64(v)
 	return
 }
+
+// ------------------ SORT -----------------
+
+func isNaN(f float64) bool { return f != f }
+
+// -----------------------
+
+type intSlice []int64
+type uintSlice []uint64
+type floatSlice []float64
+type boolSlice []bool
+type stringSlice []string
+type bytesSlice [][]byte
+
+func (p intSlice) Len() int           { return len(p) }
+func (p intSlice) Less(i, j int) bool { return p[i] < p[j] }
+func (p intSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p uintSlice) Len() int           { return len(p) }
+func (p uintSlice) Less(i, j int) bool { return p[i] < p[j] }
+func (p uintSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p floatSlice) Len() int { return len(p) }
+func (p floatSlice) Less(i, j int) bool {
+	return p[i] < p[j] || isNaN(p[i]) && !isNaN(p[j])
+}
+func (p floatSlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+func (p stringSlice) Len() int           { return len(p) }
+func (p stringSlice) Less(i, j int) bool { return p[i] < p[j] }
+func (p stringSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p bytesSlice) Len() int           { return len(p) }
+func (p bytesSlice) Less(i, j int) bool { return bytes.Compare(p[i], p[j]) == -1 }
+func (p bytesSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p boolSlice) Len() int           { return len(p) }
+func (p boolSlice) Less(i, j int) bool { return !p[i] && p[j] }
+func (p boolSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// ---------------------
+
+type intRv struct {
+	v int64
+	r reflect.Value
+}
+type intRvSlice []intRv
+type uintRv struct {
+	v uint64
+	r reflect.Value
+}
+type uintRvSlice []uintRv
+type floatRv struct {
+	v float64
+	r reflect.Value
+}
+type floatRvSlice []floatRv
+type boolRv struct {
+	v bool
+	r reflect.Value
+}
+type boolRvSlice []boolRv
+type stringRv struct {
+	v string
+	r reflect.Value
+}
+type stringRvSlice []stringRv
+type bytesRv struct {
+	v []byte
+	r reflect.Value
+}
+type bytesRvSlice []bytesRv
+
+func (p intRvSlice) Len() int           { return len(p) }
+func (p intRvSlice) Less(i, j int) bool { return p[i].v < p[j].v }
+func (p intRvSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p uintRvSlice) Len() int           { return len(p) }
+func (p uintRvSlice) Less(i, j int) bool { return p[i].v < p[j].v }
+func (p uintRvSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p floatRvSlice) Len() int { return len(p) }
+func (p floatRvSlice) Less(i, j int) bool {
+	return p[i].v < p[j].v || isNaN(p[i].v) && !isNaN(p[j].v)
+}
+func (p floatRvSlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+func (p stringRvSlice) Len() int           { return len(p) }
+func (p stringRvSlice) Less(i, j int) bool { return p[i].v < p[j].v }
+func (p stringRvSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p bytesRvSlice) Len() int           { return len(p) }
+func (p bytesRvSlice) Less(i, j int) bool { return bytes.Compare(p[i].v, p[j].v) == -1 }
+func (p bytesRvSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func (p boolRvSlice) Len() int           { return len(p) }
+func (p boolRvSlice) Less(i, j int) bool { return !p[i].v && p[j].v }
+func (p boolRvSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// -----------------
+
+type bytesI struct {
+	v []byte
+	i interface{}
+}
+
+type bytesISlice []bytesI
+
+func (p bytesISlice) Len() int           { return len(p) }
+func (p bytesISlice) Less(i, j int) bool { return bytes.Compare(p[i].v, p[j].v) == -1 }
+func (p bytesISlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }

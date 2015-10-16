@@ -564,7 +564,7 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "2f4b94206aae781e63846a9bf02ad83c387d5296"
+			"Rev": "8a2a3a8c488c3ebd98f422a965260278267a0551"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
