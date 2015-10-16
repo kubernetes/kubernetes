@@ -90,6 +90,10 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_DaemonEndpoint_To_v1_DaemonEndpoint,
 		Convert_v1_DeleteOptions_To_api_DeleteOptions,
 		Convert_api_DeleteOptions_To_v1_DeleteOptions,
+		Convert_v1_DeprecatedDownwardAPIVolumeFile_To_api_DeprecatedDownwardAPIVolumeFile,
+		Convert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPIVolumeFile,
+		Convert_v1_DeprecatedDownwardAPIVolumeSource_To_api_DeprecatedDownwardAPIVolumeSource,
+		Convert_api_DeprecatedDownwardAPIVolumeSource_To_v1_DeprecatedDownwardAPIVolumeSource,
 		Convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
 		Convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
 		Convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource,
@@ -1466,6 +1470,99 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 
 func Convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *DeleteOptions, s conversion.Scope) error {
 	return autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in, out, s)
+}
+
+func autoConvert_v1_DeprecatedDownwardAPIVolumeFile_To_api_DeprecatedDownwardAPIVolumeFile(in *DeprecatedDownwardAPIVolumeFile, out *api.DeprecatedDownwardAPIVolumeFile, s conversion.Scope) error {
+	out.Path = in.Path
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(api.ResourceFieldSelector)
+		if err := Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
+	}
+	return nil
+}
+
+func Convert_v1_DeprecatedDownwardAPIVolumeFile_To_api_DeprecatedDownwardAPIVolumeFile(in *DeprecatedDownwardAPIVolumeFile, out *api.DeprecatedDownwardAPIVolumeFile, s conversion.Scope) error {
+	return autoConvert_v1_DeprecatedDownwardAPIVolumeFile_To_api_DeprecatedDownwardAPIVolumeFile(in, out, s)
+}
+
+func autoConvert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPIVolumeFile(in *api.DeprecatedDownwardAPIVolumeFile, out *DeprecatedDownwardAPIVolumeFile, s conversion.Scope) error {
+	out.Path = in.Path
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ResourceFieldSelector)
+		if err := Convert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
+	}
+	return nil
+}
+
+func Convert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPIVolumeFile(in *api.DeprecatedDownwardAPIVolumeFile, out *DeprecatedDownwardAPIVolumeFile, s conversion.Scope) error {
+	return autoConvert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPIVolumeFile(in, out, s)
+}
+
+func autoConvert_v1_DeprecatedDownwardAPIVolumeSource_To_api_DeprecatedDownwardAPIVolumeSource(in *DeprecatedDownwardAPIVolumeSource, out *api.DeprecatedDownwardAPIVolumeSource, s conversion.Scope) error {
+	SetDefaults_DeprecatedDownwardAPIVolumeSource(in)
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]api.DeprecatedDownwardAPIVolumeFile, len(*in))
+		for i := range *in {
+			if err := Convert_v1_DeprecatedDownwardAPIVolumeFile_To_api_DeprecatedDownwardAPIVolumeFile(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1_DeprecatedDownwardAPIVolumeSource_To_api_DeprecatedDownwardAPIVolumeSource(in *DeprecatedDownwardAPIVolumeSource, out *api.DeprecatedDownwardAPIVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_DeprecatedDownwardAPIVolumeSource_To_api_DeprecatedDownwardAPIVolumeSource(in, out, s)
+}
+
+func autoConvert_api_DeprecatedDownwardAPIVolumeSource_To_v1_DeprecatedDownwardAPIVolumeSource(in *api.DeprecatedDownwardAPIVolumeSource, out *DeprecatedDownwardAPIVolumeSource, s conversion.Scope) error {
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]DeprecatedDownwardAPIVolumeFile, len(*in))
+		for i := range *in {
+			if err := Convert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPIVolumeFile(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_api_DeprecatedDownwardAPIVolumeSource_To_v1_DeprecatedDownwardAPIVolumeSource(in *api.DeprecatedDownwardAPIVolumeSource, out *DeprecatedDownwardAPIVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_DeprecatedDownwardAPIVolumeSource_To_v1_DeprecatedDownwardAPIVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, s conversion.Scope) error {
@@ -6874,10 +6971,6 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	return nil
 }
 
-func Convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
-	return autoConvert_v1_VolumeSource_To_api_VolumeSource(in, out, s)
-}
-
 func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
 	if in.HostPath != nil {
 		in, out := &in.HostPath, &out.HostPath
@@ -7078,10 +7171,6 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		out.AzureDisk = nil
 	}
 	return nil
-}
-
-func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
-	return autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
 }
 
 func autoConvert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(in *VsphereVirtualDiskVolumeSource, out *api.VsphereVirtualDiskVolumeSource, s conversion.Scope) error {
