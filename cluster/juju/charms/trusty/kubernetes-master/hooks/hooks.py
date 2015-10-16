@@ -97,7 +97,7 @@ def config_changed():
 
     if config.changed('username') or config.changed('password'):
         hookenv.log('Username or password changed, creating authentication.')
-        basic_auth(config['username'], config['username'], config['password'])
+        basic_auth(username, username, password)
         if host.service_running('apiserver'):
             host.service_restart('apiserver')
 

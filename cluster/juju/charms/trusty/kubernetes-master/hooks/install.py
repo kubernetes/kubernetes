@@ -35,7 +35,7 @@ def install():
         'export GOROOT=/usr/local/go\n',
         'export PATH=$PATH:$GOROOT/bin\n',
         'export KUBERNETES_MASTER=http://{0}:8080\n'.format(address),
-        ]
+    ]
     update_rc_files(strings)
     hookenv.log('Downloading kubernetes code')
     clone_repository()
@@ -91,6 +91,7 @@ def install_packages():
     # Create the list of packages to install.
     apt_packages = ['apache2-utils',
                     'build-essential',
+                    'docker.io',
                     'git',
                     'make',
                     'nginx',
@@ -98,12 +99,14 @@ def install_packages():
     fetch.apt_install(fetch.filter_installed_packages(apt_packages))
 
 
-def update_rc_files(strings):
+def update_rc_files(strings, rc_files=None):
     """
     Preseed the bash environment for ubuntu and root with K8's env vars to
     make interfacing with the api easier. (see: kubectrl docs)
     """
-    rc_files = [Path('/home/ubuntu/.bashrc'), Path('/root/.bashrc')]
+    if not rc_files:
+        rc_files = [Path('/home/ubuntu/.bashrc'), Path('/root/.bashrc')]
+
     for rc_file in rc_files:
         lines = rc_file.lines()
         for string in strings:
