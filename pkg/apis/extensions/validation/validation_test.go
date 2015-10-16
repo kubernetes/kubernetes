@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
@@ -36,12 +35,25 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
+				MinReplicas:    newInt(1),
+				MaxReplicas:    5,
+				CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myautoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.HorizontalPodAutoscalerSpec{
+				ScaleRef: extensions.SubresourceReference{
+					Subresource: "scale",
+				},
+				MinReplicas: newInt(1),
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -52,18 +64,17 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 
 	errorCases := map[string]extensions.HorizontalPodAutoscaler{
-		"must be non-negative": {
+		"must be bigger or equal to 1": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: -1,
+				MinReplicas: newInt(-1),
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"must be bigger or equal to minReplicas": {
@@ -72,51 +83,25 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 7,
+				MinReplicas: newInt(7),
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
-		"invalid value": {
+		"must be non-negative": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
-			},
-		},
-		"resource not supported": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
-					Subresource: "scale",
-				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
-			},
-		},
-		"required value": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.HorizontalPodAutoscalerSpec{
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas:    newInt(1),
+				MaxReplicas:    5,
+				CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: -70},
 			},
 		},
 	}
@@ -940,4 +925,10 @@ func TestValidateIngress(t *testing.T) {
 			}
 		}
 	}
+}
+
+func newInt(val int) *int {
+	p := new(int)
+	*p = val
+	return p
 }

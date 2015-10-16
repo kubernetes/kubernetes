@@ -1363,11 +1363,13 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 		hpa.Spec.ScaleRef.Namespace,
 		hpa.Spec.ScaleRef.Name,
 		hpa.Spec.ScaleRef.Subresource)
-	target := fmt.Sprintf("%s %v", hpa.Spec.Target.Quantity.String(), hpa.Spec.Target.Resource)
-
+	target := "<unknown>"
+	if hpa.Spec.CPUUtilization != nil {
+		target = fmt.Sprintf("%d%%", hpa.Spec.CPUUtilization.TargetPercentage)
+	}
 	current := "<waiting>"
-	if hpa.Status.CurrentConsumption != nil {
-		current = fmt.Sprintf("%s %v", hpa.Status.CurrentConsumption.Quantity.String(), hpa.Status.CurrentConsumption.Resource)
+	if hpa.Status.CurrentCPUUtilizationPercentage != nil {
+		current = fmt.Sprintf("%d%%", *hpa.Status.CurrentCPUUtilizationPercentage)
 	}
 	minPods := hpa.Spec.MinReplicas
 	maxPods := hpa.Spec.MaxReplicas
