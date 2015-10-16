@@ -1054,34 +1054,6 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 	return nil
 }
 
-// GetContainerLogs uses journalctl to get the logs of the container.
-// By default, it returns a snapshot of the container log. Set |follow| to true to
-// stream the log. Set |follow| to false and specify the number of lines (e.g.
-// "100" or "all") to tail the log.
-//
-// In rkt runtime's implementation, per container log is get via 'journalctl -M [rkt-$UUID] -u [APP_NAME]'.
-// See https://github.com/coreos/rkt/blob/master/Documentation/commands.md#logging for more details.
-//
-// TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
-	id, err := parseContainerID(containerID)
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("journalctl", "-M", fmt.Sprintf("rkt-%s", id.uuid), "-u", id.appName)
-	if logOptions.Follow {
-		cmd.Args = append(cmd.Args, "-f")
-	}
-	if logOptions.TailLines == nil {
-		cmd.Args = append(cmd.Args, "-a")
-	} else {
-		cmd.Args = append(cmd.Args, "-n", strconv.FormatInt(*logOptions.TailLines, 10))
-	}
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	return cmd.Run()
-}
-
 // GarbageCollect collects the pods/containers.
 // TODO(yifan): Enforce the gc policy, also, it would be better if we can
 // just GC kubernetes pods.
