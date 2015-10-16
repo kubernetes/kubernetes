@@ -299,7 +299,7 @@ function kube-up {
   get-tokens
   create-provision-scripts
 
-  vagrant up
+  vagrant up --no-parallel
 
   export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
   export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
