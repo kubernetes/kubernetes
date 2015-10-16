@@ -64,6 +64,7 @@ type ProxyServerConfig struct {
 	nodeRef            *api.ObjectReference // Reference to this node.
 	MasqueradeAll      bool
 	CleanupAndExit     bool
+	UDPIdleTimeout     time.Duration
 }
 
 type ProxyServer struct {
@@ -93,6 +94,7 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 30*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
 	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
+	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 }
 
 const (
@@ -117,6 +119,7 @@ func NewProxyConfig() *ProxyServerConfig {
 		OOMScoreAdj:        qos.KubeProxyOomScoreAdj,
 		ResourceContainer:  "/kube-proxy",
 		SyncPeriod:         30 * time.Second,
+		UDPIdleTimeout:     250 * time.Millisecond,
 	}
 }
 
@@ -241,7 +244,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		// set EndpointsConfigHandler to our loadBalancer
 		endpointsHandler = loadBalancer
 
-		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.SyncPeriod)
+		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.SyncPeriod, config.UDPIdleTimeout)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
