@@ -33,6 +33,7 @@ type ServiceRegistry struct {
 	mu      sync.Mutex
 	List    api.ServiceList
 	Service *api.Service
+	Updates []api.Service
 	Err     error
 
 	DeletedID string
@@ -103,6 +104,7 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api
 
 	r.UpdatedID = svc.Name
 	*r.Service = *svc
+	r.Updates = append(r.Updates, *svc)
 	return svc, r.Err
 }
 
