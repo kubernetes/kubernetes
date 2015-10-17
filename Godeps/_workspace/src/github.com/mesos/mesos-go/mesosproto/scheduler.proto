@@ -21,6 +21,17 @@ package mesosproto;
 import "mesos.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
 
 /**
  * Scheduler event API.
@@ -40,11 +51,26 @@ message Event {
     MESSAGE = 5;    // See 'Message' below.
     FAILURE = 6;    // See 'Failure' below.
     ERROR = 7;      // See 'Error' below.
+
+    // Periodic message sent by the Mesos master according to
+    // 'Subscribed.heartbeat_interval_seconds'. If the scheduler does
+    // not receive any events (including heartbeats) for an extended
+    // period of time (e.g., 5 x heartbeat_interval_seconds), there is
+    // likely a network partition. In such a case the scheduler should
+    // close the existing subscription connection and resubscribe
+    // using a backoff strategy.
+    HEARTBEAT = 8;
   }
 
   // First event received when the scheduler subscribes.
   message Subscribed {
     required FrameworkID framework_id = 1;
+
+    // This value will be set if the master is sending heartbeats. See
+    // the comment above on 'HEARTBEAT' for more details.
+    // TODO(vinod): Implement heartbeats in the master once the master
+    // can send HTTP events.
+    optional double heartbeat_interval_seconds = 2;
   }
 
   // Received whenever there are new resources that are offered to the
@@ -152,6 +178,7 @@ message Call {
     ACKNOWLEDGE = 8; // See 'Acknowledge' below.
     RECONCILE = 9;   // See 'Reconcile' below.
     MESSAGE = 10;    // See 'Message' below.
+    REQUEST = 11;    // See 'Request' below.
 
     // TODO(benh): Consider adding an 'ACTIVATE' and 'DEACTIVATE' for
     // already subscribed frameworks as a way of stopping offers from
@@ -282,6 +309,16 @@ message Call {
     required bytes data = 3;
   }
 
+  // Requests a specific set of resources from Mesos's allocator. If
+  // the allocator has support for this, corresponding offers will be
+  // sent asynchronously via the OFFERS event(s).
+  //
+  // NOTE: The built-in hierarchical allocator doesn't have support
+  // for this call and hence simply ignores it.
+  message Request {
+    repeated mesosproto.Request requests = 1;
+  }
+
   // Identifies who generated this call. Master assigns a framework id
   // when a new scheduler subscribes for the first time. Once assigned,
   // the scheduler must set the 'framework_id' here and within its
@@ -302,4 +339,5 @@ message Call {
   optional Acknowledge acknowledge = 8;
   optional Reconcile reconcile = 9;
   optional Message message = 10;
+  optional Request request = 11;
 }

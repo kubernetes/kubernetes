@@ -21,10 +21,22 @@ package mesosproto;
 import "mesos.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
 // TODO(benh): Provide comments for each of these messages. Also,
 // consider splitting these messages into different "packages" which
 // represent which messages get handled by which components (e.g., the
-// "mesos.internal.executor" package includes messages that the
+// "mesos.executor" package includes messages that the
 // executor handles).
 
 
@@ -194,8 +206,15 @@ message RunTaskMessage {
   // TODO(karya): Remove framework_id after MESOS-2559 has shipped.
   optional FrameworkID framework_id = 1 [deprecated = true];
   required FrameworkInfo framework = 2;
-  required string pid = 3;
   required TaskInfo task = 4;
+
+  // The pid of the framework. This was moved to 'optional' in
+  // 0.24.0 to support schedulers using the HTTP API. For now, we
+  // continue to always set pid since it was required in 0.23.x.
+  // When 'pid' is unset, or set to empty string, the slave will
+  // forward executor messages through the master. For schedulers
+  // still using the driver, this will remain set.
+  optional string pid = 3;
 }
 
 
@@ -336,7 +355,9 @@ message ShutdownExecutorMessage {
 
 message UpdateFrameworkMessage {
   required FrameworkID framework_id = 1;
-  required string pid = 2;
+
+  // See the comment on RunTaskMessage.pid.
+  optional string pid = 2;
 }
 
 

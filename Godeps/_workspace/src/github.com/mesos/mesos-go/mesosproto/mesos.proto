@@ -32,7 +32,6 @@ option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
-
 /**
  * Status is used to indicate the state of the scheduler and executor
  * driver after function calls.
@@ -105,6 +104,32 @@ message ContainerID {
 
 
 /**
+ * A network address.
+ *
+ * TODO(bmahler): Use this more widely.
+ */
+message Address {
+  // May contain a hostname, IP address, or both.
+  optional string hostname = 1;
+  optional string ip = 2;
+
+  required int32 port = 3;
+}
+
+
+/**
+ * Represents a URL.
+ */
+message URL {
+  required string scheme = 1;
+  required Address address = 2;
+  optional string path = 3;
+  repeated Parameter query = 4;
+  optional string fragment = 5;
+}
+
+
+/**
  * Describes a framework.
  */
 message FrameworkInfo {
@@ -141,7 +166,8 @@ message FrameworkInfo {
 
   // Used to indicate the current host from which the scheduler is
   // registered in the Mesos Web UI. If set to an empty string Mesos
-  // will automagically set it to the current hostname.
+  // will automagically set it to the current hostname if one is
+  // available.
   optional string hostname = 7;
 
   // This field should match the credential's principal the framework
@@ -170,6 +196,11 @@ message FrameworkInfo {
   // capabilities (e.g., ability to receive offers for revocable
   // resources).
   repeated Capability capabilities = 10;
+
+  // Labels are free-form key value pairs supplied by the framework
+  // scheduler (e.g., to describe additional functionality offered by
+  // the framework). These labels are not interpreted by Mesos itself.
+  optional Labels labels = 11;
 }
 
 
@@ -353,11 +384,35 @@ message ExecutorInfo {
  */
 message MasterInfo {
   required string id = 1;
+
+  // The IP address (only IPv4) as a packed 4-bytes integer,
+  // stored in network order.  Deprecated, use `address.ip` instead.
   required uint32 ip = 2;
+
+  // The TCP port the Master is listening on for incoming
+  // HTTP requests; deprecated, use `address.port` instead.
   required uint32 port = 3 [default = 5050];
+
+  // In the default implementation, this will contain information
+  // about both the IP address, port and Master name; it should really
+  // not be relied upon by external tooling/frameworks and be
+  // considered an "internal" implementation field.
   optional string pid = 4;
+
+  // The server's hostname, if available; it may be unreliable
+  // in environments where the DNS configuration does not resolve
+  // internal hostnames (eg, some public cloud providers).
+  // Deprecated, use `address.hostname` instead.
   optional string hostname = 5;
+
+  // The running Master version, as a string; taken from the
+  // generated "master/version.hpp".
   optional string version = 6;
+
+  // The full IP address (supports both IPv4 and IPv6 formats)
+  // and supersedes the use of `ip`, `port` and `hostname`.
+  // Since Mesos 0.24.
+  optional Address address = 7;
 }
 
 
@@ -618,6 +673,7 @@ message ResourceStatistics {
   optional uint64 mem_mapped_file_bytes = 12;
   // This is only set if swap is enabled.
   optional uint64 mem_swap_bytes = 40;
+  optional uint64 mem_unevictable_bytes = 41;
 
   // Number of occurrences of different levels of memory pressure
   // events reported by memory cgroup. Pressure listening (re)starts
@@ -680,7 +736,9 @@ message ResourceUsage {
 
   repeated Executor executors = 1;
 
-  // TODO(jieyu): Include slave's total resources here.
+  // Slave's total resources including checkpointed dynamic
+  // reservations and persistent volumes.
+  repeated Resource total = 2;
 }
 
 
@@ -764,8 +822,6 @@ message PerfStatistics {
  * to proactively influence the allocator.  If 'slave_id' is provided
  * then this request is assumed to only apply to resources on that
  * slave.
- *
- * TODO(vinod): Remove this once the old driver is removed.
  */
 message Request {
   optional SlaveID slave_id = 1;
@@ -782,6 +838,10 @@ message Offer {
   required FrameworkID framework_id = 2;
   required SlaveID slave_id = 3;
   required string hostname = 4;
+
+  // URL for reaching the slave running on the host.
+  optional URL url = 8;
+
   repeated Resource resources = 5;
   repeated Attribute attributes = 7;
   repeated ExecutorID executor_ids = 6;
@@ -944,6 +1004,14 @@ message TaskStatus {
   // (true) or unhealthy (false) according to the HealthCheck field in
   // the command info.
   optional bool healthy = 8;
+
+  // Labels are free-form key value pairs which are exposed through
+  // master and slave endpoints. Labels will not be interpreted or
+  // acted upon by Mesos itself. As opposed to the data field, labels
+  // will be kept in memory on master and slave processes. Therefore,
+  // labels should be used to tag TaskStatus message with light-weight
+  // meta-data.
+  optional Labels labels = 12;
 }
 
 
@@ -1020,81 +1088,6 @@ message Credentials {
 
 
 /**
- * ACLs used for authorization.
- */
-message ACL {
-
-  // Entity is used to describe a subject(s) or an object(s) of an ACL.
-  // NOTE:
-  // To allow everyone access to an Entity set its type to 'ANY'.
-  // To deny access to an Entity set its type to 'NONE'.
-  message Entity {
-    enum Type {
-      SOME = 0;
-      ANY = 1;
-      NONE = 2;
-    }
-    optional Type type = 1 [default = SOME];
-    repeated string values = 2; // Ignored for ANY/NONE.
-  }
-
-  // ACLs.
-  message RegisterFramework {
-    // Subjects.
-    required Entity principals = 1; // Framework principals.
-
-    // Objects.
-    required Entity roles = 2; // Roles for resource offers.
-  }
-
-  message RunTask {
-    // Subjects.
-    required Entity principals = 1; // Framework principals.
-
-    // Objects.
-    required Entity users = 2; // Users to run the tasks/executors as.
-  }
-
-  // Which principals are authorized to shutdown frameworks of other
-  // principals.
-  message ShutdownFramework {
-    // Subjects.
-    required Entity principals = 1;
-
-    // Objects.
-    required Entity framework_principals = 2;
-  }
-}
-
-
-/**
- * Collection of ACL.
- *
- * Each authorization request is evaluated against the ACLs in the order
- * they are defined.
- *
- * For simplicity, the ACLs for a given action are not aggregated even
- * when they have the same subjects or objects. The first ACL that
- * matches the request determines whether that request should be
- * permitted or not. An ACL matches iff both the subjects
- * (e.g., clients, principals) and the objects (e.g., urls, users,
- * roles) of the ACL match the request.
- *
- * If none of the ACLs match the request, the 'permissive' field
- * determines whether the request should be permitted or not.
- *
- * TODO(vinod): Do aggregation of ACLs when possible.
- *
- */
-message ACLs {
-  optional bool permissive = 1 [default = true];
-  repeated ACL.RegisterFramework register_frameworks = 2;
-  repeated ACL.RunTask run_tasks = 3;
-  repeated ACL.ShutdownFramework shutdown_frameworks = 4;
-}
-
-
-/**
  * Rate (queries per second, QPS) limit for messages from a framework to master.
  * Strictly speaking they are the combined rate from all frameworks of the same
  * principal.
@@ -1139,23 +1132,75 @@ message RateLimits {
 
 
 /**
+ * Describe an image used by tasks or executors. Note that it's only
+ * for tasks or executors launched by MesosContainerizer currently.
+ * TODO(jieyu): This feature not fully supported in 0.24.0. Please do
+ * not use it until this feature is announced.
+ */
+message Image {
+  enum Type {
+    APPC = 1;
+    DOCKER = 2;
+  }
+
+  // Protobuf for specifying an Appc container image. See:
+  // https://github.com/appc/spec/blob/master/spec/aci.md
+  message AppC {
+    // The name of the image.
+    required string name = 1;
+
+    // An image ID is a string of the format "hash-value", where
+    // "hash" is the hash algorithm used and "value" is the hex
+    // encoded string of the digest. Currently the only permitted
+    // hash algorithm is sha512.
+    optional string id = 2;
+
+    // Optional labels. Suggested labels: "version", "os", and "arch".
+    optional Labels labels = 3;
+  }
+
+  message Docker {
+    // The name of the image. Expected in format repository[:tag].
+    required string name = 1;
+  }
+
+  required Type type = 1;
+
+  // Only one of the following image messages should be set to match
+  // the type.
+  optional AppC appc = 2;
+  optional Docker docker = 3;
+}
+
+
+/**
  * Describes a volume mapping either from host to container or vice
  * versa. Both paths can either refer to a directory or a file.
  */
 message Volume {
-  // Absolute path pointing to a directory or file in the container.
-  required string container_path = 1;
-
-  // Absolute path pointing to a directory or file on the host or a path
-  // relative to the container work directory.
-  optional string host_path = 2;
-
   enum Mode {
     RW = 1; // read-write.
     RO = 2; // read-only.
   }
 
   required Mode mode = 3;
+
+  // Path pointing to a directory or file in the container. If the
+  // path is a relative path, it is relative to the container work
+  // directory. If the path is an absolute path, that path must
+  // already exist.
+  required string container_path = 1;
+
+  // The following specifies the source of this volume. At most one of
+  // the following should be set.
+
+  // Absolute path pointing to a directory or file on the host or a
+  // path relative to the container work directory.
+  optional string host_path = 2;
+
+  // The source of the volume is an Image which describes a root
+  // filesystem which will be provisioned by Mesos.
+  optional Image image = 4;
 }
 
 
@@ -1206,11 +1251,18 @@ message ContainerInfo {
     optional bool force_pull_image = 6;
   }
 
+  message MesosInfo {
+    optional Image image = 1;
+  }
+
   required Type type = 1;
   repeated Volume volumes = 2;
   optional string hostname = 4;
 
+  // Only one of the following *Info messages should be set to match
+  // the type.
   optional DockerInfo docker = 3;
+  optional MesosInfo mesos = 5;
 }
 
 
@@ -1276,4 +1328,37 @@ message DiscoveryInfo {
   optional string version = 5;
   optional Ports ports = 6;
   optional Labels labels = 7;
+}
+
+
+/**
+* Protobuf for the Appc image manifest JSON schema:
+* https://github.com/appc/spec/blob/master/spec/aci.md#image-manifest-schema
+* Where possible, any field required in the schema is required in the protobuf
+* but some cannot be expressed, e.g., a repeated string that has at least one
+* element. Further validation should be performed after parsing the JSON into
+* the protobuf.
+* This version of Appc protobuf is based on Appc spec version 0.6.1.
+* TODO(xujyan): This protobuf currently defines a subset of fields in the spec
+* that Mesos makes use of to avoid confusion. New fields are going to be added
+* when Mesos starts to support them.
+*/
+message AppcImageManifest {
+  required string acKind = 1;
+  required string acVersion = 2;
+  required string name = 3;
+
+  message Label {
+    required string name = 1;
+    required string value = 2;
+  }
+
+  repeated Label labels = 4;
+
+  message Annotation {
+    required string name = 1;
+    required string value = 2;
+  }
+
+  repeated Annotation annotations = 5;
 }
