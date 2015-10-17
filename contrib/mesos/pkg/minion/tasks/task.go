@@ -19,6 +19,7 @@ package tasks
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -218,10 +219,15 @@ func notStartedTask(t *Task) taskStateFn {
 
 	// create command
 	cmd := exec.Command(t.bin, t.args...)
-	if _, err := cmd.StdoutPipe(); err != nil {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
 		t.tryError(fmt.Errorf("error getting stdout of %v: %v", t.name, err))
 		return taskShouldRestart
 	}
+	go func() {
+		defer stdout.Close()
+		io.Copy(ioutil.Discard, stdout) // TODO(jdef) we might want to save this at some point
+	}()
 	stderrLogs, err := cmd.StderrPipe()
 	if err != nil {
 		t.tryError(fmt.Errorf("error getting stderr of %v: %v", t.name, err))
