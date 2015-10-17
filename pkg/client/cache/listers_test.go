@@ -294,7 +294,8 @@ func TestStoreToJobLister(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
 			list: func() ([]extensions.Job, error) {
-				return lister.List()
+				list, err := lister.List()
+				return list.Items, err
 			},
 			outJobNames: sets.NewString("basic"),
 			msg:         "basic listing failed",
@@ -307,7 +308,8 @@ func TestStoreToJobLister(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
 			},
 			list: func() ([]extensions.Job, error) {
-				return lister.List()
+				list, err := lister.List()
+				return list.Items, err
 			},
 			outJobNames: sets.NewString("basic", "complex", "complex2"),
 			msg:         "listing multiple jobs failed",
