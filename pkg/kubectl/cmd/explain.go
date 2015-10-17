@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -70,13 +71,28 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	recursive := cmdutil.GetFlagBool(cmd, "recursive")
 	apiV := cmdutil.GetFlagString(cmd, "api-version")
 
-	swagSchema, err := kubectl.GetSwaggerSchema(apiV, client)
+	mapper, _ := f.Object()
+	group, inModel, fieldsPath, err := kubectl.SplitAndParseResourceRequest(args[0], mapper)
 	if err != nil {
 		return err
 	}
 
-	mapper, _ := f.Object()
-	inModel, fieldsPath, err := kubectl.SplitAndParseResourceRequest(args[0], mapper)
+	if len(group) == 0 {
+		// TODO: We should deduce the group for a resource by discovering the supported resources at server.
+		group, err = mapper.GroupForResource(inModel)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(apiV) == 0 {
+		groupMeta, err := latest.Group(group)
+		if err != nil {
+			return err
+		}
+		apiV = groupMeta.GroupVersion
+	}
+	swagSchema, err := kubectl.GetSwaggerSchema(apiV, client)
 	if err != nil {
 		return err
 	}
