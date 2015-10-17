@@ -194,7 +194,7 @@ func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVers
 	}
 	// If experimental mode, delete all experimental resources for the namespace.
 	if containsVersion(versions, "extensions/v1beta1") {
-		resources, err := kubeClient.SupportedResourcesForGroupVersion("extensions/v1beta1")
+		resources, err := kubeClient.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
 		if err != nil {
 			return estimate, err
 		}
