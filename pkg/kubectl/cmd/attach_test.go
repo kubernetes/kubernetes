@@ -186,6 +186,9 @@ func TestAttach(t *testing.T) {
 		if ex.method != "POST" {
 			t.Errorf("%s: Did not get method for attach request: %s", test.name, ex.method)
 		}
+		if ex.url.Query().Get("container") != "bar" {
+			t.Errorf("%s: Did not have query parameters: %s", test.name, ex.url.Query())
+		}
 	}
 }
 
