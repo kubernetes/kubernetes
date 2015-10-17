@@ -223,7 +223,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg} ${runtime_config}\
+    sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg} ${runtime_config} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -243,7 +243,13 @@ function start_apiserver {
 
 function start_controller_manager {
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
-    sudo -E "${GO_OUT}/kube-controller-manager" \
+
+    enable_extensions=""
+   if echo "${RUNTIME_CONFIG}" | grep -q "extensions/v1beta1=true"; then
+      enable_extensions="--enable-experimental"
+    fi
+
+    sudo -E "${GO_OUT}/kube-controller-manager" ${enable_extensions} \
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
