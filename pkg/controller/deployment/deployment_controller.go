@@ -251,7 +251,7 @@ func (d *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationC
 		Replicas:        totalReplicas,
 		UpdatedReplicas: updatedReplicas,
 	}
-	_, err := d.updateDeployment(&newDeployment)
+	_, err := d.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
 	return err
 }
 
