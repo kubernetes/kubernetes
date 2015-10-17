@@ -56,7 +56,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/componentstatuses",
+    "path": "/api/v1/componentstatuses",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -104,14 +104,6 @@
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
         "required": false,
         "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -131,7 +123,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/componentstatuses/{name}",
+    "path": "/api/v1/componentstatuses/{name}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -151,14 +143,6 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
         "name": "name",
         "description": "name of the ComponentStatus",
         "required": true,
@@ -170,73 +154,6 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.ComponentStatus"
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1/componentstatuses",
-    "description": "API at /api/v1",
-    "operations": [
-     {
-      "type": "v1.ComponentStatusList",
-      "method": "GET",
-      "summary": "list objects of kind ComponentStatus",
-      "nickname": "listComponentStatus",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1.ComponentStatusList"
        }
       ],
       "produces": [

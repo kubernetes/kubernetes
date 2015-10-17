@@ -77,6 +77,7 @@ func init() {
 		"Minion",
 		"Namespace",
 		"PersistentVolume",
+		"ComponentStatus",
 	)
 
 	// these kinds should be excluded from the list of resources
