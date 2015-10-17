@@ -2039,7 +2039,7 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus) errs.ValidationE
 				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, errMsg))
 			}
 			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {
-				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, "must be a DNS name, not ip address"))
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, "must be a DNS name, not an IP address"))
 			}
 		}
 	}
