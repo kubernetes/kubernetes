@@ -1,8 +1,8 @@
 From nobody Tue Aug 11 10:13:54 2015
-Content-Type: multipart/mixed; boundary="===============6024533374511606659=="
+Content-Type: multipart/mixed; boundary="===================================="
 MIME-Version: 1.0
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -98,7 +98,7 @@ current-context: service-account-context
 EOF
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -127,7 +127,7 @@ script
 	fi
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -158,7 +158,7 @@ script
 	fi
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -226,7 +226,7 @@ script
 	rm "/etc/saltbase/${salt_tar}"
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -270,7 +270,7 @@ end script
 # Wait for 10s to start kubelet again.
 post-stop exec sleep 10
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -306,7 +306,7 @@ end script
 # Wait for 10s to start kube-proxy again.
 post-stop exec sleep 10
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -327,7 +327,11 @@ script
 
 	. /etc/kube-env
 	# Assemble docker deamon options
-	echo "DOCKER_OPTS=\"-p /var/run/docker.pid ${EXTRA_DOCKER_OPTS} --log-level=\"debug\" --bridge cbr0 --iptables=false --ip-masq=false\"" > /etc/default/docker
+	DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		DOCKER_OPTS="${DOCKER_OPTS} --log-level=debug"
+	fi
+	echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS}\"" > /etc/default/docker
 	# Make sure the network interface cbr0 is created before restarting docker daemon
 	while ! [ -L /sys/class/net/cbr0 ]; do
 		echo "Sleep 1 second to wait for cbr0"
@@ -339,7 +343,7 @@ script
 	brctl delbr docker0
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -371,7 +375,7 @@ script
 	fi
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -411,5 +415,5 @@ script
 	done
 end script
 
---===============6024533374511606659==--
+--====================================--
 
