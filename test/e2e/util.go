@@ -1447,6 +1447,9 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := podStore.List()
+		if len(pods) == 0 {
+			continue waitLoop
+		}
 		for _, p := range pods {
 			if p.Status.Phase != api.PodRunning {
 				continue waitLoop
