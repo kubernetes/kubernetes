@@ -90,21 +90,21 @@ func testComponentStatusData() *api.ComponentStatusList {
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
 		},
-		ObjectMeta: api.ObjectMeta{Name: "servergood", Namespace: "test"},
+		ObjectMeta: api.ObjectMeta{Name: "servergood"},
 	}
 
 	bad := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
 		},
-		ObjectMeta: api.ObjectMeta{Name: "serverbad", Namespace: "test"},
+		ObjectMeta: api.ObjectMeta{Name: "serverbad"},
 	}
 
 	unknown := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
 		},
-		ObjectMeta: api.ObjectMeta{Name: "serverunknown", Namespace: "test"},
+		ObjectMeta: api.ObjectMeta{Name: "serverunknown"},
 	}
 
 	return &api.ComponentStatusList{
