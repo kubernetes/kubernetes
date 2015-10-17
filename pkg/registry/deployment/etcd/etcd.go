@@ -35,15 +35,17 @@ import (
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
 type DeploymentStorage struct {
 	Deployment *REST
+	Status     *StatusREST
 	Scale      *ScaleREST
 }
 
 func NewStorage(s storage.Interface) DeploymentStorage {
-	deploymentRest := NewREST(s)
+	deploymentRest, deploymentStatusRest := NewREST(s)
 	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
 		Deployment: deploymentRest,
+		Status:     deploymentStatusRest,
 		Scale:      &ScaleREST{registry: &deploymentRegistry},
 	}
 }
@@ -53,7 +55,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/deployments"
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Deployment{} },
@@ -87,7 +89,23 @@ func NewREST(s storage.Interface) *REST {
 
 		Storage: s,
 	}
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = deployment.StatusStrategy
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a deployment
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &extensions.Deployment{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }
 
 type ScaleREST struct {
