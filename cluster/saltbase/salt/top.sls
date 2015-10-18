@@ -86,3 +86,9 @@ base:
   'roles:kubernetes-pool-vsphere':
     - match: grain
     - static-routes
+
+  'roles:kubernetes-network-provider-gateway':
+    - match: grain
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-gateway
+{% endif %}

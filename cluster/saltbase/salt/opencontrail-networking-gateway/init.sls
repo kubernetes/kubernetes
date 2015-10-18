@@ -1,13 +1,12 @@
-opencontrail-networking-minion:
+opencontrail-networking-gateway:
   cmd.script:
-    - unless: test -f /var/log/contrail/provision_minion.log
+    - unless: test -f /var/log/contrail/provision_gateway.log
     - env:
       - 'OPENCONTRAIL_TAG': '{{ pillar.get('opencontrail_tag') }}'
       - 'OPENCONTRAIL_KUBERNETES_TAG': '{{ pillar.get('opencontrail_kubernetes_tag') }}'
       - 'OPENCONTRAIL_PUBLIC_SUBNET': '{{ pillar.get('opencontrail_public_subnet') }}'
-      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
       - 'NETWORK_PROVIDER_GATEWAY_ON_MINION': '{{ pillar.get('network_provider_gw_on_minion') }}'
-    - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/provision_minion.sh
+    - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/provision_gateway.sh
     - source_hash: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/manifests.hash
     - cwd: /
     - user: root

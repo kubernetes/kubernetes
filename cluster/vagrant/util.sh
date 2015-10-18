@@ -173,6 +173,7 @@ function create-provision-scripts {
     echo "SERVICE_CLUSTER_IP_GW='${SERVICE_CLUSTER_IP_GW:-}'"
     echo "KUBE_UI_IP_PUBLIC='${KUBE_UI_IP_PUBLIC:-}'"
     echo "DNS_SERVER_IP_PUBLIC='${DNS_SERVER_IP_PUBLIC:-}'"
+    echo "NETWORK_PROVIDER_GATEWAY_ON_MINION='${NETWORK_PROVIDER_GATEWAY_ON_MINION:-false}'"
 
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"

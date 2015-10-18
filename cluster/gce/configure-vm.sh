@@ -284,6 +284,7 @@ opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW")'
 kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
 dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
+network_provider_gw_on_minion: '$(echo "$NETWORK_PROVIDER_GATEWAY_ON_MINION")'
 EOF
 
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
@@ -602,6 +603,17 @@ grains:
 EOF
 }
 
+function salt-network-provider-gw-role() {
+  cat <<EOF >/etc/salt/minion.d/grains.conf
+grains:
+  roles:
+    - kubernetes-network-provider-gateway
+  cloud: gce
+  api_servers: '${KUBERNETES_MASTER_NAME}'
+  network_provider: '${NETWORK_PROVIDER}'
+EOF
+}
+
 function salt-docker-opts() {
   DOCKER_OPTS=""
 
@@ -625,6 +637,8 @@ function configure-salt() {
     if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
         salt-apiserver-timeout-grain $KUBE_APISERVER_REQUEST_TIMEOUT
     fi
+  elif [[ "${KUBERNETES_MASTER}" == "false" ]] && [[ "${KUBERNETES_NETWORK_PROVIDER_GATEWAY}" ==  "true" ]]; then
+     salt-network-provider-gw-role
   else
     salt-node-role
     salt-docker-opts
