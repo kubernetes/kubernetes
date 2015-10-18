@@ -34,7 +34,7 @@ function config_etcd {
     else
     	# enough timeout??
       if (( attempt > 600 )); then
-        echo "timeout for waiting network config" > ~/kube/err.log
+        echo "timeout waiting for /coreos.com/network/config" >> ~/kube/err.log
         exit 2
       fi
 
@@ -46,8 +46,17 @@ function config_etcd {
 }
 
 function restart_docker {
-  #wait some secs for /run/flannel/subnet.env ready
-  sleep 15
+  
+  attempt=0
+  while [[ ! -f /run/flannel/subnet.env ]]; do 
+    if (( attempt > 200 )); then
+      echo "timeout waiting for /run/flannel/subnet.env" >> ~/kube/err.log 
+      exit 2
+    fi
+    attempt=$((attempt+1))
+    sleep 3
+  done
+  
   sudo ip link set dev docker0 down
   sudo brctl delbr docker0
 
