@@ -455,7 +455,13 @@ var _ = Describe("SchedulerPredicates", func() {
 		})
 		expectNoError(err)
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
-		expectNoError(waitForPodRunningInNamespace(c, labelPodName, ns))
+
+		// check that pod got scheduled. We intentionally DO NOT check that the
+		// pod is running because this will create a race condition with the
+		// kubelet and the scheduler: the scheduler might have scheduled a pod
+		// already when the kubelet does not know about its new label yet. The
+		// kubelet will then refuse to launch the pod.
+		expectNoError(waitForPodNotPending(c, ns, labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		expectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
