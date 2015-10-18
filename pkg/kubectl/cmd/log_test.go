@@ -20,7 +20,11 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -35,7 +39,7 @@ func TestLog(t *testing.T) {
 		{
 			name:    "v1 - pod log",
 			version: "v1",
-			podPath: "/api/v1/namespaces/test/pods/foo",
+			podPath: "/namespaces/test/pods/foo",
 			logPath: "/api/v1/namespaces/test/pods/foo/log",
 			pod:     testPod(),
 		},
@@ -86,5 +90,51 @@ func testPod() *api.Pod {
 				},
 			},
 		},
+	}
+}
+
+func TestValidateLogFlags(t *testing.T) {
+	f, _, _ := NewAPIFactory()
+
+	tests := []struct {
+		name     string
+		flags    map[string]string
+		expected string
+	}{
+		{
+			name:     "since & since-time",
+			flags:    map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
+			expected: "only one of sinceTime or sinceSeconds can be provided",
+		},
+		{
+			name:     "negative limit-bytes",
+			flags:    map[string]string{"limit-bytes": "-100"},
+			expected: "limitBytes must be a positive integer or nil",
+		},
+		{
+			name:     "negative tail",
+			flags:    map[string]string{"tail": "-100"},
+			expected: "tailLines must be a non-negative integer or nil",
+		},
+	}
+	for _, test := range tests {
+		cmd := NewCmdLog(f, bytes.NewBuffer([]byte{}))
+		out := ""
+		for flag, value := range test.flags {
+			cmd.Flags().Set(flag, value)
+		}
+		// checkErr breaks tests in case of errors, plus we just
+		// need to check errors returned by the command validation
+		o := &LogsOptions{}
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			o.Complete(f, os.Stdout, cmd, args)
+			out = o.Validate().Error()
+			o.RunLog()
+		}
+		cmd.Run(cmd, []string{"foo"})
+
+		if !strings.Contains(out, test.expected) {
+			t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expected, out)
+		}
 	}
 }

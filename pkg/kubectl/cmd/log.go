@@ -18,19 +18,21 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
+	kerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -51,193 +53,153 @@ $ kubectl logs --since=1h nginx`
 )
 
 type LogsOptions struct {
-	Client *client.Client
+	Namespace   string
+	ResourceArg string
+	Options     runtime.Object
 
-	PodNamespace  string
-	PodName       string
-	ContainerName string
-	Follow        bool
-	Timestamps    bool
-	Previous      bool
-	LimitBytes    int
-	Tail          int
-	SinceTime     *unversioned.Time
-	SinceSeconds  time.Duration
+	Mapper       meta.RESTMapper
+	Typer        runtime.ObjectTyper
+	ClientMapper resource.ClientMapper
+
+	LogsForObject func(object, options runtime.Object) (*client.Request, error)
 
 	Out io.Writer
 }
 
 // NewCmdLog creates a new pod log command
 func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	o := &LogsOptions{
-		Out:  out,
-		Tail: -1,
-	}
-
+	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
-		Run: func(cmd *cobra.Command, args []string) {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
 				printDeprecationWarning("logs", "log")
 			}
-
+		},
+		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, out, cmd, args))
 			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			cmdutil.CheckErr(o.RunLog())
+			_, err := o.RunLog()
+			cmdutil.CheckErr(err)
 		},
 		Aliases: []string{"log"},
 	}
-	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
-	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
-	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
-	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
-	cmd.Flags().IntVar(&o.LimitBytes, "limit-bytes", o.LimitBytes, "Maximum bytes of logs to return. Defaults to no limit.")
-	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
-	cmd.Flags().IntVar(&o.Tail, "tail", o.Tail, "Lines of recent log file to display. Defaults to -1, showing all log lines.")
+	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
+	cmd.Flags().Bool("timestamps", false, "Include timestamps on each line in the log output")
+	cmd.Flags().Int64("limit-bytes", 0, "Maximum bytes of logs to return. Defaults to no limit.")
+	cmd.Flags().BoolP("previous", "p", false, "If true, print the logs for the previous instance of the container in a pod if it exists.")
+	cmd.Flags().Int64("tail", -1, "Lines of recent log file to display. Defaults to -1, showing all log lines.")
 	cmd.Flags().String("since-time", "", "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.")
-	cmd.Flags().DurationVar(&o.SinceSeconds, "since", o.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
-	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Container name")
+	cmd.Flags().Duration("since", 0, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
+	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
+
+	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
+	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
 	return cmd
 }
 
 func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	containerName := cmdutil.GetFlagString(cmd, "container")
 	switch len(args) {
 	case 0:
-		return cmdutil.UsageError(cmd, "POD is required for log")
-
+		return cmdutil.UsageError(cmd, "POD is required for logs")
 	case 1:
-		o.PodName = args[0]
+		o.ResourceArg = args[0]
 	case 2:
 		if cmd.Flag("container").Changed {
 			return cmdutil.UsageError(cmd, "only one of -c, [CONTAINER] arg is allowed")
 		}
-		o.PodName = args[0]
-		o.ContainerName = args[1]
-
+		o.ResourceArg = args[0]
+		containerName = args[1]
 	default:
-		return cmdutil.UsageError(cmd, "log POD [-c CONTAINER]")
+		return cmdutil.UsageError(cmd, "logs POD [-c CONTAINER]")
 	}
-
 	var err error
-	o.PodNamespace, _, err = f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-	o.Client, err = f.Client()
+	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	sinceTime := cmdutil.GetFlagString(cmd, "since-time")
-	if len(sinceTime) > 0 {
+	logOptions := &api.PodLogOptions{
+		Container:  containerName,
+		Follow:     cmdutil.GetFlagBool(cmd, "follow"),
+		Previous:   cmdutil.GetFlagBool(cmd, "previous"),
+		Timestamps: cmdutil.GetFlagBool(cmd, "timestamps"),
+	}
+	if sinceTime := cmdutil.GetFlagString(cmd, "since-time"); len(sinceTime) > 0 {
 		t, err := api.ParseRFC3339(sinceTime, unversioned.Now)
 		if err != nil {
 			return err
 		}
-		o.SinceTime = &t
+		logOptions.SinceTime = &t
 	}
+	if limit := cmdutil.GetFlagInt64(cmd, "limit-bytes"); limit != 0 {
+		logOptions.LimitBytes = &limit
+	}
+	if tail := cmdutil.GetFlagInt64(cmd, "tail"); tail != -1 {
+		logOptions.TailLines = &tail
+	}
+	if sinceSeconds := cmdutil.GetFlagDuration(cmd, "since"); sinceSeconds != 0 {
+		// round up to the nearest second
+		sec := int64(math.Ceil(float64(sinceSeconds) / float64(time.Second)))
+		logOptions.SinceSeconds = &sec
+	}
+	o.Options = logOptions
+
+	o.Mapper, o.Typer = f.Object()
+	o.ClientMapper = f.ClientMapperForCommand()
+	o.LogsForObject = f.LogsForObject
+
+	o.Out = out
 
 	return nil
 }
 
-func (o *LogsOptions) Validate() error {
-	if len(o.PodName) == 0 {
-		return errors.New("POD must be specified")
+func (o LogsOptions) Validate() error {
+	if len(o.ResourceArg) == 0 {
+		return errors.New("a pod must be specified")
 	}
-	if o.LimitBytes < 0 {
-		return errors.New("--limit-bytes must be greater than or equal to zero")
+	logOptions, ok := o.Options.(*api.PodLogOptions)
+	if !ok {
+		return errors.New("unexpected log options object")
 	}
-	if o.Tail < -1 {
-		return errors.New("--tail must be greater than or equal to -1")
-	}
-	if o.SinceTime != nil && o.SinceSeconds > 0 {
-		return errors.New("only one of --since, --since-time may be specified")
+	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
+		return kerrors.NewAggregate(errs)
 	}
 
 	return nil
 }
 
 // RunLog retrieves a pod log
-func (o *LogsOptions) RunLog() error {
-	pod, err := o.Client.Pods(o.PodNamespace).Get(o.PodName)
+func (o LogsOptions) RunLog() (int64, error) {
+	infos, err := resource.NewBuilder(o.Mapper, o.Typer, o.ClientMapper).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		ResourceNames("pods", o.ResourceArg).
+		SingleResourceType().
+		Do().Infos()
 	if err != nil {
-		return err
+		return 0, err
+	}
+	if len(infos) != 1 {
+		return 0, errors.New("expected a resource")
+	}
+	info := infos[0]
+
+	req, err := o.LogsForObject(info.Object, o.Options)
+	if err != nil {
+		return 0, err
 	}
 
-	// [-c CONTAINER]
-	container := o.ContainerName
-	if len(container) == 0 {
-		// [CONTAINER] (container as arg not flag) is supported as legacy behavior. See PR #10519 for more details.
-		if len(pod.Spec.Containers) != 1 {
-			podContainersNames := []string{}
-			for _, container := range pod.Spec.Containers {
-				podContainersNames = append(podContainersNames, container.Name)
-			}
-
-			return fmt.Errorf("Pod %s has the following containers: %s; please specify the container to print logs for with -c", pod.ObjectMeta.Name, strings.Join(podContainersNames, ", "))
-		}
-		container = pod.Spec.Containers[0].Name
-	}
-
-	logOptions := &api.PodLogOptions{
-		Container:  container,
-		Follow:     o.Follow,
-		Previous:   o.Previous,
-		Timestamps: o.Timestamps,
-	}
-	if o.SinceSeconds > 0 {
-		// round up to the nearest second
-		sec := int64(math.Ceil(float64(o.SinceSeconds) / float64(time.Second)))
-		logOptions.SinceSeconds = &sec
-	}
-	logOptions.SinceTime = o.SinceTime
-	if o.LimitBytes != 0 {
-		i := int64(o.LimitBytes)
-		logOptions.LimitBytes = &i
-	}
-	if o.Tail >= 0 {
-		i := int64(o.Tail)
-		logOptions.TailLines = &i
-	}
-
-	return handleLog(o.Client, o.PodNamespace, o.PodName, logOptions, o.Out)
-}
-
-func handleLog(client *client.Client, namespace, podID string, logOptions *api.PodLogOptions, out io.Writer) error {
-	// TODO: transform this into a PodLogOptions call
-	req := client.RESTClient.Get().
-		Namespace(namespace).
-		Name(podID).
-		Resource("pods").
-		SubResource("log").
-		Param("follow", strconv.FormatBool(logOptions.Follow)).
-		Param("container", logOptions.Container).
-		Param("previous", strconv.FormatBool(logOptions.Previous)).
-		Param("timestamps", strconv.FormatBool(logOptions.Timestamps))
-
-	if logOptions.SinceSeconds != nil {
-		req.Param("sinceSeconds", strconv.FormatInt(*logOptions.SinceSeconds, 10))
-	}
-	if logOptions.SinceTime != nil {
-		req.Param("sinceTime", logOptions.SinceTime.Format(time.RFC3339))
-	}
-	if logOptions.LimitBytes != nil {
-		req.Param("limitBytes", strconv.FormatInt(*logOptions.LimitBytes, 10))
-	}
-	if logOptions.TailLines != nil {
-		req.Param("tailLines", strconv.FormatInt(*logOptions.TailLines, 10))
-	}
 	readCloser, err := req.Stream()
 	if err != nil {
-		return err
+		return 0, err
 	}
-
 	defer readCloser.Close()
-	_, err = io.Copy(out, readCloser)
-	return err
+
+	return io.Copy(o.Out, readCloser)
 }
