@@ -30,7 +30,7 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -85,7 +85,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 		fakeRecorder,
 		prober.FakeProber{},
 		containerRefManager,
-		&cadvisorApi.MachineInfo{},
+		&cadvisorapi.MachineInfo{},
 		PodInfraContainerImage,
 		0, 0, "",
 		kubecontainer.FakeOS{},

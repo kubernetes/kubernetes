@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -530,7 +530,7 @@ type Kubelet struct {
 	diskSpaceManager diskSpaceManager
 
 	// Cached MachineInfo returned by cadvisor.
-	machineInfo *cadvisorApi.MachineInfo
+	machineInfo *cadvisorapi.MachineInfo
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager status.Manager
@@ -2769,7 +2769,7 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 }
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 
 	podUID = kl.podManager.TranslatePodUID(podUID)
 
@@ -2791,7 +2791,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 }
 
 // Returns stats (from Cadvisor) for a non-Kubernetes container.
-func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
+func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
 	if subcontainers {
 		return kl.cadvisor.SubcontainerInfo(containerName, req)
 	} else {
@@ -2799,14 +2799,14 @@ func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.Co
 		if err != nil {
 			return nil, err
 		}
-		return map[string]*cadvisorApi.ContainerInfo{
+		return map[string]*cadvisorapi.ContainerInfo{
 			containerInfo.Name: containerInfo,
 		}, nil
 	}
 }
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
-func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	if kl.machineInfo == nil {
 		info, err := kl.cadvisor.MachineInfo()
 		if err != nil {

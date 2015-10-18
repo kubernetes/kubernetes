@@ -18,8 +18,8 @@ package cadvisor
 
 import (
 	"github.com/google/cadvisor/events"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -35,41 +35,41 @@ func (c *Mock) Start() error {
 }
 
 // ContainerInfo is a mock implementation of Interface.ContainerInfo.
-func (c *Mock) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (c *Mock) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	args := c.Called(name, req)
-	return args.Get(0).(*cadvisorApi.ContainerInfo), args.Error(1)
+	return args.Get(0).(*cadvisorapi.ContainerInfo), args.Error(1)
 }
 
-func (c *Mock) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+func (c *Mock) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	args := c.Called(name, req)
-	return args.Get(0).(map[string]*cadvisorApi.ContainerInfo), args.Error(1)
+	return args.Get(0).(map[string]*cadvisorapi.ContainerInfo), args.Error(1)
 }
 
 // DockerContainer is a mock implementation of Interface.DockerContainer.
-func (c *Mock) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
+func (c *Mock) DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error) {
 	args := c.Called(name, req)
-	return args.Get(0).(cadvisorApi.ContainerInfo), args.Error(1)
+	return args.Get(0).(cadvisorapi.ContainerInfo), args.Error(1)
 }
 
 // MachineInfo is a mock implementation of Interface.MachineInfo.
-func (c *Mock) MachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (c *Mock) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	args := c.Called()
-	return args.Get(0).(*cadvisorApi.MachineInfo), args.Error(1)
+	return args.Get(0).(*cadvisorapi.MachineInfo), args.Error(1)
 }
 
-func (c *Mock) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+func (c *Mock) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	args := c.Called()
-	return args.Get(0).(*cadvisorApi.VersionInfo), args.Error(1)
+	return args.Get(0).(*cadvisorapi.VersionInfo), args.Error(1)
 }
 
-func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
+func (c *Mock) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	args := c.Called()
-	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }
 
-func (c *Mock) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
+func (c *Mock) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	args := c.Called()
-	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }
 
 func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error) {
