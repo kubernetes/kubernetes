@@ -725,6 +725,19 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
 		fmt.Fprintf(out, "    Image ID:\t%s\n", status.ImageID)
 
+		if len(container.Command) > 0 {
+			fmt.Fprintf(out, "    Command:\n")
+			for _, c := range container.Command {
+				fmt.Fprintf(out, "      %s\n", c)
+			}
+		}
+		if len(container.Args) > 0 {
+			fmt.Fprintf(out, "    Args:\n")
+			for _, arg := range container.Args {
+				fmt.Fprintf(out, "      %s\n", arg)
+			}
+		}
+
 		resourceToQoS := qosutil.GetQoS(&container)
 		if len(resourceToQoS) > 0 {
 			fmt.Fprintf(out, "    QoS Tier:\n")
