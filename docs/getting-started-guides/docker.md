@@ -121,12 +121,32 @@ binary
 ([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
 ([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
 
-*Note:*
-On OS/X you will need to set up port forwarding via ssh:
+<hr>
+
+**Note for OS/X users:**
+You will need to set up port forwarding via ssh. For users still using boot2docker directly, it is enough to run the command:
 
 ```sh
 boot2docker ssh -L8080:localhost:8080
 ```
+
+Since the recent deprecation of boot2docker/osx-installer, the correct way to solve the problem is to issue
+
+```sh
+docker-machine ssh default -L 8080:localhost:8080
+```
+
+However, this solution works only from docker-machine version 0.5. For older versions of docker-machine, a workaround is the
+following:
+
+```sh
+docker-machine env default
+ssh -f -T -N -L8080:localhost:8080 -l docker $(echo $DOCKER_HOST | cut -d ':' -f 2 | tr -d '/')
+```
+
+Type `tcuser` as the password.
+
+<hr>
 
 List the nodes in your cluster by running:
 
