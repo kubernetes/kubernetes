@@ -33,7 +33,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -137,10 +137,10 @@ type AuthInterface interface {
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	GetContainerRuntimeVersion() (kubecontainer.Version, error)
-	GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error)
-	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
+	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
+	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetRunningPods() ([]*api.Pod, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -232,7 +232,7 @@ func (s *Server) InstallDefaultHandlers() {
 	ws.Route(ws.GET("").
 		To(s.getSpec).
 		Operation("getSpec").
-		Writes(cadvisorApi.MachineInfo{}))
+		Writes(cadvisorapi.MachineInfo{}))
 	s.restfulCont.Add(ws)
 }
 
@@ -1101,7 +1101,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
-	cadvisorRequest := cadvisorApi.ContainerInfoRequest{
+	cadvisorRequest := cadvisorapi.ContainerInfoRequest{
 		NumStats: query.NumStats,
 		Start:    query.Start,
 		End:      query.End,
@@ -1110,7 +1110,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	switch len(components) {
 	case 1:
 		// Root container stats.
-		var statsMap map[string]*cadvisorApi.ContainerInfo
+		var statsMap map[string]*cadvisorapi.ContainerInfo
 		statsMap, err = s.host.GetRawContainerInfo("/", &cadvisorRequest, false)
 		stats = statsMap["/"]
 	case 2:

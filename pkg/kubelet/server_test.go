@@ -33,7 +33,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -49,9 +49,9 @@ import (
 
 type fakeKubelet struct {
 	podByNameFunc                      func(namespace, name string) (*api.Pod, bool)
-	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	rawInfoFunc                        func(query *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
-	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
+	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	rawInfoFunc                        func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
+	machineInfoFunc                    func() (*cadvisorapi.MachineInfo, error)
 	podsFunc                           func() []*api.Pod
 	runningPodsFunc                    func() ([]*api.Pod, error)
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
@@ -79,11 +79,11 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return fk.containerInfoFunc(podFullName, uid, containerName, req)
 }
 
-func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
+func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return fk.rawInfoFunc(req)
 }
 
@@ -91,7 +91,7 @@ func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, erro
 	return fk.containerVersionFunc()
 }
 
-func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return fk.machineInfoFunc()
 }
 
@@ -218,11 +218,11 @@ func getPodName(name, namespace string) string {
 
 func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{}
+	expectedInfo := &cadvisorapi.ContainerInfo{}
 	podID := "somepod"
 	expectedPodID := getPodName(podID, "")
 	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
 			return nil, fmt.Errorf("bad podID or containerName: podID=%v; containerName=%v", podID, containerName)
 		}
@@ -234,7 +234,7 @@ func TestContainerInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.ContainerInfo
+	var receivedInfo cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -246,13 +246,13 @@ func TestContainerInfo(t *testing.T) {
 
 func TestContainerInfoWithUidNamespace(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{}
+	expectedInfo := &cadvisorapi.ContainerInfo{}
 	podID := "somepod"
 	expectedNamespace := "custom"
 	expectedPodID := getPodName(podID, expectedNamespace)
 	expectedContainerName := "goodcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 		if podID != expectedPodID || string(uid) != expectedUid || containerName != expectedContainerName {
 			return nil, fmt.Errorf("bad podID or uid or containerName: podID=%v; uid=%v; containerName=%v", podID, uid, containerName)
 		}
@@ -264,7 +264,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.ContainerInfo
+	var receivedInfo cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -280,7 +280,7 @@ func TestContainerNotFound(t *testing.T) {
 	expectedNamespace := "custom"
 	expectedContainerName := "slowstartcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 		return nil, ErrContainerNotFound
 	}
 	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, expectedUid, expectedContainerName))
@@ -295,13 +295,13 @@ func TestContainerNotFound(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{
-		ContainerReference: cadvisorApi.ContainerReference{
+	expectedInfo := &cadvisorapi.ContainerInfo{
+		ContainerReference: cadvisorapi.ContainerReference{
 			Name: "/",
 		},
 	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
-		return map[string]*cadvisorApi.ContainerInfo{
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
+		return map[string]*cadvisorapi.ContainerInfo{
 			expectedInfo.Name: expectedInfo,
 		}, nil
 	}
@@ -311,7 +311,7 @@ func TestRootInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.ContainerInfo
+	var receivedInfo cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -325,19 +325,19 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 	fw := newServerTest()
 	const kubeletContainer = "/kubelet"
 	const kubeletSubContainer = "/kubelet/sub"
-	expectedInfo := map[string]*cadvisorApi.ContainerInfo{
+	expectedInfo := map[string]*cadvisorapi.ContainerInfo{
 		kubeletContainer: {
-			ContainerReference: cadvisorApi.ContainerReference{
+			ContainerReference: cadvisorapi.ContainerReference{
 				Name: kubeletContainer,
 			},
 		},
 		kubeletSubContainer: {
-			ContainerReference: cadvisorApi.ContainerReference{
+			ContainerReference: cadvisorapi.ContainerReference{
 				Name: kubeletSubContainer,
 			},
 		},
 	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 		return expectedInfo, nil
 	}
 
@@ -347,7 +347,7 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo map[string]*cadvisorApi.ContainerInfo
+	var receivedInfo map[string]*cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("Received invalid json data: %v", err)
@@ -368,11 +368,11 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 
 func TestMachineInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.MachineInfo{
+	expectedInfo := &cadvisorapi.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 1024,
 	}
-	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorApi.MachineInfo, error) {
+	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
 		return expectedInfo, nil
 	}
 
@@ -381,7 +381,7 @@ func TestMachineInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.MachineInfo
+	var receivedInfo cadvisorapi.MachineInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)

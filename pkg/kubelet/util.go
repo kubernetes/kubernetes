@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
+func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) api.ResourceList {
 	c := api.ResourceList{
 		api.ResourceCPU: *resource.NewMilliQuantity(
 			int64(info.NumCores*1000),
