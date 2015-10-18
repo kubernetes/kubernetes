@@ -130,8 +130,8 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
-		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, latest.GroupOrDie("extensions").GroupVersion, etcdtest.PathPrefix())
-		storageVersions["extensions"] = latest.GroupOrDie("extensions").GroupVersion
+		expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
+		storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
@@ -143,7 +143,6 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			StorageDestinations:  storageDestinations,
 			StorageVersions:      storageVersions,
 			KubeletClient:        client.FakeKubeletClient{},
-			EnableExp:            true,
 			EnableLogsSupport:    false,
 			EnableProfiling:      true,
 			EnableSwaggerSupport: true,
@@ -274,7 +273,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -291,7 +290,6 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableUISupport:     false,
 		APIPrefix:           "/api",
 		APIGroupPrefix:      "/apis",
-		EnableExp:           true,
 		Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:    admit.NewAlwaysAdmit(),
 		StorageVersions:     storageVersions,

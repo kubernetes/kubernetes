@@ -44,6 +44,13 @@ func NewEtcdStorage() (storage.Interface, error) {
 	return master.NewEtcdStorage(NewEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 }
 
+func NewExtensionsEtcdStorage(client *etcd.Client) (storage.Interface, error) {
+	if client == nil {
+		client = NewEtcdClient()
+	}
+	return master.NewEtcdStorage(client, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+}
+
 func RequireEtcd() {
 	if _, err := NewEtcdClient().Get("/", false, false); err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)

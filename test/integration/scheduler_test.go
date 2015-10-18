@@ -58,8 +58,19 @@ func TestUnschedulableNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create etcd storage: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -78,7 +89,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
