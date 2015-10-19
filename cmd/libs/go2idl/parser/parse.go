@@ -18,17 +18,17 @@ package parser
 
 import (
 	"fmt"
-	"go/ast"
-	"go/build"
-	"go/parser"
-	"go/token"
-	tc "go/types"
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/kubernetes/third_party/golang/go/ast"
+	"k8s.io/kubernetes/third_party/golang/go/build"
+	"k8s.io/kubernetes/third_party/golang/go/parser"
+	"k8s.io/kubernetes/third_party/golang/go/token"
+	tc "k8s.io/kubernetes/third_party/golang/go/types"
 )
 
 // Builder lets you add all the go files in all the packages that you care
