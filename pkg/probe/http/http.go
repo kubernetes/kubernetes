@@ -30,7 +30,7 @@ import (
 
 func New() HTTPProber {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
+	transport := &http.Transport{TLSClientConfig: tlsConfig, DisableKeepAlives: true}
 	return httpProber{transport}
 }
 
