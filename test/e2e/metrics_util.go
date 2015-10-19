@@ -36,6 +36,12 @@ import (
 	"github.com/prometheus/common/model"
 )
 
+const (
+	podStartupThreshold     time.Duration = 5 * time.Second
+	listPodLatencyThreshold time.Duration = 2 * time.Second
+	apiCallLatencyThreshold time.Duration = 250 * time.Millisecond
+)
+
 // Dashboard metrics
 type LatencyMetric struct {
 	Perc50 time.Duration `json:"Perc50"`
@@ -129,9 +135,9 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 	return a, err
 }
 
-// Prints summary metrics for request types with latency above threshold
-// and returns number of such request types.
-func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error) {
+// Prints top five summary metrics for request types with latency and returns
+// number of such request types above threshold.
+func HighLatencyRequests(c *client.Client) (int, error) {
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -140,6 +146,11 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error)
 	badMetrics := 0
 	top := 5
 	for _, metric := range metrics.APICalls {
+		threshold := apiCallLatencyThreshold
+		if metric.Verb == "LIST" && metric.Resource == "pods" {
+			threshold = listPodLatencyThreshold
+		}
+
 		isBad := false
 		if metric.Latency.Perc99 > threshold {
 			badMetrics++
@@ -160,9 +171,9 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error)
 	return badMetrics, nil
 }
 
-// Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are smaller
-// than the given threshold (returns error in the oposite case).
-func VerifyPodStartupLatency(latency PodStartupLatency, podStartupThreshold time.Duration) error {
+// Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
+// within the threshold.
+func VerifyPodStartupLatency(latency PodStartupLatency) error {
 	Logf("Pod startup latency: %s", prettyPrintJSON(latency))
 
 	if latency.Latency.Perc50 > podStartupThreshold {
