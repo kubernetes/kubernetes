@@ -109,7 +109,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Nodes"
     "Etcd\sFailure"
     "MasterCerts"
-    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
+    "Daemon\sset"
     "Deployment"
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
     "Shell"
@@ -134,7 +134,7 @@ DISRUPTIVE_TESTS=(
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
     "DaemonRestart\sController\sManager"
-    "Daemon\sset\sshould"
+    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
     "Jobs\sare\slocally\srestarted"
     "Resource\susage\sof\ssystem\scontainers"
     "should\sbe\sable\sto\schange\sthe\stype\sand\snodeport\ssettings\sof\sa\sservice" # file: service.go, issue: #13032
