@@ -305,7 +305,7 @@ type ExternalServiceProviderStatus struct {
 }
 
 type ExternalServiceProviderCondition struct {
-	Type ExternalServiceProviderConditionType // ex: Ready, Alive
+	Type ExternalServiceProviderConditionType // Ready, Alive
 	Status ConditionStatus // True, False, Unknown
 	LastUpdateTime util.Time
 	LastTransitionTime util.Time
@@ -338,7 +338,7 @@ type ServiceStatus struct {
 }
 
 type ServiceCondition struct {
-	Type ServiceConditionType // Readiness, Liveness
+	Type ServiceConditionType // Ready, Alive
 	Status ConditionStatus // True, False, Unknown
 	LastUpdateTime util.Time
 	LastTransitionTime util.Time
