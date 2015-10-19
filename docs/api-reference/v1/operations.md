@@ -31,7 +31,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 <!-- needed for gh-pages to render html files when imported -->
-{% include operations.html %}
+{% include v1-operations.html %}
 
 
 
