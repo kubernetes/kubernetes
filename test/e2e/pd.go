@@ -18,7 +18,7 @@ package e2e
 
 import (
 	"fmt"
-	math_rand "math/rand"
+	mathrand "math/rand"
 	"os/exec"
 	"strings"
 	"time"
@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -62,7 +62,7 @@ var _ = Describe("Pod Disks", func() {
 		host0Name = nodes.Items[0].ObjectMeta.Name
 		host1Name = nodes.Items[1].ObjectMeta.Name
 
-		math_rand.Seed(time.Now().UTC().UnixNano())
+		mathrand.Seed(time.Now().UTC().UnixNano())
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
@@ -94,7 +94,7 @@ var _ = Describe("Pod Disks", func() {
 		expectNoError(framework.WaitForPodRunning(host0Pod.Name))
 
 		testFile := "/testpd1/tracker"
-		testFileContents := fmt.Sprintf("%v", math_rand.Int())
+		testFileContents := fmt.Sprintf("%v", mathrand.Int())
 
 		expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 		Logf("Wrote value: %v", testFileContents)
@@ -207,19 +207,19 @@ var _ = Describe("Pod Disks", func() {
 			expectNoError(framework.WaitForPodRunning(host0Pod.Name))
 
 			// randomly select a container and read/verify pd contents from it
-			containerName := fmt.Sprintf("mycontainer%v", math_rand.Intn(numContainers)+1)
+			containerName := fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
 			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			// Randomly select a container to write a file to PD from
-			containerName = fmt.Sprintf("mycontainer%v", math_rand.Intn(numContainers)+1)
+			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
 			testFile := fmt.Sprintf("/testpd1/tracker%v", i)
-			testFileContents := fmt.Sprintf("%v", math_rand.Int())
+			testFileContents := fmt.Sprintf("%v", mathrand.Int())
 			fileAndContentToVerify[testFile] = testFileContents
 			expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 			Logf("Wrote value: \"%v\" to PD %q from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
 
 			// Randomly select a container and read/verify pd contents from it
-			containerName = fmt.Sprintf("mycontainer%v", math_rand.Intn(numContainers)+1)
+			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
 			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
@@ -271,8 +271,8 @@ var _ = Describe("Pod Disks", func() {
 			// Write a file to both PDs from container
 			testFilePD1 := fmt.Sprintf("/testpd1/tracker%v", i)
 			testFilePD2 := fmt.Sprintf("/testpd2/tracker%v", i)
-			testFilePD1Contents := fmt.Sprintf("%v", math_rand.Int())
-			testFilePD2Contents := fmt.Sprintf("%v", math_rand.Int())
+			testFilePD1Contents := fmt.Sprintf("%v", mathrand.Int())
+			testFilePD2Contents := fmt.Sprintf("%v", mathrand.Int())
 			fileAndContentToVerify[testFilePD1] = testFilePD1Contents
 			fileAndContentToVerify[testFilePD2] = testFilePD2Contents
 			expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD1, testFilePD1Contents))
@@ -333,11 +333,11 @@ func createPD() (string, error) {
 		}
 		return pdName, nil
 	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(awscloud.Volumes)
 		if !ok {
 			return "", fmt.Errorf("Provider does not support volumes")
 		}
-		volumeOptions := &aws_cloud.VolumeOptions{}
+		volumeOptions := &awscloud.VolumeOptions{}
 		volumeOptions.CapacityMB = 10 * 1024
 		return volumes.CreateVolume(volumeOptions)
 	}
@@ -361,7 +361,7 @@ func deletePD(pdName string) error {
 		}
 		return err
 	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(awscloud.Volumes)
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
@@ -378,7 +378,7 @@ func detachPD(hostName, pdName string) error {
 		// TODO: make this hit the compute API directly.
 		return exec.Command("gcloud", "compute", "--quiet", "--project="+testContext.CloudConfig.ProjectID, "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
 	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(awscloud.Volumes)
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}

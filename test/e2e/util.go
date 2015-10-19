@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -1632,11 +1632,11 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 		if err != nil {
 			return false, err
 		}
-		oldRCs, err := deploymentUtil.GetOldRCs(*deployment, c)
+		oldRCs, err := deploymentutil.GetOldRCs(*deployment, c)
 		if err != nil {
 			return false, err
 		}
-		newRC, err := deploymentUtil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -1645,8 +1645,8 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 			return false, nil
 		}
 		allRCs := append(oldRCs, newRC)
-		totalCreated := deploymentUtil.GetReplicaCountForRCs(allRCs)
-		totalAvailable, err := deploymentUtil.GetAvailablePodsForRCs(c, allRCs)
+		totalCreated := deploymentutil.GetReplicaCountForRCs(allRCs)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForRCs(c, allRCs)
 		if err != nil {
 			return false, err
 		}
@@ -1660,10 +1660,10 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 		if deployment.Status.Replicas == desiredUpdatedReplicas &&
 			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
 			// Verify RCs.
-			if deploymentUtil.GetReplicaCountForRCs(oldRCs) != 0 {
+			if deploymentutil.GetReplicaCountForRCs(oldRCs) != 0 {
 				return false, fmt.Errorf("old RCs are not fully scaled down")
 			}
-			if deploymentUtil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
+			if deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
 				return false, fmt.Errorf("new RCs is not fully scaled up")
 			}
 			return true, nil

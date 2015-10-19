@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	flockerClient "github.com/ClusterHQ/flocker-go"
+	flockerclient "github.com/ClusterHQ/flocker-go"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -107,7 +107,7 @@ func (p *flockerPlugin) NewCleaner(datasetName string, podUID types.UID) (volume
 
 type flockerBuilder struct {
 	*flocker
-	client   flockerClient.Clientable
+	client   flockerclient.Clientable
 	exe      exec.Interface
 	opts     volume.VolumeOptions
 	readOnly bool
@@ -123,7 +123,7 @@ func (b flockerBuilder) SetUp() error {
 
 // newFlockerClient uses environment variables and pod attributes to return a
 // flocker client capable of talking with the Flocker control service.
-func (b flockerBuilder) newFlockerClient() (*flockerClient.Client, error) {
+func (b flockerBuilder) newFlockerClient() (*flockerclient.Client, error) {
 	host := getenvOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
 	portConfig := getenvOrFallback("FLOCKER_CONTROL_SERVICE_PORT", strconv.Itoa(defaultPort))
 	port, err := strconv.Atoi(portConfig)
@@ -134,7 +134,7 @@ func (b flockerBuilder) newFlockerClient() (*flockerClient.Client, error) {
 	keyPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
 	certPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
 
-	c, err := flockerClient.NewClient(host, port, b.flocker.pod.Status.HostIP, caCertPath, keyPath, certPath)
+	c, err := flockerclient.NewClient(host, port, b.flocker.pod.Status.HostIP, caCertPath, keyPath, certPath)
 	return c, err
 }
 

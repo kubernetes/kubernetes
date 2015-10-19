@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	offerMetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
+	offermetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
@@ -351,7 +351,7 @@ func (k *KubernetesScheduler) OfferRescinded(driver bindings.SchedulerDriver, of
 	log.Infof("Offer rescinded %v\n", offerId)
 
 	oid := offerId.GetValue()
-	k.offers.Delete(oid, offerMetrics.OfferRescinded)
+	k.offers.Delete(oid, offermetrics.OfferRescinded)
 }
 
 // StatusUpdate is called when a status update message is sent to the scheduler.
