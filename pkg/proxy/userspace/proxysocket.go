@@ -73,7 +73,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 }
 
 // How long we wait for a connection to a backend in seconds
-var endpointDialTimeout = []time.Duration{1, 2, 4, 8}
+var endpointDialTimeout = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second, 2 * time.Second}
 
 // tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
 // no new connections are allowed but existing connections are left untouched.
@@ -87,7 +87,7 @@ func (tcp *tcpProxySocket) ListenPort() int {
 }
 
 func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
-	for _, retryTimeout := range endpointDialTimeout {
+	for _, dialTimeout := range endpointDialTimeout {
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
@@ -96,7 +96,7 @@ func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string
 		glog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
-		outConn, err := net.DialTimeout(protocol, endpoint, retryTimeout*time.Second)
+		outConn, err := net.DialTimeout(protocol, endpoint, dialTimeout)
 		if err != nil {
 			if isTooManyFDsError(err) {
 				panic("Dial failed: " + err.Error())
