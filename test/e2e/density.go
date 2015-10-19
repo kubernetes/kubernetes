@@ -141,7 +141,7 @@ var _ = Describe("Density", func() {
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
+		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 	})
@@ -383,9 +383,7 @@ var _ = Describe("Density", func() {
 
 				// Test whether e2e pod startup time is acceptable.
 				podStartupLatency := PodStartupLatency{Latency: extractLatencyMetrics(e2eLag)}
-				// TODO: Switch it to 5 seconds once we are sure our tests are passing.
-				podStartupThreshold := 8 * time.Second
-				expectNoError(VerifyPodStartupLatency(podStartupLatency, podStartupThreshold))
+				expectNoError(VerifyPodStartupLatency(podStartupLatency))
 
 				// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
 				for _, l := range startupLag {
