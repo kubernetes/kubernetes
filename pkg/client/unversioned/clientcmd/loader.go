@@ -30,7 +30,7 @@ import (
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -146,7 +146,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 	}
 
-	return config, errors.NewAggregate(errlist)
+	return config, utilerrors.NewAggregate(errlist)
 }
 
 // Migrate uses the MigrationRules map.  If a destination file is not present, then the source file is checked.

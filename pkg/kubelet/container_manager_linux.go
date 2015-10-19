@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -183,7 +183,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			}
 		}
 	}
-	return errors.NewAggregate(errList)
+	return utilerrors.NewAggregate(errList)
 }
 
 func (cm *containerManagerImpl) setupNode() error {
@@ -340,7 +340,7 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 		}
 	}
 
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
 
 // Gets the (CPU) container the specified pid is in.
@@ -414,7 +414,7 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 		errs = append(errs, fmt.Errorf("ran out of attempts to create system containers %q", manager.Cgroups.Name))
 	}
 
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
 
 // Determines whether the specified PID is a kernel PID.

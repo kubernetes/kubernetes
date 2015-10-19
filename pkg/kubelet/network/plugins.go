@@ -27,7 +27,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -116,7 +116,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 		allErrs = append(allErrs, fmt.Errorf("Network plugin %q not found.", networkPluginName))
 	}
 
-	return chosenPlugin, errors.NewAggregate(allErrs)
+	return chosenPlugin, utilerrors.NewAggregate(allErrs)
 }
 
 func UnescapePluginName(in string) string {

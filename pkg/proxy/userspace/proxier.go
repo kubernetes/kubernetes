@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -647,7 +647,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *service
 	} else {
 		glog.Errorf("Some errors closing iptables portals for service %q", service)
 	}
-	return errors.NewAggregate(el)
+	return utilerrors.NewAggregate(el)
 }
 
 func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
@@ -819,7 +819,7 @@ func iptablesFlush(ipt iptables.Interface) error {
 	if len(el) != 0 {
 		glog.Errorf("Some errors flushing old iptables portals: %v", el)
 	}
-	return errors.NewAggregate(el)
+	return utilerrors.NewAggregate(el)
 }
 
 // Used below.

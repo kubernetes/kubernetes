@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // ScaleOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -149,5 +149,5 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "scaled")
 	}
 
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }

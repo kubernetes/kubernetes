@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
@@ -829,7 +829,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 	if count != 3 {
 		t.Fatalf("did not visit all infos: %d", count)
 	}
-	agg, ok := err.(errors.Aggregate)
+	agg, ok := err.(utilerrors.Aggregate)
 	if !ok {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1068,7 +1068,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
-	errs, ok := err.(errors.Aggregate)
+	errs, ok := err.(utilerrors.Aggregate)
 	if !ok {
 		t.Fatalf("unexpected error: %v", reflect.TypeOf(err))
 	}

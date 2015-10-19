@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -520,7 +520,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 
 func (b *Builder) visitorResult() *Result {
 	if len(b.errs) > 0 {
-		return &Result{err: errors.NewAggregate(b.errs)}
+		return &Result{err: utilerrors.NewAggregate(b.errs)}
 	}
 
 	if b.selectAll {

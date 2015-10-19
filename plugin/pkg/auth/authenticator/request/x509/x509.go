@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
@@ -75,7 +75,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 			}
 		}
 	}
-	return nil, false, errors.NewAggregate(errlist)
+	return nil, false, utilerrors.NewAggregate(errlist)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

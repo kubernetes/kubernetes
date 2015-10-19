@@ -26,7 +26,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
@@ -150,14 +150,14 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 		return fmt.Errorf("kind isn't string type")
 	}
 	if strings.HasSuffix(kind.(string), "List") {
-		return errors.NewAggregate(s.validateList(fields))
+		return utilerrors.NewAggregate(s.validateList(fields))
 	}
 	version := apiutil.GetVersion(groupVersion.(string))
 	allErrs := s.ValidateObject(obj, "", version+"."+kind.(string))
 	if len(allErrs) == 1 {
 		return allErrs[0]
 	}
-	return errors.NewAggregate(allErrs)
+	return utilerrors.NewAggregate(allErrs)
 }
 
 func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string) errs.ValidationErrorList {
