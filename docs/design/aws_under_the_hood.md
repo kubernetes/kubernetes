@@ -36,10 +36,9 @@ Documentation for other releases can be found at
 This document provides high-level insight into how Kubernetes works on AWS and
 maps to AWS objects.  We assume that you are familiar with AWS.
 
-We encourage you to use [kube-up](../getting-started-guides/aws.md) (or
-[CloudFormation](../getting-started-guides/aws-coreos.md)) to create clusters on
-AWS. We recommend that you avoid manual configuration but are aware that
-sometimes it's the only option.
+We encourage you to use [kube-up](../getting-started-guides/aws.md) to create
+clusters on AWS. We recommend that you avoid manual configuration but are aware
+that sometimes it's the only option.
 
 Tip: You should open an issue and let us know what enhancements can be made to
 the scripts to better suit your needs.
