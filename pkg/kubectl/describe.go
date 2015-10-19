@@ -73,7 +73,6 @@ func describerMap(c *client.Client) map[string]Describer {
 		"Secret":                &SecretDescriber{c},
 		"Service":               &ServiceDescriber{c},
 		"ServiceAccount":        &ServiceAccountDescriber{c},
-		"Minion":                &NodeDescriber{c},
 		"Node":                  &NodeDescriber{c},
 		"LimitRange":            &LimitRangeDescriber{c},
 		"ResourceQuota":         &ResourceQuotaDescriber{c},
