@@ -41,7 +41,7 @@ incomplete features are referred to in order to better describe service accounts
 
 ## User accounts vs service accounts
 
-Kubernetes distinguished between the concept of a user account and a service accounts
+Kubernetes distinguishes between the concept of a user account and a service accounts
 for a number of reasons:
   - User accounts are for humans.  Service accounts are for processes, which
     run in pods.
