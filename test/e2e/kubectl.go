@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -814,6 +815,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		AfterEach(func() {
+			glog.Info(runKubectlOrDie("get", "events", "-a"))
 			runKubectlOrDie("stop", "pods", podName, nsFlag)
 		})
 
