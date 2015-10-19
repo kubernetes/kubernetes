@@ -33,20 +33,15 @@ Documentation for other releases can be found at
 
 # Horizontal Pod Autoscaler
 
-Horizontal pod autoscaling is an experimental feature in Kubernetes 1.1.
-It allows the number of pods in a replication controller or deployment to scale automatically based on observed CPU or memory usage.
-<b>Please note that the current API is tentative and will be subject to change before a stable version is released.</b>
+Horizontal pod autoscaling is a [beta](../../../docs/api.md#api-versioning) feature in Kubernetes 1.1.
+It allows the number of pods in a replication controller or deployment to scale automatically based on observed CPU usage.
+In the future also other metrics will be supported.
 
 In this document we explain how this feature works by walking you through an example of enabling horizontal pod autoscaling with the php-apache server.
 
 ## Prerequisites
 
-This example requires a running Kubernetes cluster in the version 1.1 with experimental API enabled on API server (``--runtime-config=experimental/v1alpha1=true``),
-and experimental controllers turned on in controller manager (``--enable-experimental=true``).
-This can be simply achieved on GCE by exporting ``KUBE_ENABLE_EXPERIMENTAL_API=true`` before running ```kube-up.sh``` script.
-
-The required version of kubectl is also 1.1.
-
+This example requires a running Kubernetes cluster and kubectl in the version at least 1.1.
 
 ## Step One: Run & expose php-apache server
 
@@ -57,12 +52,11 @@ It defines [index.php](image/index.php) page which performs some CPU intensive c
 First, we will start a replication controller running the image and expose it as an external service:
 
 ```console
-$ kubectl create -f ./examples/experimental/horizontal-pod-autoscaling/rc-php-apache.yaml
+$ kubectl create -f examples/extensions/horizontal-pod-autoscaling/rc-php-apache.yaml
 replicationcontrollers/php-apache
 
 $ kubectl expose rc php-apache --port=80 --type=LoadBalancer
-NAME         LABELS           SELECTOR         IP(S)     PORT(S)
-php-apache   run=php-apache   run=php-apache             80/TCP
+service "php-apache" exposed
 ```
 
 Now, we will wait some time and verify that both the replication controller and the service were correctly created and are running. We will also determine the IP address of the service:
@@ -94,7 +88,7 @@ php-apache   run=php-apache   run=php-apache             80/TCP
 $ kubectl cluster-info | grep master
 Kubernetes master is running at https://146.148.6.215
 
-$ curl -k -u admin:password https://146.148.6.215/api/v1/proxy/namespaces/default/services/php-apache/
+$ curl -k -u <admin>:<password> https://146.148.6.215/api/v1/proxy/namespaces/default/services/php-apache/
 OK!
 ```
 
@@ -105,50 +99,45 @@ Now that the server is running, we will create a horizontal pod autoscaler for i
 To create it, we will use the [hpa-php-apache.yaml](hpa-php-apache.yaml) file, which looks like this:
 
 ```yaml
-apiVersion: experimental/v1alpha1
+apiVersion: extensions/v1beta1
 kind: HorizontalPodAutoscaler
 metadata:
   name: php-apache
   namespace: default
 spec:
-  maxReplicas: 10
-  minReplicas: 1
   scaleRef:
     kind: ReplicationController
     name: php-apache
     namespace: default
-  target:
-    quantity: 100m
-    resource: cpu
+  minReplicas: 1
+  maxReplicas: 10
+  cpuUtilization:
+    targetPercentage: 50
 ```
 
 This defines a horizontal pod autoscaler that maintains between 1 and 10 replicas of the Pods
 controlled by the php-apache replication controller you created in the first step of these instructions.
 Roughly speaking, the horizontal autoscaler will increase and decrease the number of replicas
-(via the replication controller) so as to maintain an average CPU utilization across all Pods of 100 millicores.
+(via the replication controller) so as to maintain an average CPU utilization across all Pods of 50%
+(since each pod requests 200 milli-cores in [rc-php-apache.yaml](rc-php-apache.yaml), this means average CPU utilization of 100 milli-cores).
 See [here](../../../docs/proposals/horizontal-pod-autoscaler.md#autoscaling-algorithm) for more details on the algorithm.
-
-Please be aware that this configuration sets the target CPU consumption to 100 milli-cores, while in [rc-php-apache.yaml](rc-php-apache.yaml) each pod requests 200 milli-cores.
-As a general rule, the autoscaler's target should be lower than the request.
-Otherwise, overloaded pods may not be able to consume more than the autoscaler's target utilization,
-thereby preventing the autoscaler from seeing high enough utilization to trigger it to scale up.
 
 We will create the autoscaler by executing the following command:
 
 ```console
-$ kubectl create -f ./examples/experimental/horizontal-pod-autoscaling/hpa-php-apache.yaml
+$ kubectl create -f examples/extensions/horizontal-pod-autoscaling/hpa-php-apache.yaml
 horizontalpodautoscaler "php-apache" created
 ```
 
 We may check the current status of autoscaler by running:
 
 ```console
-$ kubectl get experimental/hpa
-NAME         REFERENCE                                   TARGET     CURRENT   MINPODS   MAXPODS   AGE
-php-apache   ReplicationController/default/php-apache/   100m cpu   0 cpu     1         10        4m
+$ kubectl get hpa
+NAME         REFERENCE                                   TARGET    CURRENT   MINPODS   MAXPODS   AGE
+php-apache   ReplicationController/default/php-apache/   50%       0%        1         10        27s
 ```
 
-Please note that the current CPU consumption is 0 as we are not sending any requests to the server
+Please note that the current CPU consumption is 0% as we are not sending any requests to the server
 (the ``CURRENT`` column shows the average across all the pods controlled by the corresponding replication controller).
 
 ## Step Three: Increase load
@@ -163,18 +152,18 @@ $ while true; do curl http://146.148.6.244; done
 We may examine, how CPU load was increased (the results should be visible after about 2 minutes) by executing:
 
 ```console
-$ kubectl get experimental/hpa
-NAME         REFERENCE                                   TARGET     CURRENT    MINPODS   MAXPODS   AGE
-php-apache   ReplicationController/default/php-apache/   100m cpu   471m cpu   1         10        10m
+$ kubectl get hpa
+NAME         REFERENCE                                   TARGET    CURRENT   MINPODS   MAXPODS   AGE
+php-apache   ReplicationController/default/php-apache/   50%       305%      1         10        4m
 ```
 
-In the case presented here, it bumped CPU consumption to 471 milli-cores.
-As a result, the replication controller was resized to 5 replicas:
+In the case presented here, it bumped CPU consumption to 305% of the request.
+As a result, the replication controller was resized to 7 replicas:
 
 ```console
 $ kubectl get rc
-CONTROLLER   CONTAINER(S)   IMAGE(S)                    SELECTOR         REPLICAS   AGE
-php-apache   php-apache     gcr.io/dev-jsz/php-apache   run=php-apache   5          26m
+CONTROLLER   CONTAINER(S)   IMAGE(S)                               SELECTOR         REPLICAS   AGE
+php-apache   php-apache     gcr.io/google_containers/hpa-example   run=php-apache   7          18m
 ```
 
 Now, we may increase the load even more by running yet another infinite loop of queries (in yet another terminal):
@@ -186,13 +175,13 @@ $ while true; do curl http://146.148.6.244; done
 In the case presented here, it increased the number of serving pods to 10:
 
 ```console
-$ kubectl get experimental/hpa
-NAME         REFERENCE                                   TARGET     CURRENT    MINPODS   MAXPODS   AGE
-php-apache   ReplicationController/default/php-apache/   100m cpu   133m cpu   1         10        15m
+$ kubectl get hpa
+NAME         REFERENCE                                   TARGET    CURRENT   MINPODS   MAXPODS   AGE
+php-apache   ReplicationController/default/php-apache/   50%       65%       1         10        14m
 
 $ kubectl get rc
-CONTROLLER   CONTAINER(S)   IMAGE(S)                    SELECTOR         REPLICAS   AGE
-php-apache   php-apache     gcr.io/dev-jsz/php-apache   run=php-apache   10         31m
+CONTROLLER   CONTAINER(S)   IMAGE(S)                               SELECTOR         REPLICAS   AGE
+php-apache   php-apache     gcr.io/google_containers/hpa-example   run=php-apache   10         24m
 ```
 
 ## Step Four: Stop load
@@ -201,13 +190,13 @@ We will finish our example by stopping the user load.
 We will terminate both infinite ``while`` loops sending requests to the server and verify the result state:
 
 ```console
-$ kubectl get experimental/hpa
-NAME         REFERENCE                                   TARGET     CURRENT   MINPODS   MAXPODS   AGE
-php-apache   ReplicationController/default/php-apache/   100m cpu   0 cpu     1         10        26m
+$ kubectl get hpa
+NAME         REFERENCE                                   TARGET    CURRENT   MINPODS   MAXPODS   AGE
+php-apache   ReplicationController/default/php-apache/   50%       0%        1         10        21m
 
 $ kubectl get rc
-CONTROLLER   CONTAINER(S)   IMAGE(S)                    SELECTOR         REPLICAS   AGE
-php-apache   php-apache     gcr.io/dev-jsz/php-apache   run=php-apache   1          42m
+CONTROLLER   CONTAINER(S)   IMAGE(S)                               SELECTOR         REPLICAS   AGE
+php-apache   php-apache     gcr.io/google_containers/hpa-example   run=php-apache   1          31m
 ```
 
 As we see, in the presented case CPU utilization dropped to 0, and the number of replicas dropped to 1.
