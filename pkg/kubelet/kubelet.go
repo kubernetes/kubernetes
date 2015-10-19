@@ -294,6 +294,7 @@ func NewMainKubelet(
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
+		containerRuntimeHealthIssues:   nil,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -392,6 +393,8 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("timed out waiting for %q to come up: %v", containerRuntime, err)
 	}
 	klet.lastTimestampRuntimeUp = time.Now()
+
+	go util.Until(klet.pollContainerRuntimeState, 5*time.Minute, util.NeverStop)
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
@@ -501,6 +504,11 @@ type Kubelet struct {
 	// Network Status information
 	networkConfigMutex sync.Mutex
 	networkConfigured  bool
+
+	// Container Runtime Status
+	// Network Status information
+	containerRuntimeHealthMutex  sync.RWMutex
+	containerRuntimeHealthIssues error
 
 	// Volume plugins.
 	volumePluginMgr volume.VolumePluginMgr
@@ -2258,6 +2266,15 @@ func (kl *Kubelet) recordNodeStatusEvent(event string) {
 	kl.recorder.Eventf(kl.nodeRef, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
+func (kl *Kubelet) pollContainerRuntimeState() {
+	err := kl.containerRuntime.Ping()
+
+	kl.containerRuntimeHealthMutex.Lock()
+	defer kl.containerRuntimeHealthMutex.Unlock()
+
+	kl.containerRuntimeHealthIssues = err
+}
+
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 var oldNodeUnschedulable bool
 
@@ -2392,10 +2409,15 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	// Check whether network is configured properly
 	networkConfigured := kl.doneNetworkConfigure()
 
+	// Check health of container runtime.
+	kl.containerRuntimeHealthMutex.RLock()
+	runtimeHealthIssues := kl.containerRuntimeHealthIssues
+	kl.containerRuntimeHealthMutex.RUnlock()
+
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && networkConfigured {
+	if containerRuntimeUp && networkConfigured && runtimeHealthIssues == nil {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -2410,6 +2432,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		if !networkConfigured {
 			messages = append(messages, "network not configured correctly")
+		}
+		if runtimeHealthIssues != nil {
+			messages = append(messages, fmt.Sprintf("%v", runtimeHealthIssues))
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,

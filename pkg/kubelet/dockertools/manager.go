@@ -2082,3 +2082,30 @@ func (dm *DockerManager) GetNetNs(containerID kubecontainer.ContainerID) (string
 func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
 	return dm.containerGC.GarbageCollect(gcPolicy)
 }
+
+// Ping attempts to connect to the docker daemon and determine its health.
+// `docker ps` has been very useful for determining the state of the daemon.
+// Issue #10959 has more information on this rationale.
+func (dm *DockerManager) Ping() error {
+	const pingTimeout = 5 * time.Minute
+	errChan := make(chan error, 1)
+
+	go func(client DockerInterface) {
+		defer close(errChan)
+		_, err := client.ListContainers(docker.ListContainersOptions{All: true})
+		errChan <- err
+	}(dm.client)
+
+	const baseError = "docker daemon failed to list containers. If condition persists, take a look at kernel logs (dmesg) and restart docker daemon & the node if required"
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return fmt.Errorf("%s - %v", baseError, err)
+		}
+	case <-time.After(pingTimeout):
+		return fmt.Errorf("%s - timeout %v", baseError, pingTimeout)
+	}
+
+	return nil
+}
