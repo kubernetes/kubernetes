@@ -15,7 +15,7 @@ spec:
         run: php-apache
     spec:
       containers:
-      - image: gcr.io/dev-jsz/php-apache
+      - image: gcr.io/google_containers/hpa-example
         name: php-apache
         resources:
           requests:
