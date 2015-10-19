@@ -44,10 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -119,8 +118,8 @@ type DockerManager struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// Health check prober.
-	prober prober.Prober
+	// Health check results.
+	livenessManager proberesults.Manager
 
 	// Generator of runtime container options.
 	generator kubecontainer.RunContainerOptionsGenerator
@@ -147,7 +146,7 @@ type DockerManager struct {
 func NewDockerManager(
 	client DockerInterface,
 	recorder record.EventRecorder,
-	prober prober.Prober,
+	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
 	podInfraContainerImage string,
@@ -208,7 +207,7 @@ func NewDockerManager(
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
-		prober:                 prober,
+		livenessManager:        livenessManager,
 		generator:              generator,
 		execHandler:            execHandler,
 		oomAdjuster:            oomAdjuster,
@@ -1762,20 +1761,13 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 			continue
 		}
 
-		result, err := dm.prober.ProbeLiveness(pod, podStatus, container, c.ID, c.Created)
-		if err != nil {
-			// TODO(vmarmol): examine this logic.
-			glog.V(2).Infof("probe no-error: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
-		if result == probe.Success {
-			glog.V(4).Infof("probe success: %q", container.Name)
+		liveness, found := dm.livenessManager.Get(c.ID)
+		if !found || liveness == proberesults.Success {
 			containersToKeep[containerID] = index
 			continue
 		}
 		if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-			glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+			glog.Infof("pod %q container %q is unhealthy, it will be killed and re-created.", podFullName, container.Name)
 			containersToStart[index] = empty{}
 		}
 	}

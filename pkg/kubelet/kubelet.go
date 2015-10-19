@@ -54,12 +54,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -309,6 +309,10 @@ func NewMainKubelet(
 
 	procFs := procfs.NewProcFs()
 	imageBackOff := util.NewBackOff(resyncInterval, MaxContainerBackOff)
+
+	readinessManager := proberesults.NewManager()
+	klet.livenessManager = proberesults.NewManagerWithUpdates()
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -316,7 +320,7 @@ func NewMainKubelet(
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
 			recorder,
-			klet, // prober
+			klet.livenessManager,
 			containerRefManager,
 			machineInfo,
 			podInfraContainerImage,
@@ -344,7 +348,7 @@ func NewMainKubelet(
 			klet,
 			recorder,
 			containerRefManager,
-			klet, // prober
+			klet.livenessManager,
 			klet.volumeManager,
 			imageBackOff)
 		if err != nil {
@@ -396,11 +400,14 @@ func NewMainKubelet(
 	klet.runner = klet.containerRuntime
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
-	klet.prober = prober.New(klet.runner, containerRefManager, recorder)
 	klet.probeManager = prober.NewManager(
 		klet.resyncInterval,
 		klet.statusManager,
-		klet.prober)
+		readinessManager,
+		klet.livenessManager,
+		klet.runner,
+		containerRefManager,
+		recorder)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -508,10 +515,10 @@ type Kubelet struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// Handles container readiness probing
+	// Handles container probing.
 	probeManager prober.Manager
-	// TODO: Move prober ownership to the probeManager once the runtime no longer depends on it.
-	prober prober.Prober
+	// Manages container health check results.
+	livenessManager proberesults.Manager
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them
@@ -1982,6 +1989,12 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		// Periodically syncs all the pods and performs cleanup tasks.
 		glog.V(4).Infof("SyncLoop (periodic sync)")
 		handler.HandlePodSyncs(kl.podManager.GetPods())
+	case update := <-kl.livenessManager.Updates():
+		// We only care about failures (signalling container death) here.
+		if update.Result == proberesults.Failure {
+			glog.V(1).Infof("SyncLoop (container unhealthy).")
+			handler.HandlePodSyncs([]*api.Pod{update.Pod})
+		}
 	}
 	kl.syncLoopMonitor.Store(time.Now())
 	return true
@@ -2829,16 +2842,6 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 // is exported to simplify integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
-}
-
-// Proxy prober calls through the Kubelet to break the circular dependency between the runtime &
-// prober.
-// TODO: Remove this hack once the runtime no longer depends on the prober.
-func (kl *Kubelet) ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, createdAt int64) (probe.Result, error) {
-	return kl.prober.ProbeLiveness(pod, status, container, containerID, createdAt)
-}
-func (kl *Kubelet) ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
-	return kl.prober.ProbeReadiness(pod, status, container, containerID)
 }
 
 var minRsrc = resource.MustParse("1k")

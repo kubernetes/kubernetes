@@ -22,9 +22,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -53,19 +55,22 @@ type Manager interface {
 }
 
 type manager struct {
-	// Caches the results of readiness probes.
-	readinessCache results.Manager
-
-	// Map of active workers for readiness
-	readinessProbes map[containerPath]*worker
-	// Lock for accessing & mutating readinessProbes
+	// Map of active workers for probes
+	workers map[probeKey]*worker
+	// Lock for accessing & mutating workers
 	workerLock sync.RWMutex
 
 	// The statusManager cache provides pod IP and container IDs for probing.
 	statusManager status.Manager
 
+	// readinessManager manages the results of readiness probes
+	readinessManager results.Manager
+
+	// livenessManager manages the results of liveness probes
+	livenessManager results.Manager
+
 	// prober executes the probe actions.
-	prober Prober
+	prober *prober
 
 	// Default period for workers to execute a probe.
 	defaultProbePeriod time.Duration
@@ -74,36 +79,79 @@ type manager struct {
 func NewManager(
 	defaultProbePeriod time.Duration,
 	statusManager status.Manager,
-	prober Prober) Manager {
+	readinessManager results.Manager,
+	livenessManager results.Manager,
+	runner kubecontainer.ContainerCommandRunner,
+	refManager *kubecontainer.RefManager,
+	recorder record.EventRecorder) Manager {
+	prober := newProber(runner, refManager, recorder)
 	return &manager{
 		defaultProbePeriod: defaultProbePeriod,
 		statusManager:      statusManager,
 		prober:             prober,
-		readinessCache:     results.NewManager(),
-		readinessProbes:    make(map[containerPath]*worker),
+		readinessManager:   readinessManager,
+		livenessManager:    livenessManager,
+		workers:            make(map[probeKey]*worker),
 	}
 }
 
-// Key uniquely identifying containers
-type containerPath struct {
+// Key uniquely identifying container probes
+type probeKey struct {
 	podUID        types.UID
 	containerName string
+	probeType     probeType
+}
+
+// Type of probe (readiness or liveness)
+type probeType int
+
+const (
+	liveness probeType = iota
+	readiness
+)
+
+// For debugging.
+func (t probeType) String() string {
+	switch t {
+	case readiness:
+		return "Readiness"
+	case liveness:
+		return "Liveness"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 func (m *manager) AddPod(pod *api.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
-	key := containerPath{podUID: pod.UID}
+	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
-		if _, ok := m.readinessProbes[key]; ok {
-			glog.Errorf("Readiness probe already exists! %v - %v",
-				kubecontainer.GetPodFullName(pod), c.Name)
-			return
-		}
+
 		if c.ReadinessProbe != nil {
-			m.readinessProbes[key] = m.newWorker(pod, c)
+			key.probeType = readiness
+			if _, ok := m.workers[key]; ok {
+				glog.Errorf("Readiness probe already exists! %v - %v",
+					kubeutil.FormatPodName(pod), c.Name)
+				return
+			}
+			w := newWorker(m, readiness, pod, c)
+			m.workers[key] = w
+			go w.run()
+		}
+
+		if c.LivenessProbe != nil {
+			key.probeType = liveness
+			if _, ok := m.workers[key]; ok {
+				glog.Errorf("Liveness probe already exists! %v - %v",
+					kubeutil.FormatPodName(pod), c.Name)
+				return
+			}
+			w := newWorker(m, liveness, pod, c)
+			m.workers[key] = w
+			go w.run()
 		}
 	}
 }
@@ -112,11 +160,14 @@ func (m *manager) RemovePod(pod *api.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	key := containerPath{podUID: pod.UID}
+	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
-		if worker, ok := m.readinessProbes[key]; ok {
-			close(worker.stop)
+		for _, probeType := range [...]probeType{readiness, liveness} {
+			key.probeType = probeType
+			if worker, ok := m.workers[key]; ok {
+				close(worker.stop)
+			}
 		}
 	}
 }
@@ -130,8 +181,8 @@ func (m *manager) CleanupPods(activePods []*api.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	for path, worker := range m.readinessProbes {
-		if _, ok := desiredPods[path.podUID]; !ok {
+	for key, worker := range m.workers {
+		if _, ok := desiredPods[key.podUID]; !ok {
 			close(worker.stop)
 		}
 	}
@@ -142,28 +193,27 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *api.PodStatus) {
 		var ready bool
 		if c.State.Running == nil {
 			ready = false
-		} else if result, ok := m.readinessCache.Get(
-			kubecontainer.ParseContainerID(c.ContainerID)); ok {
+		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
 			ready = result == results.Success
 		} else {
 			// The check whether there is a probe which hasn't run yet.
-			_, exists := m.getReadinessProbe(podUID, c.Name)
+			_, exists := m.getWorker(podUID, c.Name, readiness)
 			ready = !exists
 		}
 		podStatus.ContainerStatuses[i].Ready = ready
 	}
 }
 
-func (m *manager) getReadinessProbe(podUID types.UID, containerName string) (*worker, bool) {
+func (m *manager) getWorker(podUID types.UID, containerName string, probeType probeType) (*worker, bool) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
-	probe, ok := m.readinessProbes[containerPath{podUID, containerName}]
-	return probe, ok
+	worker, ok := m.workers[probeKey{podUID, containerName, probeType}]
+	return worker, ok
 }
 
 // Called by the worker after exiting.
-func (m *manager) removeReadinessProbe(podUID types.UID, containerName string) {
+func (m *manager) removeWorker(podUID types.UID, containerName string, probeType probeType) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
-	delete(m.readinessProbes, containerPath{podUID, containerName})
+	delete(m.workers, probeKey{podUID, containerName, probeType})
 }

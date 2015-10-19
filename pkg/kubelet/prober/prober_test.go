@@ -19,7 +19,6 @@ package prober
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -184,7 +183,6 @@ func TestProbeContainer(t *testing.T) {
 		recorder:   &record.FakeRecorder{},
 	}
 	containerID := kubecontainer.ContainerID{"test", "foobar"}
-	createdAt := time.Now().Unix()
 
 	tests := []struct {
 		testContainer     api.Container
@@ -201,14 +199,7 @@ func TestProbeContainer(t *testing.T) {
 		// Only LivenessProbe. expectedReadiness should always be true here.
 		{
 			testContainer: api.Container{
-				LivenessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{InitialDelaySeconds: -100},
+				LivenessProbe: &api.Probe{},
 			},
 			expectedLiveness:  probe.Unknown,
 			expectedReadiness: probe.Success,
@@ -216,7 +207,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -228,7 +218,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -240,7 +229,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -252,7 +240,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -265,7 +252,7 @@ func TestProbeContainer(t *testing.T) {
 		// // Only ReadinessProbe. expectedLiveness should always be probe.Success here.
 		{
 			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
+				ReadinessProbe: &api.Probe{},
 			},
 			expectedLiveness:  probe.Success,
 			expectedReadiness: probe.Unknown,
@@ -273,7 +260,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -285,7 +271,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -297,7 +282,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -309,7 +293,6 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -322,32 +305,8 @@ func TestProbeContainer(t *testing.T) {
 		// Both LivenessProbe and ReadinessProbe.
 		{
 			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: -100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedLiveness:  probe.Unknown,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: -100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+				LivenessProbe:  &api.Probe{},
+				ReadinessProbe: &api.Probe{},
 			},
 			expectedLiveness:  probe.Unknown,
 			expectedReadiness: probe.Unknown,
@@ -355,25 +314,11 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
 				},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedLiveness:  probe.Unknown,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
+				ReadinessProbe: &api.Probe{},
 			},
 			expectedLiveness:  probe.Failure,
 			expectedReadiness: probe.Unknown,
@@ -381,13 +326,11 @@ func TestProbeContainer(t *testing.T) {
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
 				},
 				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
 					Handler: api.Handler{
 						Exec: &api.ExecAction{},
 					},
@@ -405,7 +348,7 @@ func TestProbeContainer(t *testing.T) {
 			prober.exec = fakeExecProber{test.expectedLiveness, nil}
 		}
 
-		liveness, err := prober.ProbeLiveness(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID, createdAt)
+		liveness, err := prober.probeLiveness(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID)
 		if test.expectError && err == nil {
 			t.Errorf("[%d] Expected liveness probe error but no error was returned.", i)
 		}
@@ -418,7 +361,7 @@ func TestProbeContainer(t *testing.T) {
 
 		// TODO: Test readiness errors
 		prober.exec = fakeExecProber{test.expectedReadiness, nil}
-		readiness, err := prober.ProbeReadiness(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID)
+		readiness, err := prober.probeReadiness(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID)
 		if err != nil {
 			t.Errorf("[%d] Unexpected readiness probe error: %v", i, err)
 		}
