@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -263,7 +263,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	}
 	// There should be 2 events, one to scale up the new RC and then to scale down the old RC.
 	Expect(len(events.Items)).Should(Equal(2))
-	newRC, err := deploymentUtil.GetNewRC(*deployment, c)
+	newRC, err := deploymentutil.GetNewRC(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up rc %s to 1", newRC.Name)))

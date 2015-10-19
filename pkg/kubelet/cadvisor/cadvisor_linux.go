@@ -27,8 +27,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/events"
-	cadvisorFs "github.com/google/cadvisor/fs"
-	cadvisorHttp "github.com/google/cadvisor/http"
+	cadvisorfs "github.com/google/cadvisor/fs"
+	cadvisorhttp "github.com/google/cadvisor/http"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
@@ -80,14 +80,14 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 	// Register the handlers regardless as this registers the prometheus
 	// collector properly.
 	mux := http.NewServeMux()
-	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "")
+	err := cadvisorhttp.RegisterHandlers(mux, cc, "", "", "", "")
 	if err != nil {
 		return err
 	}
 
 	re := regexp.MustCompile(`^k8s_(?P<kubernetes_container_name>[^_\.]+)[^_]+_(?P<kubernetes_pod_name>[^_]+)_(?P<kubernetes_namespace>[^_]+)`)
 	reCaptureNames := re.SubexpNames()
-	cadvisorHttp.RegisterPrometheusHandler(mux, cc, "/metrics", func(name string) map[string]string {
+	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", func(name string) map[string]string {
 		extraLabels := map[string]string{}
 		matches := re.FindStringSubmatch(name)
 		for i, match := range matches {
@@ -149,11 +149,11 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 }
 
 func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorFs.LabelDockerImages)
+	return cc.getFsInfo(cadvisorfs.LabelDockerImages)
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorFs.LabelSystemRoot)
+	return cc.getFsInfo(cadvisorfs.LabelSystemRoot)
 }
 
 func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) {

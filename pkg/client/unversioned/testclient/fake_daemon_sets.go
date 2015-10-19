@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	kClientLib "k8s.io/kubernetes/pkg/client/unversioned"
+	kclientlib "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -32,7 +32,7 @@ type FakeDaemonSets struct {
 }
 
 // Ensure statically that FakeDaemonSets implements DaemonInterface.
-var _ kClientLib.DaemonSetInterface = &FakeDaemonSets{}
+var _ kclientlib.DaemonSetInterface = &FakeDaemonSets{}
 
 func (c *FakeDaemonSets) Get(name string) (*extensions.DaemonSet, error) {
 	obj, err := c.Fake.Invokes(NewGetAction("daemonsets", c.Namespace, name), &extensions.DaemonSet{})
