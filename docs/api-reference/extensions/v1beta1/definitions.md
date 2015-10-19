@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/api-reference/operations.md).
+[here](http://releases.k8s.io/release-1.0/docs/api-reference/extensions/v1beta1/definitions.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -31,9 +31,11 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 <!-- needed for gh-pages to render html files when imported -->
-{% include operations.html %}
+{% include definitions.html %}
+
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api-reference/operations.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api-reference/extensions/v1beta1/definitions.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
