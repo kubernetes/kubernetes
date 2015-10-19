@@ -14,14 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Generates updated api-reference docs from the latest swagger spec.
+# Usage: ./update-api-reference-docs.sh <absolute output path>
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-V1_PATH="$PWD/${KUBE_ROOT}/docs/api-reference/v1/"
-V1BETA1_PATH="$PWD/${KUBE_ROOT}/docs/api-reference/extensions/v1beta1"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+DEFAULT_OUTPUT_PATH="$PWD/${KUBE_ROOT}/docs/api-reference"
+OUTPUT=${1:-${DEFAULT_OUTPUT_PATH}}
+
+echo "Generating api reference docs at ${OUTPUT}"
+
+V1_PATH="${OUTPUT}/v1/"
+V1BETA1_PATH="${OUTPUT}/extensions/v1beta1"
 SWAGGER_PATH="$PWD/${KUBE_ROOT}/api/swagger-spec/"
+
+echo "Reading swagger spec from: ${SWAGGER_PATH}"
+
 mkdir -p $V1_PATH
 mkdir -p $V1BETA1_PATH
 
@@ -32,3 +43,5 @@ docker run -v $V1_PATH:/output -v ${SWAGGER_PATH}:/swagger-source gcr.io/google_
 docker run -v $V1BETA1_PATH:/output -v ${SWAGGER_PATH}:/swagger-source gcr.io/google_containers/gen-swagger-docs:v3 \
     v1beta1 \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
+
+# ex: ts=2 sw=2 et filetype=sh
