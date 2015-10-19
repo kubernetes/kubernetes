@@ -431,7 +431,7 @@ func main() {
 
 			if *apiReference && !info.IsDir() && (info.Name() == "definitions.html" || info.Name() == "operations.html") {
 				fmt.Printf("Processing %s\n", path)
-				err := processHTML(path, info.Name(), *outputDir)
+				err := processHTML(path, *outputDir)
 				if err != nil {
 					return err
 				}
