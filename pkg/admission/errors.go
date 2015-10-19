@@ -19,7 +19,7 @@ package admission
 import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	errs "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 func extractKindName(a Attributes) (name, kind string, err error) {
@@ -50,7 +50,7 @@ func NewForbidden(a Attributes, internalError error) error {
 	}
 	name, kind, err := extractKindName(a)
 	if err != nil {
-		return apierrors.NewInternalError(errs.NewAggregate([]error{internalError, err}))
+		return apierrors.NewInternalError(utilerrors.NewAggregate([]error{internalError, err}))
 	}
 	return apierrors.NewForbidden(kind, name, internalError)
 }

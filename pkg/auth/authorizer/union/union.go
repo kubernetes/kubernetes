@@ -18,7 +18,7 @@ package union
 
 import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // unionAuthzHandler authorizer against a chain of authorizer.Authorizer
@@ -41,5 +41,5 @@ func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) error {
 		return nil
 	}
 
-	return errors.NewAggregate(errlist)
+	return utilerrors.NewAggregate(errlist)
 }

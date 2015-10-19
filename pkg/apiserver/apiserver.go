@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/version"
@@ -129,7 +129,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
 	AddSupportedResourcesWebService(ws, g.Version, apiResources)
 	container.Add(ws)
-	return errors.NewAggregate(registrationErrors)
+	return utilerrors.NewAggregate(registrationErrors)
 }
 
 // UpdateREST registers the REST handlers for this APIGroupVersion to an existing web service
@@ -153,7 +153,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	apiResources, registrationErrors := installer.Install(ws)
 	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
 	AddSupportedResourcesWebService(ws, g.Version, apiResources)
-	return errors.NewAggregate(registrationErrors)
+	return utilerrors.NewAggregate(registrationErrors)
 }
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.

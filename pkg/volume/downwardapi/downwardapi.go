@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
-	utilErrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -167,7 +167,7 @@ func (d *downwardAPIVolume) collectData() (map[string]string, error) {
 			data[fileName] = sortLines(values)
 		}
 	}
-	return data, utilErrors.NewAggregate(errlist)
+	return data, utilerrors.NewAggregate(errlist)
 }
 
 // isDataChanged iterate over all the entries to check whether at least one
@@ -283,7 +283,7 @@ func (d *downwardAPIVolume) writeDataInTimestampDir(data map[string]string) (str
 			errlist = append(errlist, err)
 		}
 	}
-	return timestampDir, utilErrors.NewAggregate(errlist)
+	return timestampDir, utilerrors.NewAggregate(errlist)
 }
 
 // updateSymlinksToCurrentDir creates the relative symlinks for all the files configured in this volume.
