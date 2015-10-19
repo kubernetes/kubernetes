@@ -29,7 +29,7 @@ mesosmaster1:
 mesosslave:
   hostname: mesosslave
   privileged: true
-  image: mesosphere-local/kubernetes-mesos-slave-dind:latest
+  image: local/kubernetes-mesos-slave-dind:latest
   ports: [ "10248","10249" ]
   entrypoint:
   - bash

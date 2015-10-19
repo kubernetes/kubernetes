@@ -61,7 +61,7 @@ function cluster::mesos::docker::docker_compose {
 # to `docker pull` which always hits the remote docker repo, even if the image
 # is already cached.
 function cluster::mesos::docker::docker_compose_lazy_pull {
-  for img in $(grep '^\s*image:\s' "${provider_root}/docker-compose.yml" | sed 's/[ \t]*image:[ \t]*//' | grep -vw "mesosphere-local"); do
+  for img in $(grep '^\s*image:\s' "${provider_root}/docker-compose.yml" | sed 's/[ \t]*image:[ \t]*//' | egrep -v "^local/"); do
     read repo tag <<<$(echo "${img} "| sed 's/:/ /')
     if [ -z "${tag}" ]; then
       tag="latest"

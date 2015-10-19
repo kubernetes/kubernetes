@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-IMAGE_REPO=${IMAGE_REPO:-mesosphere-local/kubernetes-mesos-slave-dind}
+IMAGE_REPO=${IMAGE_REPO:-local/kubernetes-mesos-slave-dind}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
 script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
@@ -42,7 +42,7 @@ cleanup() {
 }
 trap 'cleanup' EXIT
 
-# setup workspace to mirror script dir (dockerfile expects /bin & /opt)
+# setup workspace to mirror script dir
 echo "Copying files to workspace"
 cp "${script_dir}/Dockerfile" "${workspace}/"
 cp -a "${script_dir}/downloads" "${workspace}/"
