@@ -1144,10 +1144,11 @@ func testContainerOutputMatcher(scenarioName string,
 	for time.Now().Sub(start) < (60 * time.Second) {
 		err = nil
 		logs, err = c.Get().
-			Prefix("proxy").
-			Resource("nodes").
-			Name(podStatus.Spec.NodeName).
-			Suffix("containerLogs", ns, podStatus.Name, containerName).
+			Resource("pods").
+			Namespace(ns).
+			Name(pod.Name).
+			SubResource("log").
+			Param("container", containerName).
 			Do().
 			Raw()
 		if err == nil && strings.Contains(string(logs), "Internal Error") {
