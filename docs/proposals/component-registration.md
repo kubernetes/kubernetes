@@ -222,21 +222,21 @@ Since the changes here are complex, they will be implemented in phases.
     - Specify liveness and readiness probe methods
     - Store the last known status (list of conditions)
   - Add (or modify) a controller to probe ExternalServiceProviders and update their status
-  - Update how Endpoints are managed
-    - EITHER update the EndpointsController to manage Endpoints based on both Pod and ExternalServiceProvider status
-    - OR modify Endpoints to be a read-only view of service providers (Pod/ExternalServiceProvider) and delete the Endpoints controller
+  - Update EndpointsController to manage Endpoints based on both Pod and ExternalServiceProvider status
 2. Register component ExternalServiceProviders
   - Update all components to use consistent namespacing and component labeling
   - EITHER update "external" components to self-register their ExternalServiceProvider
   - OR update deployment automation to register deployed components as ExternalServiceProviders
-3. Rewrite ComponentStatuses
-  - Either Dynamically display a list of components and their readiness (filtered Pod/ExternalServiceProvider or Endpoints query) on `/componentstatuses`
-  - Or replace ComponentStatuses with Component and ComponentStatus (`/component/status`) resources
-4. Add Service Status Conditions
+3. Add Service Status Conditions
   - Add Service condition policies (all, half+1, at least n) that can be specified for each Service
   - Add (or modify) a controller to update the Service status conditions based on aggregate provider (Pod/ExternalServiceProvider) status
   - Make sure Services can be filtered by status conditions (e.g. all ready services with label x)
-  - Deprecate ComponentStatuses and move users to filtered "component" querying of Service Status or Pod/ExternalServiceProvider (if they need the status of individual components, not just the aggregates)
+  - Deprecate ComponentStatuses and migrate users to filtered queries (`type=component`)
+    - For aggregate status query ServiceList
+    - For individual service provider status query PodList & ExternalServiceProviderList
+4. Optimize querying service provider spec + status (PodList + ExternalServiceProviderList)
+  - Either add a new on-demand "joined view" meta-resource
+  - OR add a new Component resource (read-only cache) that gets updated every time `type=component` Pods or ExternalServiceProviders get updated
 5. Expand Service or add new a new API resource to allow discovery of API group providers
 
 
@@ -305,7 +305,7 @@ type ExternalServiceProviderStatus struct {
 }
 
 type ExternalServiceProviderCondition struct {
-	Type ExternalServiceProviderConditionType // Readiness, Liveness
+	Type ExternalServiceProviderConditionType // ex: Ready, Alive
 	Status ConditionStatus // True, False, Unknown
 	LastUpdateTime util.Time
 	LastTransitionTime util.Time
@@ -321,6 +321,17 @@ type ExternalServiceProviderList struct {
 ```
 
 ```
+type ServiceSpec struct {
+	...
+	ConditionPolicies []ServiceConditionPolicy
+}
+
+type ServiceConditionPolicy struct {
+	Type ServiceConditionType
+	MinNumber *int
+	MinPercent *float
+}
+
 type ServiceStatus struct {
 	...
 	Conditions []ServiceCondition
@@ -395,9 +406,7 @@ Since existing AddOns (e.g. kube-ui, kube-dns) already register themselves as in
 
 Services could be made to include both internal pods and external providers (in the same service).
 
-It was also suggested that this proposal overlaps somewhat with the Nodes API, and that nodes (kubelets/kube-proxy) could also be registered as ExternalServiceProviders.
-
-Because this proposal includes API changes, it's likely to be put into the experimental API group. However, the intent was to make changes that were backwards compatible, at least for "Phase 1".
+Because this proposal includes API changes, it might be put in either a new API group or in a new API version. However, the intent was to make changes that were backwards compatible, at least for the beginning phases.
 
 Because of the desire for reverse compatibility, the existing `/componentstatuses` endpoint will likely be deprecated and eventually removed. We *could* re-implement it using the API added by this proposal, but it's more desirable to also update the API to match existing conventions, which would be effectively equivalent to deleting it and making a new API (e.g. `/components/status`).
 
