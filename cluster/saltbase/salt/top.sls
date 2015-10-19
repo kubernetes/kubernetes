@@ -20,6 +20,11 @@ base:
     - opencontrail-kubelet-plugin
 {% endif %}
     - kubelet
+{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
+    - supervisor
+{% else %}
+    - monit
+{% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-minion
 {% else %}
@@ -36,11 +41,6 @@ base:
     - kube-registry-proxy
 {% endif %}
     - logrotate
-{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
-    - supervisor
-{% else %}
-    - monit
-{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
