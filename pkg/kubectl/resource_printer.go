@@ -1396,7 +1396,7 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 	if hpa.Status.CurrentCPUUtilizationPercentage != nil {
 		current = fmt.Sprintf("%d%%", *hpa.Status.CurrentCPUUtilizationPercentage)
 	}
-	minPods := hpa.Spec.MinReplicas
+	minPods := *hpa.Spec.MinReplicas
 	maxPods := hpa.Spec.MaxReplicas
 	if withNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
