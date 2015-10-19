@@ -109,6 +109,10 @@ func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOp
 	if len(pod.Spec.NodeName) == 0 {
 		period = 0
 	}
+	// if the pod is already terminated, delete immediately
+	if pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded {
+		period = 0
+	}
 	// ensure the options and the pod are in sync
 	options.GracePeriodSeconds = &period
 	return true
