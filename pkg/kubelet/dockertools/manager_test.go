@@ -38,7 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
@@ -83,7 +84,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
-		prober.FakeProber{},
+		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
 		PodInfraContainerImage,
@@ -854,6 +855,10 @@ func TestSyncPodBadHash(t *testing.T) {
 }
 
 func TestSyncPodsUnhealthy(t *testing.T) {
+	const (
+		unhealthyContainerID = "1234"
+		infraContainerID     = "9876"
+	)
 	dm, fakeDocker := newTestDockerManager()
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -862,40 +867,35 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 			Namespace: "new",
 		},
 		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "bar",
-					LivenessProbe: &api.Probe{
-					// Always returns healthy == false
-					},
-				},
-			},
+			Containers: []api.Container{{Name: "unhealthy"}},
 		},
 	}
 
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar_foo_new_12345678_42"},
-			ID:    "1234",
+			Names: []string{"/k8s_unhealthy_foo_new_12345678_42"},
+			ID:    unhealthyContainerID,
 		},
 		{
 			// pod infra container
 			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42"},
-			ID:    "9876",
+			ID:    infraContainerID,
 		},
 	}
 	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
+		unhealthyContainerID: {
+			ID:         unhealthyContainerID,
 			Config:     &docker.Config{},
 			HostConfig: &docker.HostConfig{},
 		},
-		"9876": {
-			ID:         "9876",
+		infraContainerID: {
+			ID:         infraContainerID,
 			Config:     &docker.Config{},
 			HostConfig: &docker.HostConfig{},
 		},
 	}
+	dm.livenessManager.Set(kubetypes.DockerID(unhealthyContainerID).ContainerID(), proberesults.Failure, nil)
 
 	runSyncPod(t, dm, fakeDocker, pod, nil)
 
@@ -908,7 +908,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
+	if err := fakeDocker.AssertStopped([]string{unhealthyContainerID}); err != nil {
 		t.Errorf("%v", err)
 	}
 }

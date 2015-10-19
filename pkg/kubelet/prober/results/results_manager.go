@@ -19,17 +19,23 @@ package results
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// Manager provides a probe results cache.
+// Manager provides a probe results cache and channel of updates.
 type Manager interface {
 	// Get returns the cached result for the container with the given ID.
-	Get(id kubecontainer.ContainerID) (Result, bool)
+	Get(kubecontainer.ContainerID) (Result, bool)
 	// Set sets the cached result for the container with the given ID.
-	Set(id kubecontainer.ContainerID, result Result)
+	// The pod is only included to be sent with the update.
+	Set(kubecontainer.ContainerID, Result, *api.Pod)
 	// Remove clears the cached result for the container with the given ID.
-	Remove(id kubecontainer.ContainerID)
+	Remove(kubecontainer.ContainerID)
+	// Updates creates a channel that receives an Update whenever its result changes (but not
+	// removed).
+	// NOTE: The current implementation only supports a single updates channel.
+	Updates() <-chan Update
 }
 
 // Result is the type for probe results.
@@ -51,19 +57,36 @@ func (r Result) String() string {
 	}
 }
 
+// Update is an enum of the types of updates sent over the Updates channel.
+type Update struct {
+	ContainerID kubecontainer.ContainerID
+	Result      Result
+	Pod         *api.Pod
+}
+
 // Manager implementation.
 type manager struct {
 	// guards the cache
 	sync.RWMutex
 	// map of container ID -> probe Result
 	cache map[kubecontainer.ContainerID]Result
+	// channel of updates (may be nil)
+	updates chan Update
 }
 
 var _ Manager = &manager{}
 
 // NewManager creates ane returns an empty results manager.
 func NewManager() Manager {
-	return &manager{cache: make(map[kubecontainer.ContainerID]Result)}
+	m := &manager{cache: make(map[kubecontainer.ContainerID]Result)}
+	return m
+}
+
+// NewManager creates ane returns an empty results manager.
+func NewManagerWithUpdates() Manager {
+	m := NewManager().(*manager)
+	m.updates = make(chan Update, 20)
+	return m
 }
 
 func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
@@ -73,17 +96,37 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 	return result, found
 }
 
-func (m *manager) Set(id kubecontainer.ContainerID, result Result) {
+func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *api.Pod) {
+	if m.setInternal(id, result) {
+		m.pushUpdate(Update{id, result, pod})
+	}
+}
+
+// Internal helper for locked portion of set. Returns whether an update should be sent.
+func (m *manager) setInternal(id kubecontainer.ContainerID, result Result) bool {
 	m.Lock()
 	defer m.Unlock()
 	prev, exists := m.cache[id]
 	if !exists || prev != result {
 		m.cache[id] = result
+		return true
 	}
+	return false
 }
 
 func (m *manager) Remove(id kubecontainer.ContainerID) {
 	m.Lock()
 	defer m.Unlock()
 	delete(m.cache, id)
+}
+
+func (m *manager) Updates() <-chan Update {
+	return m.updates
+}
+
+// pushUpdates sends an update on the updates channel if it is initialized.
+func (m *manager) pushUpdate(update Update) {
+	if m.updates != nil {
+		m.updates <- update
+	}
 }

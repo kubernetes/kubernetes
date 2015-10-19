@@ -41,9 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -89,7 +88,7 @@ type Runtime struct {
 	containerRefManager *kubecontainer.RefManager
 	generator           kubecontainer.RunContainerOptionsGenerator
 	recorder            record.EventRecorder
-	prober              prober.Prober
+	livenessManager     proberesults.Manager
 	volumeGetter        volumeGetter
 	imagePuller         kubecontainer.ImagePuller
 }
@@ -108,8 +107,9 @@ func New(config *Config,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
-	prober prober.Prober,
-	volumeGetter volumeGetter, imageBackOff *util.Backoff) (*Runtime, error) {
+	livenessManager proberesults.Manager,
+	volumeGetter volumeGetter,
+	imageBackOff *util.Backoff) (*Runtime, error) {
 
 	systemdVersion, err := getSystemdVersion()
 	if err != nil {
@@ -146,7 +146,7 @@ func New(config *Config,
 		containerRefManager: containerRefManager,
 		generator:           generator,
 		recorder:            recorder,
-		prober:              prober,
+		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
 	}
 	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
@@ -1032,17 +1032,13 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 			break
 		}
 
-		result, err := r.prober.ProbeLiveness(pod, podStatus, container, c.ID, c.Created)
-		// TODO(vmarmol): examine this logic.
-		if err == nil && result != probe.Success && pod.Spec.RestartPolicy != api.RestartPolicyNever {
-			glog.Infof("Pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+		liveness, found := r.livenessManager.Get(c.ID)
+		if found && liveness != proberesults.Success && pod.Spec.RestartPolicy != api.RestartPolicyNever {
+			glog.Infof("Pod %q container %q is unhealthy, it will be killed and re-created.", podFullName, container.Name)
 			restartPod = true
 			break
 		}
 
-		if err != nil {
-			glog.V(2).Infof("Probe container %q failed: %v", container.Name, err)
-		}
 		delete(unidentifiedContainers, c.ID)
 	}
 

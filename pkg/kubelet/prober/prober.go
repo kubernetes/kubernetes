@@ -39,12 +39,6 @@ import (
 
 const maxProbeRetries = 3
 
-// Prober checks the healthiness of a container.
-type Prober interface {
-	ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, createdAt int64) (probe.Result, error)
-	ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error)
-}
-
 // Prober helps to check the liveness/readiness of a container.
 type prober struct {
 	exec   execprobe.ExecProber
@@ -58,10 +52,10 @@ type prober struct {
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
-func New(
+func newProber(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) Prober {
+	recorder record.EventRecorder) *prober {
 
 	return &prober{
 		exec:       execprobe.New(),
@@ -73,9 +67,19 @@ func New(
 	}
 }
 
-// ProbeLiveness probes the liveness of a container.
-// If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID, createdAt int64) (probe.Result, error) {
+// probe probes the container.
+func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
+	switch probeType {
+	case readiness:
+		return pb.probeReadiness(pod, status, container, containerID)
+	case liveness:
+		return pb.probeLiveness(pod, status, container, containerID)
+	}
+	return probe.Unknown, fmt.Errorf("Unknown probe type: %q", probeType)
+}
+
+// probeLiveness probes the liveness of a container.
+func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
 	var live probe.Result
 	var output string
 	var err error
@@ -83,11 +87,7 @@ func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container ap
 	if p == nil {
 		return probe.Success, nil
 	}
-	if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		return probe.Success, nil
-	} else {
-		live, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
-	}
+	live, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
 	if err != nil || live != probe.Success {
 		// Liveness failed in one way or another.
@@ -113,17 +113,16 @@ func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container ap
 	return probe.Success, nil
 }
 
-// ProbeReadiness probes and sets the readiness of a container.
-func (pb *prober) ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
+// probeReadiness probes and sets the readiness of a container.
+func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
 	var ready probe.Result
 	var output string
 	var err error
 	p := container.ReadinessProbe
 	if p == nil {
-		ready = probe.Success
-	} else {
-		ready, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
+		return probe.Success, nil
 	}
+	ready, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
 	if err != nil || ready == probe.Failure {
 		// Readiness failed in one way or another.
