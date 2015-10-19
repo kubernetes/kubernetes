@@ -844,6 +844,12 @@ func deepCopy_v1_ListOptions(in ListOptions, out *ListOptions, c *conversion.Clo
 	out.FieldSelector = in.FieldSelector
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
 	return nil
 }
 
