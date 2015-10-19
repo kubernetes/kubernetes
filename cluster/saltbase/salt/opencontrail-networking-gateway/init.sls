@@ -1,6 +1,6 @@
 opencontrail-networking-gateway:
   cmd.script:
-    - unless: test -f /var/run/vrouter-sgw.ok
+    - unless: test -f /etc/contrail/vrouter_sgw_prov_run.ok
     - env:
       - 'OPENCONTRAIL_TAG': '{{ pillar.get('opencontrail_tag') }}'
       - 'OPENCONTRAIL_KUBERNETES_TAG': '{{ pillar.get('opencontrail_kubernetes_tag') }}'

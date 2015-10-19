@@ -1,6 +1,6 @@
 opencontrail-networking-master:
   cmd.script:
-    - unless: test -f /var/log/contrail/provision_master.log
+    - unless: test -f /etc/contrail/opencontrail_control_prov_run.ok
     - env:
       - 'OPENCONTRAIL_TAG': '{{ pillar.get('opencontrail_tag') }}'
       - 'OPENCONTRAIL_KUBERNETES_TAG': '{{ pillar.get('opencontrail_kubernetes_tag') }}'
