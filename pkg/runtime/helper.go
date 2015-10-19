@@ -17,15 +17,86 @@ limitations under the License.
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
-// IsListType returns true if the provided Object has a slice called Items
+// HasList returns nil if the provided Object's kind has List suffix.
+// If not, an error will be returned.
+func KindHasList(obj Object) error {
+	var err error
+	switch t := obj.(type) {
+	case *Unknown:
+	case *Unstructured:
+		if !strings.HasSuffix(t.Kind, "List") {
+			err = fmt.Errorf("object's kind field has no List suffix")
+		}
+	default:
+		err = fmt.Errorf("object type not support, must be Unknown or Unstructured")
+	}
+	return err
+}
+
+// isUnknownList returns nil if the provided Unknown is a List kind.
+// If not, an error will be returned.
+func isUnknownList(unknown *Unknown) error {
+	if !strings.HasSuffix(unknown.Kind, "List") {
+		return fmt.Errorf("object's kind field has no List suffix")
+	}
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(unknown.RawJSON, &m); err != nil {
+		return err
+	}
+	items, exists := m["items"]
+	if !exists {
+		return fmt.Errorf("no items field in %#v", m)
+	}
+	_, ok := items.([]interface{})
+	if !ok {
+		return fmt.Errorf("object's items field isn't a slice")
+	}
+	return nil
+}
+
+// isUnstrcturedList returns nil if the provided Unstructured is a List kind.
+// If not, an error will be returned.
+func isUnstrcturedList(unstructured *Unstructured) error {
+	if !strings.HasSuffix(unstructured.Kind, "List") {
+		return fmt.Errorf("object's kind field has no List suffix")
+	}
+	items, exists := unstructured.Object["items"]
+	if !exists {
+		return fmt.Errorf("no items field in %#v", unstructured.Object)
+	}
+	_, ok := items.([]interface{})
+	if !ok {
+		return fmt.Errorf("object's items field isn't a slice")
+	}
+	return nil
+}
+
+// IsList returns nil if the provided Object is a List kind.
+// If not, an error will be returned.
+func IsList(obj Object) error {
+	var err error
+	switch t := obj.(type) {
+	case *Unknown:
+		err = isUnknownList(t)
+	case *Unstructured:
+		err = isUnstrcturedList(t)
+	default:
+		_, err = GetItemsPtr(obj)
+	}
+	return err
+}
+
+// IsListType returns true if the provided Object is a List kind.
 func IsListType(obj Object) bool {
-	_, err := GetItemsPtr(obj)
+	err := IsList(obj)
 	return err == nil
 }
 
