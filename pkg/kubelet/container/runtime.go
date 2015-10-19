@@ -106,6 +106,8 @@ type Runtime interface {
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability
 	ContainerAttacher
+	// Ping determines the health of the runtime. Returns error if runtime is unhealthy or unreachable. Returns nil otherwise.
+	Ping() error
 }
 
 type ContainerAttacher interface {

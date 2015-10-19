@@ -1396,3 +1396,8 @@ func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	}
 	return nil
 }
+
+func (r *Runtime) Ping() error {
+	// TODO(yifan): Add any health check that can improve perceived system stability.
+	return nil
+}
