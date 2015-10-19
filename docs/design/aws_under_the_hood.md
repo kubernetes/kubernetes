@@ -53,7 +53,7 @@ you manually created or configured your cluster.
  * [Storage](#storage)
  * [Auto Scaling group](#auto-scaling-group)
  * [Networking](#networking)
- * [NodePort and LoadBalancing services](#nodeport-and-loadbalancing-services)
+ * [NodePort and LoadBalancer services](#nodeport-and-loadbalancer-services)
  * [Identity and access management (IAM)](#identity-and-access-management-iam)
  * [Tagging](#tagging)
  * [AWS objects](#aws-objects)
@@ -124,7 +124,7 @@ configured to route to an instance in the VPC routing table.
 It is also possible to use overlay networking on AWS, but that is not the default
 configuration of the kube-up script.
 
-### NodePort and LoadBalancing services
+### NodePort and LoadBalancer services
 
 Kubernetes on AWS integrates with [Elastic Load Balancing
 (ELB)](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SetUpASLBApp.html).
