@@ -1096,7 +1096,7 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 		return err
 	}
 	for _, f := range files {
-		if !runningKubernetesUnits.Has(f.Name()) && f.ModTime().Before(time.Now().Add(-gcPolicy.MinAge)) {
+		if strings.HasPrefix(f.Name(), kubernetesUnitPrefix) && !runningKubernetesUnits.Has(f.Name()) && f.ModTime().Before(time.Now().Add(-gcPolicy.MinAge)) {
 			glog.V(4).Infof("rkt: Removing inactive systemd service file: %v", f.Name())
 			if err := os.Remove(serviceFilePath(f.Name())); err != nil {
 				glog.Warningf("rkt: Failed to remove inactive systemd service file %v: %v", f.Name(), err)
