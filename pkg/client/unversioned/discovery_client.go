@@ -32,7 +32,7 @@ type DiscoveryInterface interface {
 	ServerResourcesInterface
 }
 
-// GroupsInterface has methods for obtaining supported groups on the API server
+// ServerGroupsInterface has methods for obtaining supported groups on the API server
 type ServerGroupsInterface interface {
 	// ServerGroups returns the supported groups, with information like supported versions and the
 	// preferred version.
@@ -79,7 +79,7 @@ func (d *DiscoveryClient) get(url string) (resp *http.Response, err error) {
 	return d.httpClient.Do(req)
 }
 
-// APIGroups returns the supported groups, with information like supported versions and the
+// ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
@@ -114,7 +114,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 	return apiGroupList, nil
 }
 
-// APIResourcesForGroup returns the supported resources for a group and version.
+// ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *unversioned.APIResourceList, err error) {
 	url := d.baseURL
 	if groupVersion == "v1" {
@@ -134,7 +134,7 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	return resources, nil
 }
 
-// APIResources returns the supported resources for all groups and versions.
+// ServerResources returns the supported resources for all groups and versions.
 func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
