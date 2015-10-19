@@ -309,6 +309,15 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 					Scheme: svcScheme,
 					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
 				}, rs.proxyTransport, nil
+			} else {
+				port, err := strconv.ParseInt(portStr, 10, 64)
+				if err == nil && int(port) == ss.Ports[i].Port {
+					ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
+					return &url.URL{
+						Scheme: svcScheme,
+						Host:   net.JoinHostPort(ip, portStr),
+					}, rs.proxyTransport, nil
+				}
 			}
 		}
 	}
