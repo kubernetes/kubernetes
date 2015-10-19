@@ -46,14 +46,18 @@ base:
     - match: grain
     - generate-cert
     - etcd
-    - kube-apiserver
-    - kube-controller-manager
-    - kube-scheduler
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
+    - docker
+    - kubelet
+{% endif %}
 {% if grains['cloud'] is defined and grains.cloud == 'gce' %}
     - supervisor
 {% else %}
     - monit
 {% endif %}
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
 {% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant' ] %}
     - nginx
 {% endif %}
@@ -74,10 +78,6 @@ base:
     - kube-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
-{% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
-    - docker
-    - kubelet
 {% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master

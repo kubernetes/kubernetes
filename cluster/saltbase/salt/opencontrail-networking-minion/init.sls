@@ -1,6 +1,6 @@
 opencontrail-networking-minion:
   cmd.script:
-    - unless: test -f /var/log/contrail/provision_minion.log
+    - unless: test -f /var/run/vrouter.ok
     - env:
       - 'OPENCONTRAIL_TAG': '{{ pillar.get('opencontrail_tag') }}'
       - 'OPENCONTRAIL_KUBERNETES_TAG': '{{ pillar.get('opencontrail_kubernetes_tag') }}'
