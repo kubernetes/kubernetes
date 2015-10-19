@@ -166,11 +166,8 @@ var _ = Describe("DaemonRestart", func() {
 	BeforeEach(func() {
 
 		// These tests require SSH
-		// TODO: Enable on gke after testing (#11834)
-		if !providerIs("gce") {
-			By(fmt.Sprintf("Skipping test, which is not implemented for %s", testContext.Provider))
-			return
-		}
+		// TODO(11834): Enable this test in GKE once experimental API there is switched on
+		SkipUnlessProviderIs("gce")
 		framework.beforeEach()
 		ns = framework.Namespace.Name
 
