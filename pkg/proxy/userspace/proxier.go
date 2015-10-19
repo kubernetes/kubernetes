@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -156,10 +155,6 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
 	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod)
-}
-
-func setRLimit(limit uint64) error {
-	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{Max: limit, Cur: limit})
 }
 
 func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod time.Duration) (*Proxier, error) {
