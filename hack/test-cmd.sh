@@ -32,18 +32,25 @@ function stop-proxy()
   PROXY_PID=
 }
 
-# Starts "kubect proxy" to test the client proxy. You may pass options, e.g.
-# --api-prefix.
+# Starts "kubect proxy" to test the client proxy. $1: api_prefix
 function start-proxy()
 {
   stop-proxy
 
   kube::log::status "Starting kubectl proxy"
-  # the --www and --www-prefix are just to make something definitely show up for
-  # wait_for_url to see.
-  kubectl proxy -p ${PROXY_PORT} --www=. --www-prefix=/healthz "$@" 1>&2 &
+
+  if [ $# -eq 0 ]; then
+    kubectl proxy -p ${PROXY_PORT} --www=. 1>&2 & break
+  else
+    kubectl proxy -p ${PROXY_PORT} --www=. --api-prefix="$1" 1>&2 & break
+  fi
+
   PROXY_PID=$!
-  kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy $@"
+  if [ $# -eq 0 ]; then
+    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy"
+  else
+    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/$1/healthz" "kubectl proxy --api-prefix=$1"
+  fi
 }
 
 function cleanup()
@@ -136,6 +143,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
+  --runtime_config="extensions/v1beta1=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -190,26 +198,24 @@ runTests() {
   #######################
 
   # Make sure the UI can be proxied
-  start-proxy --api-prefix=/
+  start-proxy
   check-curl-proxy-code /ui 301
   check-curl-proxy-code /metrics 200
-  if [[ -n "${version}" ]]; then
-    check-curl-proxy-code /api/${version}/namespaces 200
-  fi
-  stop-proxy
-
-  # Default proxy locks you into the /api path (legacy behavior)
-  start-proxy
-  check-curl-proxy-code /ui 404
-  check-curl-proxy-code /metrics 404
   check-curl-proxy-code /api/ui 404
   if [[ -n "${version}" ]]; then
     check-curl-proxy-code /api/${version}/namespaces 200
   fi
+  check-curl-proxy-code /static/ 200
+  stop-proxy
+
+  # Make sure the in-development api is accessible by default
+  start-proxy
+  check-curl-proxy-code /apis 200
+  check-curl-proxy-code /apis/extensions/ 200
   stop-proxy
 
   # Custom paths let you see everything.
-  start-proxy --api-prefix=/custom
+  start-proxy /custom
   check-curl-proxy-code /custom/ui 301
   check-curl-proxy-code /custom/metrics 200
   if [[ -n "${version}" ]]; then

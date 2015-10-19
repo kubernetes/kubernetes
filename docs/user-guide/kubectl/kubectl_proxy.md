@@ -51,7 +51,7 @@ $ kubectl proxy --api-prefix=/k8s-api
 ```
       --accept-hosts="^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$": Regular expression for hosts that the proxy should accept.
       --accept-paths="^/.*": Regular expression for paths that the proxy should accept.
-      --api-prefix="/api/": Prefix to serve the proxied API under.
+      --api-prefix="/": Prefix to serve the proxied API under.
       --disable-filter[=false]: If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.
   -p, --port=8001: The port on which to run the proxy. Set to 0 to pick a random port.
       --reject-methods="POST,PUT,PATCH": Regular expression for HTTP methods that the proxy should reject.
