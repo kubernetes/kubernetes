@@ -146,7 +146,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 		if len(infos) != 1 {
-			return fmt.Errorf("watch is only supported on a single resource - %d resources were found", len(infos))
+			return fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()

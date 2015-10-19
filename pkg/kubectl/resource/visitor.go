@@ -564,6 +564,9 @@ func RetrieveLatest(info *Info, err error) error {
 	if err != nil {
 		return err
 	}
+	if runtime.IsListType(info.Object) {
+		return fmt.Errorf("watch is only supported on individual resources and resource collections, but a list of resources is found")
+	}
 	if len(info.Name) == 0 {
 		return nil
 	}
