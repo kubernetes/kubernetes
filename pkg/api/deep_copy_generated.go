@@ -826,6 +826,12 @@ func deepCopy_api_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cl
 	}
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
 	return nil
 }
 
