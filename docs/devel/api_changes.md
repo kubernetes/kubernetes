@@ -10,7 +10,7 @@ with a number of existing API types and with the [API
 conventions](api-conventions.md).  If creating a new API
 type/resource, we also recommend that you first send a PR containing
 just a proposal for the new API types, and that you initially target
-the experimental API (pkg/apis/experimental).
+the extensions API (pkg/apis/extensions).
 
 The Kubernetes API has two major components - the internal structures and
 the versioned APIs.  The versioned APIs are intended to be stable, while the
@@ -265,13 +265,13 @@ the release notes for the next release by labeling the PR with the "release-note
 If you found that your change accidentally broke clients, it should be reverted.
 
 In short, the expected API evolution is as follows:
-* `experimental/v1alpha1` ->
+* `extensions/v1alpha1` ->
 * `newapigroup/v1alpha1` -> ... -> `newapigroup/v1alphaN` ->
 * `newapigroup/v1beta1` -> ... -> `newapigroup/v1betaN` ->
 * `newapigroup/v1` ->
 * `newapigroup/v2alpha1` -> ...
 
-While in experimental we have no obligation to move forward with the API at all and may delete or break it at any time.
+While in extensions we have no obligation to move forward with the API at all and may delete or break it at any time.
 
 While in alpha we expect to move forward with it, but may break it.
 
@@ -371,9 +371,9 @@ The conversion code resides with each versioned API. There are two files:
      functions
    - `pkg/api/<version>/conversion_generated.go` containing auto-generated
      conversion functions
-   - `pkg/apis/experimental/<version>/conversion.go` containing manually written
+   - `pkg/apis/extensions/<version>/conversion.go` containing manually written
      conversion functions
-   - `pkg/apis/experimental/<version>/conversion_generated.go` containing
+   - `pkg/apis/extensions/<version>/conversion_generated.go` containing
      auto-generated conversion functions
 
 Since auto-generated conversion functions are using manually written ones,
@@ -409,7 +409,7 @@ of your versioned api objects.
 
 The deep copy code resides with each versioned API:
    - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
-   - `pkg/apis/experimental/<version>/deep_copy_generated.go` containing auto-generated copy functions
+   - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
 
 To regenerate them:
    - run
@@ -418,12 +418,28 @@ To regenerate them:
 hack/update-generated-deep-copies.sh
 ```
 
+## Edit json (un)marshaling code
+
+We are auto-generating code for marshaling and unmarshaling json representation
+of api objects - this is to improve the overall system performance.
+
+The auto-generated code resides with each versioned API:
+   - `pkg/api/<version>/types.generated.go`
+   - `pkg/apis/extensions/<version>/types.generated.go`
+
+To regenerate them:
+   - run
+
+```sh
+hack/update-codecgen.sh
+```
+
 ## Making a new API Group
 
 This section is under construction, as we make the tooling completely generic.
 
 At the moment, you'll have to make a new directory under pkg/apis/; copy the
-directory structure from pkg/apis/experimental. Add the new group/version to all
+directory structure from pkg/apis/extensions. Add the new group/version to all
 of the hack/{verify,update}-generated-{deep-copy,conversions,swagger}.sh files
 in the appropriate places--it should just require adding your new group/version
 to a bash array. You will also need to make sure your new types are imported by
