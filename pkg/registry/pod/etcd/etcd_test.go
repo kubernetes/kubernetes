@@ -541,13 +541,6 @@ func TestEtcdCreateBinding(t *testing.T) {
 			},
 			errOK: func(err error) bool { return err == nil },
 		},
-		"kindMinion": {
-			binding: api.Binding{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine4", Kind: "Minion"},
-			},
-			errOK: func(err error) bool { return err == nil },
-		},
 	}
 	for k, test := range testCases {
 		storage, bindingStorage, _, fakeClient := newStorage(t)
