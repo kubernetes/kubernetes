@@ -234,7 +234,11 @@ func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *api.Pod) bool {
 	if pod.Name != mirrorPod.Name || pod.Namespace != mirrorPod.Namespace {
 		return false
 	}
-	return api.Semantic.DeepEqual(&pod.Spec, &mirrorPod.Spec)
+	hash, ok := getHashFromMirrorPod(mirrorPod)
+	if !ok {
+		return false
+	}
+	return hash == getPodHash(pod)
 }
 
 func podsMapToPods(UIDMap map[types.UID]*api.Pod) []*api.Pod {
