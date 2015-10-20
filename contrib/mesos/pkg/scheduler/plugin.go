@@ -306,7 +306,8 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 	}
 }
 
-// Call ScheduleFunc and subtract some resources, returning the name of the machine the task is scheduled on
+// doSchedule schedules the given task and returns the machine the task is scheduled on
+// or an error if the scheduling failed.
 func (k *kubeScheduler) doSchedule(task *podtask.T) (string, error) {
 	var offer offers.Perishable
 	var err error
