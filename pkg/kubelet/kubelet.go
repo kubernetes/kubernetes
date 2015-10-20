@@ -184,7 +184,9 @@ func NewMainKubelet(
 	resolverConfig string,
 	cpuCFSQuota bool,
 	daemonEndpoints *api.NodeDaemonEndpoints,
-	oomAdjuster *oom.OOMAdjuster) (*Kubelet, error) {
+	oomAdjuster *oom.OOMAdjuster,
+	serializeImagePulls bool,
+) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -335,7 +337,9 @@ func NewMainKubelet(
 			oomAdjuster,
 			procFs,
 			klet.cpuCFSQuota,
-			imageBackOff)
+			imageBackOff,
+			serializeImagePulls,
+		)
 
 	case "rkt":
 		conf := &rkt.Config{
@@ -350,7 +354,9 @@ func NewMainKubelet(
 			containerRefManager,
 			klet.livenessManager,
 			klet.volumeManager,
-			imageBackOff)
+			imageBackOff,
+			serializeImagePulls,
+		)
 		if err != nil {
 			return nil, err
 		}

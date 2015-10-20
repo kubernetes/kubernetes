@@ -109,8 +109,9 @@ func New(config *Config,
 	containerRefManager *kubecontainer.RefManager,
 	livenessManager proberesults.Manager,
 	volumeGetter volumeGetter,
-	imageBackOff *util.Backoff) (*Runtime, error) {
-
+	imageBackOff *util.Backoff,
+	serializeImagePulls bool,
+) (*Runtime, error) {
 	systemdVersion, err := getSystemdVersion()
 	if err != nil {
 		return nil, err
@@ -149,7 +150,11 @@ func New(config *Config,
 		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
 	}
-	rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
+	if serializeImagePulls {
+		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
+	} else {
+		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
+	}
 
 	// Test the rkt version.
 	version, err := rkt.Version()

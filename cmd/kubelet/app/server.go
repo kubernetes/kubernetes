@@ -146,6 +146,9 @@ type KubeletServer struct {
 
 	KubeApiQps   float32
 	KubeApiBurst int
+
+	// Pull images one at a time.
+	SerializeImagePulls bool
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -185,6 +188,8 @@ func NewKubeletServer() *KubeletServer {
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
+		KubeApiQps:                  5.0,
+		KubeApiBurst:                10,
 		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		LowDiskSpaceThresholdMB:     256,
 		MasterServiceNamespace:      api.NamespaceDefault,
@@ -199,6 +204,7 @@ func NewKubeletServer() *KubeletServer {
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
 		Port:                ports.KubeletPort,
 		ReadOnlyPort:        ports.KubeletReadOnlyPort,
+		ReconcileCIDR:       true,
 		RegisterNode:        true, // will be ignored if no apiserver is configured
 		RegisterSchedulable: true,
 		RegistryBurst:       10,
@@ -208,9 +214,6 @@ func NewKubeletServer() *KubeletServer {
 		RootDirectory:       defaultRootDir,
 		SyncFrequency:       10 * time.Second,
 		SystemContainer:     "",
-		ReconcileCIDR:       true,
-		KubeApiQps:          5.0,
-		KubeApiBurst:        10,
 	}
 }
 
@@ -292,6 +295,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
 	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -413,6 +417,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
+		SerializeImagePulls:            s.SerializeImagePulls,
 		StandaloneMode:                 (len(s.APIServerList) == 0),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		SyncFrequency:                  s.SyncFrequency,
@@ -672,6 +677,7 @@ func SimpleKubelet(client *client.Client,
 		ResolverConfig:      kubelet.ResolvConfDefault,
 		ResourceContainer:   "/kubelet",
 		RootDirectory:       rootDir,
+		SerializeImagePulls: true,
 		SyncFrequency:       syncFrequency,
 		SystemContainer:     "",
 		TLSOptions:          tlsOptions,
@@ -866,6 +872,7 @@ type KubeletConfig struct {
 	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
+	SerializeImagePulls            bool
 	StandaloneMode                 bool
 	StreamingConnectionIdleTimeout time.Duration
 	SyncFrequency                  time.Duration
@@ -948,7 +955,9 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ResolverConfig,
 		kc.CPUCFSQuota,
 		daemonEndpoints,
-		kc.OOMAdjuster)
+		kc.OOMAdjuster,
+		kc.SerializeImagePulls,
+	)
 
 	if err != nil {
 		return nil, nil, err
