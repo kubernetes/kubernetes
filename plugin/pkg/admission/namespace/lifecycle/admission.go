@@ -53,7 +53,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind() == "Namespace" && l.immortalNamespaces.Has(a.GetName()) {
-		return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("namespace can never be deleted"))
+		return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
 	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
