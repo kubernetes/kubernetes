@@ -548,6 +548,16 @@ var _ = Describe("Services", func() {
 			i++
 		}
 
+		By("updating service's port " + serviceName + " and reaching it at the same IP")
+		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+			s.Spec.Ports[0].Port = 19482 // chosen arbitrarily to not conflict with port 80
+		})
+		Expect(err).NotTo(HaveOccurred())
+		port = service.Spec.Ports[0]
+		if !testLoadBalancerReachable(service.Status.LoadBalancer.Ingress[0], port.Port) {
+			Failf("Failed to reach load balancer at original ingress after updating its port: %+v", service)
+		}
+
 		By("changing service " + serviceName + " back to type=ClusterIP")
 		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
@@ -580,7 +590,7 @@ var _ = Describe("Services", func() {
 		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort2)
 		By("checking the LoadBalancer is closed")
-		testLoadBalancerNotReachable(ingress1, 80)
+		testLoadBalancerNotReachable(ingress1, port.Port)
 	})
 
 	It("should prevent NodePort collisions", func() {
