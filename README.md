@@ -139,5 +139,8 @@ If you need support, start with the [troubleshooting guide](docs/troubleshooting
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
 
-
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
+
+####Awesome-Kubernetes
+
+Wish to learn more about Kubernetes.Find out more resources,slides,videos and articles related to Kubernetes on the [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list.
