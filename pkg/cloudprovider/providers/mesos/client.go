@@ -55,7 +55,7 @@ type slaveNode struct {
 
 type mesosState struct {
 	clusterName string
-	nodes       []*slaveNode
+	nodes       map[string]*slaveNode
 }
 
 type stateCache struct {
@@ -94,7 +94,7 @@ func (c *stateCache) clusterName(ctx context.Context) (string, error) {
 }
 
 // nodes returns the cached list of slave nodes.
-func (c *stateCache) nodes(ctx context.Context) ([]*slaveNode, error) {
+func (c *stateCache) nodes(ctx context.Context) (map[string]*slaveNode, error) {
 	cached, err := c.cachedState(ctx)
 	return cached.nodes, err
 }
@@ -162,7 +162,7 @@ func unpackIPv4(ip uint32) string {
 
 // listSlaves returns a (possibly cached) list of slave nodes.
 // Callers must not mutate the contents of the returned slice.
-func (c *mesosClient) listSlaves(ctx context.Context) ([]*slaveNode, error) {
+func (c *mesosClient) listSlaves(ctx context.Context) (map[string]*slaveNode, error) {
 	return c.state.nodes(ctx)
 }
 
@@ -230,7 +230,7 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 	if err := json.Unmarshal(blob, state); err != nil {
 		return nil, err
 	}
-	nodes := []*slaveNode{}
+	nodes := map[string]*slaveNode{}
 	for _, slave := range state.Slaves {
 		if slave.Hostname == "" {
 			continue
@@ -264,7 +264,7 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			}
 			log.V(4).Infof("node %q reporting capacity %v", node.hostname, cap)
 		}
-		nodes = append(nodes, node)
+		nodes[node.hostname] = node
 	}
 
 	result := &mesosState{
