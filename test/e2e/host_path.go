@@ -95,7 +95,7 @@ var _ = Describe("hostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 		//Read the content of the file with the second container to
-		//verify volumes  being shared properly among continers within the pod.
+		//verify volumes  being shared properly among containers within the pod.
 		testContainerOutput("hostPath r/w", c, pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		}, namespace.Name,
