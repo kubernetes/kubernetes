@@ -52,6 +52,23 @@ optional group names.
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.
 
+**Token Config File** is enabled by passing the `--token-config-file=SOMEFILE` option to the
+apiserver. The token config performs the same function as the above but is written in a yaml
+or json format (the decoder will attempt to automatically detect the format, though adding a
+extension is preferential). The file *MUST* contain token, name and uid fields with an optional
+groups array
+
+For example
+
+```JSON
+[
+	{ "token": "token1", "name": "user1", "uid": "uid1" },
+	{ "token": "token2", "name": "user2", "uid": "uid2" },
+	{ "token": "token3", "name": "user3", "uid": "uid3", "groups": [ "group1", "group2" ] },
+	{ "token": "token4", "name": "user4", "uid": "uid4", "groups": [ "group1" ] }
+]
+```
+
 **OpenID Connect ID Token** is enabled by passing the following options to the apiserver:
 - `--oidc-issuer-url` (required) tells the apiserver where to connect to the OpenID provider. Only HTTPS scheme will be accepted.
 - `--oidc-client-id` (required) is used by apiserver to verify the audience of the token.

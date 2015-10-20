@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenconfig"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
@@ -37,6 +38,7 @@ type AuthenticatorConfig struct {
 	BasicAuthFile         string
 	ClientCAFile          string
 	TokenAuthFile         string
+	TokenConfigFile       string
 	OIDCIssuerURL         string
 	OIDCClientID          string
 	OIDCCAFile            string
@@ -128,6 +130,16 @@ func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Requ
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error
 func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request, error) {
 	tokenAuthenticator, err := tokenfile.NewCSV(tokenAuthFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return bearertoken.New(tokenAuthenticator), nil
+}
+
+// newAuthenticatorFromTokenConfigFile returns an authenticator.Request or an error
+func newAuthenticatorFromTokenConfigFile(tokenAuthFile string) (authenticator.Request, error) {
+	tokenAuthenticator, err := tokenconfig.NewTokenConfig(tokenAuthFile)
 	if err != nil {
 		return nil, err
 	}
