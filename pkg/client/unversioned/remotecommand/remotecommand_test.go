@@ -45,7 +45,7 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 		streamCh := make(chan httpstream.Stream)
 
 		upgrader := spdy.NewResponseUpgrader()
-		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream) error {
+		conn, protocol := upgrader.UpgradeResponse(w, req, []string{StreamProtocolV2Name, StreamProtocolV1Name}, func(stream httpstream.Stream) error {
 			streamCh <- stream
 			return nil
 		})
@@ -57,6 +57,7 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 			return
 		}
 		defer conn.Close()
+		_ = protocol
 
 		var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 		receivedStreams := 0
@@ -347,7 +348,7 @@ func TestDial(t *testing.T) {
 		checkResponse: true,
 		conn:          &fakeConnection{},
 		resp: &http.Response{
-			StatusCode: http.StatusOK,
+			StatusCode: http.StatusSwitchingProtocols,
 			Body:       ioutil.NopCloser(&bytes.Buffer{}),
 		},
 	}
@@ -363,7 +364,7 @@ func TestDial(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn, err := exec.Dial()
+	conn, protocol, err := exec.Dial([]string{"a", "b"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,4 +374,5 @@ func TestDial(t *testing.T) {
 	if !called {
 		t.Errorf("wrapper not called")
 	}
+	_ = protocol
 }
