@@ -27,7 +27,6 @@ import (
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -36,6 +35,7 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/registry/pod"
+	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
@@ -46,7 +46,7 @@ type PodStorage struct {
 	Pod         *REST
 	Binding     *BindingREST
 	Status      *StatusREST
-	Log         *LogREST
+	Log         *podrest.LogREST
 	Proxy       *ProxyREST
 	Exec        *ExecREST
 	Attach      *AttachREST
@@ -110,7 +110,7 @@ func NewStorage(s storage.Interface, useCacher bool, k client.ConnectionInfoGett
 		Pod:         &REST{store, proxyTransport},
 		Binding:     &BindingREST{store: store},
 		Status:      &StatusREST{store: &statusStore},
-		Log:         &LogREST{store: store, kubeletConn: k},
+		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
 		Proxy:       &ProxyREST{store: store, proxyTransport: proxyTransport},
 		Exec:        &ExecREST{store: store, kubeletConn: k},
 		Attach:      &AttachREST{store: store, kubeletConn: k},
@@ -210,49 +210,6 @@ func (r *StatusREST) New() runtime.Object {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, obj)
-}
-
-// LogREST implements the log endpoint for a Pod
-// TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
-type LogREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
-}
-
-// LogREST implements GetterWithOptions
-var _ = rest.GetterWithOptions(&LogREST{})
-
-// New creates a new Pod log options object
-func (r *LogREST) New() runtime.Object {
-	// TODO - return a resource that represents a log
-	return &api.Pod{}
-}
-
-// Get retrieves a runtime.Object that will stream the contents of the pod log
-func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
-	logOpts, ok := opts.(*api.PodLogOptions)
-	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
-	}
-	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
-		return nil, errors.NewInvalid("podlogs", name, errs)
-	}
-	location, transport, err := pod.LogLocation(r.store, r.kubeletConn, ctx, name, logOpts)
-	if err != nil {
-		return nil, err
-	}
-	return &genericrest.LocationStreamer{
-		Location:        location,
-		Transport:       transport,
-		ContentType:     "text/plain",
-		Flush:           logOpts.Follow,
-		ResponseChecker: genericrest.NewGenericHttpResponseChecker("Pod", name),
-	}, nil
-}
-
-// NewGetOptions creates a new options object
-func (r *LogREST) NewGetOptions() (runtime.Object, bool, string) {
-	return &api.PodLogOptions{}, false, ""
 }
 
 // ProxyREST implements the proxy subresource for a Pod
