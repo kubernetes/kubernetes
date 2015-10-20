@@ -1409,7 +1409,7 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 		reference,
 		target,
 		current,
-		minPods,
+		*minPods,
 		maxPods,
 		translateTimestamp(hpa.CreationTimestamp),
 	); err != nil {
