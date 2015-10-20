@@ -311,30 +311,6 @@ func TestUpdate(t *testing.T) {
 		pair{FROM, FROM}: true,
 	}
 
-	var testDoneWG sync.WaitGroup
-
-	// Make a controller that deletes things once it observes an update.
-	// It calls Done() on the wait group on deletions so we can tell when
-	// everything we've added has been deleted.
-	_, controller := framework.NewInformer(
-		source,
-		&api.Pod{},
-		time.Millisecond*1,
-		framework.ResourceEventHandlerFuncs{
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
-				from, to := o.Labels["check"], n.Labels["check"]
-				if !allowedTransitions[pair{from, to}] {
-					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
-				}
-				source.Delete(n)
-			},
-			DeleteFunc: func(obj interface{}) {
-				testDoneWG.Done()
-			},
-		},
-	)
-
 	pod := func(name, check string) *api.Pod {
 		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -368,7 +344,31 @@ func TestUpdate(t *testing.T) {
 	}
 
 	const threads = 3
+
+	var testDoneWG sync.WaitGroup
 	testDoneWG.Add(threads * len(tests))
+
+	// Make a controller that deletes things once it observes an update.
+	// It calls Done() on the wait group on deletions so we can tell when
+	// everything we've added has been deleted.
+	_, controller := framework.NewInformer(
+		source,
+		&api.Pod{},
+		time.Millisecond*1,
+		framework.ResourceEventHandlerFuncs{
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
+				from, to := o.Labels["check"], n.Labels["check"]
+				if !allowedTransitions[pair{from, to}] {
+					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
+				}
+				source.Delete(n)
+			},
+			DeleteFunc: func(obj interface{}) {
+				testDoneWG.Done()
+			},
+		},
+	)
 
 	// Run the controller and run it until we close stop.
 	// Once Run() is called, calls to testDoneWG.Done() might start, so
