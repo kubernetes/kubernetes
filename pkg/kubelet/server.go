@@ -284,7 +284,7 @@ func (s *Server) dockerHealthCheck(req *http.Request) error {
 		return errors.New("unknown Docker version")
 	}
 	// Verify the docker version.
-	result, err := version.Compare("1.15")
+	result, err := version.Compare("1.18")
 	if err != nil {
 		return err
 	}
