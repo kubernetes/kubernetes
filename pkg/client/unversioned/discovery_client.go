@@ -17,11 +17,10 @@ limitations under the License.
 package unversioned
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/unversioned/codec"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -73,28 +72,18 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 // preferred version.
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
-	url := url.URL{}
-	url.Path = "/api"
-	resp, err := d.Get().AbsPath(url.String()).Do().Raw()
+	v := &unversioned.APIVersions{}
+	err = d.Get().AbsPath("/api").Do().Into(v)
 	if err != nil {
 		return nil, err
 	}
-	var v unversioned.APIVersions
-	err = json.Unmarshal(resp, &v)
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
-	}
-	apiGroup := apiVersionsToAPIGroup(&v)
+	apiGroup := apiVersionsToAPIGroup(v)
 
 	// Get the groupVersions exposed at /apis
-	url.Path = "/apis"
-	resp2, err := d.Get().AbsPath(url.String()).Do().Raw()
+	apiGroupList = &unversioned.APIGroupList{}
+	err = d.Get().AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil {
 		return nil, err
-	}
-	apiGroupList = &unversioned.APIGroupList{}
-	if err = json.Unmarshal(resp2, &apiGroupList); err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
 
 	// append the group retrieved from /api to the list
@@ -110,13 +99,10 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	} else {
 		url.Path = "/apis/" + groupVersion
 	}
-	resp, err := d.Get().AbsPath(url.String()).Do().Raw()
+	resources = &unversioned.APIResourceList{}
+	err = d.Get().AbsPath(url.String()).Do().Into(resources)
 	if err != nil {
 		return nil, err
-	}
-	resources = &unversioned.APIResourceList{}
-	if err = json.Unmarshal(resp, resources); err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
 	return resources, nil
 }
@@ -141,9 +127,9 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 
 func setDiscoveryDefaults(config *Config) error {
 	config.Prefix = ""
-	config.Version = ""
-	// The discoveryClient shouldn't need a codec for now.
-	config.Codec = nil
+	config.Version = "unversioned"
+	// The DiscoveryClient only uses a simple codec that unmarshal JSON to a runtime Object.
+	config.Codec = codec.JSONCodec{}
 	return nil
 }
 

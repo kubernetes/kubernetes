@@ -59,6 +59,12 @@ func TestSetsCodec(t *testing.T) {
 }
 
 func TestRESTClientRequires(t *testing.T) {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "", Codec: testapi.Default.Codec()}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Default.Version()}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Default.Version(), Codec: testapi.Default.Codec()}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

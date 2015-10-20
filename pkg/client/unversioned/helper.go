@@ -389,6 +389,13 @@ func SetKubernetesDefaults(config *Config) error {
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
 // the Kubernetes conventions, but may not be the Kubernetes API.
 func RESTClientFor(config *Config) (*RESTClient, error) {
+	if len(config.Version) == 0 {
+		return nil, fmt.Errorf("version is required when initializing a RESTClient")
+	}
+	if config.Codec == nil {
+		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
+	}
+
 	baseURL, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
