@@ -425,6 +425,14 @@ func ValidateIngressUpdate(oldIngress, ingress *extensions.Ingress) errs.Validat
 	return allErrs
 }
 
+// ValidateIngressStatusUpdate tests if required fields in the Ingress are set when updating status.
+func ValidateIngressStatusUpdate(ingress, oldIngress *extensions.Ingress) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, apivalidation.ValidateLoadBalancerStatus(&ingress.Status.LoadBalancer).Prefix("status.loadBalancer")...)
+	return allErrs
+}
+
 func validateIngressRules(IngressRules []extensions.IngressRule) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(IngressRules) == 0 {
