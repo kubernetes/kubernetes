@@ -155,7 +155,7 @@ func New(config *Config,
 		volumeGetter:        volumeGetter,
 	}
 	rkt.prober = prober.New(rkt, readinessManager, containerRefManager, recorder)
-	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt)
+	rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt)
 
 	// Test the rkt version.
 	version, err := rkt.Version()

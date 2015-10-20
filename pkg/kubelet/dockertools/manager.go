@@ -214,7 +214,7 @@ func NewDockerManager(
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
-	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm)
+	dm.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, dm)
 
 	return dm
 }
