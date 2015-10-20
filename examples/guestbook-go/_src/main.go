@@ -74,9 +74,22 @@ func HandleError(result interface{}, err error) (r interface{}) {
 }
 
 func main() {
-	masterPool = simpleredis.NewConnectionPoolHost("redis-master:6379")
+	var redisMaster, redisSlave string
+
+	switch os.Getenv("GET_HOSTS_FROM") {
+	case "env":
+		redisMaster = os.Getenv("REDIS_MASTER_SERVICE_HOST")
+		redisSlave = os.Getenv("REDIS_SLAVE_SERVICE_HOST")
+	case "dns":
+		fallthrough
+	default:
+		redisMaster = "redis-master"
+		redisSlave = "redis-slave"
+	}
+
+	masterPool = simpleredis.NewConnectionPoolHost(redisMaster + ":6379")
 	defer masterPool.Close()
-	slavePool = simpleredis.NewConnectionPoolHost("redis-slave:6379")
+	slavePool = simpleredis.NewConnectionPoolHost(redisSlave + ":6379")
 	defer slavePool.Close()
 
 	r := mux.NewRouter()

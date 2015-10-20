@@ -28,6 +28,12 @@
                         "name":"http-server",
                         "containerPort":3000
                      }
+                  ],
+                  "env":[
+                     {
+                        "name": "GET_HOSTS_FROM",
+                        "value": "dns"
+                     }
                   ]
                }
             ]
