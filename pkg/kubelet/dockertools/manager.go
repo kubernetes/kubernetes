@@ -1911,7 +1911,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			continue
 		}
 
-		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot {
+		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot != nil && *container.SecurityContext.RunAsNonRoot {
 			err := dm.verifyNonRoot(container)
 			dm.updateReasonCache(pod, container, "VerifyNonRootError", err)
 			if err != nil {

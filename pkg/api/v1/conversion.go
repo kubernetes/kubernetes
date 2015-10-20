@@ -289,6 +289,8 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 			return err
 		}
 
+		// the host namespace fields have to be handled here for backward compatibilty
+		// with v1.0.0
 		out.HostPID = in.SecurityContext.HostPID
 		out.HostNetwork = in.SecurityContext.HostNetwork
 		out.HostIPC = in.SecurityContext.HostIPC
@@ -365,6 +367,9 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 			return err
 		}
 	}
+
+	// the host namespace fields have to be handled specially for backward compatibility
+	// with v1.0.0
 	if out.SecurityContext == nil {
 		out.SecurityContext = new(api.PodSecurityContext)
 	}
@@ -415,6 +420,26 @@ func convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurity
 	}
 
 	out.SupplementalGroups = in.SupplementalGroups
+	if in.SELinuxOptions != nil {
+		out.SELinuxOptions = new(SELinuxOptions)
+		if err := convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	if in.RunAsUser != nil {
+		out.RunAsUser = new(int64)
+		*out.RunAsUser = *in.RunAsUser
+	} else {
+		out.RunAsUser = nil
+	}
+	if in.RunAsNonRoot != nil {
+		out.RunAsNonRoot = new(bool)
+		*out.RunAsNonRoot = *in.RunAsNonRoot
+	} else {
+		out.RunAsNonRoot = nil
+	}
 	return nil
 }
 
@@ -424,5 +449,25 @@ func convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 	}
 
 	out.SupplementalGroups = in.SupplementalGroups
+	if in.SELinuxOptions != nil {
+		out.SELinuxOptions = new(api.SELinuxOptions)
+		if err := convert_v1_SELinuxOptions_To_api_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	if in.RunAsUser != nil {
+		out.RunAsUser = new(int64)
+		*out.RunAsUser = *in.RunAsUser
+	} else {
+		out.RunAsUser = nil
+	}
+	if in.RunAsNonRoot != nil {
+		out.RunAsNonRoot = new(bool)
+		*out.RunAsNonRoot = *in.RunAsNonRoot
+	} else {
+		out.RunAsNonRoot = nil
+	}
 	return nil
 }
