@@ -19,6 +19,7 @@ package conversion
 import (
 	"errors"
 	"fmt"
+
 	"github.com/ugorji/go/codec"
 )
 
