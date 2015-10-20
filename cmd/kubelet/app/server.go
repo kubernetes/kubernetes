@@ -140,6 +140,8 @@ type KubeletServer struct {
 	ChaosChance float64
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
+	// Pull images one at a time.
+	SerializeImagePulls bool
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -278,6 +280,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", 1000000, "Number of files that can be opened by Kubelet process. [default=1000000]")
+	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 }
 
 // KubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -395,6 +398,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
+		SerializeImagePulls:            s.SerializeImagePulls,
 		StandaloneMode:                 (len(s.APIServerList) == 0),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		SyncFrequency:                  s.SyncFrequency,
@@ -640,17 +644,18 @@ func SimpleKubelet(client *client.Client,
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		OSInterface:               osInterface,
 		PodInfraContainerImage:    dockertools.PodInfraContainerImage,
-		Port:              port,
-		ReadOnlyPort:      readOnlyPort,
-		RegisterNode:      true,
-		ResolverConfig:    kubelet.ResolvConfDefault,
-		ResourceContainer: "/kubelet",
-		RootDirectory:     rootDir,
-		SyncFrequency:     syncFrequency,
-		SystemContainer:   "",
-		TLSOptions:        tlsOptions,
-		Writer:            &io.StdWriter{},
-		VolumePlugins:     volumePlugins,
+		Port:                port,
+		ReadOnlyPort:        readOnlyPort,
+		RegisterNode:        true,
+		ResolverConfig:      kubelet.ResolvConfDefault,
+		ResourceContainer:   "/kubelet",
+		RootDirectory:       rootDir,
+		SerializeImagePulls: true,
+		SyncFrequency:       syncFrequency,
+		SystemContainer:     "",
+		TLSOptions:          tlsOptions,
+		Writer:              &io.StdWriter{},
+		VolumePlugins:       volumePlugins,
 	}
 	return &kcfg
 }
@@ -833,6 +838,7 @@ type KubeletConfig struct {
 	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
+	SerializeImagePulls            bool
 	StandaloneMode                 bool
 	StreamingConnectionIdleTimeout time.Duration
 	SyncFrequency                  time.Duration
@@ -909,7 +915,9 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
 		kc.CPUCFSQuota,
-		daemonEndpoints)
+		daemonEndpoints,
+		kc.SerializeImagePulls,
+	)
 
 	if err != nil {
 		return nil, nil, err

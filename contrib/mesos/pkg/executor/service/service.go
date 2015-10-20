@@ -346,6 +346,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		&api.NodeDaemonEndpoints{
 			KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
 		},
+		true, // Serialize Image pulls
 	)
 	if err != nil {
 		return nil, nil, err
