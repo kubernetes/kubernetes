@@ -41,6 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -550,7 +552,7 @@ func (s *Server) createStreams(request *restful.Request, response *restful.Respo
 	streamCh := make(chan httpstream.Stream)
 
 	upgrader := spdy.NewResponseUpgrader()
-	conn := upgrader.UpgradeResponse(response.ResponseWriter, request.Request, func(stream httpstream.Stream) error {
+	conn, protocol := upgrader.UpgradeResponse(response.ResponseWriter, request.Request, []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name}, func(stream httpstream.Stream) error {
 		streamCh <- stream
 		return nil
 	})
@@ -560,6 +562,9 @@ func (s *Server) createStreams(request *restful.Request, response *restful.Respo
 		// occurred during upgrading. All we can do is return here at this point
 		// if we weren't successful in upgrading.
 		return nil, nil, nil, nil, nil, false, false
+	}
+	if len(protocol) == 0 {
+		protocol = remotecommand.StreamProtocolV1Name
 	}
 
 	conn.SetIdleTimeout(s.host.StreamingConnectionIdleTimeout())
@@ -645,11 +650,13 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 
 	glog.V(5).Infof("Upgrading port forward response")
 	upgrader := spdy.NewResponseUpgrader()
-	conn := upgrader.UpgradeResponse(w, req, portForwardStreamReceived(streamChan))
+	conn, protocol := upgrader.UpgradeResponse(w, req, []string{portforward.PortForwardProtocolV1Name}, portForwardStreamReceived(streamChan))
 	if conn == nil {
 		return
 	}
 	defer conn.Close()
+
+	_ = protocol
 
 	glog.V(5).Infof("(conn=%p) setting port forwarding streaming connection idle timeout to %v", conn, idleTimeout)
 	conn.SetIdleTimeout(idleTimeout)

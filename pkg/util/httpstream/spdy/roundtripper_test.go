@@ -87,7 +87,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			streamCh := make(chan httpstream.Stream)
 
 			responseUpgrader := NewResponseUpgrader()
-			spdyConn := responseUpgrader.UpgradeResponse(w, req, func(s httpstream.Stream) error {
+			spdyConn, _ := responseUpgrader.UpgradeResponse(w, req, []string{"protocol1"}, func(s httpstream.Stream) error {
 				streamCh <- s
 				return nil
 			})
