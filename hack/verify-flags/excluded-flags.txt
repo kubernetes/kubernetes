@@ -3,6 +3,7 @@ concurrent_rc_syncs
 etcd_mutation_timeout
 file_content
 file_mode
+file_owner
 file_perm
 fs_type
 gke_context
@@ -12,6 +13,7 @@ kube_master_url
 max_in_flight
 max_par
 new_file_0644
+new_file_0660
 new_file_0666
 new_file_0777
 pods_per_node
