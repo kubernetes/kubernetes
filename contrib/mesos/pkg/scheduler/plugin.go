@@ -278,7 +278,11 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
 			return "", noSuchPodErr
 		}
-		return k.doSchedule(k.api.tasks().Register(k.api.createPodTask(ctx, pod)))
+		task, err := k.api.tasks().Register(k.api.createPodTask(ctx, pod))
+		if err != nil {
+			return "", err
+		}
+		return k.doSchedule(task)
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
 	//we knew previously, we should probably update the task.Pod state here
@@ -294,7 +298,7 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 			// but we're going to let someone else handle it, probably the mesos task error handler
 			return "", fmt.Errorf("task %s has already been launched, aborting schedule", task.ID)
 		} else {
-			return k.doSchedule(task, nil)
+			return k.doSchedule(task)
 		}
 
 	default:
@@ -303,8 +307,10 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 }
 
 // Call ScheduleFunc and subtract some resources, returning the name of the machine the task is scheduled on
-func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
+func (k *kubeScheduler) doSchedule(task *podtask.T) (string, error) {
 	var offer offers.Perishable
+	var err error
+
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table
 		offerId := task.GetOfferId()
@@ -319,7 +325,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			}
 		}
 	}
-	if err == nil && offer == nil {
+	if offer == nil {
 		offer, err = k.api.algorithm().SchedulePod(k.api.offers(), k.api, task)
 	}
 	if err != nil {
