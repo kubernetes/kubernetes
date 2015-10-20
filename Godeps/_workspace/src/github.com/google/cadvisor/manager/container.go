@@ -42,7 +42,7 @@ import (
 // Housekeeping interval.
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
 
-var cgroupPathRegExp = regexp.MustCompile(".*devices:(.*?)[,;$].*")
+var cgroupPathRegExp = regexp.MustCompile(".*devices.*:(.*?)[,;$].*")
 
 // Decay value used for load average smoothing. Interval length of 10 seconds is used.
 var loadDecay = math.Exp(float64(-1 * (*HousekeepingInterval).Seconds() / 10))

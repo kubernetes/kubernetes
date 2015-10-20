@@ -23,6 +23,7 @@ var execCommand = cli.Command{
 	Action: execAction,
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{Name: "tty,t", Usage: "allocate a TTY to the container"},
+		cli.BoolFlag{Name: "systemd", Usage: "Use systemd for managing cgroups, if available"},
 		cli.StringFlag{Name: "id", Value: "nsinit", Usage: "specify the ID for a container"},
 		cli.StringFlag{Name: "config", Value: "", Usage: "path to the configuration file"},
 		cli.StringFlag{Name: "user,u", Value: "root", Usage: "set the user, uid, and/or gid for the process"},

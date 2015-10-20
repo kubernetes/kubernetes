@@ -24,9 +24,13 @@ import (
 )
 
 // This will usually be manager.Manager, but can be swapped out for testing.
-type subcontainersInfoProvider interface {
+type infoProvider interface {
 	// Get information about all subcontainers of the specified container (includes self).
 	SubcontainersInfo(containerName string, query *info.ContainerInfoRequest) ([]*info.ContainerInfo, error)
+	// Get information about the version.
+	GetVersionInfo() (*info.VersionInfo, error)
+	// Get information about the machine.
+	GetMachineInfo() (*info.MachineInfo, error)
 }
 
 // metricValue describes a single metric value for a given set of label values
@@ -60,21 +64,25 @@ type containerMetric struct {
 	getValues   func(s *info.ContainerStats) metricValues
 }
 
-func (cm *containerMetric) desc() *prometheus.Desc {
-	return prometheus.NewDesc(cm.name, cm.help, append([]string{"name", "id", "image"}, cm.extraLabels...), nil)
+func (cm *containerMetric) desc(baseLabels []string) *prometheus.Desc {
+	return prometheus.NewDesc(cm.name, cm.help, append(baseLabels, cm.extraLabels...), nil)
 }
+
+type ContainerNameToLabelsFunc func(containerName string) map[string]string
 
 // PrometheusCollector implements prometheus.Collector.
 type PrometheusCollector struct {
-	infoProvider     subcontainersInfoProvider
-	errors           prometheus.Gauge
-	containerMetrics []containerMetric
+	infoProvider          infoProvider
+	errors                prometheus.Gauge
+	containerMetrics      []containerMetric
+	containerNameToLabels ContainerNameToLabelsFunc
 }
 
 // NewPrometheusCollector returns a new PrometheusCollector.
-func NewPrometheusCollector(infoProvider subcontainersInfoProvider) *PrometheusCollector {
+func NewPrometheusCollector(infoProvider infoProvider, f ContainerNameToLabelsFunc) *PrometheusCollector {
 	c := &PrometheusCollector{
-		infoProvider: infoProvider,
+		infoProvider:          infoProvider,
+		containerNameToLabels: f,
 		errors: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "container",
 			Name:      "scrape_error",
@@ -116,6 +124,13 @@ func NewPrometheusCollector(infoProvider subcontainersInfoProvider) *PrometheusC
 						})
 					}
 					return values
+				},
+			}, {
+				name:      "container_memory_failcnt",
+				help:      "Number of memory usage hits limits",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.Failcnt)}}
 				},
 			}, {
 				name:      "container_memory_usage_bytes",
@@ -441,18 +456,34 @@ func NewPrometheusCollector(infoProvider subcontainersInfoProvider) *PrometheusC
 	return c
 }
 
+var (
+	versionInfoDesc       = prometheus.NewDesc("cadvisor_version_info", "A metric with a constant '1' value labeled by kernel version, OS version, docker version, cadvisor version & cadvisor revision.", []string{"kernelVersion", "osVersion", "dockerVersion", "cadvisorVersion", "cadvisorRevision"}, nil)
+	machineInfoCoresDesc  = prometheus.NewDesc("machine_cpu_cores", "Number of CPU cores on the machine.", nil, nil)
+	machineInfoMemoryDesc = prometheus.NewDesc("machine_memory_bytes", "Amount of memory installed on the machine.", nil, nil)
+)
+
 // Describe describes all the metrics ever exported by cadvisor. It
 // implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.errors.Describe(ch)
 	for _, cm := range c.containerMetrics {
-		ch <- cm.desc()
+		ch <- cm.desc([]string{})
 	}
+	ch <- versionInfoDesc
+	ch <- machineInfoCoresDesc
+	ch <- machineInfoMemoryDesc
 }
 
 // Collect fetches the stats from all containers and delivers them as
 // Prometheus metrics. It implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
+	c.collectMachineInfo(ch)
+	c.collectVersionInfo(ch)
+	c.collectContainersInfo(ch)
+	c.errors.Collect(ch)
+}
+
+func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
 		c.errors.Set(1)
@@ -460,20 +491,82 @@ func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 	for _, container := range containers {
+		baseLabels := []string{"id"}
 		id := container.Name
 		name := id
 		if len(container.Aliases) > 0 {
 			name = container.Aliases[0]
+			baseLabels = append(baseLabels, "name")
 		}
 		image := container.Spec.Image
-		stats := container.Stats[0]
+		if len(image) > 0 {
+			baseLabels = append(baseLabels, "image")
+		}
+		baseLabelValues := []string{id, name, image}[:len(baseLabels)]
 
+		if c.containerNameToLabels != nil {
+			newLabels := c.containerNameToLabels(name)
+			for k, v := range newLabels {
+				baseLabels = append(baseLabels, k)
+				baseLabelValues = append(baseLabelValues, v)
+			}
+		}
+
+		// Container spec
+		desc := prometheus.NewDesc("container_start_time_seconds", "Start time of the container since unix epoch in seconds.", baseLabels, nil)
+		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.CreationTime.Unix()), baseLabelValues...)
+
+		if container.Spec.HasCpu {
+			desc := prometheus.NewDesc("container_spec_cpu_shares", "CPU share of the container.", baseLabels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Limit), baseLabelValues...)
+		}
+
+		if container.Spec.HasMemory {
+			desc := prometheus.NewDesc("container_spec_memory_limit_bytes", "Memory limit for the container.", baseLabels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.Limit), baseLabelValues...)
+			desc = prometheus.NewDesc("container_spec_memory_swap_limit_bytes", "Memory swap limit for the container.", baseLabels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.SwapLimit), baseLabelValues...)
+		}
+
+		// Now for the actual metrics
+		stats := container.Stats[0]
 		for _, cm := range c.containerMetrics {
-			desc := cm.desc()
+			desc := cm.desc(baseLabels)
 			for _, metricValue := range cm.getValues(stats) {
-				ch <- prometheus.MustNewConstMetric(desc, cm.valueType, float64(metricValue.value), append([]string{name, id, image}, metricValue.labels...)...)
+				ch <- prometheus.MustNewConstMetric(desc, cm.valueType, float64(metricValue.value), append(baseLabelValues, metricValue.labels...)...)
 			}
 		}
 	}
-	c.errors.Collect(ch)
+}
+
+func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {
+	versionInfo, err := c.infoProvider.GetVersionInfo()
+	if err != nil {
+		c.errors.Set(1)
+		glog.Warningf("Couldn't get version info: %s", err)
+		return
+	}
+	ch <- prometheus.MustNewConstMetric(versionInfoDesc, prometheus.GaugeValue, 1, []string{versionInfo.KernelVersion, versionInfo.ContainerOsVersion, versionInfo.DockerVersion, versionInfo.CadvisorVersion, versionInfo.CadvisorRevision}...)
+}
+
+func (c *PrometheusCollector) collectMachineInfo(ch chan<- prometheus.Metric) {
+	machineInfo, err := c.infoProvider.GetMachineInfo()
+	if err != nil {
+		c.errors.Set(1)
+		glog.Warningf("Couldn't get machine info: %s", err)
+		return
+	}
+	ch <- prometheus.MustNewConstMetric(machineInfoCoresDesc, prometheus.GaugeValue, float64(machineInfo.NumCores))
+	ch <- prometheus.MustNewConstMetric(machineInfoMemoryDesc, prometheus.GaugeValue, float64(machineInfo.MemoryCapacity))
+}
+
+// Size after which we consider memory to be "unlimited". This is not
+// MaxInt64 due to rounding by the kernel.
+const maxMemorySize = uint64(1 << 62)
+
+func specMemoryValue(v uint64) float64 {
+	if v > maxMemorySize {
+		return 0
+	}
+	return float64(v)
 }

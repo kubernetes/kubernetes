@@ -15,10 +15,10 @@
 package bigquery
 
 import (
-	bigquery "code.google.com/p/google-api-go-client/bigquery/v2"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/storage/bigquery/client"
+	bigquery "google.golang.org/api/bigquery/v2"
 )
 
 type bigqueryStorage struct {
