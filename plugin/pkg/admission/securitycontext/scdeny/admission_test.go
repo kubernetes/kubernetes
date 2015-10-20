@@ -101,6 +101,8 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 		},
 	}
 
+	fsGroup := int64(1001)
+
 	tests := []struct {
 		securityContext api.PodSecurityContext
 		errorExpected   bool
@@ -112,6 +114,12 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 		{
 			securityContext: api.PodSecurityContext{
 				SupplementalGroups: []int64{1234},
+			},
+			errorExpected: true,
+		},
+		{
+			securityContext: api.PodSecurityContext{
+				FSGroup: &fsGroup,
 			},
 			errorExpected: true,
 		},

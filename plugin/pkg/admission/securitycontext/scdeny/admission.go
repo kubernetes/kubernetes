@@ -69,6 +69,10 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
+		return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
+	}
+
 	for _, v := range pod.Spec.Containers {
 		if v.SecurityContext != nil {
 			if v.SecurityContext.SELinuxOptions != nil {

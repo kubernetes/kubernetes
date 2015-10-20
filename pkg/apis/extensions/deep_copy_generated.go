@@ -464,14 +464,6 @@ func deepCopy_api_PodSecurityContext(in api.PodSecurityContext, out *api.PodSecu
 	out.HostNetwork = in.HostNetwork
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
-	if in.SupplementalGroups != nil {
-		out.SupplementalGroups = make([]int64, len(in.SupplementalGroups))
-		for i := range in.SupplementalGroups {
-			out.SupplementalGroups[i] = in.SupplementalGroups[i]
-		}
-	} else {
-		out.SupplementalGroups = nil
-	}
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(api.SELinuxOptions)
 		if err := deepCopy_api_SELinuxOptions(*in.SELinuxOptions, out.SELinuxOptions, c); err != nil {
@@ -491,6 +483,20 @@ func deepCopy_api_PodSecurityContext(in api.PodSecurityContext, out *api.PodSecu
 		*out.RunAsNonRoot = *in.RunAsNonRoot
 	} else {
 		out.RunAsNonRoot = nil
+	}
+	if in.SupplementalGroups != nil {
+		out.SupplementalGroups = make([]int64, len(in.SupplementalGroups))
+		for i := range in.SupplementalGroups {
+			out.SupplementalGroups[i] = in.SupplementalGroups[i]
+		}
+	} else {
+		out.SupplementalGroups = nil
+	}
+	if in.FSGroup != nil {
+		out.FSGroup = new(int64)
+		*out.FSGroup = *in.FSGroup
+	} else {
+		out.FSGroup = nil
 	}
 	return nil
 }

@@ -64,6 +64,8 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	"k8s.io/kubernetes/pkg/util/chmod"
+	"k8s.io/kubernetes/pkg/util/chown"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -174,6 +176,8 @@ func NewMainKubelet(
 	rktStage1Image string,
 	mounter mount.Interface,
 	writer kubeio.Writer,
+	chownRunner chown.Interface,
+	chmodRunner chmod.Interface,
 	dockerDaemonContainer string,
 	systemContainer string,
 	configureCBR0 bool,
@@ -285,6 +289,8 @@ func NewMainKubelet(
 		oomWatcher:                     oomWatcher,
 		cgroupRoot:                     cgroupRoot,
 		mounter:                        mounter,
+		chmodRunner:                    chmodRunner,
+		chownRunner:                    chownRunner,
 		writer:                         writer,
 		configureCBR0:                  configureCBR0,
 		podCIDR:                        podCIDR,
@@ -581,6 +587,10 @@ type Kubelet struct {
 
 	// Mounter to use for volumes.
 	mounter mount.Interface
+	// chown.Interface implementation to use
+	chownRunner chown.Interface
+	// chmod.Interface implementation to use
+	chmodRunner chmod.Interface
 
 	// Writer interface to use for volumes.
 	writer kubeio.Writer

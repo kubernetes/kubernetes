@@ -137,6 +137,10 @@ type emptyDir struct {
 	chconRunner   chconRunner
 }
 
+func (_ *emptyDir) SupportsOwnershipManagement() bool {
+	return true
+}
+
 // SetUp creates new directory.
 func (ed *emptyDir) SetUp() error {
 	return ed.SetUpAt(ed.GetPath())
