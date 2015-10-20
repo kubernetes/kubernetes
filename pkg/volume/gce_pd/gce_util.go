@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	gce_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/operationmanager"
@@ -123,7 +123,7 @@ func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskCleaner) error {
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
 func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (string, error) {
 	devicePaths := getDiskByIdPaths(b.gcePersistentDisk)
-	var gceCloud *gce_cloud.GCECloud
+	var gceCloud *gcecloud.GCECloud
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		// Block execution until any pending detach goroutines for this pd have completed
 		detachCleanupManager.Send(b.pdName, true)
@@ -219,7 +219,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 	}()
 
 	devicePaths := getDiskByIdPaths(c.gcePersistentDisk)
-	var gceCloud *gce_cloud.GCECloud
+	var gceCloud *gcecloud.GCECloud
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		var err error
 		if gceCloud == nil {
@@ -310,14 +310,14 @@ func pathExists(path string) (bool, error) {
 }
 
 // Return cloud provider
-func getCloudProvider() (*gce_cloud.GCECloud, error) {
+func getCloudProvider() (*gcecloud.GCECloud, error) {
 	gceCloudProvider, err := cloudprovider.GetCloudProvider("gce", nil)
 	if err != nil || gceCloudProvider == nil {
 		return nil, err
 	}
 
 	// The conversion must be safe otherwise bug in GetCloudProvider()
-	return gceCloudProvider.(*gce_cloud.GCECloud), nil
+	return gceCloudProvider.(*gcecloud.GCECloud), nil
 }
 
 // Calls "udevadm trigger --action=change" for newly created "/dev/sd*" drives (exist only in after set).

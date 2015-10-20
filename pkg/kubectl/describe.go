@@ -35,7 +35,7 @@ import (
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -1428,11 +1428,11 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge, %d min ready seconds\n", ru.MaxUnavailable.String(), ru.MaxSurge.String(), ru.MinReadySeconds)
 		}
-		oldRCs, err := deploymentUtil.GetOldRCs(*d, dd)
+		oldRCs, err := deploymentutil.GetOldRCs(*d, dd)
 		if err == nil {
 			fmt.Fprintf(out, "OldReplicationControllers:\t%s\n", printReplicationControllersByLabels(oldRCs))
 		}
-		newRC, err := deploymentUtil.GetNewRC(*d, dd)
+		newRC, err := deploymentutil.GetNewRC(*d, dd)
 		if err == nil {
 			var newRCs []*api.ReplicationController
 			if newRC != nil {

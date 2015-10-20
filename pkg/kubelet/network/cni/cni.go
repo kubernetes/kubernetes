@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/appc/cni/libcni"
-	cniTypes "github.com/appc/cni/pkg/types"
+	cnitypes "github.com/appc/cni/pkg/types"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -152,7 +152,7 @@ func (plugin *cniNetworkPlugin) Status(namespace string, name string, id kubetyp
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
-func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cniTypes.Result, error) {
+func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)

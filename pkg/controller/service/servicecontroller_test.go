@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -88,7 +88,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 	}
 
 	for _, item := range table {
-		cloud := &fake_cloud.FakeCloud{}
+		cloud := &fakecloud.FakeCloud{}
 		cloud.Region = region
 		client := &testclient.Fake{}
 		controller := New(cloud, client, "test-cluster")
@@ -110,7 +110,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				t.Errorf("unexpected client actions: %v", actions)
 			}
 		} else {
-			var balancer *fake_cloud.FakeBalancer
+			var balancer *fakecloud.FakeBalancer
 			for k := range cloud.Balancers {
 				if balancer == nil {
 					b := cloud.Balancers[k]
@@ -145,7 +145,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	hosts := []string{"node0", "node1", "node73"}
 	table := []struct {
 		services            []*api.Service
-		expectedUpdateCalls []fake_cloud.FakeUpdateBalancerCall
+		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
 	}{
 		{
 			// No services present: no calls should be made.
@@ -165,7 +165,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			services: []*api.Service{
 				newService("s0", "333", api.ServiceTypeLoadBalancer),
 			},
-			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
 				{Name: "a333", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
 		},
@@ -176,7 +176,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s1", "555", api.ServiceTypeLoadBalancer),
 				newService("s2", "666", api.ServiceTypeLoadBalancer),
 			},
-			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
 				{Name: "a444", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 				{Name: "a555", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 				{Name: "a666", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -190,7 +190,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s3", "999", api.ServiceTypeLoadBalancer),
 				newService("s4", "123", api.ServiceTypeClusterIP),
 			},
-			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
 				{Name: "a888", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 				{Name: "a999", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
@@ -201,13 +201,13 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "234", api.ServiceTypeLoadBalancer),
 				nil,
 			},
-			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
 				{Name: "a234", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
 		},
 	}
 	for _, item := range table {
-		cloud := &fake_cloud.FakeCloud{}
+		cloud := &fakecloud.FakeCloud{}
 
 		cloud.Region = region
 		client := &testclient.Fake{}
