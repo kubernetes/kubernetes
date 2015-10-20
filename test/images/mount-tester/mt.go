@@ -29,8 +29,10 @@ var (
 	fsTypePath                = ""
 	fileModePath              = ""
 	filePermPath              = ""
+	fileOwnerPath             = ""
 	newFilePath0644           = ""
 	newFilePath0666           = ""
+	newFilePath0660           = ""
 	newFilePath0777           = ""
 	readFileContentPath       = ""
 	readFileContentInLoopPath = ""
@@ -41,8 +43,10 @@ func init() {
 	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
 	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
 	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
+	flag.StringVar(&fileOwnerPath, "file_owner", "", "Path to print the owning UID and GID of")
 	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
 	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
+	flag.StringVar(&newFilePath0660, "new_file_0660", "", "Path to write to and read from with perm 0660")
 	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
 	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
 	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
@@ -86,6 +90,11 @@ func main() {
 		errs = append(errs, err)
 	}
 
+	err = readWriteNewFile(newFilePath0660, 0660)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	err = readWriteNewFile(newFilePath0777, 0777)
 	if err != nil {
 		errs = append(errs, err)
@@ -97,6 +106,11 @@ func main() {
 	}
 
 	err = filePerm(filePermPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = fileOwner(fileOwnerPath)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -168,6 +182,22 @@ func filePerm(path string) error {
 	}
 
 	fmt.Printf("perms of file %q: %v\n", path, fileinfo.Mode().Perm())
+	return nil
+}
+
+func fileOwner(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	buf := syscall.Stat_t{}
+	if err := syscall.Stat(path, &buf); err != nil {
+		fmt.Printf("error from stat(%q): %v\n", path, err)
+		return err
+	}
+
+	fmt.Printf("owner UID of %q: %v\n", path, buf.Uid)
+	fmt.Printf("owner GID of %q: %v\n", path, buf.Gid)
 	return nil
 }
 
