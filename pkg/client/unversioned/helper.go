@@ -410,6 +410,31 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	return client, nil
 }
 
+// UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
+// the config.Version to be empty.
+func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
+	if config.Codec == nil {
+		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
+	}
+
+	baseURL, err := defaultServerUrlFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
+
+	transport, err := TransportFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	if transport != http.DefaultTransport {
+		client.Client = &http.Client{Transport: transport}
+	}
+	return client, nil
+}
+
 var (
 	// tlsTransports stores reusable round trippers with custom TLSClientConfig options
 	tlsTransports = map[string]*http.Transport{}

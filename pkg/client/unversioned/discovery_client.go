@@ -17,11 +17,10 @@ limitations under the License.
 package unversioned
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"net/url"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -50,8 +49,7 @@ type ServerResourcesInterface interface {
 // DiscoveryClient implements the functions that dicovery server-supported API groups,
 // versions and resources.
 type DiscoveryClient struct {
-	httpClient HTTPClient
-	baseURL    url.URL
+	*RESTClient
 }
 
 // Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
@@ -71,42 +69,29 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 	return
 }
 
-func (d *DiscoveryClient) get(url string) (resp *http.Response, err error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	return d.httpClient.Do(req)
-}
-
 // ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
-	url := d.baseURL
-	url.Path = "/api"
-	resp, err := d.get(url.String())
-	if err != nil {
+	v := &unversioned.APIVersions{}
+	err = d.Get().AbsPath("/api").Do().Into(v)
+	apiGroup := unversioned.APIGroup{}
+	if err == nil {
+		apiGroup = apiVersionsToAPIGroup(v)
+	}
+	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
-	var v unversioned.APIVersions
-	defer resp.Body.Close()
-	err = json.NewDecoder(resp.Body).Decode(&v)
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
-	}
-	apiGroup := apiVersionsToAPIGroup(&v)
 
 	// Get the groupVersions exposed at /apis
-	url.Path = "/apis"
-	resp2, err := d.get(url.String())
-	if err != nil {
+	apiGroupList = &unversioned.APIGroupList{}
+	err = d.Get().AbsPath("/apis").Do().Into(apiGroupList)
+	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
-	defer resp2.Body.Close()
-	apiGroupList = &unversioned.APIGroupList{}
-	if err = json.NewDecoder(resp2.Body).Decode(&apiGroupList); err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
+	// to be compatible with a v1.0 server, if it's a 403 or 404, ignore and return whatever we got from /api
+	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+		apiGroupList = &unversioned.APIGroupList{}
 	}
 
 	// append the group retrieved from /api to the list
@@ -116,20 +101,21 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *unversioned.APIResourceList, err error) {
-	url := d.baseURL
+	url := url.URL{}
 	if groupVersion == "v1" {
 		url.Path = "/api/" + groupVersion
 	} else {
 		url.Path = "/apis/" + groupVersion
 	}
-	resp, err := d.get(url.String())
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 	resources = &unversioned.APIResourceList{}
-	if err = json.NewDecoder(resp.Body).Decode(resources); err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
+	err = d.Get().AbsPath(url.String()).Do().Into(resources)
+	if err != nil {
+		// ignore 403 or 404 error to be compatible with an v1.0 server.
+		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+			return resources, nil
+		} else {
+			return nil, err
+		}
 	}
 	return resources, nil
 }
@@ -155,6 +141,8 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 func setDiscoveryDefaults(config *Config) error {
 	config.Prefix = ""
 	config.Version = ""
+	// Discovery client deals with unversioned objects, so we use api.Codec.
+	config.Codec = api.Codec
 	return nil
 }
 
@@ -165,11 +153,6 @@ func NewDiscoveryClient(c *Config) (*DiscoveryClient, error) {
 	if err := setDiscoveryDefaults(&config); err != nil {
 		return nil, err
 	}
-	transport, err := TransportFor(c)
-	if err != nil {
-		return nil, err
-	}
-	client := &http.Client{Transport: transport}
-	baseURL, err := defaultServerUrlFor(c)
-	return &DiscoveryClient{client, *baseURL}, nil
+	client, err := UnversionedRESTClientFor(&config)
+	return &DiscoveryClient{client}, err
 }
