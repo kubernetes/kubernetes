@@ -1238,7 +1238,7 @@ var map_SecurityContext = map[string]string{
 	"privileged":     "Run the container in privileged mode. Default to Container.Privileged if left unset. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context",
 	"seLinuxOptions": "SELinuxOptions are the labels to be applied to the container and volumes. Options that control the SELinux labels applied. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context",
 	"runAsUser":      "RunAsUser is the UID to run the entrypoint of the container process. The user id that runs the first process in the container. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context",
-	"runAsNonRoot":   "RunAsNonRoot indicates that the container should be run as a non-root user. If the RunAsUser field is not explicitly set then the kubelet may check the image for a specified user or perform defaulting to specify a user.",
+	"runAsNonRoot":   "RunAsNonRoot indicates that the container should be run as a non-root user. Optional.  If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
