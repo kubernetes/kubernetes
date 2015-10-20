@@ -17,10 +17,12 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
@@ -56,6 +58,10 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	name := meta.Name()
+	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+		return "", fmt.Errorf("invalid name: %v", msg)
+	}
 	return prefix + "/" + meta.Namespace() + "/" + meta.Name(), nil
 }
 
@@ -63,6 +69,10 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
+	}
+	name := meta.Name()
+	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+		return "", fmt.Errorf("invalid name: %v", msg)
 	}
 	return prefix + "/" + meta.Name(), nil
 }

@@ -26,6 +26,7 @@ import (
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -128,7 +129,22 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
+	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %v.", msg))
+	}
 	key = key + "/" + name
+	return key, nil
+}
+
+// NoNamespaceKeyFunc is the default function for constructing etcd paths to a resource relative to prefix without a namespace
+func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, error) {
+	if len(name) == 0 {
+		return "", kubeerr.NewBadRequest("Name parameter required.")
+	}
+	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %v.", msg))
+	}
+	key := prefix + "/" + name
 	return key, nil
 }
 

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -153,6 +154,7 @@ func (t *Tester) TestCreate(valid runtime.Object, setFn SetFunc, getFn GetFunc, 
 		t.testCreateRejectsMismatchedNamespace(copyOrDie(valid))
 	}
 	t.testCreateInvokesValidation(invalid...)
+	t.testCreateValidatesNames(copyOrDie(valid))
 }
 
 // Test updating an object.
@@ -343,6 +345,32 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	createdObjectMeta := t.getObjectMetaOrFail(created)
 	if createdObjectMeta.Namespace != api.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
+	}
+}
+
+func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
+	for _, invalidName := range validation.NameMayNotBe {
+		objCopy := copyOrDie(valid)
+		objCopyMeta := t.getObjectMetaOrFail(objCopy)
+		objCopyMeta.Name = invalidName
+
+		ctx := t.TestContext()
+		_, err := t.storage.(rest.Creater).Create(ctx, objCopy)
+		if !errors.IsInvalid(err) {
+			t.Errorf("%s: Expected to get an invalid resource error, got %v", invalidName, err)
+		}
+	}
+
+	for _, invalidSuffix := range validation.NameMayNotContain {
+		objCopy := copyOrDie(valid)
+		objCopyMeta := t.getObjectMetaOrFail(objCopy)
+		objCopyMeta.Name += invalidSuffix
+
+		ctx := t.TestContext()
+		_, err := t.storage.(rest.Creater).Create(ctx, objCopy)
+		if !errors.IsInvalid(err) {
+			t.Errorf("%s: Expected to get an invalid resource error, got %v", invalidSuffix, err)
+		}
 	}
 }
 

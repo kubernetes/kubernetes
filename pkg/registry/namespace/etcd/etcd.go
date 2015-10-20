@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"fmt"
-	"path"
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
@@ -58,7 +57,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST, *FinalizeREST) {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return path.Join(prefix, name), nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Namespace).Name, nil
