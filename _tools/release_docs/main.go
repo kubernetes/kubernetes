@@ -113,6 +113,7 @@ func processFile(prefix, filename string) error {
 
 	output := rewriteLinks(filename, fileBytes)
 	output = rewriteCodeBlocks(output)
+	output = rewriteHTMLPreviewLinks(output)
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -227,6 +228,18 @@ func rewriteCodeBlocks(fileBytes []byte) []byte {
 		inside = !inside
 	}
 	return []byte(strings.Join(output, "\n") + "\n")
+}
+
+var (
+	htmlPreviewRE = regexp.MustCompile(`https://htmlpreview.github.io/\?https://github.com/kubernetes/kubernetes/[^/]*`)
+)
+
+// For example, this rewrites
+// https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/v1.1.0/docs/api-reference/v1/definitions.html#_v1_pod
+// To
+// http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html#_v1_pod
+func rewriteHTMLPreviewLinks(fileBytes []byte) []byte {
+	return htmlPreviewRE.ReplaceAll(fileBytes, []byte(fmt.Sprintf("http://kubernetes.io/%s", *version)))
 }
 
 var (
