@@ -79,11 +79,12 @@ In the future we expect that there will be more API groups, all at REST path `/a
 using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for (third parties to
 create their own API groups](design/extending-api.md), and to avoid naming collisions.
 
-## Enabling the extensions group
+## Enabling resources in the extensions group
 
-Enable `extensions/v1beta1` objects by adding the following flags to your API server:
-
-  - `--runtime-config=extensions/v1beta1=true`
+Jobs, Ingress and HorizontalPodAutoscalers are enabled by default.
+Other extensions resources can be enabled by setting runtime-config on
+apiserver. runtime-config accepts comma separated values. For ex: to enable deployments and disable jobs, set
+`--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/jobs=false`
 
 ## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 
