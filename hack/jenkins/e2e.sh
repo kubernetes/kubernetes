@@ -240,7 +240,6 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
     # Override GCE default for cluster size autoscaling purposes.
     ENABLE_CLUSTER_MONITORING="googleinfluxdb"
-    ENABLE_HORIZONTAL_POD_AUTOSCALER="true"
     ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
     ;;
 
@@ -1025,7 +1024,6 @@ fi
 # Shared cluster variables
 export E2E_MIN_STARTUP_PODS=${E2E_MIN_STARTUP_PODS:-}
 export KUBE_ENABLE_CLUSTER_MONITORING=${ENABLE_CLUSTER_MONITORING:-}
-export KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER=${ENABLE_HORIZONTAL_POD_AUTOSCALER:-}
 export KUBE_ENABLE_DEPLOYMENTS=${ENABLE_DEPLOYMENTS:-}
 export KUBE_ENABLE_EXPERIMENTAL_API=${ENABLE_EXPERIMENTAL_API:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
