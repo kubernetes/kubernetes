@@ -10,6 +10,7 @@ pkg-core:
       - apt-transport-https
       - python-apt
       - glusterfs-client
+      - nfs-common
       - socat
 {% endif %}
 # Ubuntu installs netcat-openbsd by default, but on GCE/Debian netcat-traditional is installed.
