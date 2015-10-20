@@ -263,15 +263,6 @@ before you can use it__
 
 See the [NFS example](../../examples/nfs/) for more details.
 
-For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how to
-specify the usage of an NFS volume within a pod.
-
-In this example one can see that a `volumeMount` called `nfs` is being mounted
-onto `/usr/share/nginx/html` in the container `web`.  The volume "nfs" is defined as
-type `nfs`, with the NFS server serving from `nfs-server.default.kube.local`
-and exporting directory `/` as the share.  The mount being created in this
-example is writeable.
-
 ### iscsi
 
 An `iscsi` volume allows an existing iSCSI (SCSI over IP) volume to be mounted
