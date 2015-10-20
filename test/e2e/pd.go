@@ -353,7 +353,15 @@ func deletePD(pdName string) error {
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
-		return volumes.DeleteDisk(pdName)
+		deleted, err := volumes.DeleteDisk(pdName)
+		if err != nil {
+			return err
+		} else {
+			if !deleted {
+				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			}
+			return nil
+		}
 	}
 }
 

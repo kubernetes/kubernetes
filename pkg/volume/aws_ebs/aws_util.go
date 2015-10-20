@@ -115,11 +115,16 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 		return err
 	}
 
-	if err = cloud.DeleteDisk(d.volumeID); err != nil {
+	deleted, err := cloud.DeleteDisk(d.volumeID)
+	if err != nil {
 		glog.V(2).Infof("Error deleting EBS Disk volume %s: %v", d.volumeID, err)
 		return err
 	}
-	glog.V(2).Infof("Successfully deleted EBS Disk volume %s", d.volumeID)
+	if deleted {
+		glog.V(2).Infof("Successfully deleted EBS Disk volume %s", d.volumeID)
+	} else {
+		glog.V(2).Infof("Successfully deleted EBS Disk volume %s (actually already deleted)", d.volumeID)
+	}
 	return nil
 }
 
