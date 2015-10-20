@@ -55,7 +55,7 @@ const TagNameKubernetesCluster = "KubernetesCluster"
 // We sometimes read to see if something exists; then try to create it if we didn't find it
 // This can fail once in a consistent system if done in parallel
 // In an eventually consistent system, it could fail unboundedly
-// MaxReadThenCreateRetries sets the maxiumum number of attempts we will make
+// MaxReadThenCreateRetries sets the maximum number of attempts we will make
 const MaxReadThenCreateRetries = 30
 
 // Abstraction over AWS, to allow mocking/other implementations
@@ -1581,7 +1581,7 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 }
 
 // EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
-// TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anwyay.
+// TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
 func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
 

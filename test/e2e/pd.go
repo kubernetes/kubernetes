@@ -326,7 +326,7 @@ func createPD() (string, error) {
 		pdName := fmt.Sprintf("%s-%s", testContext.prefix, string(util.NewUUID()))
 
 		zone := testContext.CloudConfig.Zone
-		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		err := exec.Command("gcloud", "compute", "--quiet", "--project="+testContext.CloudConfig.ProjectID, "disks", "create", "--zone="+zone, "--size=10GB", pdName).Run()
 		if err != nil {
 			return "", err

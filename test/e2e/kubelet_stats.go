@@ -147,7 +147,7 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	return badMetrics, nil
 }
 
-// getContainerInfo contacts kubelet for the container informaton. The "Stats"
+// getContainerInfo contacts kubelet for the container information. The "Stats"
 // in the returned ContainerInfo is subject to the requirements in statsRequest.
 func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
 	reqBody, err := json.Marshal(req)
@@ -214,14 +214,14 @@ func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsa
 // cpuInterval.
 // The acceptable range of the interval is 2s~120s. Be warned that as the
 // interval (and #containers) increases, the size of kubelet's response
-// could be sigificant. E.g., the 60s interval stats for ~20 containers is
+// could be significant. E.g., the 60s interval stats for ~20 containers is
 // ~1.5MB. Don't hammer the node with frequent, heavy requests.
 //
 // cadvisor records cumulative cpu usage in nanoseconds, so we need to have two
 // stats points to compute the cpu usage over the interval. Assuming cadvisor
 // polls every second, we'd need to get N stats points for N-second interval.
 // Note that this is an approximation and may not be accurate, hence we also
-// write the actual interval used for calcuation (based on the timestampes of
+// write the actual interval used for calculation (based on the timestamps of
 // the stats points in containerResourceUsage.CPUInterval.
 func getOneTimeResourceUsageOnNode(c *client.Client, nodeName string, cpuInterval time.Duration) (map[string]*containerResourceUsage, error) {
 	numStats := int(float64(cpuInterval.Seconds()) / cadvisorStatsPollingIntervalInSeconds)
@@ -367,7 +367,7 @@ func newResourceCollector(c *client.Client, nodeName string, containerNames []st
 	}
 }
 
-// Start starts a goroutine to poll the node every pollingInerval.
+// Start starts a goroutine to poll the node every pollingInterval.
 func (r *resourceCollector) Start() {
 	r.stopCh = make(chan struct{}, 1)
 	// Keep the last observed stats for comparison.

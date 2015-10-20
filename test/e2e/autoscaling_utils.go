@@ -43,7 +43,7 @@ const (
 )
 
 /*
-ResourceConsumer is a tool for testing. It helps create specified usage of CPU or memory (Warnig: memory not supported)
+ResourceConsumer is a tool for testing. It helps create specified usage of CPU or memory (Warning: memory not supported)
 typical use case:
 rc.ConsumeCPU(600)
 // ... check your assumption here

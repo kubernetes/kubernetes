@@ -33,7 +33,7 @@ import (
 const (
 	// How long each node is given during a process that restarts all nodes
 	// before the test is considered failed. (Note that the total time to
-	// restart all nodes will be this number times the nubmer of nodes.)
+	// restart all nodes will be this number times the number of nodes.)
 	restartPerNodeTimeout = 5 * time.Minute
 
 	// How often to poll the statues of a restart.

@@ -560,7 +560,7 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 		}
 	}
 
-	// a timeout occured
+	// a timeout occurred
 	if err != nil {
 		if missingTimestamp {
 			return fmt.Errorf("namespace %s was not deleted within limit: %v, some pods were not marked with a deletion timestamp, pods remaining: %v", namespace, err, remaining)
@@ -888,7 +888,7 @@ func loadClient() (*client.Client, error) {
 // TODO: Allow service names to have the same form as names
 //       for pods and replication controllers so we don't
 //       need to use such a function and can instead
-//       use the UUID utilty function.
+//       use the UUID utility function.
 func randomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
