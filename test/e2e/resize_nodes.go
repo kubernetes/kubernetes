@@ -34,7 +34,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 )
 
 const (
@@ -56,7 +56,7 @@ func resizeGroup(size int) error {
 		return err
 	} else {
 		// Supported by aws
-		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
+		instanceGroups, ok := testContext.CloudConfig.Provider.(awscloud.InstanceGroups)
 		if !ok {
 			return fmt.Errorf("Provider does not support InstanceGroups")
 		}
@@ -78,7 +78,7 @@ func groupSize() (int, error) {
 		return len(re.FindAllString(string(output), -1)), nil
 	} else {
 		// Supported by aws
-		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
+		instanceGroups, ok := testContext.CloudConfig.Provider.(awscloud.InstanceGroups)
 		if !ok {
 			return -1, fmt.Errorf("provider does not support InstanceGroups")
 		}

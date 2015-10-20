@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	expValidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -105,17 +105,17 @@ func validateObject(obj runtime.Object) (errors []error) {
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expValidation.ValidateDeployment(t)
+		errors = expvalidation.ValidateDeployment(t)
 	case *extensions.Job:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expValidation.ValidateJob(t)
+		errors = expvalidation.ValidateJob(t)
 	case *extensions.DaemonSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expValidation.ValidateDaemonSet(t)
+		errors = expvalidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}

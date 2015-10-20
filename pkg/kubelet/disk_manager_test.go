@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	cadvisorApi "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -61,12 +61,12 @@ func TestSpaceAvailable(t *testing.T) {
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 600 * mb,
 	}, nil)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
@@ -90,7 +90,7 @@ func TestIsDockerDiskSpaceAvailableWithSpace(t *testing.T) {
 	require.NoError(t, err)
 
 	// 500MB available
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9500 * mb,
 		Capacity:  10000 * mb,
 		Available: 500 * mb,
@@ -108,7 +108,7 @@ func TestIsDockerDiskSpaceAvailableWithSpace(t *testing.T) {
 func TestIsDockerDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	// 1MB available
 	assert, policy, mockCadvisor := setUp(t)
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     999 * mb,
 		Capacity:  1000 * mb,
 		Available: 1 * mb,
@@ -133,7 +133,7 @@ func TestIsRootDiskSpaceAvailableWithSpace(t *testing.T) {
 	assert.NoError(err)
 
 	// 999MB available
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     1 * mb,
 		Capacity:  1000 * mb,
 		Available: 999 * mb,
@@ -155,7 +155,7 @@ func TestIsRootDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	assert.NoError(err)
 
 	// 9MB available
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     990 * mb,
 		Capacity:  1000 * mb,
 		Available: 9 * mb,
@@ -176,12 +176,12 @@ func TestCache(t *testing.T) {
 
 	dm.Unfreeze()
 
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 300 * mb,
 	}, nil).Once()
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     500 * mb,
 		Capacity:  1000 * mb,
 		Available: 500 * mb,
@@ -221,8 +221,8 @@ func TestFsInfoError(t *testing.T) {
 	assert.NoError(err)
 
 	dm.Unfreeze()
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{}, fmt.Errorf("can't find fs"))
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{}, fmt.Errorf("EBUSY"))
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("can't find fs"))
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("EBUSY"))
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	assert.Error(err)
 	assert.True(ok)
@@ -236,7 +236,7 @@ func Test_getFsInfo(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 
 	// Sunny day case
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     10 * mb,
 		Capacity:  100 * mb,
 		Available: 90 * mb,
@@ -255,7 +255,7 @@ func Test_getFsInfo(t *testing.T) {
 
 	// Threshold case
 	mockCadvisor = new(cadvisor.Mock)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  100 * mb,
 		Available: 9 * mb,
@@ -272,7 +272,7 @@ func Test_getFsInfo(t *testing.T) {
 	assert.NoError(err)
 
 	// Frozen case
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  10 * mb,
 		Available: 500 * mb,
@@ -290,7 +290,7 @@ func Test_getFsInfo(t *testing.T) {
 
 	// Capacity error case
 	mockCadvisor = new(cadvisor.Mock)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  0,
 		Available: 500 * mb,
