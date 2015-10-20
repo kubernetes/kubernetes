@@ -149,7 +149,7 @@ func New(config *Config,
 		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
 	}
-	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
+	rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
 
 	// Test the rkt version.
 	version, err := rkt.Version()

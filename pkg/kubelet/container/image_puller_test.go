@@ -103,7 +103,7 @@ func TestPuller(t *testing.T) {
 
 		fakeRuntime := &FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImagePuller(fakeRecorder, fakeRuntime, backOff)
+		puller := NewSerializedImagePuller(fakeRecorder, fakeRuntime, backOff)
 
 		fakeRuntime.ImageList = []Image{{"present_image", nil, 0}}
 		fakeRuntime.Err = c.pullerErr
