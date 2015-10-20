@@ -766,8 +766,8 @@ __EOF__
   # Pre-condition: don't need
   # Command
   output_message=$(! kubectl expose nodes 127.0.0.1 2>&1 "${kube_flags[@]}")
-  # Post-condition: the error message has "invalid resource" string
-  kube::test::if_has_string "${output_message}" 'invalid resource'
+  # Post-condition: the error message has "cannot expose" string
+  kube::test::if_has_string "${output_message}" 'cannot expose'
 
   ### Try to generate a service with invalid name (exceeding maximum valid size)
   # Pre-condition: use --name flag

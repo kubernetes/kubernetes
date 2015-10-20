@@ -262,14 +262,21 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return generator, ok
 		},
 		CanBeExposed: func(kind string) error {
-			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
-				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			switch kind {
+			case "ReplicationController", "Service", "Pod":
+				// nothing to do here
+			default:
+				return fmt.Errorf("cannot expose a %s", kind)
 			}
 			return nil
 		},
-		CanBeAutoscaled: func(kind string) error { // TODO: support autoscale for deployments
-			if kind != "ReplicationController" {
-				return fmt.Errorf("invalid resource provided: %v, only a replication controller is accepted", kind)
+		CanBeAutoscaled: func(kind string) error {
+			switch kind {
+			// TODO: support autoscale for deployments
+			case "ReplicationController":
+				// nothing to do here
+			default:
+				return fmt.Errorf("cannot autoscale a %s", kind)
 			}
 			return nil
 		},
