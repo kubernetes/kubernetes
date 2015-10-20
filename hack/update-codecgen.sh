@@ -33,6 +33,14 @@ generated_files=$(
       \) -prune \
     \) -name '*.generated.go')
 
+# Build codecgen binary from Godeps.
+function cleanup {
+  rm -rf "${KUBE_ROOT}/codecgen_binary"
+}
+trap cleanup EXIT
+godep go build -o codecgen_binary github.com/ugorji/go/codec/codecgen
+CODECGEN="${PWD}/codecgen_binary"
+
 for generated_file in ${generated_files}; do
   initial_dir=${PWD}
   file=${generated_file//\.generated\.go/.go}
@@ -43,7 +51,7 @@ for generated_file in ${generated_files}; do
   base_generated_file=$(basename "${generated_file}")
   # We use '-d 1234' flag to have a deterministic output everytime.
   # The constant was just randomly chosen.
-  codecgen -d 1234 -o "${base_generated_file}" "${base_file}"
+  ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
   # Add boilerplate at the begining of the generated file.
   sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
   cat "${base_generated_file}" >> "${base_generated_file}.tmp"
