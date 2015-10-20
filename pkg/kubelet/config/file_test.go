@@ -95,10 +95,11 @@ func TestReadPodsFromFile(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: "mynamespace",
-					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
+					Name:        "test-" + hostname,
+					UID:         "12345",
+					Namespace:   "mynamespace",
+					Annotations: map[string]string{kubelet.ConfigHashAnnotationKey: "12345"},
+					SelfLink:    getSelfLink("test-"+hostname, "mynamespace"),
 				},
 				Spec: api.PodSpec{
 					NodeName:                      hostname,

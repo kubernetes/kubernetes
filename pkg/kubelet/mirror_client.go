@@ -54,7 +54,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *api.Pod) error {
 	for k, v := range pod.Annotations {
 		copyPod.Annotations[k] = v
 	}
-	copyPod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
+	copyPod.Annotations[ConfigMirrorAnnotationKey] = getPodHash(pod)
 
 	_, err := mc.apiserverClient.Pods(copyPod.Namespace).Create(&copyPod)
 	return err
@@ -93,9 +93,16 @@ func isStaticPod(pod *api.Pod) bool {
 }
 
 func isMirrorPod(pod *api.Pod) bool {
-	if value, ok := pod.Annotations[ConfigMirrorAnnotationKey]; !ok {
-		return false
-	} else {
-		return value == MirrorType
-	}
+	_, ok := pod.Annotations[ConfigMirrorAnnotationKey]
+	return ok
+}
+
+func getHashFromMirrorPod(pod *api.Pod) (string, bool) {
+	hash, ok := pod.Annotations[ConfigMirrorAnnotationKey]
+	return hash, ok
+}
+
+func getPodHash(pod *api.Pod) string {
+	// The annotation exists for all static pods.
+	return pod.Annotations[ConfigHashAnnotationKey]
 }
