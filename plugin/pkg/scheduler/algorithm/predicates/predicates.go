@@ -76,13 +76,30 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 			}
 		}
 	}
+	if volume.RBD != nil {
+		mon := volume.RBD.CephMonitors
+		pool := volume.RBD.RBDPool
+		image := volume.RBD.RBDImage
+
+		manifest := &(pod.Spec)
+		for ix := range manifest.Volumes {
+			if manifest.Volumes[ix].RBD != nil {
+				mon_m := manifest.Volumes[ix].RBD.CephMonitors
+				pool_m := manifest.Volumes[ix].RBD.RBDPool
+				image_m := manifest.Volumes[ix].RBD.RBDImage
+				if haveSame(mon, mon_m) && pool_m == pool && image_m == image {
+					return true
+				}
+			}
+		}
+	}
 	return false
 }
 
 // NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
 // are already mounted. Some times of volumes are mounted onto node machines.  For now, these mounts
 // are exclusive so if there is already a volume mounted on that node, another pod can't schedule
-// there. This is GCE and Amazon EBS specific for now.
+// there. This is GCE, Amazon EBS, and Ceph RBD specific for now.
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
@@ -411,4 +428,16 @@ func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	return machineToPods, nil
+}
+
+// search two arrays and return true if they have at least one common element; return false otherwise
+func haveSame(a1, a2 []string) bool {
+	for _, val1 := range a1 {
+		for _, val2 := range a2 {
+			if val1 == val2 {
+				return true
+			}
+		}
+	}
+	return false
 }
