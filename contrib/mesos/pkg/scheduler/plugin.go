@@ -337,29 +337,31 @@ func (k *kubeScheduler) doSchedule(task *podtask.T) (string, error) {
 	}
 
 	slaveId := details.GetSlaveId().GetValue()
-	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
+	slaveHostName := k.api.slaveHostNameFor(slaveId)
+	if slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
 		k.api.offers().Invalidate(details.Id.GetValue())
 		return "", fmt.Errorf("Slave disappeared (%v) while scheduling task %v", slaveId, task.ID)
-	} else {
-		if task.Offer != nil && task.Offer != offer {
-			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
-		}
-
-		task.Offer = offer
-		if err := k.api.algorithm().Procurement()(task, details); err != nil {
-			offer.Release()
-			task.Reset()
-			return "", err
-		}
-
-		if err := k.api.tasks().Update(task); err != nil {
-			offer.Release()
-			return "", err
-		}
-		return slaveHostName, nil
 	}
+
+	if task.Offer != nil && task.Offer != offer {
+		return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
+	}
+
+	task.Offer = offer
+	if err := k.api.algorithm().Procurement()(task, details); err != nil {
+		offer.Release()
+		task.Reset()
+		return "", err
+	}
+
+	if err := k.api.tasks().Update(task); err != nil {
+		offer.Release()
+		return "", err
+	}
+
+	return slaveHostName, nil
 }
 
 type queuer struct {
