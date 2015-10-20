@@ -34,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
@@ -205,12 +206,23 @@ type awsSDKProvider struct {
 	creds *credentials.Credentials
 }
 
+func addHandlers(h *request.Handlers) {
+	h.Sign.PushFrontNamed(request.NamedHandler{
+		Name: "k8s/logger",
+		Fn:   awsHandlerLogger,
+	})
+}
+
 func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
+	service := ec2.New(&aws.Config{
+		Region:      &regionName,
+		Credentials: p.creds,
+	})
+
+	addHandlers(&service.Handlers)
+
 	ec2 := &awsSdkEC2{
-		ec2: ec2.New(&aws.Config{
-			Region:      &regionName,
-			Credentials: p.creds,
-		}),
+		ec2: service,
 	}
 	return ec2, nil
 }
@@ -220,6 +232,9 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	})
+
+	addHandlers(&elbClient.Handlers)
+
 	return elbClient, nil
 }
 
@@ -228,6 +243,9 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	})
+
+	addHandlers(&client.Handlers)
+
 	return client, nil
 }
 
