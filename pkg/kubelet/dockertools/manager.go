@@ -215,7 +215,7 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm, imageBackOff)
+	dm.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, dm, imageBackOff)
 	dm.containerGC = NewContainerGC(client, containerLogsDir)
 
 	return dm
