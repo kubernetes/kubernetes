@@ -341,7 +341,11 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		}
 
 		task.Offer = offer
-		k.api.algorithm().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
+		if err := k.api.algorithm().Procurement()(task, details); err != nil {
+			offer.Release()
+			task.Reset()
+			return "", err
+		}
 
 		if err := k.api.tasks().Update(task); err != nil {
 			offer.Release()
