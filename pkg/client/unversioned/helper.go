@@ -187,7 +187,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	return nil
 }
 
-func extractGroupVersions(l *unversioned.APIGroupList) []string {
+func ExtractGroupVersions(l *unversioned.APIGroupList) []string {
 	var groupVersions []string
 	for _, g := range l.Groups {
 		for _, gv := range g.Versions {
@@ -241,7 +241,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
-	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+	groupVersions = append(groupVersions, ExtractGroupVersions(&apiGroupList)...)
 
 	return groupVersions, nil
 }
@@ -267,12 +267,13 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 	for _, v := range clientRegisteredVersions {
 		clientVersions.Insert(v)
 	}
-	apiVersions, err := client.ServerAPIVersions()
+	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
 		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
+	groupVersions := ExtractGroupVersions(apiGroupList)
 	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
+	for _, v := range groupVersions {
 		serverVersions.Insert(v)
 	}
 	// If no version requested, use config version (may also be empty).
