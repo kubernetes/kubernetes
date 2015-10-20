@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
+	k8sruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
@@ -127,7 +128,7 @@ func TestEventf(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := []struct {
-		obj          runtime.Object
+		obj          k8sruntime.Object
 		reason       string
 		messageFmt   string
 		elements     []interface{}
@@ -471,6 +472,7 @@ func TestWriteEventError(t *testing.T) {
 	for caseName := range table {
 		clock.Step(1 * time.Second)
 		recorder.Event(ref, "Reason", caseName)
+		runtime.Gosched()
 	}
 	recorder.Event(ref, "Reason", "finished")
 	<-done
@@ -548,7 +550,7 @@ func TestEventfNoNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := []struct {
-		obj          runtime.Object
+		obj          k8sruntime.Object
 		reason       string
 		messageFmt   string
 		elements     []interface{}
@@ -654,7 +656,7 @@ func TestMultiSinkCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := []struct {
-		obj          runtime.Object
+		obj          k8sruntime.Object
 		reason       string
 		messageFmt   string
 		elements     []interface{}
