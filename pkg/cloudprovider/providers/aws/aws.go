@@ -164,7 +164,9 @@ type Volumes interface {
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
 	// Delete the specified volume
-	DeleteDisk(volumeName string) error
+	// Returns true iff the volume was deleted
+	// If the was not found, returns (false, nil)
+	DeleteDisk(volumeName string) (bool, error)
 
 	// Get labels to apply to volume on creation
 	GetVolumeLabels(volumeName string) (map[string]string, error)
@@ -1104,13 +1106,18 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 }
 
 // Deletes the EBS disk
-func (self *awsDisk) deleteVolume() error {
+func (self *awsDisk) deleteVolume() (bool, error) {
 	request := &ec2.DeleteVolumeInput{VolumeId: aws.String(self.awsID)}
 	_, err := self.ec2.DeleteVolume(request)
 	if err != nil {
-		return fmt.Errorf("error delete EBS volumes: %v", err)
+		if awsError, ok := err.(awserr.Error); ok {
+			if awsError.Code() == "InvalidVolume.NotFound" {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("error deleting EBS volumes: %v", err)
 	}
-	return nil
+	return true, nil
 }
 
 // Gets the awsInstance for the EC2 instance on which we are running
@@ -1328,7 +1335,7 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 		tagRequest.Tags = tags
 		if _, err := s.createTags(tagRequest); err != nil {
 			// delete the volume and hope it succeeds
-			delerr := s.DeleteDisk(volumeName)
+			_, delerr := s.DeleteDisk(volumeName)
 			if delerr != nil {
 				// delete did not succeed, we have a stray volume!
 				return "", fmt.Errorf("error tagging volume %s, could not delete the volume: %v", volumeName, delerr)
@@ -1340,10 +1347,10 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 }
 
 // Implements Volumes.DeleteDisk
-func (aws *AWSCloud) DeleteDisk(volumeName string) error {
+func (aws *AWSCloud) DeleteDisk(volumeName string) (bool, error) {
 	awsDisk, err := newAWSDisk(aws, volumeName)
 	if err != nil {
-		return err
+		return false, err
 	}
 	return awsDisk.deleteVolume()
 }

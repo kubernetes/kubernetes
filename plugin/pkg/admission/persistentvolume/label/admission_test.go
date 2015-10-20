@@ -45,8 +45,8 @@ func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName s
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DeleteVolume(volumeName string) error {
-	return fmt.Errorf("not implemented")
+func (v *mockVolumes) DeleteDisk(volumeName string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
 }
 
 func (v *mockVolumes) GetVolumeLabels(volumeName string) (map[string]string, error) {
