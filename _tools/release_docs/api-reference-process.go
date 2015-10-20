@@ -20,6 +20,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -97,12 +98,24 @@ func nitFix(filename string) error {
 	return nil
 }
 
-//move the definitions.html and operations.html to _includes
-func moveHTML(filePath string, fileName string, outputDir string) error {
+// move the definitions.html and operations.html to _includes, with name like
+// extensions-v1beta1-definitions.html.
+func moveHTML(filePath string, outputDir string) error {
+	dirs := strings.Split(filePath, "/")
+	var i int
+	for i = 0; i < len(dirs); i++ {
+		if dirs[i] == "api-reference" {
+			break
+		}
+	}
+	if i == len(dirs) {
+		return fmt.Errorf("failed to find fold \"api-reference\"\n")
+	}
+	fileName := strings.Join(dirs[i+1:], "-")
 	return os.Rename(filePath, outputDir+"/../_includes/"+fileName)
 }
 
-func processHTML(filePath string, fileName string, outputDir string) error {
+func processHTML(filePath string, outputDir string) error {
 	if err := stripHTML(filePath); err != nil {
 		return err
 	}
@@ -112,7 +125,7 @@ func processHTML(filePath string, fileName string, outputDir string) error {
 	if err := fixLinks(filePath, outputDir); err != nil {
 		return err
 	}
-	if err := moveHTML(filePath, fileName, outputDir); err != nil {
+	if err := moveHTML(filePath, outputDir); err != nil {
 		return err
 	}
 	return nil
