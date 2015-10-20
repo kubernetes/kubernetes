@@ -75,7 +75,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	// rather than an explicit name is preferred because the names will typically have
 	// a version suffix e.g. heapster-monitoring-v1 and this will change after a rolling
 	// update e.g. to heapster-monitoring-v2. By using a label query we can check for the
-	// situaiton when a heapster-monitoring-v1 and heapster-monitoring-v2 replication controller
+	// situation when a heapster-monitoring-v1 and heapster-monitoring-v2 replication controller
 	// is running (which would be an error except during a rolling update).
 	for _, rcLabel := range rcLabels {
 		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(labels.Set{"k8s-app": rcLabel}.AsSelector(), fields.Everything())

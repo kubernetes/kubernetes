@@ -217,7 +217,7 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 0"}
 	case "randomlySucceedOrFail":
 		// Bash's $RANDOM generates pseudorandom int in range 0 - 32767.
-		// Dividing by 16384 gives roughly 50/50 chance of succeess.
+		// Dividing by 16384 gives roughly 50/50 chance of success.
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit $(( $RANDOM / 16384 ))"}
 	}
 	return job

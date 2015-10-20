@@ -69,7 +69,7 @@ type LBCTester interface {
 	getName() string
 }
 
-// haproxyControllerTester implementes LBCTester for bare metal haproxy LBs.
+// haproxyControllerTester implements LBCTester for bare metal haproxy LBs.
 type haproxyControllerTester struct {
 	client      *client.Client
 	cfg         string
@@ -174,7 +174,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		}
 	}
 	// Create services.
-	// Note that it's upto the caller to make sure the service actually matches
+	// Note that it's up to the caller to make sure the service actually matches
 	// the pods of the rc.
 	for _, svcPath := range s.svcCfgPaths {
 		svc := svcFromManifest(svcPath)

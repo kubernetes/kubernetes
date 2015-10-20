@@ -400,7 +400,7 @@ func runCmd(command string, args ...string) (string, string, error) {
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)
 	// We also output to the OS stdout/stderr to aid in debugging in case cmd
-	// hangs and never retruns before the test gets killed.
+	// hangs and never returns before the test gets killed.
 	cmd.Stdout = io.MultiWriter(os.Stdout, &bout)
 	cmd.Stderr = io.MultiWriter(os.Stderr, &berr)
 	err := cmd.Run()
@@ -447,7 +447,7 @@ func validate(f Framework, svcNameWant, rcNameWant string, ingress api.LoadBalan
 }
 
 // migRollingUpdate starts a MIG rolling update, upgrading the nodes to a new
-// instance template named tmpl, and waits up to nt times the nubmer of nodes
+// instance template named tmpl, and waits up to nt times the number of nodes
 // for it to complete.
 func migRollingUpdate(tmpl string, nt time.Duration) error {
 	By(fmt.Sprintf("starting the MIG rolling update to %s", tmpl))
@@ -464,7 +464,7 @@ func migRollingUpdate(tmpl string, nt time.Duration) error {
 	return nil
 }
 
-// migTemlate (GCE/GKE-only) returns the name of the MIG template that the
+// migTemplate (GCE/GKE-only) returns the name of the MIG template that the
 // nodes of the cluster use.
 func migTemplate() (string, error) {
 	var errLast error
@@ -514,7 +514,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 		// NOTE(mikedanese): If you are changing this gcloud command, update
 		//                 cluster/gce/upgrade.sh to match this EXACTLY.
 		// A `rolling-updates start` call outputs what we want to stderr.
-		_, output, err := retryCmd("gcloud", append(migUdpateCmdBase(),
+		_, output, err := retryCmd("gcloud", append(migUpdateCmdBase(),
 			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
@@ -566,7 +566,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 //
 // TODO(mikedanese): Remove this hack on July 29, 2015 when the migration to
 //                 `gcloud alpha compute rolling-updates` is complete.
-func migUdpateCmdBase() []string {
+func migUpdateCmdBase() []string {
 	b := []string{"preview"}
 	a := []string{"rolling-updates", "-h"}
 	if err := exec.Command("gcloud", append(b, a...)...).Run(); err != nil {
@@ -586,7 +586,7 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
 	if wait.Poll(restartPoll, timeout, func() (bool, error) {
 		// A `rolling-updates describe` call outputs what we want to stdout.
-		output, _, err := retryCmd("gcloud", append(migUdpateCmdBase(),
+		output, _, err := retryCmd("gcloud", append(migUpdateCmdBase(),
 			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),

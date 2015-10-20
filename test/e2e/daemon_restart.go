@@ -41,7 +41,7 @@ import (
 // This test primarily checks 2 things:
 // 1. Daemons restart automatically within some sane time (10m).
 // 2. They don't take abnormal actions when restarted in the steady state.
-//	- Controller manager sholdn't overshoot replicas
+//	- Controller manager shouldn't overshoot replicas
 //	- Kubelet shouldn't restart containers
 //	- Scheduler should continue assigning hosts to new pods
 
