@@ -70,23 +70,10 @@
 		/* Look for change in page state and load any changes */
 		function loadonstatechange(){
 		    $(window).bind('popstate', function (event) {
-				var returnLocation = history.location || document.location;
-				returnlochref = returnLocation.href;
-				if ((returnlochref.indexOf('.yaml') > -1 && returnlochref.indexOf('.yaml') + 5 == returnlochref.length) || (returnlochref.indexOf('.json') > -1 && returnlochref.indexOf('.json') + 5 ==  returnlochref.length)) {//open code samples (.yaml or .json files) in <code> blocks
-					$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {
-						$('#codeblock').load(returnlochref, function() { //load the code sample file into the 'code' tags
-							$('#codetitle').html(location.pathname); //set the page title
-							$( "code" ).prepend( "<br />" ); //insert line break to correct unwanted 1st line indentation
-						});
-					});
-				} else {
-					$('#doccontent').load(returnLocation + ' #doccontent > *', function() {//load the content from the target page
-						var navitem = findcurnavitem();
-						if (navitem.hasClass('gentoc')) {//generate the dynamic TOC
-							var tocid = String(navitem.parent().children('ul').attr('id'));//cast id to string
-							$('#toclist').load( location.pathname + " #" + tocid + " li" );
-						}
-					});
+				var returnlocation = history.location || document.location;
+				returnlochref = returnlocation.href;
+				if (!displaycodesample(returnlochref)) {//open code samples (.yaml or .json files) in <code> blocks
+					loadandscrollpage(returnlochref); //otherwise, load page contents
 				}
 				syncmenutourl();
 		       return;
@@ -105,15 +92,11 @@
 			var clickedon = $(this),
 				href = $(this).attr('href'),
 				isAnchor = false,
-				hasAnchor = false,
 				isCode = false;
 			if (href.indexOf('#') == 0){//check if its an in-page anchor
 				isAnchor = true;
 			} else if(href != "#") {//otherwise get the absolute url
 				href = this.href;
-				if (href.indexOf('#') > 0) {//check for an anchor in the URL
-					hasAnchor = true;
-				}
 			}
 			//handle the type of click
 			if(href == "javascript:;") {//clicks on javascript only elements
@@ -142,29 +125,10 @@
 							offset = $(href).offset().top - 155;
 						}
 						$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
-					} else if ((href.indexOf('.yaml') > -1 && href.indexOf('.yaml') + 5 == href.length) || (href.indexOf('.json') > -1 && href.indexOf('.json') + 5 ==  href.length)) {//open code samples (.yaml or .json files) in <code> blocks
-						$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {
-							$('#codeblock').load(href, function() {	//load the code sample file into the 'code' tags
-								$('#codetitle').html(location.pathname); //set the page title
-								$( "code" ).prepend( "<br />" ); //insert line break to correct unwanted 1st line indentation
-							});
-						});
+					} else if (displaycodesample(href)) {//open code samples (.yaml or .json files) in <code> blocks
 						isCode = true;
 					} else { //if its a link to another topic, only load content into the page (avoid refreshing whole page)
-						$('#doccontent').load(href + ' #doccontent > *', function() {//load the content from the target page
-							if (clickedon.hasClass('gentoc')) {//generate the dynamic TOC
-								var tocid = String(clickedon.parent().children('ul').attr('id'));//cast id to string
-								$('#toclist').load( location.pathname + " #" + tocid + " li" );
-							}
-							var offset = 0;//set offset to the top of the page
-							if (hasAnchor) {//if URL has an anchor, find and set its offset
-								var hash = "#" + href.substring(href.indexOf("#")+1);//retrieve only the anchor from the URL
-								if ($(hash).length) {//make sure its not an empty anchor
-									offset = $(hash).offset().top - 155;
-								}
-							}
-							$('html, body').animate({scrollTop: offset}, 0);
-						});
+						loadandscrollpage(href);
 						$.get(href, function(html){//update the page's <title> tags with title from loaded page (so browser shows current title)
 						    var matches = html.match(/<title>([^<]*)/);
 						    if (matches.length>0) {
@@ -173,12 +137,11 @@
 						    }
 						});
 					}
-					if(!isCode){//dont change/animate nav menu when dispalying a code sample
-						if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
-							animatenav(findcurnavitem());//is an in-page link
-						} else {
-							animatenav(clickedon);//is a nav menu link
+					if(!isCode){//animate nav menu, but not when dispalying a code sample
+						if(clickedon.parents().hasClass('bodywrapper')){//if its an in-page link, first find the nav menu item
+							clickedon = findcurnavitem();
 						}
+						animatenav(clickedon, isAnchor);
 					}
 				} else if (href != "#"){ //if its a link in the main menu, load and refresh the whole page
 					window.location = href;
@@ -186,8 +149,39 @@
 			}
 		    return false; // don't actually follow the link (avoid reloading page (default browser click behavior))
 	    });
+		/* Load the contents of the target page. Load the dynamic TOC otherwise scroll if there's an anchor */
+		function loadandscrollpage(targethref){
+			var navitem = findcurnavitem(),
+				offset = 0; //set default offset to the top of the page
+			$('#doccontent').load(targethref + ' #doccontent > *', function() {
+				if (navitem.hasClass('gentoc')) { //load the in-page TOC from the nav menu
+					var tocid = String(navitem.parent().children('ul').attr('id'));//cast id to string
+					$('#toclist').load( location.pathname + " #" + tocid + " li" );
+				} else if (targethref.indexOf('#') > 0) {//change offset if URL has anchor
+					var hash = "#" + targethref.substring(targethref.indexOf("#")+1);//retrieve only the anchor from the URL
+					if ($(hash).length) {//make sure its not an empty anchor
+						offset = $(hash).offset().top - 155;
+					}
+				}
+				$('html, body').animate({scrollTop: offset}, 0);
+			});
+		}
+		/* Load the code samples in a syntax formatted code block */
+		function displaycodesample(targethref) {
+			var isCodeSample = false;
+			if ((targethref.indexOf('.yaml') > -1 && targethref.indexOf('.yaml') + 5 == targethref.length) || (targethref.indexOf('.json') > -1 && targethref.indexOf('.json') + 5 ==  targethref.length)) {
+				$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {// load the code sample template
+					$('#codeblock').load(targethref, function() { //load the code sample file into the 'code' tags of the template
+						$('#codetitle').html(location.pathname); //set the page title
+						$( "code" ).prepend( "<br />" ); //insert line break to correct unwanted 1st line indentation
+					});
+				});
+				isCodeSample = true;
+			}
+			return isCodeSample;
+		}
 		/* Animate navigation menu to open/close sub menus and then highlight the target/active navigation menu item */
-		function animatenav(anhref){
+		function animatenav(anhref, isAnchor){
 			var ishidden = false;
 			//if target is a hidden getting started topic, then highlight and open the container
 			if(anhref.hasClass('hiddenlink')){//is an in-page link
@@ -217,7 +211,7 @@
 					});
 				}
 			//toggle the menu open/close if the target is a container
-			} else if (anhref.hasClass('active') && anhref.parent('li').hasClass('haschild')) {
+			} else if (anhref.hasClass('active') && anhref.parent('li').hasClass('haschild') && !isAnchor) {
 				anhref.next().stop(true,true).toggle('fast');
 			}
 		}
