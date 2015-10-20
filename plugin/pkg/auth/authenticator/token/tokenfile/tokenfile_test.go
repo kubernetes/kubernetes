@@ -29,8 +29,11 @@ func TestTokenFile(t *testing.T) {
 	auth, err := newWithContents(t, `
 token1,user1,uid1
 token2,user2,uid2
-token3,user3,uid3,group1,group2
-token4,user4,uid4,group2
+token3,user3,uid3,"group1,group2"
+token4,user4,uid4,"group2"
+token5,user5,uid5,group5
+token6,user6,uid6,group5,otherdata
+token7,user7,uid7,"group1,group2",otherdata
 `)
 	if err != nil {
 		t.Fatalf("unable to read tokenfile: %v", err)
@@ -64,9 +67,21 @@ token4,user4,uid4,group2
 		},
 		{
 			Token: "token5",
+			User:  &user.DefaultInfo{Name: "user5", UID: "uid5", Groups: []string{"group5"}},
+			Ok:    true,
 		},
 		{
 			Token: "token6",
+			User:  &user.DefaultInfo{Name: "user6", UID: "uid6", Groups: []string{"group5"}},
+			Ok:    true,
+		},
+		{
+			Token: "token7",
+			User:  &user.DefaultInfo{Name: "user7", UID: "uid7", Groups: []string{"group1", "group2"}},
+			Ok:    true,
+		},
+		{
+			Token: "token8",
 		},
 	}
 	for i, testCase := range testCases {
