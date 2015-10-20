@@ -29,6 +29,8 @@ func TestTokenFile(t *testing.T) {
 	auth, err := newWithContents(t, `
 token1,user1,uid1
 token2,user2,uid2
+token3,user3,uid3,group1,group2
+token4,user4,uid4,group2
 `)
 	if err != nil {
 		t.Fatalf("unable to read tokenfile: %v", err)
@@ -52,9 +54,19 @@ token2,user2,uid2
 		},
 		{
 			Token: "token3",
+			User:  &user.DefaultInfo{Name: "user3", UID: "uid3", Groups: []string{"group1", "group2"}},
+			Ok:    true,
 		},
 		{
 			Token: "token4",
+			User:  &user.DefaultInfo{Name: "user4", UID: "uid4", Groups: []string{"group2"}},
+			Ok:    true,
+		},
+		{
+			Token: "token5",
+		},
+		{
+			Token: "token6",
 		},
 	}
 	for i, testCase := range testCases {
@@ -66,6 +78,7 @@ token2,user2,uid2
 		} else if !reflect.DeepEqual(testCase.User, user) {
 			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, user)
 		}
+
 		if testCase.Ok != ok {
 			t.Errorf("%d: expected auth %v, got %v", i, testCase.Ok, ok)
 		}
