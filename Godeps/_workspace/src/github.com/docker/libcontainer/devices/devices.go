@@ -21,7 +21,7 @@ var (
 	ioutilReadDir = ioutil.ReadDir
 )
 
-// Given the path to a device and it's cgroup_permissions(which cannot be easilly queried) look up the information about a linux device and return that information as a Device struct.
+// Given the path to a device and it's cgroup_permissions(which cannot be easily queried) look up the information about a linux device and return that information as a Device struct.
 func DeviceFromPath(path, permissions string) (*configs.Device, error) {
 	fileInfo, err := osLstat(path)
 	if err != nil {

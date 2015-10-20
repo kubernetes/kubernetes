@@ -206,9 +206,27 @@ type ProcessInfo struct {
 	Cmd           string  `json:"cmd"`
 }
 
+type TcpStat struct {
+	Established uint64
+	SynSent     uint64
+	SynRecv     uint64
+	FinWait1    uint64
+	FinWait2    uint64
+	TimeWait    uint64
+	Close       uint64
+	CloseWait   uint64
+	LastAck     uint64
+	Listen      uint64
+	Closing     uint64
+}
+
 type NetworkStats struct {
 	// Network stats by interface.
 	Interfaces []v1.InterfaceStats `json:"interfaces,omitempty"`
+	// TCP connection stats (Established, Listen...)
+	Tcp TcpStat `json:"tcp"`
+	// TCP6 connection stats (Established, Listen...)
+	Tcp6 TcpStat `json:"tcp6"`
 }
 
 // Instantaneous CPU stats
