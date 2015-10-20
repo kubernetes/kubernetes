@@ -1,4 +1,4 @@
-TAG = 0.3
+TAG = 0.4
 PREFIX = gcr.io/google_containers
 
 all: push
