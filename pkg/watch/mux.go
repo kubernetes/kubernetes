@@ -39,6 +39,8 @@ const incomingQueueLength = 25
 // Broadcaster distributes event notifications among any number of watchers. Every event
 // is delivered to every watcher.
 type Broadcaster struct {
+	// TODO: see if this lock is needed now that new watchers go through
+	// the incoming channel.
 	lock sync.Mutex
 
 	watchers     map[int64]*broadcasterWatcher
@@ -73,21 +75,48 @@ func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *B
 	return m
 }
 
+const internalRunFunctionMarker = "internal-do-function"
+
+// a function type we can shoehorn into the queue.
+type functionFakeRuntimeObject func()
+
+func (functionFakeRuntimeObject) IsAnAPIObject() {}
+
+// Execute f, blocking the incoming queue (and waiting for it to drain first).
+// The purpose of this terrible hack is so that watchers added after an event
+// won't ever see that event, and will always see any event after they are
+// added.
+func (b *Broadcaster) blockQueue(f func()) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	b.incoming <- Event{
+		Type: internalRunFunctionMarker,
+		Object: functionFakeRuntimeObject(func() {
+			defer wg.Done()
+			f()
+		}),
+	}
+	wg.Wait()
+}
+
 // Watch adds a new watcher to the list and returns an Interface for it.
 // Note: new watchers will only receive new events. They won't get an entire history
 // of previous events.
 func (m *Broadcaster) Watch() Interface {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	id := m.nextWatcher
-	m.nextWatcher++
-	w := &broadcasterWatcher{
-		result:  make(chan Event, m.watchQueueLength),
-		stopped: make(chan struct{}),
-		id:      id,
-		m:       m,
-	}
-	m.watchers[id] = w
+	var w *broadcasterWatcher
+	m.blockQueue(func() {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		id := m.nextWatcher
+		m.nextWatcher++
+		w = &broadcasterWatcher{
+			result:  make(chan Event, m.watchQueueLength),
+			stopped: make(chan struct{}),
+			id:      id,
+			m:       m,
+		}
+		m.watchers[id] = w
+	})
 	return w
 }
 
@@ -96,24 +125,27 @@ func (m *Broadcaster) Watch() Interface {
 // The returned watch will have a queue length that is at least large enough to accommodate
 // all of the items in queuedEvents.
 func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	id := m.nextWatcher
-	m.nextWatcher++
-	length := m.watchQueueLength
-	if n := len(queuedEvents) + 1; n > length {
-		length = n
-	}
-	w := &broadcasterWatcher{
-		result:  make(chan Event, length),
-		stopped: make(chan struct{}),
-		id:      id,
-		m:       m,
-	}
-	m.watchers[id] = w
-	for _, e := range queuedEvents {
-		w.result <- e
-	}
+	var w *broadcasterWatcher
+	m.blockQueue(func() {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		id := m.nextWatcher
+		m.nextWatcher++
+		length := m.watchQueueLength
+		if n := len(queuedEvents) + 1; n > length {
+			length = n
+		}
+		w = &broadcasterWatcher{
+			result:  make(chan Event, length),
+			stopped: make(chan struct{}),
+			id:      id,
+			m:       m,
+		}
+		m.watchers[id] = w
+		for _, e := range queuedEvents {
+			w.result <- e
+		}
+	})
 	return w
 }
 
@@ -166,6 +198,10 @@ func (m *Broadcaster) loop() {
 		event, ok := <-m.incoming
 		if !ok {
 			break
+		}
+		if event.Type == internalRunFunctionMarker {
+			event.Object.(functionFakeRuntimeObject)()
+			continue
 		}
 		m.distribute(event)
 	}
