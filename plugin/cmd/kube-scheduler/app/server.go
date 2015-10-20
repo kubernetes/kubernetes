@@ -56,8 +56,8 @@ type SchedulerServer struct {
 	Kubeconfig        string
 	BindPodsQPS       float32
 	BindPodsBurst     int
-	KubeApiQps        float32
-	KubeApiBurst      int
+	KubeAPIQPS        float32
+	KubeAPIBurst      int
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -68,8 +68,8 @@ func NewSchedulerServer() *SchedulerServer {
 		AlgorithmProvider: factory.DefaultProvider,
 		BindPodsQPS:       50.0,
 		BindPodsBurst:     100,
-		KubeApiQps:        50.0,
-		KubeApiBurst:      100,
+		KubeAPIQPS:        50.0,
+		KubeAPIBurst:      100,
 	}
 	return &s
 }
@@ -85,8 +85,8 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", s.BindPodsQPS, "Number of bindings per second scheduler is allowed to continuously make")
 	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", s.BindPodsBurst, "Number of bindings per second scheduler is allowed to make during bursts")
-	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -105,8 +105,8 @@ func (s *SchedulerServer) Run(_ []string) error {
 	}
 
 	// Override kubeconfig qps/burst settings from flags
-	kubeconfig.QPS = s.KubeApiQps
-	kubeconfig.Burst = s.KubeApiBurst
+	kubeconfig.QPS = s.KubeAPIQPS
+	kubeconfig.Burst = s.KubeAPIBurst
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
