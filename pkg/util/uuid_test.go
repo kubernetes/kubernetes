@@ -17,28 +17,38 @@ limitations under the License.
 package util
 
 import (
-	"time"
+	"sync"
+	"testing"
 
-	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/types"
 )
 
-/**
- * The UUID package is naive and can generate identical UUIDs if the time interval is quick enough.
- * Block subsequent UUIDs for 200 Nanoseconds, the UUID uses 100 ns increments, we block for 200 to be safe
- * Blocks in a go routine, so that the caller doesn't have to wait.
- */
+func TestUUID(t *testing.T) {
+	itrs := 1000
 
-// Burst buffer size 100
-var uuidChan = make(chan types.UID, 100)
+	ids := map[types.UID]bool{}
+	for i := 0; i < itrs; i++ {
+		ids[NewUUID()] = true
+	}
 
-func init() {
-	go Forever(func() {
-		result := uuid.NewUUID()
-		uuidChan <- types.UID(result.String())
-	}, 200*time.Nanosecond)
+	if len(ids) != itrs {
+		t.Errorf("unexpected number of UUIDs: %d, expected %d", len(ids), itrs)
+	}
 }
 
-func NewUUID() types.UID {
-	return <-uuidChan
+func BenchmarkNewUUID(b *testing.B) {
+	ids := map[types.UID]bool{}
+	wg := sync.WaitGroup{}
+	wg.Add(b.N)
+	for i := 0; i < b.N; i++ {
+		go func() {
+			ids[NewUUID()] = true
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	if len(ids) != b.N {
+		b.Errorf("unexpected number of UUIDs: %d, expected %d", len(ids), b.N)
+	}
 }
