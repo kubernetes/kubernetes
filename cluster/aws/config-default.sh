@@ -97,13 +97,6 @@ if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
 fi
 
-# Optional: Enable feature for autoscaling number of pods
-# Experimental feature, not ready for production use.
-ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
-if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
-  ENABLE_EXPERIMENTAL_API=true
-fi
-
 # Optional: Enable deployment experimental feature, not ready for production use.
 ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
 if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
