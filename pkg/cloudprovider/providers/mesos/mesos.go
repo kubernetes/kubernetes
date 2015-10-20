@@ -182,7 +182,21 @@ func ipAddress(name string) (net.IP, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (c *MesosCloud) ExternalID(instance string) (string, error) {
-	ip, err := ipAddress(instance)
+	//TODO(jdef) use a timeout here? 15s?
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	nodes, err := c.client.listSlaves(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	node := nodes[instance]
+	if node == nil {
+		return "", cloudprovider.InstanceNotFound
+	}
+
+	ip, err := ipAddress(node.hostname)
 	if err != nil {
 		return "", err
 	}
