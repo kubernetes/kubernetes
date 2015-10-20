@@ -1034,6 +1034,9 @@ func TestUnacceptableParamNames(t *testing.T) {
 func TestBody(t *testing.T) {
 	const data = "test payload"
 
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	bodyExpected, _ := testapi.Default.Codec().Encode(obj)
+
 	f, err := ioutil.TempFile("", "test_body")
 	if err != nil {
 		t.Fatalf("TempFile error: %v", err)
@@ -1044,21 +1047,37 @@ func TestBody(t *testing.T) {
 	f.Close()
 
 	c := NewOrDie(&Config{})
-	tests := []interface{}{[]byte(data), f.Name(), strings.NewReader(data)}
+	tests := []struct {
+		input    interface{}
+		expected string
+		headers  map[string]string
+	}{
+		{[]byte(data), data, nil},
+		{f.Name(), data, nil},
+		{strings.NewReader(data), data, nil},
+		{obj, string(bodyExpected), map[string]string{"Content-Type": "application/json"}},
+	}
 	for i, tt := range tests {
-		r := c.Post().Body(tt)
+		r := c.Post().Body(tt.input)
 		if r.err != nil {
 			t.Errorf("%d: r.Body(%#v) error: %v", i, tt, r.err)
 			continue
 		}
-		buf := make([]byte, len(data))
+		buf := make([]byte, len(tt.expected))
 		if _, err := r.body.Read(buf); err != nil {
 			t.Errorf("%d: r.body.Read error: %v", i, err)
 			continue
 		}
 		body := string(buf)
-		if body != data {
-			t.Errorf("%d: r.body = %q; want %q", i, body, data)
+		if body != tt.expected {
+			t.Errorf("%d: r.body = %q; want %q", i, body, tt.expected)
+		}
+		if tt.headers != nil {
+			for k, v := range tt.headers {
+				if r.headers.Get(k) != v {
+					t.Errorf("%d: r.headers[%q] = %q; want %q", i, k, v, v)
+				}
+			}
 		}
 	}
 }
