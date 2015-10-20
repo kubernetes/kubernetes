@@ -83,9 +83,9 @@ type APIGroupVersion struct {
 	// TODO: caesarxuchao: Version actually contains "group/version", refactor it to avoid confusion.
 	Version string
 
-	// APIRequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
+	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
 	// TODO: refactor proxy handler to use sub resources
-	APIRequestInfoResolver *APIRequestInfoResolver
+	RequestInfoResolver *RequestInfoResolver
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
@@ -161,7 +161,7 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
 		group:             g,
-		info:              g.APIRequestInfoResolver,
+		info:              g.RequestInfoResolver,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 	}
@@ -217,14 +217,14 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.GroupOrDie("").Codec, httpWriter)
 }
 
-func InstallServiceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string) {
+func InstallServiceErrorHandler(container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(requestResolver, apiVersions, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-	requestInfo, err := requestResolver.GetAPIRequestInfo(request.Request)
+func serviceErrorHandler(requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+	requestInfo, err := requestResolver.GetRequestInfo(request.Request)
 	codec := latest.GroupOrDie("").Codec
 	if err == nil && requestInfo.APIVersion != "" {
 		// check if the api version is valid.
