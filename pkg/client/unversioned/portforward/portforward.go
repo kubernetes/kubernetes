@@ -122,13 +122,16 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}) (*P
 	}, nil
 }
 
+// The SPDY subprotocol "portforward.k8s.io" is used for port forwarding.
+const PortForwardProtocolV1Name = "portforward.k8s.io"
+
 // ForwardPorts formats and executes a port forwarding request. The connection will remain
 // open until stopChan is closed.
 func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
 	var err error
-	pf.streamConn, err = pf.dialer.Dial()
+	pf.streamConn, _, err = pf.dialer.Dial([]string{PortForwardProtocolV1Name})
 	if err != nil {
 		return fmt.Errorf("error upgrading connection: %s", err)
 	}

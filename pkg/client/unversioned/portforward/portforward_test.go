@@ -38,14 +38,15 @@ import (
 )
 
 type fakeDialer struct {
-	dialed bool
-	conn   httpstream.Connection
-	err    error
+	dialed             bool
+	conn               httpstream.Connection
+	err                error
+	negotiatedProtocol string
 }
 
-func (d *fakeDialer) Dial() (httpstream.Connection, error) {
+func (d *fakeDialer) Dial(protocols []string) (httpstream.Connection, string, error) {
 	d.dialed = true
-	return d.conn, d.err
+	return d.conn, d.negotiatedProtocol, d.err
 }
 
 func TestParsePortsAndNew(t *testing.T) {

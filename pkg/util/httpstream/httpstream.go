@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	HeaderConnection = "Connection"
-	HeaderUpgrade    = "Upgrade"
+	HeaderConnection      = "Connection"
+	HeaderUpgrade         = "Upgrade"
+	HeaderProtocolVersion = "X-Stream-Protocol-Version"
 )
 
 // NewStreamHandler defines a function that is called when a new Stream is
@@ -39,7 +40,10 @@ func NoOpNewStreamHandler(stream Stream) error { return nil }
 
 // Dialer knows how to open a streaming connection to a server.
 type Dialer interface {
-	Dial() (Connection, error)
+
+	// Dial opens a streaming connection to a server using one of the protocols
+	// specified (in order of most preferred to least preferred).
+	Dial(protocols []string) (Connection, string, error)
 }
 
 // UpgradeRoundTripper is a type of http.RoundTripper that is able to upgrade
@@ -58,7 +62,7 @@ type ResponseUpgrader interface {
 	// UpgradeResponse upgrades an HTTP response to one that supports multiplexed
 	// streams. newStreamHandler will be called synchronously whenever the
 	// other end of the upgraded connection creates a new stream.
-	UpgradeResponse(w http.ResponseWriter, req *http.Request, newStreamHandler NewStreamHandler) Connection
+	UpgradeResponse(w http.ResponseWriter, req *http.Request, protocols []string, newStreamHandler NewStreamHandler) (Connection, string)
 }
 
 // Connection represents an upgraded HTTP connection.

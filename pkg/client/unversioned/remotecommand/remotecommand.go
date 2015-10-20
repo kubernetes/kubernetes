@@ -24,6 +24,8 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
@@ -97,51 +99,207 @@ func NewStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.Rou
 	}, nil
 }
 
-// Dial opens a connection to a remote server and attempts to negotiate a SPDY connection.
-func (e *streamExecutor) Dial() (httpstream.Connection, error) {
-	client := &http.Client{Transport: e.transport}
+// Dial opens a connection to a remote server and attempts to negotiate a SPDY
+// connection. Upon success, it returns the connection and the protocol
+// selected by the server.
+func (e *streamExecutor) Dial(protocols []string) (httpstream.Connection, string, error) {
+	transport := e.transport
+	// TODO consider removing this and reusing client.TransportFor above to get this for free
+	switch {
+	case bool(glog.V(9)):
+		transport = client.NewDebuggingRoundTripper(transport, client.CurlCommand, client.URLTiming, client.ResponseHeaders)
+	case bool(glog.V(8)):
+		transport = client.NewDebuggingRoundTripper(transport, client.JustURL, client.RequestHeaders, client.ResponseStatus, client.ResponseHeaders)
+	case bool(glog.V(7)):
+		transport = client.NewDebuggingRoundTripper(transport, client.JustURL, client.RequestHeaders, client.ResponseStatus)
+	case bool(glog.V(6)):
+		transport = client.NewDebuggingRoundTripper(transport, client.URLTiming)
+	}
+	client := &http.Client{Transport: transport}
 
 	req, err := http.NewRequest(e.method, e.url.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %s", err)
+		return nil, "", fmt.Errorf("error creating request: %v", err)
+	}
+	for i := range protocols {
+		req.Header.Add(httpstream.HeaderProtocolVersion, protocols[i])
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %s", err)
+		return nil, "", fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// TODO: handle protocol selection in the future
-	return e.upgrader.NewConnection(resp)
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		return nil, "", fmt.Errorf("unexpected response status code %d (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
+	conn, err := e.upgrader.NewConnection(resp)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
+}
+
+const (
+	// The SPDY subprotocol "channel.k8s.io" is used for remote command
+	// attachment/execution. This represents the initial unversioned subprotocol,
+	// which has the known bugs http://issues.k8s.io/13394 and
+	// http://issues.k8s.io/13395.
+	StreamProtocolV1Name = "channel.k8s.io"
+	// The SPDY subprotocol "v2.channel.k8s.io" is used for remote command
+	// attachment/execution. It is the second version of the subprotocol and
+	// resolves the issues present in the first version.
+	StreamProtocolV2Name = "v2.channel.k8s.io"
+)
+
+type streamProtocolHandler interface {
+	stream(httpstream.Connection) error
 }
 
 // Stream opens a protocol streamer to the server and streams until a client closes
 // the connection or the server disconnects.
 func (e *streamExecutor) Stream(stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	conn, err := e.Dial()
+	conn, protocol, err := e.Dial([]string{StreamProtocolV2Name, StreamProtocolV1Name})
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	// TODO: negotiate protocols
-	streamer := &streamProtocol{
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
-		tty:    tty,
+
+	var streamer streamProtocolHandler
+
+	switch protocol {
+	case StreamProtocolV2Name:
+		streamer = &streamProtocolV2{
+			stdin:  stdin,
+			stdout: stdout,
+			stderr: stderr,
+			tty:    tty,
+		}
+	case "":
+		glog.Warning("The server did not negotiate a streaming protocol version. Falling back to unversioned")
+		// TODO restore v1
+		streamer = &streamProtocolV1{
+			stdin:  stdin,
+			stdout: stdout,
+			stderr: stderr,
+			tty:    tty,
+		}
 	}
+
 	return streamer.stream(conn)
 }
 
-type streamProtocol struct {
+type streamProtocolV1 struct {
 	stdin  io.Reader
 	stdout io.Writer
 	stderr io.Writer
 	tty    bool
 }
 
-func (e *streamProtocol) stream(conn httpstream.Connection) error {
+func (e *streamProtocolV1) stream(conn httpstream.Connection) error {
+	doneChan := make(chan struct{}, 2)
+	errorChan := make(chan error)
+
+	cp := func(s string, dst io.Writer, src io.Reader) {
+		glog.V(4).Infof("Copying %s", s)
+		defer glog.V(4).Infof("Done copying %s", s)
+		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
+			glog.Errorf("Error copying %s: %v", s, err)
+		}
+		if s == api.StreamTypeStdout || s == api.StreamTypeStderr {
+			doneChan <- struct{}{}
+		}
+	}
+
+	headers := http.Header{}
+	headers.Set(api.StreamType, api.StreamTypeError)
+	errorStream, err := conn.CreateStream(headers)
+	if err != nil {
+		return err
+	}
+	go func() {
+		message, err := ioutil.ReadAll(errorStream)
+		if err != nil && err != io.EOF {
+			errorChan <- fmt.Errorf("Error reading from error stream: %s", err)
+			return
+		}
+		if len(message) > 0 {
+			errorChan <- fmt.Errorf("Error executing remote command: %s", message)
+			return
+		}
+	}()
+	defer errorStream.Reset()
+
+	if e.stdin != nil {
+		headers.Set(api.StreamType, api.StreamTypeStdin)
+		remoteStdin, err := conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+		defer remoteStdin.Reset()
+		// TODO this goroutine will never exit cleanly (the io.Copy never unblocks)
+		// because stdin is not closed until the process exits. If we try to call
+		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
+		// exit when the process exits, instead.
+		go cp(api.StreamTypeStdin, remoteStdin, e.stdin)
+	}
+
+	waitCount := 0
+	completedStreams := 0
+
+	if e.stdout != nil {
+		waitCount++
+		headers.Set(api.StreamType, api.StreamTypeStdout)
+		remoteStdout, err := conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+		defer remoteStdout.Reset()
+		go cp(api.StreamTypeStdout, e.stdout, remoteStdout)
+	}
+
+	if e.stderr != nil && !e.tty {
+		waitCount++
+		headers.Set(api.StreamType, api.StreamTypeStderr)
+		remoteStderr, err := conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+		defer remoteStderr.Reset()
+		go cp(api.StreamTypeStderr, e.stderr, remoteStderr)
+	}
+
+Loop:
+	for {
+		select {
+		case <-doneChan:
+			completedStreams++
+			if completedStreams == waitCount {
+				break Loop
+			}
+		case err := <-errorChan:
+			return err
+		}
+	}
+
+	return nil
+}
+
+// streamProtocolV2 implements version 2 of the streaming protocol for attach
+// and exec. The original streaming protocol was unversioned. As a result, this
+// version is referred to as version 2, even though it is the first actual
+// numbered version.
+type streamProtocolV2 struct {
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+	tty    bool
+}
+
+func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 	headers := http.Header{}
 
 	// set up error stream
