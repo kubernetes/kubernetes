@@ -197,7 +197,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Use a unique namespace for the resources created in this test.
 	ns := f.Namespace.Name
 	name := "synthlogger"
-	// Form a unique name to taint log lines to be colelcted.
+	// Form a unique name to taint log lines to be collected.
 	// Replace '-' characters with '_' to prevent the analyzer from breaking apart names.
 	taintName := strings.Replace(ns+name, "-", "_", -1)
 
@@ -240,7 +240,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		}
 	}()
 
-	// Wait for the syntehtic logging pods to finish.
+	// Wait for the synthetic logging pods to finish.
 	By("Waiting for the pods to succeed.")
 	for _, pod := range podNames {
 		err = waitForPodSuccessInNamespace(f.Client, pod, "synth-logger", ns)

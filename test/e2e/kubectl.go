@@ -1116,7 +1116,7 @@ func validateReplicationControllerConfiguration(rc api.ReplicationController) {
 }
 
 // getUDData creates a validator function based on the input string (i.e. kitten.jpg).
-// For example, if you send "kitten.jpg", this function veridies that the image jpg = kitten.jpg
+// For example, if you send "kitten.jpg", this function verifies that the image jpg = kitten.jpg
 // in the container's json field.
 func getUDData(jpgExpected string, ns string) func(*client.Client, string) error {
 
