@@ -113,6 +113,10 @@ type flockerBuilder struct {
 	readOnly bool
 }
 
+func (_ *flockerBuilder) SupportsOwnershipManagement() bool {
+	return false
+}
+
 func (b flockerBuilder) GetPath() string {
 	return b.flocker.path
 }

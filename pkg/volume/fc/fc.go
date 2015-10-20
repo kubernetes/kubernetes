@@ -164,6 +164,10 @@ type fcDiskBuilder struct {
 
 var _ volume.Builder = &fcDiskBuilder{}
 
+func (_ *fcDiskBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *fcDiskBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }

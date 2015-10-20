@@ -97,6 +97,10 @@ type secretVolumeBuilder struct {
 
 var _ volume.Builder = &secretVolumeBuilder{}
 
+func (_ *secretVolumeBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *secretVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }

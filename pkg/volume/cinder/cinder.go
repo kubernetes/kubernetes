@@ -153,6 +153,10 @@ func detachDiskLogError(cd *cinderVolume) {
 	}
 }
 
+func (_ *cinderVolumeBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *cinderVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
