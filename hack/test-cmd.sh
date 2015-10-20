@@ -910,6 +910,26 @@ __EOF__
         kube::test::get_object_assert 'rc mock2' "{{${labels_field}.status}}" 'replaced'
       fi
     fi
+    # Command: kubectl edit multiple resources
+    temp_editor="${KUBE_TEMP}/tmp-editor.sh"
+    echo -e '#!/bin/bash\nsed -i "s/status\:\ replaced/status\:\ edited/g" $@' > "${temp_editor}"
+    chmod +x "${temp_editor}"
+    EDITOR="${temp_editor}" kubectl edit "${kube_flags[@]}" -f "${file}"
+    # Post-condition: mock service (and mock2) and mock rc (and mock2) are edited
+    if [ "$has_svc" = true ]; then
+      kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'edited'
+      if [ "$two_svcs" = true ]; then
+        kube::test::get_object_assert 'services mock2' "{{${labels_field}.status}}" 'edited'
+      fi
+    fi
+    if [ "$has_rc" = true ]; then
+      kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'edited'
+      if [ "$two_rcs" = true ]; then
+        kube::test::get_object_assert 'rc mock2' "{{${labels_field}.status}}" 'edited'
+      fi
+    fi
+    # cleaning
+    rm "${temp_editor}"
     # Command
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label" 
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
