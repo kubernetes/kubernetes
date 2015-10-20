@@ -261,7 +261,10 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 	event := recorder.makeEvent(ref, reason, message)
 	event.Source = recorder.source
 
-	recorder.Action(watch.Added, event)
+	go func() {
+		// NOTE: events should be a non-blocking operation
+		recorder.Action(watch.Added, event)
+	}()
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, reason, message string) {
