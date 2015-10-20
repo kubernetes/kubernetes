@@ -22,6 +22,7 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -32,7 +33,7 @@ import (
 )
 
 type HollowKubelet struct {
-	KubeletConfig *kubeletapp.KubeletConfig
+	KubeletConfig *kubelet.KubeletConfig
 }
 
 func NewHollowKubelet(
@@ -75,6 +76,6 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfig)
+	kubeletapp.RunKubelet(hk.KubeletConfig, nil)
 	select {}
 }
