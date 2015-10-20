@@ -21,15 +21,14 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 V1_PATH="$PWD/${KUBE_ROOT}/docs/api-reference/v1/"
 V1BETA1_PATH="$PWD/${KUBE_ROOT}/docs/api-reference/extensions/v1beta1"
+SWAGGER_PATH="$PWD/${KUBE_ROOT}/api/swagger-spec/"
 mkdir -p $V1_PATH
 mkdir -p $V1BETA1_PATH
 
-docker run -v $V1_PATH:/output gcr.io/google_containers/gen-swagger-docs:v2 \
+docker run -v $V1_PATH:/output -v ${SWAGGER_PATH}:/swagger-source gcr.io/google_containers/gen-swagger-docs:v3 \
     v1 \
-    https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1.json \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
 
-docker run -v $V1BETA1_PATH:/output gcr.io/google_containers/gen-swagger-docs:v2 \
+docker run -v $V1BETA1_PATH:/output -v ${SWAGGER_PATH}:/swagger-source gcr.io/google_containers/gen-swagger-docs:v3 \
     v1beta1 \
-    https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1beta1.json \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go

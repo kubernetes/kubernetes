@@ -22,8 +22,10 @@ set -o pipefail
 
 cd /build/
 
-wget "$2" -O input.json
-wget "$3" -O register.go
+wget "$2" -O register.go
+
+# gendocs takes "input.json" as the input swagger spec.
+cp /swagger-source/"$1".json input.json
 
 ./gradle-2.5/bin/gradle gendocs --info
 
