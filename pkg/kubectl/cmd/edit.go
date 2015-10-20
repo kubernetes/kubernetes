@@ -145,139 +145,143 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	defaultVersion := cmdutil.OutputVersion(cmd, clientConfig.Version)
 	results := editResults{}
 	for {
-		obj, err := resource.AsVersionedObject(infos, false, defaultVersion)
+		objs, err := resource.AsVersionedObjects(infos, defaultVersion)
 		if err != nil {
 			return preservedFile(err, results.file, out)
 		}
+		// if input object is a list, traverse and edit each item one at a time
+		for _, obj := range objs {
+			// TODO: add an annotating YAML printer that can print inline comments on each field,
+			//   including descriptions or validation errors
 
-		// TODO: add an annotating YAML printer that can print inline comments on each field,
-		//   including descriptions or validation errors
-
-		// generate the file to edit
-		buf := &bytes.Buffer{}
-		if err := results.header.writeTo(buf); err != nil {
-			return preservedFile(err, results.file, out)
-		}
-		if err := printer.PrintObj(obj, buf); err != nil {
-			return preservedFile(err, results.file, out)
-		}
-		original := buf.Bytes()
-
-		// launch the editor
-		edit := editor.NewDefaultEditor()
-		edited, file, err := edit.LaunchTempFile("kubectl-edit-", ext, buf)
-		if err != nil {
-			return preservedFile(err, results.file, out)
-		}
-
-		// cleanup any file from the previous pass
-		if len(results.file) > 0 {
-			os.Remove(results.file)
-		}
-
-		glog.V(4).Infof("User edited:\n%s", string(edited))
-		fmt.Printf("User edited:\n%s", string(edited))
-		lines, err := hasLines(bytes.NewBuffer(edited))
-		if err != nil {
-			return preservedFile(err, file, out)
-		}
-		if bytes.Equal(original, edited) {
-			if len(results.edit) > 0 {
-				preservedFile(nil, file, out)
-			} else {
-				os.Remove(file)
+			// generate the file to edit
+			buf := &bytes.Buffer{}
+			if err := results.header.writeTo(buf); err != nil {
+				return preservedFile(err, results.file, out)
 			}
-			fmt.Fprintln(out, "Edit cancelled, no changes made.")
-			return nil
-		}
-		if !lines {
-			if len(results.edit) > 0 {
-				preservedFile(nil, file, out)
-			} else {
-				os.Remove(file)
+			if err := printer.PrintObj(obj, buf); err != nil {
+				return preservedFile(err, results.file, out)
 			}
-			fmt.Fprintln(out, "Edit cancelled, saved file was empty.")
-			return nil
-		}
+			original := buf.Bytes()
 
-		results = editResults{
-			file: file,
-		}
-
-		// parse the edited file
-		updates, err := rmap.InfoForData(edited, "edited-file")
-		if err != nil {
-			return preservedFile(err, file, out)
-		}
-
-		// annotate the edited object for kubectl apply
-		if err := kubectl.UpdateApplyAnnotation(updates); err != nil {
-			return preservedFile(err, file, out)
-		}
-
-		visitor := resource.NewFlattenListVisitor(updates, rmap)
-
-		// need to make sure the original namespace wasn't changed while editing
-		if err = visitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
-			return preservedFile(err, file, out)
-		}
-
-		// use strategic merge to create a patch
-		originalJS, err := yaml.ToJSON(original)
-		if err != nil {
-			return preservedFile(err, file, out)
-		}
-		editedJS, err := yaml.ToJSON(edited)
-		if err != nil {
-			return preservedFile(err, file, out)
-		}
-		patch, err := strategicpatch.CreateStrategicMergePatch(originalJS, editedJS, obj)
-		// TODO: change all jsonmerge to strategicpatch
-		// for checking preconditions
-		preconditions := []jsonmerge.PreconditionFunc{}
-		if err != nil {
-			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-			return preservedFile(err, file, out)
-		} else {
-			preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("apiVersion"))
-			preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("kind"))
-			preconditions = append(preconditions, jsonmerge.RequireMetadataKeyUnchanged("name"))
-			results.version = defaultVersion
-		}
-
-		if hold, msg := jsonmerge.TestPreconditionsHold(patch, preconditions); !hold {
-			fmt.Fprintf(out, "error: %s", msg)
-			return preservedFile(nil, file, out)
-		}
-
-		err = visitor.Visit(func(info *resource.Info, err error) error {
-			patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+			// launch the editor
+			edit := editor.NewDefaultEditor()
+			edited, file, err := edit.LaunchTempFile("kubectl-edit-", ext, buf)
 			if err != nil {
-				fmt.Fprintln(out, results.addError(err, info))
-				return nil
+				return preservedFile(err, results.file, out)
 			}
-			info.Refresh(patched, true)
-			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "edited")
-			return nil
-		})
-		if err != nil {
-			return preservedFile(err, file, out)
-		}
 
-		if results.retryable > 0 {
-			fmt.Fprintf(out, "You can run `kubectl replace -f %s` to try this update again.\n", file)
-			return errExit
-		}
-		if results.conflict > 0 {
-			fmt.Fprintf(out, "You must update your local resource version and run `kubectl replace -f %s` to overwrite the remote changes.\n", file)
-			return errExit
+			// cleanup any file from the previous pass
+			if len(results.file) > 0 {
+				os.Remove(results.file)
+			}
+
+			glog.V(4).Infof("User edited:\n%s", string(edited))
+			lines, err := hasLines(bytes.NewBuffer(edited))
+			if err != nil {
+				return preservedFile(err, file, out)
+			}
+			// Compare content without comments
+			if bytes.Equal(stripComments(original), stripComments(edited)) {
+				if len(results.edit) > 0 {
+					preservedFile(nil, file, out)
+				} else {
+					os.Remove(file)
+				}
+				fmt.Fprintln(out, "Edit cancelled, no changes made.")
+				continue
+			}
+			if !lines {
+				if len(results.edit) > 0 {
+					preservedFile(nil, file, out)
+				} else {
+					os.Remove(file)
+				}
+				fmt.Fprintln(out, "Edit cancelled, saved file was empty.")
+				continue
+			}
+
+			results = editResults{
+				file: file,
+			}
+
+			// parse the edited file
+			updates, err := rmap.InfoForData(edited, "edited-file")
+			if err != nil {
+				return fmt.Errorf("The edited file had a syntax error: %v", err)
+			}
+
+			// annotate the edited object for kubectl apply
+			if err := kubectl.UpdateApplyAnnotation(updates); err != nil {
+				return preservedFile(err, file, out)
+			}
+
+			visitor := resource.NewFlattenListVisitor(updates, rmap)
+
+			// need to make sure the original namespace wasn't changed while editing
+			if err = visitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
+				return preservedFile(err, file, out)
+			}
+
+			// use strategic merge to create a patch
+			originalJS, err := yaml.ToJSON(original)
+			if err != nil {
+				return preservedFile(err, file, out)
+			}
+			editedJS, err := yaml.ToJSON(edited)
+			if err != nil {
+				return preservedFile(err, file, out)
+			}
+			patch, err := strategicpatch.CreateStrategicMergePatch(originalJS, editedJS, obj)
+			// TODO: change all jsonmerge to strategicpatch
+			// for checking preconditions
+			preconditions := []jsonmerge.PreconditionFunc{}
+			if err != nil {
+				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				return preservedFile(err, file, out)
+			} else {
+				preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("apiVersion"))
+				preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("kind"))
+				preconditions = append(preconditions, jsonmerge.RequireMetadataKeyUnchanged("name"))
+				results.version = defaultVersion
+			}
+
+			if hold, msg := jsonmerge.TestPreconditionsHold(patch, preconditions); !hold {
+				fmt.Fprintf(out, "error: %s", msg)
+				return preservedFile(nil, file, out)
+			}
+
+			err = visitor.Visit(func(info *resource.Info, err error) error {
+				patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+				if err != nil {
+					fmt.Fprintln(out, results.addError(err, info))
+					return nil
+				}
+				info.Refresh(patched, true)
+				cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "edited")
+				return nil
+			})
+			if err != nil {
+				return preservedFile(err, file, out)
+			}
+
+			if results.retryable > 0 {
+				fmt.Fprintf(out, "You can run `kubectl replace -f %s` to try this update again.\n", file)
+				return errExit
+			}
+			if results.conflict > 0 {
+				fmt.Fprintf(out, "You must update your local resource version and run `kubectl replace -f %s` to overwrite the remote changes.\n", file)
+				return errExit
+			}
+			if len(results.edit) == 0 {
+				if results.notfound == 0 {
+					os.Remove(file)
+				} else {
+					fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
+				}
+			}
 		}
 		if len(results.edit) == 0 {
-			if results.notfound == 0 {
-				os.Remove(file)
-			} else {
-				fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
-			}
 			return nil
 		}
 
@@ -394,4 +398,28 @@ func hasLines(r io.Reader) (bool, error) {
 		return false, err
 	}
 	return false, nil
+}
+
+// stripComments will transform a YAML file into JSON, thus dropping any comments
+// in it. Note that if the given file has a syntax error, the transformation will
+// fail and we will manually drop all comments from the file.
+func stripComments(file []byte) []byte {
+	stripped, err := yaml.ToJSON(file)
+	if err != nil {
+		stripped = manualStrip(file)
+	}
+	return stripped
+}
+
+// manualStrip is used for dropping comments from a YAML file
+func manualStrip(file []byte) []byte {
+	stripped := []byte{}
+	for _, line := range bytes.Split(file, []byte("\n")) {
+		if bytes.HasPrefix(bytes.TrimSpace(line), []byte("#")) {
+			continue
+		}
+		stripped = append(stripped, line...)
+		stripped = append(stripped, '\n')
+	}
+	return stripped
 }

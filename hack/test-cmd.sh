@@ -775,6 +775,16 @@ __EOF__
   # Post-condition: nginxsvc service and mock rc are replaced
   kube::test::get_object_assert 'services nginxsvc' "{{${labels_field}.status}}" 'replaced'
   kube::test::get_object_assert 'rc my-nginx' "{{${labels_field}.status}}" 'replaced'
+  # Command: kubectl edit multiple resources
+  temp_editor="${KUBE_TEMP}/tmp-editor.sh"
+  echo -e '#!/bin/bash\nsed -i "s/status\:\ replaced/status\:\ edited/g" $@' > "${temp_editor}"
+  chmod +x "${temp_editor}"
+  EDITOR="${temp_editor}" kubectl edit "${kube_flags[@]}" -f examples/https-nginx/nginx-app.yaml
+  # Post-condition: nginxsvc service and my-nginx rc are edited
+  kube::test::get_object_assert 'services nginxsvc' "{{${labels_field}.status}}" 'edited'
+  kube::test::get_object_assert 'rc my-nginx' "{{${labels_field}.status}}" 'edited'
+  # cleaning
+  rm "${temp_editor}"
   # Command
   kubectl label -f examples/https-nginx/nginx-app.yaml labeled=true "${kube_flags[@]}"
   # Post-condition: nginxsvc service and my-nginx rc are labeled
@@ -810,6 +820,15 @@ __EOF__
   # Post-condition: mock service and mock rc are replaced
   kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'
   kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'replaced'
+  # Command: kubectl edit multiple resources
+  echo -e '#!/bin/bash\nsed -i "s/status\:\ replaced/status\:\ edited/g" $@' > "${temp_editor}"
+  chmod +x "${temp_editor}"
+  EDITOR="${temp_editor}" kubectl edit "${kube_flags[@]}" -f hack/testdata/multi-resource-list.json
+  # Post-condition: mock service and mock rc are edited
+  kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'edited'
+  kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'edited'
+  # cleaning
+  rm "${temp_editor}"
   # Command
   kubectl label -f hack/testdata/multi-resource-list.json labeled=true "${kube_flags[@]}"
   # Post-condition: mock service and mock rc are labeled
@@ -841,6 +860,15 @@ __EOF__
   # Post-condition: mock service and mock rc are replaced
   kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'
   kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'replaced'
+  # Command: kubectl edit multiple resources
+  echo -e '#!/bin/bash\nsed -i "s/status\:\ replaced/status\:\ edited/g" $@' > "${temp_editor}"
+  chmod +x "${temp_editor}"
+  EDITOR="${temp_editor}" kubectl edit "${kube_flags[@]}" -f hack/testdata/multi-resource.json
+  # Post-condition: mock service and mock rc are edited
+  kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'edited'
+  kube::test::get_object_assert 'rc mock' "{{${labels_field}.status}}" 'edited'
+  # cleaning
+  rm "${temp_editor}"
   # Command
   kubectl label -f hack/testdata/multi-resource.json labeled=true "${kube_flags[@]}"
   # Post-condition: mock service and mock rc are labeled
