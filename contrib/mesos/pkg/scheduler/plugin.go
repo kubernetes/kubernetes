@@ -325,16 +325,20 @@ func (k *kubeScheduler) doSchedule(task *podtask.T) (string, error) {
 			}
 		}
 	}
+
 	if offer == nil {
 		offer, err = k.api.algorithm().SchedulePod(k.api.offers(), k.api, task)
 	}
+
 	if err != nil {
 		return "", err
 	}
+
 	details := offer.Details()
 	if details == nil {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
+
 	slaveId := details.GetSlaveId().GetValue()
 	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
