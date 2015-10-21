@@ -40,6 +40,37 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
 
+// Backoff is parameters applied to a Backoff function.
+type Backoff struct {
+	Duration time.Duration
+	Factor   float64
+	Jitter   float64
+	Steps    int
+}
+
+// ExponentialBackoff repeats a condition check up to steps times, increasing the wait
+// by multipling the previous duration by factor. If jitter is greater than zero,
+// a random amount of each duration is added (between duration and duration*(1+jitter)).
+// If the condition never returns true, ErrWaitTimeout is returned. All other errors
+// terminate immediately.
+func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
+	duration := backoff.Duration
+	for i := 0; i < backoff.Steps; i++ {
+		if i != 0 {
+			adjusted := duration
+			if backoff.Jitter > 0.0 {
+				adjusted = Jitter(duration, backoff.Jitter)
+			}
+			time.Sleep(adjusted)
+			duration = time.Duration(float64(duration) * backoff.Factor)
+		}
+		if ok, err := condition(); err != nil || ok {
+			return err
+		}
+	}
+	return ErrWaitTimeout
+}
+
 // Poll tries a condition func until it returns true, an error, or the timeout
 // is reached. condition will always be invoked at least once but some intervals
 // may be missed if the condition takes too long or the time window is too short.
