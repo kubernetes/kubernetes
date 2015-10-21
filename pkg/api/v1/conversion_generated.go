@@ -1880,10 +1880,6 @@ func autoconvert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) er
 	return nil
 }
 
-func convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error {
-	return autoconvert_api_Pod_To_v1_Pod(in, out, s)
-}
-
 func autoconvert_api_PodAttachOptions_To_v1_PodAttachOptions(in *api.PodAttachOptions, out *PodAttachOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodAttachOptions))(in)
@@ -4887,10 +4883,6 @@ func autoconvert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) er
 		return err
 	}
 	return nil
-}
-
-func convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
-	return autoconvert_v1_Pod_To_api_Pod(in, out, s)
 }
 
 func autoconvert_v1_PodAttachOptions_To_api_PodAttachOptions(in *PodAttachOptions, out *api.PodAttachOptions, s conversion.Scope) error {

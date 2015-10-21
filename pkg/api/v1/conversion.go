@@ -24,12 +24,22 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
+const (
+	// Annotation key used to identify mirror pods.
+	mirrorAnnotationKey = "kubernetes.io/config.mirror"
+
+	// Value used to identify mirror pods from pre-v1.1 kubelet.
+	mirrorAnnotationValue_1_0 = "mirror"
+)
+
 func addConversionFuncs() {
 	// Add non-generated conversion functions
 	err := api.Scheme.AddConversionFuncs(
+		convert_api_Pod_To_v1_Pod,
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 		convert_api_ServiceSpec_To_v1_ServiceSpec,
+		convert_v1_Pod_To_api_Pod,
 		convert_v1_PodSpec_To_api_PodSpec,
 		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		convert_v1_ServiceSpec_To_api_ServiceSpec,
@@ -365,7 +375,30 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 	} else {
 		out.ImagePullSecrets = nil
 	}
+
 	return nil
+}
+
+func convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error {
+	if err := autoconvert_api_Pod_To_v1_Pod(in, out, s); err != nil {
+		return err
+	}
+	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
+	// (#15960).
+	// TODO: Remove this code after we drop support for v1.0 kubelets.
+	if value, ok := in.Annotations[mirrorAnnotationKey]; ok && value == mirrorAnnotationValue_1_0 {
+		// Reset the TerminationGracePeriodSeconds.
+		out.Spec.TerminationGracePeriodSeconds = nil
+		// Reset the resource requests.
+		for i := range out.Spec.Containers {
+			out.Spec.Containers[i].Resources.Requests = nil
+		}
+	}
+	return nil
+}
+
+func convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
+	return autoconvert_v1_Pod_To_api_Pod(in, out, s)
 }
 
 func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
