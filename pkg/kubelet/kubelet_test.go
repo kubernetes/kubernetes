@@ -3529,7 +3529,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{
 						Name: "foo",
 						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
+							"net.alpha.kubernetes.io/ingress-bandwidth": "10M",
 						},
 					},
 				},
@@ -3554,7 +3554,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{
 						Name: "foo",
 						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
+							"net.alpha.kubernetes.io/ingress-bandwidth": "10M",
 						},
 					},
 				},
@@ -3580,7 +3580,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{
 						Name: "foo",
 						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
+							"net.alpha.kubernetes.io/ingress-bandwidth": "10M",
 						},
 					},
 				},
@@ -3605,7 +3605,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{
 						Name: "foo",
 						Annotations: map[string]string{
-							"kubernetes.io/ingress-bandwidth": "10M",
+							"net.alpha.kubernetes.io/ingress-bandwidth": "10M",
 						},
 					},
 				},
@@ -3693,7 +3693,7 @@ func TestExtractBandwidthResources(t *testing.T) {
 			pod: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Annotations: map[string]string{
-						"kubernetes.io/ingress-bandwidth": "10M",
+						"net.alpha.kubernetes.io/ingress-bandwidth": "10M",
 					},
 				},
 			},
@@ -3703,7 +3703,7 @@ func TestExtractBandwidthResources(t *testing.T) {
 			pod: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Annotations: map[string]string{
-						"kubernetes.io/egress-bandwidth": "10M",
+						"net.alpha.kubernetes.io/egress-bandwidth": "10M",
 					},
 				},
 			},
@@ -3713,8 +3713,8 @@ func TestExtractBandwidthResources(t *testing.T) {
 			pod: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Annotations: map[string]string{
-						"kubernetes.io/ingress-bandwidth": "4M",
-						"kubernetes.io/egress-bandwidth":  "20M",
+						"net.alpha.kubernetes.io/ingress-bandwidth": "4M",
+						"net.alpha.kubernetes.io/egress-bandwidth":  "20M",
 					},
 				},
 			},
@@ -3725,7 +3725,7 @@ func TestExtractBandwidthResources(t *testing.T) {
 			pod: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Annotations: map[string]string{
-						"kubernetes.io/ingress-bandwidth": "foo",
+						"net.alpha.kubernetes.io/ingress-bandwidth": "foo",
 					},
 				},
 			},
