@@ -19,10 +19,12 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 
@@ -66,9 +68,29 @@ func (plugin *nfsPlugin) Name() string {
 	return nfsPluginName
 }
 
+func hasNFSMount() bool {
+	exe := exec.New()
+	switch runtime.GOOS {
+	case "linux":
+		cmd1 := exe.Command("/bin/ls", "/sbin/mount.nfs")
+		_, err1 := cmd1.CombinedOutput()
+		cmd2 := exe.Command("/bin/ls", "/sbin/mount.nfs4")
+		_, err2 := cmd2.CombinedOutput()
+		return (err1 == nil || err2 == nil)
+	case "darwin":
+		cmd := exe.Command("/bin/ls", "/sbin/mount_nfs")
+		_, err := cmd.CombinedOutput()
+		return err == nil
+	}
+	return false
+}
+
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
-	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
-		(spec.Volume != nil && spec.Volume.NFS != nil)
+	if (spec.Volume != nil && spec.Volume.NFS == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS == nil) {
+		return false
+	}
+	// see if /sbin/mount.nfs* is there
+	return hasNFSMount()
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
