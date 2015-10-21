@@ -72,17 +72,18 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	apiV := cmdutil.GetFlagString(cmd, "api-version")
 
 	mapper, _ := f.Object()
-	group, inModel, fieldsPath, err := kubectl.SplitAndParseResourceRequest(args[0], mapper)
+	// TODO: After we figured out the new syntax to separate group and resource, allow
+	// the users to use it in explain (kubectl explain <group><syntax><resource>).
+	// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
+	inModel, fieldsPath, err := kubectl.SplitAndParseResourceRequest(args[0], mapper)
 	if err != nil {
 		return err
 	}
 
-	if len(group) == 0 {
-		// TODO: We should deduce the group for a resource by discovering the supported resources at server.
-		group, err = mapper.GroupForResource(inModel)
-		if err != nil {
-			return err
-		}
+	// TODO: We should deduce the group for a resource by discovering the supported resources at server.
+	group, err := mapper.GroupForResource(inModel)
+	if err != nil {
+		return err
 	}
 
 	if len(apiV) == 0 {
