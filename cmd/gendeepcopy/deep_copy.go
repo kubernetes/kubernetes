@@ -29,7 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -109,7 +109,7 @@ func main() {
 	}
 
 	versionPath := pkgPath(group, version)
-	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
+	generator := kruntime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
 	if len(*overwrites) > 0 {
