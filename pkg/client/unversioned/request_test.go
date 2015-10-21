@@ -146,28 +146,28 @@ func TestRequestSetTwiceError(t *testing.T) {
 
 func TestRequestParam(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
-	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}}) {
+	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 
 	r.Param("bar", "1")
 	r.Param("bar", "2")
-	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}, "bar": []string{"1", "2"}}) {
+	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}, "bar": []string{"1", "2"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{}).Param("foo", "a")
-	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}}) {
+	r := (&Request{apiVersion: "v1"}).Param("foo", "a")
+	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 	r.VersionedParams(&api.PodLogOptions{Follow: true, Container: "bar"}, api.Scheme)
 
-	if !api.Semantic.DeepDerivative(r.params, url.Values{
+	if !reflect.DeepEqual(r.params, url.Values{
 		"foo":       []string{"a"},
 		"container": []string{"bar"},
-		"follow":    []string{"1"},
+		"follow":    []string{"true"},
 	}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -180,7 +180,7 @@ func TestRequestURI(t *testing.T) {
 	if r.path != "/test" {
 		t.Errorf("path is wrong: %#v", r)
 	}
-	if !api.Semantic.DeepDerivative(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
+	if !reflect.DeepEqual(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 }
