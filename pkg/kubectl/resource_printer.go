@@ -500,13 +500,6 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	return ret
 }
 
-func podHostString(host, ip string) string {
-	if host == "" && ip == "" {
-		return "<unassigned>"
-	}
-	return host + "/" + ip
-}
-
 func shortHumanDuration(d time.Duration) string {
 	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time
 	// inconsistence, it can be considered as almost now.
