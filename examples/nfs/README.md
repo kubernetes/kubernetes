@@ -10,7 +10,7 @@ in a pod.
 
 ## Complete setup
 
-The example below shows how to export a NFS share from a pod and import it
+The example below shows how to export a NFS share from a pod and imports it
 into another one.
 
 ### Prerequisites
@@ -18,7 +18,7 @@ into another one.
 The nfs server pod creates a privileged container, so if you are using a Salt based KUBERNETES_PROVIDER (**gce**, **vagrant**, **aws**), you have to enable the ability to create privileged containers by API.
 
 ```sh
-#At the root of Kubernetes source code
+# At the root of Kubernetes source code
 $ vi cluster/saltbase/pillar/privilege.sls
 
 # If true, allow privileged containers to be created by API
