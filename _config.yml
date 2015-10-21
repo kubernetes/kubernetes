@@ -81,26 +81,24 @@ footer:
       - label: Mailing List
         url: "https://groups.google.com/forum/#!forum/google-containers" 
 
-include: [v1.0, vHEAD]
+include: [v1.1, v1.0]
 
 # Collections (for versioning docs)
 collections:
--v1.0:
-      output:true
-      version:v1.0
--vHEAD:
-      output:true
-      version:vHEAD
+   v1.1:
+      output: true
+   v1.0:
+      output: true
 
 # Page default settings
 defaults:
 -scope:
-      path:"v1.0"
-      type:"pages"
+      path: v1.1
+      type: page
 values:
-    layout:"docwithnav"
+    layout: docwithnav
 -scope:
-      path:"vHEAD"
-      type:"pages"
+      path: v1.0
+      type: page
 values:
-    layout:"docwithnav"
+    layout: docwithnav
