@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-
 	docker "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/api"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -107,10 +107,50 @@ func TestModifyHostConfig(t *testing.T) {
 
 	provider := NewSimpleSecurityContextProvider()
 	dummyContainer := &api.Container{}
+	dummyPod := &api.Pod{
+		Spec: apitesting.DeepEqualSafePodSpec(),
+	}
 	for k, v := range testCases {
 		dummyContainer.SecurityContext = v.securityContext
 		dockerCfg := &docker.HostConfig{}
-		provider.ModifyHostConfig(nil, dummyContainer, dockerCfg)
+		provider.ModifyHostConfig(dummyPod, dummyContainer, dockerCfg)
+		if !reflect.DeepEqual(v.expected, dockerCfg) {
+			t.Errorf("unexpected modification of host config for %s.  Expected: %#v Got: %#v", k, v.expected, dockerCfg)
+		}
+	}
+}
+
+func TestModifyHostConfigPodSecurityContext(t *testing.T) {
+	supplementalGroupsSC := &api.PodSecurityContext{}
+	supplementalGroupsSC.SupplementalGroups = []int64{2222}
+	supplementalGroupHC := fullValidHostConfig()
+	supplementalGroupHC.GroupAdd = []string{"2222"}
+
+	testCases := map[string]struct {
+		securityContext *api.PodSecurityContext
+		expected        *docker.HostConfig
+	}{
+		"nil Security Context": {
+			securityContext: nil,
+			expected:        fullValidHostConfig(),
+		},
+		"Security Context with SupplementalGroup": {
+			securityContext: supplementalGroupsSC,
+			expected:        supplementalGroupHC,
+		},
+	}
+
+	provider := NewSimpleSecurityContextProvider()
+	dummyContainer := &api.Container{}
+	dummyContainer.SecurityContext = fullValidSecurityContext()
+	dummyPod := &api.Pod{
+		Spec: apitesting.DeepEqualSafePodSpec(),
+	}
+
+	for k, v := range testCases {
+		dummyPod.Spec.SecurityContext = v.securityContext
+		dockerCfg := &docker.HostConfig{}
+		provider.ModifyHostConfig(dummyPod, dummyContainer, dockerCfg)
 		if !reflect.DeepEqual(v.expected, dockerCfg) {
 			t.Errorf("unexpected modification of host config for %s.  Expected: %#v Got: %#v", k, v.expected, dockerCfg)
 		}
