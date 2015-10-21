@@ -857,12 +857,22 @@ function start-master() {
   service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
+  # Build bootstrap config
+  NL=$'\n'
+  BOOTSTRAP_JSON="{"${NL}
+  BOOTSTRAP_JSON+=' "MasterCIDR": "'${MASTER_IP_RANGE}'",'${NL}
+  BOOTSTRAP_JSON+=' "ClusterID": "'${CLUSTER_ID}'",'${NL}
+  BOOTSTRAP_JSON+=' "MasterVolume": "'${MASTER_DISK_ID}'",'${NL}
+  BOOTSTRAP_JSON+=' "CloudProvider": "aws"'${NL}
+  BOOTSTRAP_JSON+="}"
+  EOF
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
+    echo "readonly BOOTSTRAP_JSON='${BOOTSTRAP_JSON}'"
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
@@ -899,6 +909,7 @@ function start-master() {
     echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/master-bootstrap.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
@@ -937,20 +948,11 @@ function start-master() {
         exit 1
       fi
     else
-      # We are not able to add an elastic ip, a route or volume to the instance until that instance is in "running" state.
       wait-for-instance-running $master_id
 
       KUBE_MASTER=${MASTER_NAME}
       KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
-
-      # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
-      # To work around this, we wait for volume to be ready in setup-master-pd.sh
-      echo "Attaching persistent data volume (${MASTER_DISK_ID}) to master"
-      $AWS_CMD attach-volume --volume-id ${MASTER_DISK_ID} --device /dev/sdb --instance-id ${master_id}
-
-      sleep 10
-      $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
 
       break
     fi
