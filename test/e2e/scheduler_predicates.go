@@ -176,13 +176,13 @@ var _ = Describe("SchedulerPredicates", func() {
 	})
 
 	AfterEach(func() {
+		defer framework.afterEach()
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
 			err := DeleteRC(c, ns, RCName)
 			expectNoError(err)
 		}
-		framework.afterEach()
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
