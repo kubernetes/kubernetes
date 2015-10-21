@@ -157,7 +157,6 @@ else
   fi
 fi
 
-
 if [[ ${docker_storage} == "btrfs" ]]; then
   DOCKER_OPTS="${DOCKER_OPTS} -s btrfs"
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then

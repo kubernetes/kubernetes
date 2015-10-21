@@ -29,9 +29,9 @@ function apt-get-install {
 }
 
 apt-get-install curl
+apt-get dist-upgrade -q -y
 
 # Retry a download until we get it.
-#
 # $1 is the URL to download
 download-or-bust() {
   local -r url="$1"
@@ -44,10 +44,7 @@ download-or-bust() {
   done
 }
 
-
-
-# Install salt from GCS.  See README.md for instructions on how to update these
-# debs.
+# Install salt from GCS. See README.md for instructions on how to update these debs.
 install-salt() {
   local salt_mode="$1"
 
