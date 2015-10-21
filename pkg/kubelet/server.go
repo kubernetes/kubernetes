@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/portforward"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -284,7 +285,7 @@ func (s *Server) dockerHealthCheck(req *http.Request) error {
 		return errors.New("unknown Docker version")
 	}
 	// Verify the docker version.
-	result, err := version.Compare("1.18")
+	result, err := version.Compare(dockertools.MinimumDockerAPIVersion)
 	if err != nil {
 		return err
 	}
