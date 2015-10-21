@@ -116,6 +116,10 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
+func (f *FakeCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+	return f, false
+}
+
 func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }

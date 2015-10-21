@@ -41,6 +41,8 @@ type Interface interface {
 	ProviderName() string
 	// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
 	ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string)
+	// MasterVolumes returns a MasterVolumes interface. Also returns true if the interface is supported, false otherwise.
+	MasterVolumes() (MasterVolumes, bool)
 }
 
 // Clusters is an abstract, pluggable interface for clusters of containers.
@@ -155,4 +157,13 @@ type Zone struct {
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 	GetZone() (Zone, error)
+}
+
+// MasterVolumes is an abstract, pluggable interface for attaching master volumes
+// A master volume stores state for the master, and can also perform simple mutex/leader election
+type MasterVolumes interface {
+	// AttachMasterVolume attaches the specified volume at the 'master' mountpoint
+	// The volume id will typically be an ID for the default volume type for that cloud,
+	// but is an opaque token typically provided to the bootstrapper in a config file.
+	AttachMasterVolume(volumeID string) (string, error)
 }

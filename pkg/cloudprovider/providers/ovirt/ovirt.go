@@ -143,6 +143,13 @@ func (v *OVirtCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
+// MasterVolumes returns an implementation of MasterVolumes for oVirt cloud.
+// However the driver does not currently support master volumes,
+// so this implementation always returns (nil, false).
+func (v *OVirtCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+	return nil, false
+}
+
 // Routes returns an implementation of Routes for oVirt cloud
 func (v *OVirtCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false

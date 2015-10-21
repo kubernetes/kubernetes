@@ -1,0 +1,163 @@
+/*
+Copyright 2015 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package bootstrap
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/golang/glog"
+	"io/ioutil"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"os"
+	"strings"
+)
+
+// Bootstrapper is the main bootstrapping manager class
+type Bootstrapper struct {
+	ConfigFile    string
+	config        Configuration
+	cloudProvider cloudprovider.Interface
+}
+
+// NewBootstrapper creates a Bootstrapper instance.
+func NewBootstrapper(configFile string) *Bootstrapper {
+	b := &Bootstrapper{ConfigFile: configFile}
+	return b
+}
+
+// SyncLoop is the main entry point for Bootstrapper; it performs all configuration
+func (b *Bootstrapper) SyncLoop() {
+	err := b.readConfig()
+	if err != nil {
+		glog.Fatalf("unable to read configuration: %v", err)
+	}
+
+	err = b.buildCloudProvider()
+	if err != nil {
+		glog.Fatalf("unable to build cloud provider: %v", err)
+	}
+
+	err = b.mountMasterVolume()
+	if err != nil {
+		glog.Fatalf("unable to mount master volume: %v", err)
+	}
+
+	err = b.configureMasterRoute()
+	if err != nil {
+		glog.Fatalf("unable to configure master route: %v", err)
+	}
+
+	// Proceed!
+}
+
+func (b *Bootstrapper) readConfig() error {
+	configBytes, err := ioutil.ReadFile(b.ConfigFile)
+	if err != nil {
+		return fmt.Errorf("error reading config file (%s): %v", b.ConfigFile, err)
+	}
+
+	err = json.Unmarshal(configBytes, &b.config)
+	if err != nil {
+		return fmt.Errorf("error parsing config file (%s): %v", b.ConfigFile, err)
+	}
+
+	return nil
+}
+
+func (b *Bootstrapper) buildCloudProvider() error {
+	cloudProvider, err := cloudprovider.GetCloudProvider(b.config.CloudProvider, strings.NewReader(b.config.CloudProviderConfig))
+	if err != nil {
+		return fmt.Errorf("error initializing cloud provider: %v", err)
+	}
+	if cloudProvider == nil {
+		return fmt.Errorf("cloud provider not found (%s)", b.config.CloudProvider)
+	}
+	b.cloudProvider = cloudProvider
+	return nil
+}
+
+func (b *Bootstrapper) mountMasterVolume() error {
+	// We could discover the volume using metadata (at least on AWS),
+	// but it is probably easier just to rely on it being present in config
+	volumeID := b.config.MasterVolume
+
+	masterVolumes, ok := b.cloudProvider.MasterVolumes()
+	if !ok {
+		return fmt.Errorf("cloud provider does not support master volumes (%s)", b.config.CloudProvider)
+	}
+
+	device, err := masterVolumes.AttachMasterVolume(volumeID)
+	if err != nil {
+		// TODO: This is retryable
+		return fmt.Errorf("error attaching volume (%s): %v", volumeID, err)
+	}
+
+	mounter := mount.New()
+	diskMounter := &mount.SafeFormatAndMount{mounter, exec.New()}
+
+	// Mount mounts source to target as fsType with given options.
+	target := "/mnt/master-pd"
+	fsType := "ext4"
+	options := []string{"noatime"}
+	err = diskMounter.Mount(device, target, fsType, options)
+	if err != nil {
+		// TODO: This is retryable (?)
+		return fmt.Errorf("error mounting volume (%s): %v", volumeID, err)
+	}
+
+	return nil
+}
+
+func (b *Bootstrapper) configureMasterRoute() error {
+	// Once we have it insert our entry into the routing table
+	routes, ok := b.cloudProvider.Routes()
+	if !ok {
+		// TODO: Should this just be a warning?
+		return fmt.Errorf("cloudprovider %s does not support routes", b.config.CloudProvider)
+	}
+
+	// TODO: Is there a better way to get "my name"?
+	instances, ok := b.cloudProvider.Instances()
+	if !ok {
+		return fmt.Errorf("cloudprovider %s does not support instance info", b.config.CloudProvider)
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("error getting hostname: %v", err)
+	}
+
+	myNodeName, err := instances.CurrentNodeName(hostname)
+	if err != nil {
+		return fmt.Errorf("unable to determine current node name: %v", err)
+	}
+
+	route := &cloudprovider.Route{
+		TargetInstance:  myNodeName,
+		DestinationCIDR: b.config.MasterCIDR,
+	}
+
+	nameHint := "" // TODO: master?
+	err = routes.CreateRoute(b.config.ClusterID, nameHint, route)
+	if err != nil {
+		return fmt.Errorf("error creating route: %v", err)
+	}
+
+	return nil
+}

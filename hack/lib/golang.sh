@@ -30,6 +30,7 @@ kube::golang::server_targets() {
   local targets=(
     cmd/kube-proxy
     cmd/kube-apiserver
+    cmd/kube-bootstrap
     cmd/kube-controller-manager
     cmd/kubelet
     cmd/kubemark

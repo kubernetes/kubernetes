@@ -617,6 +617,11 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 	return aws, true
 }
 
+// MasterVolumes returns an implementation of MasterVolumes for Amazon Web Services.
+func (c *AWSCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+	return c, true
+}
+
 // Routes returns an implementation of Routes for Amazon Web Services.
 func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
 	return aws, true
@@ -1117,13 +1122,13 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 }
 
 // Implements Volumes.AttachDisk
-func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
-	disk, err := newAWSDisk(aws, diskName)
+func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
+	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := aws.getAwsInstance(instanceName)
+	awsInstance, err := c.getAwsInstance(instanceName)
 	if err != nil {
 		return "", err
 	}
@@ -1139,6 +1144,10 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		return "", err
 	}
 
+	return c.attachVolumeAt(awsInstance, disk, mountDevice, alreadyAttached)
+}
+
+func (c *AWSCloud) attachVolumeAt(awsInstance *awsInstance, disk *awsDisk, mountDevice mountDevice, alreadyAttached bool) (string, error) {
 	// TODO: Are hostDevice/ec2Device really the right way round?  It doesn't look right...
 
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
@@ -1158,7 +1167,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	}()
 
 	if !alreadyAttached {
-		attachResponse, err := aws.ec2.AttachVolume(disk.awsID, awsInstance.awsID, ec2Device)
+		attachResponse, err := c.ec2.AttachVolume(disk.awsID, awsInstance.awsID, ec2Device)
 		if err != nil {
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
@@ -1167,7 +1176,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		glog.V(2).Info("AttachVolume request returned %v", attachResponse)
 	}
 
-	err = disk.waitForAttachmentStatus("attached")
+	err := disk.waitForAttachmentStatus("attached")
 	if err != nil {
 		return "", err
 	}
@@ -1175,6 +1184,29 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	attached = true
 
 	return hostDevice, nil
+}
+
+// Implements MasterVolumes.AttachMasterVolume
+func (c *AWSCloud) AttachMasterVolume(volumeID string) (string, error) {
+	disk, err := newAWSDisk(c, volumeID)
+	if err != nil {
+		return "", err
+	}
+
+	instanceName := "" // self
+	awsInstance, err := c.getAwsInstance(instanceName)
+	if err != nil {
+		return "", err
+	}
+
+	forceMountDevice := mountDevice("b")
+
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true, forceMountDevice)
+	if err != nil {
+		return "", err
+	}
+
+	return c.attachVolumeAt(awsInstance, disk, mountDevice, alreadyAttached)
 }
 
 // Implements Volumes.DetachDisk
