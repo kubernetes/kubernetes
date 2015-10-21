@@ -17,17 +17,27 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
 type DiscoveryInterface interface {
+	ServerVersionInterface
 	ServerGroupsInterface
 	ServerResourcesInterface
+}
+
+// ServerVersionInterface has method for retrieving and parsing the server's version.
+type ServerVersionInterface interface {
+	// ServerVersion retrieves and parses the server's version.
+	ServerVersion() (*version.Info, error)
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server
@@ -49,6 +59,20 @@ type ServerResourcesInterface interface {
 // versions and resources.
 type DiscoveryClient struct {
 	*RESTClient
+}
+
+// ServerVersion retrieves and parses the server's version.
+func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
+	body, err := d.Get().AbsPath("/version").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &info, nil
 }
 
 // Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
@@ -79,8 +103,18 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 	}
 	apiGroup := apiVersionsToAPIGroup(v)
 
-	// Get the groupVersions exposed at /apis
+	serverVersion, err := d.ServerVersion()
+	if err != nil {
+		return nil, err
+	}
+	// only server newer than 1.1 supports /apis
 	apiGroupList = &unversioned.APIGroupList{}
+	if !serverVersion.IsNewerThan(1, 1) {
+		apiGroupList.Groups = append(apiGroupList.Groups, apiGroup)
+		return apiGroupList, nil
+	}
+
+	// Get the groupVersions exposed at /apis
 	err = d.Get().AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil {
 		return nil, err

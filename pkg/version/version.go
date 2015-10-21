@@ -16,7 +16,12 @@ limitations under the License.
 
 package version
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
@@ -46,6 +51,18 @@ func Get() Info {
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
 	return info.GitVersion
+}
+
+// IsNewerThan returns if the version recorded in the Info is newer (inclusive) than the input version.
+func (info Info) IsNewerThan(major int, minor int) bool {
+	infoMajor, _ := strconv.Atoi(info.Major)
+	infoMinor, _ := strconv.Atoi(strings.TrimRight(info.Minor, "+"))
+	if infoMajor > major {
+		return true
+	} else if infoMajor == major {
+		return infoMinor >= minor
+	}
+	return false
 }
 
 func init() {
