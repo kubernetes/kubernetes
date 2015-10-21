@@ -172,7 +172,8 @@ if [[ ${docker_storage} == "btrfs" ]]; then
   DOCKER_OPTS="${DOCKER_OPTS} -s btrfs"
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
   # Install aufs kernel module
-  apt-get install --yes linux-image-extra-$(uname -r)
+  # Fix issue #14162 with extra-virtual
+  apt-get install --yes linux-image-extra-$(uname -r) linux-image-extra-virtual
 
   # Install aufs tools
   apt-get install --yes aufs-tools
