@@ -58,9 +58,7 @@ func NewBootstrapServerDefault(config *BootstrapServerConfig) (*BootstrapServer,
 	return NewBootstrapServer(config, bootstrapper)
 }
 
-// Run runs the specified BootstrapServer.  This should never exit (unless CleanupAndExit is set).
+// Run runs the specified BootstrapServer, which bootstraps the machine.
 func (s *BootstrapServer) Run(_ []string) error {
-	// Just loop forever for now...
-	s.Bootstrapper.SyncLoop()
-	return nil
+	return s.Bootstrapper.RunOnce()
 }

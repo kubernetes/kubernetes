@@ -41,29 +41,31 @@ func NewBootstrapper(configFile string) *Bootstrapper {
 	return b
 }
 
-// SyncLoop is the main entry point for Bootstrapper; it performs all configuration
-func (b *Bootstrapper) SyncLoop() {
+// RunOnce is the main entry point for Bootstrapper; it performs all configuration
+func (b *Bootstrapper) RunOnce() error {
 	err := b.readConfig()
 	if err != nil {
-		glog.Fatalf("unable to read configuration: %v", err)
+		return fmt.Errorf("unable to read configuration: %v", err)
 	}
 
 	err = b.buildCloudProvider()
 	if err != nil {
-		glog.Fatalf("unable to build cloud provider: %v", err)
+		return fmt.Errorf("unable to build cloud provider: %v", err)
 	}
 
 	err = b.mountMasterVolume()
 	if err != nil {
-		glog.Fatalf("unable to mount master volume: %v", err)
+		return fmt.Errorf("unable to mount master volume: %v", err)
 	}
 
 	err = b.configureMasterRoute()
 	if err != nil {
-		glog.Fatalf("unable to configure master route: %v", err)
+		return fmt.Errorf("unable to configure master route: %v", err)
 	}
 
-	// Proceed!
+	// All is well
+	glog.Info("Bootstrapping completed successfully")
+	return nil
 }
 
 func (b *Bootstrapper) readConfig() error {
