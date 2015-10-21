@@ -51,6 +51,8 @@ import (
 )
 
 const (
+	RktType = "rkt"
+
 	acVersion             = "0.7.1"
 	minimumRktVersion     = "0.9.0"
 	recommendRktVersion   = "0.9.0"
@@ -862,6 +864,10 @@ func (r *Runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
 func (r *Runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	serviceName := makePodServiceFileName(pod.UID)
 	return r.getPodStatus(serviceName)
+}
+
+func (r *Runtime) Type() string {
+	return RktType
 }
 
 // Version invokes 'rkt version' to get the version information of the rkt
