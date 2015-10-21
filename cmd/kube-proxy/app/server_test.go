@@ -45,11 +45,19 @@ func Test_mayTryIptablesProxy(t *testing.T) {
 		{"", "net.experimental.kubernetes.io/proxy-mode", "iptables", true},
 		{"", "net.experimental.kubernetes.io/proxy-mode", "other", false},
 		{"", "net.experimental.kubernetes.io/proxy-mode", "", false},
+		{"", "net.beta.kubernetes.io/proxy-mode", "userspace", false},
+		{"", "net.beta.kubernetes.io/proxy-mode", "iptables", true},
+		{"", "net.beta.kubernetes.io/proxy-mode", "other", false},
+		{"", "net.beta.kubernetes.io/proxy-mode", "", false},
 		{"", "proxy-mode", "iptables", false},
 		{"userspace", "net.experimental.kubernetes.io/proxy-mode", "userspace", false},
 		{"userspace", "net.experimental.kubernetes.io/proxy-mode", "iptables", false},
 		{"iptables", "net.experimental.kubernetes.io/proxy-mode", "userspace", true},
 		{"iptables", "net.experimental.kubernetes.io/proxy-mode", "iptables", true},
+		{"userspace", "net.beta.kubernetes.io/proxy-mode", "userspace", false},
+		{"userspace", "net.beta.kubernetes.io/proxy-mode", "iptables", false},
+		{"iptables", "net.beta.kubernetes.io/proxy-mode", "userspace", true},
+		{"iptables", "net.beta.kubernetes.io/proxy-mode", "iptables", true},
 	}
 	for i, c := range cases {
 		getter := &fakeNodeInterface{}
