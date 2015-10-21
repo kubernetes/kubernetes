@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -197,7 +197,7 @@ var _ = Describe("Density", func() {
 
 			// Create a listener for events.
 			events := make([](*api.Event), 0)
-			_, controller := controllerFramework.NewInformer(
+			_, controller := controllerframework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func() (runtime.Object, error) {
 						return c.Events(ns).List(labels.Everything(), fields.Everything())
@@ -208,7 +208,7 @@ var _ = Describe("Density", func() {
 				},
 				&api.Event{},
 				0,
-				controllerFramework.ResourceEventHandlerFuncs{
+				controllerframework.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						events = append(events, obj.(*api.Event))
 					},
@@ -280,7 +280,7 @@ var _ = Describe("Density", func() {
 				}
 
 				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
-				_, controller := controllerFramework.NewInformer(
+				_, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func() (runtime.Object, error) {
 							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
@@ -291,7 +291,7 @@ var _ = Describe("Density", func() {
 					},
 					&api.Pod{},
 					0,
-					controllerFramework.ResourceEventHandlerFuncs{
+					controllerframework.ResourceEventHandlerFuncs{
 						AddFunc: func(obj interface{}) {
 							p, ok := obj.(*api.Pod)
 							Expect(ok).To(Equal(true))
