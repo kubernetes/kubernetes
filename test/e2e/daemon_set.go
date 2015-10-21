@@ -65,9 +65,9 @@ var _ = Describe("Daemon set", func() {
 	})
 
 	AfterEach(func() {
+		defer f.afterEach()
 		err := clearDaemonSetNodeLabels(f.Client)
 		Expect(err).NotTo(HaveOccurred())
-		f.afterEach()
 	})
 
 	It("should run and stop simple daemon", func() {

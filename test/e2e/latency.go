@@ -80,6 +80,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 	})
 
 	AfterEach(func() {
+		defer framework.afterEach()
 		By("Removing additional pods if any")
 		for i := 1; i <= nodeCount; i++ {
 			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
