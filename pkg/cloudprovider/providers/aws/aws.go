@@ -883,7 +883,7 @@ func (self *awsInstance) getMountDevice(volumeID string, assign bool, forceMount
 				name = name[8:]
 			}
 			if len(name) != 1 {
-				glog.Warning("Unexpected EBS DeviceName: ", blockDevice.DeviceName)
+				glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 			}
 			deviceMappings[mountDevice(name)] = aws.StringValue(blockDevice.Ebs.VolumeId)
 		}
