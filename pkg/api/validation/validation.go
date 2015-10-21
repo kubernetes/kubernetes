@@ -45,6 +45,7 @@ var RepairMalformedUpdates bool = true
 const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNegativeErrorMsg string = `must be non-negative`
 const isNotIntegerErrorMsg string = `must be an integer`
+const fieldImmutableErrorMsg string = `field is immutable`
 
 func intervalErrorMsg(lo, hi int) string {
 	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
@@ -315,16 +316,16 @@ func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList
 	}
 
 	if old.Name != new.Name {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", new.Name, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", new.Name, fieldImmutableErrorMsg))
 	}
 	if old.Namespace != new.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", new.Namespace, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", new.Namespace, fieldImmutableErrorMsg))
 	}
 	if old.UID != new.UID {
-		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, fieldImmutableErrorMsg))
 	}
 	if old.CreationTimestamp != new.CreationTimestamp {
-		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", new.CreationTimestamp, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", new.CreationTimestamp, fieldImmutableErrorMsg))
 	}
 
 	allErrs = append(allErrs, ValidateLabels(new.Labels, "labels")...)
@@ -1344,7 +1345,7 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta).Prefix("metadata")...)
 
 	if api.IsServiceIPSet(oldService) && service.Spec.ClusterIP != oldService.Spec.ClusterIP {
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, fieldImmutableErrorMsg))
 	}
 
 	allErrs = append(allErrs, ValidateService(service)...)
@@ -1710,7 +1711,7 @@ func ValidateSecretUpdate(oldSecret, newSecret *api.Secret) errs.ValidationError
 		newSecret.Type = oldSecret.Type
 	}
 	if newSecret.Type != oldSecret.Type {
-		allErrs = append(allErrs, errs.NewFieldInvalid("type", newSecret.Type, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("type", newSecret.Type, fieldImmutableErrorMsg))
 	}
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
