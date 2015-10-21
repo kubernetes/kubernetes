@@ -14,10 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download release
+# Untar downloaded files & install release
 
-echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-download-or-bust "$SERVER_BINARY_TAR_URL"
+echo "Unpacking Salt tree"
+rm -rf kubernetes
+tar xzf "${SALT_TAR_URL##*/}"
 
-echo "Downloading binary release tar ($SALT_TAR_URL)"
-download-or-bust "$SALT_TAR_URL"
+echo "Running release install script"
+sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
