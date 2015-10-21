@@ -24,6 +24,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -40,16 +41,17 @@ func GetSwaggerSchema(apiVer string, kubeClient client.Interface) (*swagger.ApiD
 }
 
 // SplitAndParseResourceRequest separates the users input into a model and fields
-func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
+func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, string, []string, error) {
 	inResource, fieldsPath := splitDotNotation(inResource)
+	group, inResource := splitGroupFromResource(inResource)
 	inResource, _ = mapper.ResourceSingularizer(expandResourceShortcut(inResource))
-	return inResource, fieldsPath, nil
+	return group, inResource, fieldsPath, nil
 }
 
 // PrintModelDescription prints the description of a specific model or dot path
 func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swaggerSchema *swagger.ApiDeclaration, r bool) error {
 	recursive = r // this is global for convenience
-	apiVer := swaggerSchema.ApiVersion + "."
+	apiVer := apiutil.GetVersion(swaggerSchema.ApiVersion) + "."
 
 	var pointedModel *swagger.NamedModel
 	for i := range swaggerSchema.Models.List {
@@ -61,7 +63,7 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 		}
 	}
 	if pointedModel == nil {
-		return fmt.Errorf("Requested resourse: %s doesn't exit", inModel)
+		return fmt.Errorf("Requested resource: %s doesn't exist", inModel)
 	}
 
 	if len(fieldsPath) == 0 {
@@ -82,6 +84,15 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 		}
 	}
 	return printModelInfo(w, pointedModel, pointedModelAsProp)
+}
+
+func splitGroupFromResource(resource string) (string, string) {
+	seg := strings.SplitN(resource, "/", 2)
+	if len(seg) == 1 {
+		return "", seg[0]
+	} else {
+		return seg[0], seg[1]
+	}
 }
 
 func splitDotNotation(model string) (string, []string) {
