@@ -750,7 +750,7 @@ function kube-up {
       sleep 2
   done
 
-  if [ "$NETWORK_PROVIDER_GATEWAY_ON_MINION" != true ]; then
+  if [ "$NETWORK_PROVIDER" == opencontrail ] && [ "$NETWORK_PROVIDER_GATEWAY_ON_MINION" != true ]; then
      echo "Creating $NETWORK_PROVIDER gateway"
 
      NETWORK_PROVIDER_GW_RESERVED_IP=$(gcloud compute addresses create "${NETWORK_PROVIDER_GATEWAY_NAME}-ip" \
@@ -887,24 +887,26 @@ function kube-down {
     minions=( "${minions[@]:10}" )
   done
 
-  # Delete network-provider-gateway
-  if gcloud compute instances describe "${NETWORK_PROVIDER_GATEWAY_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-     gcloud compute instances delete \
+  if [ "$NETWORK_PROVIDER" == opencontrail ]; then
+    # Delete network-provider-gateway
+    if gcloud compute instances describe "${NETWORK_PROVIDER_GATEWAY_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+       gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
       --delete-disks all \
       --zone "${ZONE}" \
       "${NETWORK_PROVIDER_GATEWAY_NAME}"
-  fi
+    fi
 
-  # Delete network-provider-gateway's reserved IP
-  local REGION=${ZONE%-*}
-  if gcloud compute addresses describe "${NETWORK_PROVIDER_GATEWAY_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
-     gcloud compute addresses delete \
+    # Delete network-provider-gateway's reserved IP
+    local REGION=${ZONE%-*}
+    if gcloud compute addresses describe "${NETWORK_PROVIDER_GATEWAY_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
+       gcloud compute addresses delete \
       --project "${PROJECT}" \
       --region "${REGION}" \
       --quiet \
       "${NETWORK_PROVIDER_GATEWAY_NAME}-ip"
+    fi
   fi
 
   # Delete firewall rule for the master.
