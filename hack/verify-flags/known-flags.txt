@@ -262,8 +262,10 @@ service-account-lookup
 service-account-private-key-file
 service-address
 service-cluster-ip-range
+service-generator
 service-node-port-range
 service-node-ports
+service-overrides
 service-sync-period
 session-affinity
 since-seconds
