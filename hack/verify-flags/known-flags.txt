@@ -308,4 +308,5 @@ terminated-pod-gc-threshold
 reconcile-cidr
 register-schedulable
 repair-malformed-updates
-
+from-file
+from-literal
