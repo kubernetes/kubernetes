@@ -83,6 +83,7 @@ KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
 ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
+NUM_MINIONS: $(yaml-quote ${NUM_MINIONS})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF

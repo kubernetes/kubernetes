@@ -280,6 +280,7 @@ admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
+num_nodes: $(echo "${NUM_MINIONS}")
 EOF
 
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
