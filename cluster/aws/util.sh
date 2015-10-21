@@ -916,6 +916,13 @@ function start-master() {
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
+  # We're running right up against the 16KB limit
+  # Remove all comment lines and then put back the bin/bash shebang
+  sed -i -e 's/^[[:blank:]]*#.*$//' -e '/^[[:blank:]]*$/d' "${KUBE_TEMP}/master-start.sh"
+  sed -i '1i #! /bin/bash' "${KUBE_TEMP}/master-start.sh"
+
+  cp "${KUBE_TEMP}/master-start.sh" /tmp
+
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
     --image-id $AWS_IMAGE \
