@@ -613,13 +613,13 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # gcloud bug can cause racing component updates to stomp on each
         # other.
         export KUBE_SKIP_UPDATE=y
-        {
-          sudo flock -x -n 9
-          gcloud components update -q || true
-          gcloud components update preview -q || true
-          gcloud components update alpha -q || true
-          gcloud components update beta -q || true
-        } 9>/var/run/lock/gcloud-components.lock
+        (
+          flock -x -n 9
+          sudo gcloud components update -q || true
+          sudo gcloud components update preview -q || true
+          sudo gcloud components update alpha -q || true
+          sudo gcloud components update beta -q || true
+        ) 9>/var/run/lock/gcloud-components.lock
 
         if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
             # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
