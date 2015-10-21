@@ -75,7 +75,7 @@ func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 	}()
 	for _, n := range m.Existing {
 		if n.Name == node.Name {
-			return nil, apierrors.NewAlreadyExists("Minion", node.Name)
+			return nil, apierrors.NewAlreadyExists("Node", node.Name)
 		}
 	}
 	if m.CreateHook == nil || m.CreateHook(m, node) {
