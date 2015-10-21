@@ -322,11 +322,6 @@ cluster_registry_disk_size: $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZ
 cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
 EOF
     fi
-    if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-enable_experimental_api: '$(echo "$ENABLE_EXPERIMENTAL_API" | sed -e "s/'/''/g")'
-EOF
-    fi
     if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 terminated_pod_gc_threshold: '$(echo "${TERMINATED_POD_GC_THRESHOLD}" | sed -e "s/'/''/g")'
