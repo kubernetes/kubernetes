@@ -1,3 +1,8 @@
+{% set heapster_memory = "300Mi" -%}
+{% if pillar['num_nodes'] is defined -%}
+  {% set heapster_memory = (200 + pillar['num_nodes'] * 12)|string + "Mi" -%}
+{% endif -%}
+
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -25,7 +30,7 @@ spec:
           resources:
             limits:
               cpu: 100m
-              memory: 300Mi
+              memory: {{ heapster_memory }}
           command:
             - /heapster
             - --source=kubernetes:''
