@@ -200,13 +200,8 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	t := &testFactory{
 		Validator: validation.NullSchema{},
 	}
-	generators := map[string]kubectl.Generator{
-		"run/v1":       kubectl.BasicReplicationController{},
-		"run-pod/v1":   kubectl.BasicPod{},
-		"service/v1":   kubectl.ServiceGeneratorV1{},
-		"service/v2":   kubectl.ServiceGeneratorV2{},
-		"service/test": testServiceGenerator{},
-	}
+	generators := cmdutil.DefaultGenerators()
+	generators["service/test"] = testServiceGenerator{}
 	f := &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return testapi.Default.RESTMapper(), api.Scheme

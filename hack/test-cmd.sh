@@ -224,6 +224,8 @@ runTests() {
   hpa_cpu_field=".spec.cpuUtilization.targetPercentage"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
+  secret_data=".data"
+  secret_type=".type"
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -674,6 +676,20 @@ runTests() {
   # Namespaces #
   ##############
 
+  ### Create a new namespace
+  # Pre-condition: only the "default" namespace exists
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{$id_field}}:{{end}}" 'default:'
+  # Command
+  kubectl create namespace my-namespace
+  # Post-condition: namespace 'my-namespace' is created.
+  kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
+  # Clean up
+  kubectl delete namespace my-namespace
+
+  ##############
+  # Pods in Namespaces #
+  ##############
+
   ### Create POD valid-pod in specific namespace
   # Pre-condition: no POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -690,6 +706,33 @@ runTests() {
   # Post-condition: no POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ##############
+  # Secrets #
+  ##############
+
+  ### Create a generic secret in a specific namespace
+  # Pre-condition: no SECRET exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create secret generic test-secret --from-literal=key1=value1 --type=test-type --namespace=test-secrets
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'test-type'
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep 'key1: dmFsdWUx')" ]]
+  # Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets
+
+  ### Create a docker-registry secret in a specific namespace
+  # Pre-condition: no SECRET exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create secret docker-registry test-secret --docker-username=test-user --docker-password=test-password --docker-email='test-user@test.com' --namespace=test-secrets
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/dockercfg'
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep '.dockercfg:')" ]]
+  # Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets
 
   #################
   # Pod templates #
