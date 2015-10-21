@@ -99,7 +99,7 @@ func doMount(source string, target string, fstype string, options []string) erro
 	command := exec.Command("mount", mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+		return fmt.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, source, target, fstype, options, string(output))
 	}
 	return err
@@ -130,8 +130,7 @@ func (mounter *Mounter) Unmount(target string) error {
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		glog.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
-		return err
+		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
 	}
 	return nil
 }
