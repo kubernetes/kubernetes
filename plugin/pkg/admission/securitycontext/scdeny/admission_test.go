@@ -64,6 +64,45 @@ func TestAdmission(t *testing.T) {
 	}
 }
 
+func TestPodSecurityContextAdmission(t *testing.T) {
+	handler := NewSecurityContextDeny(nil)
+	pod := api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{},
+			},
+		},
+	}
+
+	tests := []struct {
+		securityContext api.PodSecurityContext
+		errorExpected   bool
+	}{
+		{
+			securityContext: api.PodSecurityContext{},
+			errorExpected:   false,
+		},
+		{
+			securityContext: api.PodSecurityContext{
+				SupplementalGroups: []int64{1234},
+			},
+			errorExpected: true,
+		},
+	}
+	for _, test := range tests {
+		pod.Spec.SecurityContext = &test.securityContext
+		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", "name", string(api.ResourcePods), "", "ignored", nil))
+
+		if test.errorExpected && err == nil {
+			t.Errorf("Expected error for security context %+v but did not get an error", test.securityContext)
+		}
+
+		if !test.errorExpected && err != nil {
+			t.Errorf("Unexpected error %v for security context %+v", err, test.securityContext)
+		}
+	}
+}
+
 func TestHandles(t *testing.T) {
 	handler := NewSecurityContextDeny(nil)
 	tests := map[admission.Operation]bool{

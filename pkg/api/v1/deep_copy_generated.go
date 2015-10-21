@@ -1501,6 +1501,14 @@ func deepCopy_v1_PodProxyOptions(in PodProxyOptions, out *PodProxyOptions, c *co
 }
 
 func deepCopy_v1_PodSecurityContext(in PodSecurityContext, out *PodSecurityContext, c *conversion.Cloner) error {
+	if in.SupplementalGroups != nil {
+		out.SupplementalGroups = make([]int64, len(in.SupplementalGroups))
+		for i := range in.SupplementalGroups {
+			out.SupplementalGroups[i] = in.SupplementalGroups[i]
+		}
+	} else {
+		out.SupplementalGroups = nil
+	}
 	return nil
 }
 

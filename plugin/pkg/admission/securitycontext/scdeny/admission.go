@@ -57,6 +57,11 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 	if !ok {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroups != nil {
+		return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.SupplementalGroups is forbidden"))
+	}
+
 	for _, v := range pod.Spec.Containers {
 		if v.SecurityContext != nil {
 			if v.SecurityContext.SELinuxOptions != nil {
