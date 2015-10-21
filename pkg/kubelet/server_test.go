@@ -162,7 +162,7 @@ func newServerTest() *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		containerVersionFunc: func() (kubecontainer.Version, error) {
-			return dockertools.NewVersion("1.15")
+			return dockertools.NewVersion("1.18")
 		},
 		hostnameFunc: func() string {
 			return "127.0.0.1"
@@ -506,7 +506,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
 	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
-		return dockertools.NewVersion("1.15")
+		return dockertools.NewVersion("1.18")
 	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
@@ -523,7 +523,7 @@ func TestHealthCheck(t *testing.T) {
 
 	//Test with old container runtime version
 	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
-		return dockertools.NewVersion("1.1")
+		return dockertools.NewVersion("1.16")
 	}
 
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
@@ -715,7 +715,7 @@ func TestAuthorizationSuccess(t *testing.T) {
 func TestSyncLoopCheck(t *testing.T) {
 	fw := newServerTest()
 	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
-		return dockertools.NewVersion("1.15")
+		return dockertools.NewVersion("1.18")
 	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"

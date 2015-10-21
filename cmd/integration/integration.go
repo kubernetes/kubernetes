@@ -215,7 +215,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
 	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.15"}
+	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.20"}
 
 	kcfg := kubeletapp.SimpleKubelet(
 		cl,
@@ -246,7 +246,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// have a place they can schedule.
 	testRootDir = integration.MakeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.15"}
+	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.20"}
 
 	kcfg = kubeletapp.SimpleKubelet(
 		cl,
