@@ -844,10 +844,13 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	return instances[0], nil
 }
 
-// Gets the mountpoint already assigned to the volume, or assigns an unused mountpoint
+// Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice
 // to the volume if assign==true.
-// If the volume is already assigned, this will return the existing mountpoint and true
-func (self *awsInstance) getMountDevice(volumeID string, assign bool) (device mountDevice, alreadyAttached bool, err error) {
+// If the volume is already assigned, this will return the existing mountDevice and true
+// We also allow the assigned-mountDevice to be forced; if provided we will only assign the specified mountDevice;
+// returning an error if that mountDevice is already attached to a different volume.
+// Otherwise the mountpoint is assigned by finding the first available mountDevice.
+func (self *awsInstance) getMountDevice(volumeID string, assign bool, forceMountDevice mountDevice) (device mountDevice, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -899,16 +902,28 @@ func (self *awsInstance) getMountDevice(volumeID string, assign bool) (device mo
 	// Check all the valid mountpoints to see if any of them are free
 	valid := instanceType.getEBSMountDevices()
 	chosen := mountDevice("")
-	for _, mountDevice := range valid {
-		_, found := self.deviceMappings[mountDevice]
+	if forceMountDevice != mountDevice("") {
+		_, found := self.deviceMappings[forceMountDevice]
 		if !found {
-			chosen = mountDevice
-			break
+			chosen = forceMountDevice
+		} else {
+			glog.Warning("Could not assign forced mount device - already in use.  forceMountDevice=%v, mappings=%v", forceMountDevice, self.deviceMappings)
+		}
+	} else {
+		for _, mountDevice := range valid {
+			_, found := self.deviceMappings[mountDevice]
+			if !found {
+				chosen = mountDevice
+				break
+			}
+		}
+
+		if chosen == mountDevice("") {
+			glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", self.deviceMappings, valid)
 		}
 	}
 
 	if chosen == mountDevice("") {
-		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", self.deviceMappings, valid)
 		return "", false, nil
 	}
 
@@ -1119,7 +1134,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true, "")
 	if err != nil {
 		return "", err
 	}
@@ -1174,7 +1189,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) (string, e
 		return "", err
 	}
 
-	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, false)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, false, "")
 	if err != nil {
 		return "", err
 	}
