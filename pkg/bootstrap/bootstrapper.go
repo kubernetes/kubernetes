@@ -113,8 +113,12 @@ func (b *Bootstrapper) mountMasterVolume() error {
 	mounter := mount.New()
 	diskMounter := &mount.SafeFormatAndMount{mounter, exec.New()}
 
-	// Mount mounts source to target as fsType with given options.
 	target := "/mnt/master-pd"
+	err = os.MkdirAll(target, 0755)
+	if err != nil {
+		return fmt.Errorf("error creating directory %q: %v", target, err)
+	}
+	
 	fsType := "ext4"
 	options := []string{"noatime"}
 	err = diskMounter.Mount(device, target, fsType, options)
