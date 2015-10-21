@@ -372,6 +372,17 @@ case ${JOB_NAME} in
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
 
+  # Sets up the GCE soak cluster weekly using the latest CI release.
+  kubernetes-soak-weekly-deploy-gce)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-soak-weekly"}
+    : ${E2E_TEST:="false"}
+    : ${E2E_UP:="true"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
   # Runs tests on GCE soak cluster.
   kubernetes-soak-continuous-e2e-gce)
     : ${E2E_CLUSTER_NAME:="gce-soak-weekly"}
@@ -384,6 +395,33 @@ case ${JOB_NAME} in
           ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
+  # Sets up the GCE soak cluster weekly using the latest 1.1 release.
+  kubernetes-soak-weekly-deploy-gce-release-1.1)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-release-1.1"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-soak-weekly-release-1.1"}
+    : ${E2E_TEST:="false"}
+    : ${E2E_UP:="true"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-release-1.1"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.1"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
+  # Runs tests on GCE soak cluster for latest 1.1 release.
+  kubernetes-soak-continuous-e2e-gce-release-1.1)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-release-1.1"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-soak-weekly-release-1.1"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-release-1.1"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
