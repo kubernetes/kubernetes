@@ -312,22 +312,6 @@ type containerStatusResult struct {
 
 const podIPDownwardAPISelector = "status.podIP"
 
-// podDependsOnIP returns whether any containers in a pod depend on using the pod IP via
-// the downward API.
-func podDependsOnPodIP(pod *api.Pod) bool {
-	for _, container := range pod.Spec.Containers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil &&
-				env.ValueFrom.FieldRef != nil &&
-				env.ValueFrom.FieldRef.FieldPath == podIPDownwardAPISelector {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
 // determineContainerIP determines the IP address of the given container.  It is expected
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
@@ -1886,12 +1870,10 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 				glog.Warningf("Hairpin setup failed for pod %q: %v", podFullName, err)
 			}
 		}
-		if podDependsOnPodIP(pod) {
-			// Find the pod IP after starting the infra container in order to expose
-			// it safely via the downward API without a race.
-			pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
-		}
 
+		// Find the pod IP after starting the infra container in order to expose
+		// it safely via the downward API without a race and be able to use podIP in kubelet-managed /etc/hosts file.
+		pod.Status.PodIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
 	}
 
 	// Start everything
