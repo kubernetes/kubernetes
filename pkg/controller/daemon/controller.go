@@ -406,11 +406,12 @@ func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *extensions.Dae
 		return nil
 	}
 
+	ds.Status.DesiredNumberScheduled = desiredNumberScheduled
+	ds.Status.CurrentNumberScheduled = currentNumberScheduled
+	ds.Status.NumberMisscheduled = numberMisscheduled
+
 	var updateErr, getErr error
 	for i := 0; i <= StatusUpdateRetries; i++ {
-		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
-		ds.Status.CurrentNumberScheduled = currentNumberScheduled
-		ds.Status.NumberMisscheduled = numberMisscheduled
 		_, updateErr = dsClient.UpdateStatus(ds)
 		if updateErr == nil {
 			// successful update
