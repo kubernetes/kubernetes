@@ -198,6 +198,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		"service/v1":   kubectl.ServiceGeneratorV1{},
 		"service/v2":   kubectl.ServiceGeneratorV2{},
 		"service/test": testServiceGenerator{},
+		"secret/v1":    kubectl.SecretGeneratorV1{},
 	}
 	f := &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	cmdsecret "k8s.io/kubernetes/pkg/kubectl/cmd/secret"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -177,6 +178,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
 
+	cmds.AddCommand(cmdsecret.NewCmdSecret(f, out))
 	return cmds
 }
 
