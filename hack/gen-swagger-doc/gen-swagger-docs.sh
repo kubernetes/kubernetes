@@ -25,8 +25,10 @@ echo $2
 
 cd /build/
 
-wget "$1" -O input.json
 wget "$2" -O register.go
+
+# gendocs takes "input.json" as the input swagger spec.
+cp /swagger-source/"$1".json input.json
 
 ./gradle-2.5/bin/gradle gendocs --info
 
