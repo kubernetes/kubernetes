@@ -21,7 +21,9 @@ package app
 import (
 	"k8s.io/kubernetes/pkg/bootstrap"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"time"
 )
 
 // BootstrapServerConfig contains configures and runs a Kubernetes proxy server
@@ -59,6 +61,15 @@ func NewBootstrapServerDefault(config *BootstrapServerConfig) (*BootstrapServer,
 }
 
 // Run runs the specified BootstrapServer, which bootstraps the machine.
+// If it encounters an error, it will sleep and retry.
+// Thus on exit the bootstrap has succeeded.
 func (s *BootstrapServer) Run(_ []string) error {
-	return s.Bootstrapper.RunOnce()
+	for {
+		err := s.Bootstrapper.RunOnce()
+		if err == nil {
+			return nil
+		}
+		glog.Warning("error during bootstrapping (will sleep and retry): %v", err)
+		time.Sleep(10 * time.Second)
+	}
 }

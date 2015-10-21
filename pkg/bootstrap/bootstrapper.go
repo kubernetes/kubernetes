@@ -118,7 +118,7 @@ func (b *Bootstrapper) mountMasterVolume() error {
 	if err != nil {
 		return fmt.Errorf("error creating directory %q: %v", target, err)
 	}
-	
+
 	fsType := "ext4"
 	options := []string{"noatime"}
 	err = diskMounter.Mount(device, target, fsType, options)
