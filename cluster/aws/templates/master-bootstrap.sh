@@ -15,8 +15,8 @@
 # limitations under the License.
 
 echo "Extracting & running kube-bootstrap"
-rm -rf kube-bootstrap
-tar xzf "${SERVER_BINARY_TAR_URL##*/}" kube-bootstrap
+rm -f kube-bootstrap
+tar xzf "${SERVER_BINARY_TAR_URL##*/}" --strip-components=3 kubernetes/server/bin/kube-bootstrap
 
 mkdir -p /etc/kubernetes/
 echo "${BOOTSTRAP_JSON}" >/etc/kubernetes/bootstrap.json

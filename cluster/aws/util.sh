@@ -865,7 +865,6 @@ function start-master() {
   BOOTSTRAP_JSON+=' "MasterVolume": "'${MASTER_DISK_ID}'",'${NL}
   BOOTSTRAP_JSON+=' "CloudProvider": "aws"'${NL}
   BOOTSTRAP_JSON+="}"
-  EOF
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
