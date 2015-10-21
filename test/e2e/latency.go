@@ -94,7 +94,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
+		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 	})
@@ -266,9 +266,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 
 	// Test whether e2e pod startup time is acceptable.
 	podStartupLatency := PodStartupLatency{Latency: extractLatencyMetrics(e2eLatencies)}
-	// TODO: Switch it to 5 seconds once we are sure our tests are passing.
-	podStartupThreshold := 8 * time.Second
-	expectNoError(VerifyPodStartupLatency(podStartupLatency, podStartupThreshold))
+	expectNoError(VerifyPodStartupLatency(podStartupLatency))
 
 	// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
 	logSuspiciousLatency(startLatencies, nil, nodeCount, c)
