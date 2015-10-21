@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -68,84 +69,45 @@ func newProber(
 }
 
 // probe probes the container.
-func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
+func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+	var probeSpec *api.Probe
 	switch probeType {
 	case readiness:
-		return pb.probeReadiness(pod, status, container, containerID)
+		probeSpec = container.ReadinessProbe
 	case liveness:
-		return pb.probeLiveness(pod, status, container, containerID)
+		probeSpec = container.LivenessProbe
+	default:
+		return results.Failure, fmt.Errorf("Unknown probe type: %q", probeType)
 	}
-	return probe.Unknown, fmt.Errorf("Unknown probe type: %q", probeType)
-}
 
-// probeLiveness probes the liveness of a container.
-func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
-	var live probe.Result
-	var output string
-	var err error
-	p := container.LivenessProbe
-	if p == nil {
-		return probe.Success, nil
-	}
-	live, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
-	if err != nil || live != probe.Success {
-		// Liveness failed in one way or another.
-		ref, ok := pb.refManager.GetRef(containerID)
-		if !ok {
-			glog.Warningf("No ref for pod %q - '%v'", containerID, container.Name)
+	if probeSpec == nil {
+		glog.Warningf("%s probe for %s is nil", probeType, ctrName)
+		return results.Success, nil
+	}
+
+	result, output, err := pb.runProbeWithRetries(probeSpec, pod, status, container, containerID, maxProbeRetries)
+	if err != nil || result != probe.Success {
+		// Probe failed in one way or another.
+		ref, hasRef := pb.refManager.GetRef(containerID)
+		if !hasRef {
+			glog.Warningf("No ref for container %q (%s)", containerID.String(), ctrName)
 		}
 		if err != nil {
-			glog.V(1).Infof("Liveness probe for %q errored: %v", ctrName, err)
-			if ok {
-				pb.recorder.Eventf(ref, "Unhealthy", "Liveness probe errored: %v", err)
+			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
+			if hasRef {
+				pb.recorder.Eventf(ref, "Unhealthy", "%s probe errored: %v", probeType, err)
 			}
-			return probe.Unknown, err
-		} else { // live != probe.Success
-			glog.V(1).Infof("Liveness probe for %q failed (%v): %s", ctrName, live, output)
-			if ok {
-				pb.recorder.Eventf(ref, "Unhealthy", "Liveness probe failed: %s", output)
-			}
-			return live, nil
-		}
-	}
-	glog.V(3).Infof("Liveness probe for %q succeeded", ctrName)
-	return probe.Success, nil
-}
-
-// probeReadiness probes and sets the readiness of a container.
-func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, error) {
-	var ready probe.Result
-	var output string
-	var err error
-	p := container.ReadinessProbe
-	if p == nil {
-		return probe.Success, nil
-	}
-	ready, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
-	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
-	if err != nil || ready == probe.Failure {
-		// Readiness failed in one way or another.
-		ref, ok := pb.refManager.GetRef(containerID)
-		if !ok {
-			glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
-		}
-		if err != nil {
-			glog.V(1).Infof("readiness probe for %q errored: %v", ctrName, err)
-			if ok {
-				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe errored: %v", err)
-			}
-		} else { // ready != probe.Success
-			glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
-			if ok {
-				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe failed: %s", output)
+		} else { // result != probe.Success
+			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
+			if hasRef {
+				pb.recorder.Eventf(ref, "Unhealthy", "%s probe failed: %s", probeType, output)
 			}
 		}
-		return probe.Failure, err
+		return results.Failure, err
 	}
-
-	glog.V(3).Infof("Readiness probe for %q succeeded", ctrName)
-	return ready, nil
+	glog.V(3).Infof("%s probe for %q succeeded", probeType, ctrName)
+	return results.Success, nil
 }
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
@@ -167,7 +129,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
-		return pb.exec.Probe(pb.newExecInContainer(pod, container, containerID, p.Exec.Command))
+		return pb.exec.Probe(pb.newExecInContainer(container, containerID, p.Exec.Command))
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
@@ -193,7 +155,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		return pb.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
-	return probe.Unknown, "", nil
+	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", kubecontainer.GetPodFullName(pod), container.Name)
 }
 
 func extractPort(param util.IntOrString, container api.Container) (int, error) {
@@ -241,7 +203,7 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
+func (p *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
 		return p.runner.RunInContainer(containerID, cmd)
 	}}
