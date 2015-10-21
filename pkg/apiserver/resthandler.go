@@ -102,6 +102,14 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 
 		result, err := getter(ctx, name, req)
 		if err != nil {
+			if len(namespace) > 0 {
+				// Todo, verify namespace exists or not
+				isNamespaceExist := true
+				if !isNamespaceExist {
+					errorJSON(errors.NewNotFound("namespace", namespace), scope.Codec, w)
+					return
+				}
+			}
 			errorJSON(err, scope.Codec, w)
 			return
 		}
