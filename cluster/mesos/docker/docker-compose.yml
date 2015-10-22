@@ -147,6 +147,7 @@ scheduler:
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
     --mesos-executor-cpus=1.0
+    --mesos-sandbox-overlay=/opt/sandbox-overlay.tar.gz
     --v=4
     --executor-logv=4
     --profiling=true

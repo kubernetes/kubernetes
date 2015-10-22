@@ -206,17 +206,23 @@ func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logF
 		}
 	}
 
-	// use given environment, but add /usr/sbin to the path for the iptables binary used in kube-proxy
+	// use given environment, but add /usr/sbin and $SANDBOX/bin to the path for the iptables binary used in kube-proxy
 	var kmEnv []string
-	if ms.pathOverride != "" {
-		env := os.Environ()
-		kmEnv = make([]string, 0, len(env))
-		for _, e := range env {
-			if !strings.HasPrefix(e, "PATH=") {
-				kmEnv = append(kmEnv, e)
+	env := os.Environ()
+	kmEnv = make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, "PATH=") {
+			kmEnv = append(kmEnv, e)
+		} else {
+			if ms.pathOverride != "" {
+				e = "PATH=" + ms.pathOverride
 			}
+			pwd, err := os.Getwd()
+			if err != nil {
+				log.Fatalf("Cannot get current directory: %v", err)
+			}
+			kmEnv = append(kmEnv, fmt.Sprintf("%s:%s", e, path.Join(pwd, "bin")))
 		}
-		kmEnv = append(kmEnv, "PATH="+ms.pathOverride)
 	}
 
 	t := tasks.New(server, ms.kmBinary, kmArgs, kmEnv, writerFunc)
