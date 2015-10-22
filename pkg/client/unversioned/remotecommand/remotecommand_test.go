@@ -42,10 +42,17 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		protocol, err := httpstream.Handshake(req, w, []string{StreamProtocolV2Name}, StreamProtocolV1Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if protocol != StreamProtocolV2Name {
+			t.Fatalf("unexpected protocol: %s", protocol)
+		}
 		streamCh := make(chan httpstream.Stream)
 
 		upgrader := spdy.NewResponseUpgrader()
-		conn, protocol := upgrader.UpgradeResponse(w, req, []string{StreamProtocolV2Name, StreamProtocolV1Name}, func(stream httpstream.Stream) error {
+		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream) error {
 			streamCh <- stream
 			return nil
 		})
@@ -57,7 +64,6 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 			return
 		}
 		defer conn.Close()
-		_ = protocol
 
 		var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 		receivedStreams := 0
@@ -185,6 +191,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		url, _ := url.ParseRequestURI(server.URL)
 		c := client.NewRESTClient(url, "x", nil, -1, -1)
 		req := c.Post().Resource("testing")
+		req.SetHeader(httpstream.HeaderProtocolVersion, StreamProtocolV2Name)
 		req.Param("command", "ls")
 		req.Param("command", "/")
 		conf := &client.Config{
@@ -364,7 +371,7 @@ func TestDial(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn, protocol, err := exec.Dial([]string{"a", "b"})
+	conn, protocol, err := exec.Dial("protocol1")
 	if err != nil {
 		t.Fatal(err)
 	}

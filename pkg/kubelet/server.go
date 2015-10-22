@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
@@ -549,10 +548,17 @@ func (s *Server) createStreams(request *restful.Request, response *restful.Respo
 		return nil, nil, nil, nil, nil, false, false
 	}
 
+	supportedStreamProtocols := []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name}
+	_, err := httpstream.Handshake(request.Request, response.ResponseWriter, supportedStreamProtocols, remotecommand.StreamProtocolV1Name)
+	// negotiated protocol isn't used server side at the moment, but could be in the future
+	if err != nil {
+		return nil, nil, nil, nil, nil, false, false
+	}
+
 	streamCh := make(chan httpstream.Stream)
 
 	upgrader := spdy.NewResponseUpgrader()
-	conn, protocol := upgrader.UpgradeResponse(response.ResponseWriter, request.Request, []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name}, func(stream httpstream.Stream) error {
+	conn := upgrader.UpgradeResponse(response.ResponseWriter, request.Request, func(stream httpstream.Stream) error {
 		streamCh <- stream
 		return nil
 	})
@@ -562,9 +568,6 @@ func (s *Server) createStreams(request *restful.Request, response *restful.Respo
 		// occurred during upgrading. All we can do is return here at this point
 		// if we weren't successful in upgrading.
 		return nil, nil, nil, nil, nil, false, false
-	}
-	if len(protocol) == 0 {
-		protocol = remotecommand.StreamProtocolV1Name
 	}
 
 	conn.SetIdleTimeout(s.host.StreamingConnectionIdleTimeout())
@@ -640,23 +643,33 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	ServePortForward(response.ResponseWriter, request.Request, s.host, podName, uid, s.host.StreamingConnectionIdleTimeout(), defaultStreamCreationTimeout)
 }
 
+// The subprotocol "portforward.k8s.io" is used for port forwarding.
+const PortForwardProtocolV1Name = "portforward.k8s.io"
+
 // ServePortForward handles a port forwarding request.  A single request is
 // kept alive as long as the client is still alive and the connection has not
 // been timed out due to idleness. This function handles multiple forwarded
 // connections; i.e., multiple `curl http://localhost:8888/` requests will be
 // handled by a single invocation of ServePortForward.
 func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder PortForwarder, podName string, uid types.UID, idleTimeout time.Duration, streamCreationTimeout time.Duration) {
+	supportedPortForwardProtocols := []string{PortForwardProtocolV1Name}
+	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols, PortForwardProtocolV1Name)
+	// negotiated protocol isn't currently used server side, but could be in the future
+	if err != nil {
+		// Handshake writes the error to the client
+		util.HandleError(err)
+		return
+	}
+
 	streamChan := make(chan httpstream.Stream, 1)
 
 	glog.V(5).Infof("Upgrading port forward response")
 	upgrader := spdy.NewResponseUpgrader()
-	conn, protocol := upgrader.UpgradeResponse(w, req, []string{portforward.PortForwardProtocolV1Name}, portForwardStreamReceived(streamChan))
+	conn := upgrader.UpgradeResponse(w, req, portForwardStreamReceived(streamChan))
 	if conn == nil {
 		return
 	}
 	defer conn.Close()
-
-	_ = protocol
 
 	glog.V(5).Infof("(conn=%p) setting port forwarding streaming connection idle timeout to %v", conn, idleTimeout)
 	conn.SetIdleTimeout(idleTimeout)
