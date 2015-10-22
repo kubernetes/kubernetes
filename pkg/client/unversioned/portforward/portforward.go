@@ -29,7 +29,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/portforward"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
@@ -129,7 +129,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
 	var err error
-	pf.streamConn, _, err = pf.dialer.Dial(kubelet.PortForwardProtocolV1Name)
+	pf.streamConn, _, err = pf.dialer.Dial(portforward.PortForwardProtocolV1Name)
 	if err != nil {
 		return fmt.Errorf("error upgrading connection: %s", err)
 	}
