@@ -1128,14 +1128,14 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
           #
           # If jenkins was recently restarted and jobs are failing with
           #
-          # flock: 9: Bad file descriptor
+          # flock: 9: Permission denied
           #
           # ssh into the jenkins master and run
-          # $ `sudo chown root:root /var/run/lock/gcloud-components.lock`
+          # $ `sudo chown jenkins:jenkins /var/run/lock/gcloud-components.lock`
           #
           # AGAIN: DO NOT TOUCH THIS CODE unless you are certain you understand
           # implications and have approval from jlowdermilk@ or brendandburns@
-          sudo flock -x -n 9
+          flock -x -n 9
           gcloud components update -q || true
           gcloud components update alpha -q || true
           gcloud components update beta -q || true
