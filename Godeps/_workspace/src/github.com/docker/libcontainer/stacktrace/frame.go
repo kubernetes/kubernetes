@@ -9,6 +9,9 @@ import (
 // NewFrame returns a new stack frame for the provided information
 func NewFrame(pc uintptr, file string, line int) Frame {
 	fn := runtime.FuncForPC(pc)
+	if fn == nil {
+		return Frame{}
+	}
 	pack, name := parseFunctionName(fn.Name())
 	return Frame{
 		Line:     line,

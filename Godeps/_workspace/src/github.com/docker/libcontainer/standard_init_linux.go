@@ -99,5 +99,8 @@ func (l *linuxStandardInit) Init() error {
 	if syscall.Getppid() != l.parentPid {
 		return syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 	}
+	if err := finalizeSeccomp(l.config); err != nil {
+		return err
+	}
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
 }

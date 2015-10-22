@@ -1,3 +1,5 @@
+// +build linux
+
 package cgroups
 
 type ThrottlingData struct {
@@ -30,18 +32,21 @@ type CpuStats struct {
 	ThrottlingData ThrottlingData `json:"throttling_data,omitempty"`
 }
 
+type MemoryData struct {
+	Usage    uint64 `json:"usage,omitempty"`
+	MaxUsage uint64 `json:"max_usage,omitempty"`
+	Failcnt  uint64 `json:"failcnt"`
+}
 type MemoryStats struct {
-	// current res_counter usage for memory
-	Usage uint64 `json:"usage,omitempty"`
 	// memory used for cache
 	Cache uint64 `json:"cache,omitempty"`
-	// maximum usage ever recorded.
-	MaxUsage uint64 `json:"max_usage,omitempty"`
-	// TODO(vishh): Export these as stronger types.
-	// all the stats exported via memory.stat.
-	Stats map[string]uint64 `json:"stats,omitempty"`
-	// number of times memory usage hits limits.
-	Failcnt uint64 `json:"failcnt"`
+	// usage of memory
+	Usage MemoryData `json:"usage,omitempty"`
+	// usage of memory + swap
+	SwapUsage MemoryData `json:"swap_usage,omitempty"`
+	// usafe of kernel memory
+	KernelUsage MemoryData        `json:"kernel_usage,omitempty"`
+	Stats       map[string]uint64 `json:"stats,omitempty"`
 }
 
 type BlkioStatEntry struct {
@@ -63,13 +68,25 @@ type BlkioStats struct {
 	SectorsRecursive        []BlkioStatEntry `json:"sectors_recursive,omitempty"`
 }
 
+type HugetlbStats struct {
+	// current res_counter usage for hugetlb
+	Usage uint64 `json:"usage,omitempty"`
+	// maximum usage ever recorded.
+	MaxUsage uint64 `json:"max_usage,omitempty"`
+	// number of times htgetlb usage allocation failure.
+	Failcnt uint64 `json:"failcnt"`
+}
+
 type Stats struct {
 	CpuStats    CpuStats    `json:"cpu_stats,omitempty"`
 	MemoryStats MemoryStats `json:"memory_stats,omitempty"`
 	BlkioStats  BlkioStats  `json:"blkio_stats,omitempty"`
+	// the map is in the format "size of hugepage: stats of the hugepage"
+	HugetlbStats map[string]HugetlbStats `json:"hugetlb_stats,omitempty"`
 }
 
 func NewStats() *Stats {
 	memoryStats := MemoryStats{Stats: make(map[string]uint64)}
-	return &Stats{MemoryStats: memoryStats}
+	hugetlbStats := make(map[string]HugetlbStats)
+	return &Stats{MemoryStats: memoryStats, HugetlbStats: hugetlbStats}
 }

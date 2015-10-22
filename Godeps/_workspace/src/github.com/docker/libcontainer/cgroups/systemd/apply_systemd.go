@@ -20,6 +20,7 @@ import (
 )
 
 type Manager struct {
+	mu      sync.Mutex
 	Cgroups *configs.Cgroup
 	Paths   map[string]string
 }
@@ -41,6 +42,8 @@ var subsystems = map[string]subsystem{
 	"hugetlb":    &fs.HugetlbGroup{},
 	"perf_event": &fs.PerfEventGroup{},
 	"freezer":    &fs.FreezerGroup{},
+	"net_prio":   &fs.NetPrioGroup{},
+	"net_cls":    &fs.NetClsGroup{},
 }
 
 const (
@@ -199,17 +202,20 @@ func (m *Manager) Apply(pid int) error {
 		return err
 	}
 
-	// -1 disables memorySwap
-	if c.MemorySwap >= 0 && c.Memory != 0 {
-		if err := joinMemory(c, pid); err != nil {
-			return err
-		}
-
+	if err := joinMemory(c, pid); err != nil {
+		return err
 	}
 
-	// we need to manually join the freezer and cpuset cgroup in systemd
+	// we need to manually join the freezer, net_cls, net_prio and cpuset cgroup in systemd
 	// because it does not currently support it via the dbus api.
 	if err := joinFreezer(c, pid); err != nil {
+		return err
+	}
+
+	if err := joinNetPrio(c, pid); err != nil {
+		return err
+	}
+	if err := joinNetCls(c, pid); err != nil {
 		return err
 	}
 
@@ -217,6 +223,9 @@ func (m *Manager) Apply(pid int) error {
 		return err
 	}
 
+	if err := joinHugetlb(c, pid); err != nil {
+		return err
+	}
 	// FIXME: Systemd does have `BlockIODeviceWeight` property, but we got problem
 	// using that (at least on systemd 208, see https://github.com/docker/libcontainer/pull/354),
 	// so use fs work around for now.
@@ -248,14 +257,29 @@ func (m *Manager) Apply(pid int) error {
 }
 
 func (m *Manager) Destroy() error {
-	return cgroups.RemovePaths(m.Paths)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	theConn.StopUnit(getUnitName(m.Cgroups), "replace")
+	if err := cgroups.RemovePaths(m.Paths); err != nil {
+		return err
+	}
+	m.Paths = make(map[string]string)
+	return nil
 }
 
 func (m *Manager) GetPaths() map[string]string {
-	return m.Paths
+	m.mu.Lock()
+	paths := m.Paths
+	m.mu.Unlock()
+	return paths
 }
 
 func writeFile(dir, file, data string) error {
+	// Normally dir should not be empty, one case is that cgroup subsystem
+	// is not mounted, we will get empty dir, and we want it fail here.
+	if dir == "" {
+		return fmt.Errorf("no such directory for %s.", file)
+	}
 	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
 }
 
@@ -276,28 +300,61 @@ func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
 
 func joinCpu(c *configs.Cgroup, pid int) error {
 	path, err := getSubsystemPath(c, "cpu")
-	if err != nil {
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 	if c.CpuQuota != 0 {
-		if err = ioutil.WriteFile(filepath.Join(path, "cpu.cfs_quota_us"), []byte(strconv.FormatInt(c.CpuQuota, 10)), 0700); err != nil {
+		if err = writeFile(path, "cpu.cfs_quota_us", strconv.FormatInt(c.CpuQuota, 10)); err != nil {
 			return err
 		}
 	}
 	if c.CpuPeriod != 0 {
-		if err = ioutil.WriteFile(filepath.Join(path, "cpu.cfs_period_us"), []byte(strconv.FormatInt(c.CpuPeriod, 10)), 0700); err != nil {
+		if err = writeFile(path, "cpu.cfs_period_us", strconv.FormatInt(c.CpuPeriod, 10)); err != nil {
 			return err
 		}
 	}
+	if c.CpuRtPeriod != 0 {
+		if err = writeFile(path, "cpu.rt_period_us", strconv.FormatInt(c.CpuRtPeriod, 10)); err != nil {
+			return err
+		}
+	}
+	if c.CpuRtRuntime != 0 {
+		if err = writeFile(path, "cpu.rt_runtime_us", strconv.FormatInt(c.CpuRtRuntime, 10)); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func joinFreezer(c *configs.Cgroup, pid int) error {
-	if _, err := join(c, "freezer", pid); err != nil {
+	path, err := join(c, "freezer", pid)
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 
-	return nil
+	freezer := subsystems["freezer"]
+	return freezer.Set(path, c)
+}
+
+func joinNetPrio(c *configs.Cgroup, pid int) error {
+	path, err := join(c, "net_prio", pid)
+	if err != nil && !cgroups.IsNotFound(err) {
+		return err
+	}
+	netPrio := subsystems["net_prio"]
+
+	return netPrio.Set(path, c)
+}
+
+func joinNetCls(c *configs.Cgroup, pid int) error {
+	path, err := join(c, "net_cls", pid)
+	if err != nil && !cgroups.IsNotFound(err) {
+		return err
+	}
+	netcls := subsystems["net_cls"]
+
+	return netcls.Set(path, c)
 }
 
 func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
@@ -348,6 +405,8 @@ func (m *Manager) GetPids() ([]int, error) {
 }
 
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
 	for name, path := range m.Paths {
 		sys, ok := subsystems[name]
@@ -393,6 +452,8 @@ func getUnitName(c *configs.Cgroup) string {
 // This happens at least for v208 when any sibling unit is started.
 func joinDevices(c *configs.Cgroup, pid int) error {
 	path, err := join(c, "devices", pid)
+	// Even if it's `not found` error, we'll return err because devices cgroup
+	// is hard requirement for container security.
 	if err != nil {
 		return err
 	}
@@ -402,19 +463,33 @@ func joinDevices(c *configs.Cgroup, pid int) error {
 }
 
 func joinMemory(c *configs.Cgroup, pid int) error {
-	memorySwap := c.MemorySwap
-
-	if memorySwap == 0 {
-		// By default, MemorySwap is set to twice the size of RAM.
-		memorySwap = c.Memory * 2
-	}
-
 	path, err := getSubsystemPath(c, "memory")
-	if err != nil {
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(path, "memory.memsw.limit_in_bytes"), []byte(strconv.FormatInt(memorySwap, 10)), 0700)
+	// -1 disables memoryswap
+	if c.MemorySwap > 0 {
+		err = writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(c.MemorySwap, 10))
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.KernelMemory > 0 {
+		err = writeFile(path, "memory.kmem.limit_in_bytes", strconv.FormatInt(c.KernelMemory, 10))
+		if err != nil {
+			return err
+		}
+	}
+	if c.MemorySwappiness >= 0 && c.MemorySwappiness <= 100 {
+		err = writeFile(path, "memory.swappiness", strconv.FormatInt(c.MemorySwappiness, 10))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // systemd does not atm set up the cpuset controller, so we must manually
@@ -422,7 +497,7 @@ func joinMemory(c *configs.Cgroup, pid int) error {
 // level must have a full setup as the default for a new directory is "no cpus"
 func joinCpuset(c *configs.Cgroup, pid int) error {
 	path, err := getSubsystemPath(c, "cpuset")
-	if err != nil {
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 
@@ -466,4 +541,14 @@ func joinBlkio(c *configs.Cgroup, pid int) error {
 	}
 
 	return nil
+}
+
+func joinHugetlb(c *configs.Cgroup, pid int) error {
+	path, err := join(c, "hugetlb", pid)
+	if err != nil && !cgroups.IsNotFound(err) {
+		return err
+	}
+
+	hugetlb := subsystems["hugetlb"]
+	return hugetlb.Set(path, c)
 }

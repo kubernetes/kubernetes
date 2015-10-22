@@ -1,7 +1,7 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 )
 
@@ -14,16 +14,16 @@ var oomCommand = cli.Command{
 	Action: func(context *cli.Context) {
 		container, err := getContainer(context)
 		if err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 		n, err := container.NotifyOOM()
 		if err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 		for x := range n {
 			// hack for calm down go1.4 gofmt
 			_ = x
-			log.Printf("OOM notification received")
+			logrus.Printf("OOM notification received")
 		}
 	},
 }

@@ -1,7 +1,7 @@
 ## nsinit
 
-`nsinit` is a cli application which demonstrates the use of libcontainer.  
-It is able to spawn new containers or join existing containers.  
+`nsinit` is a cli application which demonstrates the use of libcontainer.
+It is able to spawn new containers or join existing containers. 
 
 ### How to build?
 
@@ -58,7 +58,7 @@ If you wish to spawn another process inside the container while your current
 bash session is running, run the same command again to get another bash shell
 (or change the command).  If the original process (PID 1) dies, all other
 processes spawned inside the container will be killed and the namespace will
-be removed. 
+be removed.
 
 You can identify if a process is running in a container by looking to see if
 `state.json` is in the root of the directory.
@@ -68,45 +68,61 @@ file is read and where the `state.json` file will be saved.
 
 ### How to use?
 
-Currently nsinit has 9 commands. Type `nsinit -h` to list all of them. 
-And for every alternative command, you can also use `--help` to get more 
+Currently nsinit has 9 commands. Type `nsinit -h` to list all of them.
+And for every alternative command, you can also use `--help` to get more
 detailed help documents. For example, `nsinit config --help`.
 
-`nsinit` cli application is implemented using [cli.go](https://github.com/codegangsta/cli). 
-Lots of details are handled in cli.go, so the implementation of `nsinit` itself 
+`nsinit` cli application is implemented using [cli.go](https://github.com/codegangsta/cli).
+Lots of details are handled in cli.go, so the implementation of `nsinit` itself
 is very clean and clear.
 
 *   **config**	
-It will generate a standard configuration file for a container.  By default, it 
-will generate as the template file in [config.go](https://github.com/docker/libcontainer/blob/master/nsinit/config.go#L192). 
+It will generate a standard configuration file for a container.  By default, it
+will generate as the template file in [config.go](https://github.com/docker/libcontainer/blob/f28dff5539855bac2adbc5699f57f84349605b5f/nsinit/config.go#L234). 
 It will modify the template if you have specified some configuration by options.
 *   **exec**	
 Starts a container and execute a new command inside it. Besides common options, it
 has some special options as below.
 	- `--tty,-t`: allocate a TTY to the container.
-	- `--config`: you can specify a configuration file. By default, it will use 
+	- `--config`: you can specify a configuration file. By default, it will use
 	template configuration.
 	- `--id`: specify the ID for a container. By default, the id is "nsinit".
-	- `--user,-u`: set the user, uid, and/or gid for the process. By default the 
+	- `--user,-u`: set the user, uid, and/or gid for the process. By default the
 	value is "root".
 	- `--cwd`: set the current working dir.
 	- `--env`: set environment variables for the process.
 *   **init**		
-It's an internal command that is called inside the container's namespaces to 
-initialize the namespace and exec the user's process. It should not be called 
+It's an internal command that is called inside the container's namespaces to
+initialize the namespace and exec the user's process. It should not be called
 externally.
 *   **oom**		
 Display oom notifications for a container, you should specify container id.
 *   **pause**	
-Pause the container's processes, you should specify container id. It will use 
+Pause the container's processes, you should specify container id. It will use
 cgroup freeze subsystem to help.
 *   **unpause**		
 Unpause the container's processes. Same with `pause`.
 *   **stats**	
-Display statistics for the container, it will mainly show cgroup and network 
+Display statistics for the container, it will mainly show cgroup and network
 statistics.
 *   **state**	
 Get the container's current state. You can also read the state from `state.json`
- in your container_id folder.
+in your container_id folder.
+*   **checkpoint**
+Checkpoint a running container. You can read [this](http://criu.org/Advanced_usage)
+for more detailed information about options.
+	- `--id`： specify the ID for a container. By default, the id is "nsinit".
+	- `--image-path`： path for saving criu image files. You must specify this option.
+	- `--work-path`: path for saving work files and logs. By default it will
+	generate a folder named "criu.work" in root directory.
+	- `--leave-running`: leave the process running after checkpointing.
+	- `--tcp-established`: allow open tcp connections.
+	- `--ext-unix-sk`: allow external unix sockets.
+	- `--shell-job`: allow shell jobs.
+	- `--page-server`: ADDRESS:PORT of the page server. The dump image can be
+	sent to a criu page server if we have a page server.
+*   **restore**
+Restore a container from a previous checkpoint. Options are almost the same
+with checkpoint and `--image-path` must be specified.
 *   **help, h**		
 Shows a list of commands or help for one command.
