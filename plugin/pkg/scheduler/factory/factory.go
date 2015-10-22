@@ -164,7 +164,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 		ServiceLister:    f.ServiceLister,
 		ControllerLister: f.ControllerLister,
 		// All fit predicates only need to consider schedulable nodes.
-		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		NodeInfo:   f.NodeLister,
 	}
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
@@ -212,7 +212,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 	return &scheduler.Config{
 		Modeler: f.modeler,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		Algorithm:  algo,
 		Binder:     &binder{f.Client},
 		NextPod: func() *api.Pod {
@@ -224,6 +224,23 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 		BindPodsRateLimiter: f.BindPodsRateLimiter,
 		StopEverything:      f.StopEverything,
 	}, nil
+}
+
+func getNodeConditionPredicate() cache.NodeConditionPredicate {
+	return func(node api.Node) bool {
+		for _, cond := range node.Status.Conditions {
+			// We consider the node for scheduling only when its NodeReady condition status
+			// is ConditionTrue and its NodeOutOfDisk condition status is ConditionFalse.
+			if cond.Type == api.NodeReady && cond.Status != api.ConditionTrue {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			} else if cond.Type == api.NodeOutOfDisk && cond.Status != api.ConditionFalse {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			}
+		}
+		return true
+	}
 }
 
 // Returns a cache.ListWatch that finds all pods that need to be
