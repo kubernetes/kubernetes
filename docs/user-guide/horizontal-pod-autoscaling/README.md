@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/examples/experimental/horizontal-pod-autoscaling/README.md).
+[here](http://releases.k8s.io/release-1.0/docs/user-guide/horizontal-pod-autoscaling/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -52,7 +52,7 @@ It defines [index.php](image/index.php) page which performs some CPU intensive c
 First, we will start a replication controller running the image and expose it as an external service:
 
 ```console
-$ kubectl create -f examples/extensions/horizontal-pod-autoscaling/rc-php-apache.yaml
+$ kubectl create -f docs/user-guide/horizontal-pod-autoscaling/rc-php-apache.yaml
 replicationcontrollers/php-apache
 
 $ kubectl expose rc php-apache --port=80 --type=LoadBalancer
@@ -125,7 +125,7 @@ See [here](../../../docs/proposals/horizontal-pod-autoscaler.md#autoscaling-algo
 We will create the autoscaler by executing the following command:
 
 ```console
-$ kubectl create -f examples/extensions/horizontal-pod-autoscaling/hpa-php-apache.yaml
+$ kubectl create -f docs/user-guide/horizontal-pod-autoscaling/hpa-php-apache.yaml
 horizontalpodautoscaler "php-apache" created
 ```
 
@@ -201,6 +201,8 @@ php-apache   php-apache     gcr.io/google_containers/hpa-example   run=php-apach
 
 As we see, in the presented case CPU utilization dropped to 0, and the number of replicas dropped to 1.
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/horizontal-pod-autoscaling/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/horizontal-pod-autoscaling/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
