@@ -208,7 +208,6 @@ case ${JOB_NAME} in
   # Runs all non-flaky, non-slow tests on GCE, sequentially.
   kubernetes-e2e-gce)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
-    : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -218,12 +217,12 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
     : ${ENABLE_DEPLOYMENTS:=true}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs only the examples tests on GCE.
   kubernetes-e2e-gce-examples)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
-    : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-examples"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Example"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-examples"}
@@ -233,11 +232,11 @@ case ${JOB_NAME} in
   # Runs only the autoscaling tests on GCE.
   kubernetes-e2e-gce-autoscaling)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-autoscaling"}
-    : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-autoscaling"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Autoscaling\sSuite"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-autoscaling"}
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     # Override GCE default for cluster size autoscaling purposes.
     ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
@@ -246,7 +245,6 @@ case ${JOB_NAME} in
   # Runs the flaky tests on GCE, sequentially.
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
-    : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-flaky"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -255,18 +253,19 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs slow tests on GCE, sequentially.
   kubernetes-e2e-gce-slow)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-slow"}
-    : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-slow"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-slow"}
     : ${PROJECT:="k8s-jkns-e2e-gce-slow"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
@@ -340,6 +339,7 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     # Override GCE defaults.
     NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
@@ -347,7 +347,6 @@ case ${JOB_NAME} in
   # Runs only the reboot tests on GCE.
   kubernetes-e2e-gce-reboot)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
-    : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-reboot"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
@@ -471,6 +470,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${JENKINS_USE_SERVER_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-prod"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -486,6 +486,7 @@ case ${JOB_NAME} in
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${JENKINS_USE_SERVER_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-staging"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -501,6 +502,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gke-test"}
     : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -516,6 +518,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gke-ci"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -532,6 +535,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gke-ci"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
@@ -1303,5 +1307,8 @@ if [[ "${E2E_DOWN,,}" == "true" ]]; then
 fi
 
 if [[ -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
-  diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}" || true
+  if ! diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}" && [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-}" == "true" ]]; then
+    echo "!!! FAIL: Google Cloud Platform resources leaked while running tests!"
+    exit 1
+  fi
 fi
