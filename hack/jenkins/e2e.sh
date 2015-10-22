@@ -1121,27 +1121,33 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         (
           # ----------- WARNING! DO NOT TOUCH THIS CODE -----------
           #
-          # The purpose of this code is to ensure that only one job attempts to
-          # update gcloud. To do this, we call call `sudo flock` and fail
-          # silently if the lock can't be acquired, as that means another job is
-          # currently updating the components.
+          # The purpose of this block is to ensure that only one job attempts to
+          # update gcloud at a time.
           #
-          # We do NOT want to run gcloud components update under sudo, as that causes
-          # the gcloud files to get chown'd by root, which makes them undeletable in
-          # the case where we are installing gcloud under the workspace (e.g. for gke-ci
-          # and friends). If we can't cleanup old workspaces, jenkins runs out of disk
-          # and many devs get angry.
-          #
+          # PLEASE DO NOT TOUCH THIS CODE unless you are certain you understand
+          # implications. Please cc jlowdermilk@ or brendandburns@ on changes.
+
           # If jenkins was recently restarted and jobs are failing with
           #
           # flock: 9: Permission denied
           #
           # ssh into the jenkins master and run
-          # $ `sudo chown jenkins:jenkins /var/run/lock/gcloud-components.lock`
+          # $ sudo chown jenkins:jenkins /var/run/lock/gcloud-components.lock
           #
-          # AGAIN: DO NOT TOUCH THIS CODE unless you are certain you understand
-          # implications and have approval from jlowdermilk@ or brendandburns@
-          flock -x -n 9
+          # Note, flock -n would prevent parallel runs from having to wait
+          # here, but because we've set -o errexit, the err gets caught
+          # despite running in a subshell. If a run has to wait, the subsequent
+          # component update commands will be no-op, so no added delay.
+          flock -x -w 60 9
+          # We do NOT want to run gcloud components update under sudo, as that causes
+          # the gcloud files to get chown'd by root, which makes them undeletable in
+          # the case where we are installing gcloud under the workspace (e.g. for gke-ci
+          # and friends). If we can't cleanup old workspaces, jenkins runs out of disk.
+          #
+          # If the update commands are failing with permission denied, ssh into
+          # the jenkins master and run
+          #
+          # $ sudo chown -R jenkins:jenkins /usr/local/share/google/google-cloud-sdk
           gcloud components update -q || true
           gcloud components update alpha -q || true
           gcloud components update beta -q || true
