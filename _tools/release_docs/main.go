@@ -36,8 +36,9 @@ import (
 var (
 	branch       = flag.String("branch", "", "The git branch from which to pull docs. (e.g. release-1.0, master).")
 	outputDir    = flag.String("output-dir", "", "The directory in which to save results.")
-	remote       = flag.String("remote", "upstream", "The name of the remote repo from which to pull docs.")
-	apiReference = flag.Bool("apiReference", true, "Whether update api reference")
+	version      = flag.String("version", "", "The release version. It should be the same as the version segment in the URL, e.g., when importing docs that will be hosted at k8s.io/v1.0/, the version flag should be \"v1.0\".")
+	remote       = flag.String("remote", "upstream", "Optional: The name of the remote repo from which to pull docs.")
+	apiReference = flag.Bool("apiReference", true, "Optional: Whether update api reference")
 
 	subdirs = []string{"docs", "examples"}
 )
@@ -396,6 +397,10 @@ func main() {
 		fmt.Println("You must specify an output dir with --output-dir.")
 		os.Exit(1)
 	}
+	if len(*version) == 0 {
+		fmt.Println("You must specify the release version with --version.")
+		os.Exit(1)
+	}
 
 	if err := checkCWD(); err != nil {
 		fmt.Printf("Could not find the kubernetes root: %v\n", err)
@@ -431,7 +436,7 @@ func main() {
 
 			if *apiReference && !info.IsDir() && (info.Name() == "definitions.html" || info.Name() == "operations.html") {
 				fmt.Printf("Processing %s\n", path)
-				err := processHTML(path, *outputDir)
+				err := processHTML(path, *version, *outputDir)
 				if err != nil {
 					return err
 				}

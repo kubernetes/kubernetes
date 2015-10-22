@@ -1,6 +1,7 @@
 #!/bin/sh
 # This is a hack to import from a branch and call it a versioned snapshot.
 
+VERSION=v1.0
 OUTDIR=v1.0
 REPORT_TAG=v1.0.1
 BRANCH=release-1.0
@@ -20,7 +21,7 @@ tmpdir=docs.$RANDOM
 echo fetching upstream
 git fetch upstream
 go build ./_tools/release_docs
-./release_docs --branch ${BRANCH} --output-dir $tmpdir >/dev/null
+./release_docs --branch ${BRANCH} --output-dir $tmpdir --version $VERSION >/dev/null
 rm ./release_docs
 
 echo removing old
