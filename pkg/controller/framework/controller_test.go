@@ -32,7 +32,12 @@ import (
 	"github.com/google/gofuzz"
 )
 
-func Example() {
+// Let's add a few objects to the source.
+var testIDs = []string{"a-hello", "b-controller", "c-framework"}
+
+//Exemplifies the basic use of a controller using the core functionality of the framework.
+//Note that the Informer is a simpler and more declarative way to do the same thing.
+func TestExampleBasicController(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := framework.NewFakeControllerSource()
 
@@ -96,7 +101,6 @@ func Example() {
 	go framework.New(cfg).Run(stop)
 
 	// Let's add a few objects to the source.
-	testIDs := []string{"a-hello", "b-controller", "c-framework"}
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
@@ -109,16 +113,15 @@ func Example() {
 		outputSet.Insert(<-deletionCounter)
 	}
 
-	for _, key := range outputSet.List() {
-		fmt.Println(key)
-	}
+	validate(t, outputSet)
 	// Output:
 	// a-hello
 	// b-controller
 	// c-framework
 }
 
-func ExampleInformer() {
+// This test exemplifies the basics of the Informer which is generally an easier way to implement a controller.
+func TestExampleInformerController(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := framework.NewFakeControllerSource()
 
@@ -152,8 +155,6 @@ func ExampleInformer() {
 	defer close(stop)
 	go controller.Run(stop)
 
-	// Let's add a few objects to the source.
-	testIDs := []string{"a-hello", "b-controller", "c-framework"}
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
@@ -166,13 +167,19 @@ func ExampleInformer() {
 		outputSet.Insert(<-deletionCounter)
 	}
 
-	for _, key := range outputSet.List() {
-		fmt.Println(key)
-	}
+	validate(t, outputSet)
 	// Output:
 	// a-hello
 	// b-controller
 	// c-framework
+}
+
+func validate(t *testing.T, outputs sets.String) {
+	for i, key := range outputs.List() {
+		if testIDs[i] != key {
+			t.Errorf("The %v inserted event should be %v", testIDs, key)
+		}
+	}
 }
 
 func TestHammerController(t *testing.T) {
