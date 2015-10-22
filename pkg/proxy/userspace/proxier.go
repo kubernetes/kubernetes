@@ -661,7 +661,7 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 	if local, err := isLocalIP(portal.ip); err != nil {
 		el = append(el, fmt.Errorf("can't determine if IP is local, assuming not: %v", err))
 	} else if local {
-		if err := proxier.releaseNodePort(nil, portal.port, protocol, name); err != nil {
+		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
 			el = append(el, err)
 		}
 	}
