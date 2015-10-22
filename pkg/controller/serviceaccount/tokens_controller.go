@@ -31,12 +31,20 @@ import (
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const NumServiceAccountRemoveReferenceRetries = 10
+// RemoveTokenBackoff is the recommended (empirical) retry interval for removing
+// a secret reference from a service account when the secret is deleted. It is
+// exported for use by custom secret controllers.
+var RemoveTokenBackoff = wait.Backoff{
+	Steps:    10,
+	Duration: 100 * time.Millisecond,
+	Jitter:   1.0,
+}
 
 // TokensControllerOptions contains options for the TokensController
 type TokensControllerOptions struct {
@@ -244,16 +252,10 @@ func (e *TokensController) secretDeleted(obj interface{}) {
 		return
 	}
 
-	for i := 1; i <= NumServiceAccountRemoveReferenceRetries; i++ {
-		if _, err := e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name); err != nil {
-			if apierrors.IsConflict(err) && i < NumServiceAccountRemoveReferenceRetries {
-				time.Sleep(wait.Jitter(100*time.Millisecond, 0.0))
-				continue
-			}
-			glog.Error(err)
-			break
-		}
-		break
+	if err := client.RetryOnConflict(RemoveTokenBackoff, func() error {
+		return e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name)
+	}); err != nil {
+		util.HandleError(err)
 	}
 }
 
@@ -400,10 +402,10 @@ func (e *TokensController) deleteSecret(secret *api.Secret) error {
 
 // removeSecretReferenceIfNeeded updates the given ServiceAccount to remove a reference to the given secretName if needed.
 // Returns whether an update was performed, and any error that occurred
-func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.ServiceAccount, secretName string) (bool, error) {
+func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.ServiceAccount, secretName string) error {
 	// See if the account even referenced the secret
 	if !getSecretReferences(serviceAccount).Has(secretName) {
-		return false, nil
+		return nil
 	}
 
 	// We don't want to update the cache's copy of the service account
@@ -411,12 +413,12 @@ func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.Ser
 	serviceAccounts := e.client.ServiceAccounts(serviceAccount.Namespace)
 	serviceAccount, err := serviceAccounts.Get(serviceAccount.Name)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// Double-check to see if the account still references the secret
 	if !getSecretReferences(serviceAccount).Has(secretName) {
-		return false, nil
+		return nil
 	}
 
 	secrets := []api.ObjectReference{}
@@ -429,10 +431,10 @@ func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.Ser
 
 	_, err = serviceAccounts.Update(serviceAccount)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 // getServiceAccount returns the ServiceAccount referenced by the given secret. If the secret is not
