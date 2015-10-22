@@ -92,6 +92,15 @@ func addDefaultingFuncs() {
 			// If limits are specified, but requests are not, default requests to limits
 			// This is done here rather than a more specific defaulting pass on ResourceRequirements
 			// because we only want this defaulting semantic to take place on a Pod and not a PodTemplate
+			_, found := obj.Annotations["kubernetes.io/config.mirror"]
+			if found {
+				// Do nothing for mirror pods
+				return
+			}
+			if obj.Spec.TerminationGracePeriodSeconds == nil {
+				period := int64(DefaultTerminationGracePeriodSeconds)
+				obj.Spec.TerminationGracePeriodSeconds = &period
+			}
 			for i := range obj.Spec.Containers {
 				// set requests to limits if requests are not specified, but limits are
 				if obj.Spec.Containers[i].Resources.Limits != nil {
@@ -118,10 +127,6 @@ func addDefaultingFuncs() {
 			}
 			if obj.SecurityContext == nil {
 				obj.SecurityContext = &PodSecurityContext{}
-			}
-			if obj.TerminationGracePeriodSeconds == nil {
-				period := int64(DefaultTerminationGracePeriodSeconds)
-				obj.TerminationGracePeriodSeconds = &period
 			}
 		},
 		func(obj *Probe) {
