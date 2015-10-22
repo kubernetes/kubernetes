@@ -42,31 +42,53 @@ after the first section.
 Regardless of whether you are cutting a major or minor version, cutting a
 release breaks down into four pieces:
 
-1. Selecting release components.
-1. Tagging and merging the release in Git.
-1. Building and pushing the binaries.
-1. Writing release notes.
+1. selecting release components;
+1. cutting/branching the release;
+1. publishing binaries and release notes.
 
 You should progress in this strict order.
 
-### Building a New Major/Minor Version (`vX.Y.0`)
+### Selecting release components
 
-#### Selecting Release Components
+First, figure out what kind of release you're doing, what branch you're cutting
+from, and other prerequisites.
 
-When cutting a major/minor release, your first job is to find the branch
-point. We cut `vX.Y.0` releases directly from `master`, which is also the
-branch that we have most continuous validation on. Go first to [the main GCE
-Jenkins end-to-end job](http://go/k8s-test/job/kubernetes-e2e-gce) and next to [the
-Critical Builds page](http://go/k8s-test/view/Critical%20Builds) and hopefully find a
-recent Git hash that looks stable across at least `kubernetes-e2e-gce` and
-`kubernetes-e2e-gke-ci`. First glance through builds and look for nice solid
-rows of green builds, and then check temporally with the other Critical Builds
-to make sure they're solid around then as well. Once you find some greens, you
-can find the Git hash for a build by looking at the "Console Log", then look for
-`githash=`. You should see a line line:
+* Alpha releases (`vX.Y.0-alpha.W`) are cut directly from `master`.
+  * Alpha releases don't require anything besides green tests, (see below).
+* Official releases (`vX.Y.Z`) are cut from their respective release branch,
+  `release-X.Y`.
+  * Make sure all necessary cherry picks have been resolved.  You should ensure
+    that all outstanding cherry picks have been reviewed and merged and the
+    branch validated on Jenkins. See [Cherry Picks](cherry-picks.md) for more
+    information on how to manage cherry picks prior to cutting the release.
+  * Official releases also require green tests, (see below).
+* New release series are also cut direclty from `master`.
+  * **This is a big deal!**  If you're reading this doc for the first time, you
+    probably shouldn't be doing this release, and should talk to someone on the
+    release team.
+  * New release series cut a new release branch, `release-X.Y`, off of
+    `master`, and also release the first beta in the series, `vX.Y.0-beta`.
+  * Every change in the `vX.Y` series from this point on will have to be
+    cherry picked, so be sure you want to do this before proceeding.
+  * You should still look for green tests, (see below).
+
+No matter what you're cutting, you're going to want to look at
+[Jenkins](http://go/k8s-test/).  Figure out what branch you're cutting from,
+(see above,) and look at the critical jobs building from that branch.  First
+glance through builds and look for nice solid rows of green builds, and then
+check temporally with the other critical builds to make sure they're solid
+around then as well. Once you find some greens, you can find the Git hash for a
+build by looking at the Full Console Output and searching for `githash=`. You
+should see a line:
 
 ```console
-+ githash=v0.20.2-322-g974377b
+githash=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+```
+
+Or, if you're cutting from a release branch (i.e. doing an official release),
+
+```console
+githash=v1.1.0-beta.567+d79d6c9bbb44c7
 ```
 
 Because Jenkins builds frequently, if you're looking between jobs
@@ -81,99 +103,112 @@ oncall.
 Before proceeding to the next step:
 
 ```sh
-export BRANCHPOINT=v0.20.2-322-g974377b
+export GITHASH=v1.2.0-alpha.2.164+b44c7d79d6c9bb
 ```
 
-Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
-our (retroactive) branch point.
+Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the Git hash you decided on. This
+will become your release point.
 
-#### Branching, Tagging and Merging
+### Cutting/branching the release
 
-Do the following:
+You'll need the latest version of the releasing tools:
 
-1. `export VER=x.y` (e.g. `0.20` for v0.20)
-1. cd to the base of the repo
-1. `git fetch upstream && git checkout -b release-${VER} ${BRANCHPOINT}` (you did set `${BRANCHPOINT}`, right?)
-1. Make sure you don't have any files you care about littering your repo (they
-   better be checked in or outside the repo, or the next step will delete them).
-1. `make clean && git reset --hard HEAD && git clean -xdf`
-1. `make` (TBD: you really shouldn't have to do this, but the swagger output step requires it right now)
-1. `./build/mark-new-version.sh v${VER}.0` to mark the new release and get further
-   instructions. This creates a series of commits on the branch you're working
-   on (`release-${VER}`), including forking our documentation for the release,
-   the release version commit (which is then tagged), and the post-release
-   version commit.
-1. Follow the instructions given to you by that script. They are canon for the
-   remainder of the Git process. If you don't understand something in that
-   process, please ask!
+```console
+git clone git@github.com:kubernetes/contrib.git
+cd contrib/release
+```
 
-**TODO**: how to fix tags, etc., if you have to shift the release branchpoint.
+#### Cutting an alpha release (`vX.Y.0-alpha.W`)
 
-#### Building and Pushing Binaries
+Figure out what version you're cutting, and
 
-In your git repo (you still have `${VER}` set from above right?):
+```console
+export VER=vX.Y.0-alpha.W
+```
 
-1. `git checkout upstream/master && build/build-official-release.sh v${VER}.0` (the `build-official-release.sh` script is version agnostic, so it's best to run it off `master` directly).
-1. Follow the instructions given to you by that script.
-1. At this point, you've done all the Git bits, you've got all the binary bits pushed, and you've got the template for the release started on GitHub.
+then, from `contrib/release`, run
 
-#### Writing Release Notes
+```console
+cut-alpha.sh "${VER}" "${GITHASH}"
+```
 
-[This helpful guide](making-release-notes.md) describes how to write release
-notes for a major/minor release. In the release template on GitHub, leave the
-last PR number that the tool finds for the `.0` release, so the next releaser
-doesn't have to hunt.
+This will:
 
-### Building a New Patch Release (`vX.Y.Z` for `Z > 0`)
+1. clone a temporary copy of the [kubernetes repo](https://github.com/kubernetes/kubernetes);
+1. mark the `vX.Y.0-alpha.W` tag at the given Git hash;
+1. push the tag to GitHub;
+1. build the release binaries at the given Git hash;
+1. publish the binaries to GCS;
+1. prompt you to do the remainder of the work.
 
-#### Selecting Release Components
+#### Cutting an official release (`vX.Y.Z`)
 
-We cut `vX.Y.Z` releases from the `release-vX.Y` branch after all cherry picks
-to the branch have been resolved. You should ensure all outstanding cherry picks
-have been reviewed and merged and the branch validated on Jenkins (validation
-TBD). See the [Cherry Picks](cherry-picks.md) for more information on how to
-manage cherry picks prior to cutting the release.
+Figure out what version you're cutting, and
 
-#### Tagging and Merging
+```console
+export VER=vX.Y.Z
+```
 
-1. `export VER=x.y` (e.g. `0.20` for v0.20)
-1. `export PATCH=Z` where `Z` is the patch level of `vX.Y.Z`
-1. cd to the base of the repo
-1. `git fetch upstream && git checkout -b upstream/release-${VER} release-${VER}`
-1. Make sure you don't have any files you care about littering your repo (they
-   better be checked in or outside the repo, or the next step will delete them).
-1. `make clean && git reset --hard HEAD && git clean -xdf`
-1. `make` (TBD: you really shouldn't have to do this, but the swagger output step requires it right now)
-1. `./build/mark-new-version.sh v${VER}.${PATCH}` to mark the new release and get further
-   instructions. This creates a series of commits on the branch you're working
-   on (`release-${VER}`), including forking our documentation for the release,
-   the release version commit (which is then tagged), and the post-release
-   version commit.
-1. Follow the instructions given to you by that script. They are canon for the
-   remainder of the Git process. If you don't understand something in that
-   process, please ask! When proposing PRs, you can pre-fill the body with
-   `hack/cherry_pick_list.sh upstream/release-${VER}` to inform people of what
-   is already on the branch.
+then, from `contrib/release`, run
 
-**TODO**: how to fix tags, etc., if the release is changed.
+```console
+cut-official.sh "${VER}" "${GITHASH}"
+```
 
-#### Building and Pushing Binaries
+This will:
 
-In your git repo (you still have `${VER}` and `${PATCH}` set from above right?):
+1. clone a temporary copy of the [kubernetes repo](https://github.com/kubernetes/kubernetes);
+1. do a series of commits on the branch, including forking the documentation
+   and doing the release version commit;
+  * TODO(ihmccreery) it's not yet clear what exactly this is going to look like.
+1. mark both the `vX.Y.Z` and `vX.Y.(Z+1)-beta` tags at the given Git hash;
+1. push the tags to GitHub;
+1. build the release binaries at the given Git hash (on the appropriate
+   branch);
+1. publish the binaries to GCS;
+1. prompt you to do the remainder of the work.
 
-1. `git checkout upstream/master && build/build-official-release.sh
-   v${VER}.${PATCH}` (the `build-official-release.sh` script is version
-   agnostic, so it's best to run it off `master` directly).
-1. Follow the instructions given to you by that script. At this point, you've
-   done all the Git bits, you've got all the binary bits pushed, and you've got
-   the template for the release started on GitHub.
+#### Branching a new release series (`vX.Y`)
 
-#### Writing Release Notes
+Once again, **this is a big deal!**  If you're reading this doc for the first
+time, you probably shouldn't be doing this release, and should talk to someone
+on the release team.
 
-Run `hack/cherry_pick_list.sh ${VER}.${PATCH}~1` to get the release notes for
-the patch release you just created. Feel free to prune anything internal, like
-you would for a major release, but typically for patch releases we tend to
-include everything in the release notes.
+Figure out what series you're cutting, and
+
+```console
+export VER=vX.Y
+```
+
+then, from `contrib/release`, run
+
+```console
+branch-series.sh "${VER}" "${GITHASH}"
+```
+
+This will:
+
+1. clone a temporary copy of the [kubernetes repo](https://github.com/kubernetes/kubernetes);
+1. mark the `vX.(Y+1).0-alpha.0` tag at the given Git hash on `master`;
+1. fork a new branch `release-X.Y` off of `master` at the Given Git hash;
+1. do a series of commits on the branch, including forking the documentation
+   and doing the release version commit;
+  * TODO(ihmccreery) it's not yet clear what exactly this is going to look like.
+1. mark the `vX.Y.0-beta` tag at the appropriate commit on the new `release-X.Y` branch;
+1. push the tags to GitHub;
+1. build the release binaries at the appropriate Git hash on the appropriate
+   branches, (for both the new alpha and beta releases);
+1. publish the binaries to GCS;
+1. prompt you to do the remainder of the work.
+
+**TODO(ihmccreery)**: can we fix tags, etc., if you have to shift the release branchpoint?
+
+### Publishing binaries and release notes
+
+Whichever script you ran above will prompt you to take any remaining steps,
+including publishing binaries and release notes.
+
+**TODO(ihmccreery)**: deal with the `making-release-notes` doc in `docs/devel`.
 
 ## Origin of the Sources
 
@@ -195,7 +230,7 @@ between releases (e.g. at some point in development between v0.3 and v0.4).
 
 ## Version Number Format
 
-TODO(ihmccreery) update this
+TODO(ihmccreery) update everything below here
 
 In order to account for these use cases, there are some specific formats that
 may end up representing the Kubernetes version. Here are a few examples:
