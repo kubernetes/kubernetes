@@ -249,7 +249,7 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			// k8s instance in a cluster. At the moment this is not possible for
 			// a number of reasons.
 			// TODO(sttts): find way to detect executors of this k8s instance
-			if e.Name == "Kubelet-Executor" {
+			if e.Name == KubernetesExecutorName {
 				executorSlaveIds[e.SlaveId] = struct{}{}
 			}
 		}
