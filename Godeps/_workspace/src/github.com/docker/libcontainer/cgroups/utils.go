@@ -1,3 +1,5 @@
+// +build linux
+
 package cgroups
 
 import (
@@ -12,23 +14,27 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/mount"
+	"github.com/docker/docker/pkg/units"
 )
 
 // https://www.kernel.org/doc/Documentation/cgroups/cgroups.txt
 func FindCgroupMountpoint(subsystem string) (string, error) {
-	mounts, err := mount.GetMounts()
+	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return "", err
 	}
-
-	for _, mount := range mounts {
-		if mount.Fstype == "cgroup" {
-			for _, opt := range strings.Split(mount.VfsOpts, ",") {
-				if opt == subsystem {
-					return mount.Mountpoint, nil
-				}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		fields := strings.Split(txt, " ")
+		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
+			if opt == subsystem {
+				return fields[4], nil
 			}
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
 	}
 
 	return "", NewNotFoundError(subsystem)
@@ -235,4 +241,24 @@ func RemovePaths(paths map[string]string) (err error) {
 		}
 	}
 	return fmt.Errorf("Failed to remove paths: %s", paths)
+}
+
+func GetHugePageSize() ([]string, error) {
+	var pageSizes []string
+	sizeList := []string{"B", "kB", "MB", "GB", "TB", "PB"}
+	files, err := ioutil.ReadDir("/sys/kernel/mm/hugepages")
+	if err != nil {
+		return pageSizes, err
+	}
+	for _, st := range files {
+		nameArray := strings.Split(st.Name(), "-")
+		pageSize, err := units.RAMInBytes(nameArray[1])
+		if err != nil {
+			return []string{}, err
+		}
+		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, sizeList)
+		pageSizes = append(pageSizes, sizeString)
+	}
+
+	return pageSizes, nil
 }

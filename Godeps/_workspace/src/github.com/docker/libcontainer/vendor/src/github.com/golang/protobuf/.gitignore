@@ -1,0 +1,17 @@
+.DS_Store
+*.[568ao]
+*.pb.go
+*.ao
+*.so
+*.pyc
+._*
+.nfs.*
+[568a].out
+*~
+*.orig
+core
+_obj
+_test
+_testmain.go
+compiler/protoc-gen-go
+compiler/testdata/extension_test

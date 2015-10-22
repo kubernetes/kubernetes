@@ -62,9 +62,9 @@ type dockerContainerHandler struct {
 	// Manager of this container's cgroups.
 	cgroupManager cgroups.Manager
 
-	usesAufsDriver bool
-	fsInfo         fs.FsInfo
-	storageDirs    []string
+	storageDriver storageDriver
+	fsInfo        fs.FsInfo
+	storageDirs   []string
 
 	// Time at which this container was created.
 	creationTime time.Time
@@ -93,7 +93,7 @@ func newDockerContainerHandler(
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
-	usesAufsDriver bool,
+	storageDriver storageDriver,
 	cgroupSubsystems *containerLibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
 ) (container.ContainerHandler, error) {
@@ -127,14 +127,15 @@ func newDockerContainerHandler(
 		machineInfoFactory: machineInfoFactory,
 		cgroupPaths:        cgroupPaths,
 		cgroupManager:      cgroupManager,
-		usesAufsDriver:     usesAufsDriver,
+		storageDriver:      storageDriver,
 		fsInfo:             fsInfo,
 		rootFs:             rootFs,
 		storageDirs:        storageDirs,
 		fsHandler:          newFsHandler(time.Minute, storageDirs, fsInfo),
 	}
 
-	if usesAufsDriver {
+	switch storageDriver {
+	case aufsStorageDriver:
 		handler.fsHandler.start()
 	}
 
@@ -228,9 +229,8 @@ func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 
 	spec := libcontainerConfigToContainerSpec(libcontainerConfig, mi)
 	spec.CreationTime = self.creationTime
-	if self.usesAufsDriver {
-		spec.HasFilesystem = true
-	}
+	// For now only enable for aufs filesystems
+	spec.HasFilesystem = self.storageDriver == aufsStorageDriver
 	spec.Labels = self.labels
 	spec.Image = self.image
 	spec.HasNetwork = hasNet(self.networkMode)
@@ -240,7 +240,7 @@ func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 
 func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	// No support for non-aufs storage drivers.
-	if !self.usesAufsDriver {
+	if self.storageDriver != aufsStorageDriver {
 		return nil
 	}
 
@@ -335,7 +335,7 @@ func (self *dockerContainerHandler) Exists() bool {
 }
 
 func DockerInfo() (map[string]string, error) {
-	client, err := docker.NewClient(*ArgDockerEndpoint)
+	client, err := Client()
 	if err != nil {
 		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
 	}
@@ -347,7 +347,7 @@ func DockerInfo() (map[string]string, error) {
 }
 
 func DockerImages() ([]docker.APIImages, error) {
-	client, err := docker.NewClient(*ArgDockerEndpoint)
+	client, err := Client()
 	if err != nil {
 		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
 	}

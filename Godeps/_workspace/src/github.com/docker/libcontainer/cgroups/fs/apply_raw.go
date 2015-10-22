@@ -1,3 +1,5 @@
+// +build linux
+
 package fs
 
 import (
@@ -22,10 +24,13 @@ var (
 		"cpuacct":    &CpuacctGroup{},
 		"blkio":      &BlkioGroup{},
 		"hugetlb":    &HugetlbGroup{},
+		"net_cls":    &NetClsGroup{},
+		"net_prio":   &NetPrioGroup{},
 		"perf_event": &PerfEventGroup{},
 		"freezer":    &FreezerGroup{},
 	}
 	CgroupProcesses = "cgroup.procs"
+	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
 
 type subsystem interface {
@@ -40,6 +45,7 @@ type subsystem interface {
 }
 
 type Manager struct {
+	mu      sync.Mutex
 	Cgroups *configs.Cgroup
 	Paths   map[string]string
 }
@@ -78,7 +84,6 @@ type data struct {
 }
 
 func (m *Manager) Apply(pid int) error {
-
 	if m.Cgroups == nil {
 		return nil
 	}
@@ -124,14 +129,25 @@ func (m *Manager) Apply(pid int) error {
 }
 
 func (m *Manager) Destroy() error {
-	return cgroups.RemovePaths(m.Paths)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := cgroups.RemovePaths(m.Paths); err != nil {
+		return err
+	}
+	m.Paths = make(map[string]string)
+	return nil
 }
 
 func (m *Manager) GetPaths() map[string]string {
-	return m.Paths
+	m.mu.Lock()
+	paths := m.Paths
+	m.mu.Unlock()
+	return paths
 }
 
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
 	for name, path := range m.Paths {
 		sys, ok := subsystems[name]
@@ -262,6 +278,11 @@ func (raw *data) join(subsystem string) (string, error) {
 }
 
 func writeFile(dir, file, data string) error {
+	// Normally dir should not be empty, one case is that cgroup subsystem
+	// is not mounted, we will get empty dir, and we want it fail here.
+	if dir == "" {
+		return fmt.Errorf("no such directory for %s.", file)
+	}
 	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
 }
 

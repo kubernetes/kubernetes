@@ -1,5 +1,3 @@
-// +build linux
-
 package libcontainer
 
 import (
@@ -94,7 +92,7 @@ func (c *linuxConsole) mount(rootfs, mountLabel string, uid, gid int) error {
 	return syscall.Mount(c.slavePath, dest, "bind", syscall.MS_BIND, "")
 }
 
-// dupStdio opens the slavePath for the console and dup2s the fds to the current
+// dupStdio opens the slavePath for the console and dups the fds to the current
 // processes stdio, fd 0,1,2.
 func (c *linuxConsole) dupStdio() error {
 	slave, err := c.open(syscall.O_RDWR)
@@ -103,7 +101,7 @@ func (c *linuxConsole) dupStdio() error {
 	}
 	fd := int(slave.Fd())
 	for _, i := range []int{0, 1, 2} {
-		if err := syscall.Dup2(fd, i); err != nil {
+		if err := syscall.Dup3(fd, i, 0); err != nil {
 			return err
 		}
 	}

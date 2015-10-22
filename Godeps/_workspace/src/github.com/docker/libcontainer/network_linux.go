@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/libcontainer/configs"
 	"github.com/docker/libcontainer/netlink"
 	"github.com/docker/libcontainer/utils"
 )
@@ -24,6 +25,8 @@ var strategies = map[string]networkStrategy{
 type networkStrategy interface {
 	create(*network, int) error
 	initialize(*network) error
+	detach(*configs.Network) error
+	attach(*configs.Network) error
 }
 
 // getStrategy returns the specific network strategy for the
@@ -97,32 +100,39 @@ func (l *loopback) initialize(config *network) error {
 	return netlink.NetworkLinkUp(iface)
 }
 
+func (l *loopback) attach(n *configs.Network) (err error) {
+	return nil
+}
+
+func (l *loopback) detach(n *configs.Network) (err error) {
+	return nil
+}
+
 // veth is a network strategy that uses a bridge and creates
 // a veth pair, one that is attached to the bridge on the host and the other
 // is placed inside the container's namespace
 type veth struct {
 }
 
-func (v *veth) create(n *network, nspid int) (err error) {
-	tmpName, err := v.generateTempPeerName()
-	if err != nil {
-		return err
-	}
-	n.TempVethPeerName = tmpName
-	defer func() {
-		if err != nil {
-			netlink.NetworkLinkDel(n.HostInterfaceName)
-			netlink.NetworkLinkDel(n.TempVethPeerName)
-		}
-	}()
-	if n.Bridge == "" {
-		return fmt.Errorf("bridge is not specified")
-	}
+func (v *veth) detach(n *configs.Network) (err error) {
 	bridge, err := net.InterfaceByName(n.Bridge)
 	if err != nil {
 		return err
 	}
-	if err := netlink.NetworkCreateVethPair(n.HostInterfaceName, n.TempVethPeerName, n.TxQueueLen); err != nil {
+	host, err := net.InterfaceByName(n.HostInterfaceName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.DelFromBridge(host, bridge); err != nil {
+		return err
+	}
+	return nil
+}
+
+// attach a container network interface to an external network
+func (v *veth) attach(n *configs.Network) (err error) {
+	bridge, err := net.InterfaceByName(n.Bridge)
+	if err != nil {
 		return err
 	}
 	host, err := net.InterfaceByName(n.HostInterfaceName)
@@ -141,6 +151,31 @@ func (v *veth) create(n *network, nspid int) (err error) {
 		}
 	}
 	if err := netlink.NetworkLinkUp(host); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v *veth) create(n *network, nspid int) (err error) {
+	tmpName, err := v.generateTempPeerName()
+	if err != nil {
+		return err
+	}
+	n.TempVethPeerName = tmpName
+	defer func() {
+		if err != nil {
+			netlink.NetworkLinkDel(n.HostInterfaceName)
+			netlink.NetworkLinkDel(n.TempVethPeerName)
+		}
+	}()
+	if n.Bridge == "" {
+		return fmt.Errorf("bridge is not specified")
+	}
+	if err := netlink.NetworkCreateVethPair(n.HostInterfaceName, n.TempVethPeerName, n.TxQueueLen); err != nil {
+		return err
+	}
+	if err := v.attach(&n.Network); err != nil {
 		return err
 	}
 	child, err := net.InterfaceByName(n.TempVethPeerName)
