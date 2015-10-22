@@ -1113,10 +1113,32 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # other.
         export KUBE_SKIP_UPDATE=y
         (
-          flock -x -n 9
-          sudo gcloud components update -q || true
-          sudo gcloud components update alpha -q || true
-          sudo gcloud components update beta -q || true
+          # ----------- WARNING! DO NOT TOUCH THIS CODE -----------
+          #
+          # The purpose of this code is to ensure that only one job attempts to
+          # update gcloud. To do this, we call call `sudo flock` and fail
+          # silently if the lock can't be acquired, as that means another job is
+          # currently updating the components.
+          #
+          # We do NOT want to run gcloud components update under sudo, as that causes
+          # the gcloud files to get chown'd by root, which makes them undeletable in
+          # the case where we are installing gcloud under the workspace (e.g. for gke-ci
+          # and friends). If we can't cleanup old workspaces, jenkins runs out of disk
+          # and many devs get angry.
+          #
+          # If jenkins was recently restarted and jobs are failing with
+          #
+          # flock: 9: Bad file descriptor
+          #
+          # ssh into the jenkins master and run
+          # $ `sudo chown root:root /var/run/lock/gcloud-components.lock`
+          #
+          # AGAIN: DO NOT TOUCH THIS CODE unless you are certain you understand
+          # implications and have approval from jlowdermilk@ or brendandburns@
+          sudo flock -x -n 9
+          gcloud components update -q || true
+          gcloud components update alpha -q || true
+          gcloud components update beta -q || true
         ) 9>/var/run/lock/gcloud-components.lock
 
         if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
