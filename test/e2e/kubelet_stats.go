@@ -281,7 +281,7 @@ func formatResourceUsageStats(nodeName string, containerStats map[string]*contai
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
 	for name, s := range containerStats {
-		fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, s.CPUUsageInCores, float64(s.MemoryUsageInBytes)/1000000)
+		fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, s.CPUUsageInCores, float64(s.MemoryWorkingSetInBytes)/(1024*1024))
 	}
 	w.Flush()
 	return fmt.Sprintf("Resource usage on node %q:\n%s", nodeName, buf.String())
