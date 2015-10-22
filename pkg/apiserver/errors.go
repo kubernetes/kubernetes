@@ -87,7 +87,7 @@ func forbidden(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
 }
 
-// errAPIPrefixNotFound indicates that a APIRequestInfo resolution failed because the request isn't under
+// errAPIPrefixNotFound indicates that a RequestInfo resolution failed because the request isn't under
 // any known API prefixes
 type errAPIPrefixNotFound struct {
 	SpecifiedPrefix string

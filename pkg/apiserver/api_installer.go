@@ -39,7 +39,7 @@ import (
 
 type APIInstaller struct {
 	group             *APIGroupVersion
-	info              *APIRequestInfoResolver
+	info              *RequestInfoResolver
 	prefix            string // Path prefix where API resources are to be registered.
 	minRequestTimeout time.Duration
 }

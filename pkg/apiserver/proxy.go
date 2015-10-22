@@ -42,11 +42,11 @@ import (
 // ProxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type ProxyHandler struct {
-	prefix                 string
-	storage                map[string]rest.Storage
-	codec                  runtime.Codec
-	context                api.RequestContextMapper
-	apiRequestInfoResolver *APIRequestInfoResolver
+	prefix              string
+	storage             map[string]rest.Storage
+	codec               runtime.Codec
+	context             api.RequestContextMapper
+	requestInfoResolver *RequestInfoResolver
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -58,8 +58,8 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqStart := time.Now()
 	defer metrics.Monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
 
-	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
-	if err != nil {
+	requestInfo, err := r.requestInfoResolver.GetRequestInfo(req)
+	if err != nil || !requestInfo.IsResourceRequest {
 		notFound(w, req)
 		httpCode = http.StatusNotFound
 		return

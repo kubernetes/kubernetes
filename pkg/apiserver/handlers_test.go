@@ -248,14 +248,17 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"POST", "/apis/extensions/v1beta3/namespaces/other/pods", "create", "api", "extensions", "v1beta3", "other", "pods", "", "", []string{"pods"}},
 	}
 
-	apiRequestInfoResolver := newTestAPIRequestInfoResolver()
+	requestInfoResolver := newTestRequestInfoResolver()
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
 
-		apiRequestInfo, err := apiRequestInfoResolver.GetAPIRequestInfo(req)
+		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
 		if err != nil {
 			t.Errorf("Unexpected error for url: %s %v", successCase.url, err)
+		}
+		if !apiRequestInfo.IsResourceRequest {
+			t.Errorf("Expected resource request")
 		}
 		if successCase.expectedVerb != apiRequestInfo.Verb {
 			t.Errorf("Unexpected verb for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedVerb, apiRequestInfo.Verb)
@@ -293,9 +296,48 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		_, err = apiRequestInfoResolver.GetAPIRequestInfo(req)
-		if err == nil {
-			t.Errorf("Expected error for key: %s", k)
+		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		if err != nil {
+			t.Errorf("%s: Unexpected error %v", k, err)
+		}
+		if apiRequestInfo.IsResourceRequest {
+			t.Errorf("%s: expected non-resource request", k)
+		}
+	}
+}
+
+func TestGetNonAPIRequestInfo(t *testing.T) {
+	tests := map[string]struct {
+		url      string
+		expected bool
+	}{
+		"simple groupless":  {"/api/version/resource", true},
+		"simple group":      {"/apis/group/version/resource/name/subresource", true},
+		"more steps":        {"/api/version/resource/name/subresource", true},
+		"group list":        {"/apis/extensions/v1beta1/job", true},
+		"group get":         {"/apis/extensions/v1beta1/job/foo", true},
+		"group subresource": {"/apis/extensions/v1beta1/job/foo/scale", true},
+
+		"bad root":                     {"/not-api/version/resource", false},
+		"group without enough steps":   {"/apis/extensions/v1beta1", false},
+		"group without enough steps 2": {"/apis/extensions/v1beta1/", false},
+		"not enough steps":             {"/api/version", false},
+		"one step":                     {"/api", false},
+		"zero step":                    {"/", false},
+		"empty":                        {"", false},
+	}
+
+	requestInfoResolver := newTestRequestInfoResolver()
+
+	for testName, tc := range tests {
+		req, _ := http.NewRequest("GET", tc.url, nil)
+
+		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		if err != nil {
+			t.Errorf("%s: Unexpected error %v", testName, err)
+		}
+		if e, a := tc.expected, apiRequestInfo.IsResourceRequest; e != a {
+			t.Errorf("%s: expected %v, actual %v", testName, e, a)
 		}
 	}
 }
