@@ -50,6 +50,10 @@ type Attributes interface {
 
 	// The group of the resource, if a request is for a REST object.
 	GetAPIGroup() string
+
+	// In case a special endpoint like /api, /healthz has been called. This can
+	// only yield a value when both GetNamespace() & GetResource() return none.
+	GetNonResourcePath() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -72,11 +76,12 @@ type RequestAttributesGetter interface {
 
 // AttributesRecord implements Attributes interface.
 type AttributesRecord struct {
-	User      user.Info
-	Verb      string
-	Namespace string
-	APIGroup  string
-	Resource  string
+	User            user.Info
+	Verb            string
+	Namespace       string
+	APIGroup        string
+	Resource        string
+	NonResourcePath string
 }
 
 func (a AttributesRecord) GetUserName() string {
@@ -105,4 +110,8 @@ func (a AttributesRecord) GetResource() string {
 
 func (a AttributesRecord) GetAPIGroup() string {
 	return a.APIGroup
+}
+
+func (a AttributesRecord) GetNonResourcePath() string {
+	return a.NonResourcePath
 }

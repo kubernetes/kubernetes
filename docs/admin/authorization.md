@@ -57,16 +57,18 @@ The following implementations are available, and are selected by flag:
 
 ### Request Attributes
 
-A request has 5 attributes that can be considered for authorization:
+A request has 6 attributes that can be considered for authorization:
   - user (the user-string which a user was authenticated as).
   - group (the list of group names the authenticated user is a member of).
   - whether the request is readonly (GETs are readonly).
   - what resource is being accessed.
     - applies only to the API endpoints, such as
         `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
-        resource is the empty string.
+        resource is the empty string, and the non resource path is populated instead.
   - the namespace of the object being access, or the empty string if the
         endpoint does not support namespaced objects.
+  - a non resource path for providing access to miscellaneous endpoints like `/api` or `/healthz` (see [kubectl](#kubectl)).
+    - This cannot be used to provide access to namespaces/resources via their full path, only non-resource paths will be considered.
 
 We anticipate adding more attributes to allow finer grained access control and
 to assist in policy management.
@@ -85,6 +87,7 @@ Each line is a "policy object".  A policy object is a map with the following pro
       operations.
   - `resource`, type string; a resource from an URL, such as `pods`.
   - `namespace`, type string; a namespace string.
+  - `nonResourcePath`, type string; when it's set everything but the `readonly` property is ignored.
 
 An unset property is the same as a property set to the zero value for its type (e.g. empty string, 0, false).
 However, unset should be preferred for readability.
@@ -108,12 +111,27 @@ If at least one line matches the request attributes, then the request is authori
 To permit any user to do something, write a policy with the user property unset.
 To permit an action Policy with an unset namespace applies regardless of namespace.
 
+### Kubectl
+
+Kubectl uses the `/api` endpoint of api-server to negotiate client/server versions. To validate objects send to the API by create/update operations, kubectl queries certain swagger resources. For API version `v1` those would be `/swaggerapi/api/v1` & `/swaggerapi/experimental/v1`.
+
+When using ABAC authorization, those special resources have to be explicitly exposed via the `nonResourcePath` property in a policy (see [examples](#examples) below):
+
+* `/api` for api version negotiation.
+* `/version` for retrieving the api-server version via `kubectl version`.
+* `/swaggerapi/api/v1"` & `/swaggerapi/experimental/v1` for create/update operations.
+
+To inspect the HTTP calls involved in a specific kubectl operation you can turn up the verbosity:
+
+    kubectl --v=10 version
+
 ### Examples
 
- 1. Alice can do anything: `{"user":"alice"}`
+ 1. Alice can do anything to all resources in all namespaces: `{"user":"alice"}`
  2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
  4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "namespace": "projectCaribou"}`
+ 5. Anyone can retrieve a list of available api versions: `{"readonly": "true", "nonResourcePath": "/api"}`
 
 [Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
 

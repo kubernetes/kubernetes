@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeRL bool
@@ -198,6 +199,73 @@ func TestTimeout(t *testing.T) {
 	sendResponse <- struct{}{}
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
+	}
+}
+
+func TestIsAPIResourceRequest(t *testing.T) {
+	testCases := []struct {
+		apiRoots       []string
+		path           string
+		expectedResult bool
+	}{
+		{[]string{"api"}, "/abc", false},
+		{[]string{"api"}, "/api/abc", true},
+		// A prefixed path requires at least two fragments
+		{[]string{"api"}, "/api", false},
+		{[]string{"api"}, "/api/", true},
+		// It might be more than one prefix available
+		{[]string{"api", "test"}, "/test/123/abc", true},
+		// The prefix might be two or more fragments
+		{[]string{"test/123"}, "/test/123/abc", true},
+		{[]string{"test/123"}, "/test/123/", true},
+		{[]string{"test/123"}, "/test/123", false},
+	}
+
+	for i, tc := range testCases {
+		t.Logf("tc %v: %v", i, tc)
+		req, _ := http.NewRequest("GET", tc.path, nil)
+		has := isAPIResourceRequest(sets.NewString(tc.apiRoots...), req)
+		if has != tc.expectedResult {
+			t.Errorf("expected %v, was %v", tc.expectedResult, has)
+		}
+	}
+}
+
+func TestGetAttribs(t *testing.T) {
+	r := &requestAttributeGetter{api.NewRequestContextMapper(), &APIRequestInfoResolver{sets.NewString("api"), nil}}
+
+	// When path does not start with an api prefix, it's a non-resource path.
+	path := "/version"
+	req, _ := http.NewRequest("GET", path, nil)
+	attribs := r.GetAttribs(req)
+	nonResourcePath := attribs.GetNonResourcePath()
+	if nonResourcePath != path {
+		t.Errorf("Expected %s, is %+v", path, nonResourcePath)
+	}
+	namespace := attribs.GetNamespace()
+	if namespace != "" {
+		t.Errorf("Expected empty, is %+v", namespace)
+	}
+	resource := attribs.GetResource()
+	if resource != "" {
+		t.Errorf("Expected empty, is %+v", resource)
+	}
+
+	// Neither non-resource nor resource path when it starts with an api prefix.
+	path = "/api/unknown"
+	req, _ = http.NewRequest("GET", path, nil)
+	attribs = r.GetAttribs(req)
+	nonResourcePath = attribs.GetNonResourcePath()
+	if nonResourcePath != "" {
+		t.Errorf("Expected empty, is %+v", nonResourcePath)
+	}
+	namespace = attribs.GetNamespace()
+	if namespace != "" {
+		t.Errorf("Expected empty, is %+v", namespace)
+	}
+	resource = attribs.GetResource()
+	if resource != "" {
+		t.Errorf("Expected empty, is %+v", resource)
 	}
 }
 

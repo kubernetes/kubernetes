@@ -56,15 +56,19 @@ func TestExampleFile(t *testing.T) {
 	}
 }
 
-func TestNotAuthorized(t *testing.T) {
-	a, err := newWithContents(t, `{                    "readonly": true, "resource": "events"   }
-{"user":"scheduler", "readonly": true, "resource": "pods"     }
-{"user":"scheduler",                   "resource": "bindings" }
-{"user":"kubelet",   "readonly": true, "resource": "bindings" }
-{"user":"kubelet",                     "resource": "events"   }
-{"user":"alice",                                              "namespace": "projectCaribou"}
-{"user":"bob",       "readonly": true,                        "namespace": "projectCaribou"}
-`)
+func TestAuthorize(t *testing.T) {
+	a, err := newWithContents(t,
+		`{                    "readonly": true,                                                        "nonResourcePath": "/api"}
+		 {                                                                                             "nonResourcePath": "/custom"}
+		 {                    "readonly": true, "resource": "events"}
+		 {"user":"scheduler", "readonly": true, "resource": "pods"}
+		 {"user":"scheduler",                   "resource": "bindings"}
+		 {"user":"kubelet",   "readonly": true, "resource": "bindings"}
+		 {"user":"kubelet",                     "resource": "events"}
+		 {"user":"alice",                                               "namespace": "projectCaribou"}
+		 {"user":"bob",       "readonly": true,                         "namespace": "projectCaribou"}
+		 {"user":"debbie",                      "resource": "pods",     "namespace": "projectCaribou"}`)
+
 	if err != nil {
 		t.Fatalf("unable to read policy file: %v", err)
 	}
@@ -72,13 +76,15 @@ func TestNotAuthorized(t *testing.T) {
 	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1"}
 	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3"}
 	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5"}
+	uDebbie := user.DefaultInfo{Name: "debbie", UID: "uid6"}
 
 	testCases := []struct {
-		User        user.DefaultInfo
-		Verb        string
-		Resource    string
-		NS          string
-		ExpectAllow bool
+		User            user.DefaultInfo
+		Verb            string
+		Resource        string
+		NS              string
+		NonResourcePath string
+		ExpectAllow     bool
 	}{
 		// Scheduler can read pods
 		{User: uScheduler, Verb: "list", Resource: "pods", NS: "ns1", ExpectAllow: true},
@@ -102,6 +108,9 @@ func TestNotAuthorized(t *testing.T) {
 		{User: uAlice, Verb: "get", Resource: "widgets", NS: "ns1", ExpectAllow: false},
 		{User: uAlice, Verb: "get", Resource: "", NS: "ns1", ExpectAllow: false},
 
+		// Debbie can write to pods in the right namespace
+		{User: uDebbie, Verb: "update", Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
+
 		// Chuck can read events, since anyone can.
 		{User: uChuck, Verb: "get", Resource: "events", NS: "ns1", ExpectAllow: true},
 		{User: uChuck, Verb: "get", Resource: "events", NS: "", ExpectAllow: true},
@@ -109,24 +118,34 @@ func TestNotAuthorized(t *testing.T) {
 		{User: uChuck, Verb: "update", Resource: "events", NS: "ns1", ExpectAllow: false},
 		{User: uChuck, Verb: "get", Resource: "pods", NS: "ns1", ExpectAllow: false},
 		{User: uChuck, Verb: "get", Resource: "floop", NS: "ns1", ExpectAllow: false},
-		// Chunk can't access things with no kind or namespace
-		// TODO: find a way to give someone access to miscellaneous endpoints, such as
-		// /healthz, /version, etc.
+		// Chuck can't access things with no resource or namespace
 		{User: uChuck, Verb: "get", Resource: "", NS: "", ExpectAllow: false},
+		// but can access /api
+		{User: uChuck, Verb: "get", NonResourcePath: "/api", Resource: "", NS: "", ExpectAllow: true},
+		// though he cannot write to it
+		{User: uChuck, Verb: "create", NonResourcePath: "/api", Resource: "", NS: "", ExpectAllow: false},
+		// while he can write to /custom
+		{User: uChuck, Verb: "update", NonResourcePath: "/custom", Resource: "", NS: "", ExpectAllow: true},
+
+		// When the path is a non-resource path it must not match resources/ns.
+		{User: uAlice, Verb: "update", NonResourcePath: "/something", Resource: "", NS: "projectCaribou", ExpectAllow: false},
+		{User: uScheduler, Verb: "update", NonResourcePath: "/something", Resource: "bindings", NS: "", ExpectAllow: false},
+		{User: uDebbie, Verb: "update", NonResourcePath: "", Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
 	}
 	for i, tc := range testCases {
 		attr := authorizer.AttributesRecord{
-			User:      &tc.User,
-			Verb:      tc.Verb,
-			Resource:  tc.Resource,
-			Namespace: tc.NS,
+			User:            &tc.User,
+			Verb:            tc.Verb,
+			Resource:        tc.Resource,
+			Namespace:       tc.NS,
+			NonResourcePath: tc.NonResourcePath,
 		}
-		t.Logf("tc: %v -> attr %v", tc, attr)
+		t.Logf("tc %2v: %v -> attr %v", i, tc, attr)
 		err := a.Authorize(attr)
 		actualAllow := bool(err == nil)
 		if tc.ExpectAllow != actualAllow {
-			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
-				i, tc.ExpectAllow, actualAllow, tc)
+			t.Errorf("Expected allowed=%v but actually allowed=%v, for case %+v & %+v",
+				tc.ExpectAllow, actualAllow, tc, attr)
 		}
 	}
 }
