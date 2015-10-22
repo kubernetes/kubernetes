@@ -398,30 +398,31 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
-  # Sets up the GCE soak cluster weekly using the latest 1.1 release.
-  kubernetes-soak-weekly-deploy-gce-release-1.1)
-    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-release-1.1"}
+  # Sets up the GCE soak cluster weekly using the latest 1.1 ci release.
+  kubernetes-soak-weekly-deploy-gce-1.1)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
     : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="gce-soak-weekly-release-1.1"}
+    : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
     : ${E2E_TEST:="false"}
     : ${E2E_UP:="true"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-release-1.1"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.1"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="soak-1.1"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
-  # Runs tests on GCE soak cluster for latest 1.1 release.
-  kubernetes-soak-continuous-e2e-gce-release-1.1)
-    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-release-1.1"}
+  # Runs tests on GCE soak cluster for latest 1.1 ci release.
+  kubernetes-soak-continuous-e2e-gce-1.1)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
     : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="gce-soak-weekly-release-1.1"}
+    : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
     : ${E2E_UP:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-release-1.1"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
@@ -456,6 +457,7 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-1-1"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.1"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
