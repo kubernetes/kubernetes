@@ -53,8 +53,7 @@ func TestUpgradeResponse(t *testing.T) {
 	for i, testCase := range testCases {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			upgrader := NewResponseUpgrader()
-			conn, protocol := upgrader.UpgradeResponse(w, req, []string{"protocol1"}, nil)
-			_ = protocol
+			conn := upgrader.UpgradeResponse(w, req, nil)
 			haveErr := conn == nil
 			if e, a := testCase.shouldError, haveErr; e != a {
 				t.Fatalf("%d: expected shouldErr=%t, got %t", i, testCase.shouldError, haveErr)
