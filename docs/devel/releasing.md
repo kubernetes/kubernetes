@@ -177,6 +177,8 @@ include everything in the release notes.
 
 ## Origin of the Sources
 
+TODO(ihmccreery) update this
+
 Kubernetes may be built from either a git tree (using `hack/build-go.sh`) or
 from a tarball (using either `hack/build-go.sh` or `go install`) or directly by
 the Go native build system (using `go get`).
@@ -192,6 +194,8 @@ tell whether this build corresponds to an exact release (e.g. v0.3) or is
 between releases (e.g. at some point in development between v0.3 and v0.4).
 
 ## Version Number Format
+
+TODO(ihmccreery) update this
 
 In order to account for these use cases, there are some specific formats that
 may end up representing the Kubernetes version. Here are a few examples:
@@ -250,6 +254,8 @@ can, for instance, tell it to override `gitVersion` and set it to
 is the complete SHA1 of the (dirty) tree used at build time.
 
 ## Release Notes
+
+TODO(ihmccreery) update this
 
 No official release should be made final without properly matching release notes.
 
