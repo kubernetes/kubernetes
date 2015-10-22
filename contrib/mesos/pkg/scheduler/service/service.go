@@ -295,15 +295,7 @@ func (s *SchedulerServer) AddHyperkubeFlags(fs *pflag.FlagSet) {
 
 // returns (downloadURI, basename(path))
 func (s *SchedulerServer) serveFrameworkArtifact(path string) (string, string) {
-	pathSplit := strings.Split(path, "/")
-
-	var basename string
-	if len(pathSplit) > 0 {
-		basename = pathSplit[len(pathSplit)-1]
-	} else {
-		basename = path
-	}
-
+	basename := filepath.Base(path)
 	return s.serveFrameworkArtifactWithFilename(path, basename), basename
 }
 
