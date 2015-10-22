@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
@@ -39,47 +39,23 @@ func NewResponseUpgrader() httpstream.ResponseUpgrader {
 	return responseUpgrader{}
 }
 
-func negotiateProtocol(clientProtocols, serverProtocols []string) string {
-	for i := range clientProtocols {
-		for j := range serverProtocols {
-			if clientProtocols[i] == serverProtocols[j] {
-				return clientProtocols[i]
-			}
-		}
-	}
-	return ""
-}
-
 // UpgradeResponse upgrades an HTTP response to one that supports multiplexed
 // streams. newStreamHandler will be called synchronously whenever the
 // other end of the upgraded connection creates a new stream.
-func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Request, protocols []string, newStreamHandler httpstream.NewStreamHandler) (httpstream.Connection, string) {
+func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Request, newStreamHandler httpstream.NewStreamHandler) httpstream.Connection {
 	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(req.Header.Get(httpstream.HeaderUpgrade))
 	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "unable to upgrade: missing upgrade headers in request: %#v", req.Header)
-		return nil, ""
+		return nil
 	}
 
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "unable to upgrade: unable to hijack response")
-		return nil, ""
-	}
-
-	var negotiatedProtocol string
-	clientProtocols := req.Header[http.CanonicalHeaderKey(httpstream.HeaderProtocolVersion)]
-	if len(clientProtocols) > 0 {
-		negotiatedProtocol = negotiateProtocol(req.Header[http.CanonicalHeaderKey(httpstream.HeaderProtocolVersion)], protocols)
-		if len(negotiatedProtocol) > 0 {
-			w.Header().Add(httpstream.HeaderProtocolVersion, negotiatedProtocol)
-		} else {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintf(w, "unable to upgrade: unable to negotiate protocol: server accepts %v", protocols)
-			return nil, ""
-		}
+		return nil
 	}
 
 	w.Header().Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
@@ -88,15 +64,15 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 
 	conn, _, err := hijacker.Hijack()
 	if err != nil {
-		glog.Errorf("unable to upgrade: error hijacking response: %v", err)
-		return nil, ""
+		util.HandleError(fmt.Errorf("unable to upgrade: error hijacking response: %v", err))
+		return nil
 	}
 
 	spdyConn, err := NewServerConnection(conn, newStreamHandler)
 	if err != nil {
-		glog.Errorf("unable to upgrade: error creating SPDY server connection: %v", err)
-		return nil, ""
+		util.HandleError(fmt.Errorf("unable to upgrade: error creating SPDY server connection: %v", err))
+		return nil
 	}
 
-	return spdyConn, negotiatedProtocol
+	return spdyConn
 }

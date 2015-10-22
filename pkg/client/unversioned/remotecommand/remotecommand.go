@@ -98,7 +98,7 @@ func NewStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.Rou
 // Dial opens a connection to a remote server and attempts to negotiate a SPDY
 // connection. Upon success, it returns the connection and the protocol
 // selected by the server.
-func (e *streamExecutor) Dial(protocols []string) (httpstream.Connection, string, error) {
+func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	transport := e.transport
 	// TODO consider removing this and reusing client.TransportFor above to get this for free
 	switch {
@@ -111,6 +111,9 @@ func (e *streamExecutor) Dial(protocols []string) (httpstream.Connection, string
 	case bool(glog.V(6)):
 		transport = client.NewDebuggingRoundTripper(transport, client.URLTiming)
 	}
+
+	// TODO the client probably shouldn't be created here, as it doesn't allow
+	// flexibility to allow callers to configure it.
 	client := &http.Client{Transport: transport}
 
 	req, err := http.NewRequest(e.method, e.url.String(), nil)
@@ -158,7 +161,8 @@ type streamProtocolHandler interface {
 // Stream opens a protocol streamer to the server and streams until a client closes
 // the connection or the server disconnects.
 func (e *streamExecutor) Stream(stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	conn, protocol, err := e.Dial([]string{StreamProtocolV2Name, StreamProtocolV1Name})
+	supportedProtocols := []string{StreamProtocolV2Name, StreamProtocolV1Name}
+	conn, protocol, err := e.Dial(supportedProtocols...)
 	if err != nil {
 		return err
 	}
@@ -175,8 +179,7 @@ func (e *streamExecutor) Stream(stdin io.Reader, stdout, stderr io.Writer, tty b
 			tty:    tty,
 		}
 	case "":
-		glog.Warning("The server did not negotiate a streaming protocol version. Falling back to unversioned")
-		// TODO restore v1
+		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to unversioned")
 		streamer = &streamProtocolV1{
 			stdin:  stdin,
 			stdout: stdout,

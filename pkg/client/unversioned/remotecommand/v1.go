@@ -27,6 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
+// streamProtocolV1 implements the first version of the streaming exec & attach
+// protocol. This version has some bugs, such as not being able to detecte when
+// non-interactive stdin data has ended. See http://issues.k8s.io/13394 and
+// http://issues.k8s.io/13395 for more details.
 type streamProtocolV1 struct {
 	stdin  io.Reader
 	stdout io.Writer
@@ -41,8 +45,8 @@ func (e *streamProtocolV1) stream(conn httpstream.Connection) error {
 	errorChan := make(chan error)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
-		glog.V(4).Infof("Copying %s", s)
-		defer glog.V(4).Infof("Done copying %s", s)
+		glog.V(6).Infof("Copying %s", s)
+		defer glog.V(6).Infof("Done copying %s", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			glog.Errorf("Error copying %s: %v", s, err)
 		}

@@ -44,7 +44,7 @@ type fakeDialer struct {
 	negotiatedProtocol string
 }
 
-func (d *fakeDialer) Dial(protocols []string) (httpstream.Connection, string, error) {
+func (d *fakeDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	d.dialed = true
 	return d.conn, d.negotiatedProtocol, d.err
 }
