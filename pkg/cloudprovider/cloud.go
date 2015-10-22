@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/storage"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
@@ -37,6 +38,8 @@ type Interface interface {
 	Clusters() (Clusters, bool)
 	// Routes returns a routes interface along with whether the interface is supported.
 	Routes() (Routes, bool)
+	// Storage returns a storage interface along with whether the interface is supported.
+	Storage() (storage.Interface, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
 	// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.

@@ -31,7 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -41,6 +43,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1beta1"
 	"google.golang.org/api/googleapi"
+	gcs_storage "google.golang.org/api/storage/v1"
 	"google.golang.org/cloud/compute/metadata"
 )
 
@@ -64,6 +67,7 @@ const (
 type GCECloud struct {
 	service          *compute.Service
 	containerService *container.Service
+	storageService   *gcs_storage.Service
 	projectID        string
 	zone             string
 	instanceID       string
@@ -82,6 +86,12 @@ type Config struct {
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
+}
+
+// returns true if we are running on a GCE VM
+func onGCE() bool {
+	addrs, err := net.LookupHost("metadata.google.internal")
+	return err == nil && len(addrs) > 0
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -135,27 +145,33 @@ func getNetworkName() (string, error) {
 
 // newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (*GCECloud, error) {
-	projectID, zone, err := getProjectAndZone()
+	var projectID, zone, instanceID, externalID, networkURL string
+	var err error
+	if onGCE() {
+		if projectID, zone, err = getProjectAndZone(); err != nil {
+			return nil, err
+		}
+		if instanceID, err = getInstanceID(); err != nil {
+			return nil, err
+		}
+		if externalID, err = getCurrentExternalID(); err != nil {
+			return nil, err
+		}
+		var networkName string
+		if networkName, err = getNetworkName(); err != nil {
+			return nil, err
+		}
+		networkURL = gceNetworkURL(projectID, networkName)
+	} else {
+		gcloud := &GCloud{exec.New()}
+		if projectID, zone, err = gcloud.getProjectAndZone(); err != nil {
+			return nil, err
+		}
+	}
+	tokenSource, err := google.DefaultTokenSource(oauth2.NoContext)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: if we want to use this on a machine that doesn't have the http://metadata server
-	// e.g. on a user's machine (not VM) somewhere, we need to have an alternative for
-	// instance id lookup.
-	instanceID, err := getInstanceID()
-	if err != nil {
-		return nil, err
-	}
-	externalID, err := getCurrentExternalID()
-	if err != nil {
-		return nil, err
-	}
-	networkName, err := getNetworkName()
-	if err != nil {
-		return nil, err
-	}
-	networkURL := gceNetworkURL(projectID, networkName)
-	tokenSource := google.ComputeTokenSource("")
 	if config != nil {
 		var cfg Config
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
@@ -185,9 +201,14 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	storageSvc, err := gcs_storage.New(client)
+	if err != nil {
+		return nil, err
+	}
 	return &GCECloud{
 		service:          svc,
 		containerService: containerSvc,
+		storageService:   storageSvc,
 		projectID:        projectID,
 		zone:             zone,
 		instanceID:       instanceID,
@@ -663,6 +684,9 @@ func (gce *GCECloud) updateFirewall(name, region, ipAddress string, ports []*api
 }
 
 func (gce *GCECloud) firewallObject(name, region, ipAddress string, ports []*api.ServicePort, hosts []string) (*compute.Firewall, error) {
+	if len(gce.networkURL) == 0 {
+		return nil, fmt.Errorf("unknown network")
+	}
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
@@ -1369,6 +1393,9 @@ func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
 }
 
 func (gce *GCECloud) isCurrentInstance(instance string) bool {
+	if len(gce.instanceID) == 0 {
+		return false
+	}
 	return gce.instanceID == canonicalizeInstanceName(instance)
 }
 
@@ -1424,6 +1451,9 @@ func truncateClusterName(clusterName string) string {
 }
 
 func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+	if len(gce.networkURL) == 0 {
+		return nil, fmt.Errorf("unknown network")
+	}
 	listCall := gce.service.Routes.List(gce.projectID)
 
 	prefix := truncateClusterName(clusterName)
@@ -1458,6 +1488,9 @@ func gceNetworkURL(project, network string) string {
 }
 
 func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+	if len(gce.networkURL) == 0 {
+		return fmt.Errorf("unknown network")
+	}
 	routeName := truncateClusterName(clusterName) + "-" + nameHint
 
 	instanceName := canonicalizeInstanceName(route.TargetInstance)
@@ -1495,6 +1528,9 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
+	if len(gce.instanceID) == 0 {
+		return fmt.Errorf("current instance id is unknown.")
+	}
 	disk, err := gce.getDisk(diskName)
 	if err != nil {
 		return err
@@ -1514,6 +1550,9 @@ func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string) error {
+	if len(gce.instanceID) == 0 {
+		return fmt.Errorf("current instance id is unknown.")
+	}
 	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
 	if err != nil {
 		return err
@@ -1563,4 +1602,27 @@ func (gce *GCECloud) ListClusters() ([]string, error) {
 
 func (gce *GCECloud) Master(clusterName string) (string, error) {
 	return "k8s-" + clusterName + "-master.internal", nil
+}
+
+func (s *GCECloud) Storage() (storage.Interface, bool) {
+	return s, true
+}
+
+func (s *GCECloud) UploadBlob(blobName string, stream io.Reader) error {
+	parts := strings.SplitN(blobName, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid blobName: expected at least <bucket>/<file> saw %s", blobName)
+	}
+	bucket := parts[0]
+	file := parts[1]
+	_, err := s.storageService.Buckets.Get(bucket).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		_, err = s.storageService.Buckets.Insert(s.projectID, &gcs_storage.Bucket{Name: bucket}).Do()
+	}
+	if err != nil {
+		return err
+	}
+	object := &gcs_storage.Object{Name: file}
+	_, err = s.storageService.Objects.Insert(bucket, object).Media(stream).Do()
+	return err
 }

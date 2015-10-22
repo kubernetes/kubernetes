@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/storage"
 )
 
 const (
@@ -275,4 +276,8 @@ func (c *MesosCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		return nil, err
 	}
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
+}
+
+func (s *MesosCloud) Storage() (storage.Interface, bool) {
+	return nil, false
 }

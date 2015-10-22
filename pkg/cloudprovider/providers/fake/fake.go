@@ -19,12 +19,15 @@ package fake
 import (
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"regexp"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const ProviderName = "fake"
@@ -59,6 +62,7 @@ type FakeCloud struct {
 	Balancers     map[string]FakeBalancer
 	UpdateCalls   []FakeUpdateBalancerCall
 	RouteMap      map[string]*FakeRoute
+	Uploads       map[string][]byte
 	Lock          sync.Mutex
 	cloudprovider.Zone
 }
@@ -247,5 +251,18 @@ func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) 
 		return f.Err
 	}
 	delete(f.RouteMap, name)
+	return nil
+}
+
+func (f *FakeCloud) Storage() (storage.Interface, error) {
+	return f, nil
+}
+
+func (f *FakeCloud) UploadBlob(blobName string, stream io.Reader) error {
+	data, err := ioutil.ReadAll(stream)
+	if err != nil {
+		return err
+	}
+	f.Uploads[blobName] = data
 	return nil
 }

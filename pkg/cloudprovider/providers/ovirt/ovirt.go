@@ -32,6 +32,7 @@ import (
 	"github.com/scalingdata/gcfg"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/storage"
 )
 
 const ProviderName = "ovirt"
@@ -283,4 +284,8 @@ func (v *OVirtCloud) CurrentNodeName(hostname string) (string, error) {
 
 func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
+}
+
+func (s *OVirtCloud) Storage() (storage.Interface, bool) {
+	return nil, false
 }
