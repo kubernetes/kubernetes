@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/portforward"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -643,17 +644,14 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	ServePortForward(response.ResponseWriter, request.Request, s.host, podName, uid, s.host.StreamingConnectionIdleTimeout(), defaultStreamCreationTimeout)
 }
 
-// The subprotocol "portforward.k8s.io" is used for port forwarding.
-const PortForwardProtocolV1Name = "portforward.k8s.io"
-
 // ServePortForward handles a port forwarding request.  A single request is
 // kept alive as long as the client is still alive and the connection has not
 // been timed out due to idleness. This function handles multiple forwarded
 // connections; i.e., multiple `curl http://localhost:8888/` requests will be
 // handled by a single invocation of ServePortForward.
 func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder PortForwarder, podName string, uid types.UID, idleTimeout time.Duration, streamCreationTimeout time.Duration) {
-	supportedPortForwardProtocols := []string{PortForwardProtocolV1Name}
-	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols, PortForwardProtocolV1Name)
+	supportedPortForwardProtocols := []string{portforward.PortForwardProtocolV1Name}
+	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols, portforward.PortForwardProtocolV1Name)
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
 		// Handshake writes the error to the client
