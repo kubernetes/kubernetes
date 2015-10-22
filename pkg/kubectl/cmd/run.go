@@ -26,11 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -170,7 +168,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		}
 	}
 
-	obj, kind, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
+	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
 		return err
 	}
@@ -202,15 +200,12 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			return err
 		}
 		opts.Client = client
-		// TODO: this should be abstracted into Factory to support other types
-		switch t := obj.(type) {
-		case *api.ReplicationController:
-			return handleAttachReplicationController(client, t, opts)
-		case *api.Pod:
-			return handleAttachPod(client, t, opts)
-		default:
-			return fmt.Errorf("cannot attach to %s: not implemented", kind)
+
+		attachablePod, err := f.AttachablePodForObject(obj)
+		if err != nil {
+			return err
 		}
+		return handleAttachPod(client, attachablePod, opts)
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
@@ -247,22 +242,6 @@ func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) (status ap
 		time.Sleep(2 * time.Second)
 		continue
 	}
-}
-
-func handleAttachReplicationController(c *client.Client, controller *api.ReplicationController, opts *AttachOptions) error {
-	var pods *api.PodList
-	for pods == nil || len(pods.Items) == 0 {
-		var err error
-		if pods, err = c.Pods(controller.Namespace).List(labels.SelectorFromSet(controller.Spec.Selector), fields.Everything()); err != nil {
-			return err
-		}
-		if len(pods.Items) == 0 {
-			fmt.Fprint(opts.Out, "Waiting for pod to be scheduled\n")
-			time.Sleep(2 * time.Second)
-		}
-	}
-	pod := &pods.Items[0]
-	return handleAttachPod(c, pod, opts)
 }
 
 func handleAttachPod(c *client.Client, pod *api.Pod, opts *AttachOptions) error {
