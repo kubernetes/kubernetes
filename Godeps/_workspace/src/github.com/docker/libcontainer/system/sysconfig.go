@@ -1,4 +1,4 @@
-// +build cgo
+// +build cgo,linux cgo,freebsd
 
 package system
 

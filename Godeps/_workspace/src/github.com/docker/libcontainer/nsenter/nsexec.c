@@ -148,15 +148,15 @@ void nsexec()
 				pr_perror("ioctl TIOCSCTTY failed");
 				exit(1);
 			}
-			if (dup2(consolefd, STDIN_FILENO) != STDIN_FILENO) {
+			if (dup3(consolefd, STDIN_FILENO, 0) != STDIN_FILENO) {
 				pr_perror("Failed to dup 0");
 				exit(1);
 			}
-			if (dup2(consolefd, STDOUT_FILENO) != STDOUT_FILENO) {
+			if (dup3(consolefd, STDOUT_FILENO, 0) != STDOUT_FILENO) {
 				pr_perror("Failed to dup 1");
 				exit(1);
 			}
-			if (dup2(consolefd, STDERR_FILENO) != STDERR_FILENO) {
+			if (dup3(consolefd, STDERR_FILENO, 0) != STDERR_FILENO) {
 				pr_perror("Failed to dup 2");
 				exit(1);
 			}

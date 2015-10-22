@@ -1,3 +1,5 @@
+// +build linux
+
 package fs
 
 import (
@@ -6,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/configs"
@@ -16,8 +19,7 @@ type MemoryGroup struct {
 
 func (s *MemoryGroup) Apply(d *data) error {
 	dir, err := d.join("memory")
-	// only return an error for memory if it was specified
-	if err != nil && (d.c.Memory != 0 || d.c.MemoryReservation != 0 || d.c.MemorySwap != 0) {
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 	defer func() {
@@ -44,20 +46,24 @@ func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 			return err
 		}
 	}
-	// By default, MemorySwap is set to twice the size of Memory.
-	if cgroup.MemorySwap == 0 && cgroup.Memory != 0 {
-		if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.Memory*2, 10)); err != nil {
+	if cgroup.MemorySwap > 0 {
+		if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.MemorySwap, 10)); err != nil {
 			return err
 		}
 	}
-	if cgroup.MemorySwap > 0 {
-		if err := writeFile(path, "memory.memsw.limit_in_bytes", strconv.FormatInt(cgroup.MemorySwap, 10)); err != nil {
+	if cgroup.KernelMemory > 0 {
+		if err := writeFile(path, "memory.kmem.limit_in_bytes", strconv.FormatInt(cgroup.KernelMemory, 10)); err != nil {
 			return err
 		}
 	}
 
 	if cgroup.OomKillDisable {
 		if err := writeFile(path, "memory.oom_control", "1"); err != nil {
+			return err
+		}
+	}
+	if cgroup.MemorySwappiness >= 0 && cgroup.MemorySwappiness <= 100 {
+		if err := writeFile(path, "memory.swappiness", strconv.FormatInt(cgroup.MemorySwappiness, 10)); err != nil {
 			return err
 		}
 	}
@@ -88,24 +94,62 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 		}
 		stats.MemoryStats.Stats[t] = v
 	}
-
-	// Set memory usage and max historical usage.
-	value, err := getCgroupParamUint(path, "memory.usage_in_bytes")
-	if err != nil {
-		return fmt.Errorf("failed to parse memory.usage_in_bytes - %v", err)
-	}
-	stats.MemoryStats.Usage = value
 	stats.MemoryStats.Cache = stats.MemoryStats.Stats["cache"]
-	value, err = getCgroupParamUint(path, "memory.max_usage_in_bytes")
+
+	memoryUsage, err := getMemoryData(path, "")
 	if err != nil {
-		return fmt.Errorf("failed to parse memory.max_usage_in_bytes - %v", err)
+		return err
 	}
-	stats.MemoryStats.MaxUsage = value
-	value, err = getCgroupParamUint(path, "memory.failcnt")
+	stats.MemoryStats.Usage = memoryUsage
+	swapUsage, err := getMemoryData(path, "memsw")
 	if err != nil {
-		return fmt.Errorf("failed to parse memory.failcnt - %v", err)
+		return err
 	}
-	stats.MemoryStats.Failcnt = value
+	stats.MemoryStats.SwapUsage = swapUsage
+	kernelUsage, err := getMemoryData(path, "kmem")
+	if err != nil {
+		return err
+	}
+	stats.MemoryStats.KernelUsage = kernelUsage
 
 	return nil
+}
+
+func getMemoryData(path, name string) (cgroups.MemoryData, error) {
+	memoryData := cgroups.MemoryData{}
+
+	moduleName := "memory"
+	if name != "" {
+		moduleName = strings.Join([]string{"memory", name}, ".")
+	}
+	usage := strings.Join([]string{moduleName, "usage_in_bytes"}, ".")
+	maxUsage := strings.Join([]string{moduleName, "max_usage_in_bytes"}, ".")
+	failcnt := strings.Join([]string{moduleName, "failcnt"}, ".")
+
+	value, err := getCgroupParamUint(path, usage)
+	if err != nil {
+		if moduleName != "memory" && os.IsNotExist(err) {
+			return cgroups.MemoryData{}, nil
+		}
+		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", usage, err)
+	}
+	memoryData.Usage = value
+	value, err = getCgroupParamUint(path, maxUsage)
+	if err != nil {
+		if moduleName != "memory" && os.IsNotExist(err) {
+			return cgroups.MemoryData{}, nil
+		}
+		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", maxUsage, err)
+	}
+	memoryData.MaxUsage = value
+	value, err = getCgroupParamUint(path, failcnt)
+	if err != nil {
+		if moduleName != "memory" && os.IsNotExist(err) {
+			return cgroups.MemoryData{}, nil
+		}
+		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", failcnt, err)
+	}
+	memoryData.Failcnt = value
+
+	return memoryData, nil
 }

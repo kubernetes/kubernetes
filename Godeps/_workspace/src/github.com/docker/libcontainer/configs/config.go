@@ -1,7 +1,5 @@
 package configs
 
-import "fmt"
-
 type Rlimit struct {
 	Type int    `json:"type"`
 	Hard uint64 `json:"hard"`
@@ -14,6 +12,43 @@ type IDMap struct {
 	HostID      int `json:"host_id"`
 	Size        int `json:"size"`
 }
+
+type Seccomp struct {
+	Syscalls []*Syscall `json:"syscalls"`
+}
+
+type Action int
+
+const (
+	Kill Action = iota - 3
+	Trap
+	Allow
+)
+
+type Operator int
+
+const (
+	EqualTo Operator = iota
+	NotEqualTo
+	GreatherThan
+	LessThan
+	MaskEqualTo
+)
+
+type Arg struct {
+	Index int      `json:"index"`
+	Value uint32   `json:"value"`
+	Op    Operator `json:"op"`
+}
+
+type Syscall struct {
+	Value  int    `json:"value"`
+	Action Action `json:"action"`
+	Args   []*Arg `json:"args"`
+}
+
+// TODO Windows. Many of these fields should be factored out into those parts
+// which are common across platforms, and those which are platform specific.
 
 // Config defines configuration options for executing a process inside a contained environment.
 type Config struct {
@@ -84,7 +119,7 @@ type Config struct {
 
 	// AdditionalGroups specifies the gids that should be added to supplementary groups
 	// in addition to those that the user belongs to.
-	AdditionalGroups []int `json:"additional_groups"`
+	AdditionalGroups []string `json:"additional_groups"`
 
 	// UidMappings is an array of User ID mappings for User Namespaces
 	UidMappings []IDMap `json:"uid_mappings"`
@@ -103,50 +138,9 @@ type Config struct {
 	// SystemProperties is a map of properties and their values. It is the equivalent of using
 	// sysctl -w my.property.name value in Linux.
 	SystemProperties map[string]string `json:"system_properties"`
-}
 
-// Gets the root uid for the process on host which could be non-zero
-// when user namespaces are enabled.
-func (c Config) HostUID() (int, error) {
-	if c.Namespaces.Contains(NEWUSER) {
-		if c.UidMappings == nil {
-			return -1, fmt.Errorf("User namespaces enabled, but no user mappings found.")
-		}
-		id, found := c.hostIDFromMapping(0, c.UidMappings)
-		if !found {
-			return -1, fmt.Errorf("User namespaces enabled, but no root user mapping found.")
-		}
-		return id, nil
-	}
-	// Return default root uid 0
-	return 0, nil
-}
-
-// Gets the root uid for the process on host which could be non-zero
-// when user namespaces are enabled.
-func (c Config) HostGID() (int, error) {
-	if c.Namespaces.Contains(NEWUSER) {
-		if c.GidMappings == nil {
-			return -1, fmt.Errorf("User namespaces enabled, but no gid mappings found.")
-		}
-		id, found := c.hostIDFromMapping(0, c.GidMappings)
-		if !found {
-			return -1, fmt.Errorf("User namespaces enabled, but no root user mapping found.")
-		}
-		return id, nil
-	}
-	// Return default root uid 0
-	return 0, nil
-}
-
-// Utility function that gets a host ID for a container ID from user namespace map
-// if that ID is present in the map.
-func (c Config) hostIDFromMapping(containerID int, uMap []IDMap) (int, bool) {
-	for _, m := range uMap {
-		if (containerID >= m.ContainerID) && (containerID <= (m.ContainerID + m.Size - 1)) {
-			hostID := m.HostID + (containerID - m.ContainerID)
-			return hostID, true
-		}
-	}
-	return -1, false
+	// Seccomp allows actions to be taken whenever a syscall is made within the container.
+	// By default, all syscalls are allowed with actions to allow, trap, kill, or return an errno
+	// can be specified on a per syscall basis.
+	Seccomp *Seccomp `json:"seccomp"`
 }

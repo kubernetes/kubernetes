@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/docker/pkg/symlink"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/configs"
 	"github.com/docker/libcontainer/label"
@@ -48,11 +49,6 @@ func setupRootfs(config *configs.Config, console *linuxConsole) (err error) {
 	if err := setupPtmx(config, console); err != nil {
 		return newSystemError(err)
 	}
-	// stdin, stdout and stderr could be pointing to /dev/null from parent namespace.
-	// re-open them inside this namespace.
-	if err := reOpenDevNull(config.Rootfs); err != nil {
-		return newSystemError(err)
-	}
 	if err := setupDevSymlinks(config.Rootfs); err != nil {
 		return newSystemError(err)
 	}
@@ -65,6 +61,9 @@ func setupRootfs(config *configs.Config, console *linuxConsole) (err error) {
 		err = pivotRoot(config.Rootfs, config.PivotDir)
 	}
 	if err != nil {
+		return newSystemError(err)
+	}
+	if err := reOpenDevNull(config.Rootfs); err != nil {
 		return newSystemError(err)
 	}
 	if config.Readonlyfs {
@@ -139,6 +138,16 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 			// unable to bind anything to it.
 			return err
 		}
+		// ensure that the destination of the bind mount is resolved of symlinks at mount time because
+		// any previous mounts can invalidate the next mount's destination.
+		// this can happen when a user specifies mounts within other mounts to cause breakouts or other
+		// evil stuff to try to escape the container's rootfs.
+		if dest, err = symlink.FollowSymlinkInScope(filepath.Join(rootfs, m.Destination), rootfs); err != nil {
+			return err
+		}
+		if err := checkMountDestination(rootfs, dest); err != nil {
+			return err
+		}
 		if err := createIfNotExists(dest, stat.IsDir()); err != nil {
 			return err
 		}
@@ -197,6 +206,28 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 	return nil
 }
 
+// checkMountDestination checks to ensure that the mount destination is not over the
+// top of /proc or /sys.
+// dest is required to be an abs path and have any symlinks resolved before calling this function.
+func checkMountDestination(rootfs, dest string) error {
+	if filepath.Clean(rootfs) == filepath.Clean(dest) {
+		return fmt.Errorf("mounting into / is prohibited")
+	}
+	invalidDestinations := []string{
+		"/proc",
+	}
+	for _, invalid := range invalidDestinations {
+		path, err := filepath.Rel(filepath.Join(rootfs, invalid), dest)
+		if err != nil {
+			return err
+		}
+		if path == "." || !strings.HasPrefix(path, "..") {
+			return fmt.Errorf("%q cannot be mounted because it is located inside %q", dest, invalid)
+		}
+	}
+	return nil
+}
+
 func setupDevSymlinks(rootfs string) error {
 	var links = [][2]string{
 		{"/proc/self/fd", "/dev/fd"},
@@ -221,11 +252,13 @@ func setupDevSymlinks(rootfs string) error {
 	return nil
 }
 
-// If stdin, stdout or stderr are pointing to '/dev/null' in the global mount namespace,
-// this method will make them point to '/dev/null' in this namespace.
+// If stdin, stdout, and/or stderr are pointing to `/dev/null` in the parent's rootfs
+// this method will make them point to `/dev/null` in this container's rootfs.  This
+// needs to be called after we chroot/pivot into the container's rootfs so that any
+// symlinks are resolved locally.
 func reOpenDevNull(rootfs string) error {
 	var stat, devNullStat syscall.Stat_t
-	file, err := os.Open(filepath.Join(rootfs, "/dev/null"))
+	file, err := os.Open("/dev/null")
 	if err != nil {
 		return fmt.Errorf("Failed to open /dev/null - %s", err)
 	}
@@ -239,7 +272,7 @@ func reOpenDevNull(rootfs string) error {
 		}
 		if stat.Rdev == devNullStat.Rdev {
 			// Close and re-open the fd.
-			if err := syscall.Dup2(int(file.Fd()), fd); err != nil {
+			if err := syscall.Dup3(int(file.Fd()), fd, 0); err != nil {
 				return err
 			}
 		}
