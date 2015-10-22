@@ -176,7 +176,7 @@ func (c *cache) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 // Get returns the requested item, or sets exists=false.
 // Get is completely threadsafe as long as you treat all items as immutable.
 func (c *cache) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	key, _ := c.keyFunc(obj)
+	key, err := c.keyFunc(obj)
 	if err != nil {
 		return nil, false, KeyError{obj, err}
 	}
