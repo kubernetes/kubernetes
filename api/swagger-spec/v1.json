@@ -12625,7 +12625,7 @@
      },
      "securityContext": {
       "$ref": "v1.PodSecurityContext",
-      "description": "SecurityContext holds pod-level security attributes and common container settings"
+      "description": "SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field."
      },
      "imagePullSecrets": {
       "type": "array",
@@ -13115,28 +13115,28 @@
    },
    "v1.SecurityContext": {
     "id": "v1.SecurityContext",
-    "description": "SecurityContext holds security configuration that will be applied to a container.",
+    "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
     "properties": {
      "capabilities": {
       "$ref": "v1.Capabilities",
-      "description": "The linux kernel capabilites that should be added or removed. Default to Container.Capabilities if left unset. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
+      "description": "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime."
      },
      "privileged": {
       "type": "boolean",
-      "description": "Run the container in privileged mode. Default to Container.Privileged if left unset. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
+      "description": "Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false."
      },
      "seLinuxOptions": {
       "$ref": "v1.SELinuxOptions",
-      "description": "SELinuxOptions are the labels to be applied to the container and volumes. Options that control the SELinux labels applied. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
+      "description": "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence."
      },
      "runAsUser": {
       "type": "integer",
       "format": "int64",
-      "description": "RunAsUser is the UID to run the entrypoint of the container process. The user id that runs the first process in the container. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
+      "description": "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence."
      },
      "runAsNonRoot": {
       "type": "boolean",
-      "description": "RunAsNonRoot indicates that the container should be run as a non-root user. If the RunAsUser field is not explicitly set then the kubelet may check the image for a specified user or perform defaulting to specify a user."
+      "description": "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence."
      }
     }
    },
@@ -13170,19 +13170,19 @@
     "properties": {
      "user": {
       "type": "string",
-      "description": "User is a SELinux user label that applies to the container. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+      "description": "User is a SELinux user label that applies to the container."
      },
      "role": {
       "type": "string",
-      "description": "Role is a SELinux role label that applies to the container. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+      "description": "Role is a SELinux role label that applies to the container."
      },
      "type": {
       "type": "string",
-      "description": "Type is a SELinux type label that applies to the container. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+      "description": "Type is a SELinux type label that applies to the container."
      },
      "level": {
       "type": "string",
-      "description": "Level is SELinux level label that applies to the container. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+      "description": "Level is SELinux level label that applies to the container."
      }
     }
    },
@@ -13196,6 +13196,19 @@
        "$ref": "integer"
       },
       "description": "SupplementalGroups can be used to specify a list of additional groups which the main container process will run as. This will be applied to all containers in the pod in addition to the primary group of the container."
+     },
+     "seLinuxOptions": {
+      "$ref": "v1.SELinuxOptions",
+      "description": "SELinuxOptions is the SELinux context to be applied to all containers If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container."
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container."
+     },
+     "runAsNonRoot": {
+      "type": "boolean",
+      "description": "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence."
      }
     }
    },
