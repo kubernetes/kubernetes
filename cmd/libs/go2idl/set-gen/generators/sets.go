@@ -39,7 +39,7 @@ func NameSystems() namer.NameSystems {
 	}
 }
 
-// NameSystems returns the default name system for ordering the types to be
+// DefaultNameSystem returns the default name system for ordering the types to be
 // processed by the generators in this package.
 func DefaultNameSystem() string {
 	return "public"
