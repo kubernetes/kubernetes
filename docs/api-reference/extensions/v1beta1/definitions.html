@@ -532,28 +532,28 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">User is a SELinux user label that applies to the container. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md">http://releases.k8s.io/HEAD/docs/user-guide/labels.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">User is a SELinux user label that applies to the container.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">role</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Role is a SELinux role label that applies to the container. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md">http://releases.k8s.io/HEAD/docs/user-guide/labels.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Role is a SELinux role label that applies to the container.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">type</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Type is a SELinux type label that applies to the container. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md">http://releases.k8s.io/HEAD/docs/user-guide/labels.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Type is a SELinux type label that applies to the container.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">level</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Level is SELinux level label that applies to the container. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md">http://releases.k8s.io/HEAD/docs/user-guide/labels.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Level is SELinux level label that applies to the container.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1891,6 +1891,27 @@ Both these may change in the future. Incoming requests are matched against the h
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#integer">[integer]</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">seLinuxOptions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SELinuxOptions is the SELinux context to be applied to all containers If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_selinuxoptions">v1.SELinuxOptions</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">runAsUser</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">runAsNonRoot</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
 </tbody>
 </table>
 
@@ -2368,7 +2389,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_securitycontext">v1.SecurityContext</h3>
 <div class="paragraph">
-<p>SecurityContext holds security configuration that will be applied to a container.</p>
+<p>SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2390,35 +2411,35 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">capabilities</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The linux kernel capabilites that should be added or removed. Default to Container.Capabilities if left unset. More info: <a href="http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context">http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_capabilities">v1.Capabilities</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">privileged</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Run the container in privileged mode. Default to Container.Privileged if left unset. More info: <a href="http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context">http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">seLinuxOptions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SELinuxOptions are the labels to be applied to the container and volumes. Options that control the SELinux labels applied. More info: <a href="http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context">http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_selinuxoptions">v1.SELinuxOptions</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">runAsUser</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RunAsUser is the UID to run the entrypoint of the container process. The user id that runs the first process in the container. More info: <a href="http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context">http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">runAsNonRoot</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RunAsNonRoot indicates that the container should be run as a non-root user. If the RunAsUser field is not explicitly set then the kubelet may check the image for a specified user or perform defaulting to specify a user.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -3688,7 +3709,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">securityContext</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SecurityContext holds pod-level security attributes and common container settings</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podsecuritycontext">v1.PodSecurityContext</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4217,7 +4238,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-10-21 21:58:01 UTC
+Last updated 2015-10-22 10:21:28 UTC
 </div>
 </div>
 </body>
