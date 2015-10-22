@@ -75,7 +75,7 @@ func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionIn
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return prefix + "/" + name, nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
