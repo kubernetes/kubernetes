@@ -136,7 +136,9 @@ func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 		// Get the last condition of the required type
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == s.conditionType {
-				nodeCondition = &cond
+				condCopy := cond
+				nodeCondition = &condCopy
+				break
 			} else {
 				glog.V(4).Infof("Ignoring condition type %v for node %v", cond.Type, node.Name)
 			}

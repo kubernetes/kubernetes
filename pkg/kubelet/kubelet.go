@@ -2250,6 +2250,8 @@ func (kl *Kubelet) syncNetworkStatus() {
 
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
+// TODO(madhusudancs): Simplify the logic for setting node conditions and
+// refactor the node status condtion code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	// Set addresses for the node.
 	if kl.cloud != nil {
@@ -2411,6 +2413,61 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			kl.recordNodeStatusEvent("NodeNotReady")
 		}
 	}
+
+	var nodeOODCondition *api.NodeCondition
+
+	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == api.NodeOutOfDisk {
+			nodeOODCondition = &node.Status.Conditions[i]
+		}
+	}
+
+	newOODCondition := false
+	// If the NodeOutOfDisk condition doesn't exist, create one.
+	if nodeOODCondition == nil {
+		nodeOODCondition = &api.NodeCondition{
+			Type:               api.NodeOutOfDisk,
+			Status:             api.ConditionUnknown,
+			LastTransitionTime: currentTime,
+		}
+		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
+		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
+		// updates we make to nodeOODCondition below are reflected in the slice.
+		newOODCondition = true
+	}
+
+	// Update the heartbeat time irrespective of all the conditions.
+	nodeOODCondition.LastHeartbeatTime = currentTime
+
+	// Note: The conditions below take care of the case when a new NodeOutOfDisk condition is
+	// created and as well as the case when the condition already exists. When a new condition
+	// is created its status is set to api.ConditionUnknown which matches either
+	// nodeOODCondition.Status != api.ConditionTrue or
+	// nodeOODCondition.Status != api.ConditionFalse in the conditions below depending on whether
+	// the kubelet is out of disk or not.
+	if kl.isOutOfDisk() {
+		if nodeOODCondition.Status != api.ConditionTrue {
+			nodeOODCondition.Status = api.ConditionTrue
+			nodeOODCondition.Reason = "KubeletOutOfDisk"
+			nodeOODCondition.Message = "out of disk space"
+			nodeOODCondition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent("NodeOutOfDisk")
+		}
+	} else {
+		if nodeOODCondition.Status != api.ConditionFalse {
+			nodeOODCondition.Status = api.ConditionFalse
+			nodeOODCondition.Reason = "KubeletHasSufficientDisk"
+			nodeOODCondition.Message = "kubelet has sufficient disk space available"
+			nodeOODCondition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent("NodeHasSufficientDisk")
+		}
+	}
+
+	if newOODCondition {
+		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
+	}
+
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent("NodeNotSchedulable")
