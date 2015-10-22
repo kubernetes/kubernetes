@@ -95,6 +95,10 @@ func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 	return exists, nil
 }
 
+// NodeConditionPredicate is a function that indicates whether the given node's conditions meet
+// some set of criteria defined by the function.
+type NodeConditionPredicate func(node api.Node) bool
+
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
 type StoreToNodeLister struct {
@@ -109,50 +113,26 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 }
 
 // NodeCondition returns a storeToNodeConditionLister
-func (s *StoreToNodeLister) NodeCondition(conditionType api.NodeConditionType, conditionStatus api.ConditionStatus) storeToNodeConditionLister {
+func (s *StoreToNodeLister) NodeCondition(predicate NodeConditionPredicate) storeToNodeConditionLister {
 	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
 	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
-	return storeToNodeConditionLister{s.Store, conditionType, conditionStatus}
+	return storeToNodeConditionLister{s.Store, predicate}
 }
 
 // storeToNodeConditionLister filters and returns nodes matching the given type and status from the store.
 type storeToNodeConditionLister struct {
-	store           Store
-	conditionType   api.NodeConditionType
-	conditionStatus api.ConditionStatus
+	store     Store
+	predicate NodeConditionPredicate
 }
 
-// List returns a list of nodes that match the condition type/status in the storeToNodeConditionLister.
+// List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
 func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 	for _, m := range s.store.List() {
 		node := *m.(*api.Node)
-
-		// We currently only use a conditionType of "Ready". If the kubelet doesn't
-		// periodically report the status of a node, the nodecontroller sets its
-		// ConditionStatus to "Unknown". If the kubelet thinks a node is unhealthy
-		// it can (in theory) set its ConditionStatus to "False".
-		var nodeCondition *api.NodeCondition
-
-		// Get the last condition of the required type
-		for _, cond := range node.Status.Conditions {
-			if cond.Type == s.conditionType {
-				condCopy := cond
-				nodeCondition = &condCopy
-				break
-			} else {
-				glog.V(4).Infof("Ignoring condition type %v for node %v", cond.Type, node.Name)
-			}
-		}
-
-		// Check that the condition has the required status
-		if nodeCondition != nil {
-			if nodeCondition.Status == s.conditionStatus {
-				nodes.Items = append(nodes.Items, node)
-			} else {
-				glog.V(4).Infof("Ignoring node %v with condition status %v", node.Name, nodeCondition.Status)
-			}
+		if s.predicate(node) {
+			nodes.Items = append(nodes.Items, node)
 		} else {
-			glog.V(2).Infof("Node %s doesn't have conditions of type %v", node.Name, s.conditionType)
+			glog.V(2).Infof("Node %s matches none of the conditions", node.Name)
 		}
 	}
 	return
