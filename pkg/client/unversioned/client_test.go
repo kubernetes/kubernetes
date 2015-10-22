@@ -271,6 +271,46 @@ func TestGetServerVersion(t *testing.T) {
 	}
 }
 
+func TestGetServerGroupsWithV1Server(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var obj interface{}
+		switch req.URL.Path {
+		case "/api":
+			obj = &unversioned.APIVersions{
+				Versions: []string{
+					"v1",
+				},
+			}
+		case "/version":
+			obj = &version.Info{
+				Major: "1",
+				Minor: "0",
+			}
+		default:
+			t.Logf("unexpected request: %s", req.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		output, err := json.Marshal(obj)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client := NewOrDie(&Config{Host: server.URL})
+	apiGroupList, err := client.Discovery().ServerGroups()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	groupVersions := extractGroupVersions(apiGroupList)
+	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
+		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
+	}
+}
+
 func TestGetServerResources(t *testing.T) {
 	stable := unversioned.APIResourceList{
 		GroupVersion: "v1",
@@ -335,6 +375,11 @@ func TestGetServerResources(t *testing.T) {
 						},
 					},
 				},
+			}
+		case "/version":
+			list = &version.Info{
+				Major: "1",
+				Minor: "1",
 			}
 		default:
 			t.Logf("unexpected request: %s", req.URL.Path)

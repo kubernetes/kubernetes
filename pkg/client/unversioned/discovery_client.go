@@ -19,17 +19,25 @@ package unversioned
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
 type DiscoveryInterface interface {
+	ServerVersionInterface
 	ServerGroupsInterface
 	ServerResourcesInterface
+}
+
+// ServerVersionInterface has method for retrieving and parsing the server's version.
+type ServerVersionInterface interface {
+	// ServerVersion retrieves and parses the server's version.
+	ServerVersion() (*version.Info, error)
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server
@@ -50,8 +58,21 @@ type ServerResourcesInterface interface {
 // DiscoveryClient implements the functions that dicovery server-supported API groups,
 // versions and resources.
 type DiscoveryClient struct {
-	httpClient HTTPClient
-	baseURL    url.URL
+	*RESTClient
+}
+
+// ServerVersion retrieves and parses the server's version.
+func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
+	body, err := d.Get().AbsPath("/version").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &info, nil
 }
 
 // Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
@@ -71,42 +92,32 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 	return
 }
 
-func (d *DiscoveryClient) get(url string) (resp *http.Response, err error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	return d.httpClient.Do(req)
-}
-
 // ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
-	url := d.baseURL
-	url.Path = "/api"
-	resp, err := d.get(url.String())
+	v := &unversioned.APIVersions{}
+	err = d.Get().AbsPath("/api").Do().Into(v)
 	if err != nil {
 		return nil, err
 	}
-	var v unversioned.APIVersions
-	defer resp.Body.Close()
-	err = json.NewDecoder(resp.Body).Decode(&v)
+	apiGroup := apiVersionsToAPIGroup(v)
+
+	serverVersion, err := d.ServerVersion()
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
+		return nil, err
 	}
-	apiGroup := apiVersionsToAPIGroup(&v)
+	// only server newer than 1.1 supports /apis
+	apiGroupList = &unversioned.APIGroupList{}
+	if !serverVersion.IsNewerThan(1, 1) {
+		apiGroupList.Groups = append(apiGroupList.Groups, apiGroup)
+		return apiGroupList, nil
+	}
 
 	// Get the groupVersions exposed at /apis
-	url.Path = "/apis"
-	resp2, err := d.get(url.String())
+	err = d.Get().AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil {
 		return nil, err
-	}
-	defer resp2.Body.Close()
-	apiGroupList = &unversioned.APIGroupList{}
-	if err = json.NewDecoder(resp2.Body).Decode(&apiGroupList); err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
 
 	// append the group retrieved from /api to the list
@@ -116,20 +127,16 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *unversioned.APIResourceList, err error) {
-	url := d.baseURL
+	url := url.URL{}
 	if groupVersion == "v1" {
 		url.Path = "/api/" + groupVersion
 	} else {
 		url.Path = "/apis/" + groupVersion
 	}
-	resp, err := d.get(url.String())
+	resources = &unversioned.APIResourceList{}
+	err = d.Get().AbsPath(url.String()).Do().Into(resources)
 	if err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-	resources = &unversioned.APIResourceList{}
-	if err = json.NewDecoder(resp.Body).Decode(resources); err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
 	return resources, nil
 }
@@ -154,7 +161,9 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 
 func setDiscoveryDefaults(config *Config) error {
 	config.Prefix = ""
-	config.Version = ""
+	config.Version = "unversioned"
+	// The DiscoveryClient only uses a simple codec that unmarshal JSON to a runtime Object.
+	config.Codec = runtime.JSONCodec{}
 	return nil
 }
 
@@ -165,11 +174,6 @@ func NewDiscoveryClient(c *Config) (*DiscoveryClient, error) {
 	if err := setDiscoveryDefaults(&config); err != nil {
 		return nil, err
 	}
-	transport, err := TransportFor(c)
-	if err != nil {
-		return nil, err
-	}
-	client := &http.Client{Transport: transport}
-	baseURL, err := defaultServerUrlFor(c)
-	return &DiscoveryClient{client, *baseURL}, nil
+	client, err := RESTClientFor(&config)
+	return &DiscoveryClient{client}, err
 }
