@@ -245,12 +245,6 @@ func (s *CMServer) Run(_ []string) error {
 	go replicationControllerPkg.NewReplicationManager(kubeClient, s.resyncPeriod, replicationControllerPkg.BurstReplicas).
 		Run(s.ConcurrentRCSyncs, util.NeverStop)
 
-	go daemon.NewDaemonSetsController(kubeClient, r.resyncPeriod).
-		Run(s.ConcurrentDSCSyncs, util.NeverStop)
-
-	go job.NewJobController(kubeClient, s.resyncPeriod).
-		Run(s.ConcurrentJobSyncs, util.NeverStop)
-
 	if s.TerminatedPodGCThreshold > 0 {
 		go gc.New(kubeClient, s.resyncPeriod, s.TerminatedPodGCThreshold).
 			Run(util.NeverStop)
