@@ -1,0 +1,172 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl edit \- Edit a resource on the server
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl edit\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Edit a resource from the default editor.
+
+.PP
+The edit command allows you to directly edit any API resource you can retrieve via the
+command line tools. It will open the editor defined by your KUBE\_EDITOR, GIT\_EDITOR,
+or EDITOR environment variables, or fall back to 'vi'. You can edit multiple objects,
+although changes are applied one at a time. The command accepts filenames as well as
+command line arguments, although the files you point to must be previously saved
+versions of resources.
+
+.PP
+The files to edit will be output in the default API version, or a version specified
+by \-\-output\-version. The default format is YAML \- if you would like to edit in JSON
+pass \-o json.
+
+.PP
+In the event an error occurs while updating, a temporary file will be created on disk
+that contains your unapplied changes. The most common error when updating a resource
+is another editor changing the resource on the server. When this occurs, you will have
+to apply your changes to the newer version of the resource, or update your temporary
+saved copy to include the latest resource version.
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to file to use to edit the resource
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP="yaml"
+    Output format. One of: yaml|json.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    The API version to use when talking to the server
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+  # Edit the service named 'docker\-registry':
+  $ kubectl edit svc/docker\-registry
+
+  # Use an alternative editor
+  $ KUBE\_EDITOR="nano" kubectl edit svc/docker\-registry
+
+  # Edit the service 'docker\-registry' in JSON using the v1 API format:
+  $ kubectl edit svc/docker\-registry \-\-output\-version=v1 \-o json
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

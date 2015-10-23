@@ -1,0 +1,220 @@
+---
+layout: docwithnav
+title: "</strong>"
+---
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+Running Kubernetes locally via Docker
+-------------------------------------
+
+**Table of Contents**
+
+- [Overview](#setting-up-a-cluster)
+- [Prerequisites](#prerequisites)
+- [Step One: Run etcd](#step-one-run-etcd)
+- [Step Two: Run the master](#step-two-run-the-master)
+- [Step Three: Run the service proxy](#step-three-run-the-service-proxy)
+- [Test it out](#test-it-out)
+- [Run an application](#run-an-application)
+- [Expose it as a service](#expose-it-as-a-service)
+- [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
+
+### Overview
+
+The following instructions show you how to set up a simple, single node Kubernetes cluster using Docker.
+
+Here's a diagram of what the final result will look like:
+![Kubernetes Single Node on Docker](k8s-singlenode-docker.png)
+
+### Prerequisites
+
+1. You need to have docker installed on one machine.
+2. Your kernel should support memory and swap accounting. Ensure that the
+following configs are turned on in your linux kernel:
+
+{% highlight console %}
+{% raw %}
+    CONFIG_RESOURCE_COUNTERS=y
+    CONFIG_MEMCG=y
+    CONFIG_MEMCG_SWAP=y
+    CONFIG_MEMCG_SWAP_ENABLED=y
+    CONFIG_MEMCG_KMEM=y
+{% endraw %}
+{% endhighlight %}
+
+3. Enable the memory and swap accounting in the kernel, at boot, as command line
+parameters as follows:
+
+{% highlight console %}
+{% raw %}
+    GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
+{% endraw %}
+{% endhighlight %}
+
+    NOTE: The above is specifically for GRUB2.
+    You can check the command line parameters passed to your kernel by looking at the
+    output of /proc/cmdline:
+
+{% highlight console %}
+{% raw %}
+    $cat /proc/cmdline
+    BOOT_IMAGE=/boot/vmlinuz-3.18.4-aufs root=/dev/sda5 ro cgroup_enable=memory
+    swapaccount=1
+{% endraw %}
+{% endhighlight %}
+
+### Step One: Run etcd
+
+{% highlight sh %}
+{% raw %}
+docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+{% endraw %}
+{% endhighlight %}
+
+### Step Two: Run the master
+
+{% highlight sh %}
+{% raw %}
+docker run \
+    --volume=/:/rootfs:ro \
+    --volume=/sys:/sys:ro \
+    --volume=/dev:/dev \
+    --volume=/var/lib/docker/:/var/lib/docker:rw \
+    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+    --volume=/var/run:/var/run:rw \
+    --net=host \
+    --pid=host \ 
+    --privileged=true \
+    -d \
+    gcr.io/google_containers/hyperkube:v1.0.6 \
+    /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
+{% endraw %}
+{% endhighlight %}
+
+This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.html) that contains the other master components.
+
+### Step Three: Run the service proxy
+
+{% highlight sh %}
+{% raw %}
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.6 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+{% endraw %}
+{% endhighlight %}
+
+### Test it out
+
+At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl
+binary
+([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
+([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
+
+<hr>
+
+**Note for OS/X users:**
+You will need to set up port forwarding via ssh. For users still using boot2docker directly, it is enough to run the command:
+
+{% highlight sh %}
+{% raw %}
+boot2docker ssh -L8080:localhost:8080
+{% endraw %}
+{% endhighlight %}
+
+Since the recent deprecation of boot2docker/osx-installer, the correct way to solve the problem is to issue
+
+{% highlight sh %}
+{% raw %}
+docker-machine ssh default -L 8080:localhost:8080
+{% endraw %}
+{% endhighlight %}
+
+However, this solution works only from docker-machine version 0.5. For older versions of docker-machine, a workaround is the
+following:
+
+{% highlight sh %}
+{% raw %}
+docker-machine env default
+ssh -f -T -N -L8080:localhost:8080 -l docker $(echo $DOCKER_HOST | cut -d ':' -f 2 | tr -d '/')
+{% endraw %}
+{% endhighlight %}
+
+Type `tcuser` as the password.
+
+<hr>
+
+List the nodes in your cluster by running:
+
+{% highlight sh %}
+{% raw %}
+kubectl get nodes
+{% endraw %}
+{% endhighlight %}
+
+This should print:
+
+{% highlight console %}
+{% raw %}
+NAME        LABELS                             STATUS
+127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
+{% endraw %}
+{% endhighlight %}
+
+If you are running different Kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
+
+### Run an application
+
+{% highlight sh %}
+{% raw %}
+kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
+{% endraw %}
+{% endhighlight %}
+
+Now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
+
+### Expose it as a service
+
+{% highlight sh %}
+{% raw %}
+kubectl expose rc nginx --port=80
+{% endraw %}
+{% endhighlight %}
+
+This should print:
+
+{% highlight console %}
+{% raw %}
+NAME      LABELS      SELECTOR    IP(S)     PORT(S)
+nginx     run=nginx   run=nginx             80/TCP
+{% endraw %}
+{% endhighlight %}
+
+If `IP(S)` is blank run the following command to obtain it. Know issue [#10836](https://github.com/kubernetes/kubernetes/issues/10836)
+
+{% highlight sh %}
+{% raw %}
+kubectl get svc nginx
+{% endraw %}
+{% endhighlight %}
+
+Hit the webserver:
+
+{% highlight sh %}
+{% raw %}
+curl <insert-ip-from-above-here>
+{% endraw %}
+{% endhighlight %}
+
+Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
+
+### A note on turning down your cluster
+
+Many of these containers run under the management of the `kubelet` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
+the cluster, you need to first kill the kubelet container, and then any other containers.
+
+You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
+
