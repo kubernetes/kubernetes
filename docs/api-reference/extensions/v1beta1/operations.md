@@ -3,7 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 <!-- needed for gh-pages to render html files when imported -->
-{% include operations.html %}
+{% include v1.1/extensions-v1beta1-operations.html %}
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
