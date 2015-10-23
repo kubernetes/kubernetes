@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"golang.org/x/net/context"
@@ -47,8 +46,9 @@ func newTestCacher(client tools.EtcdClient) *storage.Cacher {
 	prefix := "pods"
 	config := storage.CacherConfig{
 		CacheCapacity:  10,
-		Versioner:      etcdstorage.APIObjectVersioner{},
 		Storage:        etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), etcdtest.PathPrefix()),
+		Versioner:      etcdstorage.APIObjectVersioner{},
+		ListFromCache:  true,
 		Type:           &api.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
@@ -65,18 +65,7 @@ func makeTestPod(name string) *api.Pod {
 	}
 }
 
-func waitForUpToDateCache(cacher *storage.Cacher, resourceVersion uint64) error {
-	ready := func() (bool, error) {
-		result, err := cacher.LastSyncResourceVersion()
-		if err != nil {
-			return false, err
-		}
-		return result == resourceVersion, nil
-	}
-	return wait.Poll(10*time.Millisecond, util.ForeverTestTimeout, ready)
-}
-
-func TestListFromMemory(t *testing.T) {
+func TestList(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	prefixedKey := etcdtest.AddPrefix("pods")
 	fakeClient.ExpectNotFoundGet(prefixedKey)
@@ -146,12 +135,9 @@ func TestListFromMemory(t *testing.T) {
 	for _, test := range testCases {
 		fakeClient.WatchResponse <- test
 	}
-	if err := waitForUpToDateCache(cacher, 5); err != nil {
-		t.Errorf("watch cache didn't propagated correctly: %v", err)
-	}
 
 	result := &api.PodList{}
-	if err := cacher.ListFromMemory("pods/ns", result); err != nil {
+	if err := cacher.List(context.TODO(), "pods/ns", 5, storage.Everything, result); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != "5" {
