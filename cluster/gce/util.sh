@@ -751,7 +751,7 @@ function kube-up {
   done
 
   if [ "$NETWORK_PROVIDER" == opencontrail ] && [ "$NETWORK_PROVIDER_GATEWAY_ON_MINION" != true ]; then
-     echo "Creating $NETWORK_PROVIDER gateway"
+     echo -e "\nCreating $NETWORK_PROVIDER gateway"
 
      NETWORK_PROVIDER_GW_RESERVED_IP=$(gcloud compute addresses create "${NETWORK_PROVIDER_GATEWAY_NAME}-ip" \
                                   --project "${PROJECT}" \

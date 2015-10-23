@@ -4,7 +4,6 @@ metadata:
   name: kube-dns
   namespace: kube-system
   labels:
-    name: dns
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "KubeDNS"
