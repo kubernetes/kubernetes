@@ -179,7 +179,9 @@ func (e *streamExecutor) Stream(stdin io.Reader, stdout, stderr io.Writer, tty b
 			tty:    tty,
 		}
 	case "":
-		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to unversioned")
+		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", StreamProtocolV1Name)
+		fallthrough
+	case StreamProtocolV1Name:
 		streamer = &streamProtocolV1{
 			stdin:  stdin,
 			stdout: stdout,
