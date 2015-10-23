@@ -463,6 +463,45 @@ runTests() {
   # Post-condition: no PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ## kubectl apply should update configuration annotations only if apply is already called
+  ## 1. kubectl create doesn't set the annotation
+  # Pre-Condition: no POD is running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create a pod "test-pod"
+  kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is running
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Post-Condition: pod "test-pod" doesn't have configuration annotation
+  ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  ## 2. kubectl replace doesn't set the annotation
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | sed 's/test-pod-label/test-pod-replaced/g' > "${KUBE_TEMP}"/test-pod-replace.yaml
+  # Command: replace the pod "test-pod"
+  kubectl replace -f "${KUBE_TEMP}"/test-pod-replace.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is replaced
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-replaced'
+  # Post-Condition: pod "test-pod" doesn't have configuration annotation
+  ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  ## 3. kubectl apply does set the annotation
+  # Command: apply the pod "test-pod"
+  kubectl apply -f hack/testdata/pod-apply.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is applied
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-applied'
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration > "${KUBE_TEMP}"/annotation-configuration
+  ## 4. kubectl replace updates an existing annotation
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | sed 's/test-pod-applied/test-pod-replaced/g' > "${KUBE_TEMP}"/test-pod-replace.yaml
+  # Command: replace the pod "test-pod"
+  kubectl replace -f "${KUBE_TEMP}"/test-pod-replace.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is replaced
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-replaced'
+  # Post-Condition: pod "test-pod" has configuration annotation, and it's updated (different from the annotation when it's applied)
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration > "${KUBE_TEMP}"/annotation-configuration-replaced
+  ! [[ $(diff -q "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced > /dev/null) ]]
+  # Clean up
+  rm "${KUBE_TEMP}"/test-pod-replace.yaml "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced
+
   ##############
   # Namespaces #
   ##############
