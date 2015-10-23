@@ -282,6 +282,10 @@ func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object, 
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
+
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
@@ -320,6 +324,10 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object, re
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
+
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
@@ -364,6 +372,10 @@ func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Obj
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
+
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 

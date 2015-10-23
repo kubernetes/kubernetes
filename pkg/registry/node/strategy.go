@@ -29,7 +29,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -153,17 +152,19 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	}
 	host := hostIP.String()
 
-	if portReq == "" || strconv.Itoa(ports.KubeletPort) == portReq {
-		// Ignore requested scheme, use scheme provided by GetConnectionInfo
-		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(host)
+	// Use the kubelet's scheme and transport if either:
+	// - no port is specified in request (Kubelet's port is default),
+	// - the port specified in the request is the Kubelet's port
+	kubeletScheme, kubletPort, kubeletTransport, err := connection.GetConnectionInfo(ctx, name)
+	if portReq == "" || strconv.Itoa(int(kubletPort)) == portReq {
 		if err != nil {
 			return nil, nil, err
 		}
 		return &url.URL{
-				Scheme: scheme,
+				Scheme: kubeletScheme,
 				Host: net.JoinHostPort(
 					host,
-					strconv.FormatUint(uint64(port), 10),
+					strconv.Itoa(int(kubletPort)),
 				),
 			},
 			kubeletTransport,

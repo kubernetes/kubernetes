@@ -59,6 +59,9 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
 	return &genericrest.LocationStreamer{
 		Location:        location,
 		Transport:       transport,

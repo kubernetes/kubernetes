@@ -32,7 +32,7 @@ import (
 type fakeConnectionInfoGetter struct {
 }
 
-func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (fakeConnectionInfoGetter) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
 	return "http", 12345, nil, nil
 }
 
