@@ -544,6 +544,7 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 		t.Fatalf("unexpected error: %v", err)
 	}
 	runningPod := kubecontainer.Pods(runningPods).FindPodByID(pod.UID)
+
 	podStatus, err := dm.GetPodStatus(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -710,6 +711,14 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
 			Names: []string{"/k8s_bar1_foo1_new_12345678_0"},
 			ID:    "1234",
+		},
+	}
+
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"1234": {
+			ID:         "1234",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
 		},
 	}
 
@@ -1526,49 +1535,16 @@ func TestGetRestartCount(t *testing.T) {
 			Namespace: "new",
 		},
 		Spec: api.PodSpec{
-			Containers: containers,
+			Containers:    containers,
+			RestartPolicy: "Always",
 		},
 	}
 
-	// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-	names := []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"}
-	currTime := time.Now()
-	containerMap := map[string]*docker.Container{
-		"1234": {
-			ID:     "1234",
-			Name:   "bar",
-			Config: &docker.Config{},
-			State: docker.State{
-				ExitCode:   42,
-				StartedAt:  currTime.Add(-60 * time.Second),
-				FinishedAt: currTime.Add(-60 * time.Second),
-			},
-		},
-		"5678": {
-			ID:     "5678",
-			Name:   "bar",
-			Config: &docker.Config{},
-			State: docker.State{
-				ExitCode:   42,
-				StartedAt:  currTime.Add(-30 * time.Second),
-				FinishedAt: currTime.Add(-30 * time.Second),
-			},
-		},
-		"9101": {
-			ID:     "9101",
-			Name:   "bar",
-			Config: &docker.Config{},
-			State: docker.State{
-				ExitCode:   42,
-				StartedAt:  currTime.Add(30 * time.Minute),
-				FinishedAt: currTime.Add(30 * time.Minute),
-			},
-		},
-	}
-	fakeDocker.ContainerMap = containerMap
+	fakeDocker.ContainerMap = map[string]*docker.Container{}
 
 	// Helper function for verifying the restart count.
 	verifyRestartCount := func(pod *api.Pod, expectedCount int) api.PodStatus {
+		runSyncPod(t, dm, fakeDocker, pod, nil)
 		status, err := dm.GetPodStatus(pod)
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
@@ -1580,21 +1556,48 @@ func TestGetRestartCount(t *testing.T) {
 		return *status
 	}
 
-	// Container "bar" has failed twice; create two dead docker containers.
+	killOneContainer := func(pod *api.Pod) {
+		status, err := dm.GetPodStatus(pod)
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		containerID := kubecontainer.ParseContainerID(status.ContainerStatuses[0].ContainerID)
+		dm.KillContainerInPod(containerID, &pod.Spec.Containers[0], pod)
+	}
+	// Container "bar" starts the first time.
 	// TODO: container lists are expected to be sorted reversely by time.
 	// We should fix FakeDockerClient to sort the list before returning.
-	fakeDocker.ExitedContainerList = []docker.APIContainers{{Names: names, ID: "5678"}, {Names: names, ID: "1234"}}
+	// (randome-liu) Just partially sorted now.
+	pod.Status = verifyRestartCount(&pod, 0)
+	killOneContainer(&pod)
+
+	// Poor container "bar" has been killed, and should be restarted with restart count 1
 	pod.Status = verifyRestartCount(&pod, 1)
+	killOneContainer(&pod)
 
-	// Found a new dead container. The restart count should be incremented.
-	fakeDocker.ExitedContainerList = []docker.APIContainers{
-		{Names: names, ID: "9101"}, {Names: names, ID: "5678"}, {Names: names, ID: "1234"}}
+	// Poor container "bar" has been killed again, and should be restarted with restart count 2
 	pod.Status = verifyRestartCount(&pod, 2)
+	killOneContainer(&pod)
 
-	// All dead containers have been GC'd. The restart count should persist
-	// (i.e., remain the same).
+	// Poor container "bar" has been killed again ang again, and should be restarted with restart count 3
+	pod.Status = verifyRestartCount(&pod, 3)
+
+	// The oldest container has been garbage collected
+	exitedContainers := fakeDocker.ExitedContainerList
+	fakeDocker.ExitedContainerList = exitedContainers[:len(exitedContainers)-1]
+	pod.Status = verifyRestartCount(&pod, 3)
+
+	// The last two oldest containers have been garbage collected
+	fakeDocker.ExitedContainerList = exitedContainers[:len(exitedContainers)-2]
+	pod.Status = verifyRestartCount(&pod, 3)
+
+	// All exited containers have been garbage collected
 	fakeDocker.ExitedContainerList = []docker.APIContainers{}
-	verifyRestartCount(&pod, 2)
+	pod.Status = verifyRestartCount(&pod, 3)
+	killOneContainer(&pod)
+
+	// Poor container "bar" has been killed again ang again and again, and should be restarted with restart count 4
+	pod.Status = verifyRestartCount(&pod, 4)
 }
 
 func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
