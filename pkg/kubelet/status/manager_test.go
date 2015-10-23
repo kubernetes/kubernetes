@@ -24,9 +24,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var testPod *api.Pod = &api.Pod{
@@ -284,6 +286,58 @@ func TestSyncBatchChecksMismatchedUID(t *testing.T) {
 	verifyActions(t, syncer.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 	})
+}
+
+func TestSyncBatchNoDeadlock(t *testing.T) {
+	client := testclient.Fake{}
+	m := NewManager(&client).(*manager)
+
+	// Force full channel condition.
+	m.podStatusChannel = make(chan podStatusSyncRequest)
+
+	// Setup fake client.
+	var ret api.Pod
+	var err error
+	client.AddReactor("*", "pods", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, &ret, err
+	})
+
+	pod := new(api.Pod)
+	*pod = *testPod
+	pod.Status.ContainerStatuses = []api.ContainerStatus{{State: api.ContainerState{Running: &api.ContainerStateRunning{}}}}
+
+	go func() {
+		for {
+			m.SetPodStatus(pod, getRandomPodStatus())
+		}
+	}()
+
+	// Pod not found.
+	ret = *pod
+	err = errors.NewNotFound("pods", pod.Name)
+	m.syncBatch()
+
+	// Pod was recreated.
+	ret.UID = "other_pod"
+	err = nil
+	m.syncBatch()
+
+	// Pod not deleted (success case).
+	ret = *pod
+	m.syncBatch()
+
+	// Pod is terminated, but still running.
+	pod.DeletionTimestamp = new(unversioned.Time)
+	m.syncBatch()
+
+	// Pod is terminated successfully.
+	pod.Status.ContainerStatuses[0].State.Running = nil
+	pod.Status.ContainerStatuses[0].State.Terminated = &api.ContainerStateTerminated{}
+	m.syncBatch()
+
+	// Error case.
+	err = fmt.Errorf("intentional test error")
+	m.syncBatch()
 }
 
 // shuffle returns a new shuffled list of container statuses.
