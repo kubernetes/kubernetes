@@ -153,30 +153,17 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	}
 	host := hostIP.String()
 
-	// We check if we want to get a default Kubelet's transport. It happens if either:
-	// - no port is specified in request (Kubelet's port is default),
-	// - we're using Port stored as a DaemonEndpoint and requested port is a Kubelet's port stored in the DaemonEndpoint,
-	// - there's no information in the API about DaemonEnpoint (legacy cluster) and requested port is equal to ports.KubeletPort (cluster-wide config)
-	defaultKubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
-	if defaultKubeletPort == 0 {
-		defaultKubeletPort = ports.KubeletPort
-	}
-	if portReq == "" || strconv.Itoa(defaultKubeletPort) == portReq {
+	if portReq == "" || strconv.Itoa(ports.KubeletPort) == portReq {
+		// Ignore requested scheme, use scheme provided by GetConnectionInfo
 		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(host)
 		if err != nil {
 			return nil, nil, err
-		}
-		var portString string
-		if node.Status.DaemonEndpoints.KubeletEndpoint.Port != 0 {
-			portString = strconv.Itoa(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
-		} else {
-			portString = strconv.FormatUint(uint64(port), 10)
 		}
 		return &url.URL{
 				Scheme: scheme,
 				Host: net.JoinHostPort(
 					host,
-					portString,
+					strconv.FormatUint(uint64(port), 10),
 				),
 			},
 			kubeletTransport,
