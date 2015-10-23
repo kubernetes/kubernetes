@@ -74,7 +74,7 @@ For the purposes of brevity, we will look at a subset of the options, which are 
 -repo-root="../../": Root directory of kubernetes repository, for finding test files.
 ```
 
-Prior to running the tests, it is recommended that you first create a simple auth file in your home directory, e.g. `$HOME/.kubernetes_auth` , with the following:
+Prior to running the tests, it is recommended that you first create a simple auth file in your home directory, e.g. `$HOME/.kube/config` , with the following:
 
 ```
 {
@@ -85,7 +85,7 @@ Prior to running the tests, it is recommended that you first create a simple aut
 
 Next, you will need a cluster that you can test against.  As mentioned earlier, you will want to execute `sudo ./hack/local-up-cluster.sh`.  To get a sense of what tests exist, you may want to run:
 
-`e2e.test --host="127.0.0.1:8080" --provider="local" --ginkgo.v=true -ginkgo.dryRun=true --kubeconfig="$HOME/.kubernetes_auth" --repo-root="$KUBERNETES_SRC_PATH"`
+`e2e.test --host="127.0.0.1:8080" --provider="local" --ginkgo.v=true -ginkgo.dryRun=true --kubeconfig="$HOME/.kube/config" --repo-root="$KUBERNETES_SRC_PATH"`
 
 If you wish to execute a specific set of tests you can use the `-ginkgo.focus=` regex, e.g.:
 
