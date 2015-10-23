@@ -2095,7 +2095,11 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 		return fmt.Errorf("unable to get logs for container %q in pod %q namespace %q: unable to find pod", containerName, name, namespace)
 	}
 
-	podStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	podUID := pod.UID
+	if mirrorPod, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
+		podUID = mirrorPod.UID
+	}
+	podStatus, found := kl.statusManager.GetPodStatus(podUID)
 	if !found {
 		return fmt.Errorf("failed to get status for pod %q in namespace %q", name, namespace)
 	}
