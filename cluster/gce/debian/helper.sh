@@ -192,8 +192,8 @@ function create-network-provider-gw {
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MINION_SIZE}" \
-    --image-project="${KUBE_GCE_MINION_PROJECT}" \
-    --image "${KUBE_GCE_MINION_IMAGE}" \
+    --image-project="${MINION_IMAGE_PROJECT}" \
+    --image "${MINION_IMAGE}" \
     --tags "${NETWORK_PROVIDER_GATEWAY_TAG}" \
     --network "${NETWORK}" \
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
