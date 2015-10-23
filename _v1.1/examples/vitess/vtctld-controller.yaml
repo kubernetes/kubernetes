@@ -1,0 +1,47 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: vtctld
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: vtctld
+        app: vitess
+    spec:
+      containers:
+        - name: vtctld
+          image: vitess/lite:v2.0.0-alpha3
+          volumeMounts:
+            - name: syslog
+              mountPath: /dev/log
+            - name: vtdataroot
+              mountPath: /vt/vtdataroot
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          command:
+            - sh
+            - "-c"
+            - >-
+              mkdir -p $VTDATAROOT/tmp &&
+              chown -R vitess /vt &&
+              su -p -c "/vt/bin/vtctld
+              -debug
+              -templates $VTTOP/go/cmd/vtctld/templates
+              -web_dir $VTTOP/web/vtctld
+              -log_dir $VTDATAROOT/tmp
+              -alsologtostderr
+              -port 15000
+              -service_map 'bsonrpc-vt-vtctl'
+              -topo_implementation etcd
+              -tablet_protocol grpc
+              -tablet_manager_protocol grpc
+              -etcd_global_addrs http://$ETCD_GLOBAL_SERVICE_HOST:$ETCD_GLOBAL_SERVICE_PORT" vitess
+      volumes:
+        - name: syslog
+          hostPath: {path: /dev/log}
+        - name: vtdataroot
+          emptyDir: {}
