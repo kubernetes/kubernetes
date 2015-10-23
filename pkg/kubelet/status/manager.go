@@ -241,26 +241,27 @@ func (m *manager) syncBatch() error {
 				return nil
 			}
 			if !notRunning(pod.Status.ContainerStatuses) {
-				glog.V(3).Infof("Pod %q is terminated, but some pods are still running", pod.Name)
+				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", pod.Name)
 				return nil
 			}
-			if err := m.kubeClient.Pods(statusPod.Namespace).Delete(statusPod.Name, api.NewDeleteOptions(0)); err == nil {
+			if err = m.kubeClient.Pods(statusPod.Namespace).Delete(statusPod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", statusPod.Name)
-				m.DeletePodStatus(pod.UID)
-				return nil
+				// Proceed to delete status.
 			}
 		}
+	} else {
+		// We failed to update status. In order to make sure we retry next time
+		// we delete cached value. This may result in an additional update, but
+		// this is ok.
+		err = fmt.Errorf("error updating status for pod %q: %v", kubeletutil.FormatPodName(pod), err)
 	}
 
-	// We failed to update status. In order to make sure we retry next time
-	// we delete cached value. This may result in an additional update, but
-	// this is ok.
 	// Doing this synchronously will lead to a deadlock if the podStatusChannel
 	// is full, and the pod worker holding the lock is waiting on this method
 	// to clear the channel. Even if this delete never runs subsequent container
 	// changes on the node should trigger updates.
 	go m.DeletePodStatus(pod.UID)
-	return fmt.Errorf("error updating status for pod %q: %v", kubeletutil.FormatPodName(pod), err)
+	return err
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
