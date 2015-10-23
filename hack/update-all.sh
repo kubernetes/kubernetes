@@ -45,7 +45,9 @@ BASH_TARGETS="codecgen
 	generated-deep-copies 
 	generated-docs 
 	generated-swagger-docs 
-	swagger-spec"
+	swagger-spec
+	api-reference-docs"
+
 
 for t in $BASH_TARGETS
 do
