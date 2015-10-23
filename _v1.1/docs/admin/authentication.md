@@ -25,9 +25,11 @@ The token file format is implemented in `plugin/pkg/auth/authenticator/token/tok
 and is a csv file with a minimum of 3 columns: token, user name, user uid, followed by
 optional group names. Note, if you have more than one group the column must be double quoted e.g.
 
+```
 {% raw %}
 token,user,uid,"group1,group2,group3"
 {% endraw %}
+```
 
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.

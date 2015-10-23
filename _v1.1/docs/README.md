@@ -7,7 +7,7 @@ title: "</strong>"
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Documentation: releases.k8s.io/
+# Kubernetes Documentation: releases.k8s.io/v1.1.0
 
 * The [User's guide](user-guide/README.html) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
