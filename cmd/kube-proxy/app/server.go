@@ -67,6 +67,7 @@ type ProxyServerConfig struct {
 	CleanupAndExit     bool
 	KubeApiQps         float32
 	KubeApiBurst       int
+	UDPIdleTimeout     time.Duration
 }
 
 type ProxyServer struct {
@@ -94,6 +95,7 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
 	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 }
 
 const (
@@ -122,6 +124,7 @@ func NewProxyConfig() *ProxyServerConfig {
 		ConfigSyncPeriod:   15 * time.Minute,
 		KubeApiQps:         5.0,
 		KubeApiBurst:       10,
+		UDPIdleTimeout:     250 * time.Millisecond,
 	}
 }
 
@@ -238,7 +241,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		// set EndpointsConfigHandler to our loadBalancer
 		endpointsHandler = loadBalancer
 
-		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.IptablesSyncPeriod)
+		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.IptablesSyncPeriod, config.UDPIdleTimeout)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
