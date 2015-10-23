@@ -178,11 +178,12 @@ func rewriteLinks(filename string, fileBytes []byte) []byte {
 }
 
 var (
-	// Allow more than 3 tick because people write this stuff.
+	// Allow more than 3 ticks because people write this stuff.
 	ticticticRE    = regexp.MustCompile("^`{3,}\\s*(.*)$")
 	notTicticticRE = regexp.MustCompile("^```(.*)```")
 	languageFixups = map[string]string{
-		"shell": "sh",
+		"shell":  "sh",
+		"golang": "go",
 	}
 )
 
