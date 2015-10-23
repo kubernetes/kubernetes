@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/pkg/term"
@@ -33,8 +34,13 @@ import (
 
 const (
 	// sorry, blame Git
+	// TODO: on Windows rely on 'start' to launch the editor associated
+	// with the given file type. If we can't because of the need of
+	// blocking, use a script with 'ftype' and 'assoc' to detect it.
 	defaultEditor = "vi"
 	defaultShell  = "/bin/bash"
+	windowsEditor = "notepad"
+	windowsShell  = "cmd"
 )
 
 type Editor struct {
@@ -58,15 +64,19 @@ func NewDefaultEditor() Editor {
 func defaultEnvShell() []string {
 	shell := os.Getenv("SHELL")
 	if len(shell) == 0 {
-		shell = defaultShell
+		shell = platformize(defaultShell, windowsShell)
 	}
-	return []string{shell, "-c"}
+	flag := "-c"
+	if shell == windowsShell {
+		flag = "/C"
+	}
+	return []string{shell, flag}
 }
 
 func defaultEnvEditor() ([]string, bool) {
 	editor := os.Getenv("EDITOR")
 	if len(editor) == 0 {
-		editor = defaultEditor
+		editor = platformize(defaultEditor, windowsEditor)
 	}
 	if !strings.Contains(editor, " ") {
 		return []string{editor}, false
@@ -133,6 +143,8 @@ func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, stri
 		os.Remove(path)
 		return nil, path, err
 	}
+	// This file descriptor needs to close so the next process (Launch) can claim it.
+	f.Close()
 	if err := e.Launch(path); err != nil {
 		return nil, path, err
 	}
@@ -196,4 +208,11 @@ func randSeq(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func platformize(linux, windows string) string {
+	if runtime.GOOS == "windows" {
+		return windows
+	}
+	return linux
 }
