@@ -89,6 +89,8 @@ type Factory struct {
 	Generator func(name string) (kubectl.Generator, bool)
 	// Check whether the kind of resources could be exposed
 	CanBeExposed func(kind string) error
+	// Check whether the kind of resources could be autoscaled
+	CanBeAutoscaled func(kind string) error
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -101,10 +103,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	generators := map[string]kubectl.Generator{
-		"run/v1":     kubectl.BasicReplicationController{},
-		"run-pod/v1": kubectl.BasicPod{},
-		"service/v1": kubectl.ServiceGeneratorV1{},
-		"service/v2": kubectl.ServiceGeneratorV2{},
+		"run/v1":                          kubectl.BasicReplicationController{},
+		"run-pod/v1":                      kubectl.BasicPod{},
+		"service/v1":                      kubectl.ServiceGeneratorV1{},
+		"service/v2":                      kubectl.ServiceGeneratorV2{},
+		"horizontalpodautoscaler/v1beta1": kubectl.HorizontalPodAutoscalerV1Beta1{},
 	}
 
 	clientConfig := optionalClientConfig
@@ -252,6 +255,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		CanBeExposed: func(kind string) error {
 			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
 				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
+		},
+		CanBeAutoscaled: func(kind string) error { // TODO: support autoscale for deployments
+			if kind != "ReplicationController" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller is accepted", kind)
 			}
 			return nil
 		},

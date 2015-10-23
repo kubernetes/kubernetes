@@ -4,6 +4,7 @@ docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply.1
 docs/man/man1/kubectl-attach.1
+docs/man/man1/kubectl-autoscale.1
 docs/man/man1/kubectl-cluster-info.1
 docs/man/man1/kubectl-config-set-cluster.1
 docs/man/man1/kubectl-config-set-context.1
@@ -38,6 +39,7 @@ docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
 docs/user-guide/kubectl/kubectl_attach.md
+docs/user-guide/kubectl/kubectl_autoscale.md
 docs/user-guide/kubectl/kubectl_cluster-info.md
 docs/user-guide/kubectl/kubectl_config.md
 docs/user-guide/kubectl/kubectl_config_set-cluster.md

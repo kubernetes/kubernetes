@@ -189,6 +189,9 @@ runTests() {
   port_field="(index .spec.ports 0).port"
   port_name="(index .spec.ports 0).name"
   image_field="(index .spec.containers 0).image"
+  hpa_min_field=".spec.minReplicas"
+  hpa_max_field=".spec.maxReplicas"
+  hpa_cpu_field=".spec.cpuUtilization.targetPercentage"
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -727,6 +730,25 @@ __EOF__
   kubectl stop rc frontend redis-slave "${kube_flags[@]}" # delete multiple controllers at once
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Auto scale replication controller
+  # Pre-condition: no replication controller is running
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
+  # autoscale 1~2 pods, CPU utilization 70%, rc specified by file
+  kubectl autoscale -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  # autoscale 2~3 pods, default CPU utilization (80%), rc specified by name
+  kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  # autoscale without specifying --max should fail
+  ! kubectl autoscale rc frontend "${kube_flags[@]}"
+  # Clean up
+  kubectl delete rc frontend "${kube_flags[@]}"
 
   ######################
   # Multiple Resources #
