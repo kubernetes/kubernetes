@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"regexp"
 	"strings"
 
@@ -67,9 +66,9 @@ func stripHTML(filename string) error {
 
 // replace http://releases.k8s.io/HEAD/docs/xxx.md with
 // http://kubernetes.io/v1.0/docs/xxx.html
-func fixLinks(fileName, outputDir string) error {
+func fixLinks(fileName, version string) error {
 	mdRE := regexp.MustCompile(`http://releases.k8s.io/HEAD/docs(.*?\.)md`)
-	repl := []byte("http://kubernetes.io/" + path.Base(outputDir) + "/docs" + "${1}" + "html")
+	repl := []byte("http://kubernetes.io/" + version + "/docs" + "${1}" + "html")
 	file, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return err
@@ -115,14 +114,14 @@ func moveHTML(filePath string, outputDir string) error {
 	return os.Rename(filePath, outputDir+"/../_includes/"+fileName)
 }
 
-func processHTML(filePath string, outputDir string) error {
+func processHTML(filePath string, version string, outputDir string) error {
 	if err := stripHTML(filePath); err != nil {
 		return err
 	}
 	if err := nitFix(filePath); err != nil {
 		return err
 	}
-	if err := fixLinks(filePath, outputDir); err != nil {
+	if err := fixLinks(filePath, version); err != nil {
 		return err
 	}
 	if err := moveHTML(filePath, outputDir); err != nil {
