@@ -125,6 +125,7 @@ func TestSingleWatch(t *testing.T) {
 			InvolvedObject: api.ObjectReference{
 				Namespace: ns,
 				Name:      name,
+				Kind:      "Pod",
 			},
 			Reason: fmt.Sprintf("event %v", i),
 		}
