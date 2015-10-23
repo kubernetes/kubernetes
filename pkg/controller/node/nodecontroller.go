@@ -637,6 +637,32 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 				readyCondition.LastTransitionTime = nc.now()
 			}
 		}
+
+		// Like NodeReady condition, NodeOutOfDisk was last set longer ago than gracePeriod, so update
+		// it to Unknown (regardless of its current value) in the master, without contacting kubelet.
+		oodCondition := nc.getCondition(&node.Status, api.NodeOutOfDisk)
+		if oodCondition == nil {
+			glog.V(2).Infof("Out of disk condition of node %v is never updated by kubelet", node.Name)
+			oodCondition := &api.NodeCondition{
+				Type:               api.NodeOutOfDisk,
+				Status:             api.ConditionUnknown,
+				Reason:             "NodeStatusNeverUpdated",
+				Message:            fmt.Sprintf("Kubelet never posted node status."),
+				LastHeartbeatTime:  node.CreationTimestamp,
+				LastTransitionTime: nc.now(),
+			}
+			node.Status.Conditions = append(node.Status.Conditions, *oodCondition)
+		} else {
+			glog.V(2).Infof("node %v hasn't been updated for %+v. Last out of disk condition is: %+v",
+				node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), oodCondition)
+			if oodCondition.Status != api.ConditionUnknown {
+				oodCondition.Status = api.ConditionUnknown
+				oodCondition.Reason = "NodeStatusUnknown"
+				oodCondition.Message = fmt.Sprintf("Kubelet stopped posting node status.")
+				oodCondition.LastTransitionTime = nc.now()
+			}
+		}
+
 		if !api.Semantic.DeepEqual(nc.getCondition(&node.Status, api.NodeReady), lastReadyCondition) {
 			if _, err = nc.kubeClient.Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)

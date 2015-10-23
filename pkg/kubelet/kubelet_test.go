@@ -2478,6 +2478,23 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock
+	// FsInfo values added to Cadvisor should make the kubelet report that it has sufficient
+	// disk space.
+	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
+	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
+	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
+	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
+
+	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	if err != nil {
+		t.Fatalf("can't update disk space manager: %v", err)
+	}
+	diskSpaceManager.Unfreeze()
+	kubelet.diskSpaceManager = diskSpaceManager
+
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
@@ -2488,6 +2505,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeOutOfDisk,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -2529,14 +2554,17 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
-	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
-		t.Errorf("unexpected zero last probe timestamp")
+	for i, cond := range updatedNode.Status.Conditions {
+		if cond.LastHeartbeatTime.IsZero() {
+			t.Errorf("unexpected zero last probe timestamp for %v condition", cond.Type)
+		}
+		if cond.LastTransitionTime.IsZero() {
+			t.Errorf("unexpected zero last transition timestamp for %v condition", cond.Type)
+		}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
 	}
-	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
-		t.Errorf("unexpected zero last transition timestamp")
-	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = unversioned.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = unversioned.Time{}
+
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
@@ -2557,6 +2585,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletReady",
 						Message:            fmt.Sprintf("kubelet is posting ready status"),
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:               api.NodeOutOfDisk,
+						Status:             api.ConditionTrue,
+						Reason:             "KubeletOutOfDisk",
+						Message:            "out of disk space",
 						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
@@ -2584,6 +2620,22 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock FsInfo
+	// values added to Cadvisor should make the kubelet report that it is out of disk space.
+	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 70 * mb}
+	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 50 * mb}
+	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
+	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
+
+	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	if err != nil {
+		t.Fatalf("can't update disk space manager: %v", err)
+	}
+	diskSpaceManager.Unfreeze()
+	kubelet.diskSpaceManager = diskSpaceManager
+
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
@@ -2594,6 +2646,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
+					LastHeartbeatTime:  unversioned.Time{}, // placeholder
+					LastTransitionTime: unversioned.Time{}, // placeholder
+				},
+				{
+					Type:               api.NodeOutOfDisk,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletOutOfDisk",
+					Message:            "out of disk space",
 					LastHeartbeatTime:  unversioned.Time{}, // placeholder
 					LastTransitionTime: unversioned.Time{}, // placeholder
 				},
@@ -2636,16 +2696,18 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
-	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastHeartbeatTime.Rfc3339Copy().UTC(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
-		t.Errorf("expected \n%v\n, got \n%v", unversioned.Now(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
+	for i, cond := range updatedNode.Status.Conditions {
+		// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
+		if old := unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time; reflect.DeepEqual(cond.LastHeartbeatTime.Rfc3339Copy().UTC(), old) {
+			t.Errorf("Condition %v LastProbeTime: expected \n%v\n, got \n%v", cond.Type, unversioned.Now(), old)
+		}
+		if got, want := cond.LastTransitionTime.Rfc3339Copy().UTC(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time; !reflect.DeepEqual(got, want) {
+			t.Errorf("Condition %v LastTransitionTime: expected \n%#v\n, got \n%#v", cond.Type, want, got)
+		}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
 	}
-	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy().UTC(), unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
-		t.Errorf("expected \n%#v\n, got \n%#v", updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy(),
-			unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
-	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = unversioned.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = unversioned.Time{}
+
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
 	}
@@ -2679,6 +2741,21 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
+	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock FsInfo
+	// values added to Cadvisor should make the kubelet report that it is out of disk space.
+	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
+	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
+	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
+	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
+
+	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	if err != nil {
+		t.Fatalf("can't update disk space manager: %v", err)
+	}
+	diskSpaceManager.Unfreeze()
+	kubelet.diskSpaceManager = diskSpaceManager
+
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
@@ -2689,6 +2766,14 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletNotReady",
 					Message:            fmt.Sprintf("container runtime is down"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeOutOfDisk,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            "kubelet has sufficient disk space available",
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -2732,14 +2817,17 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
 	}
 
-	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
-		t.Errorf("unexpected zero last probe timestamp")
+	for i, cond := range updatedNode.Status.Conditions {
+		if cond.LastHeartbeatTime.IsZero() {
+			t.Errorf("unexpected zero last probe timestamp")
+		}
+		if cond.LastTransitionTime.IsZero() {
+			t.Errorf("unexpected zero last transition timestamp")
+		}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
 	}
-	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
-		t.Errorf("unexpected zero last transition timestamp")
-	}
-	updatedNode.Status.Conditions[0].LastHeartbeatTime = unversioned.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = unversioned.Time{}
+
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
