@@ -46,7 +46,6 @@ const isNegativeErrorMsg string = `must be non-negative`
 const fieldImmutableErrorMsg string = `field is immutable`
 const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNotIntegerErrorMsg string = `must be an integer`
-const fieldImmutableErrorMsg string = `field is immutable`
 
 func IntervalErrorMsg(lo, hi int) string {
 	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
