@@ -47,7 +47,11 @@ be changed without restarting apiserver.
 
 The token file format is implemented in `plugin/pkg/auth/authenticator/token/tokenfile/...`
 and is a csv file with a minimum of 3 columns: token, user name, user uid, followed by
-optional group names.
+optional group names. Note, if you have more than one group the column must be double quoted e.g.
+
+```csv
+token,user,uid,"group1,group2,group3"
+```
 
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.
