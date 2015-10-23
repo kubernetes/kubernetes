@@ -38,17 +38,17 @@ To help explain how cluster level logging works let’s start off with a synthet
 
 {% highlight yaml %}
 {% raw %}
- apiVersion: v1
- kind: Pod
- metadata:
-   name: counter
-   namespace: default
- spec:
-   containers:
-   - name: count
-     image: ubuntu:14.04
-     args: [bash, -c, 
-            'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
+apiVersion: v1
+kind: Pod
+metadata:
+  name: counter
+  namespace: default
+spec:
+  containers:
+  - name: count
+    image: ubuntu:14.04
+    args: [bash, -c, 
+           'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 {% endraw %}
 {% endhighlight %}
 
