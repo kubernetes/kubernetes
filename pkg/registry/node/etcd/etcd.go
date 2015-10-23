@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -102,26 +101,4 @@ var _ = rest.Redirector(&REST{})
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
-}
-
-// An interface for types that allow getting information about a Node on which give pod is running.
-type HostLocator interface {
-	HostKubeletPort(pod *api.Pod, ctx api.Context) (int, error)
-}
-
-var _ = HostLocator(&REST{})
-
-func (r *REST) HostKubeletPort(pod *api.Pod, ctx api.Context) (int, error) {
-	obj, err := r.Get(ctx, pod.Spec.NodeName)
-	if err != nil {
-		return 0, err
-	}
-	node := obj.(*api.Node)
-	if node == nil {
-		return 0, fmt.Errorf("Unexpected object type: %#v", node)
-	}
-	if node.Status.DaemonEndpoints.KubeletEndpoint.Port == 0 {
-		return -1, nil
-	}
-	return node.Status.DaemonEndpoints.KubeletEndpoint.Port, nil
 }

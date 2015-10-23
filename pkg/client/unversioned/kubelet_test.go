@@ -40,7 +40,8 @@ func TestHTTPKubeletClient(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	if _, err := url.Parse(testServer.URL); err != nil {
+	_, err = url.Parse(testServer.URL)
+	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

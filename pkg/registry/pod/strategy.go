@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
@@ -229,14 +228,7 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Conte
 
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func LogLocation(
-	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
-	ctx api.Context,
-	name string,
-	opts *api.PodLogOptions,
-	hostLocator nodeetcd.HostLocator,
-) (*url.URL, http.RoundTripper, error) {
+func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -259,13 +251,6 @@ func LogLocation(
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {
 		return nil, nil, err
-	}
-	daemonPort, err := hostLocator.HostKubeletPort(pod, ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if daemonPort > 0 {
-		nodePort = uint(daemonPort)
 	}
 	params := url.Values{}
 	if opts.Follow {
@@ -337,40 +322,17 @@ func streamParams(params url.Values, opts runtime.Object) error {
 
 // AttachLocation returns the attach URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func AttachLocation(
-	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
-	ctx api.Context,
-	name string,
-	opts *api.PodAttachOptions,
-	hostLocator nodeetcd.HostLocator,
-) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "attach", hostLocator)
+func AttachLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodAttachOptions) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "attach")
 }
 
 // ExecLocation returns the exec URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func ExecLocation(
-	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
-	ctx api.Context,
-	name string,
-	opts *api.PodExecOptions,
-	hostLocator nodeetcd.HostLocator,
-) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec", hostLocator)
+func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
 }
 
-func streamLocation(
-	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
-	ctx api.Context,
-	name string,
-	opts runtime.Object,
-	container,
-	path string,
-	hostLocator nodeetcd.HostLocator,
-) (*url.URL, http.RoundTripper, error) {
+func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts runtime.Object, container, path string) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -393,13 +355,6 @@ func streamLocation(
 	if err != nil {
 		return nil, nil, err
 	}
-	daemonPort, err := hostLocator.HostKubeletPort(pod, ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if daemonPort > 0 {
-		nodePort = uint(daemonPort)
-	}
 	params := url.Values{}
 	if err := streamParams(params, opts); err != nil {
 		return nil, nil, err
@@ -414,13 +369,7 @@ func streamLocation(
 }
 
 // PortForwardLocation returns the port-forward URL for a pod.
-func PortForwardLocation(
-	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
-	ctx api.Context,
-	name string,
-	hostLocator nodeetcd.HostLocator,
-) (*url.URL, http.RoundTripper, error) {
+func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -434,13 +383,6 @@ func PortForwardLocation(
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {
 		return nil, nil, err
-	}
-	daemonPort, err := hostLocator.HostKubeletPort(pod, ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if daemonPort > 0 {
-		nodePort = uint(daemonPort)
 	}
 	loc := &url.URL{
 		Scheme: nodeScheme,

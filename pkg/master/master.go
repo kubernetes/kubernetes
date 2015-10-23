@@ -538,6 +538,7 @@ func (m *Master) init(c *Config) {
 	healthzChecks := []healthz.HealthzChecker{}
 
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.get("", resource) }
+	podStorage := podetcd.NewStorage(dbClient("pods"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
 
 	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"))
 
@@ -558,14 +559,6 @@ func (m *Master) init(c *Config) {
 
 	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage)
-
-	podStorage := podetcd.NewStorage(
-		dbClient("pods"),
-		nodeStorage,
-		c.EnableWatchCache,
-		c.KubeletClient,
-		m.proxyTransport,
-	)
 
 	serviceStorage := serviceetcd.NewREST(dbClient("services"))
 	m.serviceRegistry = service.NewRegistry(serviceStorage)

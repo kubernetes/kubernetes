@@ -30,17 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// Defined in pkg/registry/node/etcd/etcd.go
-type HostLocator interface {
-	HostKubeletPort(pod *api.Pod, ctx api.Context) (int, error)
-}
-
 // LogREST implements the log endpoint for a Pod
 // TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
 type LogREST struct {
-	HostLocator HostLocator
-	KubeletConn client.ConnectionInfoGetter
 	Store       *etcdgeneric.Etcd
+	KubeletConn client.ConnectionInfoGetter
 }
 
 // LogREST implements GetterWithOptions
@@ -61,12 +55,9 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
 		return nil, errors.NewInvalid("podlogs", name, errs)
 	}
-	location, transport, err := pod.LogLocation(r.Store, r.KubeletConn, ctx, name, logOpts, r.HostLocator)
+	location, transport, err := pod.LogLocation(r.Store, r.KubeletConn, ctx, name, logOpts)
 	if err != nil {
 		return nil, err
-	}
-	if location.Host == "" {
-		return nil, fmt.Errorf("Empty location.Host in %#v", location)
 	}
 	return &genericrest.LocationStreamer{
 		Location:        location,

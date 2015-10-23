@@ -403,7 +403,7 @@ script
 			echo "Docker daemon failed!"
 			pkill docker
 		fi
-		if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:##KUBELET_PORT##/healthz > /dev/null; then
+		if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:10250/healthz > /dev/null; then
 			echo "Kubelet is unhealthy!"
 			pkill kubelet
 		fi
