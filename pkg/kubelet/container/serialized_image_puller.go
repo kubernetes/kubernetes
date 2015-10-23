@@ -18,6 +18,7 @@ package container
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -25,45 +26,45 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-// imagePuller pulls the image using Runtime.PullImage().
+type imagePullRequest struct {
+	spec        ImageSpec
+	container   *api.Container
+	pullSecrets []api.Secret
+	logPrefix   string
+	ref         *api.ObjectReference
+	returnChan  chan<- error
+}
+
+// serializedImagePuller pulls the image using Runtime.PullImage().
 // It will check the presence of the image, and report the 'image pulling',
 // 'image pulled' events correspondingly.
-type imagePuller struct {
-	recorder record.EventRecorder
-	runtime  Runtime
-	backOff  *util.Backoff
+type serializedImagePuller struct {
+	recorder     record.EventRecorder
+	runtime      Runtime
+	backOff      *util.Backoff
+	pullRequests chan *imagePullRequest
 }
 
 // enforce compatibility.
-var _ ImagePuller = &imagePuller{}
+var _ ImagePuller = &serializedImagePuller{}
 
-// NewImagePuller takes an event recorder and container runtime to create a
+// NewSerializedImagePuller takes an event recorder and container runtime to create a
 // image puller that wraps the container runtime's PullImage interface.
-func NewImagePuller(recorder record.EventRecorder, runtime Runtime, imageBackOff *util.Backoff) ImagePuller {
-	return &imagePuller{
-		recorder: recorder,
-		runtime:  runtime,
-		backOff:  imageBackOff,
+// Pulls one image at a time.
+// Issue #10959 has the rationale behind serializing image pulls.
+func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime, imageBackOff *util.Backoff) ImagePuller {
+	imagePuller := &serializedImagePuller{
+		recorder:     recorder,
+		runtime:      runtime,
+		backOff:      imageBackOff,
+		pullRequests: make(chan *imagePullRequest, 10),
 	}
-}
-
-// shouldPullImage returns whether we should pull an image according to
-// the presence and pull policy of the image.
-func shouldPullImage(container *api.Container, imagePresent bool) bool {
-	if container.ImagePullPolicy == api.PullNever {
-		return false
-	}
-
-	if container.ImagePullPolicy == api.PullAlways ||
-		(container.ImagePullPolicy == api.PullIfNotPresent && (!imagePresent)) {
-		return true
-	}
-
-	return false
+	go util.Until(imagePuller.pullImages, time.Second, util.NeverStop)
+	return imagePuller
 }
 
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
-func (puller *imagePuller) logIt(ref *api.ObjectReference, event, prefix, msg string, logFn func(args ...interface{})) {
+func (puller *serializedImagePuller) logIt(ref *api.ObjectReference, event, prefix, msg string, logFn func(args ...interface{})) {
 	if ref != nil {
 		puller.recorder.Eventf(ref, event, msg)
 	} else {
@@ -72,7 +73,7 @@ func (puller *imagePuller) logIt(ref *api.ObjectReference, event, prefix, msg st
 }
 
 // PullImage pulls the image for the specified pod and container.
-func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
 	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
 	ref, err := GenerateContainerRef(pod, container)
 	if err != nil {
@@ -105,8 +106,18 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 		puller.logIt(ref, "Back-off", logPrefix, msg, glog.Info)
 		return ErrImagePullBackOff, msg
 	}
-	puller.logIt(ref, "Pulling", logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
-	if err := puller.runtime.PullImage(spec, pullSecrets); err != nil {
+
+	// enqueue image pull request and wait for response.
+	returnChan := make(chan error)
+	puller.pullRequests <- &imagePullRequest{
+		spec:        spec,
+		container:   container,
+		pullSecrets: pullSecrets,
+		logPrefix:   logPrefix,
+		ref:         ref,
+		returnChan:  returnChan,
+	}
+	if err = <-returnChan; err != nil {
 		puller.logIt(ref, "Failed", logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
 		if err == RegistryUnavailable {
@@ -119,4 +130,11 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	puller.logIt(ref, "Pulled", logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	puller.backOff.GC()
 	return nil, ""
+}
+
+func (puller *serializedImagePuller) pullImages() {
+	for pullRequest := range puller.pullRequests {
+		puller.logIt(pullRequest.ref, "Pulling", pullRequest.logPrefix, fmt.Sprintf("pulling image %q", pullRequest.container.Image), glog.Info)
+		pullRequest.returnChan <- puller.runtime.PullImage(pullRequest.spec, pullRequest.pullSecrets)
+	}
 }
