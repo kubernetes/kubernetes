@@ -37,7 +37,22 @@ GREP_REGEX=""
 function gcloud-compute-list() {
   local -r resource=$1
   echo -e "\n\n[ ${resource} ]"
-  gcloud compute ${resource} list --project=${PROJECT} ${@:2} | grep "${GREP_REGEX}"
+  local attempt=1
+  local result=""
+  while true; do
+    echo "Attempt ${attempt} to list ${resource} in GCE"
+    if result=$(gcloud compute ${resource} list --project=${PROJECT} ${@:2} | grep "${GREP_REGEX}"); then
+      echo ${result}
+      return
+    fi
+    echo -e "${color_yellow}Attempt ${attempt} failed to list ${resource}. Retrying.${color_norm}" >&2
+    attempt=$(($attempt+1))
+    if [[ ${attempt} > 5 ]]; then
+      echo -e "${color_red}List ${resource} failed!${color_norm}" >&2
+      exit 2
+    fi
+    sleep $((5*${attempt}))
+  done
 }
 
 echo "Project: ${PROJECT}"
