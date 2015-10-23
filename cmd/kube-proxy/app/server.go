@@ -219,9 +219,16 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		}
 	}
 
+	config.nodeRef = &api.ObjectReference{
+		Kind:      "Node",
+		Name:      hostname,
+		UID:       types.UID(hostname),
+		Namespace: "",
+	}
+
 	if useIptablesProxy {
 		glog.V(2).Info("Using iptables Proxier.")
-		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IptablesSyncPeriod, config.MasqueradeAll)
+		proxierIptables, err := iptables.NewProxier(iptInterface, execer, recorder, config.IptablesSyncPeriod, config.nodeRef, config.MasqueradeAll)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -238,7 +245,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		// set EndpointsConfigHandler to our loadBalancer
 		endpointsHandler = loadBalancer
 
-		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.IptablesSyncPeriod)
+		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, recorder, config.IptablesSyncPeriod, config.nodeRef)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -266,12 +273,6 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		endpointsConfig.Channel("api"),
 	)
 
-	config.nodeRef = &api.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
-	}
 	return NewProxyServer(config, iptInterface, proxier, recorder)
 }
 

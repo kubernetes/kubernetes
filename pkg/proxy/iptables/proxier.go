@@ -36,6 +36,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -135,6 +136,8 @@ type Proxier struct {
 	syncPeriod    time.Duration
 	iptables      utiliptables.Interface
 	masqueradeAll bool
+	recorder      record.EventRecorder
+	nodeRef       *api.ObjectReference
 }
 
 type localPort struct {
@@ -160,9 +163,11 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, recorder record.EventRecorder, syncPeriod time.Duration, nodeRef *api.ObjectReference, masqueradeAll bool) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := utilsysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
+		recorder.Eventf(nodeRef, "FailedToSetSysctl", "Iptables proxy: can't set sysctl")
+		time.Sleep(100 * time.Millisecond)
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 	}
 
@@ -181,6 +186,8 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		syncPeriod:    syncPeriod,
 		iptables:      ipt,
 		masqueradeAll: masqueradeAll,
+		recorder:      recorder,
+		nodeRef:       nodeRef,
 	}, nil
 }
 
@@ -461,6 +468,7 @@ func (proxier *Proxier) syncProxyRules() {
 	existingChains := make(map[utiliptables.Chain]string)
 	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableNAT)
 	if err != nil { // if we failed to get any rules
+		proxier.recorder.Eventf(proxier.nodeRef, "FailedToIptablesSave", "Failed to execute iptables-save, syncing all rules")
 		glog.Errorf("Failed to execute iptables-save, syncing all rules. %s", err.Error())
 	} else { // otherwise parse the output
 		existingChains = getChainLines(utiliptables.TableNAT, iptablesSaveRaw)
@@ -525,7 +533,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// machine, hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
 			if local, err := isLocalIP(externalIP); err != nil {
-				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
+				proxier.recorder.Eventf(proxier.nodeRef, "FailedToDetermineIPisLocal", "Can't determine if IP is local, assuming not")
+				glog.Errorf("Can't determine if IP is local, assuming not: %v", err)
 			} else if local {
 				lp := localPort{
 					desc:     "externalIP for " + svcName.String(),
@@ -538,7 +547,8 @@ func (proxier *Proxier) syncProxyRules() {
 				} else {
 					socket, err := openLocalPort(&lp)
 					if err != nil {
-						glog.Errorf("can't open %s, skipping this externalIP: %v", lp.String(), err)
+						proxier.recorder.Eventf(proxier.nodeRef, "FailedToOpenExternalIP", "Can't open %s, skipping this externalIP", lp.String())
+						glog.Errorf("Can't open %s, skipping this externalIP: %v", lp.String(), err)
 						continue
 					}
 					newLocalPorts[lp] = socket
@@ -606,7 +616,8 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				socket, err := openLocalPort(&lp)
 				if err != nil {
-					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
+					proxier.recorder.Eventf(proxier.nodeRef, "FailedToOpenNodePort", "Can't open %s, skipping this nodePort", lp.String())
+					glog.Errorf("Can't open %s, skipping this nodePort: %v", lp.String(), err)
 					continue
 				}
 				newLocalPorts[lp] = socket
@@ -735,6 +746,7 @@ func (proxier *Proxier) syncProxyRules() {
 	glog.V(3).Infof("Syncing rules: %s", lines)
 	err = proxier.iptables.Restore(utiliptables.TableNAT, lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
+		proxier.recorder.Eventf(proxier.nodeRef, "FailedToSyncIptablesRules", "Failed to sync iptables rules")
 		glog.Errorf("Failed to sync iptables rules: %v", err)
 		// Revert new local ports.
 		for k, v := range newLocalPorts {
