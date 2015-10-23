@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -58,8 +59,8 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 		}
 		tokens[record[0]] = obj
 
-		if len(record) > 3 {
-			obj.Groups = record[3:]
+		if len(record) >= 4 {
+			obj.Groups = strings.Split(record[3], ",")
 		}
 	}
 
