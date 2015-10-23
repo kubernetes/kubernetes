@@ -64,11 +64,12 @@ func stripHTML(filename string) error {
 	return nil
 }
 
-// replace http://releases.k8s.io/HEAD/docs/xxx.md with
-// http://kubernetes.io/v1.0/docs/xxx.html
+// Replace http://releases.k8s.io/HEAD/xxx.md
+// or http://releases.k8s.io/v1.1.0/xxx.md
+// http://kubernetes.io/v1.1/xxx.html
 func fixLinks(fileName, version string) error {
-	mdRE := regexp.MustCompile(`http://releases.k8s.io/HEAD/docs(.*?\.)md`)
-	repl := []byte("http://kubernetes.io/" + version + "/docs" + "${1}" + "html")
+	mdRE := regexp.MustCompile(`http://releases.k8s.io/[^/]+(.*?\.)md`)
+	repl := []byte("http://kubernetes.io/" + version + "${1}" + "html")
 	file, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return err
