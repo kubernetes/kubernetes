@@ -7,7 +7,7 @@ title: "</strong>"
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Examples: releases.k8s.io/
+# Kubernetes Examples: releases.k8s.io/v1.1.0
 
 This directory contains a number of examples of how to run
 real applications with Kubernetes.

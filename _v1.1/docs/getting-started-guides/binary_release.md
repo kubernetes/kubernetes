@@ -31,7 +31,7 @@ make release
 {% endraw %}
 {% endhighlight %}
 
-For more details on the release process see the [`build/` directory](http://releases.k8s.io//build/)
+For more details on the release process see the [`build/` directory](http://releases.k8s.io/v1.1.0/build/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

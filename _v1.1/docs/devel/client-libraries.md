@@ -11,7 +11,7 @@ title: "</strong>"
 
 ### Supported
 
-   * [Go](http://releases.k8s.io//pkg/client/)
+   * [Go](http://releases.k8s.io/v1.1.0/pkg/client/)
 
 ### User Contributed
 
