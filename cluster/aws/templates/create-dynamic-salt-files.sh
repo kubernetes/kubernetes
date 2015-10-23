@@ -40,6 +40,7 @@ network_provider: '$(echo "$NETWORK_PROVIDER")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+num_nodes: $(echo "${NUM_MINIONS}")
 EOF
 
 if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
