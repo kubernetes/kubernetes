@@ -13,8 +13,7 @@ spec:
     spec:
       containers:
       - name: nfs-server
-        # TODO(zmerlynn): change to gcr.io/google_containers/volume-nfs
-        image: jsafrane/nfs-data
+        image: gcr.io/google_containers/volume-nfs
         ports:
           - name: nfs
             containerPort: 2049
