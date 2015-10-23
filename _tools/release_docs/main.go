@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Import docs from a git branch and format them for gh-pages.
-// usage: go run _tools/release_docs/main.go _tools/release_docs/api-reference-process.go --branch release-1.0 --output-dir v1.0
+// usage: go run _tools/release_docs/main.go _tools/release_docs/api-reference-process.go --branch release-1.0 --output-dir v1.0 --version v1.0
 package main
 
 import (
