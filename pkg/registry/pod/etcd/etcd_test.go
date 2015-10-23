@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -39,8 +38,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient, PodStorage) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	nodeREST, _ := nodeetcd.NewREST(etcdStorage, false, nil, nil)
-	storage := NewStorage(etcdStorage, nodeREST, false, nil, nil)
+	storage := NewStorage(etcdStorage, false, nil, nil)
 	return storage.Pod, storage.Binding, storage.Status, fakeClient, storage
 }
 

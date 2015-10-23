@@ -29,7 +29,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -153,30 +152,19 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	}
 	host := hostIP.String()
 
-	// We check if we want to get a default Kubelet's transport. It happens if either:
+	// Use the kubelet's scheme and transport if either:
 	// - no port is specified in request (Kubelet's port is default),
-	// - we're using Port stored as a DaemonEndpoint and requested port is a Kubelet's port stored in the DaemonEndpoint,
-	// - there's no information in the API about DaemonEnpoint (legacy cluster) and requested port is equal to ports.KubeletPort (cluster-wide config)
-	defaultKubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
-	if defaultKubeletPort == 0 {
-		defaultKubeletPort = ports.KubeletPort
-	}
-	if portReq == "" || strconv.Itoa(defaultKubeletPort) == portReq {
-		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(host)
+	// - the port specified in the request is the Kubelet's port
+	kubeletScheme, kubletPort, kubeletTransport, err := connection.GetConnectionInfo(ctx, name)
+	if portReq == "" || strconv.Itoa(int(kubletPort)) == portReq {
 		if err != nil {
 			return nil, nil, err
 		}
-		var portString string
-		if node.Status.DaemonEndpoints.KubeletEndpoint.Port != 0 {
-			portString = strconv.Itoa(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
-		} else {
-			portString = strconv.FormatUint(uint64(port), 10)
-		}
 		return &url.URL{
-				Scheme: scheme,
+				Scheme: kubeletScheme,
 				Host: net.JoinHostPort(
 					host,
-					portString,
+					strconv.Itoa(int(kubletPort)),
 				),
 			},
 			kubeletTransport,

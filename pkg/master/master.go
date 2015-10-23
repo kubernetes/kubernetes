@@ -539,6 +539,16 @@ func (m *Master) init(c *Config) {
 
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.get("", resource) }
 
+	// Wrap the KubeletClient with a ConnectionInfoGetter that will return a custom port, if configured for the node
+	nodeConnection := &nodeConnectionInfoGetter{clusterInfoGetter: c.KubeletClient}
+	// Initialize node storage and registry
+	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), c.EnableWatchCache, nodeConnection, m.proxyTransport)
+	m.nodeRegistry = node.NewRegistry(nodeStorage)
+	// Give the node ConnectionInfoGetter a handle to the node registry to look up node-specific info
+	nodeConnection.nodeRegistry = m.nodeRegistry
+
+	podStorage := podetcd.NewStorage(dbClient("pods"), c.EnableWatchCache, nodeConnection, m.proxyTransport)
+
 	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"))
 
 	eventStorage := eventetcd.NewREST(dbClient("events"), uint64(c.EventTTL.Seconds()))
@@ -555,17 +565,6 @@ func (m *Master) init(c *Config) {
 
 	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), c.EnableWatchCache)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
-
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
-	m.nodeRegistry = node.NewRegistry(nodeStorage)
-
-	podStorage := podetcd.NewStorage(
-		dbClient("pods"),
-		nodeStorage,
-		c.EnableWatchCache,
-		c.KubeletClient,
-		m.proxyTransport,
-	)
 
 	serviceStorage := serviceetcd.NewREST(dbClient("services"))
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
