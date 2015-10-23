@@ -65,9 +65,8 @@ The wider discussion regarding Scale took place in [#1629](https://github.com/ku
 
 Scale subresource will be present in API for replication controller or deployment under the following paths:
 
-```api/vX/replicationcontrollers/myrc/scale```
-
-```api/vX/deployments/mydeployment/scale```
+   * `api/vX/replicationcontrollers/myrc/scale`
+   * `api/vX/deployments/mydeployment/scale`
 
 It will have the following structure:
 
