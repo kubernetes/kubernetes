@@ -211,7 +211,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			Type:            serviceType,
 		},
 	}
-	if err := rest.BeforeCreate(rest.Services, ctx, svc); err != nil {
+	if err := rest.BeforeCreate(service.Strategy, ctx, svc); err != nil {
 		return err
 	}
 
