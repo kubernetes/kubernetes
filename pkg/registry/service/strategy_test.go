@@ -14,15 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rest
+package service
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
+
+func TestCheckGeneratedNameError(t *testing.T) {
+	expect := errors.NewNotFound("foo", "bar")
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{}); err != expect {
+		t.Errorf("NotFoundError should be ignored: %v", err)
+	}
+
+	expect = errors.NewAlreadyExists("foo", "bar")
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{}); err != expect {
+		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
+	}
+
+	expect = errors.NewAlreadyExists("foo", "bar")
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+		t.Errorf("expected try again later error: %v", err)
+	}
+}
 
 func makeValidService() api.Service {
 	return api.Service{
@@ -99,7 +118,7 @@ func TestBeforeUpdate(t *testing.T) {
 		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
 		ctx := api.NewDefaultContext()
-		err := BeforeUpdate(Services, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
+		err := rest.BeforeUpdate(Strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
 		if tc.expectErr && err == nil {
 			t.Errorf("unexpected non-error for %q", tc.name)
 		}

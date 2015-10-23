@@ -112,7 +112,7 @@ type ResourceGetter interface {
 	Get(api.Context, string) (runtime.Object, error)
 }
 
-// NodeToSelectableFields returns a label set that represents the object.
+// NodeToSelectableFields returns a field set that represents the object.
 func NodeToSelectableFields(node *api.Node) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(node.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
