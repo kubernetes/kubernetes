@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func TestPuller(t *testing.T) {
+func TestSerializedPuller(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test_pod",
@@ -103,7 +103,7 @@ func TestPuller(t *testing.T) {
 
 		fakeRuntime := &FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImagePuller(fakeRecorder, fakeRuntime, backOff)
+		puller := NewSerializedImagePuller(fakeRecorder, fakeRuntime, backOff)
 
 		fakeRuntime.ImageList = []Image{{"present_image", nil, 0}}
 		fakeRuntime.Err = c.pullerErr

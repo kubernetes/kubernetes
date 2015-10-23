@@ -161,7 +161,8 @@ func NewDockerManager(
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFsInterface,
 	cpuCFSQuota bool,
-	imageBackOff *util.Backoff) *DockerManager {
+	imageBackOff *util.Backoff,
+	serializeImagePulls bool) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
@@ -215,7 +216,11 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm, imageBackOff)
+	if serializeImagePulls {
+		dm.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, dm, imageBackOff)
+	} else {
+		dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm, imageBackOff)
+	}
 	dm.containerGC = NewContainerGC(client, containerLogsDir)
 
 	return dm

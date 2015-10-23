@@ -47,7 +47,7 @@ func NewFakeDockerManager(
 	fakeProcFs := procfs.NewFakeProcFs()
 	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
-		fakeOOMAdjuster, fakeProcFs, false, imageBackOff)
+		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, true)
 	dm.dockerPuller = &FakeDockerPuller{}
 	return dm
 }
