@@ -14,40 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package atomic
 
 import (
 	"sync"
 	"sync/atomic"
 )
 
-// TODO(ArtfulCoder)
-// sync/atomic/Value was added in golang 1.4
-// Once support is dropped for go 1.3, this type must be deprecated in favor of sync/atomic/Value.
-// The functions are named Load/Store to match sync/atomic/Value function names.
-type AtomicValue struct {
-	value      interface{}
-	valueMutex sync.RWMutex
-}
-
-func (at *AtomicValue) Store(val interface{}) {
-	at.valueMutex.Lock()
-	defer at.valueMutex.Unlock()
-	at.value = val
-}
-
-func (at *AtomicValue) Load() interface{} {
-	at.valueMutex.RLock()
-	defer at.valueMutex.RUnlock()
-	return at.value
-}
-
 // HighWaterMark is a thread-safe object for tracking the maximum value seen
 // for some quantity.
 type HighWaterMark int64
 
 // Check returns true if and only if 'current' is the highest value ever seen.
-func (hwm *HighWaterMark) Check(current int64) bool {
+func (hwm *HighWaterMark) Update(current int64) bool {
 	for {
 		old := atomic.LoadInt64((*int64)(hwm))
 		if current <= old {
