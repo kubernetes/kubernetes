@@ -27,6 +27,7 @@ import (
 	"os/user"
 	"path"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -37,8 +38,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -92,6 +95,8 @@ type Factory struct {
 	CanBeExposed func(kind string) error
 	// Check whether the kind of resources could be autoscaled
 	CanBeAutoscaled func(kind string) error
+	// AttachablePodForObject returns the pod to which to attach given an object.
+	AttachablePodForObject func(object runtime.Object) (*api.Pod, error)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -267,6 +272,35 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return fmt.Errorf("invalid resource provided: %v, only a replication controller is accepted", kind)
 			}
 			return nil
+		},
+		AttachablePodForObject: func(object runtime.Object) (*api.Pod, error) {
+			client, err := clients.ClientForVersion("")
+			if err != nil {
+				return nil, err
+			}
+			switch t := object.(type) {
+			case *api.ReplicationController:
+				var pods *api.PodList
+				for pods == nil || len(pods.Items) == 0 {
+					var err error
+					if pods, err = client.Pods(t.Namespace).List(labels.SelectorFromSet(t.Spec.Selector), fields.Everything()); err != nil {
+						return nil, err
+					}
+					if len(pods.Items) == 0 {
+						time.Sleep(2 * time.Second)
+					}
+				}
+				pod := &pods.Items[0]
+				return pod, nil
+			case *api.Pod:
+				return t, nil
+			default:
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("cannot attach to %s: not implemented", kind)
+			}
 		},
 	}
 }
