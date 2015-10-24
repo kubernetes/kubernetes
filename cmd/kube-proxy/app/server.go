@@ -65,8 +65,8 @@ type ProxyServerConfig struct {
 	nodeRef            *api.ObjectReference // Reference to this node.
 	MasqueradeAll      bool
 	CleanupAndExit     bool
-	KubeApiQps         float32
-	KubeApiBurst       int
+	KubeAPIQPS         float32
+	KubeAPIBurst       int
 	UDPIdleTimeout     time.Duration
 }
 
@@ -93,8 +93,8 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ConfigSyncPeriod, "config-sync-period", s.ConfigSyncPeriod, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
 	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
 	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
-	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 }
 
@@ -122,8 +122,8 @@ func NewProxyConfig() *ProxyServerConfig {
 		ResourceContainer:  "/kube-proxy",
 		IptablesSyncPeriod: 30 * time.Second,
 		ConfigSyncPeriod:   15 * time.Minute,
-		KubeApiQps:         5.0,
-		KubeApiBurst:       10,
+		KubeAPIQPS:         5.0,
+		KubeAPIBurst:       10,
 		UDPIdleTimeout:     250 * time.Millisecond,
 	}
 }
@@ -195,8 +195,8 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	}
 
 	// Override kubeconfig qps/burst settings from flags
-	kubeconfig.QPS = config.KubeApiQps
-	kubeconfig.Burst = config.KubeApiBurst
+	kubeconfig.QPS = config.KubeAPIQPS
+	kubeconfig.Burst = config.KubeAPIBurst
 
 	client, err := kubeclient.New(kubeconfig)
 	if err != nil {
