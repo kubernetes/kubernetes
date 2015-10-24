@@ -348,6 +348,8 @@ case ${JOB_NAME} in
     NUM_MINIONS="100"
     # Reduce logs verbosity
     TEST_CLUSTER_LOG_LEVEL="--v=1"
+    # Increase resync period to simulate production
+    TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
 
   # Runs tests on GCE soak cluster.

@@ -41,12 +41,6 @@ const (
 	// Daemon sets will periodically check that their daemon pods are running as expected.
 	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
 
-	// Nodes don't need relisting.
-	FullNodeResyncPeriod = 0
-
-	// Daemon pods don't need relisting.
-	FullDaemonPodResyncPeriod = 0
-
 	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
 	// avoid a hot loop, we'll wait this long between checks.
 	PodStoreSyncedPollPeriod = 100 * time.Millisecond
@@ -85,7 +79,7 @@ type DaemonSetsController struct {
 	queue *workqueue.Type
 }
 
-func NewDaemonSetsController(kubeClient client.Interface) *DaemonSetsController {
+func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -110,6 +104,7 @@ func NewDaemonSetsController(kubeClient client.Interface) *DaemonSetsController 
 			},
 		},
 		&extensions.DaemonSet{},
+		// TODO: Can we have much longer period here?
 		FullDaemonSetResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
@@ -141,7 +136,7 @@ func NewDaemonSetsController(kubeClient client.Interface) *DaemonSetsController 
 			},
 		},
 		&api.Pod{},
-		FullDaemonPodResyncPeriod,
+		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    dsc.addPod,
 			UpdateFunc: dsc.updatePod,
@@ -159,7 +154,7 @@ func NewDaemonSetsController(kubeClient client.Interface) *DaemonSetsController 
 			},
 		},
 		&api.Node{},
-		FullNodeResyncPeriod,
+		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    dsc.addNode,
 			UpdateFunc: dsc.updateNode,
