@@ -452,6 +452,13 @@ function verify-prereqs {
       fi
     fi
   fi
+  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
+    else
+      RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
+    fi
+  fi
 
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
