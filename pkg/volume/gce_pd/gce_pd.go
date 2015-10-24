@@ -165,6 +165,10 @@ type gcePersistentDiskBuilder struct {
 
 var _ volume.Builder = &gcePersistentDiskBuilder{}
 
+func (_ *gcePersistentDiskBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *gcePersistentDiskBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())

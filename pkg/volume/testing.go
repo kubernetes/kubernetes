@@ -156,6 +156,10 @@ type FakeVolume struct {
 	Plugin  *FakeVolumePlugin
 }
 
+func (_ *FakeVolume) SupportsOwnershipManagement() bool {
+	return false
+}
+
 func (fv *FakeVolume) SetUp() error {
 	return fv.SetUpAt(fv.GetPath())
 }

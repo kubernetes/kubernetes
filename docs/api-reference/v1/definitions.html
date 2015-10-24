@@ -4846,7 +4846,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podsecuritycontext">v1.PodSecurityContext</h3>
 <div class="paragraph">
-<p>PodSecurityContext holds pod-level security attributes and common container settings.</p>
+<p>PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4867,15 +4867,8 @@ The resulting set of endpoints can be viewed as:<br>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">supplementalGroups</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SupplementalGroups can be used to specify a list of additional groups which the main container process will run as. This will be applied to all containers in the pod in addition to the primary group of the container.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#integer">[integer]</a> array</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">seLinuxOptions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SELinuxOptions is the SELinux context to be applied to all containers If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_selinuxoptions">v1.SELinuxOptions</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4893,6 +4886,22 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">supplementalGroups</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of groups applied to the first process run in each container, in addition to the container&#8217;s primary GID.  If unspecified, no groups will be added to any container.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#integer">[integer]</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsGroup</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:<br>
+<br>
+1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR&#8217;d with rw-rw</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>
@@ -6857,7 +6866,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-10-22 10:21:22 UTC
+Last updated 2015-10-22 20:39:55 UTC
 </div>
 </div>
 </body>

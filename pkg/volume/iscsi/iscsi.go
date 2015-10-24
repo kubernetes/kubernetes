@@ -158,6 +158,10 @@ type iscsiDiskBuilder struct {
 
 var _ volume.Builder = &iscsiDiskBuilder{}
 
+func (_ *iscsiDiskBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *iscsiDiskBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }

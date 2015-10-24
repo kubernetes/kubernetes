@@ -1258,13 +1258,10 @@ type PodSpec struct {
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
+// Some fields are also present in container.securityContext.  Field values of
+// container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContext struct {
-	// SupplementalGroups can be used to specify a list of
-	// additional groups which the main container process will run
-	// as. This will be applied to all containers in the pod in
-	// addition to the primary group of the container.
-	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
-	// SELinuxOptions is the SELinux context to be applied to all containers
+	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in
 	// both SecurityContext and PodSecurityContext, the value specified in SecurityContext
@@ -1283,6 +1280,20 @@ type PodSecurityContext struct {
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
+	// A list of groups applied to the first process run in each container, in addition
+	// to the container's primary GID.  If unspecified, no groups will be added to
+	// any container.
+	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
+	// A special supplemental group that applies to all containers in a pod.
+	// Some volume types allow the Kubelet to change the ownership of that volume
+	// to be owned by the pod:
+	//
+	// 1. The owning GID will be the FSGroup
+	// 2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
+	// 3. The permission bits are OR'd with rw-rw----
+	//
+	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
+	FSGroup *int64 `json:"fsGroup,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
