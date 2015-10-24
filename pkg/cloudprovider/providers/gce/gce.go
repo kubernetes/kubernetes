@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -199,6 +200,20 @@ func (gce *GCECloud) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (gce *GCECloud) ProviderName() string {
 	return ProviderName
+}
+
+// Known-useless DNS search path.
+var uselessDNSSearchRE = regexp.MustCompile(`^[0-9]+.google.internal.$`)
+
+// ScrubDNS filters DNS settings for pods.
+func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	// GCE has too many search paths by default. Filter the ones we know are useless.
+	for _, s := range searches {
+		if !uselessDNSSearchRE.MatchString(s) {
+			srchOut = append(srchOut, s)
+		}
+	}
+	return nameservers, srchOut
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
