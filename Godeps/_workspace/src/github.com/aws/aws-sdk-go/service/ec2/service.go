@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/service"
 	"github.com/aws/aws-sdk-go/aws/service/serviceinfo"
-	"github.com/aws/aws-sdk-go/internal/protocol/ec2query"
-	"github.com/aws/aws-sdk-go/internal/signer/v4"
+	"github.com/aws/aws-sdk-go/private/protocol/ec2query"
+	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
 // Amazon Elastic Compute Cloud (Amazon EC2) provides resizable computing capacity
@@ -32,7 +32,7 @@ func New(config *aws.Config) *EC2 {
 		ServiceInfo: serviceinfo.ServiceInfo{
 			Config:      defaults.DefaultConfig.Merge(config),
 			ServiceName: "ec2",
-			APIVersion:  "2015-04-15",
+			APIVersion:  "2015-10-01",
 		},
 	}
 	service.Initialize()

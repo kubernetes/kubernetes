@@ -1,6 +1,6 @@
 package ec2query
 
-//go:generate go run ../../fixtures/protocol/generate.go ../../fixtures/protocol/output/ec2.json unmarshal_test.go
+//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/ec2.json unmarshal_test.go
 
 import (
 	"encoding/xml"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/internal/protocol/xml/xmlutil"
+	"github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil"
 )
 
 // Unmarshal unmarshals a response body for the EC2 protocol.

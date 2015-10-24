@@ -24,6 +24,8 @@ var retryableCodes = map[string]struct{}{
 	"ThrottlingException":                    {},
 	"RequestLimitExceeded":                   {},
 	"RequestThrottled":                       {},
+	"LimitExceededException":                 {}, // Deleting 10+ DynamoDb tables at once
+	"TooManyRequestsException":               {}, // Lambda functions
 }
 
 // credsExpiredCodes is a collection of error codes which signify the credentials
