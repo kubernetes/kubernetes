@@ -32,7 +32,7 @@ type FakeIngress struct {
 }
 
 func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("ingress", c.Namespace, name), &extensions.Ingress{})
+	obj, err := c.Fake.Invokes(NewGetAction("ingresses", c.Namespace, name), &extensions.Ingress{})
 	if obj == nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
 }
 
 func (c *FakeIngress) List(label labels.Selector, fields fields.Selector) (*extensions.IngressList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("ingress", c.Namespace, label, nil), &extensions.IngressList{})
+	obj, err := c.Fake.Invokes(NewListAction("ingresses", c.Namespace, label, nil), &extensions.IngressList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (c *FakeIngress) List(label labels.Selector, fields fields.Selector) (*exte
 }
 
 func (c *FakeIngress) Create(ingress *extensions.Ingress) (*extensions.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("ingress", c.Namespace, ingress), ingress)
+	obj, err := c.Fake.Invokes(NewCreateAction("ingresses", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (c *FakeIngress) Create(ingress *extensions.Ingress) (*extensions.Ingress, 
 }
 
 func (c *FakeIngress) Update(ingress *extensions.Ingress) (*extensions.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("ingress", c.Namespace, ingress), ingress)
+	obj, err := c.Fake.Invokes(NewUpdateAction("ingresses", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
@@ -68,16 +68,16 @@ func (c *FakeIngress) Update(ingress *extensions.Ingress) (*extensions.Ingress, 
 }
 
 func (c *FakeIngress) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("ingress", c.Namespace, name), &extensions.Ingress{})
+	_, err := c.Fake.Invokes(NewDeleteAction("ingresses", c.Namespace, name), &extensions.Ingress{})
 	return err
 }
 
 func (c *FakeIngress) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("ingress", c.Namespace, label, field, resourceVersion))
+	return c.Fake.InvokesWatch(NewWatchAction("ingresses", c.Namespace, label, field, resourceVersion))
 }
 
 func (c *FakeIngress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("ingress", "status", c.Namespace, ingress), ingress)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("ingresses", "status", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}

@@ -153,11 +153,12 @@ func TestKindToResource(t *testing.T) {
 		{Kind: "ReplicationController", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
 		{Kind: "ReplicationController", MixedCase: false, Plural: "replicationcontrollers", Singular: "replicationcontroller"},
 
+		// Add "ies" when ending with "y"
 		{Kind: "ImageRepository", MixedCase: true, Plural: "imageRepositories", Singular: "imageRepository"},
-
+		// Add "es" when ending with "s"
+		{Kind: "miss", MixedCase: false, Plural: "misses", Singular: "miss"},
+		// Add "s" otherwise
 		{Kind: "lowercase", MixedCase: false, Plural: "lowercases", Singular: "lowercase"},
-		// Don't add extra s if the original object is already plural
-		{Kind: "lowercases", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
 		plural, singular := KindToResource(testCase.Kind, testCase.MixedCase)

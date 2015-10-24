@@ -204,7 +204,7 @@ func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVers
 				return estimate, err
 			}
 		}
-		if containsResource(resources, "ingress") {
+		if containsResource(resources, "ingresses") {
 			err = deleteIngress(kubeClient.Extensions(), namespace)
 			if err != nil {
 				return estimate, err
