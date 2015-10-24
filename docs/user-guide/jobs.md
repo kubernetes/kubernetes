@@ -70,13 +70,14 @@ It takes around 10s to complete.
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: Job
 metadata:
   name: pi
 spec:
   selector:
-    app: pi
+    matchLabels:
+      app: pi
   template:
     metadata:
       name: pi
@@ -162,11 +163,16 @@ Only a [`RestartPolicy`](pod-states.md) equal to `Never` or `OnFailure` are allo
 
 ### Pod Selector
 
-The `.spec.selector` field is a pod selector.  It works the same as the `.spec.selector` of
-a [ReplicationController](replication-controller.md).
+The `.spec.selector` field is a label query over a set of pods.
 
-If specified, the `.spec.template.metadata.labels` must be equal to the `.spec.selector`, or it will
-be rejected by the API.  If `.spec.selector` is unspecified, it will be defaulted to
+The `spec.selector` is an object consisting of two fields:
+* `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](replication-controller.md)
+* `matchExpressions` - allows to build more sophisticated selectors by specyfing key,
+  list of values and an operator that relates the key and values.
+
+When the two are specified the result is ANDed.
+
+If `.spec.selector` is unspecified, `.spec.selector.matchLabels` will be defaulted to
 `.spec.template.metadata.labels`.
 
 Also you should not normally create any pods whose labels match this selector, either directly,
