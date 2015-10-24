@@ -173,7 +173,7 @@ In any of these scenarios you can define a service without a selector:
 }
 ```
 
-Because this has no selector, the corresponding `Endpoints` object will not be
+Because this service has no selector, the corresponding `Endpoints` object will not be
 created. You can manually map the service to your own specific endpoints:
 
 ```json
@@ -189,7 +189,7 @@ created. You can manually map the service to your own specific endpoints:
                 { "IP": "1.2.3.4" }
             ],
             "ports": [
-                { "port": 80 }
+                { "port": 9376 }
             ]
         }
     ]
@@ -200,7 +200,7 @@ NOTE: Endpoint IPs may not be loopback (127.0.0.0/8), link-local
 (169.254.0.0/16), or link-local multicast ((224.0.0.0/24).
 
 Accessing a `Service` without a selector works the same as if it had selector.
-The traffic will be routed to endpoints defined by the user (`1.2.3.4:80` in
+The traffic will be routed to endpoints defined by the user (`1.2.3.4:9376` in
 this example).
 
 ## Virtual IPs and service proxies
