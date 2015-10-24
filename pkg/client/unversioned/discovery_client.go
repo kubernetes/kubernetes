@@ -140,7 +140,7 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := extractGroupVersions(apiGroups)
+	groupVersions := ExtractGroupVersions(apiGroups)
 	result := map[string]*unversioned.APIResourceList{}
 	for _, groupVersion := range groupVersions {
 		resources, err := d.ServerResourcesForGroupVersion(groupVersion)
