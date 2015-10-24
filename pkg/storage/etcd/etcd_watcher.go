@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/atomic"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -169,7 +170,7 @@ func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming
 }
 
 var (
-	watchChannelHWM util.HighWaterMark
+	watchChannelHWM atomic.HighWaterMark
 )
 
 // translate pulls stuff from etcd, converts, and pushes out the outgoing channel. Meant to be

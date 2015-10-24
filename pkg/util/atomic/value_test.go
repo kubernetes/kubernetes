@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package atomic
 
 import (
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func ExpectValue(t *testing.T, atomicValue *AtomicValue, expectedValue interface{}) {
@@ -38,7 +40,7 @@ func ExpectValue(t *testing.T, atomicValue *AtomicValue, expectedValue interface
 			t.Errorf("Expected to find %v, found %v", expectedValue, actualValue)
 			return
 		}
-	case <-time.After(ForeverTestTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Error("Value could not be read")
 		return
 	}
