@@ -18,6 +18,7 @@ package iscsi
 
 import (
 	"os"
+	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,11 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/maketmpdir"
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "iscsiTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/iscsi")
 	if err != nil {
@@ -45,8 +49,10 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "iscsiTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/iscsi")
 	if err != nil {
@@ -99,8 +105,10 @@ func (fake *fakeDiskManager) DetachDisk(c iscsiDiskCleaner, mntPath string) erro
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "iscsiTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/iscsi")
 	if err != nil {
@@ -115,9 +123,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if builder == nil {
 		t.Error("Got a nil Builder")
 	}
-
+	expectedPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~iscsi/vol1")
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~iscsi/vol1" {
+	if path != expectedPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
@@ -237,8 +245,10 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := &testclient.Fake{}
 	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
 
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "iscsiTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(iscsiPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes

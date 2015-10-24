@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/maketmpdir"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -53,8 +54,10 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "hostpathTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -66,8 +69,10 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 func TestRecycler(t *testing.T) {
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "hostpathTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	pluginHost := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	pluginHost := volume.NewFakeVolumeHost(tmpDir, nil, nil)
 	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.NewFakeRecycler, nil, nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
@@ -95,8 +100,10 @@ func TestDeleter(t *testing.T) {
 		t.Fatal("Failed to create tmp directory for deleter: %v", err)
 	}
 
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "hostpathTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
 	plug, err := plugMgr.FindDeletablePluginBySpec(spec)
@@ -149,8 +156,10 @@ func TestCreater(t *testing.T) {
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "hostpathTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
@@ -259,8 +268,10 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := &testclient.Fake{}
 	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
 
+	tmpDir, cleanUp := maketmpdir.MakeTmpDir(t, "hostpathTest")
+	defer cleanUp()
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(hostPathPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
