@@ -142,12 +142,12 @@ func KindToResource(kind string, mixedCase bool) (plural, singular string) {
 	} else {
 		singular = strings.ToLower(kind)
 	}
-	if strings.HasSuffix(singular, "status") {
-		plural = singular + "es"
+	if strings.HasSuffix(singular, "endpoints") {
+		plural = singular
 	} else {
 		switch string(singular[len(singular)-1]) {
 		case "s":
-			plural = singular
+			plural = singular + "es"
 		case "y":
 			plural = strings.TrimSuffix(singular, "y") + "ies"
 		default:

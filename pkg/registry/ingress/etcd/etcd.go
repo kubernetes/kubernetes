@@ -62,7 +62,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return ingress.MatchIngress(label, field)
 		},
-		EndpointName: "ingress",
+		EndpointName: "ingresses",
 
 		// Used to validate controller creation
 		CreateStrategy: ingress.Strategy,
