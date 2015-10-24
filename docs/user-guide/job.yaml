@@ -1,10 +1,11 @@
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: Job
 metadata:
   name: pi
 spec:
   selector:
-    app: pi
+    matchLabels:
+      app: pi
   template:
     metadata:
       name: pi
