@@ -151,6 +151,10 @@ type cephfsBuilder struct {
 
 var _ volume.Builder = &cephfsBuilder{}
 
+func (_ *cephfsBuilder) SupportsOwnershipManagement() bool {
+	return false
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (cephfsVolume *cephfsBuilder) SetUp() error {
 	return cephfsVolume.SetUpAt(cephfsVolume.GetPath())

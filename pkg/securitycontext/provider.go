@@ -38,7 +38,7 @@ type SimpleSecurityContextProvider struct{}
 // The security context provider can make changes to the Config with which
 // the container is created.
 func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) {
-	effectiveSC := determineEffectiveSecurityContext(pod, container)
+	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSC == nil {
 		return
 	}
@@ -52,24 +52,28 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, conta
 // security options, whether the container is privileged, volume binds, etc.
 func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
 	// Apply pod security context
-	if pod.Spec.SecurityContext != nil {
-		// We skip application of supplemental groups to the
+	if container.Name != leaky.PodInfraContainerName && pod.Spec.SecurityContext != nil {
+		// TODO: We skip application of supplemental groups to the
 		// infra container to work around a runc issue which
 		// requires containers to have the '/etc/group'. For
 		// more information see:
 		// https://github.com/opencontainers/runc/pull/313
 		// This can be removed once the fix makes it into the
 		// required version of docker.
-		if pod.Spec.SecurityContext.SupplementalGroups != nil && container.Name != leaky.PodInfraContainerName {
+		if pod.Spec.SecurityContext.SupplementalGroups != nil {
 			hostConfig.GroupAdd = make([]string, len(pod.Spec.SecurityContext.SupplementalGroups))
 			for i, group := range pod.Spec.SecurityContext.SupplementalGroups {
 				hostConfig.GroupAdd[i] = strconv.Itoa(int(group))
 			}
 		}
+
+		if pod.Spec.SecurityContext.FSGroup != nil {
+			hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(*pod.Spec.SecurityContext.FSGroup)))
+		}
 	}
 
 	// Apply effective security context for container
-	effectiveSC := determineEffectiveSecurityContext(pod, container)
+	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSC == nil {
 		return
 	}
@@ -116,7 +120,7 @@ func makeCapabilites(capAdd []api.Capability, capDrop []api.Capability) ([]strin
 	return addCaps, dropCaps
 }
 
-func determineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
+func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
 

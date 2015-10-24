@@ -177,6 +177,10 @@ type awsElasticBlockStoreBuilder struct {
 
 var _ volume.Builder = &awsElasticBlockStoreBuilder{}
 
+func (_ *awsElasticBlockStoreBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())

@@ -169,6 +169,10 @@ type nfsBuilder struct {
 
 var _ volume.Builder = &nfsBuilder{}
 
+func (_ *nfsBuilder) SupportsOwnershipManagement() bool {
+	return false
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *nfsBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
