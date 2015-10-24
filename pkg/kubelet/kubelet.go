@@ -1057,7 +1057,7 @@ func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	}
 	defer f.Close()
 
-	hostDNS, hostSearch, err := parseResolvConf(f)
+	hostDNS, hostSearch, err := kl.parseResolvConf(f)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1076,7 +1076,20 @@ func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
 }
 
 // Returns the list of DNS servers and DNS search domains.
-func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, err error) {
+func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, searches []string, err error) {
+	var scrubber dnsScrubber
+	if kl.cloud != nil {
+		scrubber = kl.cloud
+	}
+	return parseResolvConf(reader, scrubber)
+}
+
+// A helper for testing.
+type dnsScrubber interface {
+	ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string)
+}
+
+func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []string, searches []string, err error) {
 	file, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, nil, err
@@ -1104,6 +1117,11 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 		if fields[0] == "search" {
 			searches = fields[1:]
 		}
+	}
+
+	// Give the cloud-provider a chance to post-process DNS settings.
+	if dnsScrubber != nil {
+		nameservers, searches = dnsScrubber.ScrubDNS(nameservers, searches)
 	}
 	return nameservers, searches, nil
 }

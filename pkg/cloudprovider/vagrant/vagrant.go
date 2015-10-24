@@ -91,6 +91,11 @@ func (v *VagrantCloud) ProviderName() string {
 	return ProviderName
 }
 
+// ScrubDNS filters DNS settings for pods.
+func (v *VagrantCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.
 func (v *VagrantCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
