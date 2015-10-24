@@ -144,8 +144,8 @@ type KubeletServer struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
-	KubeApiQps   float32
-	KubeApiBurst int
+	KubeAPIQPS   float32
+	KubeAPIBurst int
 
 	// Pull images one at a time.
 	SerializeImagePulls bool
@@ -188,8 +188,6 @@ func NewKubeletServer() *KubeletServer {
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
-		KubeApiQps:                  5.0,
-		KubeApiBurst:                10,
 		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		LowDiskSpaceThresholdMB:     256,
 		MasterServiceNamespace:      api.NamespaceDefault,
@@ -204,7 +202,6 @@ func NewKubeletServer() *KubeletServer {
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
 		Port:                ports.KubeletPort,
 		ReadOnlyPort:        ports.KubeletReadOnlyPort,
-		ReconcileCIDR:       true,
 		RegisterNode:        true, // will be ignored if no apiserver is configured
 		RegisterSchedulable: true,
 		RegistryBurst:       10,
@@ -214,6 +211,9 @@ func NewKubeletServer() *KubeletServer {
 		RootDirectory:       defaultRootDir,
 		SyncFrequency:       10 * time.Second,
 		SystemContainer:     "",
+		ReconcileCIDR:       true,
+		KubeAPIQPS:          5.0,
+		KubeAPIBurst:        10,
 	}
 }
 
@@ -293,8 +293,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", 1000000, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
-	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 }
 
@@ -594,8 +594,8 @@ func (s *KubeletServer) CreateAPIServerClientConfig() (*client.Config, error) {
 	}
 
 	// Override kubeconfig qps/burst settings from flags
-	clientConfig.QPS = s.KubeApiQps
-	clientConfig.Burst = s.KubeApiBurst
+	clientConfig.QPS = s.KubeAPIQPS
+	clientConfig.Burst = s.KubeAPIBurst
 
 	s.addChaosToClientConfig(clientConfig)
 	return clientConfig, nil
