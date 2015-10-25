@@ -41,13 +41,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
-	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -399,19 +397,6 @@ func (a *EventAssertions) EventWithReason(observer *EventObserver, reason string
 	return a.Event(observer, func(e Event) bool {
 		return e.Reason == reason
 	}, msgAndArgs...)
-}
-
-type joinableDriver struct {
-	MockSchedulerDriver
-	joinFunc func() (mesos.Status, error)
-}
-
-// Join invokes joinFunc if it has been set, otherwise blocks forever
-func (m *joinableDriver) Join() (mesos.Status, error) {
-	if m.joinFunc != nil {
-		return m.joinFunc()
-	}
-	select {}
 }
 
 // Create mesos.TaskStatus for a given task
@@ -824,7 +809,7 @@ func TestPlugin_LifeCycle(t *testing.T) {
 
 	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
 	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
-		t, _ := lt.plugin.api.tasks().ForPod(podKey)
+		t, _ := lt.plugin.api.Tasks().ForPod(podKey)
 		return t == nil
 	})
 
@@ -846,132 +831,4 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	lt.podsListWatch.Modify(pod, true) // notifying the watchers
 	time.Sleep(time.Second / 2)
 	failPodFromExecutor(launchedTask.taskInfo)
-}
-
-func TestDeleteOne_NonexistentPod(t *testing.T) {
-	assert := assert.New(t)
-	obj := &MockScheduler{}
-	reg := podtask.NewInMemoryRegistry()
-	obj.On("tasks").Return(reg)
-
-	qr := queuer.New(nil)
-	assert.Equal(0, len(qr.PodQueue.List()))
-	d := &deleter{
-		api: obj,
-		qr:  qr,
-	}
-	pod := &queuer.Pod{Pod: &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: api.NamespaceDefault,
-		}}}
-	err := d.deleteOne(pod)
-	assert.Equal(err, noSuchPodErr)
-	obj.AssertExpectations(t)
-}
-
-func TestDeleteOne_PendingPod(t *testing.T) {
-	assert := assert.New(t)
-	obj := &MockScheduler{}
-	reg := podtask.NewInMemoryRegistry()
-	obj.On("tasks").Return(reg)
-
-	pod := &queuer.Pod{Pod: &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			UID:       "foo0",
-			Namespace: api.NamespaceDefault,
-		}}}
-	_, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{}))
-	if err != nil {
-		t.Fatalf("failed to create task: %v", err)
-	}
-
-	// preconditions
-	qr := queuer.New(nil)
-	qr.PodQueue.Add(pod, queue.ReplaceExisting)
-	assert.Equal(1, len(qr.PodQueue.List()))
-	_, found := qr.PodQueue.Get("default/foo")
-	assert.True(found)
-
-	// exec & post conditions
-	d := &deleter{
-		api: obj,
-		qr:  qr,
-	}
-	err = d.deleteOne(pod)
-	assert.Nil(err)
-	_, found = qr.PodQueue.Get("foo0")
-	assert.False(found)
-	assert.Equal(0, len(qr.PodQueue.List()))
-	obj.AssertExpectations(t)
-}
-
-func TestDeleteOne_Running(t *testing.T) {
-	assert := assert.New(t)
-	obj := &MockScheduler{}
-	reg := podtask.NewInMemoryRegistry()
-	obj.On("tasks").Return(reg)
-
-	pod := &queuer.Pod{Pod: &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			UID:       "foo0",
-			Namespace: api.NamespaceDefault,
-		}}}
-	task, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{}))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	task.Set(podtask.Launched)
-	err = reg.Update(task)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// preconditions
-	qr := queuer.New(nil)
-	qr.PodQueue.Add(pod, queue.ReplaceExisting)
-	assert.Equal(1, len(qr.PodQueue.List()))
-	_, found := qr.PodQueue.Get("default/foo")
-	assert.True(found)
-
-	obj.On("killTask", task.ID).Return(nil)
-
-	// exec & post conditions
-	d := &deleter{
-		api: obj,
-		qr:  qr,
-	}
-	err = d.deleteOne(pod)
-	assert.Nil(err)
-	_, found = qr.PodQueue.Get("foo0")
-	assert.False(found)
-	assert.Equal(0, len(qr.PodQueue.List()))
-	obj.AssertExpectations(t)
-}
-
-func TestDeleteOne_badPodNaming(t *testing.T) {
-	assert := assert.New(t)
-	obj := &MockScheduler{}
-	pod := &queuer.Pod{Pod: &api.Pod{}}
-	d := &deleter{
-		api: obj,
-		qr:  queuer.New(nil),
-	}
-
-	err := d.deleteOne(pod)
-	assert.NotNil(err)
-
-	pod.Pod.ObjectMeta.Name = "foo"
-	err = d.deleteOne(pod)
-	assert.NotNil(err)
-
-	pod.Pod.ObjectMeta.Name = ""
-	pod.Pod.ObjectMeta.Namespace = "bar"
-	err = d.deleteOne(pod)
-	assert.NotNil(err)
-
-	obj.AssertExpectations(t)
 }
