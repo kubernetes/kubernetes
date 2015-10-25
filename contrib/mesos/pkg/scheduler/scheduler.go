@@ -111,7 +111,7 @@ type KubernetesMesosScheduler struct {
 type Config struct {
 	Schedcfg          schedcfg.Config
 	Executor          *mesos.ExecutorInfo
-	Scheduler         PodScheduler
+	PodScheduler      PodScheduler
 	Client            *client.Client
 	EtcdClient        tools.EtcdClient
 	FailoverTimeout   float64
@@ -128,7 +128,7 @@ func New(config Config) *KubernetesMesosScheduler {
 		RWMutex:           new(sync.RWMutex),
 		executor:          config.Executor,
 		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
-		PodScheduler:      config.Scheduler,
+		PodScheduler:      config.PodScheduler,
 		client:            config.Client,
 		etcdClient:        config.EtcdClient,
 		failoverTimeout:   config.FailoverTimeout,

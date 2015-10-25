@@ -720,7 +720,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	mesosPodScheduler := scheduler.New(scheduler.Config{
 		Schedcfg:          *sc,
 		Executor:          executor,
-		Scheduler:         fcfs,
+		PodScheduler:      fcfs,
 		Client:            client,
 		EtcdClient:        etcdClient,
 		FailoverTimeout:   s.FailoverTimeout,
