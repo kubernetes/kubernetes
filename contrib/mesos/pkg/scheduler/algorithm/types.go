@@ -51,11 +51,9 @@ type PodScheduler interface {
 type empty struct{}
 
 var (
-	noSuitableOffersErr = errors.New("No suitable offers for pod/task")
-	noSuchPodErr        = errors.New("No such pod exists")
-	noSuchTaskErr       = errors.New("No such task exists")
+	NoSuitableOffersErr = errors.New("No suitable offers for pod/task")
 )
 
 type SlaveIndex interface {
-	slaveHostNameFor(id string) string
+	SlaveHostNameFor(id string) string
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -29,10 +30,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -44,19 +46,22 @@ import (
 
 const (
 	pluginRecoveryDelay = 100 * time.Millisecond // delay after scheduler plugin crashes, before we resume scheduling
-)
 
-const (
 	FailedScheduling = "FailedScheduling"
 	Scheduled        = "Scheduled"
+)
+
+var (
+	noSuchPodErr  = errors.New("No such pod exists")
+	noSuchTaskErr = errors.New("No such task exists")
 )
 
 // scheduler abstraction to allow for easier unit testing
 type schedulerInterface interface {
 	sync.Locker // synchronize scheduler plugin operations
 
-	SlaveIndex
-	algorithm() PodScheduler
+	malgorithm.SlaveIndex
+	algorithm() malgorithm.PodScheduler
 	offers() offers.Registry
 	tasks() podtask.Registry
 
@@ -75,7 +80,7 @@ type k8smScheduler struct {
 	internal *KubernetesMesosScheduler
 }
 
-func (k *k8smScheduler) algorithm() PodScheduler {
+func (k *k8smScheduler) algorithm() malgorithm.PodScheduler {
 	return k.internal
 }
 
@@ -91,7 +96,7 @@ func (k *k8smScheduler) createPodTask(ctx api.Context, pod *api.Pod) (*podtask.T
 	return podtask.New(ctx, "", *pod, k.internal.executor)
 }
 
-func (k *k8smScheduler) slaveHostNameFor(id string) string {
+func (k *k8smScheduler) SlaveHostNameFor(id string) string {
 	return k.internal.slaveHostNames.HostName(id)
 }
 
@@ -197,7 +202,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
 	slaveId := details.GetSlaveId().GetValue()
-	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
+	if slaveHostName := k.api.SlaveHostNameFor(slaveId); slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
 		k.api.offers().Invalidate(details.Id.GetValue())
@@ -259,7 +264,7 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 			return
 		}
 		breakoutEarly := queue.BreakChan(nil)
-		if schedulingErr == noSuitableOffersErr {
+		if schedulingErr == malgorithm.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
 			breakoutEarly = queue.BreakChan(k.api.offers().Listen(podKey, func(offer *mesos.Offer) bool {
 				k.api.Lock()
@@ -433,7 +438,7 @@ func (s *schedulingPlugin) reconcileTask(t *podtask.T) {
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
 	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// attempt to delete
 			if err = s.deleter.deleteOne(&queuer.Pod{Pod: &t.Pod}); err != nil && err != noSuchPodErr && err != noSuchTaskErr {
 				log.Errorf("failed to delete pod: %v: %v", t.Pod.Name, err)
