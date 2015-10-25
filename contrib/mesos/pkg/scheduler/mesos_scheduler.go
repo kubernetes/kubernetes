@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
@@ -79,7 +79,7 @@ type MesosScheduler struct {
 	// and the invoking the pod registry interfaces.
 	// In particular, changes to podtask.T objects are currently guarded by this lock.
 	*sync.RWMutex
-	malgorithm.PodScheduler
+	podschedulers.PodScheduler
 
 	// Config related, write-once
 
@@ -119,7 +119,7 @@ type MesosScheduler struct {
 type Config struct {
 	SchedulerConfig   schedcfg.Config
 	Executor          *mesos.ExecutorInfo
-	PodScheduler      malgorithm.PodScheduler
+	PodScheduler      podschedulers.PodScheduler
 	Client            *client.Client
 	EtcdClient        tools.EtcdClient
 	FailoverTimeout   float64
