@@ -23,6 +23,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -33,7 +34,7 @@ type MockScheduler struct {
 	mock.Mock
 }
 
-func (m *MockScheduler) slaveHostNameFor(id string) (hostName string) {
+func (m *MockScheduler) SlaveHostNameFor(id string) (hostName string) {
 	args := m.Called(id)
 	x := args.Get(0)
 	if x != nil {
@@ -41,11 +42,11 @@ func (m *MockScheduler) slaveHostNameFor(id string) (hostName string) {
 	}
 	return
 }
-func (m *MockScheduler) algorithm() (f PodScheduler) {
+func (m *MockScheduler) algorithm() (f malgorithm.PodScheduler) {
 	args := m.Called()
 	x := args.Get(0)
 	if x != nil {
-		f = x.(PodScheduler)
+		f = x.(malgorithm.PodScheduler)
 	}
 	return
 }
@@ -86,8 +87,8 @@ func (m *MockScheduler) launchTask(task *podtask.T) error {
 // @deprecated this is a placeholder for me to test the mock package
 func TestNoSlavesYet(t *testing.T) {
 	obj := &MockScheduler{}
-	obj.On("slaveHostNameFor", "foo").Return(nil)
-	obj.slaveHostNameFor("foo")
+	obj.On("SlaveHostNameFor", "foo").Return(nil)
+	obj.SlaveHostNameFor("foo")
 	obj.AssertExpectations(t)
 }
 

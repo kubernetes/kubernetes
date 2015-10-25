@@ -42,6 +42,7 @@ import (
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
@@ -463,7 +464,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	ei.Data = []byte{0, 1, 2}
 
 	// create scheduler
-	strategy := NewAllocationStrategy(
+	strategy := malgorithm.NewAllocationStrategy(
 		podtask.NewDefaultPredicate(
 			mresource.DefaultDefaultContainerCPULimit,
 			mresource.DefaultDefaultContainerMemLimit,
@@ -480,7 +481,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 			Host:    apiServer.server.URL,
 			Version: testapi.Default.Version(),
 		}),
-		PodScheduler: NewFCFSPodScheduler(strategy, apiServer.LookupNode),
+		PodScheduler: malgorithm.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
 		Schedcfg:     *schedcfg.CreateDefaultConfig(),
 		LookupNode:   apiServer.LookupNode,
 	})

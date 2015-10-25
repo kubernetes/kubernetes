@@ -101,5 +101,5 @@ func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, unused SlaveIndex, t
 		return nil, err
 	}
 	log.V(2).Infof("failed to find a fit for pod: %s", podName)
-	return nil, noSuitableOffersErr
+	return nil, NoSuitableOffersErr
 }
