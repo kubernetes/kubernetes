@@ -473,7 +473,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		),
 	)
 
-	scheduler := New(Config{
+	mesosScheduler := New(Config{
 		Executor: ei,
 		Client: client.NewOrDie(&client.Config{
 			Host:    apiServer.server.URL,
@@ -484,15 +484,15 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		LookupNode: apiServer.LookupNode,
 	})
 
-	assert.NotNil(scheduler.client, "client is nil")
-	assert.NotNil(scheduler.executor, "executor is nil")
-	assert.NotNil(scheduler.offers, "offer registry is nil")
+	assert.NotNil(mesosScheduler.client, "client is nil")
+	assert.NotNil(mesosScheduler.executor, "executor is nil")
+	assert.NotNil(mesosScheduler.offers, "offer registry is nil")
 
 	// create scheduler process
-	schedulerProc := ha.New(scheduler)
+	schedulerProc := ha.New(mesosScheduler)
 
 	// get plugin config from it
-	config := scheduler.NewPluginConfig(
+	config := mesosScheduler.NewPluginConfig(
 		schedulerProc.Terminal(),
 		http.DefaultServeMux,
 		&podsListWatch.ListWatch,
@@ -516,7 +516,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		eventObs:      eventObs,
 		plugin:        plugin,
 		podsListWatch: podsListWatch,
-		scheduler:     scheduler,
+		scheduler:     mesosScheduler,
 		schedulerProc: schedulerProc,
 		t:             t,
 	}
