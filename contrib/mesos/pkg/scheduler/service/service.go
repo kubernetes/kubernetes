@@ -260,7 +260,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
 	fs.DurationVar(&s.ExecutorSuicideTimeout, "executor-suicide-timeout", s.ExecutorSuicideTimeout, "Executor self-terminates after this period of inactivity. Zero disables suicide watch.")
 	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
-	fs.StringVar(&s.SandboxOverlay, "mesos-sandbox-overlay", s.SandboxOverlay, "Path to an archive extracted in the sandbox.")
+	fs.StringVar(&s.SandboxOverlay, "mesos-sandbox-overlay", s.SandboxOverlay, "Path to an archive (tar.gz, tar.bz2 or zip) extracted into the sandbox.")
 
 	fs.BoolVar(&s.ProxyBindall, "proxy-bindall", s.ProxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.RunProxy, "run-proxy", s.RunProxy, "Run the kube-proxy as a side process of the executor.")
