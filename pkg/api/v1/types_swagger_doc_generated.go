@@ -546,6 +546,7 @@ var map_ListOptions = map[string]string{
 	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
 	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
 	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+	"timeoutSeconds":  "Timeout for the list/watch call.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {

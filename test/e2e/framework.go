@@ -153,7 +153,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(
 			labels.Everything(),
 			fields.Set{"metadata.name": serviceName}.AsSelector(),
-			rv,
+			api.ListOptions{ResourceVersion: rv},
 		)
 		if err != nil {
 			return err

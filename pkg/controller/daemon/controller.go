@@ -100,7 +100,8 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&extensions.DaemonSet{},
@@ -132,7 +133,8 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 				return dsc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Pod{},
@@ -150,7 +152,8 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 				return dsc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return dsc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return dsc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Node{},

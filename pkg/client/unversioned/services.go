@@ -35,7 +35,7 @@ type ServiceInterface interface {
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 	ProxyGet(name, path string, params map[string]string) ResponseWrapper
 }
 
@@ -90,12 +90,12 @@ func (c *services) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *services) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *services) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

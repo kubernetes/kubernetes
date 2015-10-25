@@ -137,6 +137,6 @@ func TestPodTemplateWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
 	c.Validate(t, nil, err)
 }
