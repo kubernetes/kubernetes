@@ -55,7 +55,7 @@ const (
 
 type mesosSchedulerApiAdapter struct {
 	sync.Mutex
-	mesosScheduler *KubernetesMesosScheduler
+	mesosScheduler *MesosScheduler
 }
 
 func (k *mesosSchedulerApiAdapter) Algorithm() malgorithm.PodScheduler {
@@ -271,12 +271,12 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 }
 
 // Create creates a scheduler plugin and all supporting background functions.
-func (k *KubernetesMesosScheduler) NewDefaultPluginConfig(terminate <-chan struct{}, mux *http.ServeMux) *PluginConfig {
+func (k *MesosScheduler) NewDefaultPluginConfig(terminate <-chan struct{}, mux *http.ServeMux) *PluginConfig {
 	// use ListWatch watching pods using the client by default
 	return k.NewPluginConfig(terminate, mux, createAllPodsLW(k.client))
 }
 
-func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.ServeMux,
+func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.ServeMux,
 	podsWatcher *cache.ListWatch) *PluginConfig {
 
 	// Watch and queue pods that need scheduling.
@@ -360,7 +360,7 @@ func (s *schedulingPlugin) Run(done <-chan struct{}) {
 	go runtime.Until(s.scheduleOne, pluginRecoveryDelay, done)
 }
 
-// hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/scheduler.go,
+// hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/mesos_scheduler.go,
 // with the Modeler stuff removed since we don't use it because we have mesos.
 func (s *schedulingPlugin) scheduleOne() {
 	pod := s.config.NextPod()
