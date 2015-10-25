@@ -301,7 +301,7 @@ func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mu
 	podsWatcher *cache.ListWatch) *PluginConfig {
 
 	// Watch and queue pods that need scheduling.
-	updates := make(chan queue.Entry, k.schedcfg.UpdatesBacklog)
+	updates := make(chan queue.Entry, k.schedulerConfig.UpdatesBacklog)
 	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
 	reflector := cache.NewReflector(podsWatcher, &api.Pod{}, podUpdates, 0)
 
@@ -316,7 +316,7 @@ func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mu
 	}
 	eh := &errorHandler{
 		api:     kapi,
-		backoff: backoff.New(k.schedcfg.InitialPodBackoff.Duration, k.schedcfg.MaxPodBackoff.Duration),
+		backoff: backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration),
 		qr:      q,
 	}
 	startLatch := make(chan struct{})
