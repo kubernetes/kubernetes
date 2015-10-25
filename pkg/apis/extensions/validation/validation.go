@@ -34,16 +34,6 @@ import (
 	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
-const isNegativeErrorMsg string = `must be non-negative`
-
-// TODO: Expose from apivalidation instead of duplicating.
-func intervalErrorMsg(lo, hi int) string {
-	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
-}
-
-var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
-var portNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
-
 // ValidateHorizontalPodAutoscaler can be used to check whether the given autoscaler name is valid.
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string) {
@@ -318,11 +308,11 @@ func ValidateJob(job *extensions.Job) errs.ValidationErrorList {
 func ValidateJobSpec(spec *extensions.JobSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if spec.Parallelism != nil && *spec.Parallelism < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("parallelism", spec.Parallelism, isNegativeErrorMsg))
+	if spec.Parallelism != nil {
+		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Parallelism), "parallelism")...)
 	}
-	if spec.Completions != nil && *spec.Completions < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, isNegativeErrorMsg))
+	if spec.Completions != nil {
+		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Completions), "completions")...)
 	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
@@ -371,15 +361,9 @@ func ValidateJobUpdateStatus(oldJob, job *extensions.Job) errs.ValidationErrorLi
 func ValidateJobSpecUpdate(oldSpec, spec extensions.JobSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec)...)
-	if !api.Semantic.DeepEqual(oldSpec.Completions, spec.Completions) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, "field is immutable"))
-	}
-	if !api.Semantic.DeepEqual(oldSpec.Selector, spec.Selector) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("selector", spec.Selector, "field is immutable"))
-	}
-	if !api.Semantic.DeepEqual(oldSpec.Template, spec.Template) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("template", "[omitted]", "field is immutable"))
-	}
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldSpec.Completions, spec.Completions, "completions")...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldSpec.Selector, spec.Selector, "selector")...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(oldSpec.Template, spec.Template, "template")...)
 	return allErrs
 }
 
@@ -506,10 +490,10 @@ func validateIngressBackend(backend *extensions.IngressBackend) errs.ValidationE
 			allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
 		}
 		if !utilvalidation.IsValidPortName(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort.StrVal, portNameErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))
 		}
 	} else if !utilvalidation.IsValidPortNum(backend.ServicePort.IntVal) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort, portRangeErrorMsg))
+		allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort, apivalidation.PortRangeErrorMsg))
 	}
 	return allErrs
 }
