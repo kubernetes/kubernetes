@@ -427,7 +427,7 @@ type lifecycleTest struct {
 	eventObs      *EventObserver
 	plugin        *schedulingPlugin
 	podsListWatch *MockPodsListWatch
-	scheduler     *KubernetesMesosScheduler
+	scheduler     *MesosScheduler
 	schedulerProc *ha.SchedulerProcess
 	t             *testing.T
 }
