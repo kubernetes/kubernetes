@@ -201,7 +201,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
-func (s *CMServer) resyncPeriod() time.Duration {
+func (s *CMServer) ResyncPeriod() time.Duration {
 	factor := rand.Float64() + 1
 	return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
 }
@@ -247,14 +247,14 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	go endpointcontroller.NewEndpointController(kubeClient, s.resyncPeriod).
+	go endpointcontroller.NewEndpointController(kubeClient, s.ResyncPeriod).
 		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	go replicationcontroller.NewReplicationManager(kubeClient, s.resyncPeriod, replicationcontroller.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(kubeClient, s.ResyncPeriod, replicationcontroller.BurstReplicas).
 		Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go gc.New(kubeClient, s.resyncPeriod, s.TerminatedPodGCThreshold).
+		go gc.New(kubeClient, s.ResyncPeriod, s.TerminatedPodGCThreshold).
 			Run(util.NeverStop)
 	}
 
@@ -313,13 +313,13 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
+			go daemon.NewDaemonSetsController(kubeClient, s.ResyncPeriod).
 				Run(s.ConcurrentDSCSyncs, util.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(kubeClient, s.resyncPeriod).
+			go job.NewJobController(kubeClient, s.ResyncPeriod).
 				Run(s.ConcurrentJobSyncs, util.NeverStop)
 		}
 
