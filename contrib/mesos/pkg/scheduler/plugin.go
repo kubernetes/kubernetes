@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
@@ -56,7 +56,7 @@ type mesosSchedulerApiAdapter struct {
 	mesosScheduler *MesosScheduler
 }
 
-func (k *mesosSchedulerApiAdapter) Algorithm() malgorithm.PodScheduler {
+func (k *mesosSchedulerApiAdapter) Algorithm() podschedulers.PodScheduler {
 	return k.mesosScheduler
 }
 
@@ -241,7 +241,7 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 			return
 		}
 		breakoutEarly := queue.BreakChan(nil)
-		if schedulingErr == malgorithm.NoSuitableOffersErr {
+		if schedulingErr == podschedulers.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
 			breakoutEarly = queue.BreakChan(k.api.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
 				k.api.Lock()

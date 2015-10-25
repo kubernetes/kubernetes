@@ -41,7 +41,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
-	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
@@ -449,7 +449,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	ei.Data = []byte{0, 1, 2}
 
 	// create scheduler
-	strategy := malgorithm.NewAllocationStrategy(
+	strategy := podschedulers.NewAllocationStrategy(
 		podtask.NewDefaultPredicate(
 			mresource.DefaultDefaultContainerCPULimit,
 			mresource.DefaultDefaultContainerMemLimit,
@@ -466,7 +466,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 			Host:    apiServer.server.URL,
 			Version: testapi.Default.Version(),
 		}),
-		PodScheduler:    malgorithm.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
+		PodScheduler:    podschedulers.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
 		SchedulerConfig: *schedcfg.CreateDefaultConfig(),
 		LookupNode:      apiServer.LookupNode,
 	})

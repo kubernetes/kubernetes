@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -50,11 +50,11 @@ func (m *MockScheduler) SlaveHostNameFor(id string) (hostName string) {
 	return
 }
 
-func (m *MockScheduler) Algorithm() (f malgorithm.PodScheduler) {
+func (m *MockScheduler) Algorithm() (f podschedulers.PodScheduler) {
 	args := m.Called()
 	x := args.Get(0)
 	if x != nil {
-		f = x.(malgorithm.PodScheduler)
+		f = x.(podschedulers.PodScheduler)
 	}
 	return
 }

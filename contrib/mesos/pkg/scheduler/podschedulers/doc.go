@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package algorithm contains the PodSchedules which process offers and pod
 // create a scheduling match
-package algorithm
+package podschedulers

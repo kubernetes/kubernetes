@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	malgorithm "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -29,8 +29,8 @@ import (
 type SchedulerApi interface {
 	sync.Locker // synchronize scheduler plugin operations
 
-	malgorithm.SlaveIndex
-	Algorithm() malgorithm.PodScheduler
+	podschedulers.SlaveIndex
+	Algorithm() podschedulers.PodScheduler
 	Offers() offers.Registry
 	Tasks() podtask.Registry
 
