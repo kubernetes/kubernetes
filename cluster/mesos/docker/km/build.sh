@@ -48,9 +48,10 @@ kube_bin_path=$(dirname ${km_path})
 common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
 
 # download nsenter and socat
-mkdir -p "${script_dir}/overlay"
-docker run --rm -v "${script_dir}/overlay:/target" jpetazzo/nsenter
-docker run --rm -v "${script_dir}/overlay:/target" mesosphere/kubernetes-socat
+overlay_dir=${MESOS_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}
+mkdir -p "${overlay_dir}"
+docker run --rm -v "${overlay_dir}:/target" jpetazzo/nsenter
+docker run --rm -v "${overlay_dir}:/target" mesosphere/kubernetes-socat
 
 cd "${KUBE_ROOT}"
 
@@ -61,6 +62,7 @@ echo "Workspace created: ${workspace}"
 
 cleanup() {
   rm -rf "${workspace}"
+  rm -f "${overlay_dir}/*"
   echo "Workspace deleted: ${workspace}"
 }
 trap 'cleanup' EXIT
@@ -81,8 +83,8 @@ cp "${script_dir}/opt/"* "${workspace}/opt/"
 
 # package up the sandbox overay
 mkdir -p "${workspace}/overlay/bin"
-cp -a "${script_dir}/overlay/nsenter" "${workspace}/overlay/bin"
-cp -a "${script_dir}/overlay/socat" "${workspace}/overlay/bin"
+cp -a "${overlay_dir}/nsenter" "${workspace}/overlay/bin"
+cp -a "${overlay_dir}/socat" "${workspace}/overlay/bin"
 chmod +x "${workspace}/overlay/bin/"*
 cd "${workspace}/overlay" && tar -czvf "${workspace}/opt/sandbox-overlay.tar.gz" . && cd -
 
