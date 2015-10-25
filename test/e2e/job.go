@@ -61,8 +61,14 @@ var _ = Describe("Job", func() {
 	// Pods sometimes fail, but eventually succeed.
 	It("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		By("Creating a job")
-		// 50% chance of container success, local restarts.
-		job := newTestJob("randomlySucceedOrFail", "rand-local", api.RestartPolicyOnFailure, parallelism, completions)
+		// One failure, then a success, local restarts.
+		// We can't use the random failure approach used by the
+		// non-local test below, because kubelet will throttle
+		// frequently failing containers in a given pod, ramping
+		// up to 5 minutes between restarts, making test timeouts
+		// due to successive failures too likely with a reasonable
+		// test timeout.
+		job := newTestJob("failOnce", "fail-once-local", api.RestartPolicyOnFailure, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -75,6 +81,11 @@ var _ = Describe("Job", func() {
 	It("should run a job to completion when tasks sometimes fail and are not locally restarted", func() {
 		By("Creating a job")
 		// 50% chance of container success, local restarts.
+		// Can't use the failOnce approach because that relies
+		// on an emptyDir, which is not preserved across new pods.
+		// Worst case analysis: 15 failures, each taking 1 minute to
+		// run doe to some slowness, 1 in 2^15 chance of happening,
+		// causing test flake.  Should be very rare.
 		job := newTestJob("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
@@ -189,11 +200,25 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 				},
 				Spec: api.PodSpec{
 					RestartPolicy: rPol,
+					Volumes: []api.Volume{
+						{
+							Name: "data",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{},
+							},
+						},
+					},
 					Containers: []api.Container{
 						{
 							Name:    "c",
 							Image:   "gcr.io/google_containers/busybox",
 							Command: []string{},
+							VolumeMounts: []api.VolumeMount{
+								{
+									MountPath: "/data",
+									Name:      "data",
+								},
+							},
 						},
 					},
 				},
@@ -211,6 +236,13 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 		// Bash's $RANDOM generates pseudorandom int in range 0 - 32767.
 		// Dividing by 16384 gives roughly 50/50 chance of succeess.
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit $(( $RANDOM / 16384 ))"}
+	case "failOnce":
+		// Fail the first the container of the pod is run, and
+		// succeed the second time. Checks for file on emptydir.
+		// If present, succeed.  If not, create but fail.
+		// Note that this cannot be used with RestartNever because
+		// it always fails the first time for a pod.
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; else touch /data/foo ; exit 1 ; fi"}
 	}
 	return job
 }
