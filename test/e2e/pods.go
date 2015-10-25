@@ -856,7 +856,7 @@ var _ = Describe("Pods", func() {
 		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
 		delay1 += 1 // divide by zero
 		ratio := float64(delay2) / float64(delay1)
-		if math.Floor(ratio) != 2 && math.Ceil(ratio) != 2 {
+		if ratio < 1 || ratio > 4 {
 			Failf("back-off gap is not increasing exponentially pod=%s/%s delay1=%s delay2=%s", podName, containerName, delay1, delay2)
 		}
 	})
@@ -907,7 +907,7 @@ var _ = Describe("Pods", func() {
 			Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
 
-		if delayAfterUpdate > delay2 || delayAfterUpdate > delay1 {
+		if delayAfterUpdate > 2*delay2 || delayAfterUpdate > 2*delay1 {
 			Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
 		}
 	})
