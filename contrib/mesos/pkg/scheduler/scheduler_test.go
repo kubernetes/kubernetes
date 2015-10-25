@@ -86,7 +86,7 @@ func TestResourceOffer_Add(t *testing.T) {
 	assert := assert.New(t)
 
 	registrator := &mockRegistrator{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	testScheduler := &KubernetesScheduler{
+	testScheduler := &KubernetesMesosScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -131,7 +131,7 @@ func TestResourceOffer_Add(t *testing.T) {
 func TestResourceOffer_Add_Rescind(t *testing.T) {
 	assert := assert.New(t)
 
-	testScheduler := &KubernetesScheduler{
+	testScheduler := &KubernetesMesosScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -187,7 +187,7 @@ func TestSlave_Lost(t *testing.T) {
 	assert := assert.New(t)
 
 	//
-	testScheduler := &KubernetesScheduler{
+	testScheduler := &KubernetesMesosScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -244,7 +244,7 @@ func TestDisconnect(t *testing.T) {
 	assert := assert.New(t)
 
 	//
-	testScheduler := &KubernetesScheduler{
+	testScheduler := &KubernetesMesosScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -287,7 +287,7 @@ func TestStatus_Update(t *testing.T) {
 	// setup expectations
 	mockdriver.On("KillTask", util.NewTaskID("test-task-001")).Return(mesos.Status_DRIVER_RUNNING, nil)
 
-	testScheduler := &KubernetesScheduler{
+	testScheduler := &KubernetesMesosScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true

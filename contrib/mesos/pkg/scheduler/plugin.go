@@ -78,7 +78,7 @@ type schedulerInterface interface {
 
 type k8smScheduler struct {
 	sync.Mutex
-	internal *KubernetesScheduler
+	internal *KubernetesMesosScheduler
 }
 
 func (k *k8smScheduler) algorithm() PodScheduler {
@@ -652,12 +652,12 @@ func (k *deleter) deleteOne(pod *Pod) error {
 }
 
 // Create creates a scheduler plugin and all supporting background functions.
-func (k *KubernetesScheduler) NewDefaultPluginConfig(terminate <-chan struct{}, mux *http.ServeMux) *PluginConfig {
+func (k *KubernetesMesosScheduler) NewDefaultPluginConfig(terminate <-chan struct{}, mux *http.ServeMux) *PluginConfig {
 	// use ListWatch watching pods using the client by default
 	return k.NewPluginConfig(terminate, mux, createAllPodsLW(k.client))
 }
 
-func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.ServeMux,
+func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.ServeMux,
 	podsWatcher *cache.ListWatch) *PluginConfig {
 
 	// Watch and queue pods that need scheduling.
