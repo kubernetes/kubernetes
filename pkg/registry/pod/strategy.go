@@ -163,14 +163,15 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 	}
 }
 
-// PodToSelectableFields returns a label set that represents the object
+// PodToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
 func PodToSelectableFields(pod *api.Pod) fields.Set {
-	return fields.Set{
-		"metadata.name": pod.Name,
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(pod.ObjectMeta)
+	podSpecificFieldsSet := fields.Set{
 		"spec.nodeName": pod.Spec.NodeName,
 		"status.phase":  string(pod.Status.Phase),
 	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, podSpecificFieldsSet)
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.

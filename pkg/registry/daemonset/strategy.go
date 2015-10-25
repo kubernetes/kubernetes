@@ -102,9 +102,7 @@ func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
 
 // DaemonSetToSelectableFields returns a field set that represents the object.
 func DaemonSetToSelectableFields(daemon *extensions.DaemonSet) fields.Set {
-	return fields.Set{
-		"metadata.name": daemon.Name,
-	}
+	return generic.ObjectMetaFieldsSet(daemon.ObjectMeta)
 }
 
 // MatchSetDaemon is the filter used by the generic etcd backend to route
