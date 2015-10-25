@@ -33,7 +33,7 @@ type ServiceAccountsInterface interface {
 	Delete(name string) error
 	List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error)
 	Get(name string) (*api.ServiceAccount, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // serviceAccounts implements ServiceAccounts interface
@@ -91,12 +91,12 @@ func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
 }
 
 // Watch starts watching for serviceAccounts matching the given selectors.
-func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

@@ -55,6 +55,14 @@
         "allowMultiple": false
        },
        {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -171,6 +179,14 @@
         "paramType": "query",
         "name": "resourceVersion",
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
        },
@@ -462,6 +478,14 @@
         "allowMultiple": false
        },
        {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -543,6 +567,14 @@
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -608,6 +640,14 @@
         "paramType": "query",
         "name": "resourceVersion",
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
        }
@@ -738,6 +778,14 @@
         "allowMultiple": false
        },
        {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -854,6 +902,14 @@
         "paramType": "query",
         "name": "resourceVersion",
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
        },
@@ -1145,6 +1201,14 @@
         "allowMultiple": false
        },
        {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -1226,6 +1290,14 @@
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -1291,6 +1363,14 @@
         "paramType": "query",
         "name": "resourceVersion",
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
        }
@@ -1421,6 +1501,14 @@
         "allowMultiple": false
        },
        {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -1537,6 +1625,14 @@
         "paramType": "query",
         "name": "resourceVersion",
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
        },
@@ -1828,6 +1924,14 @@
         "allowMultiple": false
        },
        {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -1909,6 +2013,14 @@
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -1974,6 +2086,14 @@
         "paramType": "query",
         "name": "resourceVersion",
         "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*int64",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
        }

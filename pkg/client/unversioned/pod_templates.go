@@ -35,7 +35,7 @@ type PodTemplateInterface interface {
 	Delete(name string, options *api.DeleteOptions) error
 	Create(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
 	Update(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // podTemplates implements PodTemplatesNamespacer interface
@@ -94,12 +94,12 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 }
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *podTemplates) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("podTemplates").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

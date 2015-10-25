@@ -37,7 +37,7 @@ type JobInterface interface {
 	Create(job *extensions.Job) (*extensions.Job, error)
 	Update(job *extensions.Job) (*extensions.Job, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 	UpdateStatus(job *extensions.Job) (*extensions.Job, error)
 }
 
@@ -97,12 +97,13 @@ func (c *jobs) Delete(name string, options *api.DeleteOptions) (err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *jobs) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		Param("resourceVersion", resourceVersion).
+		Param("resourceVersion", opts.ResourceVersion).
+		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

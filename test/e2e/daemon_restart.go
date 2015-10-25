@@ -225,7 +225,8 @@ var _ = Describe("DaemonRestart", func() {
 					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
 				},
 				WatchFunc: func(rv string) (watch.Interface, error) {
-					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), rv)
+					options := api.ListOptions{ResourceVersion: rv}
+					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), options)
 				},
 			},
 			&api.Pod{},

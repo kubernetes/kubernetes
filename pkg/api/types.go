@@ -1645,6 +1645,8 @@ type ListOptions struct {
 	Watch bool
 	// The resource version to watch (no effect on list yet)
 	ResourceVersion string
+	// Timeout for the list/watch call.
+	TimeoutSeconds *int64
 }
 
 // PodLogOptions is the query options for a Pod's logs REST call

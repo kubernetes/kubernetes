@@ -137,7 +137,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
 	return node, nil
 }
 
-func (m *FakeNodeHandler) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
 

@@ -111,7 +111,8 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.ReplicationController{},
@@ -152,7 +153,8 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 				return rm.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return rm.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return rm.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Pod{},

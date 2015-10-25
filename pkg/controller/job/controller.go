@@ -89,7 +89,8 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&extensions.Job{},
@@ -112,7 +113,8 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 				return jm.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return jm.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return jm.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Pod{},

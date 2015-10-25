@@ -36,7 +36,7 @@ type DeploymentInterface interface {
 	Delete(name string, options *api.DeleteOptions) error
 	Create(Deployment *extensions.Deployment) (*extensions.Deployment, error)
 	Update(Deployment *extensions.Deployment) (*extensions.Deployment, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // deployments implements DeploymentInterface
@@ -94,12 +94,13 @@ func (c *deployments) Update(deployment *extensions.Deployment) (result *extensi
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *deployments) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
-		Param("resourceVersion", resourceVersion).
+		Param("resourceVersion", opts.ResourceVersion).
+		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

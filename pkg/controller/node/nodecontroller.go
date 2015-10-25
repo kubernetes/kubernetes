@@ -167,7 +167,8 @@ func NewNodeController(
 				return nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return nc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return nc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Pod{},
@@ -183,7 +184,8 @@ func NewNodeController(
 				return nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
-				return nc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), rv)
+				options := api.ListOptions{ResourceVersion: rv}
+				return nc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Node{},
