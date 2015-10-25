@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -113,15 +113,6 @@ func (k *k8smScheduler) launchTask(task *podtask.T) error {
 type kubeScheduler struct {
 	api        schedulerInterface
 	podUpdates queue.FIFO
-}
-
-// recoverAssignedSlave recovers the assigned Mesos slave from a pod by searching
-// the BindingHostKey. For tasks in the registry of the scheduler, the same
-// value is stored in T.Spec.AssignedSlave. Before launching, the BindingHostKey
-// annotation is added and the executor will eventually persist that to the
-// apiserver on binding.
-func recoverAssignedSlave(pod *api.Pod) string {
-	return pod.Annotations[annotation.BindingHostKey]
 }
 
 // Schedule implements the Scheduler interface of Kubernetes.
@@ -230,7 +221,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 type errorHandler struct {
 	api     schedulerInterface
 	backoff *backoff.Backoff
-	qr      *queuer
+	qr      *queuer.Queuer
 }
 
 // implementation of scheduling plugin's Error func; see plugin/pkg/scheduler
@@ -288,7 +279,7 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 		}
 		delay := k.backoff.Get(podKey)
 		log.V(3).Infof("requeuing pod %v with delay %v", podKey, delay)
-		k.qr.requeue(&Pod{Pod: pod, delay: &delay, notify: breakoutEarly})
+		k.qr.Requeue(&queuer.Pod{Pod: pod, Delay: &delay, Notify: breakoutEarly})
 
 	default:
 		log.V(2).Infof("Task is no longer pending, aborting reschedule for pod %v", podKey)
@@ -313,7 +304,7 @@ func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mu
 	// the store (cache) to the scheduling queue; its purpose is to maintain
 	// an ordering (vs interleaving) of operations that's easier to reason about.
 	kapi := &k8smScheduler{internal: k}
-	q := newQueuer(podUpdates)
+	q := queuer.NewQueuer(podUpdates)
 	podDeleter := &deleter{
 		api: kapi,
 		qr:  q,
@@ -331,7 +322,7 @@ func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mu
 		podDeleter.Run(updates, terminate)
 		q.Run(terminate)
 
-		q.installDebugHandlers(mux)
+		q.InstallDebugHandlers(mux)
 		podtask.InstallDebugHandlers(k.taskRegistry, mux)
 	})
 	return &PluginConfig{
@@ -342,7 +333,7 @@ func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mu
 				podUpdates: podUpdates,
 			},
 			Binder:   &binder{api: kapi},
-			NextPod:  q.yield,
+			NextPod:  q.Yield,
 			Error:    eh.handleSchedulingError,
 			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
 		},
@@ -358,7 +349,7 @@ type PluginConfig struct {
 	*plugin.Config
 	api      schedulerInterface
 	client   *client.Client
-	qr       *queuer
+	qr       *queuer.Queuer
 	deleter  *deleter
 	starting chan struct{} // startup latch
 }
@@ -378,7 +369,7 @@ type schedulingPlugin struct {
 	config   *plugin.Config
 	api      schedulerInterface
 	client   *client.Client
-	qr       *queuer
+	qr       *queuer.Queuer
 	deleter  *deleter
 	starting chan struct{}
 }
@@ -444,7 +435,7 @@ func (s *schedulingPlugin) reconcileTask(t *podtask.T) {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// attempt to delete
-			if err = s.deleter.deleteOne(&Pod{Pod: &t.Pod}); err != nil && err != noSuchPodErr && err != noSuchTaskErr {
+			if err = s.deleter.deleteOne(&queuer.Pod{Pod: &t.Pod}); err != nil && err != noSuchPodErr && err != noSuchTaskErr {
 				log.Errorf("failed to delete pod: %v: %v", t.Pod.Name, err)
 			}
 		} else {
@@ -479,10 +470,7 @@ func (s *schedulingPlugin) reconcileTask(t *podtask.T) {
 
 			now := time.Now()
 			log.V(3).Infof("reoffering pod %v", podKey)
-			s.qr.reoffer(&Pod{
-				Pod:      pod,
-				deadline: &now,
-			})
+			s.qr.Reoffer(queuer.NewPodWithDeadline(pod, &now))
 		} else {
 			// pod is scheduled.
 			// not sure how this happened behind our backs. attempt to reconstruct
@@ -521,22 +509,22 @@ type podStoreAdapter struct {
 
 func (psa *podStoreAdapter) Add(obj interface{}) error {
 	pod := obj.(*api.Pod)
-	return psa.FIFO.Add(&Pod{Pod: pod})
+	return psa.FIFO.Add(&queuer.Pod{Pod: pod})
 }
 
 func (psa *podStoreAdapter) Update(obj interface{}) error {
 	pod := obj.(*api.Pod)
-	return psa.FIFO.Update(&Pod{Pod: pod})
+	return psa.FIFO.Update(&queuer.Pod{Pod: pod})
 }
 
 func (psa *podStoreAdapter) Delete(obj interface{}) error {
 	pod := obj.(*api.Pod)
-	return psa.FIFO.Delete(&Pod{Pod: pod})
+	return psa.FIFO.Delete(&queuer.Pod{Pod: pod})
 }
 
 func (psa *podStoreAdapter) Get(obj interface{}) (interface{}, bool, error) {
 	pod := obj.(*api.Pod)
-	return psa.FIFO.Get(&Pod{Pod: pod})
+	return psa.FIFO.Get(&queuer.Pod{Pod: pod})
 }
 
 // Replace will delete the contents of the store, using instead the
@@ -545,7 +533,7 @@ func (psa *podStoreAdapter) Replace(objs []interface{}, resourceVersion string) 
 	newobjs := make([]interface{}, len(objs))
 	for i, v := range objs {
 		pod := v.(*api.Pod)
-		newobjs[i] = &Pod{Pod: pod}
+		newobjs[i] = &queuer.Pod{Pod: pod}
 	}
 	return psa.FIFO.Replace(newobjs, resourceVersion)
 }

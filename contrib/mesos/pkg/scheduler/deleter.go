@@ -23,12 +23,13 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 type deleter struct {
 	api schedulerInterface
-	qr  *queuer
+	qr  *queuer.Queuer
 }
 
 // currently monitors for "pod deleted" events, upon which handle()
@@ -37,19 +38,19 @@ func (k *deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
 	go runtime.Until(func() {
 		for {
 			entry := <-updates
-			pod := entry.Value().(*Pod)
+			pod := entry.Value().(*queuer.Pod)
 			if entry.Is(queue.DELETE_EVENT) {
 				if err := k.deleteOne(pod); err != nil {
 					log.Error(err)
 				}
 			} else if !entry.Is(queue.POP_EVENT) {
-				k.qr.updatesAvailable()
+				k.qr.UpdatesAvailable()
 			}
 		}
 	}, 1*time.Second, done)
 }
 
-func (k *deleter) deleteOne(pod *Pod) error {
+func (k *deleter) deleteOne(pod *queuer.Pod) error {
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 	podKey, err := podtask.MakePodKey(ctx, pod.Name)
 	if err != nil {
@@ -69,7 +70,7 @@ func (k *deleter) deleteOne(pod *Pod) error {
 	// it's concurrently being scheduled (somewhere between pod scheduling and
 	// binding) - if so, then we'll end up removing it from taskRegistry which
 	// will abort Bind()ing
-	k.qr.dequeue(pod.GetUID())
+	k.qr.Dequeue(pod.GetUID())
 
 	switch task, state := k.api.tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
