@@ -76,7 +76,7 @@ type KubernetesMesosScheduler struct {
 
 	// Config related, write-once
 
-	schedcfg          *schedcfg.Config
+	schedulerConfig   *schedcfg.Config
 	executor          *mesos.ExecutorInfo
 	executorGroup     uint64
 	client            *client.Client
@@ -110,7 +110,7 @@ type KubernetesMesosScheduler struct {
 }
 
 type Config struct {
-	Schedcfg          schedcfg.Config
+	SchedulerConfig   schedcfg.Config
 	Executor          *mesos.ExecutorInfo
 	PodScheduler      malgorithm.PodScheduler
 	Client            *client.Client
@@ -125,7 +125,7 @@ type Config struct {
 func New(config Config) *KubernetesMesosScheduler {
 	var k *KubernetesMesosScheduler
 	k = &KubernetesMesosScheduler{
-		schedcfg:          &config.Schedcfg,
+		schedulerConfig:   &config.SchedulerConfig,
 		RWMutex:           new(sync.RWMutex),
 		executor:          config.Executor,
 		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
@@ -165,9 +165,9 @@ func New(config Config) *KubernetesMesosScheduler {
 				return errOnce.Send(errOuter).Err()
 			},
 			// remember expired offers so that we can tell if a previously scheduler offer relies on one
-			LingerTTL:     config.Schedcfg.OfferLingerTTL.Duration,
-			TTL:           config.Schedcfg.OfferTTL.Duration,
-			ListenerDelay: config.Schedcfg.ListenerDelay.Duration,
+			LingerTTL:     config.SchedulerConfig.OfferLingerTTL.Duration,
+			TTL:           config.SchedulerConfig.OfferTTL.Duration,
+			ListenerDelay: config.SchedulerConfig.ListenerDelay.Duration,
 		}),
 		slaveHostNames:    slave.NewRegistry(),
 		taskRegistry:      podtask.NewInMemoryRegistry(),
@@ -217,7 +217,7 @@ func (k *KubernetesMesosScheduler) InstallDebugHandlers(mux *http.ServeMux) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 			}, k.terminate)
 			select {
-			case <-time.After(k.schedcfg.HttpHandlerTimeout.Duration):
+			case <-time.After(k.schedulerConfig.HttpHandlerTimeout.Duration):
 				log.Warningf("timed out waiting for request to be processed")
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return
@@ -294,8 +294,8 @@ func (k *KubernetesMesosScheduler) onInitialRegistration(driver bindings.Schedul
 	defer close(k.registration)
 
 	if k.failoverTimeout > 0 {
-		refreshInterval := k.schedcfg.FrameworkIdRefreshInterval.Duration
-		if k.failoverTimeout < k.schedcfg.FrameworkIdRefreshInterval.Duration.Seconds() {
+		refreshInterval := k.schedulerConfig.FrameworkIdRefreshInterval.Duration
+		if k.failoverTimeout < k.schedulerConfig.FrameworkIdRefreshInterval.Duration.Seconds() {
 			refreshInterval = time.Duration(math.Max(1, k.failoverTimeout/2)) * time.Second
 		}
 		go runtime.Until(k.storeFrameworkId, refreshInterval, k.terminate)
@@ -305,13 +305,13 @@ func (k *KubernetesMesosScheduler) onInitialRegistration(driver bindings.Schedul
 	r2 := k.makePodRegistryReconciler()
 
 	k.reconciler = newReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
-		k.reconcileCooldown, k.schedcfg.ExplicitReconciliationAbortTimeout.Duration, k.terminate)
+		k.reconcileCooldown, k.schedulerConfig.ExplicitReconciliationAbortTimeout.Duration, k.terminate)
 	go k.reconciler.Run(driver)
 
 	if k.reconcileInterval > 0 {
 		ri := time.Duration(k.reconcileInterval) * time.Second
-		time.AfterFunc(k.schedcfg.InitialImplicitReconciliationDelay.Duration, func() { runtime.Until(k.reconciler.RequestImplicit, ri, k.terminate) })
-		log.Infof("will perform implicit task reconciliation at interval: %v after %v", ri, k.schedcfg.InitialImplicitReconciliationDelay.Duration)
+		time.AfterFunc(k.schedulerConfig.InitialImplicitReconciliationDelay.Duration, func() { runtime.Until(k.reconciler.RequestImplicit, ri, k.terminate) })
+		log.Infof("will perform implicit task reconciliation at interval: %v after %v", ri, k.schedulerConfig.InitialImplicitReconciliationDelay.Duration)
 	}
 }
 
@@ -714,8 +714,8 @@ func (k *KubernetesMesosScheduler) explicitlyReconcileTasks(driver bindings.Sche
 	for backoff := 1 * time.Second; first || remaining.Len() > 0; backoff = backoff * 2 {
 		first = false
 		// nothing to do here other than wait for status updates..
-		if backoff > k.schedcfg.ExplicitReconciliationMaxBackoff.Duration {
-			backoff = k.schedcfg.ExplicitReconciliationMaxBackoff.Duration
+		if backoff > k.schedulerConfig.ExplicitReconciliationMaxBackoff.Duration {
+			backoff = k.schedulerConfig.ExplicitReconciliationMaxBackoff.Duration
 		}
 		select {
 		case <-cancel:

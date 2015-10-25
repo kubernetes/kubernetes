@@ -481,9 +481,9 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 			Host:    apiServer.server.URL,
 			Version: testapi.Default.Version(),
 		}),
-		PodScheduler: malgorithm.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
-		Schedcfg:     *schedcfg.CreateDefaultConfig(),
-		LookupNode:   apiServer.LookupNode,
+		PodScheduler:    malgorithm.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
+		SchedulerConfig: *schedcfg.CreateDefaultConfig(),
+		LookupNode:      apiServer.LookupNode,
 	})
 
 	assert.NotNil(mesosScheduler.client, "client is nil")

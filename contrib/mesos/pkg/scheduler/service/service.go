@@ -719,7 +719,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	fcfs := malgorithm.NewFCFSPodScheduler(as, lookupNode)
 	mesosPodScheduler := scheduler.New(scheduler.Config{
-		Schedcfg:          *sc,
+		SchedulerConfig:   *sc,
 		Executor:          executor,
 		PodScheduler:      fcfs,
 		Client:            client,
