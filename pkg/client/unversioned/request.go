@@ -570,6 +570,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		client = http.DefaultClient
 	}
 	resp, err := client.Do(req)
+	updateURLMetrics(r, resp, err)
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
@@ -585,6 +586,23 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
+}
+
+// updateURLMetrics is a convenience function for pushing metrics.
+// It also handles corner cases for incomplete/invalid request data.
+func updateURLMetrics(req *Request, resp *http.Response, err error) {
+	url := "none"
+	if req.baseURL != nil {
+		url = req.baseURL.Host
+	}
+
+	// If we have an error (i.e. apiserver down) we report that as a metric label.
+	if err != nil {
+		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, url).Inc()
+	} else {
+		//Metrics for failure codes
+		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, url).Inc()
+	}
 }
 
 // Stream formats and executes the request, and offers streaming of the response.
@@ -605,6 +623,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		client = http.DefaultClient
 	}
 	resp, err := client.Do(req)
+	updateURLMetrics(r, resp, err)
 	if err != nil {
 		return nil, err
 	}
@@ -641,6 +660,12 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
 func (r *Request) request(fn func(*http.Request, *http.Response)) error {
+	//Metrics for total request latency
+	start := time.Now()
+	defer func() {
+		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	if r.err != nil {
 		return r.err
 	}
@@ -671,6 +696,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		req.Header = r.headers
 
 		resp, err := client.Do(req)
+		updateURLMetrics(r, resp, err)
 		if err != nil {
 			return err
 		}
@@ -704,10 +730,6 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 //  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
-	start := time.Now()
-	defer func() {
-		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
-	}()
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result = r.transformResponse(resp, req)
@@ -720,10 +742,6 @@ func (r *Request) Do() Result {
 
 // DoRaw executes the request but does not process the response body.
 func (r *Request) DoRaw() ([]byte, error) {
-	start := time.Now()
-	defer func() {
-		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
-	}()
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
