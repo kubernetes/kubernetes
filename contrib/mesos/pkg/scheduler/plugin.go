@@ -304,7 +304,7 @@ func (k *KubernetesMesosScheduler) NewPluginConfig(terminate <-chan struct{}, mu
 	// the store (cache) to the scheduling queue; its purpose is to maintain
 	// an ordering (vs interleaving) of operations that's easier to reason about.
 	kapi := &k8smScheduler{internal: k}
-	q := queuer.NewQueuer(podUpdates)
+	q := queuer.New(podUpdates)
 	podDeleter := &deleter{
 		api: kapi,
 		qr:  q,

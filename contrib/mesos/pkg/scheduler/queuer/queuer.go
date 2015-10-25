@@ -46,7 +46,7 @@ type Queuer struct {
 	unscheduledCond sync.Cond        // there are unscheduled pods for processing
 }
 
-func NewQueuer(store queue.FIFO) *Queuer {
+func New(store queue.FIFO) *Queuer {
 	q := &Queuer{
 		PodQueue:   queue.NewDelayFIFO(),
 		podUpdates: store,
