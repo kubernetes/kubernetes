@@ -336,7 +336,7 @@ type PluginConfig struct {
 }
 
 func NewPlugin(c *PluginConfig) PluginInterface {
-	return &schedulingPlugin{
+	return &schedulerPlugin{
 		config:   c.Config,
 		api:      c.api,
 		client:   c.client,
@@ -346,7 +346,7 @@ func NewPlugin(c *PluginConfig) PluginInterface {
 	}
 }
 
-type schedulingPlugin struct {
+type schedulerPlugin struct {
 	config   *plugin.Config
 	api      schedapi.SchedulerApi
 	client   *client.Client
@@ -355,14 +355,14 @@ type schedulingPlugin struct {
 	starting chan struct{}
 }
 
-func (s *schedulingPlugin) Run(done <-chan struct{}) {
+func (s *schedulerPlugin) Run(done <-chan struct{}) {
 	defer close(s.starting)
 	go runtime.Until(s.scheduleOne, pluginRecoveryDelay, done)
 }
 
 // hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/mesos_scheduler.go,
 // with the Modeler stuff removed since we don't use it because we have mesos.
-func (s *schedulingPlugin) scheduleOne() {
+func (s *schedulerPlugin) scheduleOne() {
 	pod := s.config.NextPod()
 
 	// pods which are pre-scheduled (i.e. NodeName is set) are deleted by the kubelet
@@ -409,7 +409,7 @@ func (s *schedulingPlugin) scheduleOne() {
 //      host="..." |  host="..."    ; perhaps no updates to process?
 //
 // TODO(jdef) this needs an integration test
-func (s *schedulingPlugin) reconcileTask(t *podtask.T) {
+func (s *schedulerPlugin) reconcileTask(t *podtask.T) {
 	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
 	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
