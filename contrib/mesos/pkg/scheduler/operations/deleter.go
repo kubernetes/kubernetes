@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package operations
 
 import (
 	"time"
@@ -22,25 +22,34 @@ import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
+	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
 )
 
-type deleter struct {
-	api schedulerInterface
+type Deleter struct {
+	api schedapi.SchedulerApi
 	qr  *queuer.Queuer
+}
+
+func NewDeleter(api schedapi.SchedulerApi, qr *queuer.Queuer) *Deleter {
+	return &Deleter{
+		api: api,
+		qr:  qr,
+	}
 }
 
 // currently monitors for "pod deleted" events, upon which handle()
 // is invoked.
-func (k *deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
+func (k *Deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
 	go runtime.Until(func() {
 		for {
 			entry := <-updates
 			pod := entry.Value().(*queuer.Pod)
 			if entry.Is(queue.DELETE_EVENT) {
-				if err := k.deleteOne(pod); err != nil {
+				if err := k.DeleteOne(pod); err != nil {
 					log.Error(err)
 				}
 			} else if !entry.Is(queue.POP_EVENT) {
@@ -50,7 +59,7 @@ func (k *deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
 	}, 1*time.Second, done)
 }
 
-func (k *deleter) deleteOne(pod *queuer.Pod) error {
+func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 	podKey, err := podtask.MakePodKey(ctx, pod.Name)
 	if err != nil {
@@ -72,10 +81,10 @@ func (k *deleter) deleteOne(pod *queuer.Pod) error {
 	// will abort Bind()ing
 	k.qr.Dequeue(pod.GetUID())
 
-	switch task, state := k.api.tasks().ForPod(podKey); state {
+	switch task, state := k.api.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		log.V(2).Infof("Could not resolve pod '%s' to task id", podKey)
-		return noSuchPodErr
+		return merrors.NoSuchPodErr
 
 	// determine if the task has already been launched to mesos, if not then
 	// cleanup is easier (unregister) since there's no state to sync
@@ -87,11 +96,11 @@ func (k *deleter) deleteOne(pod *queuer.Pod) error {
 				task.Reset()
 				task.Set(podtask.Deleted)
 				//TODO(jdef) probably want better handling here
-				if err := k.api.tasks().Update(task); err != nil {
+				if err := k.api.Tasks().Update(task); err != nil {
 					return err
 				}
 			}
-			k.api.tasks().Unregister(task)
+			k.api.Tasks().Unregister(task)
 			return nil
 		}
 		fallthrough
@@ -99,13 +108,13 @@ func (k *deleter) deleteOne(pod *queuer.Pod) error {
 	case podtask.StateRunning:
 		// signal to watchers that the related pod is going down
 		task.Set(podtask.Deleted)
-		if err := k.api.tasks().Update(task); err != nil {
+		if err := k.api.Tasks().Update(task); err != nil {
 			log.Errorf("failed to update task w/ Deleted status: %v", err)
 		}
-		return k.api.killTask(task.ID)
+		return k.api.KillTask(task.ID)
 
 	default:
 		log.Infof("cannot kill pod '%s': non-terminal task not found %v", podKey, task.ID)
-		return noSuchTaskErr
+		return merrors.NoSuchTaskErr
 	}
 }

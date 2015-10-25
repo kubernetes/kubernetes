@@ -14,24 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package operations
 
 import (
 	"fmt"
 	"strconv"
 
 	log "github.com/golang/glog"
+	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
+	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 )
 
-type binder struct {
-	api schedulerInterface
+type Binder struct {
+	api schedapi.SchedulerApi
+}
+
+func NewBinder(api schedapi.SchedulerApi) *Binder {
+	return &Binder{
+		api: api,
+	}
 }
 
 // implements binding.Registry, launches the pod-associated-task in mesos
-func (b *binder) Bind(binding *api.Binding) error {
+func (b *Binder) Bind(binding *api.Binding) error {
 
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
 
@@ -44,21 +52,21 @@ func (b *binder) Bind(binding *api.Binding) error {
 	b.api.Lock()
 	defer b.api.Unlock()
 
-	switch task, state := b.api.tasks().ForPod(podKey); state {
+	switch task, state := b.api.Tasks().ForPod(podKey); state {
 	case podtask.StatePending:
 		return b.bind(ctx, binding, task)
 	default:
 		// in this case it's likely that the pod has been deleted between Schedule
 		// and Bind calls
 		log.Infof("No pending task for pod %s", podKey)
-		return noSuchPodErr //TODO(jdef) this error is somewhat misleading since the task could be running?!
+		return merrors.NoSuchPodErr //TODO(jdef) this error is somewhat misleading since the task could be running?!
 	}
 }
 
-func (b *binder) rollback(task *podtask.T, err error) error {
+func (b *Binder) rollback(task *podtask.T, err error) error {
 	task.Offer.Release()
 	task.Reset()
-	if err2 := b.api.tasks().Update(task); err2 != nil {
+	if err2 := b.api.Tasks().Update(task); err2 != nil {
 		log.Errorf("failed to update pod task: %v", err2)
 	}
 	return err
@@ -70,7 +78,7 @@ func (b *binder) rollback(task *podtask.T, err error) error {
 // kubernetes executor on the slave will finally do the binding. This is different from the
 // upstream scheduler in the sense that the upstream scheduler does the binding and the
 // kubelet will notice that and launches the pod.
-func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
+func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
 	// sanity check: ensure that the task hasAcceptedOffer(), it's possible that between
 	// Schedule() and now that the offer for this task was rescinded or invalidated.
 	// ((we should never see this here))
@@ -80,7 +88,7 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 
 	// By this time, there is a chance that the slave is disconnected.
 	offerId := task.GetOfferId()
-	if offer, ok := b.api.offers().Get(offerId); !ok || offer.HasExpired() {
+	if offer, ok := b.api.Offers().Get(offerId); !ok || offer.HasExpired() {
 		// already rescinded or timed out or otherwise invalidated
 		return b.rollback(task, fmt.Errorf("failed prior to launchTask due to expired offer for task %v", task.ID))
 	}
@@ -88,10 +96,10 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
 		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\", cpu %.2f, mem %.2f MB",
 			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.CPU, task.Spec.Memory)
-		if err = b.api.launchTask(task); err == nil {
-			b.api.offers().Invalidate(offerId)
+		if err = b.api.LaunchTask(task); err == nil {
+			b.api.Offers().Invalidate(offerId)
 			task.Set(podtask.Launched)
-			if err = b.api.tasks().Update(task); err != nil {
+			if err = b.api.Tasks().Update(task); err != nil {
 				// this should only happen if the task has been removed or has changed status,
 				// which SHOULD NOT HAPPEN as long as we're synchronizing correctly
 				log.Errorf("failed to update task w/ Launched status: %v", err)
@@ -103,7 +111,7 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 }
 
 //TODO(jdef) unit test this, ensure that task's copy of api.Pod is not modified
-func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *podtask.T, offerId string) error {
+func (b *Binder) prepareTaskForLaunch(ctx api.Context, machine string, task *podtask.T, offerId string) error {
 	pod := task.Pod
 
 	// we make an effort here to avoid making changes to the task's copy of the pod, since
