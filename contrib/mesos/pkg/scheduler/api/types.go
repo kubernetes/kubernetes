@@ -26,7 +26,7 @@ import (
 )
 
 // scheduler abstraction to allow for easier unit testing
-type SchedulerApi interface {
+type Scheduler interface {
 	sync.Locker // synchronize scheduler plugin operations
 
 	podschedulers.SlaveIndex

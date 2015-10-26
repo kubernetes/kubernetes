@@ -37,11 +37,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
@@ -936,13 +936,13 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 	// lock that guards critial sections that involve transferring pods from
 	// the store (cache) to the scheduling queue; its purpose is to maintain
 	// an ordering (vs interleaving) of operations that's easier to reason about.
-	kapi := &mesosSchedulerApiAdapter{mesosScheduler: k}
+	scheduler := &mesosSchedulerApiAdapter{mesosScheduler: k}
 	q := queuer.New(podUpdates)
-	podDeleter := operations.NewDeleter(kapi, q)
+	podDeleter := operations.NewDeleter(scheduler, q)
 	eh := &errorHandler{
-		api:     kapi,
-		backoff: backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration),
-		qr:      q,
+		scheduler: scheduler,
+		backoff:   backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration),
+		qr:        q,
 	}
 	startLatch := make(chan struct{})
 	eventBroadcaster := record.NewBroadcaster()
@@ -959,18 +959,18 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 		Config: &plugin.Config{
 			NodeLister: nil,
 			Algorithm: &schedulerApiAlgorithmAdapter{
-				api:        kapi,
+				scheduler:  scheduler,
 				podUpdates: podUpdates,
 			},
-			Binder:   operations.NewBinder(kapi),
+			Binder:   operations.NewBinder(scheduler),
 			NextPod:  q.Yield,
 			Error:    eh.handleSchedulingError,
 			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
 		},
-		api:      kapi,
-		client:   k.client,
-		qr:       q,
-		deleter:  podDeleter,
-		starting: startLatch,
+		scheduler: scheduler,
+		client:    k.client,
+		qr:        q,
+		deleter:   podDeleter,
+		starting:  startLatch,
 	}
 }

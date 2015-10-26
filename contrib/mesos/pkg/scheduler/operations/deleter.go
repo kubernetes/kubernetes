@@ -30,14 +30,14 @@ import (
 )
 
 type Deleter struct {
-	api schedapi.SchedulerApi
-	qr  *queuer.Queuer
+	scheduler schedapi.Scheduler
+	qr        *queuer.Queuer
 }
 
-func NewDeleter(api schedapi.SchedulerApi, qr *queuer.Queuer) *Deleter {
+func NewDeleter(scheduler schedapi.Scheduler, qr *queuer.Queuer) *Deleter {
 	return &Deleter{
-		api: api,
-		qr:  qr,
+		scheduler: scheduler,
+		qr:        qr,
 	}
 }
 
@@ -72,8 +72,8 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	// removing the pod from the scheduling queue. this makes the concurrent
 	// execution of scheduler-error-handling and delete-handling easier to
 	// reason about.
-	k.api.Lock()
-	defer k.api.Unlock()
+	k.scheduler.Lock()
+	defer k.scheduler.Unlock()
 
 	// prevent the scheduler from attempting to pop this; it's also possible that
 	// it's concurrently being scheduled (somewhere between pod scheduling and
@@ -81,7 +81,7 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	// will abort Bind()ing
 	k.qr.Dequeue(pod.GetUID())
 
-	switch task, state := k.api.Tasks().ForPod(podKey); state {
+	switch task, state := k.scheduler.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		log.V(2).Infof("Could not resolve pod '%s' to task id", podKey)
 		return merrors.NoSuchPodErr
@@ -96,11 +96,11 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 				task.Reset()
 				task.Set(podtask.Deleted)
 				//TODO(jdef) probably want better handling here
-				if err := k.api.Tasks().Update(task); err != nil {
+				if err := k.scheduler.Tasks().Update(task); err != nil {
 					return err
 				}
 			}
-			k.api.Tasks().Unregister(task)
+			k.scheduler.Tasks().Unregister(task)
 			return nil
 		}
 		fallthrough
@@ -108,10 +108,10 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	case podtask.StateRunning:
 		// signal to watchers that the related pod is going down
 		task.Set(podtask.Deleted)
-		if err := k.api.Tasks().Update(task); err != nil {
+		if err := k.scheduler.Tasks().Update(task); err != nil {
 			log.Errorf("failed to update task w/ Deleted status: %v", err)
 		}
-		return k.api.KillTask(task.ID)
+		return k.scheduler.KillTask(task.ID)
 
 	default:
 		log.Infof("cannot kill pod '%s': non-terminal task not found %v", podKey, task.ID)
