@@ -50,7 +50,7 @@ func (m *MockScheduler) SlaveHostNameFor(id string) (hostName string) {
 	return
 }
 
-func (m *MockScheduler) Algorithm() (f podschedulers.PodScheduler) {
+func (m *MockScheduler) PodScheduler() (f podschedulers.PodScheduler) {
 	args := m.Called()
 	x := args.Get(0)
 	if x != nil {
