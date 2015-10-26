@@ -19,12 +19,13 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+# Runs the unit and integration tests, producing JUnit-style XML test
+# reports in ${WORKSPACE}/artifacts. This script is intended to be run from
+# kubekins-test container with a kubernetes repo mapped in. See
+# hack/jenkins/gotest-dockerized.sh
+
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-./hack/install-etcd.sh
-go get -u github.com/jstemmer/go-junit-report
-go get golang.org/x/tools/cmd/cover
-go get github.com/mattn/goveralls
 go get github.com/tools/godep
 go get github.com/jstemmer/go-junit-report
 
@@ -36,22 +37,15 @@ export KUBE_COVER="n"
 export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
-export KUBE_GOVERALLS_BIN="${GOPATH}/bin/goveralls"
 export KUBE_TIMEOUT='-timeout 300s'
-export KUBE_COVERPROCS=8
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
 
-./hack/verify-gofmt.sh
-./hack/verify-boilerplate.sh
-./hack/verify-description.sh
-./hack/verify-flags-underscore.py
-./hack/verify-generated-conversions.sh
-./hack/verify-generated-deep-copies.sh
-./hack/verify-generated-docs.sh
-./hack/verify-generated-swagger-docs.sh
-./hack/verify-swagger-spec.sh
-./hack/verify-linkcheck.sh
+./hack/build-go.sh
+godep go install ./...
+./hack/install-etcd.sh
+
+./hack/verify-all.sh
 
 ./hack/test-go.sh -- -p=2
 ./hack/test-cmd.sh
