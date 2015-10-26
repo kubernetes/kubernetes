@@ -100,14 +100,18 @@ func (f *Framework) afterEach() {
 		Failf("All nodes should be ready after test, %v", err)
 	}
 
-	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
+	if testContext.DeleteNamespace {
+		By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
 
-	timeout := 5 * time.Minute
-	if f.NamespaceDeletionTimeout != 0 {
-		timeout = f.NamespaceDeletionTimeout
-	}
-	if err := deleteNS(f.Client, f.Namespace.Name, timeout); err != nil {
-		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
+		timeout := 5 * time.Minute
+		if f.NamespaceDeletionTimeout != 0 {
+			timeout = f.NamespaceDeletionTimeout
+		}
+		if err := deleteNS(f.Client, f.Namespace.Name, timeout); err != nil {
+			Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
+		}
+	} else {
+		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
