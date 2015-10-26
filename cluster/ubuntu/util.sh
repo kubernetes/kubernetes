@@ -339,7 +339,7 @@ function kube-up() {
   source "${KUBE_ROOT}/cluster/common.sh"
 
   # set kubernetes user and password
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
 
   create-kubeconfig
 }
