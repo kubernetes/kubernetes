@@ -1009,6 +1009,26 @@ case ${JOB_NAME} in
     KUBEMARK_NUM_MINIONS="100"
     ;;
 
+  # Run Kubemark test on a fake 500 node cluster to test for regressions on
+  # bigger clusters
+  kubernetes-kubemark-500-gce)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-500"}
+    : ${E2E_NETWORK:="kubernetes-kubemark-500"}
+    : ${PROJECT:="k8s-jenkins-kubemark"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    NUM_MINIONS="6"
+    MASTER_SIZE="n1-standard-4"
+    MINION_SIZE="n1-stadnard-8"
+    KUBE_GCE_INSTANCE_PREFIX="kubemark500"
+    E2E_ZONE="asia-east1-a"
+    KUBEMARK_MASTER_SIZE="n1-standard-16"
+    KUBEMARK_NUM_MINIONS="500"
+    ;;
+
   # Run big Kubemark test, this currently means a 1000 node cluster and 16 core master
   kubernetes-kubemark-gce-scale)
     : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-scale"}
