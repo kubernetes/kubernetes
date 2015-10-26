@@ -809,7 +809,7 @@ func TestPlugin_LifeCycle(t *testing.T) {
 
 	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
 	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
-		t, _ := lt.plugin.scheduler.Tasks().ForPod(podKey)
+		t, _ := lt.plugin.fw.Tasks().ForPod(podKey)
 		return t == nil
 	})
 

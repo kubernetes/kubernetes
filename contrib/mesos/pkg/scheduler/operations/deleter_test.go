@@ -19,20 +19,19 @@ package operations
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
-	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
+	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestDeleteOne_NonexistentPod(t *testing.T) {
 	assert := assert.New(t)
-	obj := &schedapi.MockScheduler{}
+	obj := &types.MockScheduler{}
 	reg := podtask.NewInMemoryRegistry()
 	obj.On("Tasks").Return(reg)
 
@@ -51,7 +50,7 @@ func TestDeleteOne_NonexistentPod(t *testing.T) {
 
 func TestDeleteOne_PendingPod(t *testing.T) {
 	assert := assert.New(t)
-	obj := &schedapi.MockScheduler{}
+	obj := &types.MockScheduler{}
 	reg := podtask.NewInMemoryRegistry()
 	obj.On("Tasks").Return(reg)
 
@@ -85,7 +84,7 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 
 func TestDeleteOne_Running(t *testing.T) {
 	assert := assert.New(t)
-	obj := &schedapi.MockScheduler{}
+	obj := &types.MockScheduler{}
 	reg := podtask.NewInMemoryRegistry()
 	obj.On("Tasks").Return(reg)
 
@@ -127,7 +126,7 @@ func TestDeleteOne_Running(t *testing.T) {
 
 func TestDeleteOne_badPodNaming(t *testing.T) {
 	assert := assert.New(t)
-	obj := &schedapi.MockScheduler{}
+	obj := &types.MockScheduler{}
 	pod := &queuer.Pod{Pod: &api.Pod{}}
 	d := NewDeleter(obj, queuer.New(nil))
 

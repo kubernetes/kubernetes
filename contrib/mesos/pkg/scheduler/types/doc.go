@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package api contains an abstract scheduler interface, implemented by the
-// scheduler plugin and consumed by the scheduler operations.
-package api
+// Package types contains an abstract framework interface, implemented by the
+// MesosScheduler and consumed by the scheduler operations.
+package types

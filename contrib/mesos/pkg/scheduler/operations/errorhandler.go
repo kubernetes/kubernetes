@@ -21,26 +21,26 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
-	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
+	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 type ErrorHandler struct {
-	scheduler schedapi.Scheduler
-	backoff   *backoff.Backoff
-	qr        *queuer.Queuer
+	fw      types.Framework
+	backoff *backoff.Backoff
+	qr      *queuer.Queuer
 }
 
-func NewErrorHandler(scheduler schedapi.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer) *ErrorHandler {
+func NewErrorHandler(fw types.Framework, backoff *backoff.Backoff, qr *queuer.Queuer) *ErrorHandler {
 	return &ErrorHandler{
-		scheduler: scheduler,
-		backoff:   backoff,
-		qr:        qr,
+		fw:      fw,
+		backoff: backoff,
+		qr:      qr,
 	}
 }
 
@@ -64,10 +64,10 @@ func (k *ErrorHandler) Error(pod *api.Pod, schedulingErr error) {
 	}
 
 	k.backoff.GC()
-	k.scheduler.Lock()
-	defer k.scheduler.Unlock()
+	k.fw.Lock()
+	defer k.fw.Unlock()
 
-	switch task, state := k.scheduler.Tasks().ForPod(podKey); state {
+	switch task, state := k.fw.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		// if we don't have a mapping here any more then someone deleted the pod
 		log.V(2).Infof("Could not resolve pod to task, aborting pod reschdule: %s", podKey)
@@ -81,16 +81,16 @@ func (k *ErrorHandler) Error(pod *api.Pod, schedulingErr error) {
 		breakoutEarly := queue.BreakChan(nil)
 		if schedulingErr == podschedulers.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
-			breakoutEarly = queue.BreakChan(k.scheduler.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
-				k.scheduler.Lock()
-				defer k.scheduler.Unlock()
-				switch task, state := k.scheduler.Tasks().Get(task.ID); state {
+			breakoutEarly = queue.BreakChan(k.fw.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
+				k.fw.Lock()
+				defer k.fw.Unlock()
+				switch task, state := k.fw.Tasks().Get(task.ID); state {
 				case podtask.StatePending:
 					// Assess fitness of pod with the current offer. The scheduler normally
 					// "backs off" when it can't find an offer that matches up with a pod.
 					// The backoff period for a pod can terminate sooner if an offer becomes
 					// available that matches up.
-					return !task.Has(podtask.Launched) && k.scheduler.PodScheduler().FitPredicate()(task, offer, nil)
+					return !task.Has(podtask.Launched) && k.fw.PodScheduler().FitPredicate()(task, offer, nil)
 				default:
 					// no point in continuing to check for matching offers
 					return true
