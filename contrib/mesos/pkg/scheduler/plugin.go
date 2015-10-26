@@ -354,9 +354,3 @@ func parseSelectorOrDie(s string) fields.Selector {
 	}
 	return selector
 }
-
-// createAllPodsLW returns a listWatch that finds all pods
-func createAllPodsLW(cl *client.Client) *cache.ListWatch {
-	return cache.NewListWatchFromClient(cl, "pods", api.NamespaceAll, parseSelectorOrDie(""))
-}
-

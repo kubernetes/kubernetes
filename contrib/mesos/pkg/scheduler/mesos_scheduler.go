@@ -922,7 +922,8 @@ func (ks *MesosScheduler) recoverTasks() error {
 // Create creates a scheduler plugin and all supporting background functions.
 func (k *MesosScheduler) NewDefaultPluginConfig(terminate <-chan struct{}, mux *http.ServeMux) *PluginConfig {
 	// use ListWatch watching pods using the client by default
-	return k.NewPluginConfig(terminate, mux, createAllPodsLW(k.client))
+	lw := cache.NewListWatchFromClient(k.client, "pods", api.NamespaceAll, parseSelectorOrDie(""))
+	return k.NewPluginConfig(terminate, mux, lw)
 }
 
 func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.ServeMux,
