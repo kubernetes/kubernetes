@@ -60,15 +60,6 @@ import (
 	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
 )
 
-type PluginInterface interface {
-	// the apiserver may have a different state for the pod than we do
-	// so reconcile our records, but only for this one pod
-	reconcileTask(*podtask.T)
-
-	// execute the Scheduling plugin, should start a go routine and return immediately
-	Run(<-chan struct{})
-}
-
 // KubernetesScheduler implements:
 // 1: A mesos scheduler.
 // 2: A kubernetes scheduler plugin.
