@@ -61,8 +61,8 @@ for doc in "${md_files[@]}"; do
   $SED -ri -e "s|(${HTML_PREVIEW_PREFIX}/HEAD)|${HTML_PREVIEW_PREFIX}/tree/${NEW_VERSION}|g" "${doc}"
 
   is_versioned_tag="<!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->"
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->"
   if ! grep -q "${is_versioned_tag}" "${doc}"; then
     echo -e "\n\n${is_versioned_tag}\n\n" >> "${doc}"
   fi
