@@ -51,6 +51,15 @@ const (
 	Scheduled        = "Scheduled"
 )
 
+type PluginInterface interface {
+	// the apiserver may have a different state for the pod than we do
+	// so reconcile our records, but only for this one pod
+	reconcileTask(*podtask.T)
+
+	// execute the Scheduling plugin, should start a go routine and return immediately
+	Run(<-chan struct{})
+}
+
 type mesosSchedulerApiAdapter struct {
 	sync.Mutex
 	mesosScheduler *MesosScheduler
