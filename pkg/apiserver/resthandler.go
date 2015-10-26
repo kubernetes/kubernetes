@@ -284,7 +284,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 
-		result, err := r.List(ctx, opts.LabelSelector, opts.FieldSelector)
+		result, err := r.List(ctx, opts.LabelSelector, opts.FieldSelector, &opts)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return

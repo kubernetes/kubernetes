@@ -28,7 +28,7 @@ import (
 // Registry is an interface implemented by things that know how to store ThirdPartyResourceData objects.
 type Registry interface {
 	// ListThirdPartyResourceData obtains a list of ThirdPartyResourceData having labels which match selector.
-	ListThirdPartyResourceData(ctx api.Context, selector labels.Selector) (*extensions.ThirdPartyResourceDataList, error)
+	ListThirdPartyResourceData(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
 	// Watch for new/changed/deleted ThirdPartyResourceData
 	WatchThirdPartyResourceData(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	// Get a specific ThirdPartyResourceData
@@ -52,8 +52,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListThirdPartyResourceData(ctx api.Context, label labels.Selector) (*extensions.ThirdPartyResourceDataList, error) {
-	obj, err := s.List(ctx, label, fields.Everything())
+func (s *storage) ListThirdPartyResourceData(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

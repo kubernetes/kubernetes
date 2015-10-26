@@ -242,7 +242,7 @@ func TestEtcdList(t *testing.T) {
 			key = etcdtest.AddPrefix(key)
 			fakeClient.Data[key] = item.in
 		}
-		list, err := registry.ListPredicate(ctx, item.m)
+		list, err := registry.ListPredicate(ctx, item.m, nil)
 		if e, a := item.succeed, err == nil; e != a {
 			t.Errorf("%v: expected %v, got %v: %v", name, e, a, err)
 			continue

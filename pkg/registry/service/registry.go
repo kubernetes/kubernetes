@@ -26,7 +26,7 @@ import (
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ServiceList, error)
+	ListServices(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.ServiceList, error)
 	CreateService(ctx api.Context, svc *api.Service) (*api.Service, error)
 	GetService(ctx api.Context, name string) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
@@ -45,8 +45,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServices(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ServiceList, error) {
-	obj, err := s.List(ctx, label, field)
+func (s *storage) ListServices(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.ServiceList, error) {
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

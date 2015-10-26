@@ -28,7 +28,7 @@ import (
 
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
-	ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error)
+	ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*extensions.DeploymentList, error)
 	GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error)
 	CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
@@ -46,11 +46,11 @@ func NewRegistry(s rest.StandardStorage) Registry {
 }
 
 // List obtains a list of Deployments that match selector.
-func (s *storage) ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error) {
+func (s *storage) ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*extensions.DeploymentList, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
-	obj, err := s.List(ctx, label, field)
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

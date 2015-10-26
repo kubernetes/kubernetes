@@ -59,7 +59,7 @@ func (r *NodeRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *NodeRegistry) ListNodes(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+func (r *NodeRegistry) ListNodes(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.NodeList, error) {
 	r.Lock()
 	defer r.Unlock()
 	return &r.Nodes, r.Err

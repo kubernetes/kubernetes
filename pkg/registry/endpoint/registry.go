@@ -26,7 +26,7 @@ import (
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListEndpoints(ctx api.Context) (*api.EndpointsList, error)
+	ListEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
 	WatchEndpoints(ctx api.Context, labels labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
@@ -44,8 +44,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListEndpoints(ctx api.Context) (*api.EndpointsList, error) {
-	obj, err := s.List(ctx, labels.Everything(), fields.Everything())
+func (s *storage) ListEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.EndpointsList, error) {
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}
