@@ -399,6 +399,11 @@ func (os *OpenStack) ProviderName() string {
 	return ProviderName
 }
 
+// ScrubDNS filters DNS settings for pods.
+func (os *OpenStack) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
+}
+
 type LoadBalancer struct {
 	network *gophercloud.ServiceClient
 	compute *gophercloud.ServiceClient
