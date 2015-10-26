@@ -66,7 +66,7 @@ type mesosSchedulerApiAdapter struct {
 }
 
 func (k *mesosSchedulerApiAdapter) Algorithm() podschedulers.PodScheduler {
-	return k.mesosScheduler
+	return k.mesosScheduler.podScheduler
 }
 
 func (k *mesosSchedulerApiAdapter) Offers() offers.Registry {
