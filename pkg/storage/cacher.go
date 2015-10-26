@@ -219,8 +219,8 @@ func (c *Cacher) GetToList(ctx context.Context, key string, filter FilterFunc, l
 }
 
 // Implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error {
-	return c.storage.List(ctx, key, filter, listObj)
+func (c *Cacher) List(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc, listObj runtime.Object) error {
+	return c.storage.List(ctx, key, resourceVersion, filter, listObj)
 }
 
 // ListFromMemory implements list operation (the same signature as List method)
@@ -344,7 +344,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 	list := lw.newListFunc()
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, Everything, list); err != nil {
+	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, 0, Everything, list); err != nil {
 		return nil, err
 	}
 	return list, nil

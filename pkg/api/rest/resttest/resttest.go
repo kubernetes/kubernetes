@@ -853,7 +853,7 @@ func (t *Tester) testListError() {
 
 	storageError := fmt.Errorf("test error")
 	t.withStorageError(storageError, func() {
-		_, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
+		_, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything(), nil)
 		if err != storageError {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -870,7 +870,7 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 
 	existing := assignFn([]runtime.Object{foo1, foo2})
 
-	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
+	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything(), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -902,7 +902,7 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	filtered := []runtime.Object{existing[1]}
 
 	selector := labels.SelectorFromSet(labels.Set(testLabels))
-	listObj, err := t.storage.(rest.Lister).List(ctx, selector, fields.Everything())
+	listObj, err := t.storage.(rest.Lister).List(ctx, selector, fields.Everything(), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -924,7 +924,7 @@ func (t *Tester) testListNotFound(assignFn AssignFunc, setRVFn SetRVFunc) {
 	setRVFn(uint64(123))
 	_ = assignFn([]runtime.Object{})
 
-	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
+	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything(), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

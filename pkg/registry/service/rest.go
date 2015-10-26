@@ -173,8 +173,8 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id)
 }
 
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListServices(ctx, label, field)
+func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (runtime.Object, error) {
+	return rs.registry.ListServices(ctx, label, field, options)
 }
 
 // Watch returns Services events via a watch.Interface.

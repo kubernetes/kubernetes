@@ -116,7 +116,9 @@ type Interface interface {
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	List(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	List(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.

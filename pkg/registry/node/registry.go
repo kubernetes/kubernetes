@@ -26,7 +26,7 @@ import (
 
 // Registry is an interface for things that know how to store node.
 type Registry interface {
-	ListNodes(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error)
+	ListNodes(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.NodeList, error)
 	CreateNode(ctx api.Context, node *api.Node) error
 	UpdateNode(ctx api.Context, node *api.Node) error
 	GetNode(ctx api.Context, nodeID string) (*api.Node, error)
@@ -45,8 +45,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNodes(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
-	obj, err := s.List(ctx, label, field)
+func (s *storage) ListNodes(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.NodeList, error) {
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

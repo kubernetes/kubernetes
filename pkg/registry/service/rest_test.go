@@ -543,7 +543,7 @@ func TestServiceRegistryList(t *testing.T) {
 		},
 	})
 	registry.List.ResourceVersion = "1"
-	s, _ := storage.List(ctx, labels.Everything(), fields.Everything())
+	s, _ := storage.List(ctx, labels.Everything(), fields.Everything(), nil)
 	sl := s.(*api.ServiceList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 services, but got %v", len(sl.Items))

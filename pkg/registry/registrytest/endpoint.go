@@ -36,7 +36,7 @@ type EndpointRegistry struct {
 	lock sync.Mutex
 }
 
-func (e *EndpointRegistry) ListEndpoints(ctx api.Context) (*api.EndpointsList, error) {
+func (e *EndpointRegistry) ListEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.EndpointsList, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
