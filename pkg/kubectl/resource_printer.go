@@ -931,11 +931,16 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, withNamespace bool, w
 			return err
 		}
 	}
+	selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		// this shouldn't happen if PodSelector passed validation
+		return err
+	}
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		labels.FormatLabels(ds.Spec.Selector),
+		selector,
 		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
 	); err != nil {
 		return err

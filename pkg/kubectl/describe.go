@@ -845,7 +845,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, controller.Spec.Selector)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, labels.SelectorFromSet(controller.Spec.Selector))
 	if err != nil {
 		return "", err
 	}
@@ -927,7 +927,11 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, daemon.Spec.Selector)
+	selector, err := extensions.PodSelectorAsSelector(daemon.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
 	if err != nil {
 		return "", err
 	}
@@ -945,7 +949,12 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 		} else {
 			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
 		}
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Selector))
+		selector, err := extensions.PodSelectorAsSelector(daemon.Spec.Selector)
+		if err != nil {
+			// this shouldn't happen if PodSelector passed validation
+			return err
+		}
+		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(daemon.Labels))
 		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
@@ -1575,7 +1584,11 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 	// Find the ones that match labelsToMatch.
 	var matchingDaemonSets []extensions.DaemonSet
 	for _, ds := range dss.Items {
-		selector := labels.SelectorFromSet(ds.Spec.Selector)
+		selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+		if err != nil {
+			// this should never happen if the DaemonSet passed validation
+			return nil, err
+		}
 		if selector.Matches(labelsToMatch) {
 			matchingDaemonSets = append(matchingDaemonSets, ds)
 		}
@@ -1620,8 +1633,8 @@ func printReplicationControllersByLabels(matchingRCs []*api.ReplicationControlle
 	return list
 }
 
-func getPodStatusForController(c client.PodInterface, selector map[string]string) (running, waiting, succeeded, failed int, err error) {
-	rcPods, err := c.List(labels.SelectorFromSet(selector), fields.Everything())
+func getPodStatusForController(c client.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
+	rcPods, err := c.List(selector, fields.Everything())
 	if err != nil {
 		return
 	}
