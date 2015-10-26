@@ -392,6 +392,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.KubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.KubeletSyncFrequency))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.ContainPodResources))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.EnableProfiling))
 
 	if s.AuthPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
@@ -678,8 +679,15 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	as := scheduler.NewAllocationStrategy(
-		podtask.DefaultPredicate,
-		podtask.NewDefaultProcurement(s.DefaultContainerCPULimit, s.DefaultContainerMemLimit))
+		podtask.NewDefaultPredicate(
+			s.DefaultContainerCPULimit,
+			s.DefaultContainerMemLimit,
+		),
+		podtask.NewDefaultProcurement(
+			s.DefaultContainerCPULimit,
+			s.DefaultContainerMemLimit,
+		),
+	)
 
 	// downgrade allocation strategy if user disables "account-for-pod-resources"
 	if !s.AccountForPodResources {

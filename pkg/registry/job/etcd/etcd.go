@@ -18,7 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -40,10 +40,10 @@ var jobPrefix = "/jobs"
 // NewREST returns a RESTStorage object that will work against Jobs.
 func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	store := &etcdgeneric.Etcd{
-		NewFunc: func() runtime.Object { return &experimental.Job{} },
+		NewFunc: func() runtime.Object { return &extensions.Job{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &experimental.JobList{} },
+		NewListFunc: func() runtime.Object { return &extensions.JobList{} },
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -56,7 +56,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		},
 		// Retrieve the name field of a job
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*experimental.Job).Name, nil
+			return obj.(*extensions.Job).Name, nil
 		},
 		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
@@ -85,7 +85,7 @@ type StatusREST struct {
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &experimental.Job{}
+	return &extensions.Job{}
 }
 
 // Update alters the status subset of an object.

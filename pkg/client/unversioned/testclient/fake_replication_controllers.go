@@ -39,8 +39,8 @@ func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationControlle
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) List(label labels.Selector) (*api.ReplicationControllerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, label, nil), &api.ReplicationControllerList{})
+func (c *FakeReplicationControllers) List(label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, label, field), &api.ReplicationControllerList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -63,6 +63,14 @@ func (c *FakeReplicationControllers) Update(controller *api.ReplicationControlle
 		return nil, err
 	}
 
+	return obj.(*api.ReplicationController), err
+}
+
+func (c *FakeReplicationControllers) UpdateStatus(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("replicationcontrollers", "status", c.Namespace, controller), &api.ReplicationController{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.ReplicationController), err
 }
 

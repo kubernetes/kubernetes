@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
@@ -59,6 +60,8 @@ type Fake struct {
 	WatchReactionChain []WatchReactor
 	// ProxyReactionChain is the list of proxy reactors that will be attempted for every request in the order they are tried
 	ProxyReactionChain []ProxyReactor
+
+	Resources map[string]*unversioned.APIResourceList
 }
 
 // Reactor is an interface to allow the composition of reaction functions.
@@ -267,8 +270,12 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
-func (c *Fake) Experimental() client.ExperimentalInterface {
+func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
+}
+
+func (c *Fake) Discovery() client.DiscoveryInterface {
+	return &FakeDiscovery{c}
 }
 
 func (c *Fake) ServerVersion() (*version.Info, error) {
@@ -281,13 +288,13 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 	return &versionInfo, nil
 }
 
-func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
+func (c *Fake) ServerAPIVersions() (*unversioned.APIVersions, error) {
 	action := ActionImpl{}
 	action.Verb = "get"
 	action.Resource = "apiversions"
 
 	c.Invokes(action, nil)
-	return &api.APIVersions{Versions: registered.RegisteredVersions}, nil
+	return &unversioned.APIVersions{Versions: registered.RegisteredVersions}, nil
 }
 
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
@@ -330,4 +337,30 @@ func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
 
 func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 	return &FakeIngress{Fake: c, Namespace: namespace}
+}
+
+type FakeDiscovery struct {
+	*Fake
+}
+
+func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+	action := ActionImpl{
+		Verb:     "get",
+		Resource: "resource",
+	}
+	c.Invokes(action, nil)
+	return c.Resources[groupVersion], nil
+}
+
+func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+	action := ActionImpl{
+		Verb:     "get",
+		Resource: "resource",
+	}
+	c.Invokes(action, nil)
+	return c.Resources, nil
+}
+
+func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
+	return nil, nil
 }

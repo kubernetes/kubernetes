@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -145,7 +146,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 		if len(infos) != 1 {
-			return fmt.Errorf("watch is only supported on a single resource - %d resources were found", len(infos))
+			return fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
@@ -220,13 +221,23 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	// use the default printer for each object
-	return b.Do().Visit(func(r *resource.Info, err error) error {
+	printer = nil
+	var lastMapping *meta.RESTMapping
+	w := kubectl.GetNewTabWriter(out)
+	defer w.Flush()
+	return b.Flatten().Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-		printer, err := f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
-		if err != nil {
-			return err
+		if printer == nil || lastMapping == nil || r.Mapping == nil || r.Mapping.Resource != lastMapping.Resource {
+			printer, err = f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
+			if err != nil {
+				return err
+			}
+			lastMapping = r.Mapping
+		}
+		if _, found := printer.(*kubectl.HumanReadablePrinter); found {
+			return printer.PrintObj(r.Object, w)
 		}
 		return printer.PrintObj(r.Object, out)
 	})

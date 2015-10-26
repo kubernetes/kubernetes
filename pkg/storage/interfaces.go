@@ -19,6 +19,7 @@ package storage
 import (
 	"time"
 
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -74,7 +75,7 @@ type Interface interface {
 	// Returns list of servers addresses of the underyling database.
 	// TODO: This method is used only in a single place. Consider refactoring and getting rid
 	// of this method from the interface.
-	Backends() []string
+	Backends(ctx context.Context) []string
 
 	// Returns Versioner associated with this interface.
 	Versioner() Versioner
@@ -82,40 +83,40 @@ type Interface interface {
 	// Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
 	// set to the read value from database.
-	Create(key string, obj, out runtime.Object, ttl uint64) error
+	Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
 
 	// Set marshals obj via json and stores in database under key. Will do an atomic update
 	// if obj's ResourceVersion field is set. 'ttl' is time-to-live in seconds (0 means forever).
 	// If no error is returned and out is not nil, out will be set to the read value from database.
-	Set(key string, obj, out runtime.Object, ttl uint64) error
+	Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
 
 	// Delete removes the specified key and returns the value that existed at that spot.
-	Delete(key string, out runtime.Object) error
+	Delete(ctx context.Context, key string, out runtime.Object) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching
 	// (e.g. reconnecting without missing any updates).
-	Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item passing 'filter' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching
 	// (e.g. reconnecting without missing any updates).
-	WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
 	// Treats empty responses and nil response nodes exactly like a not found error.
-	Get(key string, objPtr runtime.Object, ignoreNotFound bool) error
+	Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(key string, filter FilterFunc, listObj runtime.Object) error
+	GetToList(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	List(key string, filter FilterFunc, listObj runtime.Object) error
+	List(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
@@ -141,7 +142,7 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error
+	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error
 
 	// Codec provides access to the underlying codec being used by the implementation.
 	Codec() runtime.Codec

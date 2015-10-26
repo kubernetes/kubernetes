@@ -18,7 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -33,12 +33,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/horizontalpodautoscalers"
 	store := &etcdgeneric.Etcd{
-		NewFunc: func() runtime.Object { return &experimental.HorizontalPodAutoscaler{} },
+		NewFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscaler{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &experimental.HorizontalPodAutoscalerList{} },
+		NewListFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} },
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -51,7 +51,7 @@ func NewREST(s storage.Interface) *REST {
 		},
 		// Retrieve the name field of an autoscaler
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*experimental.HorizontalPodAutoscaler).Name, nil
+			return obj.(*extensions.HorizontalPodAutoscaler).Name, nil
 		},
 		// Used to match objects based on labels/fields for list
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
@@ -67,5 +67,21 @@ func NewREST(s storage.Interface) *REST {
 
 		Storage: s,
 	}
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = horizontalpodautoscaler.StatusStrategy
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a daemonset
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &extensions.HorizontalPodAutoscaler{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

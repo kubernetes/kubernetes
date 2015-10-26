@@ -19,6 +19,7 @@ package tasks
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -218,10 +219,15 @@ func notStartedTask(t *Task) taskStateFn {
 
 	// create command
 	cmd := exec.Command(t.bin, t.args...)
-	if _, err := cmd.StdoutPipe(); err != nil {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
 		t.tryError(fmt.Errorf("error getting stdout of %v: %v", t.name, err))
 		return taskShouldRestart
 	}
+	go func() {
+		defer stdout.Close()
+		io.Copy(ioutil.Discard, stdout) // TODO(jdef) we might want to save this at some point
+	}()
 	stderrLogs, err := cmd.StderrPipe()
 	if err != nil {
 		t.tryError(fmt.Errorf("error getting stderr of %v: %v", t.name, err))
@@ -281,7 +287,7 @@ func taskRunning(t *Task) taskStateFn {
 
 	select {
 	case <-t.shouldQuit:
-		t.tryComplete(t.awaitDeath(defaultKillGracePeriod, waitCh))
+		t.tryComplete(t.awaitDeath(&realTimer{}, defaultKillGracePeriod, waitCh))
 	case wr := <-waitCh:
 		t.tryComplete(wr)
 	}
@@ -290,7 +296,9 @@ func taskRunning(t *Task) taskStateFn {
 
 // awaitDeath waits for the process to complete, or else for a "quit" signal on the task-
 // at which point we'll attempt to kill manually.
-func (t *Task) awaitDeath(gracePeriod time.Duration, waitCh <-chan *Completion) *Completion {
+func (t *Task) awaitDeath(timer timer, gracePeriod time.Duration, waitCh <-chan *Completion) *Completion {
+	defer timer.discard()
+
 	select {
 	case wr := <-waitCh:
 		// got a signal to quit, but we're already finished
@@ -318,10 +326,11 @@ waitLoop:
 		}
 
 		// Wait for the kill to be processed, and child proc resources cleaned up; try to avoid zombies!
+		timer.set(gracePeriod)
 		select {
 		case wr = <-waitCh:
 			break waitLoop
-		case <-time.After(gracePeriod):
+		case <-timer.await():
 			// want a timeout, but a shorter one than we used initially.
 			// using /= 2 is deterministic and yields the desirable effect.
 			gracePeriod /= 2

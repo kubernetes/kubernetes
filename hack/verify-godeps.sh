@@ -62,10 +62,6 @@ GODEP="${_tmpdir}/bin/godep"
 # fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
 
-# github.com/prometheus/client_golang removed the model and extraction directory.
-# thus go get fails and thus godep fails. So load it by hand.
-preload-dep "github.com/prometheus" "client_golang" "692492e54b553a81013254cc1fba4b6dd76fad30"
-
 "${GODEP}" restore
 echo "Download finished"
 
@@ -84,7 +80,7 @@ pushd "${_kubetmp}" > /dev/null
   git init > /dev/null 2>&1
 
   # recreate the Godeps using the nice clean set we just downloaded
-  "${GODEP}" save -t ./...
+  "${GODEP}" save ./...
 popd > /dev/null
 
 if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then

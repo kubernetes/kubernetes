@@ -1,3 +1,4 @@
+kubectl-apply.1
 kubectl-annotate.1
 kubectl-api-versions.1
 kubectl-attach.1
@@ -10,6 +11,7 @@ kubectl-config-unset.1
 kubectl-config-use-context.1
 kubectl-config-view.1
 kubectl-config.1
+kubectl-convert.1
 kubectl-create.1
 kubectl-delete.1
 kubectl-describe.1

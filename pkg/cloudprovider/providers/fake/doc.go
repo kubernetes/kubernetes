@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package fake_cloud is a test-double implementation of cloudprovider
+// Package fake is a test-double implementation of cloudprovider
 // Interface, TCPLoadBalancer and Instances. It is useful for testing.
-package fake_cloud
+package fake

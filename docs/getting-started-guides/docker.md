@@ -96,13 +96,14 @@ docker run \
     --volume=/:/rootfs:ro \
     --volume=/sys:/sys:ro \
     --volume=/dev:/dev \
-    --volume=/var/lib/docker/:/var/lib/docker:ro \
+    --volume=/var/lib/docker/:/var/lib/docker:rw \
     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
     --volume=/var/run:/var/run:rw \
     --net=host \
+    --pid=host \ 
     --privileged=true \
     -d \
-    gcr.io/google_containers/hyperkube:v1.0.1 \
+    gcr.io/google_containers/hyperkube:v1.0.6 \
     /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
 ```
 
@@ -111,7 +112,7 @@ This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md
 ### Step Three: Run the service proxy
 
 ```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.6 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
@@ -121,12 +122,32 @@ binary
 ([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
 ([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
 
-*Note:*
-On OS/X you will need to set up port forwarding via ssh:
+<hr>
+
+**Note for OS/X users:**
+You will need to set up port forwarding via ssh. For users still using boot2docker directly, it is enough to run the command:
 
 ```sh
 boot2docker ssh -L8080:localhost:8080
 ```
+
+Since the recent deprecation of boot2docker/osx-installer, the correct way to solve the problem is to issue
+
+```sh
+docker-machine ssh default -L 8080:localhost:8080
+```
+
+However, this solution works only from docker-machine version 0.5. For older versions of docker-machine, a workaround is the
+following:
+
+```sh
+docker-machine env default
+ssh -f -T -N -L8080:localhost:8080 -l docker $(echo $DOCKER_HOST | cut -d ':' -f 2 | tr -d '/')
+```
+
+Type `tcuser` as the password.
+
+<hr>
 
 List the nodes in your cluster by running:
 
@@ -137,8 +158,8 @@ kubectl get nodes
 This should print:
 
 ```console
-NAME        LABELS    STATUS
-127.0.0.1   <none>    Ready
+NAME        LABELS                             STATUS
+127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
 ```
 
 If you are running different Kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
@@ -160,11 +181,11 @@ kubectl expose rc nginx --port=80
 This should print:
 
 ```console
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
-nginx             10.0.93.211      <none>            80/TCP        run=nginx              1h
+NAME      LABELS      SELECTOR    IP(S)     PORT(S)
+nginx     run=nginx   run=nginx             80/TCP
 ```
 
-If `CLUSTER_IP` is blank run the following command to obtain it. Know issue [#10836](https://github.com/kubernetes/kubernetes/issues/10836)
+If `IP(S)` is blank run the following command to obtain it. Know issue [#10836](https://github.com/kubernetes/kubernetes/issues/10836)
 
 ```sh
 kubectl get svc nginx

@@ -6,7 +6,7 @@ matrix:
   include:
     - go: 1.4
       env:
-        - KUBE_TEST_API_VERSIONS=v1,experimental/v1alpha1 KUBE_TEST_ETCD_PREFIXES=registry
+        - KUBE_TEST_API_VERSIONS=v1,extensions/v1beta1 KUBE_TEST_ETCD_PREFIXES=registry
         - KUBE_JUNIT_REPORT_DIR="${SHIPPABLE_REPO_DIR}/shippable/testresults"
         - CI_NAME="shippable"
         - CI_BUILD_NUMBER="$BUILD_NUMBER"
@@ -17,7 +17,7 @@ matrix:
         - secure: hfh1Kwl2XYUlJCn4dtKSG0C9yXl5TtksVOY74OeqolvDAdVj4sc+GJD3Bywsp91CJe8YMEnkt9rN0WGI+gPVMcjTmZ9tMUxKiNNBP8m5oLRFbdgKOkNuXjpjpFHHWGAnNhMmh9vjI+ehADo+QIpU1fGxd3yO4tmIJ1qoK3QqvUrOZ1RwUubRXoeVn3xy3LK5yg4vP5ruitbNeWMw/RZZ7D6czvqvEfCgV6b4mdNDRMiqlUJNkaTRc3em1APXr30yagDV3a7hXLq3HdlyFwvF+9pmB4AKhQctyjPN4zvvPd0/gJXq3ZHXSlZXOZBMPXHlSS5pizfSInNszyZyrP3+/w==
     - go: 1.3
       env:
-        - KUBE_TEST_API_VERSIONS=v1,experimental/v1alpha1 KUBE_TEST_ETCD_PREFIXES=kubernetes.io/registry
+        - KUBE_TEST_API_VERSIONS=v1,extensions/v1beta1 KUBE_TEST_ETCD_PREFIXES=kubernetes.io/registry
         - KUBE_JUNIT_REPORT_DIR="${SHIPPABLE_REPO_DIR}/shippable/testresults"
         - CI_NAME="shippable"
         - CI_BUILD_NUMBER="$BUILD_NUMBER"
@@ -32,7 +32,7 @@ before_install:
   - if [[ $SHIPPABLE_GO_VERSION == "tip" ]]; then gvm install tip; gvm use tip; fi
   - if [[ $SHIPPABLE_GO_VERSION == *release* ]]; then gvm install release; gvm use release; fi
   - if [[ $SHIPPABLE_GO_VERSION =~ [0-9].[0-9] ]]; then gvm install go$SHIPPABLE_GO_VERSION; gvm use go$SHIPPABLE_GO_VERSION; fi
-  - ./hack/travis/install-etcd.sh
+  - ./hack/install-etcd.sh
   - export GOPATH=$SHIPPABLE_GOPATH
   - mkdir -p /root/workspace/src/k8s.io; mv /root/workspace/src/github.com/kubernetes/kubernetes /root/workspace/src/k8s.io/kubernetes
   - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
@@ -44,7 +44,7 @@ install:
   - go get github.com/jstemmer/go-junit-report
   - ./hack/build-go.sh
   - godep go install ./...
-  - ./hack/travis/install-etcd.sh
+  - ./hack/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/verify-description.sh

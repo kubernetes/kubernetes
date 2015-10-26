@@ -190,8 +190,8 @@ func TestJSONInput(t *testing.T) {
 	testJSONPath(pointsTests, t)
 }
 
-// TestKubenates tests some use cases from kubenates
-func TestKubenates(t *testing.T) {
+// TestKubernetes tests some use cases from kubernetes
+func TestKubernetes(t *testing.T) {
 	var input = []byte(`{
 	  "kind": "List",
 	  "items":[

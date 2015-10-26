@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1 
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    name: nginx-deployment
+spec:
+  replicas: 3
+  selector:
+    name: nginx
+  template:
+    metadata:
+      labels:
+        name: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80

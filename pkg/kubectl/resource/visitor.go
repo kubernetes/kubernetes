@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -196,7 +196,7 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 			errs = append(errs, err)
 		}
 	}
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
 
 func ValidateSchema(data []byte, schema validation.Schema) error {
@@ -307,7 +307,7 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 	if len(errs) == 1 {
 		return errs[0]
 	}
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
 
 // FlattenListVisitor flattens any objects that runtime.ExtractList recognizes as a list
@@ -343,7 +343,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			runtime.ObjectTyper
 			runtime.Decoder
 		}{v.Mapper, info.Mapping.Codec}); len(errs) > 0 {
-			return errors.NewAggregate(errs)
+			return utilerrors.NewAggregate(errs)
 		}
 		for i := range items {
 			item, err := v.InfoForObject(items[i])
@@ -563,6 +563,9 @@ func RequireNamespace(namespace string) VisitorFunc {
 func RetrieveLatest(info *Info, err error) error {
 	if err != nil {
 		return err
+	}
+	if runtime.IsListType(info.Object) {
+		return fmt.Errorf("watch is only supported on individual resources and resource collections, but a list of resources is found")
 	}
 	if len(info.Name) == 0 {
 		return nil

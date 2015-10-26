@@ -32,10 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
@@ -83,7 +84,6 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 }
 
 func testData() (*api.PodList, *api.ServiceList) {
-	grace := int64(30)
 	pods := &api.PodList{
 		ListMeta: unversioned.ListMeta{
 			ResourceVersion: "15",
@@ -91,19 +91,11 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
 	}
@@ -512,7 +504,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
-	labelKey := api.LabelSelectorQueryParam(testapi.Default.Version())
+	labelKey := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
@@ -562,6 +554,112 @@ func TestSingleResourceType(t *testing.T) {
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestHasNamesArg(t *testing.T) {
+	testCases := map[string]struct {
+		args     []string
+		expected bool
+	}{
+		"resource/name": {
+			args:     []string{"pods/foo"},
+			expected: true,
+		},
+		"resource name": {
+			args:     []string{"pods", "foo"},
+			expected: true,
+		},
+		"resource1,resource2 name": {
+			args:     []string{"pods,rc", "foo"},
+			expected: true,
+		},
+		"resource1,group2/resource2 name": {
+			args:     []string{"pods,experimental/deployments", "foo"},
+			expected: true,
+		},
+		"group/resource name": {
+			args:     []string{"experimental/deployments", "foo"},
+			expected: true,
+		},
+		"group/resource/name": {
+			args:     []string{"experimental/deployments/foo"},
+			expected: true,
+		},
+		"group1/resource1,group2/resource2": {
+			args:     []string{"experimental/daemonsets,experimental/deployments"},
+			expected: false,
+		},
+		"resource1,group2/resource2": {
+			args:     []string{"pods,experimental/deployments"},
+			expected: false,
+		},
+		"group/resource/name,group2/resource2": {
+			args:     []string{"experimental/deployments/foo,controller/deamonset"},
+			expected: false,
+		},
+	}
+	for k, testCase := range testCases {
+		b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient())
+		if testCase.expected != b.hasNamesArg(testCase.args) {
+			t.Errorf("%s: unexpected argument - expected: %v", k, testCase.expected)
+		}
+	}
+}
+
+func TestSplitGroupResourceTypeName(t *testing.T) {
+	expectNoErr := func(err error) bool { return err == nil }
+	expectErr := func(err error) bool { return err != nil }
+	testCases := map[string]struct {
+		arg           string
+		expectedTuple resourceTuple
+		expectedOK    bool
+		errFn         func(error) bool
+	}{
+		"group/type/name": {
+			arg:           "experimental/deployments/foo",
+			expectedTuple: resourceTuple{Resource: "experimental/deployments", Name: "foo"},
+			expectedOK:    true,
+			errFn:         expectNoErr,
+		},
+		"type/name": {
+			arg:           "pods/foo",
+			expectedTuple: resourceTuple{Resource: "pods", Name: "foo"},
+			expectedOK:    true,
+			errFn:         expectNoErr,
+		},
+		"type": {
+			arg:        "pods",
+			expectedOK: false,
+			errFn:      expectNoErr,
+		},
+		"": {
+			arg:        "",
+			expectedOK: false,
+			errFn:      expectNoErr,
+		},
+		"/": {
+			arg:        "/",
+			expectedOK: false,
+			errFn:      expectErr,
+		},
+		"group/type/name/something": {
+			arg:        "experimental/deployments/foo/something",
+			expectedOK: false,
+			errFn:      expectErr,
+		},
+	}
+	for k, testCase := range testCases {
+		tuple, ok, err := splitGroupResourceTypeName(testCase.arg)
+		if !testCase.errFn(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		}
+		if ok != testCase.expectedOK {
+			t.Errorf("%s: unexpected ok: %v", k, ok)
+		}
+		if testCase.expectedOK && !reflect.DeepEqual(tuple, testCase.expectedTuple) {
+			t.Errorf("%s: unexpected tuple - expected: %v, got: %v", k, testCase.expectedTuple, tuple)
+		}
 	}
 }
 
@@ -731,7 +829,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 	if count != 3 {
 		t.Fatalf("did not visit all infos: %d", count)
 	}
-	agg, ok := err.(errors.Aggregate)
+	agg, ok := err.(utilerrors.Aggregate)
 	if !ok {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -807,7 +905,7 @@ func TestSingularRootScopedObject(t *testing.T) {
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
-	labelKey := api.LabelSelectorQueryParam(testapi.Default.Version())
+	labelKey := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 	})).
@@ -840,7 +938,7 @@ func TestListObject(t *testing.T) {
 
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
-	labelKey := api.LabelSelectorQueryParam(testapi.Default.Version())
+	labelKey := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
@@ -970,7 +1068,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
-	errs, ok := err.(errors.Aggregate)
+	errs, ok := err.(utilerrors.Aggregate)
 	if !ok {
 		t.Fatalf("unexpected error: %v", reflect.TypeOf(err))
 	}

@@ -21,15 +21,16 @@ package cadvisor
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/events"
-	cadvisorFs "github.com/google/cadvisor/fs"
-	cadvisorHttp "github.com/google/cadvisor/http"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
+	cadvisorfs "github.com/google/cadvisor/fs"
+	cadvisorhttp "github.com/google/cadvisor/http"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
 	"k8s.io/kubernetes/pkg/util"
@@ -79,10 +80,23 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 	// Register the handlers regardless as this registers the prometheus
 	// collector properly.
 	mux := http.NewServeMux()
-	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "", "/metrics")
+	err := cadvisorhttp.RegisterHandlers(mux, cc, "", "", "", "")
 	if err != nil {
 		return err
 	}
+
+	re := regexp.MustCompile(`^k8s_(?P<kubernetes_container_name>[^_\.]+)[^_]+_(?P<kubernetes_pod_name>[^_]+)_(?P<kubernetes_namespace>[^_]+)`)
+	reCaptureNames := re.SubexpNames()
+	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", func(name string) map[string]string {
+		extraLabels := map[string]string{}
+		matches := re.FindStringSubmatch(name)
+		for i, match := range matches {
+			if len(reCaptureNames[i]) > 0 {
+				extraLabels[re.SubexpNames()[i]] = match
+			}
+		}
+		return extraLabels
+	})
 
 	// Only start the http server if port > 0
 	if port > 0 {
@@ -109,46 +123,46 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 	return nil
 }
 
-func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return cc.GetContainerInfo(name, req)
 }
 
-func (cc *cadvisorClient) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+func (cc *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return cc.GetVersionInfo()
 }
 
-func (cc *cadvisorClient) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+func (cc *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	infos, err := cc.SubcontainersInfo(name, req)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]*cadvisorApi.ContainerInfo, len(infos))
+	result := make(map[string]*cadvisorapi.ContainerInfo, len(infos))
 	for _, info := range infos {
 		result[info.Name] = info
 	}
 	return result, nil
 }
 
-func (cc *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
 
-func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorFs.LabelDockerImages)
+func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cc.getFsInfo(cadvisorfs.LabelDockerImages)
 }
 
-func (cc *cadvisorClient) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorFs.LabelSystemRoot)
+func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cc.getFsInfo(cadvisorfs.LabelSystemRoot)
 }
 
-func (cc *cadvisorClient) getFsInfo(label string) (cadvisorApiV2.FsInfo, error) {
+func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) {
 	res, err := cc.GetFsInfo(label)
 	if err != nil {
-		return cadvisorApiV2.FsInfo{}, err
+		return cadvisorapiv2.FsInfo{}, err
 	}
 	if len(res) == 0 {
-		return cadvisorApiV2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem labeled %q", label)
+		return cadvisorapiv2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem labeled %q", label)
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {

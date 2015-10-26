@@ -97,6 +97,20 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.Cont
 		} else {
 			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
+
+		t, err := tcpStatsFromProc(rootFs, pid, "net/tcp")
+		if err != nil {
+			glog.V(2).Infof("Unable to get tcp stats from pid %d: %v", pid, err)
+		} else {
+			stats.Network.Tcp = t
+		}
+
+		t6, err := tcpStatsFromProc(rootFs, pid, "net/tcp6")
+		if err != nil {
+			glog.V(2).Infof("Unable to get tcp6 stats from pid %d: %v", pid, err)
+		} else {
+			stats.Network.Tcp6 = t6
+		}
 	}
 
 	// For backwards compatibility.
@@ -168,6 +182,78 @@ func scanInterfaceStats(netStatsFile string) ([]info.InterfaceStats, error) {
 				stats = append(stats, i)
 			}
 		}
+	}
+
+	return stats, nil
+}
+
+func tcpStatsFromProc(rootFs string, pid int, file string) (info.TcpStat, error) {
+	tcpStatsFile := path.Join(rootFs, "proc", strconv.Itoa(pid), file)
+
+	tcpStats, err := scanTcpStats(tcpStatsFile)
+	if err != nil {
+		return tcpStats, fmt.Errorf("couldn't read tcp stats: %v", err)
+	}
+
+	return tcpStats, nil
+}
+
+func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
+
+	var stats info.TcpStat
+
+	data, err := ioutil.ReadFile(tcpStatsFile)
+	if err != nil {
+		return stats, fmt.Errorf("failure opening %s: %v", tcpStatsFile, err)
+	}
+
+	tcpStatLineRE, _ := regexp.Compile("[0-9:].*")
+
+	tcpStateMap := map[string]uint64{
+		"01": 0, //ESTABLISHED
+		"02": 0, //SYN_SENT
+		"03": 0, //SYN_RECV
+		"04": 0, //FIN_WAIT1
+		"05": 0, //FIN_WAIT2
+		"06": 0, //TIME_WAIT
+		"07": 0, //CLOSE
+		"08": 0, //CLOSE_WAIT
+		"09": 0, //LAST_ACK
+		"0A": 0, //LISTEN
+		"0B": 0, //CLOSING
+	}
+
+	reader := strings.NewReader(string(data))
+	scanner := bufio.NewScanner(reader)
+
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+
+		line := scanner.Text()
+		//skip header
+		matched := tcpStatLineRE.MatchString(line)
+
+		if matched {
+			state := strings.Fields(line)
+			//#file header tcp state is the 4 filed:
+			//sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt  uid timeout inode
+			tcpStateMap[state[3]]++
+		}
+	}
+
+	stats = info.TcpStat{
+		Established: tcpStateMap["01"],
+		SynSent:     tcpStateMap["02"],
+		SynRecv:     tcpStateMap["03"],
+		FinWait1:    tcpStateMap["04"],
+		FinWait2:    tcpStateMap["05"],
+		TimeWait:    tcpStateMap["06"],
+		Close:       tcpStateMap["07"],
+		CloseWait:   tcpStateMap["08"],
+		LastAck:     tcpStateMap["09"],
+		Listen:      tcpStateMap["0A"],
+		Closing:     tcpStateMap["0B"],
 	}
 
 	return stats, nil
@@ -262,6 +348,7 @@ func toContainerStats1(s *cgroups.Stats, ret *info.ContainerStats) {
 
 func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.Usage = s.MemoryStats.Usage
+	ret.Memory.Failcnt = s.MemoryStats.Failcnt
 	if v, ok := s.MemoryStats.Stats["pgfault"]; ok {
 		ret.Memory.ContainerData.Pgfault = v
 		ret.Memory.HierarchicalData.Pgfault = v

@@ -44,6 +44,21 @@ func NewSemVer(s string) (*SemVer, error) {
 	return &v, nil
 }
 
+func (sv SemVer) LessThanMajor(versionB SemVer) bool {
+	majorA := semver.Version(sv).Major
+	majorB := semver.Version(versionB).Major
+	if majorA < majorB {
+		return true
+	}
+	return false
+}
+
+func (sv SemVer) LessThanExact(versionB SemVer) bool {
+	vA := semver.Version(sv)
+	vB := semver.Version(versionB)
+	return vA.LessThan(vB)
+}
+
 func (sv SemVer) String() string {
 	s := semver.Version(sv)
 	return s.String()

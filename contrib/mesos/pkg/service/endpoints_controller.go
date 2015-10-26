@@ -58,7 +58,7 @@ func NewEndpointController(client *client.Client) *endpointController {
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Services(api.NamespaceAll).List(labels.Everything())
+				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
 				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
@@ -85,7 +85,7 @@ func NewEndpointController(client *client.Client) *endpointController {
 			},
 		},
 		&api.Pod{},
-		kservice.PodRelistPeriod,
+		5*time.Minute,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    e.addPod,
 			UpdateFunc: e.updatePod,

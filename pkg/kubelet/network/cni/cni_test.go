@@ -29,7 +29,7 @@ import (
 	"text/template"
 
 	docker "github.com/fsouza/go-dockerclient"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -37,15 +37,20 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // The temp dir where test plugins will be stored.
-const testNetworkConfigPath = "/tmp/fake/plugins/net/cni"
-const testVendorCNIDirPrefix = "/tmp"
+func tmpDirOrDie() string {
+	dir, err := ioutil.TempDir(os.TempDir(), "cni-test")
+	if err != nil {
+		panic(fmt.Sprintf("error creating tmp dir: %v", err))
+	}
+	return dir
+}
 
-func installPluginUnderTest(t *testing.T, vendorName string, plugName string) {
+func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
 	pluginDir := path.Join(testNetworkConfigPath, plugName)
 	err := os.MkdirAll(pluginDir, 0777)
 	if err != nil {
@@ -74,6 +79,8 @@ func installPluginUnderTest(t *testing.T, vendorName string, plugName string) {
 
 	const execScriptTempl = `#!/bin/bash
 read ignore
+env > {{.OutputEnv}}
+echo "%@" >> {{.OutputEnv}}
 export $(echo ${CNI_ARGS} | sed 's/;/ /g') &> /dev/null
 mkdir -p {{.OutputDir}} &> /dev/null
 echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}
@@ -81,6 +88,7 @@ echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 `
 	execTemplateData := &map[string]interface{}{
 		"OutputFile": path.Join(pluginDir, plugName+".out"),
+		"OutputEnv":  path.Join(pluginDir, plugName+".env"),
 		"OutputDir":  pluginDir,
 	}
 
@@ -103,13 +111,8 @@ echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 	f.Close()
 }
 
-func tearDownPlugin(plugName string, vendorName string) {
-	err := os.RemoveAll(testNetworkConfigPath)
-	if err != nil {
-		fmt.Printf("Error in cleaning up test: %v", err)
-	}
-	vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, testVendorCNIDirPrefix, vendorName)
-	err = os.RemoveAll(vendorCNIDir)
+func tearDownPlugin(tmpDir string) {
+	err := os.RemoveAll(tmpDir)
 	if err != nil {
 		fmt.Printf("Error in cleaning up test: %v", err)
 	}
@@ -149,13 +152,14 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 	dockerManager := dockertools.NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
-		prober.FakeProber{},
+		proberesults.NewManager(),
 		containerRefManager,
-		&cadvisorApi.MachineInfo{},
+		&cadvisorapi.MachineInfo{},
 		dockertools.PodInfraContainerImage,
 		0, 0, "",
 		kubecontainer.FakeOS{},
 		networkPlugin,
+		nil,
 		nil,
 		nil)
 
@@ -166,8 +170,12 @@ func TestCNIPlugin(t *testing.T) {
 	// install some random plugin
 	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
 	vendorName := fmt.Sprintf("test_vendor%d", rand.Intn(1000))
-	defer tearDownPlugin(pluginName, vendorName)
-	installPluginUnderTest(t, vendorName, pluginName)
+
+	tmpDir := tmpDirOrDie()
+	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
+	testVendorCNIDirPrefix := tmpDir
+	defer tearDownPlugin(tmpDir)
+	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
 
 	np := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), testVendorCNIDirPrefix)
 	plug, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil))
@@ -179,7 +187,13 @@ func TestCNIPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
-	output, err := ioutil.ReadFile(path.Join(testNetworkConfigPath, pluginName, pluginName+".out"))
+	outputEnv := path.Join(testNetworkConfigPath, pluginName, pluginName+".env")
+	eo, eerr := ioutil.ReadFile(outputEnv)
+	outputFile := path.Join(testNetworkConfigPath, pluginName, pluginName+".out")
+	output, err := ioutil.ReadFile(outputFile)
+	if err != nil {
+		t.Errorf("Failed to read output file %s: %v (env %s err %v)", outputFile, err, eo, eerr)
+	}
 	expectedOutput := "ADD /proc/12345/ns/net podNamespace podName dockerid2345"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))

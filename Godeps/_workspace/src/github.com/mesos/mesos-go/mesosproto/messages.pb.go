@@ -10,6 +10,16 @@ import math "math"
 
 // discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto"
 
+import bytes "bytes"
+
+import strings "strings"
+import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
+import sort "sort"
+import strconv "strconv"
+import reflect "reflect"
+
+import io "io"
+
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
@@ -82,9 +92,8 @@ type Task struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *Task) Reset()         { *m = Task{} }
-func (m *Task) String() string { return proto.CompactTextString(m) }
-func (*Task) ProtoMessage()    {}
+func (m *Task) Reset()      { *m = Task{} }
+func (*Task) ProtoMessage() {}
 
 func (m *Task) GetName() string {
 	if m != nil && m.Name != nil {
@@ -190,9 +199,8 @@ type StatusUpdate struct {
 	XXX_unrecognized []byte     `json:"-"`
 }
 
-func (m *StatusUpdate) Reset()         { *m = StatusUpdate{} }
-func (m *StatusUpdate) String() string { return proto.CompactTextString(m) }
-func (*StatusUpdate) ProtoMessage()    {}
+func (m *StatusUpdate) Reset()      { *m = StatusUpdate{} }
+func (*StatusUpdate) ProtoMessage() {}
 
 func (m *StatusUpdate) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -253,9 +261,8 @@ type StatusUpdateRecord struct {
 	XXX_unrecognized []byte                   `json:"-"`
 }
 
-func (m *StatusUpdateRecord) Reset()         { *m = StatusUpdateRecord{} }
-func (m *StatusUpdateRecord) String() string { return proto.CompactTextString(m) }
-func (*StatusUpdateRecord) ProtoMessage()    {}
+func (m *StatusUpdateRecord) Reset()      { *m = StatusUpdateRecord{} }
+func (*StatusUpdateRecord) ProtoMessage() {}
 
 func (m *StatusUpdateRecord) GetType() StatusUpdateRecord_Type {
 	if m != nil && m.Type != nil {
@@ -283,9 +290,8 @@ type SubmitSchedulerRequest struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *SubmitSchedulerRequest) Reset()         { *m = SubmitSchedulerRequest{} }
-func (m *SubmitSchedulerRequest) String() string { return proto.CompactTextString(m) }
-func (*SubmitSchedulerRequest) ProtoMessage()    {}
+func (m *SubmitSchedulerRequest) Reset()      { *m = SubmitSchedulerRequest{} }
+func (*SubmitSchedulerRequest) ProtoMessage() {}
 
 func (m *SubmitSchedulerRequest) GetName() string {
 	if m != nil && m.Name != nil {
@@ -299,9 +305,8 @@ type SubmitSchedulerResponse struct {
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *SubmitSchedulerResponse) Reset()         { *m = SubmitSchedulerResponse{} }
-func (m *SubmitSchedulerResponse) String() string { return proto.CompactTextString(m) }
-func (*SubmitSchedulerResponse) ProtoMessage()    {}
+func (m *SubmitSchedulerResponse) Reset()      { *m = SubmitSchedulerResponse{} }
+func (*SubmitSchedulerResponse) ProtoMessage() {}
 
 func (m *SubmitSchedulerResponse) GetOkay() bool {
 	if m != nil && m.Okay != nil {
@@ -318,9 +323,8 @@ type ExecutorToFrameworkMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *ExecutorToFrameworkMessage) Reset()         { *m = ExecutorToFrameworkMessage{} }
-func (m *ExecutorToFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*ExecutorToFrameworkMessage) ProtoMessage()    {}
+func (m *ExecutorToFrameworkMessage) Reset()      { *m = ExecutorToFrameworkMessage{} }
+func (*ExecutorToFrameworkMessage) ProtoMessage() {}
 
 func (m *ExecutorToFrameworkMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -358,9 +362,8 @@ type FrameworkToExecutorMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *FrameworkToExecutorMessage) Reset()         { *m = FrameworkToExecutorMessage{} }
-func (m *FrameworkToExecutorMessage) String() string { return proto.CompactTextString(m) }
-func (*FrameworkToExecutorMessage) ProtoMessage()    {}
+func (m *FrameworkToExecutorMessage) Reset()      { *m = FrameworkToExecutorMessage{} }
+func (*FrameworkToExecutorMessage) ProtoMessage() {}
 
 func (m *FrameworkToExecutorMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -395,9 +398,8 @@ type RegisterFrameworkMessage struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *RegisterFrameworkMessage) Reset()         { *m = RegisterFrameworkMessage{} }
-func (m *RegisterFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*RegisterFrameworkMessage) ProtoMessage()    {}
+func (m *RegisterFrameworkMessage) Reset()      { *m = RegisterFrameworkMessage{} }
+func (*RegisterFrameworkMessage) ProtoMessage() {}
 
 func (m *RegisterFrameworkMessage) GetFramework() *FrameworkInfo {
 	if m != nil {
@@ -412,9 +414,8 @@ type ReregisterFrameworkMessage struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *ReregisterFrameworkMessage) Reset()         { *m = ReregisterFrameworkMessage{} }
-func (m *ReregisterFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*ReregisterFrameworkMessage) ProtoMessage()    {}
+func (m *ReregisterFrameworkMessage) Reset()      { *m = ReregisterFrameworkMessage{} }
+func (*ReregisterFrameworkMessage) ProtoMessage() {}
 
 func (m *ReregisterFrameworkMessage) GetFramework() *FrameworkInfo {
 	if m != nil {
@@ -436,9 +437,8 @@ type FrameworkRegisteredMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *FrameworkRegisteredMessage) Reset()         { *m = FrameworkRegisteredMessage{} }
-func (m *FrameworkRegisteredMessage) String() string { return proto.CompactTextString(m) }
-func (*FrameworkRegisteredMessage) ProtoMessage()    {}
+func (m *FrameworkRegisteredMessage) Reset()      { *m = FrameworkRegisteredMessage{} }
+func (*FrameworkRegisteredMessage) ProtoMessage() {}
 
 func (m *FrameworkRegisteredMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -460,9 +460,8 @@ type FrameworkReregisteredMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *FrameworkReregisteredMessage) Reset()         { *m = FrameworkReregisteredMessage{} }
-func (m *FrameworkReregisteredMessage) String() string { return proto.CompactTextString(m) }
-func (*FrameworkReregisteredMessage) ProtoMessage()    {}
+func (m *FrameworkReregisteredMessage) Reset()      { *m = FrameworkReregisteredMessage{} }
+func (*FrameworkReregisteredMessage) ProtoMessage() {}
 
 func (m *FrameworkReregisteredMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -483,9 +482,8 @@ type UnregisterFrameworkMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *UnregisterFrameworkMessage) Reset()         { *m = UnregisterFrameworkMessage{} }
-func (m *UnregisterFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*UnregisterFrameworkMessage) ProtoMessage()    {}
+func (m *UnregisterFrameworkMessage) Reset()      { *m = UnregisterFrameworkMessage{} }
+func (*UnregisterFrameworkMessage) ProtoMessage() {}
 
 func (m *UnregisterFrameworkMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -499,9 +497,8 @@ type DeactivateFrameworkMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *DeactivateFrameworkMessage) Reset()         { *m = DeactivateFrameworkMessage{} }
-func (m *DeactivateFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*DeactivateFrameworkMessage) ProtoMessage()    {}
+func (m *DeactivateFrameworkMessage) Reset()      { *m = DeactivateFrameworkMessage{} }
+func (*DeactivateFrameworkMessage) ProtoMessage() {}
 
 func (m *DeactivateFrameworkMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -516,9 +513,8 @@ type ResourceRequestMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *ResourceRequestMessage) Reset()         { *m = ResourceRequestMessage{} }
-func (m *ResourceRequestMessage) String() string { return proto.CompactTextString(m) }
-func (*ResourceRequestMessage) ProtoMessage()    {}
+func (m *ResourceRequestMessage) Reset()      { *m = ResourceRequestMessage{} }
+func (*ResourceRequestMessage) ProtoMessage() {}
 
 func (m *ResourceRequestMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -540,9 +536,8 @@ type ResourceOffersMessage struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *ResourceOffersMessage) Reset()         { *m = ResourceOffersMessage{} }
-func (m *ResourceOffersMessage) String() string { return proto.CompactTextString(m) }
-func (*ResourceOffersMessage) ProtoMessage()    {}
+func (m *ResourceOffersMessage) Reset()      { *m = ResourceOffersMessage{} }
+func (*ResourceOffersMessage) ProtoMessage() {}
 
 func (m *ResourceOffersMessage) GetOffers() []*Offer {
 	if m != nil {
@@ -566,9 +561,8 @@ type LaunchTasksMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *LaunchTasksMessage) Reset()         { *m = LaunchTasksMessage{} }
-func (m *LaunchTasksMessage) String() string { return proto.CompactTextString(m) }
-func (*LaunchTasksMessage) ProtoMessage()    {}
+func (m *LaunchTasksMessage) Reset()      { *m = LaunchTasksMessage{} }
+func (*LaunchTasksMessage) ProtoMessage() {}
 
 func (m *LaunchTasksMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -603,9 +597,8 @@ type RescindResourceOfferMessage struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *RescindResourceOfferMessage) Reset()         { *m = RescindResourceOfferMessage{} }
-func (m *RescindResourceOfferMessage) String() string { return proto.CompactTextString(m) }
-func (*RescindResourceOfferMessage) ProtoMessage()    {}
+func (m *RescindResourceOfferMessage) Reset()      { *m = RescindResourceOfferMessage{} }
+func (*RescindResourceOfferMessage) ProtoMessage() {}
 
 func (m *RescindResourceOfferMessage) GetOfferId() *OfferID {
 	if m != nil {
@@ -619,9 +612,8 @@ type ReviveOffersMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *ReviveOffersMessage) Reset()         { *m = ReviveOffersMessage{} }
-func (m *ReviveOffersMessage) String() string { return proto.CompactTextString(m) }
-func (*ReviveOffersMessage) ProtoMessage()    {}
+func (m *ReviveOffersMessage) Reset()      { *m = ReviveOffersMessage{} }
+func (*ReviveOffersMessage) ProtoMessage() {}
 
 func (m *ReviveOffersMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -632,16 +624,21 @@ func (m *ReviveOffersMessage) GetFrameworkId() *FrameworkID {
 
 type RunTaskMessage struct {
 	// TODO(karya): Remove framework_id after MESOS-2559 has shipped.
-	FrameworkId      *FrameworkID   `protobuf:"bytes,1,opt,name=framework_id" json:"framework_id,omitempty"`
-	Framework        *FrameworkInfo `protobuf:"bytes,2,req,name=framework" json:"framework,omitempty"`
-	Pid              *string        `protobuf:"bytes,3,req,name=pid" json:"pid,omitempty"`
-	Task             *TaskInfo      `protobuf:"bytes,4,req,name=task" json:"task,omitempty"`
-	XXX_unrecognized []byte         `json:"-"`
+	FrameworkId *FrameworkID   `protobuf:"bytes,1,opt,name=framework_id" json:"framework_id,omitempty"`
+	Framework   *FrameworkInfo `protobuf:"bytes,2,req,name=framework" json:"framework,omitempty"`
+	Task        *TaskInfo      `protobuf:"bytes,4,req,name=task" json:"task,omitempty"`
+	// The pid of the framework. This was moved to 'optional' in
+	// 0.24.0 to support schedulers using the HTTP API. For now, we
+	// continue to always set pid since it was required in 0.23.x.
+	// When 'pid' is unset, or set to empty string, the slave will
+	// forward executor messages through the master. For schedulers
+	// still using the driver, this will remain set.
+	Pid              *string `protobuf:"bytes,3,opt,name=pid" json:"pid,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *RunTaskMessage) Reset()         { *m = RunTaskMessage{} }
-func (m *RunTaskMessage) String() string { return proto.CompactTextString(m) }
-func (*RunTaskMessage) ProtoMessage()    {}
+func (m *RunTaskMessage) Reset()      { *m = RunTaskMessage{} }
+func (*RunTaskMessage) ProtoMessage() {}
 
 func (m *RunTaskMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -657,18 +654,18 @@ func (m *RunTaskMessage) GetFramework() *FrameworkInfo {
 	return nil
 }
 
-func (m *RunTaskMessage) GetPid() string {
-	if m != nil && m.Pid != nil {
-		return *m.Pid
-	}
-	return ""
-}
-
 func (m *RunTaskMessage) GetTask() *TaskInfo {
 	if m != nil {
 		return m.Task
 	}
 	return nil
+}
+
+func (m *RunTaskMessage) GetPid() string {
+	if m != nil && m.Pid != nil {
+		return *m.Pid
+	}
+	return ""
 }
 
 type KillTaskMessage struct {
@@ -679,9 +676,8 @@ type KillTaskMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *KillTaskMessage) Reset()         { *m = KillTaskMessage{} }
-func (m *KillTaskMessage) String() string { return proto.CompactTextString(m) }
-func (*KillTaskMessage) ProtoMessage()    {}
+func (m *KillTaskMessage) Reset()      { *m = KillTaskMessage{} }
+func (*KillTaskMessage) ProtoMessage() {}
 
 func (m *KillTaskMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -705,9 +701,8 @@ type StatusUpdateMessage struct {
 	XXX_unrecognized []byte        `json:"-"`
 }
 
-func (m *StatusUpdateMessage) Reset()         { *m = StatusUpdateMessage{} }
-func (m *StatusUpdateMessage) String() string { return proto.CompactTextString(m) }
-func (*StatusUpdateMessage) ProtoMessage()    {}
+func (m *StatusUpdateMessage) Reset()      { *m = StatusUpdateMessage{} }
+func (*StatusUpdateMessage) ProtoMessage() {}
 
 func (m *StatusUpdateMessage) GetUpdate() *StatusUpdate {
 	if m != nil {
@@ -731,9 +726,8 @@ type StatusUpdateAcknowledgementMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *StatusUpdateAcknowledgementMessage) Reset()         { *m = StatusUpdateAcknowledgementMessage{} }
-func (m *StatusUpdateAcknowledgementMessage) String() string { return proto.CompactTextString(m) }
-func (*StatusUpdateAcknowledgementMessage) ProtoMessage()    {}
+func (m *StatusUpdateAcknowledgementMessage) Reset()      { *m = StatusUpdateAcknowledgementMessage{} }
+func (*StatusUpdateAcknowledgementMessage) ProtoMessage() {}
 
 func (m *StatusUpdateAcknowledgementMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -768,9 +762,8 @@ type LostSlaveMessage struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *LostSlaveMessage) Reset()         { *m = LostSlaveMessage{} }
-func (m *LostSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*LostSlaveMessage) ProtoMessage()    {}
+func (m *LostSlaveMessage) Reset()      { *m = LostSlaveMessage{} }
+func (*LostSlaveMessage) ProtoMessage() {}
 
 func (m *LostSlaveMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -791,9 +784,8 @@ type ReconcileTasksMessage struct {
 	XXX_unrecognized []byte        `json:"-"`
 }
 
-func (m *ReconcileTasksMessage) Reset()         { *m = ReconcileTasksMessage{} }
-func (m *ReconcileTasksMessage) String() string { return proto.CompactTextString(m) }
-func (*ReconcileTasksMessage) ProtoMessage()    {}
+func (m *ReconcileTasksMessage) Reset()      { *m = ReconcileTasksMessage{} }
+func (*ReconcileTasksMessage) ProtoMessage() {}
 
 func (m *ReconcileTasksMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -814,9 +806,8 @@ type FrameworkErrorMessage struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *FrameworkErrorMessage) Reset()         { *m = FrameworkErrorMessage{} }
-func (m *FrameworkErrorMessage) String() string { return proto.CompactTextString(m) }
-func (*FrameworkErrorMessage) ProtoMessage()    {}
+func (m *FrameworkErrorMessage) Reset()      { *m = FrameworkErrorMessage{} }
+func (*FrameworkErrorMessage) ProtoMessage() {}
 
 func (m *FrameworkErrorMessage) GetMessage() string {
 	if m != nil && m.Message != nil {
@@ -838,9 +829,8 @@ type RegisterSlaveMessage struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *RegisterSlaveMessage) Reset()         { *m = RegisterSlaveMessage{} }
-func (m *RegisterSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*RegisterSlaveMessage) ProtoMessage()    {}
+func (m *RegisterSlaveMessage) Reset()      { *m = RegisterSlaveMessage{} }
+func (*RegisterSlaveMessage) ProtoMessage() {}
 
 func (m *RegisterSlaveMessage) GetSlave() *SlaveInfo {
 	if m != nil {
@@ -879,9 +869,8 @@ type ReregisterSlaveMessage struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *ReregisterSlaveMessage) Reset()         { *m = ReregisterSlaveMessage{} }
-func (m *ReregisterSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*ReregisterSlaveMessage) ProtoMessage()    {}
+func (m *ReregisterSlaveMessage) Reset()      { *m = ReregisterSlaveMessage{} }
+func (*ReregisterSlaveMessage) ProtoMessage() {}
 
 func (m *ReregisterSlaveMessage) GetSlave() *SlaveInfo {
 	if m != nil {
@@ -931,9 +920,8 @@ type SlaveRegisteredMessage struct {
 	XXX_unrecognized []byte                 `json:"-"`
 }
 
-func (m *SlaveRegisteredMessage) Reset()         { *m = SlaveRegisteredMessage{} }
-func (m *SlaveRegisteredMessage) String() string { return proto.CompactTextString(m) }
-func (*SlaveRegisteredMessage) ProtoMessage()    {}
+func (m *SlaveRegisteredMessage) Reset()      { *m = SlaveRegisteredMessage{} }
+func (*SlaveRegisteredMessage) ProtoMessage() {}
 
 func (m *SlaveRegisteredMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -956,9 +944,8 @@ type SlaveReregisteredMessage struct {
 	XXX_unrecognized []byte                   `json:"-"`
 }
 
-func (m *SlaveReregisteredMessage) Reset()         { *m = SlaveReregisteredMessage{} }
-func (m *SlaveReregisteredMessage) String() string { return proto.CompactTextString(m) }
-func (*SlaveReregisteredMessage) ProtoMessage()    {}
+func (m *SlaveReregisteredMessage) Reset()      { *m = SlaveReregisteredMessage{} }
+func (*SlaveReregisteredMessage) ProtoMessage() {}
 
 func (m *SlaveReregisteredMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -986,9 +973,8 @@ type UnregisterSlaveMessage struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *UnregisterSlaveMessage) Reset()         { *m = UnregisterSlaveMessage{} }
-func (m *UnregisterSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*UnregisterSlaveMessage) ProtoMessage()    {}
+func (m *UnregisterSlaveMessage) Reset()      { *m = UnregisterSlaveMessage{} }
+func (*UnregisterSlaveMessage) ProtoMessage() {}
 
 func (m *UnregisterSlaveMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -1005,9 +991,8 @@ type MasterSlaveConnection struct {
 	XXX_unrecognized        []byte   `json:"-"`
 }
 
-func (m *MasterSlaveConnection) Reset()         { *m = MasterSlaveConnection{} }
-func (m *MasterSlaveConnection) String() string { return proto.CompactTextString(m) }
-func (*MasterSlaveConnection) ProtoMessage()    {}
+func (m *MasterSlaveConnection) Reset()      { *m = MasterSlaveConnection{} }
+func (*MasterSlaveConnection) ProtoMessage() {}
 
 func (m *MasterSlaveConnection) GetTotalPingTimeoutSeconds() float64 {
 	if m != nil && m.TotalPingTimeoutSeconds != nil {
@@ -1023,9 +1008,8 @@ type PingSlaveMessage struct {
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *PingSlaveMessage) Reset()         { *m = PingSlaveMessage{} }
-func (m *PingSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*PingSlaveMessage) ProtoMessage()    {}
+func (m *PingSlaveMessage) Reset()      { *m = PingSlaveMessage{} }
+func (*PingSlaveMessage) ProtoMessage() {}
 
 func (m *PingSlaveMessage) GetConnected() bool {
 	if m != nil && m.Connected != nil {
@@ -1040,9 +1024,8 @@ type PongSlaveMessage struct {
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *PongSlaveMessage) Reset()         { *m = PongSlaveMessage{} }
-func (m *PongSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*PongSlaveMessage) ProtoMessage()    {}
+func (m *PongSlaveMessage) Reset()      { *m = PongSlaveMessage{} }
+func (*PongSlaveMessage) ProtoMessage() {}
 
 // Tells a slave to shut down all executors of the given framework.
 type ShutdownFrameworkMessage struct {
@@ -1050,9 +1033,8 @@ type ShutdownFrameworkMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *ShutdownFrameworkMessage) Reset()         { *m = ShutdownFrameworkMessage{} }
-func (m *ShutdownFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*ShutdownFrameworkMessage) ProtoMessage()    {}
+func (m *ShutdownFrameworkMessage) Reset()      { *m = ShutdownFrameworkMessage{} }
+func (*ShutdownFrameworkMessage) ProtoMessage() {}
 
 func (m *ShutdownFrameworkMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -1071,9 +1053,8 @@ type ShutdownExecutorMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *ShutdownExecutorMessage) Reset()         { *m = ShutdownExecutorMessage{} }
-func (m *ShutdownExecutorMessage) String() string { return proto.CompactTextString(m) }
-func (*ShutdownExecutorMessage) ProtoMessage()    {}
+func (m *ShutdownExecutorMessage) Reset()      { *m = ShutdownExecutorMessage{} }
+func (*ShutdownExecutorMessage) ProtoMessage() {}
 
 func (m *ShutdownExecutorMessage) GetExecutorId() *ExecutorID {
 	if m != nil {
@@ -1090,14 +1071,14 @@ func (m *ShutdownExecutorMessage) GetFrameworkId() *FrameworkID {
 }
 
 type UpdateFrameworkMessage struct {
-	FrameworkId      *FrameworkID `protobuf:"bytes,1,req,name=framework_id" json:"framework_id,omitempty"`
-	Pid              *string      `protobuf:"bytes,2,req,name=pid" json:"pid,omitempty"`
-	XXX_unrecognized []byte       `json:"-"`
+	FrameworkId *FrameworkID `protobuf:"bytes,1,req,name=framework_id" json:"framework_id,omitempty"`
+	// See the comment on RunTaskMessage.pid.
+	Pid              *string `protobuf:"bytes,2,opt,name=pid" json:"pid,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *UpdateFrameworkMessage) Reset()         { *m = UpdateFrameworkMessage{} }
-func (m *UpdateFrameworkMessage) String() string { return proto.CompactTextString(m) }
-func (*UpdateFrameworkMessage) ProtoMessage()    {}
+func (m *UpdateFrameworkMessage) Reset()      { *m = UpdateFrameworkMessage{} }
+func (*UpdateFrameworkMessage) ProtoMessage() {}
 
 func (m *UpdateFrameworkMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -1121,9 +1102,8 @@ type CheckpointResourcesMessage struct {
 	XXX_unrecognized []byte      `json:"-"`
 }
 
-func (m *CheckpointResourcesMessage) Reset()         { *m = CheckpointResourcesMessage{} }
-func (m *CheckpointResourcesMessage) String() string { return proto.CompactTextString(m) }
-func (*CheckpointResourcesMessage) ProtoMessage()    {}
+func (m *CheckpointResourcesMessage) Reset()      { *m = CheckpointResourcesMessage{} }
+func (*CheckpointResourcesMessage) ProtoMessage() {}
 
 func (m *CheckpointResourcesMessage) GetResources() []*Resource {
 	if m != nil {
@@ -1141,9 +1121,8 @@ type UpdateSlaveMessage struct {
 	XXX_unrecognized        []byte      `json:"-"`
 }
 
-func (m *UpdateSlaveMessage) Reset()         { *m = UpdateSlaveMessage{} }
-func (m *UpdateSlaveMessage) String() string { return proto.CompactTextString(m) }
-func (*UpdateSlaveMessage) ProtoMessage()    {}
+func (m *UpdateSlaveMessage) Reset()      { *m = UpdateSlaveMessage{} }
+func (*UpdateSlaveMessage) ProtoMessage() {}
 
 func (m *UpdateSlaveMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -1165,9 +1144,8 @@ type RegisterExecutorMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *RegisterExecutorMessage) Reset()         { *m = RegisterExecutorMessage{} }
-func (m *RegisterExecutorMessage) String() string { return proto.CompactTextString(m) }
-func (*RegisterExecutorMessage) ProtoMessage()    {}
+func (m *RegisterExecutorMessage) Reset()      { *m = RegisterExecutorMessage{} }
+func (*RegisterExecutorMessage) ProtoMessage() {}
 
 func (m *RegisterExecutorMessage) GetFrameworkId() *FrameworkID {
 	if m != nil {
@@ -1192,9 +1170,8 @@ type ExecutorRegisteredMessage struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *ExecutorRegisteredMessage) Reset()         { *m = ExecutorRegisteredMessage{} }
-func (m *ExecutorRegisteredMessage) String() string { return proto.CompactTextString(m) }
-func (*ExecutorRegisteredMessage) ProtoMessage()    {}
+func (m *ExecutorRegisteredMessage) Reset()      { *m = ExecutorRegisteredMessage{} }
+func (*ExecutorRegisteredMessage) ProtoMessage() {}
 
 func (m *ExecutorRegisteredMessage) GetExecutorInfo() *ExecutorInfo {
 	if m != nil {
@@ -1237,9 +1214,8 @@ type ExecutorReregisteredMessage struct {
 	XXX_unrecognized []byte     `json:"-"`
 }
 
-func (m *ExecutorReregisteredMessage) Reset()         { *m = ExecutorReregisteredMessage{} }
-func (m *ExecutorReregisteredMessage) String() string { return proto.CompactTextString(m) }
-func (*ExecutorReregisteredMessage) ProtoMessage()    {}
+func (m *ExecutorReregisteredMessage) Reset()      { *m = ExecutorReregisteredMessage{} }
+func (*ExecutorReregisteredMessage) ProtoMessage() {}
 
 func (m *ExecutorReregisteredMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -1263,9 +1239,8 @@ type ExitedExecutorMessage struct {
 	XXX_unrecognized []byte       `json:"-"`
 }
 
-func (m *ExitedExecutorMessage) Reset()         { *m = ExitedExecutorMessage{} }
-func (m *ExitedExecutorMessage) String() string { return proto.CompactTextString(m) }
-func (*ExitedExecutorMessage) ProtoMessage()    {}
+func (m *ExitedExecutorMessage) Reset()      { *m = ExitedExecutorMessage{} }
+func (*ExitedExecutorMessage) ProtoMessage() {}
 
 func (m *ExitedExecutorMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -1300,9 +1275,8 @@ type ReconnectExecutorMessage struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *ReconnectExecutorMessage) Reset()         { *m = ReconnectExecutorMessage{} }
-func (m *ReconnectExecutorMessage) String() string { return proto.CompactTextString(m) }
-func (*ReconnectExecutorMessage) ProtoMessage()    {}
+func (m *ReconnectExecutorMessage) Reset()      { *m = ReconnectExecutorMessage{} }
+func (*ReconnectExecutorMessage) ProtoMessage() {}
 
 func (m *ReconnectExecutorMessage) GetSlaveId() *SlaveID {
 	if m != nil {
@@ -1319,9 +1293,8 @@ type ReregisterExecutorMessage struct {
 	XXX_unrecognized []byte          `json:"-"`
 }
 
-func (m *ReregisterExecutorMessage) Reset()         { *m = ReregisterExecutorMessage{} }
-func (m *ReregisterExecutorMessage) String() string { return proto.CompactTextString(m) }
-func (*ReregisterExecutorMessage) ProtoMessage()    {}
+func (m *ReregisterExecutorMessage) Reset()      { *m = ReregisterExecutorMessage{} }
+func (*ReregisterExecutorMessage) ProtoMessage() {}
 
 func (m *ReregisterExecutorMessage) GetExecutorId() *ExecutorID {
 	if m != nil {
@@ -1356,9 +1329,8 @@ type ShutdownMessage struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *ShutdownMessage) Reset()         { *m = ShutdownMessage{} }
-func (m *ShutdownMessage) String() string { return proto.CompactTextString(m) }
-func (*ShutdownMessage) ProtoMessage()    {}
+func (m *ShutdownMessage) Reset()      { *m = ShutdownMessage{} }
+func (*ShutdownMessage) ProtoMessage() {}
 
 func (m *ShutdownMessage) GetMessage() string {
 	if m != nil && m.Message != nil {
@@ -1374,9 +1346,8 @@ type Archive struct {
 	XXX_unrecognized []byte               `json:"-"`
 }
 
-func (m *Archive) Reset()         { *m = Archive{} }
-func (m *Archive) String() string { return proto.CompactTextString(m) }
-func (*Archive) ProtoMessage()    {}
+func (m *Archive) Reset()      { *m = Archive{} }
+func (*Archive) ProtoMessage() {}
 
 func (m *Archive) GetFrameworks() []*Archive_Framework {
 	if m != nil {
@@ -1392,9 +1363,8 @@ type Archive_Framework struct {
 	XXX_unrecognized []byte         `json:"-"`
 }
 
-func (m *Archive_Framework) Reset()         { *m = Archive_Framework{} }
-func (m *Archive_Framework) String() string { return proto.CompactTextString(m) }
-func (*Archive_Framework) ProtoMessage()    {}
+func (m *Archive_Framework) Reset()      { *m = Archive_Framework{} }
+func (*Archive_Framework) ProtoMessage() {}
 
 func (m *Archive_Framework) GetFrameworkInfo() *FrameworkInfo {
 	if m != nil {
@@ -1434,9 +1404,8 @@ type TaskHealthStatus struct {
 	XXX_unrecognized    []byte `json:"-"`
 }
 
-func (m *TaskHealthStatus) Reset()         { *m = TaskHealthStatus{} }
-func (m *TaskHealthStatus) String() string { return proto.CompactTextString(m) }
-func (*TaskHealthStatus) ProtoMessage()    {}
+func (m *TaskHealthStatus) Reset()      { *m = TaskHealthStatus{} }
+func (*TaskHealthStatus) ProtoMessage() {}
 
 const Default_TaskHealthStatus_KillTask bool = false
 
@@ -1475,9 +1444,8 @@ type HookExecuted struct {
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *HookExecuted) Reset()         { *m = HookExecuted{} }
-func (m *HookExecuted) String() string { return proto.CompactTextString(m) }
-func (*HookExecuted) ProtoMessage()    {}
+func (m *HookExecuted) Reset()      { *m = HookExecuted{} }
+func (*HookExecuted) ProtoMessage() {}
 
 func (m *HookExecuted) GetModule() string {
 	if m != nil && m.Module != nil {
@@ -1489,3 +1457,15380 @@ func (m *HookExecuted) GetModule() string {
 func init() {
 	proto.RegisterEnum("mesosproto.StatusUpdateRecord_Type", StatusUpdateRecord_Type_name, StatusUpdateRecord_Type_value)
 }
+func (this *Task) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Task)
+	if !ok {
+		return fmt.Errorf("that is not of type *Task")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Task but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Taskbut is not nil && this == nil")
+	}
+	if this.Name != nil && that1.Name != nil {
+		if *this.Name != *that1.Name {
+			return fmt.Errorf("Name this(%v) Not Equal that(%v)", *this.Name, *that1.Name)
+		}
+	} else if this.Name != nil {
+		return fmt.Errorf("this.Name == nil && that.Name != nil")
+	} else if that1.Name != nil {
+		return fmt.Errorf("Name this(%v) Not Equal that(%v)", this.Name, that1.Name)
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return fmt.Errorf("TaskId this(%v) Not Equal that(%v)", this.TaskId, that1.TaskId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if this.State != nil && that1.State != nil {
+		if *this.State != *that1.State {
+			return fmt.Errorf("State this(%v) Not Equal that(%v)", *this.State, *that1.State)
+		}
+	} else if this.State != nil {
+		return fmt.Errorf("this.State == nil && that.State != nil")
+	} else if that1.State != nil {
+		return fmt.Errorf("State this(%v) Not Equal that(%v)", this.State, that1.State)
+	}
+	if len(this.Resources) != len(that1.Resources) {
+		return fmt.Errorf("Resources this(%v) Not Equal that(%v)", len(this.Resources), len(that1.Resources))
+	}
+	for i := range this.Resources {
+		if !this.Resources[i].Equal(that1.Resources[i]) {
+			return fmt.Errorf("Resources this[%v](%v) Not Equal that[%v](%v)", i, this.Resources[i], i, that1.Resources[i])
+		}
+	}
+	if len(this.Statuses) != len(that1.Statuses) {
+		return fmt.Errorf("Statuses this(%v) Not Equal that(%v)", len(this.Statuses), len(that1.Statuses))
+	}
+	for i := range this.Statuses {
+		if !this.Statuses[i].Equal(that1.Statuses[i]) {
+			return fmt.Errorf("Statuses this[%v](%v) Not Equal that[%v](%v)", i, this.Statuses[i], i, that1.Statuses[i])
+		}
+	}
+	if this.StatusUpdateState != nil && that1.StatusUpdateState != nil {
+		if *this.StatusUpdateState != *that1.StatusUpdateState {
+			return fmt.Errorf("StatusUpdateState this(%v) Not Equal that(%v)", *this.StatusUpdateState, *that1.StatusUpdateState)
+		}
+	} else if this.StatusUpdateState != nil {
+		return fmt.Errorf("this.StatusUpdateState == nil && that.StatusUpdateState != nil")
+	} else if that1.StatusUpdateState != nil {
+		return fmt.Errorf("StatusUpdateState this(%v) Not Equal that(%v)", this.StatusUpdateState, that1.StatusUpdateState)
+	}
+	if !bytes.Equal(this.StatusUpdateUuid, that1.StatusUpdateUuid) {
+		return fmt.Errorf("StatusUpdateUuid this(%v) Not Equal that(%v)", this.StatusUpdateUuid, that1.StatusUpdateUuid)
+	}
+	if !this.Labels.Equal(that1.Labels) {
+		return fmt.Errorf("Labels this(%v) Not Equal that(%v)", this.Labels, that1.Labels)
+	}
+	if !this.Discovery.Equal(that1.Discovery) {
+		return fmt.Errorf("Discovery this(%v) Not Equal that(%v)", this.Discovery, that1.Discovery)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *Task) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Task)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Name != nil && that1.Name != nil {
+		if *this.Name != *that1.Name {
+			return false
+		}
+	} else if this.Name != nil {
+		return false
+	} else if that1.Name != nil {
+		return false
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if this.State != nil && that1.State != nil {
+		if *this.State != *that1.State {
+			return false
+		}
+	} else if this.State != nil {
+		return false
+	} else if that1.State != nil {
+		return false
+	}
+	if len(this.Resources) != len(that1.Resources) {
+		return false
+	}
+	for i := range this.Resources {
+		if !this.Resources[i].Equal(that1.Resources[i]) {
+			return false
+		}
+	}
+	if len(this.Statuses) != len(that1.Statuses) {
+		return false
+	}
+	for i := range this.Statuses {
+		if !this.Statuses[i].Equal(that1.Statuses[i]) {
+			return false
+		}
+	}
+	if this.StatusUpdateState != nil && that1.StatusUpdateState != nil {
+		if *this.StatusUpdateState != *that1.StatusUpdateState {
+			return false
+		}
+	} else if this.StatusUpdateState != nil {
+		return false
+	} else if that1.StatusUpdateState != nil {
+		return false
+	}
+	if !bytes.Equal(this.StatusUpdateUuid, that1.StatusUpdateUuid) {
+		return false
+	}
+	if !this.Labels.Equal(that1.Labels) {
+		return false
+	}
+	if !this.Discovery.Equal(that1.Discovery) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *StatusUpdate) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*StatusUpdate)
+	if !ok {
+		return fmt.Errorf("that is not of type *StatusUpdate")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *StatusUpdate but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *StatusUpdatebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.Status.Equal(that1.Status) {
+		return fmt.Errorf("Status this(%v) Not Equal that(%v)", this.Status, that1.Status)
+	}
+	if this.Timestamp != nil && that1.Timestamp != nil {
+		if *this.Timestamp != *that1.Timestamp {
+			return fmt.Errorf("Timestamp this(%v) Not Equal that(%v)", *this.Timestamp, *that1.Timestamp)
+		}
+	} else if this.Timestamp != nil {
+		return fmt.Errorf("this.Timestamp == nil && that.Timestamp != nil")
+	} else if that1.Timestamp != nil {
+		return fmt.Errorf("Timestamp this(%v) Not Equal that(%v)", this.Timestamp, that1.Timestamp)
+	}
+	if !bytes.Equal(this.Uuid, that1.Uuid) {
+		return fmt.Errorf("Uuid this(%v) Not Equal that(%v)", this.Uuid, that1.Uuid)
+	}
+	if this.LatestState != nil && that1.LatestState != nil {
+		if *this.LatestState != *that1.LatestState {
+			return fmt.Errorf("LatestState this(%v) Not Equal that(%v)", *this.LatestState, *that1.LatestState)
+		}
+	} else if this.LatestState != nil {
+		return fmt.Errorf("this.LatestState == nil && that.LatestState != nil")
+	} else if that1.LatestState != nil {
+		return fmt.Errorf("LatestState this(%v) Not Equal that(%v)", this.LatestState, that1.LatestState)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *StatusUpdate) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*StatusUpdate)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.Status.Equal(that1.Status) {
+		return false
+	}
+	if this.Timestamp != nil && that1.Timestamp != nil {
+		if *this.Timestamp != *that1.Timestamp {
+			return false
+		}
+	} else if this.Timestamp != nil {
+		return false
+	} else if that1.Timestamp != nil {
+		return false
+	}
+	if !bytes.Equal(this.Uuid, that1.Uuid) {
+		return false
+	}
+	if this.LatestState != nil && that1.LatestState != nil {
+		if *this.LatestState != *that1.LatestState {
+			return false
+		}
+	} else if this.LatestState != nil {
+		return false
+	} else if that1.LatestState != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *StatusUpdateRecord) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*StatusUpdateRecord)
+	if !ok {
+		return fmt.Errorf("that is not of type *StatusUpdateRecord")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *StatusUpdateRecord but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *StatusUpdateRecordbut is not nil && this == nil")
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return fmt.Errorf("Type this(%v) Not Equal that(%v)", *this.Type, *that1.Type)
+		}
+	} else if this.Type != nil {
+		return fmt.Errorf("this.Type == nil && that.Type != nil")
+	} else if that1.Type != nil {
+		return fmt.Errorf("Type this(%v) Not Equal that(%v)", this.Type, that1.Type)
+	}
+	if !this.Update.Equal(that1.Update) {
+		return fmt.Errorf("Update this(%v) Not Equal that(%v)", this.Update, that1.Update)
+	}
+	if !bytes.Equal(this.Uuid, that1.Uuid) {
+		return fmt.Errorf("Uuid this(%v) Not Equal that(%v)", this.Uuid, that1.Uuid)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *StatusUpdateRecord) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*StatusUpdateRecord)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Type != nil && that1.Type != nil {
+		if *this.Type != *that1.Type {
+			return false
+		}
+	} else if this.Type != nil {
+		return false
+	} else if that1.Type != nil {
+		return false
+	}
+	if !this.Update.Equal(that1.Update) {
+		return false
+	}
+	if !bytes.Equal(this.Uuid, that1.Uuid) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *SubmitSchedulerRequest) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*SubmitSchedulerRequest)
+	if !ok {
+		return fmt.Errorf("that is not of type *SubmitSchedulerRequest")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *SubmitSchedulerRequest but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *SubmitSchedulerRequestbut is not nil && this == nil")
+	}
+	if this.Name != nil && that1.Name != nil {
+		if *this.Name != *that1.Name {
+			return fmt.Errorf("Name this(%v) Not Equal that(%v)", *this.Name, *that1.Name)
+		}
+	} else if this.Name != nil {
+		return fmt.Errorf("this.Name == nil && that.Name != nil")
+	} else if that1.Name != nil {
+		return fmt.Errorf("Name this(%v) Not Equal that(%v)", this.Name, that1.Name)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *SubmitSchedulerRequest) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*SubmitSchedulerRequest)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Name != nil && that1.Name != nil {
+		if *this.Name != *that1.Name {
+			return false
+		}
+	} else if this.Name != nil {
+		return false
+	} else if that1.Name != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *SubmitSchedulerResponse) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*SubmitSchedulerResponse)
+	if !ok {
+		return fmt.Errorf("that is not of type *SubmitSchedulerResponse")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *SubmitSchedulerResponse but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *SubmitSchedulerResponsebut is not nil && this == nil")
+	}
+	if this.Okay != nil && that1.Okay != nil {
+		if *this.Okay != *that1.Okay {
+			return fmt.Errorf("Okay this(%v) Not Equal that(%v)", *this.Okay, *that1.Okay)
+		}
+	} else if this.Okay != nil {
+		return fmt.Errorf("this.Okay == nil && that.Okay != nil")
+	} else if that1.Okay != nil {
+		return fmt.Errorf("Okay this(%v) Not Equal that(%v)", this.Okay, that1.Okay)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *SubmitSchedulerResponse) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*SubmitSchedulerResponse)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Okay != nil && that1.Okay != nil {
+		if *this.Okay != *that1.Okay {
+			return false
+		}
+	} else if this.Okay != nil {
+		return false
+	} else if that1.Okay != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ExecutorToFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ExecutorToFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ExecutorToFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ExecutorToFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ExecutorToFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !bytes.Equal(this.Data, that1.Data) {
+		return fmt.Errorf("Data this(%v) Not Equal that(%v)", this.Data, that1.Data)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ExecutorToFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ExecutorToFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !bytes.Equal(this.Data, that1.Data) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *FrameworkToExecutorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*FrameworkToExecutorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *FrameworkToExecutorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *FrameworkToExecutorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *FrameworkToExecutorMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !bytes.Equal(this.Data, that1.Data) {
+		return fmt.Errorf("Data this(%v) Not Equal that(%v)", this.Data, that1.Data)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *FrameworkToExecutorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*FrameworkToExecutorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !bytes.Equal(this.Data, that1.Data) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RegisterFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RegisterFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *RegisterFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RegisterFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RegisterFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.Framework.Equal(that1.Framework) {
+		return fmt.Errorf("Framework this(%v) Not Equal that(%v)", this.Framework, that1.Framework)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *RegisterFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RegisterFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Framework.Equal(that1.Framework) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ReregisterFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ReregisterFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ReregisterFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ReregisterFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ReregisterFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.Framework.Equal(that1.Framework) {
+		return fmt.Errorf("Framework this(%v) Not Equal that(%v)", this.Framework, that1.Framework)
+	}
+	if this.Failover != nil && that1.Failover != nil {
+		if *this.Failover != *that1.Failover {
+			return fmt.Errorf("Failover this(%v) Not Equal that(%v)", *this.Failover, *that1.Failover)
+		}
+	} else if this.Failover != nil {
+		return fmt.Errorf("this.Failover == nil && that.Failover != nil")
+	} else if that1.Failover != nil {
+		return fmt.Errorf("Failover this(%v) Not Equal that(%v)", this.Failover, that1.Failover)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ReregisterFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ReregisterFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Framework.Equal(that1.Framework) {
+		return false
+	}
+	if this.Failover != nil && that1.Failover != nil {
+		if *this.Failover != *that1.Failover {
+			return false
+		}
+	} else if this.Failover != nil {
+		return false
+	} else if that1.Failover != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *FrameworkRegisteredMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*FrameworkRegisteredMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *FrameworkRegisteredMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *FrameworkRegisteredMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *FrameworkRegisteredMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.MasterInfo.Equal(that1.MasterInfo) {
+		return fmt.Errorf("MasterInfo this(%v) Not Equal that(%v)", this.MasterInfo, that1.MasterInfo)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *FrameworkRegisteredMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*FrameworkRegisteredMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.MasterInfo.Equal(that1.MasterInfo) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *FrameworkReregisteredMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*FrameworkReregisteredMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *FrameworkReregisteredMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *FrameworkReregisteredMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *FrameworkReregisteredMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.MasterInfo.Equal(that1.MasterInfo) {
+		return fmt.Errorf("MasterInfo this(%v) Not Equal that(%v)", this.MasterInfo, that1.MasterInfo)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *FrameworkReregisteredMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*FrameworkReregisteredMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.MasterInfo.Equal(that1.MasterInfo) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *UnregisterFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*UnregisterFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *UnregisterFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *UnregisterFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *UnregisterFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *UnregisterFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*UnregisterFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *DeactivateFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*DeactivateFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *DeactivateFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *DeactivateFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *DeactivateFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *DeactivateFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*DeactivateFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ResourceRequestMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ResourceRequestMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ResourceRequestMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ResourceRequestMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ResourceRequestMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if len(this.Requests) != len(that1.Requests) {
+		return fmt.Errorf("Requests this(%v) Not Equal that(%v)", len(this.Requests), len(that1.Requests))
+	}
+	for i := range this.Requests {
+		if !this.Requests[i].Equal(that1.Requests[i]) {
+			return fmt.Errorf("Requests this[%v](%v) Not Equal that[%v](%v)", i, this.Requests[i], i, that1.Requests[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ResourceRequestMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ResourceRequestMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if len(this.Requests) != len(that1.Requests) {
+		return false
+	}
+	for i := range this.Requests {
+		if !this.Requests[i].Equal(that1.Requests[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ResourceOffersMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ResourceOffersMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ResourceOffersMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ResourceOffersMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ResourceOffersMessagebut is not nil && this == nil")
+	}
+	if len(this.Offers) != len(that1.Offers) {
+		return fmt.Errorf("Offers this(%v) Not Equal that(%v)", len(this.Offers), len(that1.Offers))
+	}
+	for i := range this.Offers {
+		if !this.Offers[i].Equal(that1.Offers[i]) {
+			return fmt.Errorf("Offers this[%v](%v) Not Equal that[%v](%v)", i, this.Offers[i], i, that1.Offers[i])
+		}
+	}
+	if len(this.Pids) != len(that1.Pids) {
+		return fmt.Errorf("Pids this(%v) Not Equal that(%v)", len(this.Pids), len(that1.Pids))
+	}
+	for i := range this.Pids {
+		if this.Pids[i] != that1.Pids[i] {
+			return fmt.Errorf("Pids this[%v](%v) Not Equal that[%v](%v)", i, this.Pids[i], i, that1.Pids[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ResourceOffersMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ResourceOffersMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if len(this.Offers) != len(that1.Offers) {
+		return false
+	}
+	for i := range this.Offers {
+		if !this.Offers[i].Equal(that1.Offers[i]) {
+			return false
+		}
+	}
+	if len(this.Pids) != len(that1.Pids) {
+		return false
+	}
+	for i := range this.Pids {
+		if this.Pids[i] != that1.Pids[i] {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *LaunchTasksMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*LaunchTasksMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *LaunchTasksMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *LaunchTasksMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *LaunchTasksMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return fmt.Errorf("Tasks this(%v) Not Equal that(%v)", len(this.Tasks), len(that1.Tasks))
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return fmt.Errorf("Tasks this[%v](%v) Not Equal that[%v](%v)", i, this.Tasks[i], i, that1.Tasks[i])
+		}
+	}
+	if !this.Filters.Equal(that1.Filters) {
+		return fmt.Errorf("Filters this(%v) Not Equal that(%v)", this.Filters, that1.Filters)
+	}
+	if len(this.OfferIds) != len(that1.OfferIds) {
+		return fmt.Errorf("OfferIds this(%v) Not Equal that(%v)", len(this.OfferIds), len(that1.OfferIds))
+	}
+	for i := range this.OfferIds {
+		if !this.OfferIds[i].Equal(that1.OfferIds[i]) {
+			return fmt.Errorf("OfferIds this[%v](%v) Not Equal that[%v](%v)", i, this.OfferIds[i], i, that1.OfferIds[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *LaunchTasksMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*LaunchTasksMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return false
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return false
+		}
+	}
+	if !this.Filters.Equal(that1.Filters) {
+		return false
+	}
+	if len(this.OfferIds) != len(that1.OfferIds) {
+		return false
+	}
+	for i := range this.OfferIds {
+		if !this.OfferIds[i].Equal(that1.OfferIds[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RescindResourceOfferMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RescindResourceOfferMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *RescindResourceOfferMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RescindResourceOfferMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RescindResourceOfferMessagebut is not nil && this == nil")
+	}
+	if !this.OfferId.Equal(that1.OfferId) {
+		return fmt.Errorf("OfferId this(%v) Not Equal that(%v)", this.OfferId, that1.OfferId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *RescindResourceOfferMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RescindResourceOfferMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.OfferId.Equal(that1.OfferId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ReviveOffersMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ReviveOffersMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ReviveOffersMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ReviveOffersMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ReviveOffersMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ReviveOffersMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ReviveOffersMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RunTaskMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RunTaskMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *RunTaskMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RunTaskMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RunTaskMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.Framework.Equal(that1.Framework) {
+		return fmt.Errorf("Framework this(%v) Not Equal that(%v)", this.Framework, that1.Framework)
+	}
+	if !this.Task.Equal(that1.Task) {
+		return fmt.Errorf("Task this(%v) Not Equal that(%v)", this.Task, that1.Task)
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return fmt.Errorf("Pid this(%v) Not Equal that(%v)", *this.Pid, *that1.Pid)
+		}
+	} else if this.Pid != nil {
+		return fmt.Errorf("this.Pid == nil && that.Pid != nil")
+	} else if that1.Pid != nil {
+		return fmt.Errorf("Pid this(%v) Not Equal that(%v)", this.Pid, that1.Pid)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *RunTaskMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RunTaskMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.Framework.Equal(that1.Framework) {
+		return false
+	}
+	if !this.Task.Equal(that1.Task) {
+		return false
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return false
+		}
+	} else if this.Pid != nil {
+		return false
+	} else if that1.Pid != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *KillTaskMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*KillTaskMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *KillTaskMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *KillTaskMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *KillTaskMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return fmt.Errorf("TaskId this(%v) Not Equal that(%v)", this.TaskId, that1.TaskId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *KillTaskMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*KillTaskMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *StatusUpdateMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*StatusUpdateMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *StatusUpdateMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *StatusUpdateMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *StatusUpdateMessagebut is not nil && this == nil")
+	}
+	if !this.Update.Equal(that1.Update) {
+		return fmt.Errorf("Update this(%v) Not Equal that(%v)", this.Update, that1.Update)
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return fmt.Errorf("Pid this(%v) Not Equal that(%v)", *this.Pid, *that1.Pid)
+		}
+	} else if this.Pid != nil {
+		return fmt.Errorf("this.Pid == nil && that.Pid != nil")
+	} else if that1.Pid != nil {
+		return fmt.Errorf("Pid this(%v) Not Equal that(%v)", this.Pid, that1.Pid)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *StatusUpdateMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*StatusUpdateMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Update.Equal(that1.Update) {
+		return false
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return false
+		}
+	} else if this.Pid != nil {
+		return false
+	} else if that1.Pid != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *StatusUpdateAcknowledgementMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*StatusUpdateAcknowledgementMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *StatusUpdateAcknowledgementMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *StatusUpdateAcknowledgementMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *StatusUpdateAcknowledgementMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return fmt.Errorf("TaskId this(%v) Not Equal that(%v)", this.TaskId, that1.TaskId)
+	}
+	if !bytes.Equal(this.Uuid, that1.Uuid) {
+		return fmt.Errorf("Uuid this(%v) Not Equal that(%v)", this.Uuid, that1.Uuid)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *StatusUpdateAcknowledgementMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*StatusUpdateAcknowledgementMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return false
+	}
+	if !bytes.Equal(this.Uuid, that1.Uuid) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *LostSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*LostSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *LostSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *LostSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *LostSlaveMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *LostSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*LostSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ReconcileTasksMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ReconcileTasksMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ReconcileTasksMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ReconcileTasksMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ReconcileTasksMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if len(this.Statuses) != len(that1.Statuses) {
+		return fmt.Errorf("Statuses this(%v) Not Equal that(%v)", len(this.Statuses), len(that1.Statuses))
+	}
+	for i := range this.Statuses {
+		if !this.Statuses[i].Equal(that1.Statuses[i]) {
+			return fmt.Errorf("Statuses this[%v](%v) Not Equal that[%v](%v)", i, this.Statuses[i], i, that1.Statuses[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ReconcileTasksMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ReconcileTasksMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if len(this.Statuses) != len(that1.Statuses) {
+		return false
+	}
+	for i := range this.Statuses {
+		if !this.Statuses[i].Equal(that1.Statuses[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *FrameworkErrorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*FrameworkErrorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *FrameworkErrorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *FrameworkErrorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *FrameworkErrorMessagebut is not nil && this == nil")
+	}
+	if this.Message != nil && that1.Message != nil {
+		if *this.Message != *that1.Message {
+			return fmt.Errorf("Message this(%v) Not Equal that(%v)", *this.Message, *that1.Message)
+		}
+	} else if this.Message != nil {
+		return fmt.Errorf("this.Message == nil && that.Message != nil")
+	} else if that1.Message != nil {
+		return fmt.Errorf("Message this(%v) Not Equal that(%v)", this.Message, that1.Message)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *FrameworkErrorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*FrameworkErrorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Message != nil && that1.Message != nil {
+		if *this.Message != *that1.Message {
+			return false
+		}
+	} else if this.Message != nil {
+		return false
+	} else if that1.Message != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RegisterSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RegisterSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *RegisterSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RegisterSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RegisterSlaveMessagebut is not nil && this == nil")
+	}
+	if !this.Slave.Equal(that1.Slave) {
+		return fmt.Errorf("Slave this(%v) Not Equal that(%v)", this.Slave, that1.Slave)
+	}
+	if len(this.CheckpointedResources) != len(that1.CheckpointedResources) {
+		return fmt.Errorf("CheckpointedResources this(%v) Not Equal that(%v)", len(this.CheckpointedResources), len(that1.CheckpointedResources))
+	}
+	for i := range this.CheckpointedResources {
+		if !this.CheckpointedResources[i].Equal(that1.CheckpointedResources[i]) {
+			return fmt.Errorf("CheckpointedResources this[%v](%v) Not Equal that[%v](%v)", i, this.CheckpointedResources[i], i, that1.CheckpointedResources[i])
+		}
+	}
+	if this.Version != nil && that1.Version != nil {
+		if *this.Version != *that1.Version {
+			return fmt.Errorf("Version this(%v) Not Equal that(%v)", *this.Version, *that1.Version)
+		}
+	} else if this.Version != nil {
+		return fmt.Errorf("this.Version == nil && that.Version != nil")
+	} else if that1.Version != nil {
+		return fmt.Errorf("Version this(%v) Not Equal that(%v)", this.Version, that1.Version)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *RegisterSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RegisterSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Slave.Equal(that1.Slave) {
+		return false
+	}
+	if len(this.CheckpointedResources) != len(that1.CheckpointedResources) {
+		return false
+	}
+	for i := range this.CheckpointedResources {
+		if !this.CheckpointedResources[i].Equal(that1.CheckpointedResources[i]) {
+			return false
+		}
+	}
+	if this.Version != nil && that1.Version != nil {
+		if *this.Version != *that1.Version {
+			return false
+		}
+	} else if this.Version != nil {
+		return false
+	} else if that1.Version != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ReregisterSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ReregisterSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ReregisterSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ReregisterSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ReregisterSlaveMessagebut is not nil && this == nil")
+	}
+	if !this.Slave.Equal(that1.Slave) {
+		return fmt.Errorf("Slave this(%v) Not Equal that(%v)", this.Slave, that1.Slave)
+	}
+	if len(this.CheckpointedResources) != len(that1.CheckpointedResources) {
+		return fmt.Errorf("CheckpointedResources this(%v) Not Equal that(%v)", len(this.CheckpointedResources), len(that1.CheckpointedResources))
+	}
+	for i := range this.CheckpointedResources {
+		if !this.CheckpointedResources[i].Equal(that1.CheckpointedResources[i]) {
+			return fmt.Errorf("CheckpointedResources this[%v](%v) Not Equal that[%v](%v)", i, this.CheckpointedResources[i], i, that1.CheckpointedResources[i])
+		}
+	}
+	if len(this.ExecutorInfos) != len(that1.ExecutorInfos) {
+		return fmt.Errorf("ExecutorInfos this(%v) Not Equal that(%v)", len(this.ExecutorInfos), len(that1.ExecutorInfos))
+	}
+	for i := range this.ExecutorInfos {
+		if !this.ExecutorInfos[i].Equal(that1.ExecutorInfos[i]) {
+			return fmt.Errorf("ExecutorInfos this[%v](%v) Not Equal that[%v](%v)", i, this.ExecutorInfos[i], i, that1.ExecutorInfos[i])
+		}
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return fmt.Errorf("Tasks this(%v) Not Equal that(%v)", len(this.Tasks), len(that1.Tasks))
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return fmt.Errorf("Tasks this[%v](%v) Not Equal that[%v](%v)", i, this.Tasks[i], i, that1.Tasks[i])
+		}
+	}
+	if len(this.CompletedFrameworks) != len(that1.CompletedFrameworks) {
+		return fmt.Errorf("CompletedFrameworks this(%v) Not Equal that(%v)", len(this.CompletedFrameworks), len(that1.CompletedFrameworks))
+	}
+	for i := range this.CompletedFrameworks {
+		if !this.CompletedFrameworks[i].Equal(that1.CompletedFrameworks[i]) {
+			return fmt.Errorf("CompletedFrameworks this[%v](%v) Not Equal that[%v](%v)", i, this.CompletedFrameworks[i], i, that1.CompletedFrameworks[i])
+		}
+	}
+	if this.Version != nil && that1.Version != nil {
+		if *this.Version != *that1.Version {
+			return fmt.Errorf("Version this(%v) Not Equal that(%v)", *this.Version, *that1.Version)
+		}
+	} else if this.Version != nil {
+		return fmt.Errorf("this.Version == nil && that.Version != nil")
+	} else if that1.Version != nil {
+		return fmt.Errorf("Version this(%v) Not Equal that(%v)", this.Version, that1.Version)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ReregisterSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ReregisterSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.Slave.Equal(that1.Slave) {
+		return false
+	}
+	if len(this.CheckpointedResources) != len(that1.CheckpointedResources) {
+		return false
+	}
+	for i := range this.CheckpointedResources {
+		if !this.CheckpointedResources[i].Equal(that1.CheckpointedResources[i]) {
+			return false
+		}
+	}
+	if len(this.ExecutorInfos) != len(that1.ExecutorInfos) {
+		return false
+	}
+	for i := range this.ExecutorInfos {
+		if !this.ExecutorInfos[i].Equal(that1.ExecutorInfos[i]) {
+			return false
+		}
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return false
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return false
+		}
+	}
+	if len(this.CompletedFrameworks) != len(that1.CompletedFrameworks) {
+		return false
+	}
+	for i := range this.CompletedFrameworks {
+		if !this.CompletedFrameworks[i].Equal(that1.CompletedFrameworks[i]) {
+			return false
+		}
+	}
+	if this.Version != nil && that1.Version != nil {
+		if *this.Version != *that1.Version {
+			return false
+		}
+	} else if this.Version != nil {
+		return false
+	} else if that1.Version != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *SlaveRegisteredMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*SlaveRegisteredMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *SlaveRegisteredMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *SlaveRegisteredMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *SlaveRegisteredMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.Connection.Equal(that1.Connection) {
+		return fmt.Errorf("Connection this(%v) Not Equal that(%v)", this.Connection, that1.Connection)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *SlaveRegisteredMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*SlaveRegisteredMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.Connection.Equal(that1.Connection) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *SlaveReregisteredMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*SlaveReregisteredMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *SlaveReregisteredMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *SlaveReregisteredMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *SlaveReregisteredMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if len(this.Reconciliations) != len(that1.Reconciliations) {
+		return fmt.Errorf("Reconciliations this(%v) Not Equal that(%v)", len(this.Reconciliations), len(that1.Reconciliations))
+	}
+	for i := range this.Reconciliations {
+		if !this.Reconciliations[i].Equal(that1.Reconciliations[i]) {
+			return fmt.Errorf("Reconciliations this[%v](%v) Not Equal that[%v](%v)", i, this.Reconciliations[i], i, that1.Reconciliations[i])
+		}
+	}
+	if !this.Connection.Equal(that1.Connection) {
+		return fmt.Errorf("Connection this(%v) Not Equal that(%v)", this.Connection, that1.Connection)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *SlaveReregisteredMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*SlaveReregisteredMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if len(this.Reconciliations) != len(that1.Reconciliations) {
+		return false
+	}
+	for i := range this.Reconciliations {
+		if !this.Reconciliations[i].Equal(that1.Reconciliations[i]) {
+			return false
+		}
+	}
+	if !this.Connection.Equal(that1.Connection) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *UnregisterSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*UnregisterSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *UnregisterSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *UnregisterSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *UnregisterSlaveMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *UnregisterSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*UnregisterSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *MasterSlaveConnection) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*MasterSlaveConnection)
+	if !ok {
+		return fmt.Errorf("that is not of type *MasterSlaveConnection")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *MasterSlaveConnection but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *MasterSlaveConnectionbut is not nil && this == nil")
+	}
+	if this.TotalPingTimeoutSeconds != nil && that1.TotalPingTimeoutSeconds != nil {
+		if *this.TotalPingTimeoutSeconds != *that1.TotalPingTimeoutSeconds {
+			return fmt.Errorf("TotalPingTimeoutSeconds this(%v) Not Equal that(%v)", *this.TotalPingTimeoutSeconds, *that1.TotalPingTimeoutSeconds)
+		}
+	} else if this.TotalPingTimeoutSeconds != nil {
+		return fmt.Errorf("this.TotalPingTimeoutSeconds == nil && that.TotalPingTimeoutSeconds != nil")
+	} else if that1.TotalPingTimeoutSeconds != nil {
+		return fmt.Errorf("TotalPingTimeoutSeconds this(%v) Not Equal that(%v)", this.TotalPingTimeoutSeconds, that1.TotalPingTimeoutSeconds)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *MasterSlaveConnection) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*MasterSlaveConnection)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.TotalPingTimeoutSeconds != nil && that1.TotalPingTimeoutSeconds != nil {
+		if *this.TotalPingTimeoutSeconds != *that1.TotalPingTimeoutSeconds {
+			return false
+		}
+	} else if this.TotalPingTimeoutSeconds != nil {
+		return false
+	} else if that1.TotalPingTimeoutSeconds != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *PingSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*PingSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *PingSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *PingSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *PingSlaveMessagebut is not nil && this == nil")
+	}
+	if this.Connected != nil && that1.Connected != nil {
+		if *this.Connected != *that1.Connected {
+			return fmt.Errorf("Connected this(%v) Not Equal that(%v)", *this.Connected, *that1.Connected)
+		}
+	} else if this.Connected != nil {
+		return fmt.Errorf("this.Connected == nil && that.Connected != nil")
+	} else if that1.Connected != nil {
+		return fmt.Errorf("Connected this(%v) Not Equal that(%v)", this.Connected, that1.Connected)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *PingSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*PingSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Connected != nil && that1.Connected != nil {
+		if *this.Connected != *that1.Connected {
+			return false
+		}
+	} else if this.Connected != nil {
+		return false
+	} else if that1.Connected != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *PongSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*PongSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *PongSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *PongSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *PongSlaveMessagebut is not nil && this == nil")
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *PongSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*PongSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ShutdownFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ShutdownFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ShutdownFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ShutdownFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ShutdownFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ShutdownFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ShutdownFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ShutdownExecutorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ShutdownExecutorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ShutdownExecutorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ShutdownExecutorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ShutdownExecutorMessagebut is not nil && this == nil")
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ShutdownExecutorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ShutdownExecutorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *UpdateFrameworkMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*UpdateFrameworkMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *UpdateFrameworkMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *UpdateFrameworkMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *UpdateFrameworkMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return fmt.Errorf("Pid this(%v) Not Equal that(%v)", *this.Pid, *that1.Pid)
+		}
+	} else if this.Pid != nil {
+		return fmt.Errorf("this.Pid == nil && that.Pid != nil")
+	} else if that1.Pid != nil {
+		return fmt.Errorf("Pid this(%v) Not Equal that(%v)", this.Pid, that1.Pid)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *UpdateFrameworkMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*UpdateFrameworkMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return false
+		}
+	} else if this.Pid != nil {
+		return false
+	} else if that1.Pid != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *CheckpointResourcesMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*CheckpointResourcesMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *CheckpointResourcesMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *CheckpointResourcesMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *CheckpointResourcesMessagebut is not nil && this == nil")
+	}
+	if len(this.Resources) != len(that1.Resources) {
+		return fmt.Errorf("Resources this(%v) Not Equal that(%v)", len(this.Resources), len(that1.Resources))
+	}
+	for i := range this.Resources {
+		if !this.Resources[i].Equal(that1.Resources[i]) {
+			return fmt.Errorf("Resources this[%v](%v) Not Equal that[%v](%v)", i, this.Resources[i], i, that1.Resources[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *CheckpointResourcesMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*CheckpointResourcesMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if len(this.Resources) != len(that1.Resources) {
+		return false
+	}
+	for i := range this.Resources {
+		if !this.Resources[i].Equal(that1.Resources[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *UpdateSlaveMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*UpdateSlaveMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *UpdateSlaveMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *UpdateSlaveMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *UpdateSlaveMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if len(this.OversubscribedResources) != len(that1.OversubscribedResources) {
+		return fmt.Errorf("OversubscribedResources this(%v) Not Equal that(%v)", len(this.OversubscribedResources), len(that1.OversubscribedResources))
+	}
+	for i := range this.OversubscribedResources {
+		if !this.OversubscribedResources[i].Equal(that1.OversubscribedResources[i]) {
+			return fmt.Errorf("OversubscribedResources this[%v](%v) Not Equal that[%v](%v)", i, this.OversubscribedResources[i], i, that1.OversubscribedResources[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *UpdateSlaveMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*UpdateSlaveMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if len(this.OversubscribedResources) != len(that1.OversubscribedResources) {
+		return false
+	}
+	for i := range this.OversubscribedResources {
+		if !this.OversubscribedResources[i].Equal(that1.OversubscribedResources[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *RegisterExecutorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RegisterExecutorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *RegisterExecutorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RegisterExecutorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RegisterExecutorMessagebut is not nil && this == nil")
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *RegisterExecutorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RegisterExecutorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ExecutorRegisteredMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ExecutorRegisteredMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ExecutorRegisteredMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ExecutorRegisteredMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ExecutorRegisteredMessagebut is not nil && this == nil")
+	}
+	if !this.ExecutorInfo.Equal(that1.ExecutorInfo) {
+		return fmt.Errorf("ExecutorInfo this(%v) Not Equal that(%v)", this.ExecutorInfo, that1.ExecutorInfo)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.FrameworkInfo.Equal(that1.FrameworkInfo) {
+		return fmt.Errorf("FrameworkInfo this(%v) Not Equal that(%v)", this.FrameworkInfo, that1.FrameworkInfo)
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.SlaveInfo.Equal(that1.SlaveInfo) {
+		return fmt.Errorf("SlaveInfo this(%v) Not Equal that(%v)", this.SlaveInfo, that1.SlaveInfo)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ExecutorRegisteredMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ExecutorRegisteredMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.ExecutorInfo.Equal(that1.ExecutorInfo) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.FrameworkInfo.Equal(that1.FrameworkInfo) {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.SlaveInfo.Equal(that1.SlaveInfo) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ExecutorReregisteredMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ExecutorReregisteredMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ExecutorReregisteredMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ExecutorReregisteredMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ExecutorReregisteredMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.SlaveInfo.Equal(that1.SlaveInfo) {
+		return fmt.Errorf("SlaveInfo this(%v) Not Equal that(%v)", this.SlaveInfo, that1.SlaveInfo)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ExecutorReregisteredMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ExecutorReregisteredMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.SlaveInfo.Equal(that1.SlaveInfo) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ExitedExecutorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ExitedExecutorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ExitedExecutorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ExitedExecutorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ExitedExecutorMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if this.Status != nil && that1.Status != nil {
+		if *this.Status != *that1.Status {
+			return fmt.Errorf("Status this(%v) Not Equal that(%v)", *this.Status, *that1.Status)
+		}
+	} else if this.Status != nil {
+		return fmt.Errorf("this.Status == nil && that.Status != nil")
+	} else if that1.Status != nil {
+		return fmt.Errorf("Status this(%v) Not Equal that(%v)", this.Status, that1.Status)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ExitedExecutorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ExitedExecutorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if this.Status != nil && that1.Status != nil {
+		if *this.Status != *that1.Status {
+			return false
+		}
+	} else if this.Status != nil {
+		return false
+	} else if that1.Status != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ReconnectExecutorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ReconnectExecutorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ReconnectExecutorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ReconnectExecutorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ReconnectExecutorMessagebut is not nil && this == nil")
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return fmt.Errorf("SlaveId this(%v) Not Equal that(%v)", this.SlaveId, that1.SlaveId)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ReconnectExecutorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ReconnectExecutorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.SlaveId.Equal(that1.SlaveId) {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ReregisterExecutorMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ReregisterExecutorMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ReregisterExecutorMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ReregisterExecutorMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ReregisterExecutorMessagebut is not nil && this == nil")
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return fmt.Errorf("ExecutorId this(%v) Not Equal that(%v)", this.ExecutorId, that1.ExecutorId)
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return fmt.Errorf("FrameworkId this(%v) Not Equal that(%v)", this.FrameworkId, that1.FrameworkId)
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return fmt.Errorf("Tasks this(%v) Not Equal that(%v)", len(this.Tasks), len(that1.Tasks))
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return fmt.Errorf("Tasks this[%v](%v) Not Equal that[%v](%v)", i, this.Tasks[i], i, that1.Tasks[i])
+		}
+	}
+	if len(this.Updates) != len(that1.Updates) {
+		return fmt.Errorf("Updates this(%v) Not Equal that(%v)", len(this.Updates), len(that1.Updates))
+	}
+	for i := range this.Updates {
+		if !this.Updates[i].Equal(that1.Updates[i]) {
+			return fmt.Errorf("Updates this[%v](%v) Not Equal that[%v](%v)", i, this.Updates[i], i, that1.Updates[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ReregisterExecutorMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ReregisterExecutorMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.ExecutorId.Equal(that1.ExecutorId) {
+		return false
+	}
+	if !this.FrameworkId.Equal(that1.FrameworkId) {
+		return false
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return false
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return false
+		}
+	}
+	if len(this.Updates) != len(that1.Updates) {
+		return false
+	}
+	for i := range this.Updates {
+		if !this.Updates[i].Equal(that1.Updates[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *ShutdownMessage) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*ShutdownMessage)
+	if !ok {
+		return fmt.Errorf("that is not of type *ShutdownMessage")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *ShutdownMessage but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *ShutdownMessagebut is not nil && this == nil")
+	}
+	if this.Message != nil && that1.Message != nil {
+		if *this.Message != *that1.Message {
+			return fmt.Errorf("Message this(%v) Not Equal that(%v)", *this.Message, *that1.Message)
+		}
+	} else if this.Message != nil {
+		return fmt.Errorf("this.Message == nil && that.Message != nil")
+	} else if that1.Message != nil {
+		return fmt.Errorf("Message this(%v) Not Equal that(%v)", this.Message, that1.Message)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *ShutdownMessage) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ShutdownMessage)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Message != nil && that1.Message != nil {
+		if *this.Message != *that1.Message {
+			return false
+		}
+	} else if this.Message != nil {
+		return false
+	} else if that1.Message != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Archive) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Archive)
+	if !ok {
+		return fmt.Errorf("that is not of type *Archive")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Archive but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Archivebut is not nil && this == nil")
+	}
+	if len(this.Frameworks) != len(that1.Frameworks) {
+		return fmt.Errorf("Frameworks this(%v) Not Equal that(%v)", len(this.Frameworks), len(that1.Frameworks))
+	}
+	for i := range this.Frameworks {
+		if !this.Frameworks[i].Equal(that1.Frameworks[i]) {
+			return fmt.Errorf("Frameworks this[%v](%v) Not Equal that[%v](%v)", i, this.Frameworks[i], i, that1.Frameworks[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *Archive) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Archive)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if len(this.Frameworks) != len(that1.Frameworks) {
+		return false
+	}
+	for i := range this.Frameworks {
+		if !this.Frameworks[i].Equal(that1.Frameworks[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Archive_Framework) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*Archive_Framework)
+	if !ok {
+		return fmt.Errorf("that is not of type *Archive_Framework")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *Archive_Framework but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *Archive_Frameworkbut is not nil && this == nil")
+	}
+	if !this.FrameworkInfo.Equal(that1.FrameworkInfo) {
+		return fmt.Errorf("FrameworkInfo this(%v) Not Equal that(%v)", this.FrameworkInfo, that1.FrameworkInfo)
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return fmt.Errorf("Pid this(%v) Not Equal that(%v)", *this.Pid, *that1.Pid)
+		}
+	} else if this.Pid != nil {
+		return fmt.Errorf("this.Pid == nil && that.Pid != nil")
+	} else if that1.Pid != nil {
+		return fmt.Errorf("Pid this(%v) Not Equal that(%v)", this.Pid, that1.Pid)
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return fmt.Errorf("Tasks this(%v) Not Equal that(%v)", len(this.Tasks), len(that1.Tasks))
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return fmt.Errorf("Tasks this[%v](%v) Not Equal that[%v](%v)", i, this.Tasks[i], i, that1.Tasks[i])
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *Archive_Framework) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*Archive_Framework)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.FrameworkInfo.Equal(that1.FrameworkInfo) {
+		return false
+	}
+	if this.Pid != nil && that1.Pid != nil {
+		if *this.Pid != *that1.Pid {
+			return false
+		}
+	} else if this.Pid != nil {
+		return false
+	} else if that1.Pid != nil {
+		return false
+	}
+	if len(this.Tasks) != len(that1.Tasks) {
+		return false
+	}
+	for i := range this.Tasks {
+		if !this.Tasks[i].Equal(that1.Tasks[i]) {
+			return false
+		}
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *TaskHealthStatus) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*TaskHealthStatus)
+	if !ok {
+		return fmt.Errorf("that is not of type *TaskHealthStatus")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *TaskHealthStatus but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *TaskHealthStatusbut is not nil && this == nil")
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return fmt.Errorf("TaskId this(%v) Not Equal that(%v)", this.TaskId, that1.TaskId)
+	}
+	if this.Healthy != nil && that1.Healthy != nil {
+		if *this.Healthy != *that1.Healthy {
+			return fmt.Errorf("Healthy this(%v) Not Equal that(%v)", *this.Healthy, *that1.Healthy)
+		}
+	} else if this.Healthy != nil {
+		return fmt.Errorf("this.Healthy == nil && that.Healthy != nil")
+	} else if that1.Healthy != nil {
+		return fmt.Errorf("Healthy this(%v) Not Equal that(%v)", this.Healthy, that1.Healthy)
+	}
+	if this.KillTask != nil && that1.KillTask != nil {
+		if *this.KillTask != *that1.KillTask {
+			return fmt.Errorf("KillTask this(%v) Not Equal that(%v)", *this.KillTask, *that1.KillTask)
+		}
+	} else if this.KillTask != nil {
+		return fmt.Errorf("this.KillTask == nil && that.KillTask != nil")
+	} else if that1.KillTask != nil {
+		return fmt.Errorf("KillTask this(%v) Not Equal that(%v)", this.KillTask, that1.KillTask)
+	}
+	if this.ConsecutiveFailures != nil && that1.ConsecutiveFailures != nil {
+		if *this.ConsecutiveFailures != *that1.ConsecutiveFailures {
+			return fmt.Errorf("ConsecutiveFailures this(%v) Not Equal that(%v)", *this.ConsecutiveFailures, *that1.ConsecutiveFailures)
+		}
+	} else if this.ConsecutiveFailures != nil {
+		return fmt.Errorf("this.ConsecutiveFailures == nil && that.ConsecutiveFailures != nil")
+	} else if that1.ConsecutiveFailures != nil {
+		return fmt.Errorf("ConsecutiveFailures this(%v) Not Equal that(%v)", this.ConsecutiveFailures, that1.ConsecutiveFailures)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *TaskHealthStatus) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*TaskHealthStatus)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if !this.TaskId.Equal(that1.TaskId) {
+		return false
+	}
+	if this.Healthy != nil && that1.Healthy != nil {
+		if *this.Healthy != *that1.Healthy {
+			return false
+		}
+	} else if this.Healthy != nil {
+		return false
+	} else if that1.Healthy != nil {
+		return false
+	}
+	if this.KillTask != nil && that1.KillTask != nil {
+		if *this.KillTask != *that1.KillTask {
+			return false
+		}
+	} else if this.KillTask != nil {
+		return false
+	} else if that1.KillTask != nil {
+		return false
+	}
+	if this.ConsecutiveFailures != nil && that1.ConsecutiveFailures != nil {
+		if *this.ConsecutiveFailures != *that1.ConsecutiveFailures {
+			return false
+		}
+	} else if this.ConsecutiveFailures != nil {
+		return false
+	} else if that1.ConsecutiveFailures != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *HookExecuted) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*HookExecuted)
+	if !ok {
+		return fmt.Errorf("that is not of type *HookExecuted")
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *HookExecuted but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *HookExecutedbut is not nil && this == nil")
+	}
+	if this.Module != nil && that1.Module != nil {
+		if *this.Module != *that1.Module {
+			return fmt.Errorf("Module this(%v) Not Equal that(%v)", *this.Module, *that1.Module)
+		}
+	} else if this.Module != nil {
+		return fmt.Errorf("this.Module == nil && that.Module != nil")
+	} else if that1.Module != nil {
+		return fmt.Errorf("Module this(%v) Not Equal that(%v)", this.Module, that1.Module)
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return fmt.Errorf("XXX_unrecognized this(%v) Not Equal that(%v)", this.XXX_unrecognized, that1.XXX_unrecognized)
+	}
+	return nil
+}
+func (this *HookExecuted) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*HookExecuted)
+	if !ok {
+		return false
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Module != nil && that1.Module != nil {
+		if *this.Module != *that1.Module {
+			return false
+		}
+	} else if this.Module != nil {
+		return false
+	} else if that1.Module != nil {
+		return false
+	}
+	if !bytes.Equal(this.XXX_unrecognized, that1.XXX_unrecognized) {
+		return false
+	}
+	return true
+}
+func (this *Task) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 16)
+	s = append(s, "&mesosproto.Task{")
+	if this.Name != nil {
+		s = append(s, "Name: "+valueToGoStringMessages(this.Name, "string")+",\n")
+	}
+	if this.TaskId != nil {
+		s = append(s, "TaskId: "+fmt.Sprintf("%#v", this.TaskId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.State != nil {
+		s = append(s, "State: "+valueToGoStringMessages(this.State, "mesosproto.TaskState")+",\n")
+	}
+	if this.Resources != nil {
+		s = append(s, "Resources: "+fmt.Sprintf("%#v", this.Resources)+",\n")
+	}
+	if this.Statuses != nil {
+		s = append(s, "Statuses: "+fmt.Sprintf("%#v", this.Statuses)+",\n")
+	}
+	if this.StatusUpdateState != nil {
+		s = append(s, "StatusUpdateState: "+valueToGoStringMessages(this.StatusUpdateState, "mesosproto.TaskState")+",\n")
+	}
+	if this.StatusUpdateUuid != nil {
+		s = append(s, "StatusUpdateUuid: "+valueToGoStringMessages(this.StatusUpdateUuid, "byte")+",\n")
+	}
+	if this.Labels != nil {
+		s = append(s, "Labels: "+fmt.Sprintf("%#v", this.Labels)+",\n")
+	}
+	if this.Discovery != nil {
+		s = append(s, "Discovery: "+fmt.Sprintf("%#v", this.Discovery)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *StatusUpdate) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 11)
+	s = append(s, "&mesosproto.StatusUpdate{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.Status != nil {
+		s = append(s, "Status: "+fmt.Sprintf("%#v", this.Status)+",\n")
+	}
+	if this.Timestamp != nil {
+		s = append(s, "Timestamp: "+valueToGoStringMessages(this.Timestamp, "float64")+",\n")
+	}
+	if this.Uuid != nil {
+		s = append(s, "Uuid: "+valueToGoStringMessages(this.Uuid, "byte")+",\n")
+	}
+	if this.LatestState != nil {
+		s = append(s, "LatestState: "+valueToGoStringMessages(this.LatestState, "mesosproto.TaskState")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *StatusUpdateRecord) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.StatusUpdateRecord{")
+	if this.Type != nil {
+		s = append(s, "Type: "+valueToGoStringMessages(this.Type, "mesosproto.StatusUpdateRecord_Type")+",\n")
+	}
+	if this.Update != nil {
+		s = append(s, "Update: "+fmt.Sprintf("%#v", this.Update)+",\n")
+	}
+	if this.Uuid != nil {
+		s = append(s, "Uuid: "+valueToGoStringMessages(this.Uuid, "byte")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *SubmitSchedulerRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.SubmitSchedulerRequest{")
+	if this.Name != nil {
+		s = append(s, "Name: "+valueToGoStringMessages(this.Name, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *SubmitSchedulerResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.SubmitSchedulerResponse{")
+	if this.Okay != nil {
+		s = append(s, "Okay: "+valueToGoStringMessages(this.Okay, "bool")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ExecutorToFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.ExecutorToFrameworkMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.Data != nil {
+		s = append(s, "Data: "+valueToGoStringMessages(this.Data, "byte")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *FrameworkToExecutorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.FrameworkToExecutorMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.Data != nil {
+		s = append(s, "Data: "+valueToGoStringMessages(this.Data, "byte")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RegisterFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.RegisterFrameworkMessage{")
+	if this.Framework != nil {
+		s = append(s, "Framework: "+fmt.Sprintf("%#v", this.Framework)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReregisterFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.ReregisterFrameworkMessage{")
+	if this.Framework != nil {
+		s = append(s, "Framework: "+fmt.Sprintf("%#v", this.Framework)+",\n")
+	}
+	if this.Failover != nil {
+		s = append(s, "Failover: "+valueToGoStringMessages(this.Failover, "bool")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *FrameworkRegisteredMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.FrameworkRegisteredMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.MasterInfo != nil {
+		s = append(s, "MasterInfo: "+fmt.Sprintf("%#v", this.MasterInfo)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *FrameworkReregisteredMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.FrameworkReregisteredMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.MasterInfo != nil {
+		s = append(s, "MasterInfo: "+fmt.Sprintf("%#v", this.MasterInfo)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *UnregisterFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.UnregisterFrameworkMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *DeactivateFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.DeactivateFrameworkMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ResourceRequestMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.ResourceRequestMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.Requests != nil {
+		s = append(s, "Requests: "+fmt.Sprintf("%#v", this.Requests)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ResourceOffersMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.ResourceOffersMessage{")
+	if this.Offers != nil {
+		s = append(s, "Offers: "+fmt.Sprintf("%#v", this.Offers)+",\n")
+	}
+	if this.Pids != nil {
+		s = append(s, "Pids: "+fmt.Sprintf("%#v", this.Pids)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *LaunchTasksMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.LaunchTasksMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.Tasks != nil {
+		s = append(s, "Tasks: "+fmt.Sprintf("%#v", this.Tasks)+",\n")
+	}
+	if this.Filters != nil {
+		s = append(s, "Filters: "+fmt.Sprintf("%#v", this.Filters)+",\n")
+	}
+	if this.OfferIds != nil {
+		s = append(s, "OfferIds: "+fmt.Sprintf("%#v", this.OfferIds)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RescindResourceOfferMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.RescindResourceOfferMessage{")
+	if this.OfferId != nil {
+		s = append(s, "OfferId: "+fmt.Sprintf("%#v", this.OfferId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReviveOffersMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.ReviveOffersMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RunTaskMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.RunTaskMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.Framework != nil {
+		s = append(s, "Framework: "+fmt.Sprintf("%#v", this.Framework)+",\n")
+	}
+	if this.Task != nil {
+		s = append(s, "Task: "+fmt.Sprintf("%#v", this.Task)+",\n")
+	}
+	if this.Pid != nil {
+		s = append(s, "Pid: "+valueToGoStringMessages(this.Pid, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *KillTaskMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.KillTaskMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.TaskId != nil {
+		s = append(s, "TaskId: "+fmt.Sprintf("%#v", this.TaskId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *StatusUpdateMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.StatusUpdateMessage{")
+	if this.Update != nil {
+		s = append(s, "Update: "+fmt.Sprintf("%#v", this.Update)+",\n")
+	}
+	if this.Pid != nil {
+		s = append(s, "Pid: "+valueToGoStringMessages(this.Pid, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *StatusUpdateAcknowledgementMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.StatusUpdateAcknowledgementMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.TaskId != nil {
+		s = append(s, "TaskId: "+fmt.Sprintf("%#v", this.TaskId)+",\n")
+	}
+	if this.Uuid != nil {
+		s = append(s, "Uuid: "+valueToGoStringMessages(this.Uuid, "byte")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *LostSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.LostSlaveMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReconcileTasksMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.ReconcileTasksMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.Statuses != nil {
+		s = append(s, "Statuses: "+fmt.Sprintf("%#v", this.Statuses)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *FrameworkErrorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.FrameworkErrorMessage{")
+	if this.Message != nil {
+		s = append(s, "Message: "+valueToGoStringMessages(this.Message, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RegisterSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.RegisterSlaveMessage{")
+	if this.Slave != nil {
+		s = append(s, "Slave: "+fmt.Sprintf("%#v", this.Slave)+",\n")
+	}
+	if this.CheckpointedResources != nil {
+		s = append(s, "CheckpointedResources: "+fmt.Sprintf("%#v", this.CheckpointedResources)+",\n")
+	}
+	if this.Version != nil {
+		s = append(s, "Version: "+valueToGoStringMessages(this.Version, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReregisterSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&mesosproto.ReregisterSlaveMessage{")
+	if this.Slave != nil {
+		s = append(s, "Slave: "+fmt.Sprintf("%#v", this.Slave)+",\n")
+	}
+	if this.CheckpointedResources != nil {
+		s = append(s, "CheckpointedResources: "+fmt.Sprintf("%#v", this.CheckpointedResources)+",\n")
+	}
+	if this.ExecutorInfos != nil {
+		s = append(s, "ExecutorInfos: "+fmt.Sprintf("%#v", this.ExecutorInfos)+",\n")
+	}
+	if this.Tasks != nil {
+		s = append(s, "Tasks: "+fmt.Sprintf("%#v", this.Tasks)+",\n")
+	}
+	if this.CompletedFrameworks != nil {
+		s = append(s, "CompletedFrameworks: "+fmt.Sprintf("%#v", this.CompletedFrameworks)+",\n")
+	}
+	if this.Version != nil {
+		s = append(s, "Version: "+valueToGoStringMessages(this.Version, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *SlaveRegisteredMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.SlaveRegisteredMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.Connection != nil {
+		s = append(s, "Connection: "+fmt.Sprintf("%#v", this.Connection)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *SlaveReregisteredMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.SlaveReregisteredMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.Reconciliations != nil {
+		s = append(s, "Reconciliations: "+fmt.Sprintf("%#v", this.Reconciliations)+",\n")
+	}
+	if this.Connection != nil {
+		s = append(s, "Connection: "+fmt.Sprintf("%#v", this.Connection)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *UnregisterSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.UnregisterSlaveMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *MasterSlaveConnection) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.MasterSlaveConnection{")
+	if this.TotalPingTimeoutSeconds != nil {
+		s = append(s, "TotalPingTimeoutSeconds: "+valueToGoStringMessages(this.TotalPingTimeoutSeconds, "float64")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PingSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.PingSlaveMessage{")
+	if this.Connected != nil {
+		s = append(s, "Connected: "+valueToGoStringMessages(this.Connected, "bool")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PongSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 4)
+	s = append(s, "&mesosproto.PongSlaveMessage{")
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ShutdownFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.ShutdownFrameworkMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ShutdownExecutorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.ShutdownExecutorMessage{")
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *UpdateFrameworkMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.UpdateFrameworkMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.Pid != nil {
+		s = append(s, "Pid: "+valueToGoStringMessages(this.Pid, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *CheckpointResourcesMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.CheckpointResourcesMessage{")
+	if this.Resources != nil {
+		s = append(s, "Resources: "+fmt.Sprintf("%#v", this.Resources)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *UpdateSlaveMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.UpdateSlaveMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.OversubscribedResources != nil {
+		s = append(s, "OversubscribedResources: "+fmt.Sprintf("%#v", this.OversubscribedResources)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RegisterExecutorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.RegisterExecutorMessage{")
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ExecutorRegisteredMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 9)
+	s = append(s, "&mesosproto.ExecutorRegisteredMessage{")
+	if this.ExecutorInfo != nil {
+		s = append(s, "ExecutorInfo: "+fmt.Sprintf("%#v", this.ExecutorInfo)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.FrameworkInfo != nil {
+		s = append(s, "FrameworkInfo: "+fmt.Sprintf("%#v", this.FrameworkInfo)+",\n")
+	}
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.SlaveInfo != nil {
+		s = append(s, "SlaveInfo: "+fmt.Sprintf("%#v", this.SlaveInfo)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ExecutorReregisteredMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&mesosproto.ExecutorReregisteredMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.SlaveInfo != nil {
+		s = append(s, "SlaveInfo: "+fmt.Sprintf("%#v", this.SlaveInfo)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ExitedExecutorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.ExitedExecutorMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.Status != nil {
+		s = append(s, "Status: "+valueToGoStringMessages(this.Status, "int32")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReconnectExecutorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.ReconnectExecutorMessage{")
+	if this.SlaveId != nil {
+		s = append(s, "SlaveId: "+fmt.Sprintf("%#v", this.SlaveId)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReregisterExecutorMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.ReregisterExecutorMessage{")
+	if this.ExecutorId != nil {
+		s = append(s, "ExecutorId: "+fmt.Sprintf("%#v", this.ExecutorId)+",\n")
+	}
+	if this.FrameworkId != nil {
+		s = append(s, "FrameworkId: "+fmt.Sprintf("%#v", this.FrameworkId)+",\n")
+	}
+	if this.Tasks != nil {
+		s = append(s, "Tasks: "+fmt.Sprintf("%#v", this.Tasks)+",\n")
+	}
+	if this.Updates != nil {
+		s = append(s, "Updates: "+fmt.Sprintf("%#v", this.Updates)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ShutdownMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.ShutdownMessage{")
+	if this.Message != nil {
+		s = append(s, "Message: "+valueToGoStringMessages(this.Message, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Archive) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.Archive{")
+	if this.Frameworks != nil {
+		s = append(s, "Frameworks: "+fmt.Sprintf("%#v", this.Frameworks)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Archive_Framework) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&mesosproto.Archive_Framework{")
+	if this.FrameworkInfo != nil {
+		s = append(s, "FrameworkInfo: "+fmt.Sprintf("%#v", this.FrameworkInfo)+",\n")
+	}
+	if this.Pid != nil {
+		s = append(s, "Pid: "+valueToGoStringMessages(this.Pid, "string")+",\n")
+	}
+	if this.Tasks != nil {
+		s = append(s, "Tasks: "+fmt.Sprintf("%#v", this.Tasks)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *TaskHealthStatus) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&mesosproto.TaskHealthStatus{")
+	if this.TaskId != nil {
+		s = append(s, "TaskId: "+fmt.Sprintf("%#v", this.TaskId)+",\n")
+	}
+	if this.Healthy != nil {
+		s = append(s, "Healthy: "+valueToGoStringMessages(this.Healthy, "bool")+",\n")
+	}
+	if this.KillTask != nil {
+		s = append(s, "KillTask: "+valueToGoStringMessages(this.KillTask, "bool")+",\n")
+	}
+	if this.ConsecutiveFailures != nil {
+		s = append(s, "ConsecutiveFailures: "+valueToGoStringMessages(this.ConsecutiveFailures, "int32")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *HookExecuted) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&mesosproto.HookExecuted{")
+	if this.Module != nil {
+		s = append(s, "Module: "+valueToGoStringMessages(this.Module, "string")+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func valueToGoStringMessages(v interface{}, typ string) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
+}
+func extensionToGoStringMessages(e map[int32]github_com_gogo_protobuf_proto.Extension) string {
+	if e == nil {
+		return "nil"
+	}
+	s := "map[int32]proto.Extension{"
+	keys := make([]int, 0, len(e))
+	for k := range e {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	ss := []string{}
+	for _, k := range keys {
+		ss = append(ss, strconv.Itoa(k)+": "+e[int32(k)].GoString())
+	}
+	s += strings.Join(ss, ",") + "}"
+	return s
+}
+func (m *Task) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Task) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Name == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Name)))
+		i += copy(data[i:], *m.Name)
+	}
+	if m.TaskId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.TaskId.Size()))
+		n1, err := m.TaskId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n2, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
+	if m.ExecutorId != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n3, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n3
+	}
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0x2a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n4, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n4
+	}
+	if m.State == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("state")
+	} else {
+		data[i] = 0x30
+		i++
+		i = encodeVarintMessages(data, i, uint64(*m.State))
+	}
+	if len(m.Resources) > 0 {
+		for _, msg := range m.Resources {
+			data[i] = 0x3a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.Statuses) > 0 {
+		for _, msg := range m.Statuses {
+			data[i] = 0x42
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.StatusUpdateState != nil {
+		data[i] = 0x48
+		i++
+		i = encodeVarintMessages(data, i, uint64(*m.StatusUpdateState))
+	}
+	if m.StatusUpdateUuid != nil {
+		data[i] = 0x52
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(m.StatusUpdateUuid)))
+		i += copy(data[i:], m.StatusUpdateUuid)
+	}
+	if m.Labels != nil {
+		data[i] = 0x5a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Labels.Size()))
+		n5, err := m.Labels.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	if m.Discovery != nil {
+		data[i] = 0x62
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Discovery.Size()))
+		n6, err := m.Discovery.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n6
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *StatusUpdate) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *StatusUpdate) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n7, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n7
+	}
+	if m.ExecutorId != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n8, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n8
+	}
+	if m.SlaveId != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n9, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n9
+	}
+	if m.Status == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Status.Size()))
+		n10, err := m.Status.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n10
+	}
+	if m.Timestamp == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("timestamp")
+	} else {
+		data[i] = 0x29
+		i++
+		i = encodeFixed64Messages(data, i, uint64(math.Float64bits(*m.Timestamp)))
+	}
+	if m.Uuid != nil {
+		data[i] = 0x32
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(m.Uuid)))
+		i += copy(data[i:], m.Uuid)
+	}
+	if m.LatestState != nil {
+		data[i] = 0x38
+		i++
+		i = encodeVarintMessages(data, i, uint64(*m.LatestState))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *StatusUpdateRecord) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *StatusUpdateRecord) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Type == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
+	} else {
+		data[i] = 0x8
+		i++
+		i = encodeVarintMessages(data, i, uint64(*m.Type))
+	}
+	if m.Update != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Update.Size()))
+		n11, err := m.Update.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n11
+	}
+	if m.Uuid != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(m.Uuid)))
+		i += copy(data[i:], m.Uuid)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *SubmitSchedulerRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *SubmitSchedulerRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Name == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Name)))
+		i += copy(data[i:], *m.Name)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *SubmitSchedulerResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *SubmitSchedulerResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Okay == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("okay")
+	} else {
+		data[i] = 0x8
+		i++
+		if *m.Okay {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ExecutorToFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ExecutorToFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n12, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n12
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n13, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n13
+	}
+	if m.ExecutorId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n14, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n14
+	}
+	if m.Data == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("data")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(m.Data)))
+		i += copy(data[i:], m.Data)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *FrameworkToExecutorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *FrameworkToExecutorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n15, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n15
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n16, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n16
+	}
+	if m.ExecutorId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n17, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n17
+	}
+	if m.Data == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("data")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(m.Data)))
+		i += copy(data[i:], m.Data)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RegisterFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RegisterFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Framework == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Framework.Size()))
+		n18, err := m.Framework.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n18
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ReregisterFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ReregisterFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Framework == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Framework.Size()))
+		n19, err := m.Framework.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n19
+	}
+	if m.Failover == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("failover")
+	} else {
+		data[i] = 0x18
+		i++
+		if *m.Failover {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *FrameworkRegisteredMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *FrameworkRegisteredMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n20, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n20
+	}
+	if m.MasterInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("master_info")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.MasterInfo.Size()))
+		n21, err := m.MasterInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n21
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *FrameworkReregisteredMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *FrameworkReregisteredMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n22, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n22
+	}
+	if m.MasterInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("master_info")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.MasterInfo.Size()))
+		n23, err := m.MasterInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n23
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *UnregisterFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *UnregisterFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n24, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n24
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *DeactivateFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *DeactivateFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n25, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n25
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ResourceRequestMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ResourceRequestMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n26, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n26
+	}
+	if len(m.Requests) > 0 {
+		for _, msg := range m.Requests {
+			data[i] = 0x12
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ResourceOffersMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ResourceOffersMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Offers) > 0 {
+		for _, msg := range m.Offers {
+			data[i] = 0xa
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.Pids) > 0 {
+		for _, s := range m.Pids {
+			data[i] = 0x12
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			data[i] = uint8(l)
+			i++
+			i += copy(data[i:], s)
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *LaunchTasksMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *LaunchTasksMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n27, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n27
+	}
+	if len(m.Tasks) > 0 {
+		for _, msg := range m.Tasks {
+			data[i] = 0x1a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.Filters == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("filters")
+	} else {
+		data[i] = 0x2a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Filters.Size()))
+		n28, err := m.Filters.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n28
+	}
+	if len(m.OfferIds) > 0 {
+		for _, msg := range m.OfferIds {
+			data[i] = 0x32
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RescindResourceOfferMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RescindResourceOfferMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.OfferId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("offer_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.OfferId.Size()))
+		n29, err := m.OfferId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n29
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ReviveOffersMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ReviveOffersMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n30, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n30
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RunTaskMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RunTaskMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n31, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n31
+	}
+	if m.Framework == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Framework.Size()))
+		n32, err := m.Framework.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n32
+	}
+	if m.Pid != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Pid)))
+		i += copy(data[i:], *m.Pid)
+	}
+	if m.Task == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("task")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Task.Size()))
+		n33, err := m.Task.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n33
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *KillTaskMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *KillTaskMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n34, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n34
+	}
+	if m.TaskId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.TaskId.Size()))
+		n35, err := m.TaskId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n35
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *StatusUpdateMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *StatusUpdateMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Update == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("update")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Update.Size()))
+		n36, err := m.Update.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n36
+	}
+	if m.Pid != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Pid)))
+		i += copy(data[i:], *m.Pid)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *StatusUpdateAcknowledgementMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *StatusUpdateAcknowledgementMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n37, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n37
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n38, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n38
+	}
+	if m.TaskId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.TaskId.Size()))
+		n39, err := m.TaskId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n39
+	}
+	if m.Uuid == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("uuid")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(m.Uuid)))
+		i += copy(data[i:], m.Uuid)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *LostSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *LostSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n40, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n40
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ReconcileTasksMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ReconcileTasksMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n41, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n41
+	}
+	if len(m.Statuses) > 0 {
+		for _, msg := range m.Statuses {
+			data[i] = 0x12
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *FrameworkErrorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *FrameworkErrorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Message == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("message")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Message)))
+		i += copy(data[i:], *m.Message)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RegisterSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RegisterSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Slave == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Slave.Size()))
+		n42, err := m.Slave.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n42
+	}
+	if m.Version != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Version)))
+		i += copy(data[i:], *m.Version)
+	}
+	if len(m.CheckpointedResources) > 0 {
+		for _, msg := range m.CheckpointedResources {
+			data[i] = 0x1a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ReregisterSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ReregisterSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Slave == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Slave.Size()))
+		n43, err := m.Slave.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n43
+	}
+	if len(m.Tasks) > 0 {
+		for _, msg := range m.Tasks {
+			data[i] = 0x1a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.ExecutorInfos) > 0 {
+		for _, msg := range m.ExecutorInfos {
+			data[i] = 0x22
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.CompletedFrameworks) > 0 {
+		for _, msg := range m.CompletedFrameworks {
+			data[i] = 0x2a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.Version != nil {
+		data[i] = 0x32
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Version)))
+		i += copy(data[i:], *m.Version)
+	}
+	if len(m.CheckpointedResources) > 0 {
+		for _, msg := range m.CheckpointedResources {
+			data[i] = 0x3a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *SlaveRegisteredMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *SlaveRegisteredMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n44, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n44
+	}
+	if m.Connection != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Connection.Size()))
+		n45, err := m.Connection.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n45
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *SlaveReregisteredMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *SlaveReregisteredMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n46, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n46
+	}
+	if len(m.Reconciliations) > 0 {
+		for _, msg := range m.Reconciliations {
+			data[i] = 0x12
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.Connection != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.Connection.Size()))
+		n47, err := m.Connection.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n47
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *UnregisterSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *UnregisterSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n48, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n48
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *MasterSlaveConnection) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *MasterSlaveConnection) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.TotalPingTimeoutSeconds != nil {
+		data[i] = 0x9
+		i++
+		i = encodeFixed64Messages(data, i, uint64(math.Float64bits(*m.TotalPingTimeoutSeconds)))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *PingSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PingSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Connected == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("connected")
+	} else {
+		data[i] = 0x8
+		i++
+		if *m.Connected {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *PongSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PongSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ShutdownFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ShutdownFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n49, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n49
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ShutdownExecutorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ShutdownExecutorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.ExecutorId != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n50, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n50
+	}
+	if m.FrameworkId != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n51, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n51
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *UpdateFrameworkMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *UpdateFrameworkMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n52, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n52
+	}
+	if m.Pid != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Pid)))
+		i += copy(data[i:], *m.Pid)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *CheckpointResourcesMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *CheckpointResourcesMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Resources) > 0 {
+		for _, msg := range m.Resources {
+			data[i] = 0xa
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *UpdateSlaveMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *UpdateSlaveMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n53, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n53
+	}
+	if len(m.OversubscribedResources) > 0 {
+		for _, msg := range m.OversubscribedResources {
+			data[i] = 0x12
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *RegisterExecutorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RegisterExecutorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n54, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n54
+	}
+	if m.ExecutorId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n55, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n55
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ExecutorRegisteredMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ExecutorRegisteredMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.ExecutorInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_info")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorInfo.Size()))
+		n56, err := m.ExecutorInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n56
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n57, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n57
+	}
+	if m.FrameworkInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_info")
+	} else {
+		data[i] = 0x22
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkInfo.Size()))
+		n58, err := m.FrameworkInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n58
+	}
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0x2a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n59, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n59
+	}
+	if m.SlaveInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_info")
+	} else {
+		data[i] = 0x32
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveInfo.Size()))
+		n60, err := m.SlaveInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n60
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ExecutorReregisteredMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ExecutorReregisteredMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n61, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n61
+	}
+	if m.SlaveInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_info")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveInfo.Size()))
+		n62, err := m.SlaveInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n62
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ExitedExecutorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ExitedExecutorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n63, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n63
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n64, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n64
+	}
+	if m.ExecutorId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	} else {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n65, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n65
+	}
+	if m.Status == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	} else {
+		data[i] = 0x20
+		i++
+		i = encodeVarintMessages(data, i, uint64(*m.Status))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ReconnectExecutorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ReconnectExecutorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SlaveId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.SlaveId.Size()))
+		n66, err := m.SlaveId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n66
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ReregisterExecutorMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ReregisterExecutorMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.ExecutorId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.ExecutorId.Size()))
+		n67, err := m.ExecutorId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n67
+	}
+	if m.FrameworkId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	} else {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkId.Size()))
+		n68, err := m.FrameworkId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n68
+	}
+	if len(m.Tasks) > 0 {
+		for _, msg := range m.Tasks {
+			data[i] = 0x1a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.Updates) > 0 {
+		for _, msg := range m.Updates {
+			data[i] = 0x22
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *ShutdownMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ShutdownMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Message != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Message)))
+		i += copy(data[i:], *m.Message)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Archive) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Archive) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Frameworks) > 0 {
+		for _, msg := range m.Frameworks {
+			data[i] = 0xa
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *Archive_Framework) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Archive_Framework) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.FrameworkInfo == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_info")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.FrameworkInfo.Size()))
+		n69, err := m.FrameworkInfo.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n69
+	}
+	if m.Pid != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Pid)))
+		i += copy(data[i:], *m.Pid)
+	}
+	if len(m.Tasks) > 0 {
+		for _, msg := range m.Tasks {
+			data[i] = 0x1a
+			i++
+			i = encodeVarintMessages(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *TaskHealthStatus) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *TaskHealthStatus) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.TaskId == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	} else {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(m.TaskId.Size()))
+		n70, err := m.TaskId.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n70
+	}
+	if m.Healthy == nil {
+		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("healthy")
+	} else {
+		data[i] = 0x10
+		i++
+		if *m.Healthy {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.KillTask != nil {
+		data[i] = 0x18
+		i++
+		if *m.KillTask {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	if m.ConsecutiveFailures != nil {
+		data[i] = 0x20
+		i++
+		i = encodeVarintMessages(data, i, uint64(*m.ConsecutiveFailures))
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *HookExecuted) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *HookExecuted) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Module != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintMessages(data, i, uint64(len(*m.Module)))
+		i += copy(data[i:], *m.Module)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(data[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func encodeFixed64Messages(data []byte, offset int, v uint64) int {
+	data[offset] = uint8(v)
+	data[offset+1] = uint8(v >> 8)
+	data[offset+2] = uint8(v >> 16)
+	data[offset+3] = uint8(v >> 24)
+	data[offset+4] = uint8(v >> 32)
+	data[offset+5] = uint8(v >> 40)
+	data[offset+6] = uint8(v >> 48)
+	data[offset+7] = uint8(v >> 56)
+	return offset + 8
+}
+func encodeFixed32Messages(data []byte, offset int, v uint32) int {
+	data[offset] = uint8(v)
+	data[offset+1] = uint8(v >> 8)
+	data[offset+2] = uint8(v >> 16)
+	data[offset+3] = uint8(v >> 24)
+	return offset + 4
+}
+func encodeVarintMessages(data []byte, offset int, v uint64) int {
+	for v >= 1<<7 {
+		data[offset] = uint8(v&0x7f | 0x80)
+		v >>= 7
+		offset++
+	}
+	data[offset] = uint8(v)
+	return offset + 1
+}
+func NewPopulatedTask(r randyMessages, easy bool) *Task {
+	this := &Task{}
+	v1 := randStringMessages(r)
+	this.Name = &v1
+	this.TaskId = NewPopulatedTaskID(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	v2 := TaskState([]int32{6, 0, 1, 2, 3, 4, 5, 7}[r.Intn(8)])
+	this.State = &v2
+	if r.Intn(10) != 0 {
+		v3 := r.Intn(10)
+		this.Resources = make([]*Resource, v3)
+		for i := 0; i < v3; i++ {
+			this.Resources[i] = NewPopulatedResource(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v4 := r.Intn(10)
+		this.Statuses = make([]*TaskStatus, v4)
+		for i := 0; i < v4; i++ {
+			this.Statuses[i] = NewPopulatedTaskStatus(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v5 := TaskState([]int32{6, 0, 1, 2, 3, 4, 5, 7}[r.Intn(8)])
+		this.StatusUpdateState = &v5
+	}
+	if r.Intn(10) != 0 {
+		v6 := r.Intn(100)
+		this.StatusUpdateUuid = make([]byte, v6)
+		for i := 0; i < v6; i++ {
+			this.StatusUpdateUuid[i] = byte(r.Intn(256))
+		}
+	}
+	if r.Intn(10) != 0 {
+		this.Labels = NewPopulatedLabels(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.Discovery = NewPopulatedDiscoveryInfo(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 13)
+	}
+	return this
+}
+
+func NewPopulatedStatusUpdate(r randyMessages, easy bool) *StatusUpdate {
+	this := &StatusUpdate{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.SlaveId = NewPopulatedSlaveID(r, easy)
+	}
+	this.Status = NewPopulatedTaskStatus(r, easy)
+	v7 := float64(r.Float64())
+	if r.Intn(2) == 0 {
+		v7 *= -1
+	}
+	this.Timestamp = &v7
+	if r.Intn(10) != 0 {
+		v8 := r.Intn(100)
+		this.Uuid = make([]byte, v8)
+		for i := 0; i < v8; i++ {
+			this.Uuid[i] = byte(r.Intn(256))
+		}
+	}
+	if r.Intn(10) != 0 {
+		v9 := TaskState([]int32{6, 0, 1, 2, 3, 4, 5, 7}[r.Intn(8)])
+		this.LatestState = &v9
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 8)
+	}
+	return this
+}
+
+func NewPopulatedStatusUpdateRecord(r randyMessages, easy bool) *StatusUpdateRecord {
+	this := &StatusUpdateRecord{}
+	v10 := StatusUpdateRecord_Type([]int32{0, 1}[r.Intn(2)])
+	this.Type = &v10
+	if r.Intn(10) != 0 {
+		this.Update = NewPopulatedStatusUpdate(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		v11 := r.Intn(100)
+		this.Uuid = make([]byte, v11)
+		for i := 0; i < v11; i++ {
+			this.Uuid[i] = byte(r.Intn(256))
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 4)
+	}
+	return this
+}
+
+func NewPopulatedSubmitSchedulerRequest(r randyMessages, easy bool) *SubmitSchedulerRequest {
+	this := &SubmitSchedulerRequest{}
+	v12 := randStringMessages(r)
+	this.Name = &v12
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedSubmitSchedulerResponse(r randyMessages, easy bool) *SubmitSchedulerResponse {
+	this := &SubmitSchedulerResponse{}
+	v13 := bool(bool(r.Intn(2) == 0))
+	this.Okay = &v13
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedExecutorToFrameworkMessage(r randyMessages, easy bool) *ExecutorToFrameworkMessage {
+	this := &ExecutorToFrameworkMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	v14 := r.Intn(100)
+	this.Data = make([]byte, v14)
+	for i := 0; i < v14; i++ {
+		this.Data[i] = byte(r.Intn(256))
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedFrameworkToExecutorMessage(r randyMessages, easy bool) *FrameworkToExecutorMessage {
+	this := &FrameworkToExecutorMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	v15 := r.Intn(100)
+	this.Data = make([]byte, v15)
+	for i := 0; i < v15; i++ {
+		this.Data[i] = byte(r.Intn(256))
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedRegisterFrameworkMessage(r randyMessages, easy bool) *RegisterFrameworkMessage {
+	this := &RegisterFrameworkMessage{}
+	this.Framework = NewPopulatedFrameworkInfo(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedReregisterFrameworkMessage(r randyMessages, easy bool) *ReregisterFrameworkMessage {
+	this := &ReregisterFrameworkMessage{}
+	this.Framework = NewPopulatedFrameworkInfo(r, easy)
+	v16 := bool(bool(r.Intn(2) == 0))
+	this.Failover = &v16
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 4)
+	}
+	return this
+}
+
+func NewPopulatedFrameworkRegisteredMessage(r randyMessages, easy bool) *FrameworkRegisteredMessage {
+	this := &FrameworkRegisteredMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.MasterInfo = NewPopulatedMasterInfo(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedFrameworkReregisteredMessage(r randyMessages, easy bool) *FrameworkReregisteredMessage {
+	this := &FrameworkReregisteredMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.MasterInfo = NewPopulatedMasterInfo(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedUnregisterFrameworkMessage(r randyMessages, easy bool) *UnregisterFrameworkMessage {
+	this := &UnregisterFrameworkMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedDeactivateFrameworkMessage(r randyMessages, easy bool) *DeactivateFrameworkMessage {
+	this := &DeactivateFrameworkMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedResourceRequestMessage(r randyMessages, easy bool) *ResourceRequestMessage {
+	this := &ResourceRequestMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		v17 := r.Intn(10)
+		this.Requests = make([]*Request, v17)
+		for i := 0; i < v17; i++ {
+			this.Requests[i] = NewPopulatedRequest(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedResourceOffersMessage(r randyMessages, easy bool) *ResourceOffersMessage {
+	this := &ResourceOffersMessage{}
+	if r.Intn(10) != 0 {
+		v18 := r.Intn(10)
+		this.Offers = make([]*Offer, v18)
+		for i := 0; i < v18; i++ {
+			this.Offers[i] = NewPopulatedOffer(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v19 := r.Intn(10)
+		this.Pids = make([]string, v19)
+		for i := 0; i < v19; i++ {
+			this.Pids[i] = randStringMessages(r)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedLaunchTasksMessage(r randyMessages, easy bool) *LaunchTasksMessage {
+	this := &LaunchTasksMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		v20 := r.Intn(10)
+		this.Tasks = make([]*TaskInfo, v20)
+		for i := 0; i < v20; i++ {
+			this.Tasks[i] = NewPopulatedTaskInfo(r, easy)
+		}
+	}
+	this.Filters = NewPopulatedFilters(r, easy)
+	if r.Intn(10) != 0 {
+		v21 := r.Intn(10)
+		this.OfferIds = make([]*OfferID, v21)
+		for i := 0; i < v21; i++ {
+			this.OfferIds[i] = NewPopulatedOfferID(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 7)
+	}
+	return this
+}
+
+func NewPopulatedRescindResourceOfferMessage(r randyMessages, easy bool) *RescindResourceOfferMessage {
+	this := &RescindResourceOfferMessage{}
+	this.OfferId = NewPopulatedOfferID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedReviveOffersMessage(r randyMessages, easy bool) *ReviveOffersMessage {
+	this := &ReviveOffersMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedRunTaskMessage(r randyMessages, easy bool) *RunTaskMessage {
+	this := &RunTaskMessage{}
+	if r.Intn(10) != 0 {
+		this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	}
+	this.Framework = NewPopulatedFrameworkInfo(r, easy)
+	if r.Intn(10) != 0 {
+		v22 := randStringMessages(r)
+		this.Pid = &v22
+	}
+	this.Task = NewPopulatedTaskInfo(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedKillTaskMessage(r randyMessages, easy bool) *KillTaskMessage {
+	this := &KillTaskMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.TaskId = NewPopulatedTaskID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedStatusUpdateMessage(r randyMessages, easy bool) *StatusUpdateMessage {
+	this := &StatusUpdateMessage{}
+	this.Update = NewPopulatedStatusUpdate(r, easy)
+	if r.Intn(10) != 0 {
+		v23 := randStringMessages(r)
+		this.Pid = &v23
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedStatusUpdateAcknowledgementMessage(r randyMessages, easy bool) *StatusUpdateAcknowledgementMessage {
+	this := &StatusUpdateAcknowledgementMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.TaskId = NewPopulatedTaskID(r, easy)
+	v24 := r.Intn(100)
+	this.Uuid = make([]byte, v24)
+	for i := 0; i < v24; i++ {
+		this.Uuid[i] = byte(r.Intn(256))
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedLostSlaveMessage(r randyMessages, easy bool) *LostSlaveMessage {
+	this := &LostSlaveMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedReconcileTasksMessage(r randyMessages, easy bool) *ReconcileTasksMessage {
+	this := &ReconcileTasksMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		v25 := r.Intn(10)
+		this.Statuses = make([]*TaskStatus, v25)
+		for i := 0; i < v25; i++ {
+			this.Statuses[i] = NewPopulatedTaskStatus(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedFrameworkErrorMessage(r randyMessages, easy bool) *FrameworkErrorMessage {
+	this := &FrameworkErrorMessage{}
+	v26 := randStringMessages(r)
+	this.Message = &v26
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedRegisterSlaveMessage(r randyMessages, easy bool) *RegisterSlaveMessage {
+	this := &RegisterSlaveMessage{}
+	this.Slave = NewPopulatedSlaveInfo(r, easy)
+	if r.Intn(10) != 0 {
+		v27 := randStringMessages(r)
+		this.Version = &v27
+	}
+	if r.Intn(10) != 0 {
+		v28 := r.Intn(10)
+		this.CheckpointedResources = make([]*Resource, v28)
+		for i := 0; i < v28; i++ {
+			this.CheckpointedResources[i] = NewPopulatedResource(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 4)
+	}
+	return this
+}
+
+func NewPopulatedReregisterSlaveMessage(r randyMessages, easy bool) *ReregisterSlaveMessage {
+	this := &ReregisterSlaveMessage{}
+	this.Slave = NewPopulatedSlaveInfo(r, easy)
+	if r.Intn(10) != 0 {
+		v29 := r.Intn(10)
+		this.Tasks = make([]*Task, v29)
+		for i := 0; i < v29; i++ {
+			this.Tasks[i] = NewPopulatedTask(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v30 := r.Intn(10)
+		this.ExecutorInfos = make([]*ExecutorInfo, v30)
+		for i := 0; i < v30; i++ {
+			this.ExecutorInfos[i] = NewPopulatedExecutorInfo(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v31 := r.Intn(10)
+		this.CompletedFrameworks = make([]*Archive_Framework, v31)
+		for i := 0; i < v31; i++ {
+			this.CompletedFrameworks[i] = NewPopulatedArchive_Framework(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v32 := randStringMessages(r)
+		this.Version = &v32
+	}
+	if r.Intn(10) != 0 {
+		v33 := r.Intn(10)
+		this.CheckpointedResources = make([]*Resource, v33)
+		for i := 0; i < v33; i++ {
+			this.CheckpointedResources[i] = NewPopulatedResource(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 8)
+	}
+	return this
+}
+
+func NewPopulatedSlaveRegisteredMessage(r randyMessages, easy bool) *SlaveRegisteredMessage {
+	this := &SlaveRegisteredMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	if r.Intn(10) != 0 {
+		this.Connection = NewPopulatedMasterSlaveConnection(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedSlaveReregisteredMessage(r randyMessages, easy bool) *SlaveReregisteredMessage {
+	this := &SlaveReregisteredMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	if r.Intn(10) != 0 {
+		v34 := r.Intn(10)
+		this.Reconciliations = make([]*ReconcileTasksMessage, v34)
+		for i := 0; i < v34; i++ {
+			this.Reconciliations[i] = NewPopulatedReconcileTasksMessage(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		this.Connection = NewPopulatedMasterSlaveConnection(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 4)
+	}
+	return this
+}
+
+func NewPopulatedUnregisterSlaveMessage(r randyMessages, easy bool) *UnregisterSlaveMessage {
+	this := &UnregisterSlaveMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedMasterSlaveConnection(r randyMessages, easy bool) *MasterSlaveConnection {
+	this := &MasterSlaveConnection{}
+	if r.Intn(10) != 0 {
+		v35 := float64(r.Float64())
+		if r.Intn(2) == 0 {
+			v35 *= -1
+		}
+		this.TotalPingTimeoutSeconds = &v35
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedPingSlaveMessage(r randyMessages, easy bool) *PingSlaveMessage {
+	this := &PingSlaveMessage{}
+	v36 := bool(bool(r.Intn(2) == 0))
+	this.Connected = &v36
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedPongSlaveMessage(r randyMessages, easy bool) *PongSlaveMessage {
+	this := &PongSlaveMessage{}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 1)
+	}
+	return this
+}
+
+func NewPopulatedShutdownFrameworkMessage(r randyMessages, easy bool) *ShutdownFrameworkMessage {
+	this := &ShutdownFrameworkMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedShutdownExecutorMessage(r randyMessages, easy bool) *ShutdownExecutorMessage {
+	this := &ShutdownExecutorMessage{}
+	if r.Intn(10) != 0 {
+		this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	}
+	if r.Intn(10) != 0 {
+		this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedUpdateFrameworkMessage(r randyMessages, easy bool) *UpdateFrameworkMessage {
+	this := &UpdateFrameworkMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		v37 := randStringMessages(r)
+		this.Pid = &v37
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedCheckpointResourcesMessage(r randyMessages, easy bool) *CheckpointResourcesMessage {
+	this := &CheckpointResourcesMessage{}
+	if r.Intn(10) != 0 {
+		v38 := r.Intn(10)
+		this.Resources = make([]*Resource, v38)
+		for i := 0; i < v38; i++ {
+			this.Resources[i] = NewPopulatedResource(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedUpdateSlaveMessage(r randyMessages, easy bool) *UpdateSlaveMessage {
+	this := &UpdateSlaveMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	if r.Intn(10) != 0 {
+		v39 := r.Intn(10)
+		this.OversubscribedResources = make([]*Resource, v39)
+		for i := 0; i < v39; i++ {
+			this.OversubscribedResources[i] = NewPopulatedResource(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedRegisterExecutorMessage(r randyMessages, easy bool) *RegisterExecutorMessage {
+	this := &RegisterExecutorMessage{}
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedExecutorRegisteredMessage(r randyMessages, easy bool) *ExecutorRegisteredMessage {
+	this := &ExecutorRegisteredMessage{}
+	this.ExecutorInfo = NewPopulatedExecutorInfo(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.FrameworkInfo = NewPopulatedFrameworkInfo(r, easy)
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	this.SlaveInfo = NewPopulatedSlaveInfo(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 7)
+	}
+	return this
+}
+
+func NewPopulatedExecutorReregisteredMessage(r randyMessages, easy bool) *ExecutorReregisteredMessage {
+	this := &ExecutorReregisteredMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	this.SlaveInfo = NewPopulatedSlaveInfo(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 3)
+	}
+	return this
+}
+
+func NewPopulatedExitedExecutorMessage(r randyMessages, easy bool) *ExitedExecutorMessage {
+	this := &ExitedExecutorMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	v40 := int32(r.Int31())
+	if r.Intn(2) == 0 {
+		v40 *= -1
+	}
+	this.Status = &v40
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedReconnectExecutorMessage(r randyMessages, easy bool) *ReconnectExecutorMessage {
+	this := &ReconnectExecutorMessage{}
+	this.SlaveId = NewPopulatedSlaveID(r, easy)
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedReregisterExecutorMessage(r randyMessages, easy bool) *ReregisterExecutorMessage {
+	this := &ReregisterExecutorMessage{}
+	this.ExecutorId = NewPopulatedExecutorID(r, easy)
+	this.FrameworkId = NewPopulatedFrameworkID(r, easy)
+	if r.Intn(10) != 0 {
+		v41 := r.Intn(10)
+		this.Tasks = make([]*TaskInfo, v41)
+		for i := 0; i < v41; i++ {
+			this.Tasks[i] = NewPopulatedTaskInfo(r, easy)
+		}
+	}
+	if r.Intn(10) != 0 {
+		v42 := r.Intn(10)
+		this.Updates = make([]*StatusUpdate, v42)
+		for i := 0; i < v42; i++ {
+			this.Updates[i] = NewPopulatedStatusUpdate(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedShutdownMessage(r randyMessages, easy bool) *ShutdownMessage {
+	this := &ShutdownMessage{}
+	if r.Intn(10) != 0 {
+		v43 := randStringMessages(r)
+		this.Message = &v43
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedArchive(r randyMessages, easy bool) *Archive {
+	this := &Archive{}
+	if r.Intn(10) != 0 {
+		v44 := r.Intn(10)
+		this.Frameworks = make([]*Archive_Framework, v44)
+		for i := 0; i < v44; i++ {
+			this.Frameworks[i] = NewPopulatedArchive_Framework(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+func NewPopulatedArchive_Framework(r randyMessages, easy bool) *Archive_Framework {
+	this := &Archive_Framework{}
+	this.FrameworkInfo = NewPopulatedFrameworkInfo(r, easy)
+	if r.Intn(10) != 0 {
+		v45 := randStringMessages(r)
+		this.Pid = &v45
+	}
+	if r.Intn(10) != 0 {
+		v46 := r.Intn(10)
+		this.Tasks = make([]*Task, v46)
+		for i := 0; i < v46; i++ {
+			this.Tasks[i] = NewPopulatedTask(r, easy)
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 4)
+	}
+	return this
+}
+
+func NewPopulatedTaskHealthStatus(r randyMessages, easy bool) *TaskHealthStatus {
+	this := &TaskHealthStatus{}
+	this.TaskId = NewPopulatedTaskID(r, easy)
+	v47 := bool(bool(r.Intn(2) == 0))
+	this.Healthy = &v47
+	if r.Intn(10) != 0 {
+		v48 := bool(bool(r.Intn(2) == 0))
+		this.KillTask = &v48
+	}
+	if r.Intn(10) != 0 {
+		v49 := int32(r.Int31())
+		if r.Intn(2) == 0 {
+			v49 *= -1
+		}
+		this.ConsecutiveFailures = &v49
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 5)
+	}
+	return this
+}
+
+func NewPopulatedHookExecuted(r randyMessages, easy bool) *HookExecuted {
+	this := &HookExecuted{}
+	if r.Intn(10) != 0 {
+		v50 := randStringMessages(r)
+		this.Module = &v50
+	}
+	if !easy && r.Intn(10) != 0 {
+		this.XXX_unrecognized = randUnrecognizedMessages(r, 2)
+	}
+	return this
+}
+
+type randyMessages interface {
+	Float32() float32
+	Float64() float64
+	Int63() int64
+	Int31() int32
+	Uint32() uint32
+	Intn(n int) int
+}
+
+func randUTF8RuneMessages(r randyMessages) rune {
+	ru := r.Intn(62)
+	if ru < 10 {
+		return rune(ru + 48)
+	} else if ru < 36 {
+		return rune(ru + 55)
+	}
+	return rune(ru + 61)
+}
+func randStringMessages(r randyMessages) string {
+	v51 := r.Intn(100)
+	tmps := make([]rune, v51)
+	for i := 0; i < v51; i++ {
+		tmps[i] = randUTF8RuneMessages(r)
+	}
+	return string(tmps)
+}
+func randUnrecognizedMessages(r randyMessages, maxFieldNumber int) (data []byte) {
+	l := r.Intn(5)
+	for i := 0; i < l; i++ {
+		wire := r.Intn(4)
+		if wire == 3 {
+			wire = 5
+		}
+		fieldNumber := maxFieldNumber + r.Intn(100)
+		data = randFieldMessages(data, r, fieldNumber, wire)
+	}
+	return data
+}
+func randFieldMessages(data []byte, r randyMessages, fieldNumber int, wire int) []byte {
+	key := uint32(fieldNumber)<<3 | uint32(wire)
+	switch wire {
+	case 0:
+		data = encodeVarintPopulateMessages(data, uint64(key))
+		v52 := r.Int63()
+		if r.Intn(2) == 0 {
+			v52 *= -1
+		}
+		data = encodeVarintPopulateMessages(data, uint64(v52))
+	case 1:
+		data = encodeVarintPopulateMessages(data, uint64(key))
+		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	case 2:
+		data = encodeVarintPopulateMessages(data, uint64(key))
+		ll := r.Intn(100)
+		data = encodeVarintPopulateMessages(data, uint64(ll))
+		for j := 0; j < ll; j++ {
+			data = append(data, byte(r.Intn(256)))
+		}
+	default:
+		data = encodeVarintPopulateMessages(data, uint64(key))
+		data = append(data, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	}
+	return data
+}
+func encodeVarintPopulateMessages(data []byte, v uint64) []byte {
+	for v >= 1<<7 {
+		data = append(data, uint8(uint64(v)&0x7f|0x80))
+		v >>= 7
+	}
+	data = append(data, uint8(v))
+	return data
+}
+func (m *Task) Size() (n int) {
+	var l int
+	_ = l
+	if m.Name != nil {
+		l = len(*m.Name)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.TaskId != nil {
+		l = m.TaskId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.State != nil {
+		n += 1 + sovMessages(uint64(*m.State))
+	}
+	if len(m.Resources) > 0 {
+		for _, e := range m.Resources {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if len(m.Statuses) > 0 {
+		for _, e := range m.Statuses {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.StatusUpdateState != nil {
+		n += 1 + sovMessages(uint64(*m.StatusUpdateState))
+	}
+	if m.StatusUpdateUuid != nil {
+		l = len(m.StatusUpdateUuid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Labels != nil {
+		l = m.Labels.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Discovery != nil {
+		l = m.Discovery.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *StatusUpdate) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Status != nil {
+		l = m.Status.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Timestamp != nil {
+		n += 9
+	}
+	if m.Uuid != nil {
+		l = len(m.Uuid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.LatestState != nil {
+		n += 1 + sovMessages(uint64(*m.LatestState))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *StatusUpdateRecord) Size() (n int) {
+	var l int
+	_ = l
+	if m.Type != nil {
+		n += 1 + sovMessages(uint64(*m.Type))
+	}
+	if m.Update != nil {
+		l = m.Update.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Uuid != nil {
+		l = len(m.Uuid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *SubmitSchedulerRequest) Size() (n int) {
+	var l int
+	_ = l
+	if m.Name != nil {
+		l = len(*m.Name)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *SubmitSchedulerResponse) Size() (n int) {
+	var l int
+	_ = l
+	if m.Okay != nil {
+		n += 2
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ExecutorToFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Data != nil {
+		l = len(m.Data)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *FrameworkToExecutorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Data != nil {
+		l = len(m.Data)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *RegisterFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Framework != nil {
+		l = m.Framework.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ReregisterFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Framework != nil {
+		l = m.Framework.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Failover != nil {
+		n += 2
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *FrameworkRegisteredMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.MasterInfo != nil {
+		l = m.MasterInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *FrameworkReregisteredMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.MasterInfo != nil {
+		l = m.MasterInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *UnregisterFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DeactivateFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ResourceRequestMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Requests) > 0 {
+		for _, e := range m.Requests {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ResourceOffersMessage) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Offers) > 0 {
+		for _, e := range m.Offers {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if len(m.Pids) > 0 {
+		for _, s := range m.Pids {
+			l = len(s)
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *LaunchTasksMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Tasks) > 0 {
+		for _, e := range m.Tasks {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.Filters != nil {
+		l = m.Filters.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.OfferIds) > 0 {
+		for _, e := range m.OfferIds {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *RescindResourceOfferMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.OfferId != nil {
+		l = m.OfferId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ReviveOffersMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *RunTaskMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Framework != nil {
+		l = m.Framework.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Pid != nil {
+		l = len(*m.Pid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Task != nil {
+		l = m.Task.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *KillTaskMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.TaskId != nil {
+		l = m.TaskId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *StatusUpdateMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Update != nil {
+		l = m.Update.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Pid != nil {
+		l = len(*m.Pid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *StatusUpdateAcknowledgementMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.TaskId != nil {
+		l = m.TaskId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Uuid != nil {
+		l = len(m.Uuid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *LostSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ReconcileTasksMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Statuses) > 0 {
+		for _, e := range m.Statuses {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *FrameworkErrorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Message != nil {
+		l = len(*m.Message)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *RegisterSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Slave != nil {
+		l = m.Slave.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Version != nil {
+		l = len(*m.Version)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.CheckpointedResources) > 0 {
+		for _, e := range m.CheckpointedResources {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ReregisterSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Slave != nil {
+		l = m.Slave.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Tasks) > 0 {
+		for _, e := range m.Tasks {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if len(m.ExecutorInfos) > 0 {
+		for _, e := range m.ExecutorInfos {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if len(m.CompletedFrameworks) > 0 {
+		for _, e := range m.CompletedFrameworks {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.Version != nil {
+		l = len(*m.Version)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.CheckpointedResources) > 0 {
+		for _, e := range m.CheckpointedResources {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *SlaveRegisteredMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Connection != nil {
+		l = m.Connection.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *SlaveReregisteredMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Reconciliations) > 0 {
+		for _, e := range m.Reconciliations {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.Connection != nil {
+		l = m.Connection.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *UnregisterSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *MasterSlaveConnection) Size() (n int) {
+	var l int
+	_ = l
+	if m.TotalPingTimeoutSeconds != nil {
+		n += 9
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *PingSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Connected != nil {
+		n += 2
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *PongSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ShutdownFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ShutdownExecutorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *UpdateFrameworkMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Pid != nil {
+		l = len(*m.Pid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *CheckpointResourcesMessage) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Resources) > 0 {
+		for _, e := range m.Resources {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *UpdateSlaveMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.OversubscribedResources) > 0 {
+		for _, e := range m.OversubscribedResources {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *RegisterExecutorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ExecutorRegisteredMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.ExecutorInfo != nil {
+		l = m.ExecutorInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkInfo != nil {
+		l = m.FrameworkInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.SlaveInfo != nil {
+		l = m.SlaveInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ExecutorReregisteredMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.SlaveInfo != nil {
+		l = m.SlaveInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ExitedExecutorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Status != nil {
+		n += 1 + sovMessages(uint64(*m.Status))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ReconnectExecutorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.SlaveId != nil {
+		l = m.SlaveId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ReregisterExecutorMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.ExecutorId != nil {
+		l = m.ExecutorId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.FrameworkId != nil {
+		l = m.FrameworkId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Tasks) > 0 {
+		for _, e := range m.Tasks {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if len(m.Updates) > 0 {
+		for _, e := range m.Updates {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *ShutdownMessage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Message != nil {
+		l = len(*m.Message)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *Archive) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Frameworks) > 0 {
+		for _, e := range m.Frameworks {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *Archive_Framework) Size() (n int) {
+	var l int
+	_ = l
+	if m.FrameworkInfo != nil {
+		l = m.FrameworkInfo.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Pid != nil {
+		l = len(*m.Pid)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if len(m.Tasks) > 0 {
+		for _, e := range m.Tasks {
+			l = e.Size()
+			n += 1 + l + sovMessages(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *TaskHealthStatus) Size() (n int) {
+	var l int
+	_ = l
+	if m.TaskId != nil {
+		l = m.TaskId.Size()
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.Healthy != nil {
+		n += 2
+	}
+	if m.KillTask != nil {
+		n += 2
+	}
+	if m.ConsecutiveFailures != nil {
+		n += 1 + sovMessages(uint64(*m.ConsecutiveFailures))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *HookExecuted) Size() (n int) {
+	var l int
+	_ = l
+	if m.Module != nil {
+		l = len(*m.Module)
+		n += 1 + l + sovMessages(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func sovMessages(x uint64) (n int) {
+	for {
+		n++
+		x >>= 7
+		if x == 0 {
+			break
+		}
+	}
+	return n
+}
+func sozMessages(x uint64) (n int) {
+	return sovMessages(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *Task) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Task{`,
+		`Name:` + valueToStringMessages(this.Name) + `,`,
+		`TaskId:` + strings.Replace(fmt.Sprintf("%v", this.TaskId), "TaskID", "TaskID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`State:` + valueToStringMessages(this.State) + `,`,
+		`Resources:` + strings.Replace(fmt.Sprintf("%v", this.Resources), "Resource", "Resource", 1) + `,`,
+		`Statuses:` + strings.Replace(fmt.Sprintf("%v", this.Statuses), "TaskStatus", "TaskStatus", 1) + `,`,
+		`StatusUpdateState:` + valueToStringMessages(this.StatusUpdateState) + `,`,
+		`StatusUpdateUuid:` + valueToStringMessages(this.StatusUpdateUuid) + `,`,
+		`Labels:` + strings.Replace(fmt.Sprintf("%v", this.Labels), "Labels", "Labels", 1) + `,`,
+		`Discovery:` + strings.Replace(fmt.Sprintf("%v", this.Discovery), "DiscoveryInfo", "DiscoveryInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusUpdate) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusUpdate{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`Status:` + strings.Replace(fmt.Sprintf("%v", this.Status), "TaskStatus", "TaskStatus", 1) + `,`,
+		`Timestamp:` + valueToStringMessages(this.Timestamp) + `,`,
+		`Uuid:` + valueToStringMessages(this.Uuid) + `,`,
+		`LatestState:` + valueToStringMessages(this.LatestState) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusUpdateRecord) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusUpdateRecord{`,
+		`Type:` + valueToStringMessages(this.Type) + `,`,
+		`Update:` + strings.Replace(fmt.Sprintf("%v", this.Update), "StatusUpdate", "StatusUpdate", 1) + `,`,
+		`Uuid:` + valueToStringMessages(this.Uuid) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SubmitSchedulerRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SubmitSchedulerRequest{`,
+		`Name:` + valueToStringMessages(this.Name) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SubmitSchedulerResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SubmitSchedulerResponse{`,
+		`Okay:` + valueToStringMessages(this.Okay) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExecutorToFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExecutorToFrameworkMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`Data:` + valueToStringMessages(this.Data) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *FrameworkToExecutorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&FrameworkToExecutorMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`Data:` + valueToStringMessages(this.Data) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RegisterFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RegisterFrameworkMessage{`,
+		`Framework:` + strings.Replace(fmt.Sprintf("%v", this.Framework), "FrameworkInfo", "FrameworkInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReregisterFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReregisterFrameworkMessage{`,
+		`Framework:` + strings.Replace(fmt.Sprintf("%v", this.Framework), "FrameworkInfo", "FrameworkInfo", 1) + `,`,
+		`Failover:` + valueToStringMessages(this.Failover) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *FrameworkRegisteredMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&FrameworkRegisteredMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`MasterInfo:` + strings.Replace(fmt.Sprintf("%v", this.MasterInfo), "MasterInfo", "MasterInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *FrameworkReregisteredMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&FrameworkReregisteredMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`MasterInfo:` + strings.Replace(fmt.Sprintf("%v", this.MasterInfo), "MasterInfo", "MasterInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *UnregisterFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&UnregisterFrameworkMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeactivateFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeactivateFrameworkMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ResourceRequestMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ResourceRequestMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`Requests:` + strings.Replace(fmt.Sprintf("%v", this.Requests), "Request", "Request", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ResourceOffersMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ResourceOffersMessage{`,
+		`Offers:` + strings.Replace(fmt.Sprintf("%v", this.Offers), "Offer", "Offer", 1) + `,`,
+		`Pids:` + fmt.Sprintf("%v", this.Pids) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LaunchTasksMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&LaunchTasksMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`Tasks:` + strings.Replace(fmt.Sprintf("%v", this.Tasks), "TaskInfo", "TaskInfo", 1) + `,`,
+		`Filters:` + strings.Replace(fmt.Sprintf("%v", this.Filters), "Filters", "Filters", 1) + `,`,
+		`OfferIds:` + strings.Replace(fmt.Sprintf("%v", this.OfferIds), "OfferID", "OfferID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RescindResourceOfferMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RescindResourceOfferMessage{`,
+		`OfferId:` + strings.Replace(fmt.Sprintf("%v", this.OfferId), "OfferID", "OfferID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReviveOffersMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReviveOffersMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RunTaskMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RunTaskMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`Framework:` + strings.Replace(fmt.Sprintf("%v", this.Framework), "FrameworkInfo", "FrameworkInfo", 1) + `,`,
+		`Pid:` + valueToStringMessages(this.Pid) + `,`,
+		`Task:` + strings.Replace(fmt.Sprintf("%v", this.Task), "TaskInfo", "TaskInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *KillTaskMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&KillTaskMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`TaskId:` + strings.Replace(fmt.Sprintf("%v", this.TaskId), "TaskID", "TaskID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusUpdateMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusUpdateMessage{`,
+		`Update:` + strings.Replace(fmt.Sprintf("%v", this.Update), "StatusUpdate", "StatusUpdate", 1) + `,`,
+		`Pid:` + valueToStringMessages(this.Pid) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusUpdateAcknowledgementMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusUpdateAcknowledgementMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`TaskId:` + strings.Replace(fmt.Sprintf("%v", this.TaskId), "TaskID", "TaskID", 1) + `,`,
+		`Uuid:` + valueToStringMessages(this.Uuid) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LostSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&LostSlaveMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReconcileTasksMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReconcileTasksMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`Statuses:` + strings.Replace(fmt.Sprintf("%v", this.Statuses), "TaskStatus", "TaskStatus", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *FrameworkErrorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&FrameworkErrorMessage{`,
+		`Message:` + valueToStringMessages(this.Message) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RegisterSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RegisterSlaveMessage{`,
+		`Slave:` + strings.Replace(fmt.Sprintf("%v", this.Slave), "SlaveInfo", "SlaveInfo", 1) + `,`,
+		`Version:` + valueToStringMessages(this.Version) + `,`,
+		`CheckpointedResources:` + strings.Replace(fmt.Sprintf("%v", this.CheckpointedResources), "Resource", "Resource", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReregisterSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReregisterSlaveMessage{`,
+		`Slave:` + strings.Replace(fmt.Sprintf("%v", this.Slave), "SlaveInfo", "SlaveInfo", 1) + `,`,
+		`Tasks:` + strings.Replace(fmt.Sprintf("%v", this.Tasks), "Task", "Task", 1) + `,`,
+		`ExecutorInfos:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorInfos), "ExecutorInfo", "ExecutorInfo", 1) + `,`,
+		`CompletedFrameworks:` + strings.Replace(fmt.Sprintf("%v", this.CompletedFrameworks), "Archive_Framework", "Archive_Framework", 1) + `,`,
+		`Version:` + valueToStringMessages(this.Version) + `,`,
+		`CheckpointedResources:` + strings.Replace(fmt.Sprintf("%v", this.CheckpointedResources), "Resource", "Resource", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SlaveRegisteredMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SlaveRegisteredMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`Connection:` + strings.Replace(fmt.Sprintf("%v", this.Connection), "MasterSlaveConnection", "MasterSlaveConnection", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SlaveReregisteredMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SlaveReregisteredMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`Reconciliations:` + strings.Replace(fmt.Sprintf("%v", this.Reconciliations), "ReconcileTasksMessage", "ReconcileTasksMessage", 1) + `,`,
+		`Connection:` + strings.Replace(fmt.Sprintf("%v", this.Connection), "MasterSlaveConnection", "MasterSlaveConnection", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *UnregisterSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&UnregisterSlaveMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *MasterSlaveConnection) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&MasterSlaveConnection{`,
+		`TotalPingTimeoutSeconds:` + valueToStringMessages(this.TotalPingTimeoutSeconds) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PingSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PingSlaveMessage{`,
+		`Connected:` + valueToStringMessages(this.Connected) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PongSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PongSlaveMessage{`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ShutdownFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ShutdownFrameworkMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ShutdownExecutorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ShutdownExecutorMessage{`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *UpdateFrameworkMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&UpdateFrameworkMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`Pid:` + valueToStringMessages(this.Pid) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CheckpointResourcesMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CheckpointResourcesMessage{`,
+		`Resources:` + strings.Replace(fmt.Sprintf("%v", this.Resources), "Resource", "Resource", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *UpdateSlaveMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&UpdateSlaveMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`OversubscribedResources:` + strings.Replace(fmt.Sprintf("%v", this.OversubscribedResources), "Resource", "Resource", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RegisterExecutorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RegisterExecutorMessage{`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExecutorRegisteredMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExecutorRegisteredMessage{`,
+		`ExecutorInfo:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorInfo), "ExecutorInfo", "ExecutorInfo", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`FrameworkInfo:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkInfo), "FrameworkInfo", "FrameworkInfo", 1) + `,`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`SlaveInfo:` + strings.Replace(fmt.Sprintf("%v", this.SlaveInfo), "SlaveInfo", "SlaveInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExecutorReregisteredMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExecutorReregisteredMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`SlaveInfo:` + strings.Replace(fmt.Sprintf("%v", this.SlaveInfo), "SlaveInfo", "SlaveInfo", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExitedExecutorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExitedExecutorMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`Status:` + valueToStringMessages(this.Status) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReconnectExecutorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReconnectExecutorMessage{`,
+		`SlaveId:` + strings.Replace(fmt.Sprintf("%v", this.SlaveId), "SlaveID", "SlaveID", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReregisterExecutorMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReregisterExecutorMessage{`,
+		`ExecutorId:` + strings.Replace(fmt.Sprintf("%v", this.ExecutorId), "ExecutorID", "ExecutorID", 1) + `,`,
+		`FrameworkId:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkId), "FrameworkID", "FrameworkID", 1) + `,`,
+		`Tasks:` + strings.Replace(fmt.Sprintf("%v", this.Tasks), "TaskInfo", "TaskInfo", 1) + `,`,
+		`Updates:` + strings.Replace(fmt.Sprintf("%v", this.Updates), "StatusUpdate", "StatusUpdate", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ShutdownMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ShutdownMessage{`,
+		`Message:` + valueToStringMessages(this.Message) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Archive) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Archive{`,
+		`Frameworks:` + strings.Replace(fmt.Sprintf("%v", this.Frameworks), "Archive_Framework", "Archive_Framework", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Archive_Framework) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Archive_Framework{`,
+		`FrameworkInfo:` + strings.Replace(fmt.Sprintf("%v", this.FrameworkInfo), "FrameworkInfo", "FrameworkInfo", 1) + `,`,
+		`Pid:` + valueToStringMessages(this.Pid) + `,`,
+		`Tasks:` + strings.Replace(fmt.Sprintf("%v", this.Tasks), "Task", "Task", 1) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TaskHealthStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TaskHealthStatus{`,
+		`TaskId:` + strings.Replace(fmt.Sprintf("%v", this.TaskId), "TaskID", "TaskID", 1) + `,`,
+		`Healthy:` + valueToStringMessages(this.Healthy) + `,`,
+		`KillTask:` + valueToStringMessages(this.KillTask) + `,`,
+		`ConsecutiveFailures:` + valueToStringMessages(this.ConsecutiveFailures) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *HookExecuted) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&HookExecuted{`,
+		`Module:` + valueToStringMessages(this.Module) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringMessages(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
+}
+func (m *Task) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Name = &s
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TaskId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.TaskId == nil {
+				m.TaskId = &TaskID{}
+			}
+			if err := m.TaskId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000008)
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			var v TaskState
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (TaskState(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.State = &v
+			hasFields[0] |= uint64(0x00000010)
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Resources = append(m.Resources, &Resource{})
+			if err := m.Resources[len(m.Resources)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Statuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Statuses = append(m.Statuses, &TaskStatus{})
+			if err := m.Statuses[len(m.Statuses)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StatusUpdateState", wireType)
+			}
+			var v TaskState
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (TaskState(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.StatusUpdateState = &v
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StatusUpdateUuid", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StatusUpdateUuid = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Labels", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Labels == nil {
+				m.Labels = &Labels{}
+			}
+			if err := m.Labels.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Discovery", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Discovery == nil {
+				m.Discovery = &DiscoveryInfo{}
+			}
+			if err := m.Discovery.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000010) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("state")
+	}
+
+	return nil
+}
+func (m *StatusUpdate) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Status == nil {
+				m.Status = &TaskStatus{}
+			}
+			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 5:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += 8
+			v = uint64(data[iNdEx-8])
+			v |= uint64(data[iNdEx-7]) << 8
+			v |= uint64(data[iNdEx-6]) << 16
+			v |= uint64(data[iNdEx-5]) << 24
+			v |= uint64(data[iNdEx-4]) << 32
+			v |= uint64(data[iNdEx-3]) << 40
+			v |= uint64(data[iNdEx-2]) << 48
+			v |= uint64(data[iNdEx-1]) << 56
+			v2 := float64(math.Float64frombits(v))
+			m.Timestamp = &v2
+			hasFields[0] |= uint64(0x00000004)
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uuid", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Uuid = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LatestState", wireType)
+			}
+			var v TaskState
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (TaskState(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.LatestState = &v
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("timestamp")
+	}
+
+	return nil
+}
+func (m *StatusUpdateRecord) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var v StatusUpdateRecord_Type
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (StatusUpdateRecord_Type(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Type = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Update", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Update == nil {
+				m.Update = &StatusUpdate{}
+			}
+			if err := m.Update.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uuid", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Uuid = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
+	}
+
+	return nil
+}
+func (m *SubmitSchedulerRequest) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Name = &s
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
+	}
+
+	return nil
+}
+func (m *SubmitSchedulerResponse) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Okay", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Okay = &b
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("okay")
+	}
+
+	return nil
+}
+func (m *ExecutorToFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000008)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("data")
+	}
+
+	return nil
+}
+func (m *FrameworkToExecutorMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000008)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("data")
+	}
+
+	return nil
+}
+func (m *RegisterFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Framework", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Framework == nil {
+				m.Framework = &FrameworkInfo{}
+			}
+			if err := m.Framework.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework")
+	}
+
+	return nil
+}
+func (m *ReregisterFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Framework", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Framework == nil {
+				m.Framework = &FrameworkInfo{}
+			}
+			if err := m.Framework.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Failover", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Failover = &b
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("failover")
+	}
+
+	return nil
+}
+func (m *FrameworkRegisteredMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MasterInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.MasterInfo == nil {
+				m.MasterInfo = &MasterInfo{}
+			}
+			if err := m.MasterInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("master_info")
+	}
+
+	return nil
+}
+func (m *FrameworkReregisteredMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MasterInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.MasterInfo == nil {
+				m.MasterInfo = &MasterInfo{}
+			}
+			if err := m.MasterInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("master_info")
+	}
+
+	return nil
+}
+func (m *UnregisterFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *DeactivateFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *ResourceRequestMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Requests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Requests = append(m.Requests, &Request{})
+			if err := m.Requests[len(m.Requests)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *ResourceOffersMessage) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Offers", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Offers = append(m.Offers, &Offer{})
+			if err := m.Offers[len(m.Offers)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pids", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Pids = append(m.Pids, string(data[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *LaunchTasksMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Tasks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Tasks = append(m.Tasks, &TaskInfo{})
+			if err := m.Tasks[len(m.Tasks)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Filters", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Filters == nil {
+				m.Filters = &Filters{}
+			}
+			if err := m.Filters.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OfferIds", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.OfferIds = append(m.OfferIds, &OfferID{})
+			if err := m.OfferIds[len(m.OfferIds)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("filters")
+	}
+
+	return nil
+}
+func (m *RescindResourceOfferMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OfferId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.OfferId == nil {
+				m.OfferId = &OfferID{}
+			}
+			if err := m.OfferId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("offer_id")
+	}
+
+	return nil
+}
+func (m *ReviveOffersMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *RunTaskMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Framework", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Framework == nil {
+				m.Framework = &FrameworkInfo{}
+			}
+			if err := m.Framework.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Pid = &s
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Task", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Task == nil {
+				m.Task = &TaskInfo{}
+			}
+			if err := m.Task.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("task")
+	}
+
+	return nil
+}
+func (m *KillTaskMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TaskId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.TaskId == nil {
+				m.TaskId = &TaskID{}
+			}
+			if err := m.TaskId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	}
+
+	return nil
+}
+func (m *StatusUpdateMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Update", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Update == nil {
+				m.Update = &StatusUpdate{}
+			}
+			if err := m.Update.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Pid = &s
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("update")
+	}
+
+	return nil
+}
+func (m *StatusUpdateAcknowledgementMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TaskId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.TaskId == nil {
+				m.TaskId = &TaskID{}
+			}
+			if err := m.TaskId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uuid", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Uuid = append([]byte{}, data[iNdEx:postIndex]...)
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000008)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("uuid")
+	}
+
+	return nil
+}
+func (m *LostSlaveMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+
+	return nil
+}
+func (m *ReconcileTasksMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Statuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Statuses = append(m.Statuses, &TaskStatus{})
+			if err := m.Statuses[len(m.Statuses)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *FrameworkErrorMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Message = &s
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("message")
+	}
+
+	return nil
+}
+func (m *RegisterSlaveMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Slave", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Slave == nil {
+				m.Slave = &SlaveInfo{}
+			}
+			if err := m.Slave.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Version = &s
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CheckpointedResources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CheckpointedResources = append(m.CheckpointedResources, &Resource{})
+			if err := m.CheckpointedResources[len(m.CheckpointedResources)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave")
+	}
+
+	return nil
+}
+func (m *ReregisterSlaveMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Slave", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Slave == nil {
+				m.Slave = &SlaveInfo{}
+			}
+			if err := m.Slave.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Tasks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Tasks = append(m.Tasks, &Task{})
+			if err := m.Tasks[len(m.Tasks)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorInfos", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ExecutorInfos = append(m.ExecutorInfos, &ExecutorInfo{})
+			if err := m.ExecutorInfos[len(m.ExecutorInfos)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CompletedFrameworks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CompletedFrameworks = append(m.CompletedFrameworks, &Archive_Framework{})
+			if err := m.CompletedFrameworks[len(m.CompletedFrameworks)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Version = &s
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CheckpointedResources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CheckpointedResources = append(m.CheckpointedResources, &Resource{})
+			if err := m.CheckpointedResources[len(m.CheckpointedResources)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave")
+	}
+
+	return nil
+}
+func (m *SlaveRegisteredMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Connection", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Connection == nil {
+				m.Connection = &MasterSlaveConnection{}
+			}
+			if err := m.Connection.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+
+	return nil
+}
+func (m *SlaveReregisteredMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Reconciliations", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Reconciliations = append(m.Reconciliations, &ReconcileTasksMessage{})
+			if err := m.Reconciliations[len(m.Reconciliations)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Connection", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Connection == nil {
+				m.Connection = &MasterSlaveConnection{}
+			}
+			if err := m.Connection.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+
+	return nil
+}
+func (m *UnregisterSlaveMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+
+	return nil
+}
+func (m *MasterSlaveConnection) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TotalPingTimeoutSeconds", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += 8
+			v = uint64(data[iNdEx-8])
+			v |= uint64(data[iNdEx-7]) << 8
+			v |= uint64(data[iNdEx-6]) << 16
+			v |= uint64(data[iNdEx-5]) << 24
+			v |= uint64(data[iNdEx-4]) << 32
+			v |= uint64(data[iNdEx-3]) << 40
+			v |= uint64(data[iNdEx-2]) << 48
+			v |= uint64(data[iNdEx-1]) << 56
+			v2 := float64(math.Float64frombits(v))
+			m.TotalPingTimeoutSeconds = &v2
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *PingSlaveMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Connected", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Connected = &b
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("connected")
+	}
+
+	return nil
+}
+func (m *PongSlaveMessage) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		switch fieldNum {
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *ShutdownFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *ShutdownExecutorMessage) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *UpdateFrameworkMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Pid = &s
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *CheckpointResourcesMessage) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Resources = append(m.Resources, &Resource{})
+			if err := m.Resources[len(m.Resources)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *UpdateSlaveMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OversubscribedResources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.OversubscribedResources = append(m.OversubscribedResources, &Resource{})
+			if err := m.OversubscribedResources[len(m.OversubscribedResources)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+
+	return nil
+}
+func (m *RegisterExecutorMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	}
+
+	return nil
+}
+func (m *ExecutorRegisteredMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorInfo == nil {
+				m.ExecutorInfo = &ExecutorInfo{}
+			}
+			if err := m.ExecutorInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkInfo == nil {
+				m.FrameworkInfo = &FrameworkInfo{}
+			}
+			if err := m.FrameworkInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000008)
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveInfo == nil {
+				m.SlaveInfo = &SlaveInfo{}
+			}
+			if err := m.SlaveInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000010)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_info")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_info")
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000010) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_info")
+	}
+
+	return nil
+}
+func (m *ExecutorReregisteredMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveInfo == nil {
+				m.SlaveInfo = &SlaveInfo{}
+			}
+			if err := m.SlaveInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_info")
+	}
+
+	return nil
+}
+func (m *ExitedExecutorMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Status = &v
+			hasFields[0] |= uint64(0x00000008)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
+	}
+
+	return nil
+}
+func (m *ReconnectExecutorMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SlaveId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SlaveId == nil {
+				m.SlaveId = &SlaveID{}
+			}
+			if err := m.SlaveId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("slave_id")
+	}
+
+	return nil
+}
+func (m *ReregisterExecutorMessage) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecutorId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExecutorId == nil {
+				m.ExecutorId = &ExecutorID{}
+			}
+			if err := m.ExecutorId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkId == nil {
+				m.FrameworkId = &FrameworkID{}
+			}
+			if err := m.FrameworkId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Tasks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Tasks = append(m.Tasks, &TaskInfo{})
+			if err := m.Tasks[len(m.Tasks)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Updates", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Updates = append(m.Updates, &StatusUpdate{})
+			if err := m.Updates[len(m.Updates)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("executor_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_id")
+	}
+
+	return nil
+}
+func (m *ShutdownMessage) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Message = &s
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *Archive) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Frameworks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Frameworks = append(m.Frameworks, &Archive_Framework{})
+			if err := m.Frameworks[len(m.Frameworks)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func (m *Archive_Framework) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FrameworkInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FrameworkInfo == nil {
+				m.FrameworkInfo = &FrameworkInfo{}
+			}
+			if err := m.FrameworkInfo.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Pid = &s
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Tasks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Tasks = append(m.Tasks, &Task{})
+			if err := m.Tasks[len(m.Tasks)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("framework_info")
+	}
+
+	return nil
+}
+func (m *TaskHealthStatus) Unmarshal(data []byte) error {
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TaskId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.TaskId == nil {
+				m.TaskId = &TaskID{}
+			}
+			if err := m.TaskId.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Healthy", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Healthy = &b
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field KillTask", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.KillTask = &b
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConsecutiveFailures", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ConsecutiveFailures = &v
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("task_id")
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("healthy")
+	}
+
+	return nil
+}
+func (m *HookExecuted) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Module", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMessages
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+			m.Module = &s
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipMessages(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMessages
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+func skipMessages(data []byte) (n int, err error) {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return 0, io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		wireType := int(wire & 0x7)
+		switch wireType {
+		case 0:
+			for {
+				if iNdEx >= l {
+					return 0, io.ErrUnexpectedEOF
+				}
+				iNdEx++
+				if data[iNdEx-1] < 0x80 {
+					break
+				}
+			}
+			return iNdEx, nil
+		case 1:
+			iNdEx += 8
+			return iNdEx, nil
+		case 2:
+			var length int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return 0, io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				length |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			iNdEx += length
+			if length < 0 {
+				return 0, ErrInvalidLengthMessages
+			}
+			return iNdEx, nil
+		case 3:
+			for {
+				var innerWire uint64
+				var start int = iNdEx
+				for shift := uint(0); ; shift += 7 {
+					if iNdEx >= l {
+						return 0, io.ErrUnexpectedEOF
+					}
+					b := data[iNdEx]
+					iNdEx++
+					innerWire |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				innerWireType := int(innerWire & 0x7)
+				if innerWireType == 4 {
+					break
+				}
+				next, err := skipMessages(data[start:])
+				if err != nil {
+					return 0, err
+				}
+				iNdEx = start + next
+			}
+			return iNdEx, nil
+		case 4:
+			return iNdEx, nil
+		case 5:
+			iNdEx += 4
+			return iNdEx, nil
+		default:
+			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
+		}
+	}
+	panic("unreachable")
+}
+
+var (
+	ErrInvalidLengthMessages = fmt.Errorf("proto: negative length found during unmarshaling")
+)

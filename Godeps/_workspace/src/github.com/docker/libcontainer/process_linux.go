@@ -119,6 +119,9 @@ func (p *setnsProcess) execSetns() error {
 // terminate sends a SIGKILL to the forked process for the setns routine then waits to
 // avoid the process becomming a zombie.
 func (p *setnsProcess) terminate() error {
+	if p.cmd.Process == nil {
+		return nil
+	}
 	err := p.cmd.Process.Kill()
 	if _, werr := p.wait(); err == nil {
 		err = werr

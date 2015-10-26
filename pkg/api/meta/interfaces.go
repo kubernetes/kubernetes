@@ -157,4 +157,5 @@ type RESTMapper interface {
 	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
+	ResourceIsValid(resource string) bool
 }

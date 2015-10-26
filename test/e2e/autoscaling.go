@@ -29,6 +29,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	scaleUpTimeout   = 20 * time.Minute
+	scaleDownTimeout = 30 * time.Minute
+)
+
 var _ = Describe("Autoscaling", func() {
 	f := NewFramework("autoscaling")
 	var nodeCount int
@@ -58,20 +63,20 @@ var _ = Describe("Autoscaling", func() {
 		// Consume 50% CPU
 		millicoresPerReplica := 500
 		rc := NewStaticResourceConsumer("cpu-utilization", nodeCount*coresPerNode, millicoresPerReplica*nodeCount*coresPerNode, 0, int64(millicoresPerReplica), 100, f)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout))
 
 		rc.CleanUp()
-		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
-	It("[Skipped] should scale cluster size based on cpu reservation", func() {
+	It("[Skipped][Autoscaling Suite] should scale cluster size based on cpu reservation", func() {
 		setUpAutoscaler("cpu/node_reservation", 0.5, nodeCount, nodeCount+1)
 
 		ReserveCpu(f, "cpu-reservation", 600*nodeCount*coresPerNode)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout))
 
 		expectNoError(DeleteRC(f.Client, f.Namespace.Name, "cpu-reservation"))
-		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
 	It("[Skipped][Autoscaling Suite] should scale cluster size based on memory utilization", func() {
@@ -80,20 +85,20 @@ var _ = Describe("Autoscaling", func() {
 		// Consume 60% of total memory capacity
 		megabytesPerReplica := int(memCapacityMb * 6 / 10 / coresPerNode)
 		rc := NewStaticResourceConsumer("mem-utilization", nodeCount*coresPerNode, 0, megabytesPerReplica*nodeCount*coresPerNode, 100, int64(megabytesPerReplica+100), f)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout))
 
 		rc.CleanUp()
-		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 
-	It("[Skipped] should scale cluster size based on memory reservation", func() {
+	It("[Skipped][Autoscaling Suite] should scale cluster size based on memory reservation", func() {
 		setUpAutoscaler("memory/node_reservation", 0.5, nodeCount, nodeCount+1)
 
 		ReserveMemory(f, "memory-reservation", nodeCount*memCapacityMb*6/10)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, scaleUpTimeout))
 
 		expectNoError(DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
 	})
 })
 
@@ -128,7 +133,7 @@ func ReserveCpu(f *Framework, id string, millicores int) {
 		Name:       id,
 		Namespace:  f.Namespace.Name,
 		Timeout:    10 * time.Minute,
-		Image:      "gcr.io/google_containers/pause",
+		Image:      "beta.gcr.io/google_containers/pause:2.0",
 		Replicas:   millicores / 100,
 		CpuRequest: 100,
 	}
@@ -142,7 +147,7 @@ func ReserveMemory(f *Framework, id string, megabytes int) {
 		Name:       id,
 		Namespace:  f.Namespace.Name,
 		Timeout:    10 * time.Minute,
-		Image:      "gcr.io/google_containers/pause",
+		Image:      "beta.gcr.io/google_containers/pause:2.0",
 		Replicas:   megabytes / 500,
 		MemRequest: 500 * 1024 * 1024,
 	}

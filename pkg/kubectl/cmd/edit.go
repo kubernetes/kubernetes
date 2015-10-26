@@ -210,6 +210,11 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return preservedFile(err, file, out)
 		}
 
+		// annotate the edited object for kubectl apply
+		if err := kubectl.UpdateApplyAnnotation(updates); err != nil {
+			return preservedFile(err, file, out)
+		}
+
 		visitor := resource.NewFlattenListVisitor(updates, rmap)
 
 		// need to make sure the original namespace wasn't changed while editing

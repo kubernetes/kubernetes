@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -132,14 +133,9 @@ func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorit
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	grace := int64(30)
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
-		Spec: api.PodSpec{
-			RestartPolicy:                 api.RestartPolicyAlways,
-			DNSPolicy:                     api.DNSClusterFirst,
-			TerminationGracePeriodSeconds: &grace,
-		},
+		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 	handler := util.FakeHandler{
 		StatusCode:   200,

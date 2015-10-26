@@ -282,7 +282,7 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 }
 
 func (self *RealFsInfo) GetDirUsage(dir string) (uint64, error) {
-	out, err := exec.Command("du", "-s", dir).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", dir).CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("du command failed on %s with output %s - %s", dir, out, err)
 	}

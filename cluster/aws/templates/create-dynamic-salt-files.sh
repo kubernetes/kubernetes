@@ -44,7 +44,14 @@ service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW")'
 kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
 dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
 network_provider_gw_on_minion: '$(echo "$NETWORK_PROVIDER_GATEWAY_ON_MINION")'
+num_nodes: $(echo "${NUM_MINIONS}")
 EOF
+
+if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_experimental_api: '$(echo "$ENABLE_EXPERIMENTAL_API" | sed -e "s/'/''/g")'
+EOF
+fi
 
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 if [ ! -e "${BASIC_AUTH_FILE}" ]; then

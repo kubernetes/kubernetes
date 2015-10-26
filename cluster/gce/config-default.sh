@@ -20,12 +20,12 @@ GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-2}
 MINION_SIZE=${MINION_SIZE:-n1-standard-2}
-NUM_MINIONS=${NUM_MINIONS:-4}
+NUM_MINIONS=${NUM_MINIONS:-3}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 MINION_DISK_TYPE=pd-standard
 MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
-REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_MINION=${PREEMPTIBLE_MINION:-false}
 
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
@@ -96,16 +96,14 @@ if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
 fi
 
-# Optional: Enable feature for autoscaling number of pods
-# Experimental feature, not ready for production use.
-ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
-if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
-  ENABLE_EXPERIMENTAL_API=true
-fi
-
 # Optional: Enable deployment experimental feature, not ready for production use.
 ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
 if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+# Optional: Enable daemonset experimental feature, not ready for production use.
+ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-false}"
+if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
 

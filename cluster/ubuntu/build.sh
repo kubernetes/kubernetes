@@ -33,7 +33,7 @@ mkdir -p binaries/master
 mkdir -p binaries/minion
 
 # flannel
-FLANNEL_VERSION=${FLANNEL_VERSION:-"0.4.0"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
 echo "Prepare flannel ${FLANNEL_VERSION} release ..."
 if [ ! -f flannel.tar.gz ] ; then
   curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz

@@ -1,7 +1,7 @@
 //+build unsafe
 
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -26,6 +26,9 @@ type unsafeBytes struct {
 // In unsafe mode, it doesn't incur allocation and copying caused by conversion.
 // In regular safe mode, it is an allocation and copy.
 func stringView(v []byte) string {
+	if len(v) == 0 {
+		return ""
+	}
 	x := unsafeString{uintptr(unsafe.Pointer(&v[0])), len(v)}
 	return *(*string)(unsafe.Pointer(&x))
 }
@@ -34,6 +37,9 @@ func stringView(v []byte) string {
 // In unsafe mode, it doesn't incur allocation and copying caused by conversion.
 // In regular safe mode, it is an allocation and copy.
 func bytesView(v string) []byte {
+	if len(v) == 0 {
+		return zeroByteSlice
+	}
 	x := unsafeBytes{uintptr(unsafe.Pointer(&v)), len(v), len(v)}
 	return *(*[]byte)(unsafe.Pointer(&x))
 }

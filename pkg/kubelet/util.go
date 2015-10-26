@@ -19,14 +19,15 @@ package kubelet
 import (
 	"fmt"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
+func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) api.ResourceList {
 	c := api.ResourceList{
 		api.ResourceCPU: *resource.NewMilliQuantity(
 			int64(info.NumCores*1000),
@@ -40,7 +41,7 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 
 // Check whether we have the capabilities to run the specified pod.
 func canRunPod(pod *api.Pod) error {
-	if pod.Spec.HostNetwork {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
 		allowed, err := allowHostNetwork(pod)
 		if err != nil {
 			return err
@@ -50,7 +51,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.HostPID {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
 		allowed, err := allowHostPID(pod)
 		if err != nil {
 			return err
@@ -60,7 +61,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.HostIPC {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
 		allowed, err := allowHostIPC(pod)
 		if err != nil {
 			return err
@@ -82,7 +83,7 @@ func canRunPod(pod *api.Pod) error {
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostNetwork(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
 	}
@@ -96,7 +97,7 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostPID(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
 	}
@@ -110,7 +111,7 @@ func allowHostPID(pod *api.Pod) (bool, error) {
 
 // Determined whether the specified pod is allowed to use host ipc
 func allowHostIPC(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
 	}

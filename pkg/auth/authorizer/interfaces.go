@@ -17,6 +17,8 @@ limitations under the License.
 package authorizer
 
 import (
+	"net/http"
+
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -61,6 +63,11 @@ type AuthorizerFunc func(a Attributes) error
 
 func (f AuthorizerFunc) Authorize(a Attributes) error {
 	return f(a)
+}
+
+// RequestAttributesGetter provides a function that extracts Attributes from an http.Request
+type RequestAttributesGetter interface {
+	GetRequestAttributes(user.Info, *http.Request) Attributes
 }
 
 // AttributesRecord implements Attributes interface.

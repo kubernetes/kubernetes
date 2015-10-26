@@ -50,17 +50,14 @@ func (rcStrategy) PrepareForCreate(obj runtime.Object) {
 	controller.Status = api.ReplicationControllerStatus{}
 
 	controller.Generation = 1
-	controller.Status.ObservedGeneration = 0
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	// TODO: once RC has a status sub-resource we can enable this.
-	//newController := obj.(*api.ReplicationController)
-	//oldController := old.(*api.ReplicationController)
-	//newController.Status = oldController.Status
 	newController := obj.(*api.ReplicationController)
 	oldController := old.(*api.ReplicationController)
+	// update is not allowed to set status
+	newController.Status = oldController.Status
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -124,4 +121,21 @@ func MatchController(label labels.Selector, field fields.Selector) generic.Match
 			return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), nil
 		},
 	}
+}
+
+type rcStatusStrategy struct {
+	rcStrategy
+}
+
+var StatusStrategy = rcStatusStrategy{Strategy}
+
+func (rcStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newRc := obj.(*api.ReplicationController)
+	oldRc := old.(*api.ReplicationController)
+	// update is not allowed to set spec
+	newRc.Spec = oldRc.Spec
+}
+
+func (rcStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateReplicationControllerStatusUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
 }

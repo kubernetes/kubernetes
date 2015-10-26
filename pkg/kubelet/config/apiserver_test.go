@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -67,8 +67,8 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update := got.(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource, pod1v1)
+	update := got.(kubetypes.PodUpdate)
+	expected := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v1)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v; Got %#v", expected, update)
 	}
@@ -79,10 +79,10 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update = got.(kubelet.PodUpdate)
+	update = got.(kubetypes.PodUpdate)
 	// Could be sorted either of these two ways:
-	expectedA := CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource, pod1v1, pod2)
-	expectedB := CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource, pod2, pod1v1)
+	expectedA := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v1, pod2)
+	expectedB := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2, pod1v1)
 
 	if !api.Semantic.DeepEqual(expectedA, update) && !api.Semantic.DeepEqual(expectedB, update) {
 		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, update)
@@ -94,9 +94,9 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update = got.(kubelet.PodUpdate)
-	expectedA = CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource, pod1v2, pod2)
-	expectedB = CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource, pod2, pod1v2)
+	update = got.(kubetypes.PodUpdate)
+	expectedA = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v2, pod2)
+	expectedB = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2, pod1v2)
 
 	if !api.Semantic.DeepEqual(expectedA, update) && !api.Semantic.DeepEqual(expectedB, update) {
 		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, update)
@@ -108,8 +108,8 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update = got.(kubelet.PodUpdate)
-	expected = CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource, pod2)
+	update = got.(kubetypes.PodUpdate)
+	expected = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
@@ -120,8 +120,8 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update = got.(kubelet.PodUpdate)
-	expected = CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource)
+	update = got.(kubetypes.PodUpdate)
+	expected = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
@@ -150,7 +150,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update := got.(kubelet.PodUpdate)
+	update := got.(kubetypes.PodUpdate)
 	// Make sure that we get both pods.  Catches bug #2294.
 	if !(len(update.Pods) == 2) {
 		t.Errorf("Expected %d, Got %d", 2, len(update.Pods))
@@ -162,7 +162,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update = got.(kubelet.PodUpdate)
+	update = got.(kubetypes.PodUpdate)
 	if !(len(update.Pods) == 1) {
 		t.Errorf("Expected %d, Got %d", 1, len(update.Pods))
 	}
@@ -184,8 +184,8 @@ func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	update := got.(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.ApiserverSource)
+	update := got.(kubetypes.PodUpdate)
+	expected := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v; Got %#v", expected, update)
 	}

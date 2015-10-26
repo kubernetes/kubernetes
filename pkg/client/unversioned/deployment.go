@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,22 +31,22 @@ type DeploymentsNamespacer interface {
 
 // DeploymentInterface has methods to work with Deployment resources.
 type DeploymentInterface interface {
-	List(label labels.Selector, field fields.Selector) (*experimental.DeploymentList, error)
-	Get(name string) (*experimental.Deployment, error)
+	List(label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error)
+	Get(name string) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Create(Deployment *experimental.Deployment) (*experimental.Deployment, error)
-	Update(Deployment *experimental.Deployment) (*experimental.Deployment, error)
+	Create(Deployment *extensions.Deployment) (*extensions.Deployment, error)
+	Update(Deployment *extensions.Deployment) (*extensions.Deployment, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	client *ExperimentalClient
+	client *ExtensionsClient
 	ns     string
 }
 
 // newDeployments returns a Deployments
-func newDeployments(c *ExperimentalClient, namespace string) *deployments {
+func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	return &deployments{
 		client: c,
 		ns:     namespace,
@@ -54,15 +54,15 @@ func newDeployments(c *ExperimentalClient, namespace string) *deployments {
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(label labels.Selector, field fields.Selector) (result *experimental.DeploymentList, err error) {
-	result = &experimental.DeploymentList{}
+func (c *deployments) List(label labels.Selector, field fields.Selector) (result *extensions.DeploymentList, err error) {
+	result = &extensions.DeploymentList{}
 	err = c.client.Get().Namespace(c.ns).Resource("deployments").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *deployments) Get(name string) (result *experimental.Deployment, err error) {
-	result = &experimental.Deployment{}
+func (c *deployments) Get(name string) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
 	err = c.client.Get().Namespace(c.ns).Resource("deployments").Name(name).Do().Into(result)
 	return
 }
@@ -80,15 +80,15 @@ func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Create(deployment *experimental.Deployment) (result *experimental.Deployment, err error) {
-	result = &experimental.Deployment{}
+func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
 	err = c.client.Post().Namespace(c.ns).Resource("deployments").Body(deployment).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Update(deployment *experimental.Deployment) (result *experimental.Deployment, err error) {
-	result = &experimental.Deployment{}
+func (c *deployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
 	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(deployment).Do().Into(result)
 	return
 }

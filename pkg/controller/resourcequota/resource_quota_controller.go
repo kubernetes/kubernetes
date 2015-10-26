@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourcequotacontroller
+package resourcequota
 
 import (
 	"fmt"
@@ -58,7 +58,7 @@ func (rm *ResourceQuotaController) Run(period time.Duration) {
 
 func (rm *ResourceQuotaController) synchronize() {
 	var resourceQuotas []api.ResourceQuota
-	list, err := rm.kubeClient.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
+	list, err := rm.kubeClient.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 	}
@@ -165,19 +165,19 @@ func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 		case api.ResourcePods:
 			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
 		case api.ResourceServices:
-			items, err := rm.kubeClient.Services(usage.Namespace).List(labels.Everything())
+			items, err := rm.kubeClient.Services(usage.Namespace).List(labels.Everything(), fields.Everything())
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceReplicationControllers:
-			items, err := rm.kubeClient.ReplicationControllers(usage.Namespace).List(labels.Everything())
+			items, err := rm.kubeClient.ReplicationControllers(usage.Namespace).List(labels.Everything(), fields.Everything())
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
-			items, err := rm.kubeClient.ResourceQuotas(usage.Namespace).List(labels.Everything())
+			items, err := rm.kubeClient.ResourceQuotas(usage.Namespace).List(labels.Everything(), fields.Everything())
 			if err != nil {
 				return err
 			}

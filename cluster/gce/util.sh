@@ -39,13 +39,8 @@ KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 # multiple versions of the server are being used in the same project
 # simultaneously (e.g. on Jenkins).
 KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX-""}
-
-# VERSION_REGEX matches things like "v0.13.1"
-readonly KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-
-# CI_VERSION_REGEX matches things like "v0.14.1-341-ge0c9d9e"
-readonly KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(.*)$"
-
+# How long (in seconds) to wait for cluster initialization.
+KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
 
 function join_csv {
   local IFS=','; echo "$*";
@@ -55,15 +50,30 @@ function join_csv {
 function verify-prereqs {
   if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
     if [[ -z "${RUNTIME_CONFIG}" ]]; then
-      RUNTIME_CONFIG="experimental/v1alpha1=true"
+      RUNTIME_CONFIG="extensions/v1beta1=true"
     else
-      # TODO: add checking if RUNTIME_CONFIG contains "experimental/v1alpha1=false" and appending "experimental/v1alpha1=true" if not.
-      if echo "${RUNTIME_CONFIG}" | grep -q -v "experimental/v1alpha1=true"; then
-        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+      # TODO: add checking if RUNTIME_CONFIG contains "extensions/v1beta1=false" and appending "extensions/v1beta1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1=true"; then
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!" >&2
         exit 1
       fi
     fi
   fi
+  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
+    else
+      RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
+    fi
+  fi
+  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
+    else
+      RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
+    fi
+  fi
+
 
   local cmd
   for cmd in gcloud gsutil; do
@@ -79,8 +89,8 @@ function verify-prereqs {
         curl https://sdk.cloud.google.com | bash
       fi
       if ! which "${cmd}" >/dev/null; then
-        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
-        echo "SDK can be downloaded from https://cloud.google.com/sdk/."
+        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
+        echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
         exit 1
       fi
     fi
@@ -109,31 +119,6 @@ function ensure-temp-dir {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
-# Verify and find the various tar files that we are going to use on the server.
-#
-# Vars set:
-#   SERVER_BINARY_TAR
-#   SALT_TAR
-function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
-    exit 1
-  fi
-
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
-  fi
-  if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
-    exit 1
   fi
 }
 
@@ -331,6 +316,30 @@ function wait-for-jobs {
   fi
 }
 
+# Robustly try to create a static ip.
+# $1: The name of the ip to create
+# $2: The name of the region to create the ip in.
+function create-static-ip {
+  detect-project
+  local attempt=0
+  local REGION="$2"
+  while true; do
+    if ! gcloud compute addresses create "$1" \
+      --project "${PROJECT}" \
+      --region "${REGION}" -q > /dev/null; then
+      if (( attempt > 4 )); then
+        echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
+        exit 2
+      fi
+      attempt=$(($attempt+1)) 
+      echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
+      sleep $(($attempt * 5))
+    else
+      break
+    fi
+  done
+}
+
 # Robustly try to create a firewall rule.
 # $1: The name of firewall rule.
 # $2: IP ranges.
@@ -345,12 +354,13 @@ function create-firewall-rule {
       --source-ranges "$2" \
       --target-tags "$3" \
       --allow tcp,udp,icmp,esp,ah,sctp; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}"
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}"
-        attempt=$(($attempt+1))
+      if (( attempt > 4 )); then
+        echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}" >&2
+        exit 2
+      fi
+      echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
+      attempt=$(($attempt+1))
+      sleep $(($attempt * 5))
     else
         break
     fi
@@ -431,10 +441,10 @@ function add-instance-metadata {
       --zone "${ZONE}" \
       --metadata "${kvs[@]}"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
+          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -458,10 +468,10 @@ function add-instance-metadata-from-file {
       --zone "${ZONE}" \
       --metadata-from-file "$(join_csv ${kvs[@]})"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
+          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -545,7 +555,7 @@ function create-certs {
     ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
-    echo "=== Failed to generate certificates: Aborting ==="
+    echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
@@ -656,7 +666,8 @@ function kube-up {
   # so extract the region name, which is the same as the zone but with the final
   # dash and characters trailing the dash removed.
   local REGION=${ZONE%-*}
-  MASTER_RESERVED_IP=$(gcloud compute addresses create "${MASTER_NAME}-ip" \
+  create-static-ip "${MASTER_NAME}-ip" "${REGION}"
+  MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
     --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
 
@@ -725,11 +736,10 @@ function kube-up {
         --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
   fi
 
-  echo "Waiting for cluster initialization."
+  echo "Waiting up to ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds for cluster initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
-  echo "  This might loop forever if there was some uncaught error during start"
-  echo "  up."
+  echo "  This may time out if there was some uncaught error during start up."
   echo
 
   # curl in mavericks is borked.
@@ -740,12 +750,17 @@ function kube-up {
     fi
   fi
 
-
+  local start_time=$(date +%s)
   until curl --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
           --max-time 5 --fail --output /dev/null --silent \
           "https://${KUBE_MASTER_IP}/api/v1/pods"; do
+      local elapsed=$(($(date +%s) - ${start_time}))
+      if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
+          echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
+          exit 2
+      fi
       printf "."
       sleep 2
   done

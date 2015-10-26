@@ -153,7 +153,8 @@ coreos:
         --cluster-domain=cluster.local \
         --logtostderr=true \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
-        --rkt-path=/opt/rkt/rkt/rkt
+        --rkt-path=/opt/rkt/rkt/rkt \
+        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0}
         Restart=always
         RestartSec=10
 
@@ -177,31 +178,10 @@ coreos:
         Restart=always
         RestartSec=10
 
-    - name: rkt-metadata.socket
+    - name: docker.service
       command: start
-      content: |
-        [Unit]
-        Description=rkt metadata service socket
-        PartOf=rkt-metadata.service
-        Requires=kubernetes-install-rkt.service
-        After=kubernetes-install-rkt.service
-        [Socket]
-        ListenStream=/run/rkt/metadata-svc.sock
-        SocketMode=0660
-        SocketUser=root
-        SocketGroup=root
-        RemoveOnStop=true
-
-    - name: rkt-metadata.service
-      command: start
-      content: |
-        [Unit]
-        Description=rkt metadata service
-        Documentation=http://github.com/coreos/rkt
-        Requires=rkt-metadata.socket
-        After=network.target rkt-metadata.socket
-        Requires=kubernetes-install-rkt.service
-        After=kubernetes-install-rkt.service
-        [Service]
-        EnvironmentFile=/etc/kube-env
-        ExecStart=/opt/rkt/rkt/rkt metadata-service
+      drop-ins:
+        - name: 50-docker-opts.conf
+          content: |
+            [Service]
+            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'

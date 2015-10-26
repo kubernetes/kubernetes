@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	offerMetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
+	offermetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
@@ -46,8 +46,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -351,7 +351,7 @@ func (k *KubernetesScheduler) OfferRescinded(driver bindings.SchedulerDriver, of
 	log.Infof("Offer rescinded %v\n", offerId)
 
 	oid := offerId.GetValue()
-	k.offers.Delete(oid, offerMetrics.OfferRescinded)
+	k.offers.Delete(oid, offermetrics.OfferRescinded)
 }
 
 // StatusUpdate is called when a status update message is sent to the scheduler.
@@ -437,16 +437,18 @@ func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDri
 	if (state == podtask.StateRunning || state == podtask.StatePending) &&
 		((taskStatus.GetSource() == mesos.TaskStatus_SOURCE_MASTER && taskStatus.GetReason() == mesos.TaskStatus_REASON_RECONCILIATION) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED)) {
+			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED) ||
+			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.ContainersDisappeared)) {
 		//--
 		// pod-task has metadata that refers to:
 		// (1) a task that Mesos no longer knows about, or else
 		// (2) a pod that the Kubelet will never report as "failed"
+		// (3) a pod that the kubeletExecutor reported as lost (likely due to docker daemon crash/restart)
 		// For now, destroy the pod and hope that there's a replication controller backing it up.
 		// TODO(jdef) for case #2 don't delete the pod, just update it's status to Failed
 		pod := &task.Pod
 		log.Warningf("deleting rogue pod %v/%v for lost task %v", pod.Namespace, pod.Name, task.ID)
-		if err := k.client.Pods(pod.Namespace).Delete(pod.Name, nil); err != nil && !errors.IsNotFound(err) {
+		if err := k.client.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
 			log.Errorf("failed to delete pod %v/%v for terminal task %v: %v", pod.Namespace, pod.Name, task.ID, err)
 		}
 	} else if taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED || taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED {
@@ -897,7 +899,7 @@ func (ks *KubernetesScheduler) recoverTasks() error {
 		ks.slaveHostNames.Register(slaveId, t.Offer.Host())
 	}
 	for _, pod := range podList.Items {
-		if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
+		if _, isMirrorPod := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; isMirrorPod {
 			// mirrored pods are never reconciled because the scheduler isn't responsible for
 			// scheduling them; they're started by the executor/kubelet upon instantiation and
 			// reflected in the apiserver afterward. the scheduler has no knowledge of them.

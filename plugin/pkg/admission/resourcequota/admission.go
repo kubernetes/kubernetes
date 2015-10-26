@@ -27,11 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/resourcequota"
+	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -51,7 +51,7 @@ type quota struct {
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
+			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
@@ -261,5 +261,5 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 		}
 	}
 
-	return dirty, errors.NewAggregate(errs)
+	return dirty, utilerrors.NewAggregate(errs)
 }

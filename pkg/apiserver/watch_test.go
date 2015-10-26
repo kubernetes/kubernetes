@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -47,9 +48,9 @@ var watchTestTable = []struct {
 	t   watch.EventType
 	obj runtime.Object
 }{
-	{watch.Added, &Simple{ObjectMeta: api.ObjectMeta{Name: "foo"}}},
-	{watch.Modified, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
-	{watch.Deleted, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
+	{watch.Added, &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "foo"}}},
+	{watch.Modified, &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
+	{watch.Deleted, &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
 }
 
 func TestWatchWebsocket(t *testing.T) {
@@ -363,7 +364,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
-	watcher.Add(&Simple{TypeMeta: unversioned.TypeMeta{APIVersion: newVersion}})
+	watcher.Add(&apiservertesting.Simple{TypeMeta: unversioned.TypeMeta{APIVersion: newVersion}})
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)

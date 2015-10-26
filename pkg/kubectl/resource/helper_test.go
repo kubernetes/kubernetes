@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/labels"
@@ -129,7 +130,6 @@ func TestHelperCreate(t *testing.T) {
 		return true
 	}
 
-	grace := int64(30)
 	tests := []struct {
 		Resp     *http.Response
 		RespFunc fake.HTTPClientFunc
@@ -173,11 +173,7 @@ func TestHelperCreate(t *testing.T) {
 			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			Resp: &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})},
 			Req:  expectPost,
@@ -332,7 +328,7 @@ func TestHelperList(t *testing.T) {
 					t.Errorf("url doesn't contain name: %#v", req.URL)
 					return false
 				}
-				if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Default.Version())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
+				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
 					t.Errorf("url doesn't contain query parameters: %#v", req.URL)
 					return false
 				}
@@ -384,7 +380,6 @@ func TestHelperReplace(t *testing.T) {
 		return true
 	}
 
-	grace := int64(30)
 	tests := []struct {
 		Resp      *http.Response
 		RespFunc  fake.HTTPClientFunc
@@ -421,11 +416,7 @@ func TestHelperReplace(t *testing.T) {
 			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			Overwrite: true,
 			RespFunc: func(req *http.Request) (*http.Response, error) {

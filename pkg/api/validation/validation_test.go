@@ -191,10 +191,10 @@ func TestValidateAnnotations(t *testing.T) {
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
 		{"UpperCase123": "bar"},
-		{"a": strings.Repeat("b", (64*1024)-1)},
+		{"a": strings.Repeat("b", totalAnnotationSizeLimitB-1)},
 		{
-			"a": strings.Repeat("b", (32*1024)-1),
-			"c": strings.Repeat("d", (32*1024)-1),
+			"a": strings.Repeat("b", totalAnnotationSizeLimitB/2-1),
+			"c": strings.Repeat("d", totalAnnotationSizeLimitB/2-1),
 		},
 	}
 	for i := range successCases {
@@ -221,10 +221,10 @@ func TestValidateAnnotations(t *testing.T) {
 		}
 	}
 	totalSizeErrorCases := []map[string]string{
-		{"a": strings.Repeat("b", 64*1024)},
+		{"a": strings.Repeat("b", totalAnnotationSizeLimitB)},
 		{
-			"a": strings.Repeat("b", 32*1024),
-			"c": strings.Repeat("d", 32*1024),
+			"a": strings.Repeat("b", totalAnnotationSizeLimitB/2),
+			"c": strings.Repeat("d", totalAnnotationSizeLimitB/2),
 		},
 	}
 	for i := range totalSizeErrorCases {
@@ -1259,20 +1259,25 @@ func TestValidatePodSpec(t *testing.T) {
 					{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
 				},
 			},
-			HostNetwork:   true,
-			HostIPC:       true,
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate HostIPC.
-			HostIPC:       true,
+			SecurityContext: &api.PodSecurityContext{
+				HostIPC: true,
+			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate HostPID.
-			HostPID:       true,
+			SecurityContext: &api.PodSecurityContext{
+				HostPID: true,
+			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
@@ -1324,7 +1329,9 @@ func TestValidatePodSpec(t *testing.T) {
 					{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
 				},
 			},
-			HostNetwork:   true,
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -2094,6 +2101,89 @@ func TestValidateService(t *testing.T) {
 	}
 }
 
+func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
+	validSelector := map[string]string{"a": "b"}
+	validPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: api.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
+	type rcUpdateTest struct {
+		old    api.ReplicationController
+		update api.ReplicationController
+	}
+	successCases := []rcUpdateTest{
+		{
+			old: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: api.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas: 2,
+				},
+			},
+			update: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 3,
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas: 4,
+				},
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateReplicationControllerStatusUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := map[string]rcUpdateTest{
+		"negative replicas": {
+			old: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: api.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas: 3,
+				},
+			},
+			update: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 2,
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas: -3,
+				},
+			},
+		},
+	}
+	for testName, errorCase := range errorCases {
+		if errs := ValidateReplicationControllerStatusUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
+			t.Errorf("expected failure: %s", testName)
+		}
+	}
+
+}
+
 func TestValidateReplicationControllerUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -2468,7 +2558,8 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "spec.replicas" &&
 				field != "spec.template.labels" &&
 				field != "metadata.annotations" &&
-				field != "metadata.labels" {
+				field != "metadata.labels" &&
+				field != "status.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -3153,6 +3244,21 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 
+	fractionalComputeSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100m"),
+		},
+	}
+
+	fractionalPodSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourcePods:                   resource.MustParse(".1"),
+			api.ResourceServices:               resource.MustParse(".5"),
+			api.ResourceReplicationControllers: resource.MustParse("1.25"),
+			api.ResourceQuotas:                 resource.MustParse("2.5"),
+		},
+	}
+
 	successCases := []api.ResourceQuota{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -3160,6 +3266,13 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: spec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: fractionalComputeSpec,
 		},
 	}
 
@@ -3192,6 +3305,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"negative-limits": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
 			isNegativeErrorMsg,
+		},
+		"fractional-api-resource": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
+			isNotIntegerErrorMsg,
 		},
 	}
 	for k, v := range errorCases {

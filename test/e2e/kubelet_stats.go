@@ -29,7 +29,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	cadvisor "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -39,9 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/prometheus/client_golang/extraction"
-	"github.com/prometheus/client_golang/model"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -64,10 +62,13 @@ func (a KubeletMetricByLatency) Len() int           { return len(a) }
 func (a KubeletMetricByLatency) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KubeletMetricByLatency) Less(i, j int) bool { return a[i].Latency > a[j].Latency }
 
-// KubeletMetricIngester implements extraction.Ingester
-type kubeletMetricIngester []KubeletMetric
+// ParseKubeletMetrics reads metrics from the kubelet server running on the given node
+func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
+	samples, err := extractMetricSamples(metricsBlob)
+	if err != nil {
+		return nil, err
+	}
 
-func (k *kubeletMetricIngester) Ingest(samples model.Samples) error {
 	acceptedMethods := sets.NewString(
 		metrics.PodWorkerLatencyKey,
 		metrics.PodWorkerStartLatencyKey,
@@ -79,6 +80,7 @@ func (k *kubeletMetricIngester) Ingest(samples model.Samples) error {
 		metrics.DockerErrorsKey,
 	)
 
+	var kms []KubeletMetric
 	for _, sample := range samples {
 		const prefix = metrics.KubeletSubsystem + "_"
 		metricName := string(sample.Metric[model.MetricNameLabel])
@@ -106,16 +108,14 @@ func (k *kubeletMetricIngester) Ingest(samples model.Samples) error {
 			}
 		}
 
-		*k = append(*k, KubeletMetric{operation, method, quantile, time.Duration(int64(latency)) * time.Microsecond})
+		kms = append(kms, KubeletMetric{
+			operation,
+			method,
+			quantile,
+			time.Duration(int64(latency)) * time.Microsecond,
+		})
 	}
-	return nil
-}
-
-// ReadKubeletMetrics reads metrics from the kubelet server running on the given node
-func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
-	var ingester kubeletMetricIngester
-	err := extraction.Processor004.ProcessSingle(strings.NewReader(metricsBlob), &ingester, &extraction.ProcessOptions{})
-	return ingester, err
+	return kms, nil
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
@@ -147,9 +147,9 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	return badMetrics, nil
 }
 
-// getContainerInfo contacts kubelet for the container informaton. The "Stats"
+// getContainerInfo contacts kubelet for the container information. The "Stats"
 // in the returned ContainerInfo is subject to the requirements in statsRequest.
-func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisor.ContainerInfo, error) {
+func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsReque
 		Body(reqBody).
 		Do().Raw()
 
-	var containers map[string]cadvisor.ContainerInfo
+	var containers map[string]cadvisorapi.ContainerInfo
 	err = json.Unmarshal(data, &containers)
 	if err != nil {
 		return nil, err
@@ -214,14 +214,14 @@ func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsa
 // cpuInterval.
 // The acceptable range of the interval is 2s~120s. Be warned that as the
 // interval (and #containers) increases, the size of kubelet's response
-// could be sigificant. E.g., the 60s interval stats for ~20 containers is
+// could be significant. E.g., the 60s interval stats for ~20 containers is
 // ~1.5MB. Don't hammer the node with frequent, heavy requests.
 //
 // cadvisor records cumulative cpu usage in nanoseconds, so we need to have two
 // stats points to compute the cpu usage over the interval. Assuming cadvisor
 // polls every second, we'd need to get N stats points for N-second interval.
 // Note that this is an approximation and may not be accurate, hence we also
-// write the actual interval used for calcuation (based on the timestampes of
+// write the actual interval used for calculation (based on the timestamps of
 // the stats points in containerResourceUsage.CPUInterval.
 func getOneTimeResourceUsageOnNode(c *client.Client, nodeName string, cpuInterval time.Duration) (map[string]*containerResourceUsage, error) {
 	numStats := int(float64(cpuInterval.Seconds()) / cadvisorStatsPollingIntervalInSeconds)
@@ -281,7 +281,7 @@ func formatResourceUsageStats(nodeName string, containerStats map[string]*contai
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
 	for name, s := range containerStats {
-		fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, s.CPUUsageInCores, float64(s.MemoryUsageInBytes)/1000000)
+		fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, s.CPUUsageInCores, float64(s.MemoryWorkingSetInBytes)/(1024*1024))
 	}
 	w.Flush()
 	return fmt.Sprintf("Resource usage on node %q:\n%s", nodeName, buf.String())
@@ -332,7 +332,7 @@ func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
 	return result, nil
 }
 
-func computeContainerResourceUsage(name string, oldStats, newStats *cadvisor.ContainerStats) *containerResourceUsage {
+func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapi.ContainerStats) *containerResourceUsage {
 	return &containerResourceUsage{
 		Name:                    name,
 		Timestamp:               newStats.Timestamp,
@@ -367,11 +367,11 @@ func newResourceCollector(c *client.Client, nodeName string, containerNames []st
 	}
 }
 
-// Start starts a goroutine to poll the node every pollingInerval.
+// Start starts a goroutine to poll the node every pollingInterval.
 func (r *resourceCollector) Start() {
 	r.stopCh = make(chan struct{}, 1)
 	// Keep the last observed stats for comparison.
-	oldStats := make(map[string]*cadvisor.ContainerStats)
+	oldStats := make(map[string]*cadvisorapi.ContainerStats)
 	go util.Until(func() { r.collectStats(oldStats) }, r.pollingInterval, r.stopCh)
 }
 
@@ -382,7 +382,7 @@ func (r *resourceCollector) Stop() {
 
 // collectStats gets the latest stats from kubelet's /stats/container, computes
 // the resource usage, and pushes it to the buffer.
-func (r *resourceCollector) collectStats(oldStats map[string]*cadvisor.ContainerStats) {
+func (r *resourceCollector) collectStats(oldStats map[string]*cadvisorapi.ContainerStats) {
 	infos, err := getContainerInfo(r.client, r.node, &kubelet.StatsRequest{
 		ContainerName: "/",
 		NumStats:      1,

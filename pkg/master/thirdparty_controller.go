@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	expapi "k8s.io/kubernetes/pkg/apis/experimental"
+	expapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"

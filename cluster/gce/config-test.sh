@@ -46,7 +46,8 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.245.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 MINION_SCOPES="${MINION_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
-ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
+ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-true}"
+TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
@@ -61,10 +62,11 @@ SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=4}"
+TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m}"
 
 KUBELET_TEST_ARGS="--max-pods=100 $TEST_CLUSTER_LOG_LEVEL"
-APISERVER_TEST_ARGS="--runtime-config=experimental/v1alpha1 ${TEST_CLUSTER_LOG_LEVEL}"
-CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
+APISERVER_TEST_ARGS="--runtime-config=extensions/v1beta1 ${TEST_CLUSTER_LOG_LEVEL}"
+CONTROLLER_MANAGER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL} ${TEST_CLUSTER_RESYNC_PERIOD}"
 SCHEDULER_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_ARGS="${TEST_CLUSTER_LOG_LEVEL}"
 
@@ -104,20 +106,19 @@ if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
 fi
 
-# Optional: Enable feature for autoscaling number of pods
-# Experimental feature, not ready for production use.
-ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-false}"
-if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
-  ENABLE_EXPERIMENTAL_API=true
-fi
-
 # Optional: Enable deployment experimental feature, not ready for production use.
 ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
 if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
 
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+# Optional: Enable daemonset experimental feature, not ready for production use.
+ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-true}"
+if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+
+ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota}"
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

@@ -208,7 +208,7 @@ func (w *etcdWatcher) translate() {
 }
 
 func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
-	if obj, found := w.cache.getFromCache(node.ModifiedIndex); found {
+	if obj, found := w.cache.getFromCache(node.ModifiedIndex, storage.Everything); found {
 		return obj, nil
 	}
 

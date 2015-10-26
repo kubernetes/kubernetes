@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
@@ -66,6 +67,60 @@ func NewSwaggerSchemaFromBytes(data []byte) (Schema, error) {
 	return schema, nil
 }
 
+// validateList unpack a list and validate every item in the list.
+// It return nil if every item is ok.
+// Otherwise it return an error list contain errors of every item.
+func (s *SwaggerSchema) validateList(obj map[string]interface{}) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	items, exists := obj["items"]
+	if !exists {
+		return append(allErrs, fmt.Errorf("no items field in %#v", obj))
+	}
+	itemList, ok := items.([]interface{})
+	if !ok {
+		return append(allErrs, fmt.Errorf("items isn't a slice"))
+	}
+	for i, item := range itemList {
+		fields, ok := item.(map[string]interface{})
+		if !ok {
+			allErrs = append(allErrs, fmt.Errorf("items[%d] isn't a map[string]interface{}", i))
+			continue
+		}
+		groupVersion := fields["apiVersion"]
+		if groupVersion == nil {
+			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion not set", i))
+			continue
+		}
+		itemVersion, ok := groupVersion.(string)
+		if !ok {
+			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion isn't string type", i))
+			continue
+		}
+		if len(itemVersion) == 0 {
+			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion is empty", i))
+		}
+		kind := fields["kind"]
+		if kind == nil {
+			allErrs = append(allErrs, fmt.Errorf("items[%d].kind not set", i))
+			continue
+		}
+		itemKind, ok := kind.(string)
+		if !ok {
+			allErrs = append(allErrs, fmt.Errorf("items[%d].kind isn't string type", i))
+			continue
+		}
+		if len(itemKind) == 0 {
+			allErrs = append(allErrs, fmt.Errorf("items[%d].kind is empty", i))
+		}
+		version := apiutil.GetVersion(itemVersion)
+		errs := s.ValidateObject(item, "", version+"."+itemKind)
+		if len(errs) >= 1 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+	return allErrs
+}
+
 func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	var obj interface{}
 	out, err := yaml.ToJSON(data)
@@ -84,22 +139,30 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	if groupVersion == nil {
 		return fmt.Errorf("apiVersion not set")
 	}
+	if _, ok := groupVersion.(string); !ok {
+		return fmt.Errorf("apiVersion isn't string type")
+	}
 	kind := fields["kind"]
 	if kind == nil {
 		return fmt.Errorf("kind not set")
+	}
+	if _, ok := kind.(string); !ok {
+		return fmt.Errorf("kind isn't string type")
+	}
+	if strings.HasSuffix(kind.(string), "List") {
+		return utilerrors.NewAggregate(s.validateList(fields))
 	}
 	version := apiutil.GetVersion(groupVersion.(string))
 	allErrs := s.ValidateObject(obj, "", version+"."+kind.(string))
 	if len(allErrs) == 1 {
 		return allErrs[0]
 	}
-	return errors.NewAggregate(allErrs)
+	return utilerrors.NewAggregate(allErrs)
 }
 
 func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	models := s.api.Models
-	// TODO: handle required fields here too.
 	model, ok := models.At(typeName)
 	if !ok {
 		return append(allErrs, fmt.Errorf("couldn't find type: %s", typeName))

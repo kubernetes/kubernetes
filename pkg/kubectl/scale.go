@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -83,7 +83,7 @@ func (precondition *ScalePrecondition) ValidateReplicationController(controller 
 }
 
 // ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
-func (precondition *ScalePrecondition) ValidateJob(job *experimental.Job) error {
+func (precondition *ScalePrecondition) ValidateJob(job *extensions.Job) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
 	}
@@ -202,7 +202,7 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 
 // ScaleSimple is responsible for updating job's parallelism.
 func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
-	job, err := scaler.c.Experimental().Jobs(namespace).Get(name)
+	job, err := scaler.c.Extensions().Jobs(namespace).Get(name)
 	if err != nil {
 		return ControllerScaleError{ControllerScaleGetFailure, "Unknown", err}
 	}
@@ -213,7 +213,7 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	}
 	parallelism := int(newSize)
 	job.Spec.Parallelism = &parallelism
-	if _, err := scaler.c.Experimental().Jobs(namespace).Update(job); err != nil {
+	if _, err := scaler.c.Extensions().Jobs(namespace).Update(job); err != nil {
 		if errors.IsInvalid(err) {
 			return ControllerScaleError{ControllerScaleUpdateInvalidFailure, job.ResourceVersion, err}
 		}
@@ -239,7 +239,7 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 		return err
 	}
 	if waitForReplicas != nil {
-		job, err := scaler.c.Experimental().Jobs(namespace).Get(name)
+		job, err := scaler.c.Extensions().Jobs(namespace).Get(name)
 		if err != nil {
 			return err
 		}

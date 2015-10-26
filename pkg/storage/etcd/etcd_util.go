@@ -23,10 +23,9 @@ import (
 	"net/http"
 	"os/exec"
 
-	"k8s.io/kubernetes/pkg/tools"
-
 	goetcd "github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/tools"
 )
 
 // IsEtcdNotFound returns true if and only if err is an etcd not found error.

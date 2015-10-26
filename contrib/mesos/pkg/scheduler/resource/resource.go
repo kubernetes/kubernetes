@@ -19,7 +19,7 @@ package resource
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/controller/resourcequota"
+	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 )
 
 const (

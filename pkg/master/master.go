@@ -17,18 +17,15 @@ limitations under the License.
 package master
 
 import (
+	"crypto/tls"
 	"fmt"
-	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -36,9 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
-	expapi "k8s.io/kubernetes/pkg/apis/experimental"
+	expapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -82,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilsets "k8s.io/kubernetes/pkg/util/sets"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
@@ -90,6 +89,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
@@ -152,19 +152,28 @@ func (s *StorageDestinations) backends() []string {
 	backends := sets.String{}
 	for _, group := range s.APIGroups {
 		if group.Default != nil {
-			for _, backend := range group.Default.Backends() {
+			for _, backend := range group.Default.Backends(context.TODO()) {
 				backends.Insert(backend)
 			}
 		}
 		if group.Overrides != nil {
 			for _, storage := range group.Overrides {
-				for _, backend := range storage.Backends() {
+				for _, backend := range storage.Backends(context.TODO()) {
 					backends.Insert(backend)
 				}
 			}
 		}
 	}
 	return backends.List()
+}
+
+// Specifies the overrides for various API group versions.
+// This can be used to enable/disable entire group versions or specific resources.
+type APIGroupVersionOverride struct {
+	// Whether to enable or disable this group version.
+	Disable bool
+	// List of overrides for individual resources in this group version.
+	ResourceOverrides map[string]bool
 }
 
 // Config is a structure used to configure a Master.
@@ -181,9 +190,8 @@ type Config struct {
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow api versions to be conditionally disabled
-	DisableV1 bool
-	EnableExp bool
+	// Allows api group versions or specific resources to be conditionally enabled/disabled.
+	APIGroupVersionOverrides map[string]APIGroupVersionOverride
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -240,10 +248,24 @@ type Config struct {
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange util.PortRange
 
-	// Used for secure proxy.  If empty, don't use secure proxy.
-	SSHUser       string
-	SSHKeyfile    string
-	InstallSSHKey InstallSSHKey
+	// Used to customize default proxy dial/tls options
+	ProxyDialer          apiserver.ProxyDialerFunc
+	ProxyTLSClientConfig *tls.Config
+
+	// Used to start and monitor tunneling
+	Tunneler Tunneler
+
+	// Additional ports to be exposed on the master service
+	// extraServicePorts is injectable in the event that more ports
+	// (other than the default 443/tcp) are exposed on the master
+	// and those ports need to be load balanced by the master
+	// service because this pkg is linked by out-of-tree projects
+	// like openshift which want to use the master but also do
+	// more stuff.
+	ExtraServicePorts []api.ServicePort
+	// Additional ports to be exposed on the master endpoints
+	// Port names should align with ports defined in ExtraServicePorts
+	ExtraEndpointPorts []api.EndpointPort
 
 	KubernetesServiceNodePort int
 }
@@ -258,26 +280,25 @@ type Master struct {
 	cacheTimeout          time.Duration
 	minRequestTimeout     time.Duration
 
-	mux                   apiserver.Mux
-	muxHelper             *apiserver.MuxHelper
-	handlerContainer      *restful.Container
-	rootWebService        *restful.WebService
-	enableCoreControllers bool
-	enableLogsSupport     bool
-	enableUISupport       bool
-	enableSwaggerSupport  bool
-	enableProfiling       bool
-	enableWatchCache      bool
-	apiPrefix             string
-	apiGroupPrefix        string
-	corsAllowedOriginList []string
-	authenticator         authenticator.Request
-	authorizer            authorizer.Authorizer
-	admissionControl      admission.Interface
-	masterCount           int
-	v1                    bool
-	exp                   bool
-	requestContextMapper  api.RequestContextMapper
+	mux                      apiserver.Mux
+	muxHelper                *apiserver.MuxHelper
+	handlerContainer         *restful.Container
+	rootWebService           *restful.WebService
+	enableCoreControllers    bool
+	enableLogsSupport        bool
+	enableUISupport          bool
+	enableSwaggerSupport     bool
+	enableProfiling          bool
+	enableWatchCache         bool
+	apiPrefix                string
+	apiGroupPrefix           string
+	corsAllowedOriginList    []string
+	authenticator            authenticator.Request
+	authorizer               authorizer.Authorizer
+	admissionControl         admission.Interface
+	masterCount              int
+	apiGroupVersionOverrides map[string]APIGroupVersionOverride
+	requestContextMapper     api.RequestContextMapper
 
 	// External host is the name that should be used in external (public internet) URLs for this master
 	externalHost string
@@ -287,6 +308,8 @@ type Master struct {
 	serviceReadWriteIP   net.IP
 	serviceReadWritePort int
 	masterServices       *util.Runner
+	extraServicePorts    []api.ServicePort
+	extraEndpointPorts   []api.EndpointPort
 
 	// storage contains the RESTful endpoints exposed by this master
 	storage map[string]rest.Storage
@@ -305,14 +328,11 @@ type Master struct {
 	Handler         http.Handler
 	InsecureHandler http.Handler
 
-	// Used for secure proxy
-	dialer         apiserver.ProxyDialerFunc
-	tunnels        *util.SSHTunnelList
-	tunnelsLock    sync.Mutex
-	installSSHKey  InstallSSHKey
-	lastSync       int64 // Seconds since Epoch
-	lastSyncMetric prometheus.GaugeFunc
-	clock          util.Clock
+	// Used for custom proxy dialing, and proxy TLS options
+	proxyTransport http.RoundTripper
+
+	// Used to start and monitor tunneling
+	tunneler Tunneler
 
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
@@ -423,24 +443,23 @@ func New(c *Config) *Master {
 	}
 
 	m := &Master{
-		serviceClusterIPRange: c.ServiceClusterIPRange,
-		serviceNodePortRange:  c.ServiceNodePortRange,
-		rootWebService:        new(restful.WebService),
-		enableCoreControllers: c.EnableCoreControllers,
-		enableLogsSupport:     c.EnableLogsSupport,
-		enableUISupport:       c.EnableUISupport,
-		enableSwaggerSupport:  c.EnableSwaggerSupport,
-		enableProfiling:       c.EnableProfiling,
-		enableWatchCache:      c.EnableWatchCache,
-		apiPrefix:             c.APIPrefix,
-		apiGroupPrefix:        c.APIGroupPrefix,
-		corsAllowedOriginList: c.CorsAllowedOriginList,
-		authenticator:         c.Authenticator,
-		authorizer:            c.Authorizer,
-		admissionControl:      c.AdmissionControl,
-		v1:                    !c.DisableV1,
-		exp:                   c.EnableExp,
-		requestContextMapper:  c.RequestContextMapper,
+		serviceClusterIPRange:    c.ServiceClusterIPRange,
+		serviceNodePortRange:     c.ServiceNodePortRange,
+		rootWebService:           new(restful.WebService),
+		enableCoreControllers:    c.EnableCoreControllers,
+		enableLogsSupport:        c.EnableLogsSupport,
+		enableUISupport:          c.EnableUISupport,
+		enableSwaggerSupport:     c.EnableSwaggerSupport,
+		enableProfiling:          c.EnableProfiling,
+		enableWatchCache:         c.EnableWatchCache,
+		apiPrefix:                c.APIPrefix,
+		apiGroupPrefix:           c.APIGroupPrefix,
+		corsAllowedOriginList:    c.CorsAllowedOriginList,
+		authenticator:            c.Authenticator,
+		authorizer:               c.Authorizer,
+		admissionControl:         c.AdmissionControl,
+		apiGroupVersionOverrides: c.APIGroupVersionOverrides,
+		requestContextMapper:     c.RequestContextMapper,
 
 		cacheTimeout:      c.CacheTimeout,
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
@@ -452,8 +471,11 @@ func New(c *Config) *Master {
 		serviceReadWriteIP:  c.ServiceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
 		serviceReadWritePort: 443,
+		extraServicePorts:    c.ExtraServicePorts,
+		extraEndpointPorts:   c.ExtraEndpointPorts,
 
-		installSSHKey:             c.InstallSSHKey,
+		tunneler: c.Tunneler,
+
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 	}
 
@@ -505,10 +527,18 @@ func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
 
 // init initializes master.
 func (m *Master) init(c *Config) {
+
+	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
+		m.proxyTransport = util.SetTransportDefaults(&http.Transport{
+			Dial:            c.ProxyDialer,
+			TLSClientConfig: c.ProxyTLSClientConfig,
+		})
+	}
+
 	healthzChecks := []healthz.HealthzChecker{}
-	m.clock = util.RealClock{}
+
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.get("", resource) }
-	podStorage := podetcd.NewStorage(dbClient("pods"), c.EnableWatchCache, c.KubeletClient)
+	podStorage := podetcd.NewStorage(dbClient("pods"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
 
 	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"))
 
@@ -527,7 +557,7 @@ func (m *Master) init(c *Config) {
 	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), c.EnableWatchCache)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), c.EnableWatchCache, c.KubeletClient)
+	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage)
 
 	serviceStorage := serviceetcd.NewREST(dbClient("services"))
@@ -551,7 +581,7 @@ func (m *Master) init(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage := controlleretcd.NewREST(dbClient("replicationControllers"))
+	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"))
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
@@ -567,12 +597,13 @@ func (m *Master) init(c *Config) {
 
 		"podTemplates": podTemplateStorage,
 
-		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator),
-		"endpoints":              endpointsStorage,
-		"nodes":                  nodeStorage,
-		"nodes/status":           nodeStatusStorage,
-		"events":                 eventStorage,
+		"replicationControllers":        controllerStorage,
+		"replicationControllers/status": controllerStatusStorage,
+		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.proxyTransport),
+		"endpoints":                     endpointsStorage,
+		"nodes":                         nodeStorage,
+		"nodes/status":                  nodeStatusStorage,
+		"events":                        eventStorage,
 
 		"limitRanges":                   limitRangeStorage,
 		"resourceQuotas":                resourceQuotaStorage,
@@ -590,55 +621,18 @@ func (m *Master) init(c *Config) {
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
 
-	// establish the node proxy dialer
-	if len(c.SSHUser) > 0 {
-		// Usernames are capped @ 32
-		if len(c.SSHUser) > 32 {
-			glog.Warning("SSH User is too long, truncating to 32 chars")
-			c.SSHUser = c.SSHUser[0:32]
-		}
-		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
-
-		// public keyfile is written last, so check for that.
-		publicKeyFile := c.SSHKeyfile + ".pub"
-		exists, err := util.FileExists(publicKeyFile)
-		if err != nil {
-			glog.Errorf("Error detecting if key exists: %v", err)
-		} else if !exists {
-			glog.Infof("Key doesn't exist, attempting to create")
-			err := m.generateSSHKey(c.SSHUser, c.SSHKeyfile, publicKeyFile)
-			if err != nil {
-				glog.Errorf("Failed to create key pair: %v", err)
-			}
-		}
-		m.tunnels = &util.SSHTunnelList{}
-		m.dialer = m.Dial
-		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile, publicKeyFile)
-		m.lastSync = m.clock.Now().Unix()
-
-		// This is pretty ugly.  A better solution would be to pull this all the way up into the
-		// server.go file.
-		httpKubeletClient, ok := c.KubeletClient.(*client.HTTPKubeletClient)
-		if ok {
-			httpKubeletClient.Config.Dial = m.dialer
-			transport, err := client.MakeTransport(httpKubeletClient.Config)
-			if err != nil {
-				glog.Errorf("Error setting up transport over SSH: %v", err)
-			} else {
-				httpKubeletClient.Client.Transport = transport
-			}
-		} else {
-			glog.Errorf("Failed to cast %v to HTTPKubeletClient, skipping SSH tunnel.", c.KubeletClient)
-		}
+	if m.tunneler != nil {
+		m.tunneler.Run(m.getNodeAddresses)
 		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
-		m.lastSyncMetric = prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "apiserver_proxy_tunnel_sync_latency_secs",
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(m.secondsSinceSync()) })
+		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
 
 	apiVersions := []string{}
-	if m.v1 {
+	// Install v1 unless disabled.
+	if !m.apiGroupVersionOverrides["api/v1"].Disable {
 		if err := m.api_v1().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1: %v", err)
 		}
@@ -647,12 +641,13 @@ func (m *Master) init(c *Config) {
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), apiVersions)
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), apiVersions)
 
 	// allGroups records all supported groups at /apis
-	allGroups := []api.APIGroup{}
-	if m.exp {
-		m.thirdPartyStorage = c.StorageDestinations.APIGroups["experimental"].Default
+	allGroups := []unversioned.APIGroup{}
+	// Install extensions unless disabled.
+	if !m.apiGroupVersionOverrides["extensions/v1beta1"].Disable {
+		m.thirdPartyStorage = c.StorageDestinations.APIGroups["extensions"].Default
 		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
 
 		expVersion := m.experimental(c)
@@ -660,11 +655,11 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		g, err := latest.Group("experimental")
+		g, err := latest.Group("extensions")
 		if err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		expAPIVersions := []api.GroupVersion{
+		expAPIVersions := []unversioned.GroupVersion{
 			{
 				GroupVersion: expVersion.Version,
 				Version:      apiutil.GetVersion(expVersion.Version),
@@ -674,14 +669,14 @@ func (m *Master) init(c *Config) {
 		if !found {
 			glog.Fatalf("Couldn't find storage version of group %v", g.Group)
 		}
-		group := api.APIGroup{
+		group := unversioned.APIGroup{
 			Name:             g.Group,
 			Versions:         expAPIVersions,
-			PreferredVersion: api.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
+			PreferredVersion: unversioned.GroupVersion{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("experimental").Group+"/", group)
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group+"/", group)
 		allGroups = append(allGroups, group)
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), []string{expVersion.Version})
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.Version})
 	}
 
 	// This should be done after all groups are registered
@@ -724,7 +719,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, m.newAPIRequestInfoResolver())
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, m.newRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -787,6 +782,8 @@ func (m *Master) NewBootstrapController() *Controller {
 
 		ServiceIP:                 m.serviceReadWriteIP,
 		ServicePort:               m.serviceReadWritePort,
+		ExtraServicePorts:         m.extraServicePorts,
+		ExtraEndpointPorts:        m.extraEndpointPorts,
 		PublicServicePort:         m.publicReadWritePort,
 		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
 	}
@@ -852,8 +849,8 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
-func (m *Master) newAPIRequestInfoResolver() *apiserver.APIRequestInfoResolver {
-	return &apiserver.APIRequestInfoResolver{
+func (m *Master) newRequestInfoResolver() *apiserver.RequestInfoResolver {
+	return &apiserver.RequestInfoResolver{
 		sets.NewString(strings.Trim(m.apiPrefix, "/"), strings.Trim(thirdpartyprefix, "/")), // all possible API prefixes
 		sets.NewString(strings.Trim(m.apiPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
@@ -861,8 +858,8 @@ func (m *Master) newAPIRequestInfoResolver() *apiserver.APIRequestInfoResolver {
 
 func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
-		Root: m.apiPrefix,
-		APIRequestInfoResolver: m.newAPIRequestInfoResolver(),
+		Root:                m.apiPrefix,
+		RequestInfoResolver: m.newRequestInfoResolver(),
 
 		Mapper: latest.GroupOrDie("").RESTMapper,
 
@@ -874,7 +871,6 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
 
-		ProxyDialerFn:     m.dialer,
 		MinRequestTimeout: m.minRequestTimeout,
 	}
 }
@@ -990,17 +986,17 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
 	path := makeThirdPartyPath(group)
-	groupVersion := api.GroupVersion{
+	groupVersion := unversioned.GroupVersion{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
 	}
-	apiGroup := api.APIGroup{
+	apiGroup := unversioned.APIGroup{
 		Name:     group,
-		Versions: []api.GroupVersion{groupVersion},
+		Versions: []unversioned.GroupVersion{groupVersion},
 	}
 	apiserver.AddGroupWebService(m.handlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newAPIRequestInfoResolver(), []string{thirdparty.Version})
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{thirdparty.Version})
 	return nil
 }
 
@@ -1014,86 +1010,110 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 
 	return &apiserver.APIGroupVersion{
-		Root:                   apiRoot,
-		Version:                apiutil.GetGroupVersion(group, version),
-		APIRequestInfoResolver: m.newAPIRequestInfoResolver(),
+		Root:                apiRoot,
+		Version:             apiutil.GetGroupVersion(group, version),
+		RequestInfoResolver: m.newRequestInfoResolver(),
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:        thirdpartyresourcedata.NewMapper(latest.GroupOrDie("experimental").RESTMapper, kind, version, group),
-		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("experimental").Codec, kind),
-		Linker:        latest.GroupOrDie("experimental").SelfLinker,
+		Mapper:        thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
+		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
+		Linker:        latest.GroupOrDie("extensions").SelfLinker,
 		Storage:       storage,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Context: m.requestContextMapper,
 
-		ProxyDialerFn:     m.dialer,
 		MinRequestTimeout: m.minRequestTimeout,
 	}
 }
 
 // experimental returns the resources and codec for the experimental api
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
-	controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.get("", "replicationControllers"))
+	// All resources except these are disabled by default.
+	enabledResources := utilsets.NewString("jobs", "horizontalpodautoscalers", "ingress")
+	resourceOverrides := m.apiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		enabled, ok := resourceOverrides[resource]
+		if !ok {
+			return enabledResources.Has(resource)
+		}
+		return enabled
+	}
 	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.get("experimental", resource)
-	}
-	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
-	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"))
-	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"))
-	deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
-	jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"))
-	ingressStorage := ingressetcd.NewREST(dbClient("ingress"))
-
-	thirdPartyControl := ThirdPartyController{
-		master: m,
-		thirdPartyResourceRegistry: thirdPartyResourceStorage,
-	}
-	go func() {
-		util.Forever(func() {
-			if err := thirdPartyControl.SyncResources(); err != nil {
-				glog.Warningf("third party resource sync failed: %v", err)
-			}
-		}, 10*time.Second)
-	}()
-	storage := map[string]rest.Storage{
-		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
-		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
-		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
-		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
-		strings.ToLower("daemonsets"):                   daemonSetStorage,
-		strings.ToLower("daemonsets/status"):            daemonSetStatusStorage,
-		strings.ToLower("deployments"):                  deploymentStorage.Deployment,
-		strings.ToLower("deployments/scale"):            deploymentStorage.Scale,
-		strings.ToLower("jobs"):                         jobStorage,
-		strings.ToLower("jobs/status"):                  jobStatusStorage,
-		strings.ToLower("ingress"):                      ingressStorage,
+		return c.StorageDestinations.get("extensions", resource)
 	}
 
-	expMeta := latest.GroupOrDie("experimental")
+	storage := map[string]rest.Storage{}
+	if isEnabled("horizontalpodautoscalers") {
+		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
+		storage["horizontalpodautoscalers"] = autoscalerStorage
+		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
+		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.get("", "replicationControllers"))
+		storage["replicationcontrollers"] = controllerStorage.ReplicationController
+		storage["replicationcontrollers/scale"] = controllerStorage.Scale
+	}
+	if isEnabled("thirdpartyresources") {
+		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"))
+		thirdPartyControl := ThirdPartyController{
+			master: m,
+			thirdPartyResourceRegistry: thirdPartyResourceStorage,
+		}
+		go func() {
+			util.Forever(func() {
+				if err := thirdPartyControl.SyncResources(); err != nil {
+					glog.Warningf("third party resource sync failed: %v", err)
+				}
+			}, 10*time.Second)
+		}()
+
+		storage["thirdpartyresources"] = thirdPartyResourceStorage
+	}
+
+	if isEnabled("daemonsets") {
+		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"))
+		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if isEnabled("deployments") {
+		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/scale"] = deploymentStorage.Scale
+	}
+	if isEnabled("jobs") {
+		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"))
+		storage["jobs"] = jobStorage
+		storage["jobs/status"] = jobStatusStorage
+	}
+	if isEnabled("ingress") {
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingress"))
+		storage["ingress"] = ingressStorage
+		storage["ingress/status"] = ingressStatusStorage
+	}
+
+	extensionsGroup := latest.GroupOrDie("extensions")
 
 	return &apiserver.APIGroupVersion{
-		Root: m.apiGroupPrefix,
-		APIRequestInfoResolver: m.newAPIRequestInfoResolver(),
+		Root:                m.apiGroupPrefix,
+		RequestInfoResolver: m.newRequestInfoResolver(),
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:        expMeta.RESTMapper,
-		Codec:         expMeta.Codec,
-		Linker:        expMeta.SelfLinker,
+		Mapper:        extensionsGroup.RESTMapper,
+		Codec:         extensionsGroup.Codec,
+		Linker:        extensionsGroup.SelfLinker,
 		Storage:       storage,
-		Version:       expMeta.GroupVersion,
+		Version:       extensionsGroup.GroupVersion,
 		ServerVersion: latest.GroupOrDie("").GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
 
-		ProxyDialerFn:     m.dialer,
 		MinRequestTimeout: m.minRequestTimeout,
 	}
 }
@@ -1116,41 +1136,6 @@ func findExternalAddress(node *api.Node) (string, error) {
 	return "", fmt.Errorf("Couldn't find external address: %v", node)
 }
 
-func (m *Master) Dial(net, addr string) (net.Conn, error) {
-	// Only lock while picking a tunnel.
-	tunnel, err := func() (util.SSHTunnelEntry, error) {
-		m.tunnelsLock.Lock()
-		defer m.tunnelsLock.Unlock()
-		return m.tunnels.PickRandomTunnel()
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	start := time.Now()
-	id := rand.Int63() // So you can match begins/ends in the log.
-	glog.V(3).Infof("[%x: %v] Dialing...", id, tunnel.Address)
-	defer func() {
-		glog.V(3).Infof("[%x: %v] Dialed in %v.", id, tunnel.Address, time.Now().Sub(start))
-	}()
-	return tunnel.Tunnel.Dial(net, addr)
-}
-
-func (m *Master) needToReplaceTunnels(addrs []string) bool {
-	m.tunnelsLock.Lock()
-	defer m.tunnelsLock.Unlock()
-	if m.tunnels == nil || m.tunnels.Len() != len(addrs) {
-		return true
-	}
-	// TODO (cjcullen): This doesn't need to be n^2
-	for ix := range addrs {
-		if !m.tunnels.Has(addrs[ix]) {
-			return true
-		}
-	}
-	return false
-}
-
 func (m *Master) getNodeAddresses() ([]string, error) {
 	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != nil {
@@ -1169,126 +1154,12 @@ func (m *Master) getNodeAddresses() ([]string, error) {
 }
 
 func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
-	lag := m.secondsSinceSync()
+	if m.tunneler == nil {
+		return nil
+	}
+	lag := m.tunneler.SecondsSinceSync()
 	if lag > 600 {
 		return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
 	}
 	return nil
-}
-
-func (m *Master) secondsSinceSync() int64 {
-	now := m.clock.Now().Unix()
-	then := atomic.LoadInt64(&m.lastSync)
-	return now - then
-}
-
-func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
-	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
-	tunnels := util.MakeSSHTunnels(user, keyfile, newAddrs)
-	if err := tunnels.Open(); err != nil {
-		return err
-	}
-	m.tunnelsLock.Lock()
-	defer m.tunnelsLock.Unlock()
-	if m.tunnels != nil {
-		m.tunnels.Close()
-	}
-	m.tunnels = tunnels
-	atomic.StoreInt64(&m.lastSync, m.clock.Now().Unix())
-	return nil
-}
-
-func (m *Master) loadTunnels(user, keyfile string) error {
-	addrs, err := m.getNodeAddresses()
-	if err != nil {
-		return err
-	}
-	if !m.needToReplaceTunnels(addrs) {
-		return nil
-	}
-	// TODO: This is going to unnecessarily close connections to unchanged nodes.
-	// See comment about using Watch above.
-	glog.Info("found different nodes. Need to replace tunnels")
-	return m.replaceTunnels(user, keyfile, addrs)
-}
-
-func (m *Master) refreshTunnels(user, keyfile string) error {
-	addrs, err := m.getNodeAddresses()
-	if err != nil {
-		return err
-	}
-	return m.replaceTunnels(user, keyfile, addrs)
-}
-
-func (m *Master) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
-	// Sync loop to ensure that the SSH key has been installed.
-	go util.Until(func() {
-		if m.installSSHKey == nil {
-			glog.Error("Won't attempt to install ssh key: installSSHKey function is nil")
-			return
-		}
-		key, err := util.ParsePublicKeyFromFile(publicKeyfile)
-		if err != nil {
-			glog.Errorf("Failed to load public key: %v", err)
-			return
-		}
-		keyData, err := util.EncodeSSHKey(key)
-		if err != nil {
-			glog.Errorf("Failed to encode public key: %v", err)
-			return
-		}
-		if err := m.installSSHKey(user, keyData); err != nil {
-			glog.Errorf("Failed to install ssh key: %v", err)
-		}
-	}, 5*time.Minute, util.NeverStop)
-	// Sync loop for tunnels
-	// TODO: switch this to watch.
-	go util.Until(func() {
-		if err := m.loadTunnels(user, privateKeyfile); err != nil {
-			glog.Errorf("Failed to load SSH Tunnels: %v", err)
-		}
-		if m.tunnels != nil && m.tunnels.Len() != 0 {
-			// Sleep for 10 seconds if we have some tunnels.
-			// TODO (cjcullen): tunnels can lag behind actually existing nodes.
-			time.Sleep(9 * time.Second)
-		}
-	}, 1*time.Second, util.NeverStop)
-	// Refresh loop for tunnels
-	// TODO: could make this more controller-ish
-	go util.Until(func() {
-		time.Sleep(5 * time.Minute)
-		if err := m.refreshTunnels(user, privateKeyfile); err != nil {
-			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
-		}
-	}, 0*time.Second, util.NeverStop)
-}
-
-func (m *Master) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
-	// TODO: user is not used. Consider removing it as an input to the function.
-	private, public, err := util.GenerateKey(2048)
-	if err != nil {
-		return err
-	}
-	// If private keyfile already exists, we must have only made it halfway
-	// through last time, so delete it.
-	exists, err := util.FileExists(privateKeyfile)
-	if err != nil {
-		glog.Errorf("Error detecting if private key exists: %v", err)
-	} else if exists {
-		glog.Infof("Private key exists, but public key does not")
-		if err := os.Remove(privateKeyfile); err != nil {
-			glog.Errorf("Failed to remove stale private key: %v", err)
-		}
-	}
-	if err := ioutil.WriteFile(privateKeyfile, util.EncodePrivateKey(private), 0600); err != nil {
-		return err
-	}
-	publicKeyBytes, err := util.EncodePublicKey(public)
-	if err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(publicKeyfile+".tmp", publicKeyBytes, 0600); err != nil {
-		return err
-	}
-	return os.Rename(publicKeyfile+".tmp", publicKeyfile)
 }

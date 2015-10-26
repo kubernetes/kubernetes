@@ -21,17 +21,17 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
-	ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector) (*experimental.DeploymentList, error)
-	GetDeployment(ctx api.Context, deploymentID string) (*experimental.Deployment, error)
-	CreateDeployment(ctx api.Context, deployment *experimental.Deployment) (*experimental.Deployment, error)
-	UpdateDeployment(ctx api.Context, deployment *experimental.Deployment) (*experimental.Deployment, error)
+	ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error)
+	GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error)
+	CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
+	UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	DeleteDeployment(ctx api.Context, deploymentID string) error
 }
 
@@ -46,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 }
 
 // List obtains a list of Deployments that match selector.
-func (s *storage) ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector) (*experimental.DeploymentList, error) {
+func (s *storage) ListDeployments(ctx api.Context, label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -54,31 +54,31 @@ func (s *storage) ListDeployments(ctx api.Context, label labels.Selector, field 
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*experimental.DeploymentList), err
+	return obj.(*extensions.DeploymentList), err
 }
 
-func (s *storage) GetDeployment(ctx api.Context, deploymentID string) (*experimental.Deployment, error) {
+func (s *storage) GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error) {
 	obj, err := s.Get(ctx, deploymentID)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*experimental.Deployment), nil
+	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) CreateDeployment(ctx api.Context, deployment *experimental.Deployment) (*experimental.Deployment, error) {
+func (s *storage) CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	obj, err := s.Create(ctx, deployment)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*experimental.Deployment), nil
+	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) UpdateDeployment(ctx api.Context, deployment *experimental.Deployment) (*experimental.Deployment, error) {
+func (s *storage) UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	obj, _, err := s.Update(ctx, deployment)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*experimental.Deployment), nil
+	return obj.(*extensions.Deployment), nil
 }
 
 func (s *storage) DeleteDeployment(ctx api.Context, deploymentID string) error {

@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -41,7 +41,7 @@ import (
 // This test primarily checks 2 things:
 // 1. Daemons restart automatically within some sane time (10m).
 // 2. They don't take abnormal actions when restarted in the steady state.
-//	- Controller manager sholdn't overshoot replicas
+//	- Controller manager shouldn't overshoot replicas
 //	- Kubelet shouldn't restart containers
 //	- Scheduler should continue assigning hosts to new pods
 
@@ -191,7 +191,7 @@ var _ = Describe("DaemonRestart", func() {
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config RCConfig
-	var controller *controllerFramework.Controller
+	var controller *controllerframework.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
@@ -199,11 +199,8 @@ var _ = Describe("DaemonRestart", func() {
 	BeforeEach(func() {
 
 		// These tests require SSH
-		// TODO: Enable on gke after testing (#11834)
-		if !providerIs("gce") {
-			By(fmt.Sprintf("Skipping test, which is not implemented for %s", testContext.Provider))
-			return
-		}
+		// TODO(11834): Enable this test in GKE once experimental API there is switched on
+		SkipUnlessProviderIs("gce")
 		framework.beforeEach()
 		ns = framework.Namespace.Name
 
@@ -213,7 +210,7 @@ var _ = Describe("DaemonRestart", func() {
 			Client:      framework.Client,
 			Name:        rcName,
 			Namespace:   ns,
-			Image:       "kubernetes/pause",
+			Image:       "beta.gcr.io/google_containers/pause:2.0",
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
@@ -222,7 +219,7 @@ var _ = Describe("DaemonRestart", func() {
 
 		stopCh = make(chan struct{})
 		tracker = newPodTracker()
-		newPods, controller = controllerFramework.NewInformer(
+		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func() (runtime.Object, error) {
 					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
@@ -233,7 +230,7 @@ var _ = Describe("DaemonRestart", func() {
 			},
 			&api.Pod{},
 			0,
-			controllerFramework.ResourceEventHandlerFuncs{
+			controllerframework.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					tracker.remember(obj.(*api.Pod), ADD)
 				},
@@ -249,9 +246,9 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	AfterEach(func() {
+		defer framework.afterEach()
 		close(stopCh)
 		expectNoError(DeleteRC(framework.Client, ns, rcName))
-		framework.afterEach()
 	})
 
 	It("Controller Manager should not create/delete replicas across restart", func() {
@@ -285,9 +282,6 @@ var _ = Describe("DaemonRestart", func() {
 
 	It("Scheduler should continue assigning pods to nodes across restart", func() {
 
-		// TODO: Enabale this test in GKE once experimental API there is switched on
-		SkipIfProviderIs("gke")
-
 		restarter := NewRestartConfig(
 			getMasterHost(), "kube-scheduler", ports.SchedulerPort, restartPollInterval, restartTimeout)
 
@@ -303,9 +297,6 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	It("Kubelet should not restart containers across restart", func() {
-
-		// TODO: Enabale this test in GKE once experimental API there is switched on
-		SkipIfProviderIs("gke")
 
 		nodeIPs, err := getNodePublicIps(framework.Client)
 		expectNoError(err)

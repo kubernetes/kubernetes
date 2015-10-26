@@ -1,4 +1,5 @@
 kubectl.md
+kubectl_apply.md
 kubectl_annotate.md
 kubectl_api-versions.md
 kubectl_attach.md
@@ -11,6 +12,7 @@ kubectl_config_set.md
 kubectl_config_unset.md
 kubectl_config_use-context.md
 kubectl_config_view.md
+kubectl_convert.md
 kubectl_create.md
 kubectl_delete.md
 kubectl_describe.md

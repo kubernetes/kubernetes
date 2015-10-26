@@ -27,9 +27,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apis/experimental"
-	_ "k8s.io/kubernetes/pkg/apis/experimental/v1alpha1"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	_ "k8s.io/kubernetes/pkg/apis/extensions"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -105,11 +105,11 @@ func main() {
 
 	_, err := data.WriteString(fmt.Sprintf("package %s\n", pkgname))
 	if err != nil {
-		glog.Fatalf("error writing package line: %v", err)
+		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
 	versionPath := pkgPath(group, version)
-	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
+	generator := kruntime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
 	if len(*overwrites) > 0 {
@@ -133,24 +133,24 @@ func main() {
 			continue
 		}
 		if err := generator.AddType(knownType); err != nil {
-			glog.Errorf("error while generating deep copy functions for %v: %v", knownType, err)
+			glog.Errorf("Error while generating deep copy functions for %v: %v", knownType, err)
 		}
 	}
 	generator.RepackImports()
 	if err := generator.WriteImports(data); err != nil {
-		glog.Fatalf("error while writing imports: %v", err)
+		glog.Fatalf("Error while writing imports: %v", err)
 	}
 	if err := generator.WriteDeepCopyFunctions(data); err != nil {
-		glog.Fatalf("error while writing deep copy functions: %v", err)
+		glog.Fatalf("Error while writing deep copy functions: %v", err)
 	}
 	if err := generator.RegisterDeepCopyFunctions(data, registerTo); err != nil {
-		glog.Fatalf("error while registering deep copy functions: %v", err)
+		glog.Fatalf("Error while registering deep copy functions: %v", err)
 	}
 	b, err := imports.Process("", data.Bytes(), nil)
 	if err != nil {
-		glog.Fatalf("error while update imports: %v", err)
+		glog.Fatalf("Error while update imports: %v", err)
 	}
 	if _, err := funcOut.Write(b); err != nil {
-		glog.Fatalf("error while writing out the resulting file: %v", err)
+		glog.Fatalf("Error while writing out the resulting file: %v", err)
 	}
 }

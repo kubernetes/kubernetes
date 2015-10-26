@@ -95,7 +95,7 @@ def file_passes(filename, refs, regexs):
 def file_extension(filename):
     return os.path.splitext(filename)[1].split(".")[-1].lower()
 
-skipped_dirs = ['Godeps', 'third_party', '_output', '.git']
+skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git']
 def normalize_files(files):
     newfiles = []
     for pathname in files:

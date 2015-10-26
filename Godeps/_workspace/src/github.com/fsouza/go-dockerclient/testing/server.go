@@ -957,7 +957,7 @@ func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Reques
 
 func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if exec, err := s.getExec(id); err == nil {
+	if exec, err := s.getExec(id, false); err == nil {
 		s.execMut.Lock()
 		exec.Running = true
 		s.execMut.Unlock()
@@ -979,7 +979,7 @@ func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request
 
 func (s *DockerServer) resizeExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if _, err := s.getExec(id); err == nil {
+	if _, err := s.getExec(id, false); err == nil {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -988,7 +988,7 @@ func (s *DockerServer) resizeExecContainer(w http.ResponseWriter, r *http.Reques
 
 func (s *DockerServer) inspectExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if exec, err := s.getExec(id); err == nil {
+	if exec, err := s.getExec(id, true); err == nil {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(exec)
@@ -997,11 +997,15 @@ func (s *DockerServer) inspectExecContainer(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (s *DockerServer) getExec(id string) (*docker.ExecInspect, error) {
+func (s *DockerServer) getExec(id string, copy bool) (*docker.ExecInspect, error) {
 	s.execMut.RLock()
 	defer s.execMut.RUnlock()
 	for _, exec := range s.execs {
 		if exec.ID == id {
+			if copy {
+				cp := *exec
+				exec = &cp
+			}
 			return exec, nil
 		}
 	}

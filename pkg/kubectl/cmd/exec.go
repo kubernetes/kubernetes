@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -58,7 +59,8 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			argsLenAtDash := cmd.ArgsLenAtDash()
+			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
 			cmdutil.CheckErr(options.Validate())
 			cmdutil.CheckErr(options.Run())
 		},
@@ -73,15 +75,18 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
 type RemoteExecutor interface {
-	Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Execute(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
 }
 
 // DefaultRemoteExecutor is the standard implementation of remote command execution
 type DefaultRemoteExecutor struct{}
 
-func (*DefaultRemoteExecutor) Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	executor := remotecommand.New(req, config, command, stdin, stdout, stderr, tty)
-	return executor.Execute()
+func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+	exec, err := remotecommand.NewExecutor(config, method, url)
+	if err != nil {
+		return err
+	}
+	return exec.Stream(stdin, stdout, stderr, tty)
 }
 
 // ExecOptions declare the arguments accepted by the Exec command
@@ -103,8 +108,9 @@ type ExecOptions struct {
 }
 
 // Complete verifies command line arguments and loads data from the command environment
-func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
-	if len(p.PodName) == 0 && len(argsIn) == 0 {
+func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+	// Let kubectl exec follow rules for `--`, see #13004 issue
+	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
 		return cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 	if len(p.PodName) != 0 {
@@ -220,6 +226,14 @@ func (p *ExecOptions) Run() error {
 		Namespace(pod.Namespace).
 		SubResource("exec").
 		Param("container", containerName)
+	req.VersionedParams(&api.PodExecOptions{
+		Container: containerName,
+		Command:   p.Command,
+		Stdin:     stdin != nil,
+		Stdout:    p.Out != nil,
+		Stderr:    p.Err != nil,
+		TTY:       tty,
+	}, api.Scheme)
 
-	return p.Executor.Execute(req, p.Config, p.Command, stdin, p.Out, p.Err, tty)
+	return p.Executor.Execute("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
 }

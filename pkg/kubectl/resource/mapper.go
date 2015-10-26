@@ -66,6 +66,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
+
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)

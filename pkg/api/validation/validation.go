@@ -38,8 +38,14 @@ import (
 	"github.com/golang/glog"
 )
 
+// TODO: delete this global variable when we enable the validation of common
+// fields by default.
+var RepairMalformedUpdates bool = true
+
 const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNegativeErrorMsg string = `must be non-negative`
+const isNotIntegerErrorMsg string = `must be an integer`
+const fieldImmutableErrorMsg string = `field is immutable`
 
 func intervalErrorMsg(lo, hi int) string {
 	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
@@ -54,7 +60,7 @@ var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
 var portNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
 
-const totalAnnotationSizeLimitB int = 64 * (1 << 10) // 64 kB
+const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 func ValidateLabelName(labelName, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -231,6 +237,7 @@ func ValidatePositiveQuantity(value resource.Quantity, fieldName string) errs.Va
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
+// TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
@@ -273,23 +280,32 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
+	if !RepairMalformedUpdates && new.UID != old.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, "field is immutable"))
+	}
 	// in the event it is left empty, set it, to allow clients more flexibility
-	if len(new.UID) == 0 {
-		new.UID = old.UID
+	// TODO: remove the following code that repairs the update request when we retire the clients that modify the immutable fields.
+	// Please do not copy this pattern elsewhere; validation functions should not be modifying the objects they are passed!
+	if RepairMalformedUpdates {
+		if len(new.UID) == 0 {
+			new.UID = old.UID
+		}
+		// ignore changes to timestamp
+		if old.CreationTimestamp.IsZero() {
+			old.CreationTimestamp = new.CreationTimestamp
+		} else {
+			new.CreationTimestamp = old.CreationTimestamp
+		}
+		// an object can never remove a deletion timestamp or clear/change grace period seconds
+		if !old.DeletionTimestamp.IsZero() {
+			new.DeletionTimestamp = old.DeletionTimestamp
+		}
+		if old.DeletionGracePeriodSeconds != nil && new.DeletionGracePeriodSeconds == nil {
+			new.DeletionGracePeriodSeconds = old.DeletionGracePeriodSeconds
+		}
 	}
-	// ignore changes to timestamp
-	if old.CreationTimestamp.IsZero() {
-		old.CreationTimestamp = new.CreationTimestamp
-	} else {
-		new.CreationTimestamp = old.CreationTimestamp
-	}
-	// an object can never remove a deletion timestamp or clear/change grace period seconds
-	if !old.DeletionTimestamp.IsZero() {
-		new.DeletionTimestamp = old.DeletionTimestamp
-	}
-	if old.DeletionGracePeriodSeconds != nil && new.DeletionGracePeriodSeconds == nil {
-		new.DeletionGracePeriodSeconds = old.DeletionGracePeriodSeconds
-	}
+
+	// TODO: needs to check if new==nil && old !=nil after the repair logic is removed.
 	if new.DeletionGracePeriodSeconds != nil && old.DeletionGracePeriodSeconds != nil && *new.DeletionGracePeriodSeconds != *old.DeletionGracePeriodSeconds {
 		allErrs = append(allErrs, errs.NewFieldInvalid("deletionGracePeriodSeconds", new.DeletionGracePeriodSeconds, "field is immutable; may only be changed via deletion"))
 	}
@@ -300,16 +316,16 @@ func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList
 	}
 
 	if old.Name != new.Name {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", new.Name, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", new.Name, fieldImmutableErrorMsg))
 	}
 	if old.Namespace != new.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", new.Namespace, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", new.Namespace, fieldImmutableErrorMsg))
 	}
 	if old.UID != new.UID {
-		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, fieldImmutableErrorMsg))
 	}
 	if old.CreationTimestamp != new.CreationTimestamp {
-		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", new.CreationTimestamp, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", new.CreationTimestamp, fieldImmutableErrorMsg))
 	}
 
 	allErrs = append(allErrs, ValidateLabels(new.Labels, "labels")...)
@@ -1107,7 +1123,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
-	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
+	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec).Prefix("securityContext")...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 	if len(spec.ServiceAccountName) > 0 {
 		if ok, msg := ValidateServiceAccountName(spec.ServiceAccountName, false); !ok {
@@ -1120,6 +1136,17 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 			allErrs = append(allErrs, errs.NewFieldInvalid("activeDeadlineSeconds", spec.ActiveDeadlineSeconds, "activeDeadlineSeconds must be a positive integer greater than 0"))
 		}
 	}
+	return allErrs
+}
+
+// ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
+func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *api.PodSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if securityContext != nil {
+		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
+	}
+
 	return allErrs
 }
 
@@ -1318,7 +1345,7 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta).Prefix("metadata")...)
 
 	if api.IsServiceIPSet(oldService) && service.Spec.ClusterIP != oldService.Spec.ClusterIP {
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, fieldImmutableErrorMsg))
 	}
 
 	allErrs = append(allErrs, ValidateService(service)...)
@@ -1338,6 +1365,15 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+// ValidateReplicationControllerStatusUpdate tests if required fields in the replication controller are set.
+func ValidateReplicationControllerStatusUpdate(oldController, controller *api.ReplicationController) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.Replicas), "status.replicas")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.ObservedGeneration), "status.observedGeneration")...)
 	return allErrs
 }
 
@@ -1675,7 +1711,7 @@ func ValidateSecretUpdate(oldSecret, newSecret *api.Secret) errs.ValidationError
 		newSecret.Type = oldSecret.Type
 	}
 	if newSecret.Type != oldSecret.Type {
-		allErrs = append(allErrs, errs.NewFieldInvalid("type", newSecret.Type, "field is immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("type", newSecret.Type, fieldImmutableErrorMsg))
 	}
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
@@ -1731,15 +1767,27 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 
 	for k, v := range resourceQuota.Spec.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
-		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	for k, v := range resourceQuota.Status.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
-		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	for k, v := range resourceQuota.Status.Used {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
-		allErrs = append(allErrs, ValidatePositiveQuantity(v, string(k))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
+	}
+	return allErrs
+}
+
+// validateResourceQuantityValue enforces that specified quantity is valid for specified resource
+func validateResourceQuantityValue(resource string, value resource.Quantity) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidatePositiveQuantity(value, resource)...)
+	if api.IsIntegerResourceName(resource) {
+		if value.MilliValue()%int64(1000) != int64(0) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(resource, value, isNotIntegerErrorMsg))
+		}
 	}
 	return allErrs
 }
@@ -1749,8 +1797,9 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.ResourceQuota) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta).Prefix("metadata")...)
-	for k := range newResourceQuota.Spec.Hard {
+	for k, v := range newResourceQuota.Spec.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
@@ -1764,11 +1813,13 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 	if newResourceQuota.ResourceVersion == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
 	}
-	for k := range newResourceQuota.Status.Hard {
+	for k, v := range newResourceQuota.Status.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
-	for k := range newResourceQuota.Status.Used {
+	for k, v := range newResourceQuota.Status.Used {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v)...)
 	}
 	newResourceQuota.Spec = oldResourceQuota.Spec
 	return allErrs
@@ -1970,6 +2021,27 @@ func ValidatePodLogOptions(opts *api.PodLogOptions) errs.ValidationErrorList {
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, errs.NewFieldInvalid("sinceSeconds", *opts.SinceSeconds, "sinceSeconds must be a positive integer"))
+		}
+	}
+	return allErrs
+}
+
+// ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
+func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for _, ingress := range status.Ingress {
+		if len(ingress.IP) > 0 {
+			if isIP := (net.ParseIP(ingress.IP) != nil); !isIP {
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.ip", ingress.IP, "must be an IP address"))
+			}
+		}
+		if len(ingress.Hostname) > 0 {
+			if valid, errMsg := NameIsDNSSubdomain(ingress.Hostname, false); !valid {
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, errMsg))
+			}
+			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {
+				allErrs = append(allErrs, errs.NewFieldInvalid("ingress.hostname", ingress.Hostname, "must be a DNS name, not an IP address"))
+			}
 		}
 	}
 	return allErrs

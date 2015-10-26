@@ -212,9 +212,14 @@ def register_machine(apiserver, retry=False):
     registration_request.data['spec']['externalID'] = private_address
     registration_request.data['status']['hostIP'] = private_address
 
-    response, result = registration_request.register(parsed.hostname,
-                                                     parsed.port,
-                                                     '/api/v1/nodes')
+    try:
+        response, result = registration_request.register(parsed.hostname,
+                                                         parsed.port,
+                                                         '/api/v1/nodes')
+    except socket.error:
+        hookenv.status_set('blocked',
+                           'Error communicating with Kubenetes Master')
+        return
 
     print(response)
 

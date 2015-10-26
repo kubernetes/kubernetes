@@ -22,6 +22,8 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,16 +44,19 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/websocket"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
 const (
@@ -335,7 +340,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
 		// ensure they are also checked.
-		rcList, err := c.ReplicationControllers(ns).List(labels.Everything())
+		rcList, err := c.ReplicationControllers(ns).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			return false, nil
@@ -555,7 +560,7 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 		}
 	}
 
-	// a timeout occured
+	// a timeout occurred
 	if err != nil {
 		if missingTimestamp {
 			return fmt.Errorf("namespace %s was not deleted within limit: %v, some pods were not marked with a deletion timestamp, pods remaining: %v", namespace, err, remaining)
@@ -883,7 +888,7 @@ func loadClient() (*client.Client, error) {
 // TODO: Allow service names to have the same form as names
 //       for pods and replication controllers so we don't
 //       need to use such a function and can instead
-//       use the UUID utilty function.
+//       use the UUID utility function.
 func randomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
@@ -1056,6 +1061,11 @@ func runKubectl(args ...string) string {
 	return newKubectlCommand(args...).exec()
 }
 
+// runKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+func runKubectlInput(data string, args ...string) string {
+	return newKubectlCommand(args...).withStdinData(data).exec()
+}
+
 func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
 	if err != nil {
@@ -1077,10 +1087,29 @@ func tryKill(cmd *exec.Cmd) {
 	}
 }
 
-// testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
-// the exact container log and searches for lines of expected output.
-func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
+// testContainerOutput runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a substring matcher.
+func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
+	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, ContainSubstring)
+}
+
+// testContainerOutputRegexp runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a regexp matcher.
+func testContainerOutputRegexp(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
+	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, MatchRegexp)
+}
+
+// testContainerOutputMatcher runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using the given matcher.
+func testContainerOutputMatcher(scenarioName string,
+	c *client.Client,
+	pod *api.Pod,
+	containerIndex int,
+	expectedOutput []string, ns string,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name, api.NewDeleteOptions(0))
@@ -1115,10 +1144,11 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 	for time.Now().Sub(start) < (60 * time.Second) {
 		err = nil
 		logs, err = c.Get().
-			Prefix("proxy").
-			Resource("nodes").
-			Name(podStatus.Spec.NodeName).
-			Suffix("containerLogs", ns, podStatus.Name, containerName).
+			Resource("pods").
+			Namespace(ns).
+			Name(pod.Name).
+			SubResource("log").
+			Param("container", containerName).
 			Do().
 			Raw()
 		if err == nil && strings.Contains(string(logs), "Internal Error") {
@@ -1136,7 +1166,7 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 	}
 
 	for _, m := range expectedOutput {
-		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
+		Expect(string(logs)).To(matcher(m), "%q in container output", m)
 	}
 }
 
@@ -1397,9 +1427,11 @@ func RunRC(config RCConfig) error {
 	}
 
 	if oldRunning != config.Replicas {
-		if pods, err := config.Client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+		// List only pods from a given replication controller.
+		if pods, err := config.Client.Pods(api.NamespaceAll).List(label, fields.Everything()); err == nil {
+
 			for _, pod := range pods.Items {
-				Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+				Logf("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
 			}
 		} else {
 			Logf("Can't list pod debug info: %v", err)
@@ -1493,15 +1525,29 @@ func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	return waitForRCPodsRunning(c, ns, name)
 }
 
-// Wait up to 10 minutes for pods to become Running.
+// Wait up to 10 minutes for pods to become Running. Assume that the pods of the
+// rc are labels with {"name":rcName}.
 func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	err := waitForPodsWithLabelRunning(c, ns, selector)
+	if err != nil {
+		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", rcName, err)
+	}
+	return nil
+}
+
+// Wait up to 10 minutes for all matching pods to become Running and at least one
+// matching pod exists.
+func waitForPodsWithLabelRunning(c *client.Client, ns string, label labels.Selector) error {
 	running := false
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	podStore := newPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
 waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := podStore.List()
+		if len(pods) == 0 {
+			continue waitLoop
+		}
 		for _, p := range pods {
 			if p.Status.Phase != api.PodRunning {
 				continue waitLoop
@@ -1511,7 +1557,7 @@ waitLoop:
 		break
 	}
 	if !running {
-		return fmt.Errorf("Timeout while waiting for replication controller %s pods to be running", rcName)
+		return fmt.Errorf("Timeout while waiting for pods with labels %q to be running", label.String())
 	}
 	return nil
 }
@@ -1586,11 +1632,11 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 		if err != nil {
 			return false, err
 		}
-		oldRCs, err := deploymentUtil.GetOldRCs(*deployment, c)
+		oldRCs, err := deploymentutil.GetOldRCs(*deployment, c)
 		if err != nil {
 			return false, err
 		}
-		newRC, err := deploymentUtil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -1599,8 +1645,8 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 			return false, nil
 		}
 		allRCs := append(oldRCs, newRC)
-		totalCreated := deploymentUtil.GetReplicaCountForRCs(allRCs)
-		totalAvailable, err := deploymentUtil.GetAvailablePodsForRCs(c, allRCs)
+		totalCreated := deploymentutil.GetReplicaCountForRCs(allRCs)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForRCs(c, allRCs)
 		if err != nil {
 			return false, err
 		}
@@ -1614,15 +1660,34 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 		if deployment.Status.Replicas == desiredUpdatedReplicas &&
 			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
 			// Verify RCs.
-			if deploymentUtil.GetReplicaCountForRCs(oldRCs) != 0 {
+			if deploymentutil.GetReplicaCountForRCs(oldRCs) != 0 {
 				return false, fmt.Errorf("old RCs are not fully scaled down")
 			}
-			if deploymentUtil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
+			if deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
 				return false, fmt.Errorf("new RCs is not fully scaled up")
 			}
 			return true, nil
 		}
 		return false, nil
+	})
+}
+
+// Waits for the number of events on the given object to reach a desired count.
+func waitForEvents(c *client.Client, ns string, objOrRef runtime.Object, desiredEventsCount int) error {
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+		events, err := c.Events(ns).Search(objOrRef)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		eventsCount := len(events.Items)
+		if eventsCount == desiredEventsCount {
+			return true, nil
+		}
+		if eventsCount < desiredEventsCount {
+			return false, nil
+		}
+		// Number of events has exceeded the desired count.
+		return false, fmt.Errorf("number of events has exceeded the desired count, eventsCount: %d, desiredCount: %d", eventsCount, desiredEventsCount)
 	})
 }
 
@@ -1997,4 +2062,82 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 		Logf("Waiting for cluster size %d, current size %d, not ready nodes %d", size, numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
+}
+
+// getHostExternalAddress gets the node for a pod and returns the first External
+// address. Returns an error if the node the pod is on doesn't have an External
+// address.
+func getHostExternalAddress(client *client.Client, p *api.Pod) (externalAddress string, err error) {
+	node, err := client.Nodes().Get(p.Spec.NodeName)
+	if err != nil {
+		return "", err
+	}
+	for _, address := range node.Status.Addresses {
+		if address.Type == api.NodeExternalIP {
+			if address.Address != "" {
+				externalAddress = address.Address
+				break
+			}
+		}
+	}
+	if externalAddress == "" {
+		err = fmt.Errorf("No external address for pod %v on node %v",
+			p.Name, p.Spec.NodeName)
+	}
+	return
+}
+
+type extractRT struct {
+	http.Header
+}
+
+func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.Header = req.Header
+	return nil, nil
+}
+
+// headersForConfig extracts any http client logic necessary for the provided
+// config.
+func headersForConfig(c *client.Config) (http.Header, error) {
+	extract := &extractRT{}
+	rt, err := client.HTTPWrappersForConfig(c, extract)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := rt.RoundTrip(&http.Request{}); err != nil {
+		return nil, err
+	}
+	return extract.Header, nil
+}
+
+// OpenWebSocketForURL constructs a websocket connection to the provided URL, using the client
+// config, with the specified protocols.
+func OpenWebSocketForURL(url *url.URL, config *client.Config, protocols []string) (*websocket.Conn, error) {
+	tlsConfig, err := client.TLSConfigFor(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tls config: %v", err)
+	}
+	if tlsConfig != nil {
+		url.Scheme = "wss"
+		if !strings.Contains(url.Host, ":") {
+			url.Host += ":443"
+		}
+	} else {
+		url.Scheme = "ws"
+		if !strings.Contains(url.Host, ":") {
+			url.Host += ":80"
+		}
+	}
+	headers, err := headersForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load http headers: %v", err)
+	}
+	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create websocket config: %v", err)
+	}
+	cfg.Header = headers
+	cfg.TlsConfig = tlsConfig
+	cfg.Protocol = protocols
+	return websocket.DialConfig(cfg)
 }

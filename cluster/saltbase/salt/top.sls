@@ -10,9 +10,6 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn-client
-{% endif %}
     - helpers
     - cadvisor
     - kube-client-tools
@@ -26,6 +23,7 @@ base:
     - monit
 {% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-vrouter-kernel
     - opencontrail-networking-minion
 {% else %}
     - kube-proxy
@@ -47,8 +45,8 @@ base:
     - generate-cert
     - etcd
 {% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
-    - docker
     - kubelet
+    - docker
 {% endif %}
 {% if grains['cloud'] is defined and grains.cloud == 'gce' %}
     - supervisor
@@ -76,8 +74,9 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
+    - docker
+    - kubelet
 {% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
@@ -90,5 +89,6 @@ base:
   'roles:kubernetes-network-provider-gateway':
     - match: grain
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-vrouter-kernel
     - opencontrail-networking-gateway
 {% endif %}

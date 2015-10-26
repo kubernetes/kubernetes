@@ -28,7 +28,7 @@ import (
 var _ = Describe("Secrets", func() {
 	f := NewFramework("secrets")
 
-	It("should be consumable from pods", func() {
+	It("should be consumable from pods [Conformance]", func() {
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -92,7 +92,7 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("consume secrets", f.Client, pod, 0, []string{
+		testContainerOutput("consume secrets", f.Client, pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
 		}, f.Namespace.Name)

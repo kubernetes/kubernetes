@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -66,7 +66,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{}, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -76,14 +76,14 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{Pods: pods, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
 
 	case statInfo.Mode().IsRegular():
 		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{pod}, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")

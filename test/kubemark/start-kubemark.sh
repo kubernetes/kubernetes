@@ -18,11 +18,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
-source "${KUBE_ROOT}/cluster/kubemark/util.sh"
-
-detect-project &> /dev/null
-export PROJECT
+source "${KUBE_ROOT}/test/kubemark/common.sh"
 
 RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
@@ -43,17 +39,15 @@ make
 rm kubemark
 cd $CURR_DIR
 
-MASTER_NAME="hollow-cluster-master"
+GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
 gcloud compute disks create "${MASTER_NAME}-pd" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
+    ${GCLOUD_COMMON_ARGS} \
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
 
 gcloud compute instances create "${MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
+    ${GCLOUD_COMMON_ARGS} \
     --machine-type "${MASTER_SIZE}" \
     --image-project="${MASTER_IMAGE_PROJECT}" \
     --image "${MASTER_IMAGE}" \
@@ -62,15 +56,47 @@ gcloud compute instances create "${MASTER_NAME}" \
     --scopes "storage-ro,compute-rw,logging-write" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
-gcloud compute firewall-rules create "kubemark-master-https" \
+gcloud compute firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
     --project "${PROJECT}" \
     --network "${NETWORK}" \
     --source-ranges "0.0.0.0/0" \
-    --target-tags "${MASTER_NAME}" \
-    --allow "tcp:443" || true
+    --target-tags "${MASTER_TAG}" \
+    --allow "tcp:443"
 
-MASTER_IP=$(gcloud compute instances describe hollow-cluster-master \
+MASTER_IP=$(gcloud compute instances describe ${MASTER_NAME} \
   --zone="${ZONE}" --project="${PROJECT}" | grep natIP: | cut -f2 -d":" | sed "s/ //g")
+
+if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
+  EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
+  gcloud compute disks create "${EVENT_STORE_NAME}-pd" \
+      ${GCLOUD_COMMON_ARGS} \
+      --type "${MASTER_DISK_TYPE}" \
+      --size "${MASTER_DISK_SIZE}"
+
+  gcloud compute instances create "${EVENT_STORE_NAME}" \
+      ${GCLOUD_COMMON_ARGS} \
+      --machine-type "${MASTER_SIZE}" \
+      --image-project="${MASTER_IMAGE_PROJECT}" \
+      --image "${MASTER_IMAGE}" \
+      --tags "${EVENT_STORE_NAME}" \
+      --network "${NETWORK}" \
+      --scopes "storage-ro,compute-rw,logging-write" \
+      --disk "name=${EVENT_STORE_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+
+  EVENT_STORE_IP=$(gcloud compute instances describe ${EVENT_STORE_NAME} \
+  --zone="${ZONE}" --project="${PROJECT}" | grep networkIP: | cut -f2 -d":" | sed "s/ //g")
+
+  until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${EVENT_STORE_NAME}" --command="ls" &> /dev/null; do
+    sleep 1
+  done
+
+  gcloud compute ssh ${EVENT_STORE_NAME} --zone=${ZONE} --project="${PROJECT}" \
+    --command="sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
+      --listen-peer-urls http://127.0.0.1:2380 \
+      --addr=127.0.0.1:4002 \
+      --bind-addr=0.0.0.0:4002 \
+      --data-dir=/var/etcd/data"
+fi
 
 ensure-temp-dir
 gen-kube-bearertoken
@@ -82,11 +108,11 @@ echo "${CA_CERT_BASE64}" | base64 -d > ca.crt
 echo "${KUBECFG_CERT_BASE64}" | base64 -d > kubecfg.crt
 echo "${KUBECFG_KEY_BASE64}" | base64 -d > kubecfg.key
 
-until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" hollow-cluster-master --command="ls" &> /dev/null; do
+until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command="ls" &> /dev/null; do
   sleep 1
 done
 
-gcloud compute ssh --zone=${ZONE} --project="${PROJECT}" hollow-cluster-master \
+gcloud compute ssh --zone=${ZONE} --project="${PROJECT}" ${MASTER_NAME} \
   --command="sudo mkdir /srv/kubernetes -p && \
   sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
   sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
@@ -103,17 +129,17 @@ if [ "${RUN_FROM_DISTRO}" == "false" ]; then
     "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" \
     "${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh" \
     "${KUBE_ROOT}/test/kubemark/configure-kubectl.sh" \
-    "hollow-cluster-master":~
+    "${MASTER_NAME}":~
 else
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
     "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" \
     "${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh" \
     "${KUBE_ROOT}/test/kubemark/configure-kubectl.sh" \
-    "hollow-cluster-master":~
+    "${MASTER_NAME}":~
 fi
 
-gcloud compute ssh hollow-cluster-master --zone=${ZONE} --project="${PROJECT}" \
-  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh"
+gcloud compute ssh ${MASTER_NAME} --zone=${ZONE} --project="${PROJECT}" \
+  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -174,8 +200,7 @@ contexts:
 current-context: kubemark-context
 EOF
 
-sed "s/##masterip##/\"${MASTER_IP}\"/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
-sed -i'' -e "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
+sed "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet_template.json > ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json
 kubectl create -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json
 kubectl create -f ${KUBECONFIG_SECRET} --namespace="kubemark"

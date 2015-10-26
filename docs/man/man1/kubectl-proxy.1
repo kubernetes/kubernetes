@@ -51,7 +51,7 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
     The IP address on which to serve on.
 
 .PP
-\fB\-\-api\-prefix\fP="/api/"
+\fB\-\-api\-prefix\fP="/"
     Prefix to serve the proxied API under.
 
 .PP
@@ -67,7 +67,7 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
     Regular expression for HTTP methods that the proxy should reject.
 
 .PP
-\fB\-\-reject\-paths\fP="^/api/.\fI/exec,^/api/.\fP/run"
+\fB\-\-reject\-paths\fP="^/api/.\fI/exec,^/api/.\fP/run,^/api/.*/attach"
     Regular expression for paths that the proxy should reject.
 
 .PP

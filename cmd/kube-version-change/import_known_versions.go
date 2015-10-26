@@ -19,5 +19,5 @@ package main
 // These imports are the API groups the kube-version-change tool will support.
 import (
 	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/experimental/install"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )

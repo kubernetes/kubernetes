@@ -33,14 +33,17 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -50,12 +53,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
+	"k8s.io/kubernetes/pkg/util/wsstream"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
+	auth        AuthInterface
 	host        HostInterface
-	restfulCont *restful.Container
+	restfulCont containerInterface
 }
 
 type TLSOptions struct {
@@ -64,10 +69,38 @@ type TLSOptions struct {
 	KeyFile  string
 }
 
+// containerInterface defines the restful.Container functions used on the root container
+type containerInterface interface {
+	Add(service *restful.WebService) *restful.Container
+	Handle(path string, handler http.Handler)
+	Filter(filter restful.FilterFunction)
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	RegisteredWebServices() []*restful.WebService
+
+	// RegisteredHandlePaths returns the paths of handlers registered directly with the container (non-web-services)
+	// Used to test filters are being applied on non-web-service handlers
+	RegisteredHandlePaths() []string
+}
+
+// filteringContainer delegates all Handle(...) calls to Container.HandleWithFilter(...),
+// so we can ensure restful.FilterFunctions are used for all handlers
+type filteringContainer struct {
+	*restful.Container
+	registeredHandlePaths []string
+}
+
+func (a *filteringContainer) Handle(path string, handler http.Handler) {
+	a.HandleWithFilter(path, handler)
+	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
+}
+func (a *filteringContainer) RegisteredHandlePaths() []string {
+	return a.registeredHandlePaths
+}
+
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool) {
+func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, enableDebuggingHandlers)
+	handler := NewServer(host, auth, enableDebuggingHandlers)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -84,8 +117,7 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, port uint) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, false)
-	s.restfulCont.Handle("/metrics", prometheus.Handler())
+	s := NewServer(host, nil, false)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -95,13 +127,20 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, por
 	glog.Fatal(server.ListenAndServe())
 }
 
+// AuthInterface contains all methods required by the auth filters
+type AuthInterface interface {
+	authenticator.Request
+	authorizer.RequestAttributesGetter
+	authorizer.Authorizer
+}
+
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	GetContainerRuntimeVersion() (kubecontainer.Version, error)
-	GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error)
-	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
+	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
+	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetRunningPods() ([]*api.Pod, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -118,16 +157,51 @@ type HostInterface interface {
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, enableDebuggingHandlers bool) Server {
+func NewServer(host HostInterface, auth AuthInterface, enableDebuggingHandlers bool) Server {
 	server := Server{
 		host:        host,
-		restfulCont: restful.NewContainer(),
+		auth:        auth,
+		restfulCont: &filteringContainer{Container: restful.NewContainer()},
+	}
+	if auth != nil {
+		server.InstallAuthFilter()
 	}
 	server.InstallDefaultHandlers()
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 	}
 	return server
+}
+
+// InstallAuthFilter installs authentication filters with the restful Container.
+func (s *Server) InstallAuthFilter() {
+	s.restfulCont.Filter(func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+		// Authenticate
+		u, ok, err := s.auth.AuthenticateRequest(req.Request)
+		if err != nil {
+			glog.Errorf("Unable to authenticate the request due to an error: %v", err)
+			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		if !ok {
+			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		// Get authorization attributes
+		attrs := s.auth.GetRequestAttributes(u, req.Request)
+
+		// Authorize
+		if err := s.auth.Authorize(attrs); err != nil {
+			msg := fmt.Sprintf("Forbidden (user=%s, verb=%s, namespace=%s, resource=%s)", u.GetName(), attrs.GetVerb(), attrs.GetNamespace(), attrs.GetResource())
+			glog.V(2).Info(msg)
+			resp.WriteErrorString(http.StatusForbidden, msg)
+			return
+		}
+
+		// Continue
+		chain.ProcessFilter(req, resp)
+	})
 }
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
@@ -149,6 +223,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Add(ws)
 
 	s.restfulCont.Handle("/stats/", &httpHandler{f: s.handleStats})
+	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	ws = new(restful.WebService)
 	ws.
@@ -157,7 +232,7 @@ func (s *Server) InstallDefaultHandlers() {
 	ws.Route(ws.GET("").
 		To(s.getSpec).
 		Operation("getSpec").
-		Writes(cadvisorApi.MachineInfo{}))
+		Writes(cadvisorapi.MachineInfo{}))
 	s.restfulCont.Add(ws)
 }
 
@@ -181,7 +256,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	ws = new(restful.WebService)
 	ws.
 		Path("/exec")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getExec).
+		Operation("getExec"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+		To(s.getExec).
+		Operation("getExec"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getExec).
 		Operation("getExec"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
@@ -192,7 +273,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	ws = new(restful.WebService)
 	ws.
 		Path("/attach")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getAttach).
+		Operation("getAttach"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+		To(s.getAttach).
+		Operation("getAttach"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getAttach).
 		Operation("getAttach"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
@@ -226,8 +313,6 @@ func (s *Server) InstallDebuggingHandlers() {
 		To(s.getContainerLogs).
 		Operation("getContainerLogs"))
 	s.restfulCont.Add(ws)
-
-	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
 		name := strings.TrimPrefix(req.Request.URL.Path, pprofBasePath)
@@ -461,6 +546,10 @@ func getContainerCoordinates(request *restful.Request) (namespace, pod string, u
 
 const defaultStreamCreationTimeout = 30 * time.Second
 
+type Closer interface {
+	Close() error
+}
+
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	podNamespace, podID, uid, container := getContainerCoordinates(request)
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
@@ -528,23 +617,72 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 }
 
-func (s *Server) createStreams(request *restful.Request, response *restful.Response) (io.Reader, io.WriteCloser, io.WriteCloser, io.WriteCloser, httpstream.Connection, bool, bool) {
-	// start at 1 for error stream
-	expectedStreams := 1
-	if request.QueryParameter(api.ExecStdinParam) == "1" {
-		expectedStreams++
+// standardShellChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
+// along with the approprxate duplex value
+func standardShellChannels(stdin, stdout, stderr bool) []wsstream.ChannelType {
+	// open three half-duplex channels
+	channels := []wsstream.ChannelType{wsstream.ReadChannel, wsstream.WriteChannel, wsstream.WriteChannel}
+	if !stdin {
+		channels[0] = wsstream.IgnoreChannel
 	}
-	if request.QueryParameter(api.ExecStdoutParam) == "1" {
-		expectedStreams++
+	if !stdout {
+		channels[1] = wsstream.IgnoreChannel
 	}
+	if !stderr {
+		channels[2] = wsstream.IgnoreChannel
+	}
+	return channels
+}
+
+func (s *Server) createStreams(request *restful.Request, response *restful.Response) (io.Reader, io.WriteCloser, io.WriteCloser, io.WriteCloser, Closer, bool, bool) {
 	tty := request.QueryParameter(api.ExecTTYParam) == "1"
-	if !tty && request.QueryParameter(api.ExecStderrParam) == "1" {
+	stdin := request.QueryParameter(api.ExecStdinParam) == "1"
+	stdout := request.QueryParameter(api.ExecStdoutParam) == "1"
+	stderr := request.QueryParameter(api.ExecStderrParam) == "1"
+	if tty && stderr {
+		// TODO: make this an error before we reach this method
+		glog.V(4).Infof("Access to exec with tty and stderr is not supported, bypassing stderr")
+		stderr = false
+	}
+
+	// count the streams client asked for, starting with 1
+	expectedStreams := 1
+	if stdin {
+		expectedStreams++
+	}
+	if stdout {
+		expectedStreams++
+	}
+	if stderr {
 		expectedStreams++
 	}
 
 	if expectedStreams == 1 {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr"))
 		return nil, nil, nil, nil, nil, false, false
+	}
+
+	if wsstream.IsWebSocketRequest(request.Request) {
+		// open the requested channels, and always open the error channel
+		channels := append(standardShellChannels(stdin, stdout, stderr), wsstream.WriteChannel)
+		conn := wsstream.NewConn(channels...)
+		conn.SetIdleTimeout(s.host.StreamingConnectionIdleTimeout())
+		streams, err := conn.Open(httplog.Unlogged(response.ResponseWriter), request.Request)
+		if err != nil {
+			glog.Errorf("Unable to upgrade websocket connection: %v", err)
+			return nil, nil, nil, nil, nil, false, false
+		}
+		// Send an empty message to the lowest writable channel to notify the client the connection is established
+		// TODO: make generic to SDPY and WebSockets and do it outside of this method?
+		switch {
+		case stdout:
+			streams[1].Write([]byte{})
+		case stderr:
+			streams[2].Write([]byte{})
+		default:
+			streams[3].Write([]byte{})
+		}
+		return streams[0], streams[1], streams[2], streams[3], conn, tty, true
 	}
 
 	streamCh := make(chan httpstream.Stream)
@@ -963,7 +1101,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
-	cadvisorRequest := cadvisorApi.ContainerInfoRequest{
+	cadvisorRequest := cadvisorapi.ContainerInfoRequest{
 		NumStats: query.NumStats,
 		Start:    query.Start,
 		End:      query.End,
@@ -972,7 +1110,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	switch len(components) {
 	case 1:
 		// Root container stats.
-		var statsMap map[string]*cadvisorApi.ContainerInfo
+		var statsMap map[string]*cadvisorapi.ContainerInfo
 		statsMap, err = s.host.GetRawContainerInfo("/", &cadvisorRequest, false)
 		stats = statsMap["/"]
 	case 2:

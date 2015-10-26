@@ -31,8 +31,8 @@ export GOPATH=${HOME}/_gopath
 export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:$PATH
 
 # Install a few things needed by unit and /integration tests.
+command -v etcd &>/dev/null || ./hack/install-etcd.sh
 go get -u github.com/jstemmer/go-junit-report
-./hack/travis/install-etcd.sh
 
 # Enable the Go race detector.
 export KUBE_RACE=-race

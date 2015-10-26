@@ -76,18 +76,18 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 	}{
 		{
 			legacyVersion:   "v1",
-			storageVersions: "v1,experimental/v1alpha1",
+			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]string{
-				"":             "v1",
-				"experimental": "experimental/v1alpha1",
+				"":           "v1",
+				"extensions": "extensions/v1beta1",
 			},
 		},
 		{
 			legacyVersion:   "",
-			storageVersions: "experimental/v1alpha1,v1",
+			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]string{
-				"":             "v1",
-				"experimental": "experimental/v1alpha1",
+				"":           "v1",
+				"extensions": "extensions/v1beta1",
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 }
 
 func TestUpdateEtcdOverrides(t *testing.T) {
-	storageVersions := generateStorageVersionMap("", "v1,experimental/v1alpha1")
+	storageVersions := generateStorageVersionMap("", "v1,extensions/v1beta1")
 
 	testCases := []struct {
 		apigroup string
@@ -123,7 +123,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
 		},
 		{
-			apigroup: "experimental",
+			apigroup: "extensions",
 			resource: "resource",
 			servers:  []string{"http://127.0.0.1:10000"},
 		},
@@ -153,4 +153,97 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func TestParseRuntimeConfig(t *testing.T) {
+	testCases := []struct {
+		runtimeConfig            map[string]string
+		apiGroupVersionOverrides map[string]master.APIGroupVersionOverride
+		err                      bool
+	}{
+		{
+			runtimeConfig:            map[string]string{},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{},
+			err: false,
+		},
+		{
+			// Cannot override v1 resources.
+			runtimeConfig: map[string]string{
+				"api/v1/pods": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{},
+			err: true,
+		},
+		{
+			// Disable v1.
+			runtimeConfig: map[string]string{
+				"api/v1": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"api/v1": {
+					Disable: true,
+				},
+			},
+			err: false,
+		},
+		{
+			// Disable extensions.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"extensions/v1beta1": {
+					Disable: true,
+				},
+			},
+			err: false,
+		},
+		{
+			// Disable deployments.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"extensions/v1beta1": {
+					ResourceOverrides: map[string]bool{
+						"deployments": false,
+					},
+				},
+			},
+			err: false,
+		},
+		{
+			// Enable deployments and disable jobs.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "true",
+				"extensions/v1beta1/jobs":        "false",
+			},
+			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+				"extensions/v1beta1": {
+					ResourceOverrides: map[string]bool{
+						"deployments": true,
+						"jobs":        false,
+					},
+				},
+			},
+			err: false,
+		},
+	}
+	for _, test := range testCases {
+		s := &APIServer{
+			RuntimeConfig: test.runtimeConfig,
+		}
+		apiGroupVersionOverrides, err := s.parseRuntimeConfig()
+
+		if err == nil && test.err {
+			t.Fatalf("expected error for test: %q", test)
+		} else if err != nil && !test.err {
+			t.Fatalf("unexpected error: %s, for test: %q", err, test)
+		}
+
+		if err == nil && !reflect.DeepEqual(apiGroupVersionOverrides, test.apiGroupVersionOverrides) {
+			t.Fatalf("unexpected apiGroupVersionOverrides. Actual: %q, expected: %q", apiGroupVersionOverrides, test.apiGroupVersionOverrides)
+		}
+	}
+
 }

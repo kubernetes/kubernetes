@@ -24,12 +24,13 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -45,7 +46,7 @@ func newPod(uid, name string) *api.Pod {
 func createFakeRuntimeCache(fakeRecorder *record.FakeRecorder) kubecontainer.RuntimeCache {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorApi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil)
+	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorapi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
 	return kubecontainer.NewFakeRuntimeCache(dockerManager)
 }
 
@@ -56,7 +57,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	fakeRuntimeCache := createFakeRuntimeCache(fakeRecorder)
 	podWorkers := newPodWorkers(
 		fakeRuntimeCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -93,7 +94,7 @@ func TestUpdatePod(t *testing.T) {
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
-			podWorkers.UpdatePod(newPod(string(j), string(i)), nil, SyncPodCreate, func() {})
+			podWorkers.UpdatePod(newPod(string(j), string(i)), nil, kubetypes.SyncPodCreate, func() {})
 		}
 	}
 	drainWorkers(podWorkers, numPods)
@@ -126,7 +127,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		podWorkers.UpdatePod(newPod(string(i), "name"), nil, SyncPodUpdate, func() {})
+		podWorkers.UpdatePod(newPod(string(i), "name"), nil, kubetypes.SyncPodUpdate, func() {})
 	}
 	drainWorkers(podWorkers, numPods)
 
@@ -162,12 +163,12 @@ type simpleFakeKubelet struct {
 	wg sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
+func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
 	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncPodWithWaitGroup(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
 	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
 	kl.wg.Done()
 	return nil
@@ -193,7 +194,7 @@ func TestFakePodWorkers(t *testing.T) {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorApi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil)
+	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorapi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
 	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
 
 	kubeletForRealWorkers := &simpleFakeKubelet{}
@@ -353,8 +354,8 @@ func TestFakePodWorkers(t *testing.T) {
 		kubeletForRealWorkers.wg.Add(1)
 
 		fakeDocker.ContainerList = tt.containerList
-		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, SyncPodUpdate, func() {})
-		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, SyncPodUpdate, func() {})
+		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
+		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
 
 		kubeletForRealWorkers.wg.Wait()
 

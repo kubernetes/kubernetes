@@ -28,12 +28,13 @@ import (
 
 	"github.com/docker/docker/pkg/jsonmessage"
 	docker "github.com/fsouza/go-dockerclient"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -171,10 +172,10 @@ func TestExecSupportNotExists(t *testing.T) {
 
 func TestDockerContainerCommand(t *testing.T) {
 	runner := &DockerManager{}
-	containerID := "1234"
+	containerID := kubetypes.DockerID("1234").ContainerID()
 	command := []string{"ls"}
 	cmd, _ := runner.getRunInContainerCommand(containerID, command)
-	if cmd.Dir != "/var/lib/docker/execdriver/native/"+containerID {
+	if cmd.Dir != "/var/lib/docker/execdriver/native/"+containerID.ID {
 		t.Errorf("unexpected command CWD: %s", cmd.Dir)
 	}
 	if !reflect.DeepEqual(cmd.Args, []string{"/usr/sbin/nsinit", "exec", "ls"}) {
@@ -256,7 +257,7 @@ func TestPullWithJSONError(t *testing.T) {
 		"Bad gateway": {
 			"ubuntu",
 			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
-			"because the registry is temporarily unavailable",
+			kubecontainer.RegistryUnavailable.Error(),
 		},
 	}
 	for i, test := range tests {
@@ -517,7 +518,7 @@ type containersByID []*kubecontainer.Container
 
 func (b containersByID) Len() int           { return len(b) }
 func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b containersByID) Less(i, j int) bool { return b[i].ID < b[j].ID }
+func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
 func TestFindContainersByPod(t *testing.T) {
 	tests := []struct {
@@ -560,12 +561,12 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   "foobar",
+							ID:   kubetypes.DockerID("foobar").ContainerID(),
 							Name: "foobar",
 							Hash: 0x1234,
 						},
 						{
-							ID:   "baz",
+							ID:   kubetypes.DockerID("baz").ContainerID(),
 							Name: "baz",
 							Hash: 0x1234,
 						},
@@ -577,7 +578,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   "barbar",
+							ID:   kubetypes.DockerID("barbar").ContainerID(),
 							Name: "barbar",
 							Hash: 0x1234,
 						},
@@ -618,17 +619,17 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   "foobar",
+							ID:   kubetypes.DockerID("foobar").ContainerID(),
 							Name: "foobar",
 							Hash: 0x1234,
 						},
 						{
-							ID:   "barfoo",
+							ID:   kubetypes.DockerID("barfoo").ContainerID(),
 							Name: "barfoo",
 							Hash: 0x1234,
 						},
 						{
-							ID:   "baz",
+							ID:   kubetypes.DockerID("baz").ContainerID(),
 							Name: "baz",
 							Hash: 0x1234,
 						},
@@ -640,7 +641,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   "barbar",
+							ID:   kubetypes.DockerID("barbar").ContainerID(),
 							Name: "barbar",
 							Hash: 0x1234,
 						},
@@ -652,7 +653,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:   "bazbaz",
+							ID:   kubetypes.DockerID("bazbaz").ContainerID(),
 							Name: "bazbaz",
 							Hash: 0x1234,
 						},
@@ -669,7 +670,8 @@ func TestFindContainersByPod(t *testing.T) {
 	}
 	fakeClient := &FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorApi.MachineInfo{}, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil)
+	// image back-off is set to nil, this test shouldnt pull images
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

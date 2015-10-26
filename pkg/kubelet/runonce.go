@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -39,7 +40,7 @@ type RunPodResult struct {
 }
 
 // RunOnce polls from one configuration update and run the associated pods.
-func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
+func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, error) {
 	select {
 	case u := <-updates:
 		glog.Infof("processing manifest with %d pods", len(u.Pods))
@@ -109,7 +110,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
 		// We don't create mirror pods in this mode; pass a dummy boolean value
 		// to sycnPod.
-		if err = kl.syncPod(pod, nil, p, SyncPodUpdate); err != nil {
+		if err = kl.syncPod(pod, nil, p, kubetypes.SyncPodUpdate); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {

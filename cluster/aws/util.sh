@@ -441,6 +441,18 @@ function create-dhcp-option-set () {
 
 # Verify prereqs
 function verify-prereqs {
+  if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1=true"
+    else
+      # TODO: add checking if RUNTIME_CONFIG contains "extensions/v1beta1=false" and appending "extensions/v1beta1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1=true"; then
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+        exit 1
+      fi
+    fi
+  fi
+
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
@@ -456,31 +468,6 @@ function ensure-temp-dir {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
-# Verify and find the various tar files that we are going to use on the server.
-#
-# Vars set:
-#   SERVER_BINARY_TAR
-#   SALT_TAR
-function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
-    exit 1
-  fi
-
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
-  fi
-  if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
-    exit 1
   fi
 }
 
@@ -844,6 +831,8 @@ function kube-up {
     echo "readonly ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "readonly ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI:-false}'"
+    echo "readonly ENABLE_EXPERIMENTAL_API='${ENABLE_EXPERIMENTAL_API:-false}'"
+    echo "readonly RUNTIME_CONFIG='${RUNTIME_CONFIG}'"
     echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"

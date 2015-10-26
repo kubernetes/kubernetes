@@ -24,8 +24,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -110,11 +112,25 @@ func runPortForward(ns, podName string, port int) (*exec.Cmd, int) {
 	return cmd, listenPort
 }
 
+func runKubectlWithTimeout(timeout time.Duration, args ...string) string {
+	logOutput := make(chan string)
+	go func() {
+		logOutput <- runKubectl(args...)
+	}()
+	select {
+	case <-time.After(timeout):
+		Failf("kubectl timed out")
+		return ""
+	case o := <-logOutput:
+		return o
+	}
+}
+
 var _ = Describe("Port forwarding", func() {
 	framework := NewFramework("port-forwarding")
 
 	Describe("With a server that expects a client request", func() {
-		It("should support a client that connects, sends no data, and disconnects", func() {
+		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "1", "1", "1")
 			framework.Client.Pods(framework.Namespace.Name).Create(pod)
@@ -133,12 +149,12 @@ var _ = Describe("Port forwarding", func() {
 			By("Closing the connection to the local port")
 			conn.Close()
 
-			logOutput := runKubectl("logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
+			logOutput := runKubectlWithTimeout(util.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Expected to read 3 bytes from client, but got 0 instead")
 		})
 
-		It("should support a client that connects, sends data, and disconnects", func() {
+		It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "10", "10", "100")
 			framework.Client.Pods(framework.Namespace.Name).Create(pod)
@@ -178,14 +194,14 @@ var _ = Describe("Port forwarding", func() {
 				Failf("Expected %q from server, got %q", e, a)
 			}
 
-			logOutput := runKubectl("logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
+			logOutput := runKubectlWithTimeout(util.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
 			verifyLogMessage(logOutput, "^Accepted client connection$")
 			verifyLogMessage(logOutput, "^Received expected client data$")
 			verifyLogMessage(logOutput, "^Done$")
 		})
 	})
 	Describe("With a server that expects no client request", func() {
-		It("should support a client that connects, sends no data, and disconnects", func() {
+		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("", "10", "10", "100")
 			framework.Client.Pods(framework.Namespace.Name).Create(pod)
@@ -215,7 +231,7 @@ var _ = Describe("Port forwarding", func() {
 				Failf("Expected %q from server, got %q", e, a)
 			}
 
-			logOutput := runKubectl("logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
+			logOutput := runKubectlWithTimeout(util.ForeverTestTimeout, "logs", fmt.Sprintf("--namespace=%v", framework.Namespace.Name), "-f", podName)
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Done")
 		})

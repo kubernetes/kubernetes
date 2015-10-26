@@ -24,12 +24,12 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 type HandlerRunner struct {
-	httpGetter       kubeletTypes.HttpGetter
+	httpGetter       kubetypes.HttpGetter
 	commandRunner    kubecontainer.ContainerCommandRunner
 	containerManager podStatusProvider
 }
@@ -38,7 +38,7 @@ type podStatusProvider interface {
 	GetPodStatus(pod *api.Pod) (*api.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubeletTypes.HttpGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,
@@ -46,8 +46,7 @@ func NewHandlerRunner(httpGetter kubeletTypes.HttpGetter, commandRunner kubecont
 	}
 }
 
-// TODO(yifan): Use a strong type for containerID.
-func (hr *HandlerRunner) Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error {
+func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error {
 	switch {
 	case handler.Exec != nil:
 		_, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command)

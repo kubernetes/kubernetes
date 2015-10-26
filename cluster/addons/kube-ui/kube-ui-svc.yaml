@@ -8,6 +8,8 @@ metadata:
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "KubeUI"
 spec:
+  selector:
+    k8s-app: kube-ui
   ports:
   - port: 80
     targetPort: 8080

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -245,6 +246,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile, "Path to a cert. file for the certificate authority.")
 	//See #14282 for details on how to test/try this option out.  TODO remove this comment once this option is tested in CI.
 	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", 0, "If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be of type NodePort, using this as the value of the port. If zero, the Kubernetes master service will be of type ClusterIP.")
+	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
+	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", true, "If true, server will do its best to fix the update request to pass the validation, e.g., setting empty UID in update request to its existing value. This flag can be turned off after we fix all the clients that send malformed updates.")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -353,7 +356,7 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
-		glog.Fatalf("specify either --etcd-servers or --etcd-config")
+		glog.Fatalf("Specify either --etcd-servers or --etcd-config")
 	}
 
 	if s.KubernetesServiceNodePort > 0 && !s.ServiceNodePortRange.Contains(s.KubernetesServiceNodePort) {
@@ -376,34 +379,39 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
+	// Setup tunneler if needed
+	var tunneler master.Tunneler
+	var proxyDialerFn apiserver.ProxyDialerFunc
+	if len(s.SSHUser) > 0 {
+		// Get ssh key distribution func, if supported
+		var installSSH master.InstallSSHKey
+		if cloud != nil {
+			if instances, supported := cloud.Instances(); supported {
+				installSSH = instances.AddSSHKeyToAllInstances
+			}
+		}
+
+		// Set up the tunneler
+		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, installSSH)
+
+		// Use the tunneler's dialer to connect to the kubelet
+		s.KubeletConfig.Dial = tunneler.Dial
+		// Use the tunneler's dialer when proxying to pods, services, and nodes
+		proxyDialerFn = tunneler.Dial
+	}
+
+	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
+	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+
 	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
 	if err != nil {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
-	// "api/all=false" allows users to selectively enable specific api versions.
-	disableAllAPIs := false
-	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
-	if ok && allAPIFlagValue == "false" {
-		disableAllAPIs = true
+	apiGroupVersionOverrides, err := s.parseRuntimeConfig()
+	if err != nil {
+		glog.Fatalf("error in parsing runtime-config: %s", err)
 	}
-
-	// "api/legacy=false" allows users to disable legacy api versions.
-	disableLegacyAPIs := false
-	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
-	if ok && legacyAPIFlagValue == "false" {
-		disableLegacyAPIs = true
-	}
-	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
-
-	// "api/v1={true|false} allows users to enable/disable v1 API.
-	// This takes preference over api/all and api/legacy, if specified.
-	disableV1 := disableAllAPIs
-	disableV1 = !s.getRuntimeConfigValue("api/v1", !disableV1)
-
-	// "experimental/v1alpha1={true|false} allows users to enable/disable the experimental API.
-	// This takes preference over api/all, if specified.
-	enableExp := s.getRuntimeConfigValue("experimental/v1alpha1", false)
 
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -431,19 +439,19 @@ func (s *APIServer) Run(_ []string) error {
 	}
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
-	if enableExp {
-		expGroup, err := latest.Group("experimental")
+	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
+		expGroup, err := latest.Group("extensions")
 		if err != nil {
-			glog.Fatalf("experimental API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
 		if _, found := storageVersions[expGroup.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.Group, storageVersions)
 		}
 		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.Group], s.EtcdPathPrefix)
 		if err != nil {
-			glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
+			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
-		storageDestinations.AddAPIGroup("experimental", expEtcdStorage)
+		storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 	}
 
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdPathPrefix, &storageDestinations, newEtcd)
@@ -455,7 +463,7 @@ func (s *APIServer) Run(_ []string) error {
 		if apiserver.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
 			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
 		} else {
-			glog.Warning("no RSA key provided, service account token authentication disabled")
+			glog.Warning("No RSA key provided, service account token authentication disabled")
 		}
 	}
 	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
@@ -490,15 +498,15 @@ func (s *APIServer) Run(_ []string) error {
 		if s.CloudProvider == "gce" {
 			instances, supported := cloud.Instances()
 			if !supported {
-				glog.Fatalf("gce cloud provider has no instances.  this shouldn't happen. exiting.")
+				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
 			}
 			name, err := os.Hostname()
 			if err != nil {
-				glog.Fatalf("failed to get hostname: %v", err)
+				glog.Fatalf("Failed to get hostname: %v", err)
 			}
 			addrs, err := instances.NodeAddresses(name)
 			if err != nil {
-				glog.Warningf("unable to obtain external host address from cloud provider: %v", err)
+				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
 			} else {
 				for _, addr := range addrs {
 					if addr.Type == api.NodeExternalIP {
@@ -508,12 +516,7 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}
 	}
-	var installSSH master.InstallSSHKey
-	if cloud != nil {
-		if instances, supported := cloud.Instances(); supported {
-			installSSH = instances.AddSSHKeyToAllInstances
-		}
-	}
+
 	config := &master.Config{
 		StorageDestinations:       storageDestinations,
 		StorageVersions:           storageVersions,
@@ -536,15 +539,14 @@ func (s *APIServer) Run(_ []string) error {
 		SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
 		Authorizer:                authorizer,
 		AdmissionControl:          admissionController,
-		DisableV1:                 disableV1,
-		EnableExp:                 enableExp,
+		APIGroupVersionOverrides:  apiGroupVersionOverrides,
 		MasterServiceNamespace:    s.MasterServiceNamespace,
 		ClusterName:               s.ClusterName,
 		ExternalHost:              s.ExternalHost,
 		MinRequestTimeout:         s.MinRequestTimeout,
-		SSHUser:                   s.SSHUser,
-		SSHKeyfile:                s.SSHKeyfile,
-		InstallSSHKey:             installSSH,
+		ProxyDialer:               proxyDialerFn,
+		ProxyTLSClientConfig:      proxyTLSClientConfig,
+		Tunneler:                  tunneler,
 		ServiceNodePortRange:      s.ServiceNodePortRange,
 		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
 	}
@@ -588,7 +590,7 @@ func (s *APIServer) Run(_ []string) error {
 		if len(s.ClientCAFile) > 0 {
 			clientCAs, err := util.CertPoolFromFile(s.ClientCAFile)
 			if err != nil {
-				glog.Fatalf("unable to load client CA file: %v", err)
+				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
 			// Populate PeerCertificates in requests, but don't reject connections without certificates
 			// This allows certificates to be validated by authenticators, while still allowing other auth types
@@ -657,4 +659,62 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		return boolValue
 	}
 	return defaultValue
+}
+
+// Parses the given runtime-config and formats it into map[string]ApiGroupVersionOverride
+func (s *APIServer) parseRuntimeConfig() (map[string]master.APIGroupVersionOverride, error) {
+	// "api/all=false" allows users to selectively enable specific api versions.
+	disableAllAPIs := false
+	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
+	if ok && allAPIFlagValue == "false" {
+		disableAllAPIs = true
+	}
+
+	// "api/legacy=false" allows users to disable legacy api versions.
+	disableLegacyAPIs := false
+	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
+	if ok && legacyAPIFlagValue == "false" {
+		disableLegacyAPIs = true
+	}
+	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
+
+	// "api/v1={true|false} allows users to enable/disable v1 API.
+	// This takes preference over api/all and api/legacy, if specified.
+	disableV1 := disableAllAPIs
+	v1GroupVersion := "api/v1"
+	disableV1 = !s.getRuntimeConfigValue(v1GroupVersion, !disableV1)
+	apiGroupVersionOverrides := map[string]master.APIGroupVersionOverride{}
+	if disableV1 {
+		apiGroupVersionOverrides[v1GroupVersion] = master.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
+
+	// "extensions/v1beta1={true|false} allows users to enable/disable the extensions API.
+	// This takes preference over api/all, if specified.
+	disableExtensions := disableAllAPIs
+	extensionsGroupVersion := "extensions/v1beta1"
+	// TODO: Make this a loop over all group/versions when there are more of them.
+	disableExtensions = !s.getRuntimeConfigValue(extensionsGroupVersion, !disableExtensions)
+	if disableExtensions {
+		apiGroupVersionOverrides[extensionsGroupVersion] = master.APIGroupVersionOverride{
+			Disable: true,
+		}
+	}
+
+	for key := range s.RuntimeConfig {
+		if strings.HasPrefix(key, v1GroupVersion+"/") {
+			return nil, fmt.Errorf("api/v1 resources cannot be enabled/disabled individually")
+		} else if strings.HasPrefix(key, extensionsGroupVersion+"/") {
+			resource := strings.TrimPrefix(key, extensionsGroupVersion+"/")
+
+			apiGroupVersionOverride := apiGroupVersionOverrides[extensionsGroupVersion]
+			if apiGroupVersionOverride.ResourceOverrides == nil {
+				apiGroupVersionOverride.ResourceOverrides = map[string]bool{}
+			}
+			apiGroupVersionOverride.ResourceOverrides[resource] = s.getRuntimeConfigValue(key, false)
+			apiGroupVersionOverrides[extensionsGroupVersion] = apiGroupVersionOverride
+		}
+	}
+	return apiGroupVersionOverrides, nil
 }

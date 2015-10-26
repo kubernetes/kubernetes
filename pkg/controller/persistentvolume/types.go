@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumeclaimbinder
+package persistentvolume
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ const (
 	// A PV created specifically for one claim must contain this annotation in order to bind to the claim.
 	// The value must be the namespace and name of the claim being bound to (i.e, claim.Namespace/claim.Name)
 	// This is an experimental feature and likely to change in the future.
-	createdForKey = "volume.experimental.kubernetes.io/provisioned-for"
+	createdForKey = "volume.extensions.kubernetes.io/provisioned-for"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes indexed by AccessModes and ordered by storage capacity.

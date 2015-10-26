@@ -285,6 +285,10 @@ service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW")'
 kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
 dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
 network_provider_gw_on_minion: '$(echo "$NETWORK_PROVIDER_GATEWAY_ON_MINION")'
+enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
+manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
+manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
+num_nodes: $(echo "${NUM_MINIONS}")
 EOF
 
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
@@ -323,6 +327,11 @@ EOF
     if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 enable_experimental_api: '$(echo "$ENABLE_EXPERIMENTAL_API" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+terminated_pod_gc_threshold: '$(echo "${TERMINATED_POD_GC_THRESHOLD}" | sed -e "s/'/''/g")'
 EOF
     fi
 }

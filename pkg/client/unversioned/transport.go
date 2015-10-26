@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type userAgentRoundTripper struct {
@@ -40,6 +42,12 @@ func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	req = cloneRequest(req)
 	req.Header.Set("User-Agent", rt.agent)
 	return rt.rt.RoundTrip(req)
+}
+
+var _ = util.RoundTripperWrapper(&userAgentRoundTripper{})
+
+func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.rt
 }
 
 type basicAuthRoundTripper struct {
@@ -63,6 +71,12 @@ func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	return rt.rt.RoundTrip(req)
 }
 
+var _ = util.RoundTripperWrapper(&basicAuthRoundTripper{})
+
+func (rt *basicAuthRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.rt
+}
+
 type bearerAuthRoundTripper struct {
 	bearer string
 	rt     http.RoundTripper
@@ -84,34 +98,44 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	return rt.rt.RoundTrip(req)
 }
 
+var _ = util.RoundTripperWrapper(&bearerAuthRoundTripper{})
+
+func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.rt
+}
+
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
 func TLSConfigFor(config *Config) (*tls.Config, error) {
 	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
 	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
 
+	if !hasCA && !hasCert && !config.Insecure {
+		return nil, nil
+	}
 	if hasCA && config.Insecure {
 		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
 	}
 	if err := LoadTLSFiles(config); err != nil {
 		return nil, err
 	}
-	var tlsConfig *tls.Config
-	switch {
-	case hasCert:
-		cfg, err := NewClientCertTLSConfig(config.CertData, config.KeyData, config.CAData)
+
+	tlsConfig := &tls.Config{
+		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
+		MinVersion:         tls.VersionTLS10,
+		InsecureSkipVerify: config.Insecure,
+	}
+
+	if hasCA {
+		tlsConfig.RootCAs = rootCertPool(config.CAData)
+	}
+
+	if hasCert {
+		cert, err := tls.X509KeyPair(config.CertData, config.KeyData)
 		if err != nil {
 			return nil, err
 		}
-		tlsConfig = cfg
-	case hasCA:
-		cfg, err := NewTLSConfig(config.CAData)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig = cfg
-	case config.Insecure:
-		tlsConfig = NewUnsafeTLSConfig()
+		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 
 	return tlsConfig, nil
@@ -166,30 +190,6 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 	return nil, nil
 }
 
-func NewClientCertTLSConfig(certData, keyData, caData []byte) (*tls.Config, error) {
-	cert, err := tls.X509KeyPair(certData, keyData)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tls.Config{
-		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
-		MinVersion: tls.VersionTLS10,
-		Certificates: []tls.Certificate{
-			cert,
-		},
-		RootCAs: rootCertPool(caData),
-	}, nil
-}
-
-func NewTLSConfig(caData []byte) (*tls.Config, error) {
-	return &tls.Config{
-		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
-		MinVersion: tls.VersionTLS10,
-		RootCAs:    rootCertPool(caData),
-	}, nil
-}
-
 // rootCertPool returns nil if caData is empty.  When passed along, this will mean "use system CAs".
 // When caData is not empty, it will be the ONLY information used in the CertPool.
 func rootCertPool(caData []byte) *x509.CertPool {
@@ -204,12 +204,6 @@ func rootCertPool(caData []byte) *x509.CertPool {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caData)
 	return certPool
-}
-
-func NewUnsafeTLSConfig() *tls.Config {
-	return &tls.Config{
-		InsecureSkipVerify: true,
-	}
 }
 
 // cloneRequest returns a clone of the provided *http.Request.

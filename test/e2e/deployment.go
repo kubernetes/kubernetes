@@ -19,8 +19,8 @@ package e2e
 import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	deploymentUtil "k8s.io/kubernetes/pkg/util/deployment"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -46,11 +46,11 @@ func testNewDeployment(f *Framework) {
 	deploymentName := "nginx-deployment"
 	podLabels := map[string]string{"name": "nginx"}
 	Logf("Creating simple deployment %s", deploymentName)
-	_, err := c.Deployments(ns).Create(&experimental.Deployment{
+	_, err := c.Deployments(ns).Create(&extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Replicas:       1,
 			Selector:       podLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
@@ -139,11 +139,11 @@ func testRollingUpdateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	newDeployment := experimental.Deployment{
+	newDeployment := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Replicas:       3,
 			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
@@ -220,11 +220,11 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	newDeployment := experimental.Deployment{
+	newDeployment := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: experimental.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			Replicas:       1,
 			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
@@ -255,6 +255,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
+	waitForEvents(c, ns, deployment, 2)
 	events, err := c.Events(ns).Search(deployment)
 	if err != nil {
 		Logf("error in listing events: %s", err)
@@ -262,7 +263,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	}
 	// There should be 2 events, one to scale up the new RC and then to scale down the old RC.
 	Expect(len(events.Items)).Should(Equal(2))
-	newRC, err := deploymentUtil.GetNewRC(*deployment, c)
+	newRC, err := deploymentutil.GetNewRC(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up rc %s to 1", newRC.Name)))

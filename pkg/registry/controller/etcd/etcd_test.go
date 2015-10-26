@@ -27,9 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 )
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	return NewREST(etcdStorage), fakeClient
+	storage, statusStorage := NewREST(etcdStorage)
+	return storage, statusStorage, fakeClient
 }
 
 // createController is a helper function that returns a controller with the updated resource version.
@@ -74,7 +75,7 @@ func validNewController() *api.ReplicationController {
 var validController = validNewController()
 
 func TestCreate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	controller := validNewController()
 	controller.ObjectMeta = api.ObjectMeta{}
@@ -93,7 +94,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
@@ -124,13 +125,13 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestDelete(validNewController())
 }
 
 func TestGenerationNumber(t *testing.T) {
-	storage, _ := newStorage(t)
+	storage, _, _ := newStorage(t)
 	modifiedSno := *validNewController()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
@@ -179,19 +180,19 @@ func TestGenerationNumber(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validNewController())
 }
 
 func TestList(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestList(validNewController())
 }
 
 func TestWatch(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validController,
@@ -220,3 +221,5 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+//TODO TestUpdateStatus

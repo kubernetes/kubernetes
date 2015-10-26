@@ -89,6 +89,16 @@ git remote set-url --push upstream no_push
 
 ### Committing changes to your fork
 
+Before committing any changes, please link/copy these pre-commit hooks into your .git
+directory. This will keep you from accidentally committing non-gofmt'd go code.
+
+```sh
+cd kubernetes/.git/hooks/
+ln -s ../../hooks/pre-commit .
+```
+
+Then you can commit your changes and push them to your fork:
+
 ```sh
 git commit
 git push -f origin myfeature
@@ -203,16 +213,6 @@ It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimi
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
 
-## Hooks
-
-Before committing any changes, please link/copy these hooks into your .git
-directory. This will keep you from accidentally committing non-gofmt'd go code.
-
-```sh
-cd kubernetes/.git/hooks/
-ln -s ../../hooks/pre-commit .
-```
-
 ## Unit tests
 
 ```sh
@@ -264,7 +264,9 @@ Coverage results for the project can also be viewed on [Coveralls](https://cover
 
 ## Integration tests
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases) in your path. To download a copy of the latest version used by Kubernetes, either
+ * run `hack/install-etcd.sh`, which will download etcd to `third_party/etcd`, and then set your `PATH` to include `third_party/etcd`.
+ * inspect `cluster/saltbase/salt/etcd/etcd.manifest` for the correct version, and then manually download and install it to some place in your `PATH`.
 
 ```sh
 cd kubernetes

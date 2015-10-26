@@ -70,7 +70,7 @@ kube::golang::test_targets() {
     cmd/genconversion
     cmd/gendeepcopy
     cmd/genswaggertypedocs
-    examples/k8petstore/web-server
+    examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
@@ -90,6 +90,7 @@ readonly KUBE_TEST_PORTABLE=(
   test/kubemark
   hack/e2e.go
   hack/e2e-internal
+  hack/get-build.sh
   hack/ginkgo-e2e.sh
   hack/lib
 )

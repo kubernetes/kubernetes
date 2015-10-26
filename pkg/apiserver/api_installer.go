@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -38,10 +39,9 @@ import (
 
 type APIInstaller struct {
 	group             *APIGroupVersion
-	info              *APIRequestInfoResolver
+	info              *RequestInfoResolver
 	prefix            string // Path prefix where API resources are to be registered.
 	minRequestTimeout time.Duration
-	proxyDialerFn     ProxyDialerFunc
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -61,10 +61,10 @@ type documentable interface {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []api.APIResource, errors []error) {
+func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
 	errors = make([]error, 0)
 
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
@@ -100,7 +100,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*api.APIResource, error) {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
 	admit := a.group.Admit
 	context := a.group.Context
 
@@ -267,7 +267,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	params := []*restful.Parameter{}
 	actions := []action{}
 
-	var apiResource api.APIResource
+	var apiResource unversioned.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
 	case meta.RESTScopeNameRoot:
@@ -480,7 +480,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("patch"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
-				Reads(api.Patch{}).
+				Reads(unversioned.Patch{}).
 				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)

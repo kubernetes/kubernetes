@@ -59,7 +59,7 @@ var _ = Describe("hostPath", func() {
 		}
 	})
 
-	It("should give a volume the correct mode", func() {
+	It("should give a volume the correct mode [Conformance]", func() {
 		volumePath := "/test-volume"
 		source := &api.HostPathVolumeSource{
 			Path: "/tmp",
@@ -70,13 +70,13 @@ var _ = Describe("hostPath", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		testContainerOutputInNamespace("hostPath mode", c, pod, 0, []string{
+		testContainerOutput("hostPath mode", c, pod, 0, []string{
 			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		},
 			namespace.Name)
 	})
 
-	It("should support r/w", func() {
+	It("should support r/w [Conformance]", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
@@ -95,8 +95,8 @@ var _ = Describe("hostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 		//Read the content of the file with the second container to
-		//verify volumes  being shared properly among continers within the pod.
-		testContainerOutputInNamespace("hostPath r/w", c, pod, 1, []string{
+		//verify volumes  being shared properly among containers within the pod.
+		testContainerOutput("hostPath r/w", c, pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		}, namespace.Name,
 		)

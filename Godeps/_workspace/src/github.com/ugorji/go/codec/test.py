@@ -5,8 +5,9 @@
 # So it can process them (so we don't have to checkin the files).
 
 # Ensure msgpack-python and cbor are installed first, using:
-#   pip install --user msgpack-python
-#   pip install --user cbor
+#   sudo apt-get install python-dev
+#   sudo apt-get install python-pip
+#   pip install --user msgpack-python msgpack-rpc-python cbor
 
 import cbor, msgpack, msgpackrpc, sys, os, threading
 

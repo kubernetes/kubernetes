@@ -435,7 +435,8 @@ function kube-down {
       ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
-      sudo rm -rf ~/kube /var/lib/kubelet'
+      sudo rm -rf ~/kube /var/lib/kubelet;
+      sudo rm -rf /run/flannel/subnet.env' || true
     }
     ((ii=ii+1))
   done

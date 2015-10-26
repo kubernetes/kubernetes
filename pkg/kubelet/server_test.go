@@ -19,6 +19,7 @@ package kubelet
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,21 +33,25 @@ import (
 	"testing"
 	"time"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeKubelet struct {
 	podByNameFunc                      func(namespace, name string) (*api.Pod, bool)
-	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	rawInfoFunc                        func(query *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
-	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
+	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	rawInfoFunc                        func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
+	machineInfoFunc                    func() (*cadvisorapi.MachineInfo, error)
 	podsFunc                           func() []*api.Pod
 	runningPodsFunc                    func() ([]*api.Pod, error)
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
@@ -74,11 +79,11 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return fk.containerInfoFunc(podFullName, uid, containerName, req)
 }
 
-func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
+func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return fk.rawInfoFunc(req)
 }
 
@@ -86,7 +91,7 @@ func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, erro
 	return fk.containerVersionFunc()
 }
 
-func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return fk.machineInfoFunc()
 }
 
@@ -130,15 +135,38 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return fk.streamingConnectionIdleTimeoutFunc()
 }
 
+type fakeAuth struct {
+	authenticateFunc func(*http.Request) (user.Info, bool, error)
+	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
+	authorizeFunc    func(authorizer.Attributes) (err error)
+}
+
+func (f *fakeAuth) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	return f.authenticateFunc(req)
+}
+func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
+	return f.attributesFunc(u, req)
+}
+func (f *fakeAuth) Authorize(a authorizer.Attributes) (err error) {
+	return f.authorizeFunc(a)
+}
+
 type serverTestFramework struct {
 	serverUnderTest *Server
 	fakeKubelet     *fakeKubelet
+	fakeAuth        *fakeAuth
 	testHTTPServer  *httptest.Server
 }
 
 func newServerTest() *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
+		containerVersionFunc: func() (kubecontainer.Version, error) {
+			return dockertools.NewVersion("1.15")
+		},
+		hostnameFunc: func() string {
+			return "127.0.0.1"
+		},
 		podByNameFunc: func(namespace, name string) (*api.Pod, bool) {
 			return &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -148,7 +176,18 @@ func newServerTest() *serverTestFramework {
 			}, true
 		},
 	}
-	server := NewServer(fw.fakeKubelet, true)
+	fw.fakeAuth = &fakeAuth{
+		authenticateFunc: func(req *http.Request) (user.Info, bool, error) {
+			return &user.DefaultInfo{Name: "test"}, true, nil
+		},
+		attributesFunc: func(u user.Info, req *http.Request) authorizer.Attributes {
+			return &authorizer.AttributesRecord{User: u}
+		},
+		authorizeFunc: func(a authorizer.Attributes) (err error) {
+			return nil
+		},
+	}
+	server := NewServer(fw.fakeKubelet, fw.fakeAuth, true)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -172,18 +211,18 @@ func readResp(resp *http.Response) (string, error) {
 // A helper function to return the correct pod name.
 func getPodName(name, namespace string) string {
 	if namespace == "" {
-		namespace = NamespaceDefault
+		namespace = kubetypes.NamespaceDefault
 	}
 	return name + "_" + namespace
 }
 
 func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{}
+	expectedInfo := &cadvisorapi.ContainerInfo{}
 	podID := "somepod"
 	expectedPodID := getPodName(podID, "")
 	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
 			return nil, fmt.Errorf("bad podID or containerName: podID=%v; containerName=%v", podID, containerName)
 		}
@@ -195,7 +234,7 @@ func TestContainerInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.ContainerInfo
+	var receivedInfo cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -207,13 +246,13 @@ func TestContainerInfo(t *testing.T) {
 
 func TestContainerInfoWithUidNamespace(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{}
+	expectedInfo := &cadvisorapi.ContainerInfo{}
 	podID := "somepod"
 	expectedNamespace := "custom"
 	expectedPodID := getPodName(podID, expectedNamespace)
 	expectedContainerName := "goodcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 		if podID != expectedPodID || string(uid) != expectedUid || containerName != expectedContainerName {
 			return nil, fmt.Errorf("bad podID or uid or containerName: podID=%v; uid=%v; containerName=%v", podID, uid, containerName)
 		}
@@ -225,7 +264,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.ContainerInfo
+	var receivedInfo cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -241,7 +280,7 @@ func TestContainerNotFound(t *testing.T) {
 	expectedNamespace := "custom"
 	expectedContainerName := "slowstartcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 		return nil, ErrContainerNotFound
 	}
 	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, expectedUid, expectedContainerName))
@@ -256,13 +295,13 @@ func TestContainerNotFound(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{
-		ContainerReference: cadvisorApi.ContainerReference{
+	expectedInfo := &cadvisorapi.ContainerInfo{
+		ContainerReference: cadvisorapi.ContainerReference{
 			Name: "/",
 		},
 	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
-		return map[string]*cadvisorApi.ContainerInfo{
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
+		return map[string]*cadvisorapi.ContainerInfo{
 			expectedInfo.Name: expectedInfo,
 		}, nil
 	}
@@ -272,7 +311,7 @@ func TestRootInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.ContainerInfo
+	var receivedInfo cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -286,19 +325,19 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 	fw := newServerTest()
 	const kubeletContainer = "/kubelet"
 	const kubeletSubContainer = "/kubelet/sub"
-	expectedInfo := map[string]*cadvisorApi.ContainerInfo{
+	expectedInfo := map[string]*cadvisorapi.ContainerInfo{
 		kubeletContainer: {
-			ContainerReference: cadvisorApi.ContainerReference{
+			ContainerReference: cadvisorapi.ContainerReference{
 				Name: kubeletContainer,
 			},
 		},
 		kubeletSubContainer: {
-			ContainerReference: cadvisorApi.ContainerReference{
+			ContainerReference: cadvisorapi.ContainerReference{
 				Name: kubeletSubContainer,
 			},
 		},
 	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 		return expectedInfo, nil
 	}
 
@@ -308,7 +347,7 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo map[string]*cadvisorApi.ContainerInfo
+	var receivedInfo map[string]*cadvisorapi.ContainerInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("Received invalid json data: %v", err)
@@ -329,11 +368,11 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 
 func TestMachineInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.MachineInfo{
+	expectedInfo := &cadvisorapi.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 1024,
 	}
-	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorApi.MachineInfo, error) {
+	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
 		return expectedInfo, nil
 	}
 
@@ -342,7 +381,7 @@ func TestMachineInfo(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	var receivedInfo cadvisorApi.MachineInfo
+	var receivedInfo cadvisorapi.MachineInfo
 	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
@@ -498,6 +537,178 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	defer resp.Body.Close()
 	if resp.StatusCode != expectedErrorCode {
 		t.Errorf("expected status code %d, got %d", expectedErrorCode, resp.StatusCode)
+	}
+}
+
+type authTestCase struct {
+	Method string
+	Path   string
+}
+
+func TestAuthFilters(t *testing.T) {
+	fw := newServerTest()
+
+	testcases := []authTestCase{}
+
+	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
+	// Ideally, these would move to registered web services and this list would get shorter
+	expectedPaths := []string{"/healthz", "/stats/", "/metrics"}
+	paths := sets.NewString(fw.serverUnderTest.restfulCont.RegisteredHandlePaths()...)
+	for _, expectedPath := range expectedPaths {
+		if !paths.Has(expectedPath) {
+			t.Errorf("Expected registered handle path %s was missing", expectedPath)
+		}
+	}
+
+	// Test all the non-web-service handlers
+	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
+		testcases = append(testcases, authTestCase{"GET", path})
+		testcases = append(testcases, authTestCase{"POST", path})
+		// Test subpaths for directory handlers
+		if strings.HasSuffix(path, "/") {
+			testcases = append(testcases, authTestCase{"GET", path + "foo"})
+			testcases = append(testcases, authTestCase{"POST", path + "foo"})
+		}
+	}
+
+	// Test all the generated web-service paths
+	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
+		for _, r := range ws.Routes() {
+			testcases = append(testcases, authTestCase{r.Method, r.Path})
+		}
+	}
+
+	for _, tc := range testcases {
+		var (
+			expectedUser       = &user.DefaultInfo{Name: "test"}
+			expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+			calledAuthenticate = false
+			calledAuthorize    = false
+			calledAttributes   = false
+		)
+
+		fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+			calledAuthenticate = true
+			return expectedUser, true, nil
+		}
+		fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+			calledAttributes = true
+			if u != expectedUser {
+				t.Fatalf("%s: expected user %v, got %v", tc.Path, expectedUser, u)
+			}
+			return expectedAttributes
+		}
+		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+			calledAuthorize = true
+			if a != expectedAttributes {
+				t.Fatalf("%s: expected attributes %v, got %v", tc.Path, expectedAttributes, a)
+			}
+			return errors.New("Forbidden")
+		}
+
+		req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.Path, err)
+			continue
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.Path, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("%s: unexpected status code %d", tc.Path, resp.StatusCode)
+			continue
+		}
+
+		if !calledAuthenticate {
+			t.Errorf("%s: Authenticate was not called", tc.Path)
+			continue
+		}
+		if !calledAttributes {
+			t.Errorf("%s: Attributes were not called", tc.Path)
+			continue
+		}
+		if !calledAuthorize {
+			t.Errorf("%s: Authorize was not called", tc.Path)
+			continue
+		}
+	}
+}
+
+func TestAuthenticationFailure(t *testing.T) {
+	var (
+		expectedUser       = &user.DefaultInfo{Name: "test"}
+		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+		calledAuthenticate = false
+		calledAuthorize    = false
+		calledAttributes   = false
+	)
+
+	fw := newServerTest()
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+		calledAuthenticate = true
+		return nil, false, nil
+	}
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+		calledAttributes = true
+		return expectedAttributes
+	}
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+		calledAuthorize = true
+		return errors.New("not allowed")
+	}
+
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusUnauthorized)
+
+	if !calledAuthenticate {
+		t.Fatalf("Authenticate was not called")
+	}
+	if calledAttributes {
+		t.Fatalf("Attributes was called unexpectedly")
+	}
+	if calledAuthorize {
+		t.Fatalf("Authorize was called unexpectedly")
+	}
+}
+
+func TestAuthorizationSuccess(t *testing.T) {
+	var (
+		expectedUser       = &user.DefaultInfo{Name: "test"}
+		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+		calledAuthenticate = false
+		calledAuthorize    = false
+		calledAttributes   = false
+	)
+
+	fw := newServerTest()
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+		calledAuthenticate = true
+		return expectedUser, true, nil
+	}
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+		calledAttributes = true
+		return expectedAttributes
+	}
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+		calledAuthorize = true
+		return nil
+	}
+
+	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
+
+	if !calledAuthenticate {
+		t.Fatalf("Authenticate was not called")
+	}
+	if !calledAttributes {
+		t.Fatalf("Attributes were not called")
+	}
+	if !calledAuthorize {
+		t.Fatalf("Authorize was not called")
 	}
 }
 

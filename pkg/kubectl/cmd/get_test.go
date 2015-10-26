@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -39,7 +40,6 @@ import (
 )
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
-	grace := int64(30)
 	pods := &api.PodList{
 		ListMeta: unversioned.ListMeta{
 			ResourceVersion: "15",
@@ -47,19 +47,11 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
 	}
@@ -94,29 +86,29 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 }
 
 func testComponentStatusData() *api.ComponentStatusList {
-	good := &api.ComponentStatus{
+	good := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
 		},
+		ObjectMeta: api.ObjectMeta{Name: "servergood"},
 	}
-	good.Name = "servergood"
 
-	bad := &api.ComponentStatus{
+	bad := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
 		},
+		ObjectMeta: api.ObjectMeta{Name: "serverbad"},
 	}
-	bad.Name = "serverbad"
 
-	unknown := &api.ComponentStatus{
+	unknown := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
 		},
+		ObjectMeta: api.ObjectMeta{Name: "serverunknown"},
 	}
-	unknown.Name = "serverunknown"
 
 	return &api.ComponentStatusList{
-		Items: []api.ComponentStatus{*good, *bad, *unknown},
+		Items: []api.ComponentStatus{good, bad, unknown},
 	}
 }
 
@@ -322,14 +314,31 @@ func TestGetListObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := []runtime.Object{pods}
+	expected, err := extractResourceList([]runtime.Object{pods})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("unexpected object: %#v %#v", expected, actual)
+		t.Errorf("unexpected object: expected %#v, got %#v", expected, actual)
 	}
 	if len(buf.String()) == 0 {
 		t.Errorf("unexpected empty output")
 	}
+}
+
+func extractResourceList(objs []runtime.Object) ([]runtime.Object, error) {
+	finalObjs := []runtime.Object{}
+	for _, obj := range objs {
+		items, err := runtime.ExtractList(obj)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			finalObjs = append(finalObjs, item)
+		}
+	}
+	return finalObjs, nil
 }
 
 func TestGetAllListObjects(t *testing.T) {
@@ -349,7 +358,10 @@ func TestGetAllListObjects(t *testing.T) {
 	cmd.Flags().Set("show-all", "true")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := []runtime.Object{pods}
+	expected, err := extractResourceList([]runtime.Object{pods})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v %#v", expected, actual)
@@ -375,10 +387,13 @@ func TestGetListComponentStatus(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
-	expected := []runtime.Object{statuses}
+	expected, err := extractResourceList([]runtime.Object{statuses})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("unexpected object: %#v %#v", expected, actual)
+		t.Errorf("unexpected object: expected %#v, got %#v", expected, actual)
 	}
 	if len(buf.String()) == 0 {
 		t.Errorf("unexpected empty output")
@@ -411,7 +426,10 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := []runtime.Object{pods, svc}
+	expected, err := extractResourceList([]runtime.Object{pods, svc})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v", actual)
@@ -489,7 +507,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -512,7 +530,10 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := []runtime.Object{pods, svc}
+	expected, err := extractResourceList([]runtime.Object{pods, svc})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v", actual)
@@ -567,7 +588,6 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	}
 }
 func watchTestData() ([]api.Pod, []watch.Event) {
-	grace := int64(30)
 	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -575,11 +595,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				Namespace:       "test",
 				ResourceVersion: "10",
 			},
-			Spec: api.PodSpec{
-				RestartPolicy:                 api.RestartPolicyAlways,
-				DNSPolicy:                     api.DNSClusterFirst,
-				TerminationGracePeriodSeconds: &grace,
-			},
+			Spec: apitesting.DeepEqualSafePodSpec(),
 		},
 	}
 	events := []watch.Event{
@@ -591,11 +607,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "11",
 				},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec: apitesting.DeepEqualSafePodSpec(),
 			},
 		},
 		{
@@ -606,11 +618,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "12",
 				},
-				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-				},
+				Spec: apitesting.DeepEqualSafePodSpec(),
 			},
 		},
 	}
@@ -625,7 +633,7 @@ func TestWatchSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -652,7 +660,7 @@ func TestWatchSelector(t *testing.T) {
 	expected := []runtime.Object{&api.PodList{Items: pods}, events[0].Object, events[1].Object}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("unexpected object: %#v %#v", expected[0], actual[0])
+		t.Errorf("unexpected object:\nExpected: %#v\n\nGot: %#v\n\n", expected[0], actual[0])
 	}
 	if len(buf.String()) == 0 {
 		t.Errorf("unexpected empty output")
@@ -690,7 +698,7 @@ func TestWatchResource(t *testing.T) {
 	expected := []runtime.Object{&pods[0], events[0].Object, events[1].Object}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("unexpected object: %#v", actual)
+		t.Errorf("unexpected object:\nExpected: %#v\n\nGot: %#v\n\n", expected, actual)
 	}
 	if len(buf.String()) == 0 {
 		t.Errorf("unexpected empty output")

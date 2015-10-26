@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -97,11 +97,11 @@ var _ = Describe("Job", func() {
 
 		By("Ensuring job shows many failures")
 		err = wait.Poll(poll, jobTimeout, func() (bool, error) {
-			curr, err := f.Client.Experimental().Jobs(f.Namespace.Name).Get(job.Name)
+			curr, err := f.Client.Extensions().Jobs(f.Namespace.Name).Get(job.Name)
 			if err != nil {
 				return false, err
 			}
-			return curr.Status.Unsuccessful > lotsOfFailures, nil
+			return curr.Status.Failed > lotsOfFailures, nil
 		})
 	})
 
@@ -176,22 +176,22 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
-		_, err = f.Client.Experimental().Jobs(f.Namespace.Name).Get(job.Name)
+		_, err = f.Client.Extensions().Jobs(f.Namespace.Name).Get(job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
 })
 
 // newTestJob returns a job which does one of several testing behaviors.
-func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *experimental.Job {
-	job := &experimental.Job{
+func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *extensions.Job {
+	job := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
 				},
@@ -217,18 +217,18 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 0"}
 	case "randomlySucceedOrFail":
 		// Bash's $RANDOM generates pseudorandom int in range 0 - 32767.
-		// Dividing by 16384 gives roughly 50/50 chance of succeess.
+		// Dividing by 16384 gives roughly 50/50 chance of success.
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit $(( $RANDOM / 16384 ))"}
 	}
 	return job
 }
 
-func createJob(c *client.Client, ns string, job *experimental.Job) (*experimental.Job, error) {
-	return c.Experimental().Jobs(ns).Create(job)
+func createJob(c *client.Client, ns string, job *extensions.Job) (*extensions.Job, error) {
+	return c.Extensions().Jobs(ns).Create(job)
 }
 
 func deleteJob(c *client.Client, ns, name string) error {
-	return c.Experimental().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
+	return c.Extensions().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
@@ -252,10 +252,10 @@ func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int
 // Wait for job to reach completions.
 func waitForJobFinish(c *client.Client, ns, jobName string, completions int) error {
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {
-		curr, err := c.Experimental().Jobs(ns).Get(jobName)
+		curr, err := c.Extensions().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
 		}
-		return curr.Status.Successful == completions, nil
+		return curr.Status.Succeeded == completions, nil
 	})
 }

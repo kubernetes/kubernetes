@@ -17,15 +17,22 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"math"
 	"strconv"
+	"strings"
 	"time"
+
+	"golang.org/x/net/websocket"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -37,6 +44,12 @@ import (
 
 const (
 	defaultObservationTimeout = time.Minute * 2
+)
+
+var (
+	buildBackOffDuration = time.Minute
+	syncLoopFrequency    = 10 * time.Second
+	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
 )
 
 func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRestarts int, timeout time.Duration) {
@@ -129,10 +142,74 @@ func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	}
 }
 
+func runPodFromStruct(framework *Framework, pod *api.Pod) {
+	By("submitting the pod to kubernetes")
+
+	podClient := framework.Client.Pods(framework.Namespace.Name)
+	pod, err := podClient.Create(pod)
+	if err != nil {
+		Failf("Failed to create pod: %v", err)
+	}
+
+	expectNoError(framework.WaitForPodRunning(pod.Name))
+
+	By("verifying the pod is in kubernetes")
+	pod, err = podClient.Get(pod.Name)
+	if err != nil {
+		Failf("failed to get pod: %v", err)
+	}
+}
+
+func startPodAndGetBackOffs(framework *Framework, pod *api.Pod, podName string, containerName string, sleepAmount time.Duration) (time.Duration, time.Duration) {
+	runPodFromStruct(framework, pod)
+	time.Sleep(sleepAmount)
+
+	By("getting restart delay-0")
+	_, err := getRestartDelay(framework.Client, pod, framework.Namespace.Name, podName, containerName)
+	if err != nil {
+		Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+	}
+
+	By("getting restart delay-1")
+	delay1, err := getRestartDelay(framework.Client, pod, framework.Namespace.Name, podName, containerName)
+	if err != nil {
+		Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+	}
+
+	By("getting restart delay-2")
+	delay2, err := getRestartDelay(framework.Client, pod, framework.Namespace.Name, podName, containerName)
+	if err != nil {
+		Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+	}
+	return delay1, delay2
+}
+
+func getRestartDelay(c *client.Client, pod *api.Pod, ns string, name string, containerName string) (time.Duration, error) {
+	beginTime := time.Now()
+	for time.Since(beginTime) < (2 * maxBackOffTolerance) { // may just miss the 1st MaxContainerBackOff delay
+		time.Sleep(time.Second)
+		pod, err := c.Pods(ns).Get(name)
+		expectNoError(err, fmt.Sprintf("getting pod %s", name))
+		status, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+		if !ok {
+			Logf("getRestartDelay: status missing")
+			continue
+		}
+
+		if status.State.Waiting == nil && status.State.Running != nil && status.LastTerminationState.Terminated != nil && status.State.Running.StartedAt.Time.After(beginTime) {
+			startedAt := status.State.Running.StartedAt.Time
+			finishedAt := status.LastTerminationState.Terminated.FinishedAt.Time
+			Logf("getRestartDelay: finishedAt=%s restartedAt=%s (%s)", finishedAt, startedAt, startedAt.Sub(finishedAt))
+			return startedAt.Sub(finishedAt), nil
+		}
+	}
+	return 0, fmt.Errorf("timeout getting pod restart delay")
+}
+
 var _ = Describe("Pods", func() {
 	framework := NewFramework("pods")
 
-	PIt("should get a host IP", func() {
+	PIt("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(util.NewUUID())
 		testHostIP(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -142,14 +219,14 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "test",
-						Image: "gcr.io/google_containers/pause",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
 		})
 	})
 
-	It("should be schedule with cpu and memory limits", func() {
+	It("should be schedule with cpu and memory limits [Conformance]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
@@ -167,7 +244,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/pause",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
@@ -186,7 +263,7 @@ var _ = Describe("Pods", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 	})
 
-	It("should be submitted and removed", func() {
+	It("should be submitted and removed [Conformance]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
@@ -294,7 +371,7 @@ var _ = Describe("Pods", func() {
 		Expect(len(pods.Items)).To(Equal(0))
 	})
 
-	It("should be updated", func() {
+	It("should be updated [Conformance]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
@@ -376,7 +453,7 @@ var _ = Describe("Pods", func() {
 		Logf("Pod update OK")
 	})
 
-	It("should contain environment variables for services", func() {
+	It("should contain environment variables for services [Conformance]", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
 		serverName := "server-envvars-" + string(util.NewUUID())
@@ -463,7 +540,7 @@ var _ = Describe("Pods", func() {
 		})
 	})
 
-	It("should be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
+	It("should be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-exec",
@@ -489,7 +566,7 @@ var _ = Describe("Pods", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
-	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
+	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-exec",
@@ -515,7 +592,7 @@ var _ = Describe("Pods", func() {
 		}, 0, defaultObservationTimeout)
 	})
 
-	It("should be restarted with a /healthz http liveness probe", func() {
+	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
@@ -542,7 +619,7 @@ var _ = Describe("Pods", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
-	It("should have monotonically increasing restart count", func() {
+	It("should have monotonically increasing restart count [Conformance]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
@@ -569,7 +646,7 @@ var _ = Describe("Pods", func() {
 		}, 5, time.Minute*5)
 	})
 
-	It("should *not* be restarted with a /healthz http liveness probe", func() {
+	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
@@ -600,6 +677,338 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}, 0, defaultObservationTimeout)
+	})
+
+	It("should support remote command execution over websockets", func() {
+		config, err := loadConfig()
+		if err != nil {
+			Failf("Unable to get base config: %v", err)
+		}
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+
+		By("creating the pod")
+		name := "pod-exec-websocket-" + string(util.NewUUID())
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "main",
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
+					},
+				},
+			},
+		}
+
+		By("submitting the pod to kubernetes")
+		defer func() {
+			By("deleting the pod")
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		}()
+		pod, err = podClient.Create(pod)
+		if err != nil {
+			Failf("Failed to create pod: %v", err)
+		}
+
+		expectNoError(framework.WaitForPodRunning(pod.Name))
+
+		req := framework.Client.Get().
+			Namespace(framework.Namespace.Name).
+			Resource("pods").
+			Name(pod.Name).
+			Suffix("exec").
+			Param("stderr", "1").
+			Param("stdout", "1").
+			Param("container", pod.Spec.Containers[0].Name).
+			Param("command", "cat").
+			Param("command", "/etc/resolv.conf")
+
+		url := req.URL()
+		ws, err := OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
+		if err != nil {
+			Failf("Failed to open websocket to %s: %v", url.String(), err)
+		}
+		defer ws.Close()
+
+		buf := &bytes.Buffer{}
+		for {
+			var msg []byte
+			if err := websocket.Message.Receive(ws, &msg); err != nil {
+				if err == io.EOF {
+					break
+				}
+				Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+			}
+			if len(msg) == 0 {
+				continue
+			}
+			if msg[0] != 1 {
+				Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+			}
+			buf.Write(msg[1:])
+		}
+		if buf.Len() == 0 {
+			Failf("Unexpected output from server")
+		}
+		if !strings.Contains(buf.String(), "nameserver") {
+			Failf("Expected to find 'nameserver' in %q", buf.String())
+		}
+	})
+
+	It("should support retrieving logs from the container over websockets", func() {
+		config, err := loadConfig()
+		if err != nil {
+			Failf("Unable to get base config: %v", err)
+		}
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+
+		By("creating the pod")
+		name := "pod-logs-websocket-" + string(util.NewUUID())
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "main",
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
+					},
+				},
+			},
+		}
+
+		By("submitting the pod to kubernetes")
+		defer func() {
+			By("deleting the pod")
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		}()
+		pod, err = podClient.Create(pod)
+		if err != nil {
+			Failf("Failed to create pod: %v", err)
+		}
+
+		expectNoError(framework.WaitForPodRunning(pod.Name))
+
+		req := framework.Client.Get().
+			Namespace(framework.Namespace.Name).
+			Resource("pods").
+			Name(pod.Name).
+			Suffix("log").
+			Param("container", pod.Spec.Containers[0].Name)
+
+		url := req.URL()
+
+		ws, err := OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
+		if err != nil {
+			Failf("Failed to open websocket to %s: %v", url.String(), err)
+		}
+		defer ws.Close()
+		buf := &bytes.Buffer{}
+		for {
+			var msg []byte
+			if err := websocket.Message.Receive(ws, &msg); err != nil {
+				if err == io.EOF {
+					break
+				}
+				Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+			}
+			if len(msg) == 0 {
+				continue
+			}
+			buf.Write(msg)
+		}
+		if buf.String() != "container is alive\n" {
+			Failf("Unexpected websocket logs:\n%s", buf.String())
+		}
+	})
+
+	It("should have their container restart back-off timer increase exponentially", func() {
+		podName := "pod-back-off-exponentially"
+		containerName := "back-off"
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "back-off-image"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    containerName,
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
+					},
+				},
+			},
+		}
+
+		defer func() {
+			By("deleting the pod")
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		}()
+
+		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
+		delay1 += 1 // divide by zero
+		ratio := float64(delay2) / float64(delay1)
+		if math.Floor(ratio) != 2 && math.Ceil(ratio) != 2 {
+			Failf("back-off gap is not increasing exponentially pod=%s/%s delay1=%s delay2=%s", podName, containerName, delay1, delay2)
+		}
+	})
+
+	It("should have their auto-restart back-off timer reset on image update", func() {
+		podName := "pod-back-off-image"
+		containerName := "back-off"
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "back-off-image"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    containerName,
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
+					},
+				},
+			},
+		}
+
+		defer func() {
+			By("deleting the pod")
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		}()
+
+		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
+
+		By("updating the image")
+		pod, err := podClient.Get(pod.Name)
+		if err != nil {
+			Failf("failed to get pod: %v", err)
+		}
+		pod.Spec.Containers[0].Image = "nginx"
+		pod, err = podClient.Update(pod)
+		if err != nil {
+			Failf("error updating pod=%s/%s %v", podName, containerName, err)
+		}
+		time.Sleep(syncLoopFrequency)
+		expectNoError(framework.WaitForPodRunning(pod.Name))
+
+		By("get restart delay after image update")
+		delayAfterUpdate, err := getRestartDelay(framework.Client, pod, framework.Namespace.Name, podName, containerName)
+		if err != nil {
+			Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+		}
+
+		if delayAfterUpdate > delay2 || delayAfterUpdate > delay1 {
+			Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
+		}
+	})
+
+	It("should not back-off restarting a container on LivenessProbe failure", func() {
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+		podName := "pod-back-off-liveness"
+		containerName := "back-off-liveness"
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    containerName,
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 5; rm -rf /tmp/health; sleep 600"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								Exec: &api.ExecAction{
+									Command: []string{"cat", "/tmp/health"},
+								},
+							},
+							InitialDelaySeconds: 5,
+						},
+					},
+				},
+			},
+		}
+
+		defer func() {
+			By("deleting the pod")
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		}()
+
+		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
+
+		if math.Abs(float64(delay2-delay1)) > float64(syncLoopFrequency) {
+			Failf("back-off increasing on LivenessProbe failure delay1=%s delay2=%s", delay1, delay2)
+		}
+	})
+
+	It("should cap back-off at MaxContainerBackOff", func() {
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+		podName := "back-off-cap"
+		containerName := "back-off-cap"
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    containerName,
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
+					},
+				},
+			},
+		}
+
+		defer func() {
+			By("deleting the pod")
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		}()
+
+		runPodFromStruct(framework, pod)
+		time.Sleep(2 * kubelet.MaxContainerBackOff) // it takes slightly more than 2*x to get to a back-off of x
+
+		// wait for a delay == capped delay of MaxContainerBackOff
+		By("geting restart delay when capped")
+		var (
+			delay1 time.Duration
+			err    error
+		)
+		for i := 0; i < 3; i++ {
+			delay1, err = getRestartDelay(framework.Client, pod, framework.Namespace.Name, podName, containerName)
+			if err != nil {
+				Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+			}
+
+			if delay1 < kubelet.MaxContainerBackOff {
+				continue
+			}
+		}
+
+		if (delay1 < kubelet.MaxContainerBackOff) || (delay1 > maxBackOffTolerance) {
+			Failf("expected %s back-off got=%s in delay1", kubelet.MaxContainerBackOff, delay1)
+		}
+
+		By("getting restart delay after a capped delay")
+		delay2, err := getRestartDelay(framework.Client, pod, framework.Namespace.Name, podName, containerName)
+		if err != nil {
+			Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+		}
+
+		if delay2 < kubelet.MaxContainerBackOff || delay2 > maxBackOffTolerance { // syncloop cumulative drift
+			Failf("expected %s back-off got=%s on delay2", kubelet.MaxContainerBackOff, delay2)
+		}
 	})
 
 	// The following tests for remote command execution and port forwarding are

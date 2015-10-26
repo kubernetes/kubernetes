@@ -53,13 +53,13 @@ func proxyContext(version string) {
 	prefix := "/api/" + version
 
 	// Port here has to be kept in sync with default kubelet port.
-	It("should proxy logs on node with explicit kubelet port", func() { nodeProxyTest(f, version, ":10250/logs/") })
+	It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, version, ":10250/logs/") })
 
-	It("should proxy logs on node", func() { nodeProxyTest(f, version, "/logs/") })
+	It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, version, "/logs/") })
 
-	It("should proxy to cadvisor", func() { nodeProxyTest(f, version, ":4194/containers/") })
+	It("should proxy to cadvisor [Conformance]", func() { nodeProxyTest(f, version, ":4194/containers/") })
 
-	It("should proxy through a service and a pod", func() {
+	It("should proxy through a service and a pod [Conformance]", func() {
 		labels := map[string]string{"proxy-service-target": "true"}
 		service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{

@@ -17,25 +17,29 @@
 # Script that destroys Kubemark clusters and deletes all GCE resources created for Master
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
-source "${KUBE_ROOT}/cluster/kubemark/util.sh"
-
-detect-project &> /dev/null
-
-MASTER_NAME="hollow-cluster-master"
+source "${KUBE_ROOT}/test/kubemark/common.sh"
 
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
 kubectl delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
 
-gcloud compute instances delete "${MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --quiet \
-    --zone "${ZONE}" || true
+GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 
-gcloud compute disks delete \
-      --project "${PROJECT}" \
-      --quiet \
-      --zone "${ZONE}" \
-      "${MASTER_NAME}"-pd || true
+gcloud compute instances delete "${MASTER_NAME}" \
+    ${GCLOUD_COMMON_ARGS} || true
+
+gcloud compute disks delete "${MASTER_NAME}-pd" \
+    ${GCLOUD_COMMON_ARGS} || true
+
+gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
+	--project "${PROJECT}" \
+	--quiet || true
+
+if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
+	gcloud compute instances delete "${EVENT_STORE_NAME}" \
+    	${GCLOUD_COMMON_ARGS} || true
+
+	gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
+    	${GCLOUD_COMMON_ARGS} || true
+fi
 
 rm -rf "${KUBE_ROOT}/test/kubemark/kubeconfig.loc" &> /dev/null || true

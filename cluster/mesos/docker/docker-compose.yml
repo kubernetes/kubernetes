@@ -13,7 +13,7 @@ etcd:
     --initial-cluster-state new
 mesosmaster1:
   hostname: mesosmaster1
-  image: mesosphere/mesos:0.23.0-1.0.ubuntu1404
+  image: mesosphere/mesos:0.24.0-1.0.27.ubuntu1404
   entrypoint: [ "mesos-master" ]
   ports: [ "5050:5050" ]
   environment:
@@ -29,7 +29,8 @@ mesosmaster1:
 mesosslave:
   hostname: mesosslave
   privileged: true
-  image: mesosphere/mesos-slave-dind:0.23.0-1.0.ubuntu1404.docker181
+  image: mesosphere/mesos-slave-dind:mesos-0.24.0_dind-0.2_docker-1.8.2_ubuntu-14.04.3
+  ports: [ "10248","10249" ]
   entrypoint:
   - bash
   - -xc
@@ -50,6 +51,7 @@ mesosslave:
   - MESOS_RESOURCES=cpus:4;mem:1280;disk:25600;ports:[8000-21099]
   - MESOS_SWITCH_USER=0
   - MESOS_CONTAINERIZERS=docker,mesos
+  - MESOS_ISOLATION=cgroups/cpu,cgroups/mem
   - DOCKER_DAEMON_ARGS
   links:
   - etcd
@@ -144,7 +146,10 @@ scheduler:
     --mesos-master=mesosmaster1:5050
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
+    --mesos-executor-cpus=1.0
     --v=4
+    --executor-logv=4
+    --profiling=true
   environment:
   - MESOS_DOCKER_ETCD_TIMEOUT
   - MESOS_DOCKER_MESOS_TIMEOUT

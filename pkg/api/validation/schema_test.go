@@ -136,7 +136,7 @@ func TestVersionRegex(t *testing.T) {
 			match:    true,
 		},
 		{
-			typeName: "v1alpha1.Binding",
+			typeName: "v1beta1.Binding",
 			match:    true,
 		},
 		{

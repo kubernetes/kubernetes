@@ -43,6 +43,7 @@ var createFlags = []cli.Flag{
 	cli.StringFlag{Name: "veth-address", Usage: "veth ip address"},
 	cli.StringFlag{Name: "veth-gateway", Usage: "veth gateway address"},
 	cli.IntFlag{Name: "veth-mtu", Usage: "veth mtu"},
+	cli.BoolFlag{Name: "cgroup", Usage: "mount the cgroup data for the container"},
 }
 
 var configCommand = cli.Command{
@@ -186,6 +187,12 @@ func modify(config *configs.Config, context *cli.Context) {
 			HostInterfaceName: hostName,
 		}
 		config.Networks = append(config.Networks, network)
+	}
+	if context.Bool("cgroup") {
+		config.Mounts = append(config.Mounts, &configs.Mount{
+			Destination: "/sys/fs/cgroup",
+			Device:      "cgroup",
+		})
 	}
 }
 

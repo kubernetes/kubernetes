@@ -90,6 +90,8 @@ type Factory struct {
 	Generator func(name string) (kubectl.Generator, bool)
 	// Check whether the kind of resources could be exposed
 	CanBeExposed func(kind string) error
+	// Check whether the kind of resources could be autoscaled
+	CanBeAutoscaled func(kind string) error
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -102,10 +104,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	generators := map[string]kubectl.Generator{
-		"run/v1":     kubectl.BasicReplicationController{},
-		"run-pod/v1": kubectl.BasicPod{},
-		"service/v1": kubectl.ServiceGeneratorV1{},
-		"service/v2": kubectl.ServiceGeneratorV2{},
+		"run/v1":                          kubectl.BasicReplicationController{},
+		"run-pod/v1":                      kubectl.BasicPod{},
+		"service/v1":                      kubectl.ServiceGeneratorV1{},
+		"service/v2":                      kubectl.ServiceGeneratorV2{},
+		"horizontalpodautoscaler/v1beta1": kubectl.HorizontalPodAutoscalerV1Beta1{},
 	}
 
 	clientConfig := optionalClientConfig
@@ -135,6 +138,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
+			if err != nil {
+				return nil, err
+			}
 			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
@@ -142,8 +148,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch group {
 			case "":
 				return client.RESTClient, nil
-			case "experimental":
-				return client.ExperimentalClient.RESTClient, nil
+			case "extensions":
+				return client.ExtensionsClient.RESTClient, nil
 			}
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
@@ -253,6 +259,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		CanBeExposed: func(kind string) error {
 			if kind != "ReplicationController" && kind != "Service" && kind != "Pod" {
 				return fmt.Errorf("invalid resource provided: %v, only a replication controller, service or pod is accepted", kind)
+			}
+			return nil
+		},
+		CanBeAutoscaled: func(kind string) error { // TODO: support autoscale for deployments
+			if kind != "ReplicationController" {
+				return fmt.Errorf("invalid resource provided: %v, only a replication controller is accepted", kind)
 			}
 			return nil
 		},
@@ -406,11 +418,11 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
 	}
-	if group == "experimental" {
-		if c.c.ExperimentalClient == nil {
+	if group == "extensions" {
+		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
-		return getSchemaAndValidate(c.c.ExperimentalClient.RESTClient, data, "apis/", version, c.cacheDir)
+		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", version, c.cacheDir)
 	}
 	return getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
 }
@@ -530,5 +542,13 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 func (f *Factory) ClientMapperForCommand() resource.ClientMapper {
 	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.RESTClient(mapping)
+	})
+}
+
+// NilClientMapperForCommand returns a ClientMapper which always returns nil.
+// When command is running locally and client isn't needed, this mapper can be parsed to NewBuilder.
+func (f *Factory) NilClientMapperForCommand() resource.ClientMapper {
+	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+		return nil, nil
 	})
 }

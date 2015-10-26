@@ -33,7 +33,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -44,11 +43,11 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 const (
@@ -341,12 +340,23 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	deleteAllEtcdKeys()
 
 	// Etcd
-	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	// Listener
 	var m *master.Master
@@ -422,7 +432,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		Authenticator:       authenticator,
 		Authorizer:          authorizer,
 		AdmissionControl:    serviceAccountAdmission,
-		StorageVersions:     map[string]string{"": testapi.Default.Version()},
+		StorageVersions:     storageVersions,
 	})
 
 	// Start the service account and service account token controllers

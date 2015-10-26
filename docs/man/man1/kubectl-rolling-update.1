@@ -36,7 +36,7 @@ existing replication controller and overwrite at least one (common) label in its
 
 .PP
 \fB\-\-image\fP=""
-    Image to use for upgrading the replication controller.  Can not be used with \-\-filename/\-f
+    Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with \-\-filename/\-f
 
 .PP
 \fB\-\-no\-headers\fP=false
@@ -73,7 +73,7 @@ existing replication controller and overwrite at least one (common) label in its
     If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
-\fB\-t\fP, \fB\-\-template\fP=""
+\fB\-\-template\fP=""
     Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 

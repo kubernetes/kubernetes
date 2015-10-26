@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -53,14 +55,14 @@ func TestListServices(t *testing.T) {
 			},
 		},
 	}
-	receivedServiceList, err := c.Setup(t).Services(ns).List(labels.Everything())
+	receivedServiceList, err := c.Setup(t).Services(ns).List(labels.Everything(), fields.Everything())
 	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
 
 func TestListServicesLabels(t *testing.T) {
 	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Default.Version())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
@@ -90,7 +92,7 @@ func TestListServicesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedServiceList, err := c.Services(ns).List(selector)
+	receivedServiceList, err := c.Services(ns).List(selector, fields.Everything())
 	c.Validate(t, receivedServiceList, err)
 }
 

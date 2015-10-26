@@ -90,6 +90,7 @@ CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 RKT_PATH=${RKT_PATH:-""}
 RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
+CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
@@ -262,6 +263,7 @@ function start_kubelet {
         --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
+        --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else

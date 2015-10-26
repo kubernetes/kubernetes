@@ -4,21 +4,19 @@
 
 package docker
 
-import (
-	"bytes"
-	"strings"
-)
+import "strings"
 
 // Version returns version information about the docker server.
 //
 // See https://goo.gl/ND9R8L for more details.
 func (c *Client) Version() (*Env, error) {
-	body, _, err := c.do("GET", "/version", doOptions{})
+	resp, err := c.do("GET", "/version", doOptions{})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var env Env
-	if err := env.Decode(bytes.NewReader(body)); err != nil {
+	if err := env.Decode(resp.Body); err != nil {
 		return nil, err
 	}
 	return &env, nil
@@ -28,13 +26,13 @@ func (c *Client) Version() (*Env, error) {
 //
 // See https://goo.gl/ElTHi2 for more details.
 func (c *Client) Info() (*Env, error) {
-	body, _, err := c.do("GET", "/info", doOptions{})
+	resp, err := c.do("GET", "/info", doOptions{})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var info Env
-	err = info.Decode(bytes.NewReader(body))
-	if err != nil {
+	if err := info.Decode(resp.Body); err != nil {
 		return nil, err
 	}
 	return &info, nil

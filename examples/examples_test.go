@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/experimental"
-	expValidation "k8s.io/kubernetes/pkg/apis/experimental/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -101,21 +101,21 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
-	case *experimental.Deployment:
+	case *extensions.Deployment:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expValidation.ValidateDeployment(t)
-	case *experimental.Job:
+		errors = expvalidation.ValidateDeployment(t)
+	case *extensions.Job:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expValidation.ValidateJob(t)
-	case *experimental.DaemonSet:
+		errors = expvalidation.ValidateJob(t)
+	case *extensions.DaemonSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expValidation.ValidateDaemonSet(t)
+		errors = expvalidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -221,10 +221,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"multi-pod":   nil,
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
-			"job":         &experimental.Job{},
+			"job":         &extensions.Job{},
 		},
 		"../docs/admin": {
-			"daemon": &experimental.DaemonSet{},
+			"daemon": &extensions.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
@@ -363,8 +363,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/fibre_channel": {
 			"fc": &api.Pod{},
 		},
-		"../examples/experimental": {
-			"deployment": &experimental.Deployment{},
+		"../examples/extensions": {
+			"deployment": &extensions.Deployment{},
+		},
+		"../examples/javaweb-tomcat-sidecar": {
+			"javaweb":   &api.Pod{},
+			"javaweb-2": &api.Pod{},
 		},
 	}
 

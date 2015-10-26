@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestJobStrategy(t *testing.T) {
@@ -32,10 +32,12 @@ func TestJobStrategy(t *testing.T) {
 		t.Errorf("Job should not allow create on update")
 	}
 
-	validSelector := map[string]string{"a": "b"}
+	validSelector := &extensions.PodSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
 	validPodTemplateSpec := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector,
+			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -43,16 +45,16 @@ func TestJobStrategy(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	job := &experimental.Job{
+	job := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "myjob",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Selector: validSelector,
-			Template: &validPodTemplateSpec,
+			Template: validPodTemplateSpec,
 		},
-		Status: experimental.JobStatus{
+		Status: extensions.JobStatus{
 			Active: 11,
 		},
 	}
@@ -66,12 +68,12 @@ func TestJobStrategy(t *testing.T) {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	parallelism := 10
-	updatedJob := &experimental.Job{
+	updatedJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 		},
-		Status: experimental.JobStatus{
+		Status: extensions.JobStatus{
 			Active: 11,
 		},
 	}
@@ -95,10 +97,12 @@ func TestJobStatusStrategy(t *testing.T) {
 	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("Job should not allow create on update")
 	}
-	validSelector := map[string]string{"a": "b"}
+	validSelector := &extensions.PodSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
 	validPodTemplateSpec := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector,
+			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -108,33 +112,33 @@ func TestJobStatusStrategy(t *testing.T) {
 	}
 	oldParallelism := 10
 	newParallelism := 11
-	oldJob := &experimental.Job{
+	oldJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "10",
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Selector:    validSelector,
-			Template:    &validPodTemplateSpec,
+			Template:    validPodTemplateSpec,
 			Parallelism: &oldParallelism,
 		},
-		Status: experimental.JobStatus{
+		Status: extensions.JobStatus{
 			Active: 11,
 		},
 	}
-	newJob := &experimental.Job{
+	newJob := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "9",
 		},
-		Spec: experimental.JobSpec{
+		Spec: extensions.JobSpec{
 			Selector:    validSelector,
-			Template:    &validPodTemplateSpec,
+			Template:    validPodTemplateSpec,
 			Parallelism: &newParallelism,
 		},
-		Status: experimental.JobStatus{
+		Status: extensions.JobStatus{
 			Active: 12,
 		},
 	}

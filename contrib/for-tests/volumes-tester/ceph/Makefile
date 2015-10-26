@@ -7,7 +7,7 @@ container:
 	docker tag gcr.io/google_containers/volume-ceph gcr.io/google_containers/volume-ceph:$(TAG)  # Add the version tag to the latest image 
 
 push: container
-	gcloud preview docker push gcr.io/google_containers/volume-ceph # Push image tagged as latest to repository
-	gcloud preview docker push gcr.io/google_containers/volume-ceph:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
+	gcloud docker push gcr.io/google_containers/volume-ceph # Push image tagged as latest to repository
+	gcloud docker push gcr.io/google_containers/volume-ceph:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
 
 clean:

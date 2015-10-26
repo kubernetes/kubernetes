@@ -33,12 +33,12 @@ import (
 )
 
 // Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduledNumbers(pods *api.PodList) (scheduledPods, notScheduledPods int) {
+func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName != "" {
-			scheduledPods += 1
+			scheduledPods = append(scheduledPods, pod)
 		} else {
-			notScheduledPods += 1
+			notScheduledPods = append(notScheduledPods, pod)
 		}
 	}
 	return
@@ -49,7 +49,7 @@ func getPodsScheduledNumbers(pods *api.PodList) (scheduledPods, notScheduledPods
 func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
-	podsScheduledBefore, _ := getPodsScheduledNumbers(allPods)
+	podsScheduledBefore, _ := getPodsScheduled(allPods)
 
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
@@ -67,7 +67,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 	timeout := 10 * time.Minute
 	startTime := time.Now()
 	currentlyScheduledPods := 0
-	for podsScheduledBefore+replicas != currentlyScheduledPods {
+	for len(podsScheduledBefore)+replicas != currentlyScheduledPods {
 		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		scheduledPods := 0
@@ -84,7 +84,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 		}
 		time.Sleep(5 * time.Second)
 	}
-	Expect(currentlyScheduledPods).To(Equal(podsScheduledBefore + replicas))
+	Expect(currentlyScheduledPods).To(Equal(len(podsScheduledBefore) + replicas))
 }
 
 func getRequestedCPU(pod api.Pod) int64 {
@@ -95,10 +95,10 @@ func getRequestedCPU(pod api.Pod) int64 {
 	return result
 }
 
-func verifyResult(c *client.Client, podName string, ns string, oldNotScheduled int) {
+func verifyResult(c *client.Client, podName string, ns string) {
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
-	_, notScheduledPods := getPodsScheduledNumbers(allPods)
+	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
 
 	schedEvents, err := c.Events(ns).List(
 		labels.Everything(),
@@ -121,8 +121,8 @@ func verifyResult(c *client.Client, podName string, ns string, oldNotScheduled i
 		}
 	}
 
-	Expect(notScheduledPods).To(Equal(1+oldNotScheduled), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
-	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
+	Expect(len(notScheduledPods)).To(Equal(1), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 func cleanupPods(c *client.Client, ns string) {
@@ -133,6 +133,29 @@ func cleanupPods(c *client.Client, ns string) {
 	for _, p := range pods.Items {
 		expectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
 	}
+}
+
+// Waits until all existing pods are scheduled and returns their amount.
+func waitForStableCluster(c *client.Client) int {
+	timeout := 10 * time.Minute
+	startTime := time.Now()
+
+	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	expectNoError(err)
+	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
+	for len(currentlyNotScheduledPods) != 0 {
+		time.Sleep(2 * time.Second)
+
+		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		expectNoError(err)
+		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
+
+		if startTime.Add(timeout).Before(time.Now()) {
+			Failf("Timed out after %v waiting for stable cluster.", timeout)
+			break
+		}
+	}
+	return len(scheduledPods)
 }
 
 var _ = Describe("SchedulerPredicates", func() {
@@ -153,19 +176,19 @@ var _ = Describe("SchedulerPredicates", func() {
 	})
 
 	AfterEach(func() {
+		defer framework.afterEach()
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
 			err := DeleteRC(c, ns, RCName)
 			expectNoError(err)
 		}
-		framework.afterEach()
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
 	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check
 	// if max-pods is working we need to fully saturate the cluster and keep it in this state for few seconds.
-	It("validates MaxPods limit number of pods that are allowed to run.", func() {
+	It("validates MaxPods limit number of pods that are allowed to run", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
@@ -175,9 +198,7 @@ var _ = Describe("SchedulerPredicates", func() {
 			Logf("Node: %v", node)
 		}
 
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
-		expectNoError(err)
-		currentlyScheduledPods, currentlyNotScheduledPods := getPodsScheduledNumbers(allPods)
+		currentlyScheduledPods := waitForStableCluster(c)
 		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
@@ -194,14 +215,14 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
 		})
 
 		podName := "additional-pod"
-		_, err = c.Pods(ns).Create(&api.Pod{
+		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -213,7 +234,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -224,32 +245,30 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, currentlyNotScheduledPods)
+		verifyResult(c, podName, ns)
 		cleanupPods(c, ns)
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
-	It("validates resource limits of pods that are allowed to run.", func() {
+	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
 		nodeToCapacityMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			capacity, found := node.Status.Capacity["cpu"]
 			Expect(found).To(Equal(true))
 			nodeToCapacityMap[node.Name] = capacity.MilliValue()
 		}
+		waitForStableCluster(c)
 
 		pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		var currentlyDeadPods int
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
 			Expect(found).To(Equal(true))
 			if pod.Status.Phase == api.PodRunning {
 				Logf("Pod %v requesting capacity %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
-			} else {
-				currentlyDeadPods += 1
 			}
 		}
 
@@ -274,7 +293,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -298,7 +317,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -314,21 +333,19 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, currentlyDeadPods)
+		verifyResult(c, podName, ns)
 		cleanupPods(c, ns)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// nonempty Selector set.
-	It("validates that NodeSelector is respected if not matching", func() {
+	It("validates that NodeSelector is respected if not matching [Conformance]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
-		expectNoError(err)
-		_, currentlyNotScheduledPods := getPodsScheduledNumbers(allPods)
+		waitForStableCluster(c)
 
-		_, err = c.Pods(ns).Create(&api.Pod{
+		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -340,7 +357,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 				NodeSelector: map[string]string{
@@ -354,11 +371,11 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns, currentlyNotScheduledPods)
+		verifyResult(c, podName, ns)
 		cleanupPods(c, ns)
 	})
 
-	It("validates that NodeSelector is respected if matching.", func() {
+	It("validates that NodeSelector is respected if matching [Conformance]", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
@@ -376,7 +393,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -414,7 +431,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause:go",
+						Image: "beta.gcr.io/google_containers/pause:2.0",
 					},
 				},
 				NodeSelector: map[string]string{
@@ -425,7 +442,13 @@ var _ = Describe("SchedulerPredicates", func() {
 		})
 		expectNoError(err)
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
-		expectNoError(waitForPodRunningInNamespace(c, labelPodName, ns))
+
+		// check that pod got scheduled. We intentionally DO NOT check that the
+		// pod is running because this will create a race condition with the
+		// kubelet and the scheduler: the scheduler might have scheduled a pod
+		// already when the kubelet does not know about its new label yet. The
+		// kubelet will then refuse to launch the pod.
+		expectNoError(waitForPodNotPending(c, ns, labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		expectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))

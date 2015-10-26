@@ -14,5 +14,22 @@
 
 package version
 
-// Version of cAdvisor.
-const VERSION = "0.16.0"
+// Build information. Populated at build-time.
+var (
+	Version   string
+	Revision  string
+	Branch    string
+	BuildUser string
+	BuildDate string
+	GoVersion string
+)
+
+// Info provides the iterable version information.
+var Info = map[string]string{
+	"version":   Version,
+	"revision":  Revision,
+	"branch":    Branch,
+	"buildUser": BuildUser,
+	"buildDate": BuildDate,
+	"goVersion": GoVersion,
+}

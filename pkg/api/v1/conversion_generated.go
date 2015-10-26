@@ -292,6 +292,7 @@ func autoconvert_api_Container_To_v1_Container(in *api.Container, out *Container
 		out.SecurityContext = nil
 	}
 	out.Stdin = in.Stdin
+	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
 	return nil
 }
@@ -2084,9 +2085,13 @@ func autoconvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
-	out.HostPID = in.HostPID
-	out.HostIPC = in.HostIPC
+	if in.SecurityContext != nil {
+		if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -2645,7 +2650,12 @@ func autoconvert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityConte
 	} else {
 		out.RunAsUser = nil
 	}
-	out.RunAsNonRoot = in.RunAsNonRoot
+	if in.RunAsNonRoot != nil {
+		out.RunAsNonRoot = new(bool)
+		*out.RunAsNonRoot = *in.RunAsNonRoot
+	} else {
+		out.RunAsNonRoot = nil
+	}
 	return nil
 }
 
@@ -3301,6 +3311,7 @@ func autoconvert_v1_Container_To_api_Container(in *Container, out *api.Container
 		out.SecurityContext = nil
 	}
 	out.Stdin = in.Stdin
+	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
 	return nil
 }
@@ -5094,9 +5105,16 @@ func autoconvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.ServiceAccountName = in.ServiceAccountName
 	// in.DeprecatedServiceAccount has no peer in out
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
-	out.HostPID = in.HostPID
-	out.HostIPC = in.HostIPC
+	// in.HostNetwork has no peer in out
+	// in.HostPID has no peer in out
+	// in.HostIPC has no peer in out
+	if in.SecurityContext != nil {
+		if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -5653,7 +5671,12 @@ func autoconvert_v1_SecurityContext_To_api_SecurityContext(in *SecurityContext, 
 	} else {
 		out.RunAsUser = nil
 	}
-	out.RunAsNonRoot = in.RunAsNonRoot
+	if in.RunAsNonRoot != nil {
+		out.RunAsNonRoot = new(bool)
+		*out.RunAsNonRoot = *in.RunAsNonRoot
+	} else {
+		out.RunAsNonRoot = nil
+	}
 	return nil
 }
 

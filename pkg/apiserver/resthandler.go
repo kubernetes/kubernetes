@@ -179,18 +179,28 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 				return
 			}
 		}
-		handler, err := connecter.Connect(ctx, name, opts)
+		handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req.Request, w: w})
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 		handler.ServeHTTP(w, req.Request)
-		err = handler.RequestError()
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
-		}
 	}
+}
+
+// responder implements rest.Responder for assisting a connector in writing objects or errors.
+type responder struct {
+	scope RequestScope
+	req   *http.Request
+	w     http.ResponseWriter
+}
+
+func (r *responder) Object(statusCode int, obj runtime.Object) {
+	write(statusCode, r.scope.APIVersion, r.scope.Codec, obj, r.w, r.req)
+}
+
+func (r *responder) Error(err error) {
+	errorJSON(err, r.scope.Codec, r.w)
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.

@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -100,7 +100,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return client.LimitRanges(api.NamespaceAll).List(labels.Everything())
+			return client.LimitRanges(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
@@ -395,5 +395,5 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 			}
 		}
 	}
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }

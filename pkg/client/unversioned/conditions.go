@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -45,10 +45,10 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(c Interface, job *experimental.Job) wait.ConditionFunc {
+func JobHasDesiredParallelism(c Interface, job *extensions.Job) wait.ConditionFunc {
 
 	return func() (bool, error) {
-		job, err := c.Experimental().Jobs(job.Namespace).Get(job.Name)
+		job, err := c.Extensions().Jobs(job.Namespace).Get(job.Name)
 		if err != nil {
 			return false, err
 		}
@@ -58,7 +58,7 @@ func JobHasDesiredParallelism(c Interface, job *experimental.Job) wait.Condition
 			return true, nil
 		}
 		// otherwise count successful
-		progress := *job.Spec.Completions - job.Status.Active - job.Status.Successful
+		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
 		return progress == 0, nil
 	}
 }

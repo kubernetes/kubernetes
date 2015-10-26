@@ -20,13 +20,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo $1
-echo $2
-
 cd /build/
 
-wget "$1" -O input.json
 wget "$2" -O register.go
+
+# gendocs takes "input.json" as the input swagger spec.
+cp /swagger-source/"$1".json input.json
 
 ./gradle-2.5/bin/gradle gendocs --info
 
@@ -36,9 +35,9 @@ top_level_models=$(grep IsAnAPIObject ./register.go | sed 's/func (\*\(.*\)) IsA
     | tr -d '()' | tr -d '{}' | tr -d ' ')
 for m in $top_level_models
 do
-  if grep -xq "=== v1.$m" ./definitions.adoc
+  if grep -xq "=== $1.$m" ./definitions.adoc
   then
-    buf+="* <<v1."$m">>\n"
+    buf+="* <<$1."$m">>\n"
   fi
 done
 sed -i "1i $buf" ./definitions.adoc

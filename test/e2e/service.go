@@ -65,12 +65,12 @@ var _ = Describe("Services", func() {
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 
-	It("should provide secure master service", func() {
+	It("should provide secure master service [Conformance]", func() {
 		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should serve a basic endpoint from pods", func() {
+	It("should serve a basic endpoint from pods [Conformance]", func() {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		labels := map[string]string{
@@ -129,7 +129,7 @@ var _ = Describe("Services", func() {
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
-	It("should serve multiport endpoints from pods", func() {
+	It("should serve multiport endpoints from pods [Conformance]", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name
@@ -548,6 +548,16 @@ var _ = Describe("Services", func() {
 			i++
 		}
 
+		By("updating service's port " + serviceName + " and reaching it at the same IP")
+		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+			s.Spec.Ports[0].Port = 19482 // chosen arbitrarily to not conflict with port 80
+		})
+		Expect(err).NotTo(HaveOccurred())
+		port = service.Spec.Ports[0]
+		if !testLoadBalancerReachable(service.Status.LoadBalancer.Ingress[0], port.Port) {
+			Failf("Failed to reach load balancer at original ingress after updating its port: %+v", service)
+		}
+
 		By("changing service " + serviceName + " back to type=ClusterIP")
 		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
@@ -580,7 +590,7 @@ var _ = Describe("Services", func() {
 		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort2)
 		By("checking the LoadBalancer is closed")
-		testLoadBalancerNotReachable(ingress1, 80)
+		testLoadBalancerNotReachable(ingress1, port.Port)
 	})
 
 	It("should prevent NodePort collisions", func() {
@@ -1058,7 +1068,7 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "gcr.io/google_containers/pause",
+					Image: "beta.gcr.io/google_containers/pause:2.0",
 					Ports: containerPorts,
 				},
 			},
@@ -1240,7 +1250,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
-		Timeout:              30 * time.Second,
+		Timeout:              podReadyBeforeTimeout,
 		Replicas:             replicas,
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,

@@ -38,7 +38,7 @@ func newConsole(uid, gid int) (Console, error) {
 	}, nil
 }
 
-// newConsoleFromPath is an internal fucntion returning an initialzied console for use inside
+// newConsoleFromPath is an internal function returning an initialized console for use inside
 // a container's MNT namespace.
 func newConsoleFromPath(slavePath string) *linuxConsole {
 	return &linuxConsole{

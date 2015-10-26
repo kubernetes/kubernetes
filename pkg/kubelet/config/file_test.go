@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
@@ -46,8 +46,8 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+		update := got.(kubetypes.PodUpdate)
+		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -75,7 +75,7 @@ func TestReadPodsFromFile(t *testing.T) {
 	var testCases = []struct {
 		desc     string
 		pod      runtime.Object
-		expected kubelet.PodUpdate
+		expected kubetypes.PodUpdate
 	}{
 		{
 			desc: "Simple pod",
@@ -90,15 +90,17 @@ func TestReadPodsFromFile(t *testing.T) {
 					Namespace: "mynamespace",
 				},
 				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					Containers:      []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &api.PodSecurityContext{},
 				},
 			},
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
+			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: "mynamespace",
-					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
+					Name:        "test-" + hostname,
+					UID:         "12345",
+					Namespace:   "mynamespace",
+					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+					SelfLink:    getSelfLink("test-"+hostname, "mynamespace"),
 				},
 				Spec: api.PodSpec{
 					NodeName:                      hostname,
@@ -111,6 +113,7 @@ func TestReadPodsFromFile(t *testing.T) {
 						TerminationMessagePath: "/dev/termination-log",
 						ImagePullPolicy:        "IfNotPresent",
 						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &api.PodSecurityContext{},
 				},
 			}),
 		},
@@ -135,7 +138,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
 			select {
 			case got := <-ch:
-				update := got.(kubelet.PodUpdate)
+				update := got.(kubetypes.PodUpdate)
 				for _, pod := range update.Pods {
 					if errs := validation.ValidatePod(pod); len(errs) > 0 {
 						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
@@ -178,8 +181,8 @@ func TestExtractFromEmptyDir(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+	update := (<-ch).(kubetypes.PodUpdate)
+	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}

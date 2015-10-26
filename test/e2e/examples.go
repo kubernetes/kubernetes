@@ -449,7 +449,7 @@ var _ = Describe("Examples e2e", func() {
 	})
 
 	Describe("[Example]ClusterDns", func() {
-		It("should create pod that uses dns", func() {
+		It("should create pod that uses dns [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/cluster-dns", file)
 			}
@@ -535,7 +535,13 @@ var _ = Describe("Examples e2e", func() {
 			for _, ns := range namespaces {
 				newKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).withStdinData(updatedPodYaml).exec()
 			}
-			// remember that we cannot wait for the pods to be running because our pods terminate by themselves.
+
+			// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
+			// that we cannot wait for the pods to be running because our pods terminate by themselves.
+			for _, ns := range namespaces {
+				err := waitForPodNotPending(c, ns.Name, frontendPodName)
+				expectNoError(err)
+			}
 
 			// wait for pods to print their result
 			for _, ns := range namespaces {

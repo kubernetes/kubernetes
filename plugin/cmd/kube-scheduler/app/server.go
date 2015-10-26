@@ -56,6 +56,8 @@ type SchedulerServer struct {
 	Kubeconfig        string
 	BindPodsQPS       float32
 	BindPodsBurst     int
+	KubeApiQps        float32
+	KubeApiBurst      int
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -64,6 +66,10 @@ func NewSchedulerServer() *SchedulerServer {
 		Port:              ports.SchedulerPort,
 		Address:           net.ParseIP("127.0.0.1"),
 		AlgorithmProvider: factory.DefaultProvider,
+		BindPodsQPS:       50.0,
+		BindPodsBurst:     100,
+		KubeApiQps:        50.0,
+		KubeApiBurst:      100,
 	}
 	return &s
 }
@@ -77,8 +83,10 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", 15.0, "Number of bindings per second scheduler is allowed to continuously make")
-	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", 20, "Number of bindings per second scheduler is allowed to make during bursts")
+	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", s.BindPodsQPS, "Number of bindings per second scheduler is allowed to continuously make")
+	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", s.BindPodsBurst, "Number of bindings per second scheduler is allowed to make during bursts")
+	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -95,8 +103,10 @@ func (s *SchedulerServer) Run(_ []string) error {
 	if err != nil {
 		return err
 	}
-	kubeconfig.QPS = 20.0
-	kubeconfig.Burst = 30
+
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = s.KubeApiQps
+	kubeconfig.Burst = s.KubeApiBurst
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {

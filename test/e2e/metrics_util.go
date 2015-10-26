@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -31,8 +32,14 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	"github.com/prometheus/client_golang/extraction"
-	"github.com/prometheus/client_golang/model"
+	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
+)
+
+const (
+	podStartupThreshold     time.Duration = 5 * time.Second
+	listPodLatencyThreshold time.Duration = 2 * time.Second
+	apiCallLatencyThreshold time.Duration = 250 * time.Millisecond
 )
 
 // Dashboard metrics
@@ -60,34 +67,6 @@ func (a APIResponsiveness) Len() int      { return len(a.APICalls) }
 func (a APIResponsiveness) Swap(i, j int) { a.APICalls[i], a.APICalls[j] = a.APICalls[j], a.APICalls[i] }
 func (a APIResponsiveness) Less(i, j int) bool {
 	return a.APICalls[i].Latency.Perc99 < a.APICalls[j].Latency.Perc99
-}
-
-// Ingest method implements extraction.Ingester (necessary for Prometheus library
-// to parse the metrics).
-func (a *APIResponsiveness) Ingest(samples model.Samples) error {
-	ignoredResources := sets.NewString("events")
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
-
-	for _, sample := range samples {
-		// Example line:
-		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
-			continue
-		}
-
-		resource := string(sample.Metric["resource"])
-		verb := string(sample.Metric["verb"])
-		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
-			continue
-		}
-		latency := sample.Value
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return err
-		}
-		a.addMetric(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
-	}
-	return nil
 }
 
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
@@ -118,19 +97,47 @@ func setQuantile(apicall APICall, quantile float64, latency time.Duration) APICa
 }
 
 func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
+	var a APIResponsiveness
+
 	body, err := getMetrics(c)
 	if err != nil {
-		return APIResponsiveness{}, err
+		return a, err
 	}
 
-	var ingester APIResponsiveness
-	err = extraction.Processor004.ProcessSingle(strings.NewReader(body), &ingester, &extraction.ProcessOptions{})
-	return ingester, err
+	samples, err := extractMetricSamples(body)
+	if err != nil {
+		return a, err
+	}
+
+	ignoredResources := sets.NewString("events")
+	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
+
+	for _, sample := range samples {
+		// Example line:
+		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
+			continue
+		}
+
+		resource := string(sample.Metric["resource"])
+		verb := string(sample.Metric["verb"])
+		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
+			continue
+		}
+		latency := sample.Value
+		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+		if err != nil {
+			return a, err
+		}
+		a.addMetric(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
+	}
+
+	return a, err
 }
 
-// Prints summary metrics for request types with latency above threshold
-// and returns number of such request types.
-func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error) {
+// Prints top five summary metrics for request types with latency and returns
+// number of such request types above threshold.
+func HighLatencyRequests(c *client.Client) (int, error) {
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -139,6 +146,11 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error)
 	badMetrics := 0
 	top := 5
 	for _, metric := range metrics.APICalls {
+		threshold := apiCallLatencyThreshold
+		if metric.Verb == "LIST" && metric.Resource == "pods" {
+			threshold = listPodLatencyThreshold
+		}
+
 		isBad := false
 		if metric.Latency.Perc99 > threshold {
 			badMetrics++
@@ -159,9 +171,9 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error)
 	return badMetrics, nil
 }
 
-// Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are smaller
-// than the given threshold (returns error in the oposite case).
-func VerifyPodStartupLatency(latency PodStartupLatency, podStartupThreshold time.Duration) error {
+// Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
+// within the threshold.
+func VerifyPodStartupLatency(latency PodStartupLatency) error {
 	Logf("Pod startup latency: %s", prettyPrintJSON(latency))
 
 	if latency.Latency.Perc50 > podStartupThreshold {
@@ -274,4 +286,61 @@ func writePerfData(c *client.Client, dirName string, postfix string) error {
 		}
 	}
 	return nil
+}
+
+// extractMetricSamples parses the prometheus metric samples from the input string.
+func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
+	dec, err := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
+	if err != nil {
+		return nil, err
+	}
+	decoder := expfmt.SampleDecoder{
+		Dec:  dec,
+		Opts: &expfmt.DecodeOptions{},
+	}
+
+	var samples []*model.Sample
+	for {
+		var v model.Vector
+		if err = decoder.Decode(&v); err != nil {
+			if err == io.EOF {
+				// Expected loop termination condition.
+				return samples, nil
+			}
+			return nil, err
+		}
+		samples = append(samples, v...)
+	}
+}
+
+// logSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
+// If latencyDataLag is nil then it will be populated from latencyData
+func logSuspiciousLatency(latencyData []podLatencyData, latencyDataLag []podLatencyData, nodeCount int, c *client.Client) {
+	if latencyDataLag == nil {
+		latencyDataLag = latencyData
+	}
+	for _, l := range latencyData {
+		if l.Latency > NodeStartupThreshold {
+			HighLatencyKubeletOperations(c, 1*time.Second, l.Node)
+		}
+	}
+	Logf("Approx throughput: %v pods/min",
+		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
+}
+
+// testMaximumLatencyValue verifies the highest latency value is less than or equal to
+// the given time.Duration. Since the arrays are sorted we are looking at the last
+// element which will always be the highest. If the latency is higher than the max Failf
+// is called.
+func testMaximumLatencyValue(latencies []podLatencyData, max time.Duration, name string) {
+	highestLatency := latencies[len(latencies)-1]
+	if !(highestLatency.Latency <= max) {
+		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
+	}
+}
+
+func printLatencies(latencies []podLatencyData, header string) {
+	metrics := extractLatencyMetrics(latencies)
+	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
+	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
