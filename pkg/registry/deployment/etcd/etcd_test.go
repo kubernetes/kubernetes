@@ -48,7 +48,7 @@ func validNewDeployment() *extensions.Deployment {
 		},
 		Spec: extensions.DeploymentSpec{
 			Selector: map[string]string{"a": "b"},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},

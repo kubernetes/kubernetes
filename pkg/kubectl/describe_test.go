@@ -503,7 +503,7 @@ func TestDescribeDeployment(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: extensions.DeploymentSpec{
-			Template: &api.PodTemplateSpec{},
+			Template: api.PodTemplateSpec{},
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
