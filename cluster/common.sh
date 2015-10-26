@@ -109,7 +109,7 @@ function clear-kubeconfig() {
   "${kubectl}" config unset "contexts.${CONTEXT}"
 
   local current
-  current=$("${kubectl}" config view -o template --template='{{ index . "current-context" }}')
+  current=$("${kubectl}" config view -o jsonpath='{.current-context}')
   if [[ "${current}" == "${CONTEXT}" ]]; then
     "${kubectl}" config unset current-context
   fi
@@ -129,6 +129,7 @@ function tear_down_alive_resources() {
 # Gets username, password for the current-context in kubeconfig, if they exist.
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
+#   KUBE_CONTEXT  # if unset, defaults to current-context
 #
 # Vars set:
 #   KUBE_USER
@@ -138,21 +139,14 @@ function tear_down_alive_resources() {
 # the current-context user does not exist or contain basicauth entries.
 function get-kubeconfig-basicauth() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  # Templates to safely extract the username,password for the current-context
-  # user.  The long chain of 'with' commands avoids indexing nil if any of the
-  # entries ("current-context", "contexts"."current-context", "users", etc)
-  # is missing.
-  # Note: we save dot ('.') to $root because the 'with' action overrides it.
-  # See http://golang.org/pkg/text/template/.
-  local username='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "username" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
-  local password='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "password" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
-  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${username}")
-  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${password}")
-  # Handle empty/missing username|password
-  if [[ "${KUBE_USER}" == '<no value>' || "$KUBE_PASSWORD" == '<no value>' ]]; then
-    KUBE_USER=''
-    KUBE_PASSWORD=''
+
+  local cc="current-context"
+  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+    cc="${KUBE_CONTEXT}"
   fi
+  local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.username}")
+  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.password}")
 }
 
 # Generate basic auth user and password.
@@ -168,6 +162,7 @@ function gen-kube-basicauth() {
 # Get the bearer token for the current-context in kubeconfig if one exists.
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
+#   KUBE_CONTEXT  # if unset, defaults to current-context
 #
 # Vars set:
 #   KUBE_BEARER_TOKEN
@@ -176,18 +171,13 @@ function gen-kube-basicauth() {
 # current-context user does not exist or contain a bearer token entry.
 function get-kubeconfig-bearertoken() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  # Template to safely extract the token for the current-context user.
-  # The long chain of 'with' commands avoids indexing nil if any of the
-  # entries ("current-context", "contexts"."current-context", "users", etc)
-  # is missing.
-  # Note: we save dot ('.') to $root because the 'with' action overrides it.
-  # See http://golang.org/pkg/text/template/.
-  local token='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "token" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
-  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${token}")
-  # Handle empty/missing token
-  if [[ "${KUBE_BEARER_TOKEN}" == '<no value>' ]]; then
-    KUBE_BEARER_TOKEN=''
+
+  local cc="current-context"
+  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+    cc="${KUBE_CONTEXT}"
   fi
+  local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
 }
 
 # Generate bearer token.
@@ -198,10 +188,31 @@ function gen-kube-bearertoken() {
     KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }
 
+
+function load-or-gen-kube-basicauth() {
+  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+    get-kubeconfig-basicauth
+  fi
+
+  if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
+    gen-kube-basicauth
+  fi
+}
+
+function load-or-gen-kube-bearertoken() {
+  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+    get-kubeconfig-bearertoken
+  fi
+  if [[ -z "${KUBE_BEARER_TOKEN:-}" ]]; then
+    gen-kube-bearertoken
+  fi
+}
+
 # Get the master IP for the current-context in kubeconfig if one exists.
 #
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
+#   KUBE_CONTEXT  # if unset, defaults to current-context
 #
 # Vars set:
 #   KUBE_MASTER_URL
@@ -210,18 +221,13 @@ function gen-kube-bearertoken() {
 # current-context user does not exist or contain a server entry.
 function detect-master-from-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  # Template to safely extract the server for the current-context cluster.
-  # The long chain of 'with' commands avoids indexing nil if any of the
-  # entries ("current-context", "contexts"."current-context", "users", etc)
-  # is missing.
-  # Note: we save dot ('.') to $root because the 'with' action overrides it.
-  # See http://golang.org/pkg/text/template/.
-  local server_tpl='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $cluster := .context.cluster }}{{range $element := (index $dot "clusters")}}{{ if eq .name $cluster }}{{ index . "cluster" "server" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
-  KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${server_tpl}")
-  # Handle empty/missing server
-  if [[ "${KUBE_MASTER_URL}" == '<no value>' ]]; then
-    KUBE_MASTER_URL=''
+
+  local cc="current-context"
+  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+    cc="${KUBE_CONTEXT}"
   fi
+  local cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+  KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
 }
 
 # Sets KUBE_VERSION variable to the version passed in as an argument, or if argument is
