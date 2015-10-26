@@ -5,6 +5,23 @@
 
 # Pods
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Pods](#pods)
+  - [What is a _pod_?](#what-is-a-pod)
+  - [Motivation for pods](#motivation-for-pods)
+    - [Resource sharing and communication](#resource-sharing-and-communication)
+    - [Management](#management)
+  - [Uses of pods](#uses-of-pods)
+  - [Alternatives considered](#alternatives-considered)
+  - [Durability of pods (or lack thereof)](#durability-of-pods-or-lack-thereof)
+  - [Termination of Pods](#termination-of-pods)
+  - [Privileged mode for pod containers](#privileged-mode-for-pod-containers)
+  - [API Object](#api-object)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 In Kubernetes, rather than individual application containers, _pods_ are the smallest deployable units that can be created, scheduled, and managed.
 
 ## What is a _pod_?
@@ -49,6 +66,8 @@ Pods can be used to host vertically integrated application stacks, but their pri
 * controllers, managers, configurators, and updaters
 
 Individual pods are not intended to run multiple instances of the same application, in general.
+
+For a longer explanation, see [The Distributed System ToolKit: Patterns for Composite Containers](http://blog.kubernetes.io/2015/06/the-distributed-system-toolkit-patterns.html).
 
 ## Alternatives considered
 

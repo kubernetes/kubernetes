@@ -52,6 +52,7 @@ kubectl
 * [kubectl api-versions](kubectl_api-versions.md)	 - Print available API versions.
 * [kubectl apply](kubectl_apply.md)	 - Apply a configuration to a resource by filename or stdin
 * [kubectl attach](kubectl_attach.md)	 - Attach to a running container.
+* [kubectl autoscale](kubectl_autoscale.md)	 - Auto-scale a replication controller
 * [kubectl cluster-info](kubectl_cluster-info.md)	 - Display cluster info
 * [kubectl config](kubectl_config.md)	 - config modifies kubeconfig files
 * [kubectl create](kubectl_create.md)	 - Create a resource by filename or stdin

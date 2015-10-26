@@ -836,6 +836,11 @@ func deepCopy_extensions_APIVersion(in APIVersion, out *APIVersion, c *conversio
 	return nil
 }
 
+func deepCopy_extensions_CPUTargetUtilization(in CPUTargetUtilization, out *CPUTargetUtilization, c *conversion.Cloner) error {
+	out.TargetPercentage = in.TargetPercentage
+	return nil
+}
+
 func deepCopy_extensions_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1038,40 +1043,49 @@ func deepCopy_extensions_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerL
 }
 
 func deepCopy_extensions_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
-	if in.ScaleRef != nil {
-		out.ScaleRef = new(SubresourceReference)
-		if err := deepCopy_extensions_SubresourceReference(*in.ScaleRef, out.ScaleRef, c); err != nil {
+	if err := deepCopy_extensions_SubresourceReference(in.ScaleRef, &out.ScaleRef, c); err != nil {
+		return err
+	}
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int)
+		*out.MinReplicas = *in.MinReplicas
+	} else {
+		out.MinReplicas = nil
+	}
+	out.MaxReplicas = in.MaxReplicas
+	if in.CPUUtilization != nil {
+		out.CPUUtilization = new(CPUTargetUtilization)
+		if err := deepCopy_extensions_CPUTargetUtilization(*in.CPUUtilization, out.CPUUtilization, c); err != nil {
 			return err
 		}
 	} else {
-		out.ScaleRef = nil
-	}
-	out.MinReplicas = in.MinReplicas
-	out.MaxReplicas = in.MaxReplicas
-	if err := deepCopy_extensions_ResourceConsumption(in.Target, &out.Target, c); err != nil {
-		return err
+		out.CPUUtilization = nil
 	}
 	return nil
 }
 
 func deepCopy_extensions_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
+	if in.ObservedGeneration != nil {
+		out.ObservedGeneration = new(int64)
+		*out.ObservedGeneration = *in.ObservedGeneration
+	} else {
+		out.ObservedGeneration = nil
+	}
+	if in.LastScaleTime != nil {
+		out.LastScaleTime = new(unversioned.Time)
+		if err := deepCopy_unversioned_Time(*in.LastScaleTime, out.LastScaleTime, c); err != nil {
+			return err
+		}
+	} else {
+		out.LastScaleTime = nil
+	}
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentConsumption != nil {
-		out.CurrentConsumption = new(ResourceConsumption)
-		if err := deepCopy_extensions_ResourceConsumption(*in.CurrentConsumption, out.CurrentConsumption, c); err != nil {
-			return err
-		}
+	if in.CurrentCPUUtilizationPercentage != nil {
+		out.CurrentCPUUtilizationPercentage = new(int)
+		*out.CurrentCPUUtilizationPercentage = *in.CurrentCPUUtilizationPercentage
 	} else {
-		out.CurrentConsumption = nil
-	}
-	if in.LastScaleTimestamp != nil {
-		out.LastScaleTimestamp = new(unversioned.Time)
-		if err := deepCopy_unversioned_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTimestamp = nil
+		out.CurrentCPUUtilizationPercentage = nil
 	}
 	return nil
 }
@@ -1322,14 +1336,6 @@ func deepCopy_extensions_ReplicationControllerDummy(in ReplicationControllerDumm
 	return nil
 }
 
-func deepCopy_extensions_ResourceConsumption(in ResourceConsumption, out *ResourceConsumption, c *conversion.Cloner) error {
-	out.Resource = in.Resource
-	if err := deepCopy_resource_Quantity(in.Quantity, &out.Quantity, c); err != nil {
-		return err
-	}
-	return nil
-}
-
 func deepCopy_extensions_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
 	if err := deepCopy_util_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
 		return err
@@ -1518,6 +1524,7 @@ func init() {
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_extensions_APIVersion,
+		deepCopy_extensions_CPUTargetUtilization,
 		deepCopy_extensions_DaemonSet,
 		deepCopy_extensions_DaemonSetList,
 		deepCopy_extensions_DaemonSetSpec,
@@ -1548,7 +1555,6 @@ func init() {
 		deepCopy_extensions_PodSelector,
 		deepCopy_extensions_PodSelectorRequirement,
 		deepCopy_extensions_ReplicationControllerDummy,
-		deepCopy_extensions_ResourceConsumption,
 		deepCopy_extensions_RollingUpdateDeployment,
 		deepCopy_extensions_Scale,
 		deepCopy_extensions_ScaleSpec,

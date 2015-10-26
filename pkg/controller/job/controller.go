@@ -68,7 +68,7 @@ type JobController struct {
 	queue *workqueue.Type
 }
 
-func NewJobController(kubeClient client.Interface) *JobController {
+func NewJobController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -93,6 +93,7 @@ func NewJobController(kubeClient client.Interface) *JobController {
 			},
 		},
 		&extensions.Job{},
+		// TODO: Can we have much longer period here?
 		replicationcontroller.FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
@@ -119,7 +120,7 @@ func NewJobController(kubeClient client.Interface) *JobController {
 			},
 		},
 		&api.Pod{},
-		replicationcontroller.PodRelistPeriod,
+		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    jm.addPod,
 			UpdateFunc: jm.updatePod,

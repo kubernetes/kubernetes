@@ -159,7 +159,9 @@ func NewDockerManager(
 	execHandler ExecHandler,
 	oomAdjuster *oom.OomAdjuster,
 	procFs procfs.ProcFsInterface,
-	cpuCFSQuota bool) *DockerManager {
+	cpuCFSQuota bool,
+	serializeImagePulls bool) *DockerManager {
+
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
@@ -214,7 +216,11 @@ func NewDockerManager(
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
-	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm)
+	if serializeImagePulls {
+		dm.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, dm)
+	} else {
+		dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm)
+	}
 
 	return dm
 }

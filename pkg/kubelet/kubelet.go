@@ -178,7 +178,9 @@ func NewMainKubelet(
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
 	cpuCFSQuota bool,
-	daemonEndpoints *api.NodeDaemonEndpoints) (*Kubelet, error) {
+	daemonEndpoints *api.NodeDaemonEndpoints,
+	serializeImagePulls bool,
+) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -335,7 +337,10 @@ func NewMainKubelet(
 			dockerExecHandler,
 			oomAdjuster,
 			procFs,
-			klet.cpuCFSQuota)
+			klet.cpuCFSQuota,
+			serializeImagePulls,
+		)
+
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -348,7 +353,9 @@ func NewMainKubelet(
 			recorder,
 			containerRefManager,
 			readinessManager,
-			klet.volumeManager)
+			klet.volumeManager,
+			serializeImagePulls,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -2095,7 +2102,11 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 		return fmt.Errorf("unable to get logs for container %q in pod %q namespace %q: unable to find pod", containerName, name, namespace)
 	}
 
-	podStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	podUID := pod.UID
+	if mirrorPod, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
+		podUID = mirrorPod.UID
+	}
+	podStatus, found := kl.statusManager.GetPodStatus(podUID)
 	if !found {
 		return fmt.Errorf("failed to get status for pod %q in namespace %q", name, namespace)
 	}
@@ -2467,7 +2478,11 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 					failed++
 				}
 			} else if containerStatus.State.Waiting != nil {
-				waiting++
+				if containerStatus.LastTerminationState.Terminated != nil {
+					stopped++
+				} else {
+					waiting++
+				}
 			} else {
 				unknown++
 			}

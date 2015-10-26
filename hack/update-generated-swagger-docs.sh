@@ -66,4 +66,3 @@ for group_version in "${GROUP_VERSIONS[@]}"; do
 done
 
 "${KUBE_ROOT}/hack/update-swagger-spec.sh"
-"${KUBE_ROOT}/hack/gen-swagger-doc/run-gen-swagger-docs.sh"

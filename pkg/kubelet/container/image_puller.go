@@ -32,6 +32,9 @@ type imagePuller struct {
 	runtime  Runtime
 }
 
+// enforce compatibility.
+var _ ImagePuller = &imagePuller{}
+
 // NewImagePuller takes an event recorder and container runtime to create a
 // image puller that wraps the container runtime's PullImage interface.
 func NewImagePuller(recorder record.EventRecorder, runtime Runtime) ImagePuller {
@@ -69,6 +72,7 @@ func (puller *imagePuller) reportImagePull(ref *api.ObjectReference, event strin
 		puller.recorder.Eventf(ref, "Pulled", "Successfully pulled image %q", image)
 	case "failed":
 		puller.recorder.Eventf(ref, "Failed", "Failed to pull image %q: %v", image, pullError)
+
 	}
 }
 
@@ -78,6 +82,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
+
 	spec := ImageSpec{container.Image}
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
@@ -95,7 +100,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	}
 
 	puller.reportImagePull(ref, "pulling", container.Image, nil)
-	if err = puller.runtime.PullImage(spec, pullSecrets); err != nil {
+	if err := puller.runtime.PullImage(spec, pullSecrets); err != nil {
 		puller.reportImagePull(ref, "failed", container.Image, err)
 		return err
 	}

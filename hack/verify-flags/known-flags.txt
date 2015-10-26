@@ -52,6 +52,7 @@ cors-allowed-origins
 create-external-load-balancer
 current-release-pr
 current-replicas
+cpu-percent
 default-container-cpu-limit
 default-container-mem-limit
 delay-shutdown
@@ -69,8 +70,6 @@ duration-sec
 e2e-verify-service-account
 e2e-output-dir
 enable-debugging-handlers
-enable-horizontal-pod-autoscaler
-enable-deployment-controller
 enable-server
 etcd-config
 etcd-prefix
@@ -182,6 +181,7 @@ minion-max-log-size
 minion-path-override
 min-pr-number
 min-request-timeout
+min-resync-period
 namespace-sync-period
 network-plugin
 network-plugin-dir
@@ -248,6 +248,7 @@ runtime-config
 scheduler-config
 schema-cache-dir
 secure-port
+serialize-image-pulls
 service-account-key-file
 service-account-lookup
 service-account-private-key-file
@@ -283,6 +284,7 @@ token-auth-file
 ttl-secs
 type-src
 udp-port
+udp-timeout
 unix-socket
 update-period
 upgrade-target

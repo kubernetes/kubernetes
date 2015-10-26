@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
@@ -36,12 +35,25 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
+				MinReplicas:    newInt(1),
+				MaxReplicas:    5,
+				CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myautoscaler",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.HorizontalPodAutoscalerSpec{
+				ScaleRef: extensions.SubresourceReference{
+					Subresource: "scale",
+				},
+				MinReplicas: newInt(1),
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -52,18 +64,17 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 
 	errorCases := map[string]extensions.HorizontalPodAutoscaler{
-		"must be non-negative": {
+		"must be bigger or equal to 1": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: -1,
+				MinReplicas: newInt(-1),
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"must be bigger or equal to minReplicas": {
@@ -72,51 +83,25 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 7,
+				MinReplicas: newInt(7),
 				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
-		"invalid value": {
+		"must be non-negative": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myautoscaler",
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
+				ScaleRef: extensions.SubresourceReference{
 					Subresource: "scale",
 				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
-			},
-		},
-		"resource not supported": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.HorizontalPodAutoscalerSpec{
-				ScaleRef: &extensions.SubresourceReference{
-					Subresource: "scale",
-				},
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
-			},
-		},
-		"required value": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: extensions.HorizontalPodAutoscalerSpec{
-				MinReplicas: 1,
-				MaxReplicas: 5,
-				Target:      extensions.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+				MinReplicas:    newInt(1),
+				MaxReplicas:    5,
+				CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: -70},
 			},
 		},
 	}
@@ -930,6 +915,104 @@ func TestValidateIngress(t *testing.T) {
 
 	for k, v := range errorCases {
 		errs := ValidateIngress(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0].(*errors.ValidationError)
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+			}
+		}
+	}
+}
+
+func newInt(val int) *int {
+	p := new(int)
+	*p = val
+	return p
+}
+
+func TestValidateIngressStatusUpdate(t *testing.T) {
+	defaultBackend := extensions.IngressBackend{
+		ServiceName: "default-backend",
+		ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+	}
+
+	newValid := func() extensions.Ingress {
+		return extensions.Ingress{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				Namespace:       api.NamespaceDefault,
+				ResourceVersion: "9",
+			},
+			Spec: extensions.IngressSpec{
+				Backend: &extensions.IngressBackend{
+					ServiceName: "default-backend",
+					ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+				},
+				Rules: []extensions.IngressRule{
+					{
+						Host: "foo.bar.com",
+						IngressRuleValue: extensions.IngressRuleValue{
+							HTTP: &extensions.HTTPIngressRuleValue{
+								Paths: []extensions.HTTPIngressPath{
+									{
+										Path:    "/foo",
+										Backend: defaultBackend,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Status: extensions.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{IP: "127.0.0.1", Hostname: "foo.bar.com"},
+					},
+				},
+			},
+		}
+	}
+	oldValue := newValid()
+	newValue := newValid()
+	newValue.Status = extensions.IngressStatus{
+		LoadBalancer: api.LoadBalancerStatus{
+			Ingress: []api.LoadBalancerIngress{
+				{IP: "127.0.0.2", Hostname: "foo.com"},
+			},
+		},
+	}
+	invalidIP := newValid()
+	invalidIP.Status = extensions.IngressStatus{
+		LoadBalancer: api.LoadBalancerStatus{
+			Ingress: []api.LoadBalancerIngress{
+				{IP: "abcd", Hostname: "foo.com"},
+			},
+		},
+	}
+	invalidHostname := newValid()
+	invalidHostname.Status = extensions.IngressStatus{
+		LoadBalancer: api.LoadBalancerStatus{
+			Ingress: []api.LoadBalancerIngress{
+				{IP: "127.0.0.1", Hostname: "127.0.0.1"},
+			},
+		},
+	}
+
+	errs := ValidateIngressStatusUpdate(&newValue, &oldValue)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error %v", errs)
+	}
+
+	errorCases := map[string]extensions.Ingress{
+		"status.loadBalancer.ingress.ip: invalid value":       invalidIP,
+		"status.loadBalancer.ingress.hostname: invalid value": invalidHostname,
+	}
+	for k, v := range errorCases {
+		errs := ValidateIngressStatusUpdate(&v, &oldValue)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {

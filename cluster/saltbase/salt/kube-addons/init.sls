@@ -23,6 +23,7 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-monitoring/influxdb
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755
@@ -34,6 +35,7 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-monitoring/google
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755
@@ -45,6 +47,7 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-monitoring/standalone
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755
@@ -57,6 +60,7 @@ addon-dir-create:
     - source: salt://kube-addons/cluster-monitoring
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
     - exclude_pat: E@(^.+heapster-controller\.yaml$|^.+heapster-controller\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755

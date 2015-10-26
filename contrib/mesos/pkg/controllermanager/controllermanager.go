@@ -19,11 +19,14 @@ package controllermanager
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -72,6 +75,11 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.UseHostPortEndpoints, "host_port_endpoints", s.UseHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
 }
 
+func (s *CMServer) resyncPeriod() time.Duration {
+	factor := rand.Float64() + 1
+	return time.Duration(float64(time.Hour) * 12.0 * factor)
+}
+
 func (s *CMServer) Run(_ []string) error {
 	if s.Kubeconfig == "" && s.Master == "" {
 		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
@@ -111,10 +119,10 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := s.createEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	controllerManager := replicationcontroller.NewReplicationManager(kubeClient, replicationcontroller.BurstReplicas)
-	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
+	go replicationcontroller.NewReplicationManager(kubeClient, s.resyncPeriod, replicationcontroller.BurstReplicas).
+		Run(s.ConcurrentRCSyncs, util.NeverStop)
 
-	go daemon.NewDaemonSetsController(kubeClient).
+	go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
 		Run(s.ConcurrentDSCSyncs, util.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
@@ -148,7 +156,7 @@ func (s *CMServer) Run(_ []string) error {
 	resourceQuotaController := resourcequotacontroller.NewResourceQuotaController(kubeClient)
 	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
-	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, false, s.NamespaceSyncPeriod)
+	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, &unversioned.APIVersions{}, s.NamespaceSyncPeriod)
 	namespaceController.Run()
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
@@ -202,6 +210,6 @@ func (s *CMServer) createEndpointController(client *client.Client) kmendpoint.En
 		return kmendpoint.NewEndpointController(client)
 	}
 	glog.V(2).Infof("Creating podIP:containerPort endpoint controller")
-	stockEndpointController := kendpoint.NewEndpointController(client)
+	stockEndpointController := kendpoint.NewEndpointController(client, s.resyncPeriod)
 	return stockEndpointController
 }

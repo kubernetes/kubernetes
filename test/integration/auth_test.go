@@ -390,8 +390,19 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -408,7 +419,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	transport := http.DefaultTransport
@@ -508,8 +519,18 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -527,7 +548,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	transport := http.DefaultTransport
@@ -578,8 +599,18 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -598,7 +629,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -668,8 +699,18 @@ func TestBobIsForbidden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -688,7 +729,7 @@ func TestBobIsForbidden(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	transport := http.DefaultTransport
@@ -732,8 +773,18 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -752,7 +803,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	transport := http.DefaultTransport
@@ -812,8 +863,18 @@ func TestNamespaceAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	a := newAuthorizerWithContents(t, `{"namespace": "foo"}
 `)
@@ -835,7 +896,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -930,8 +991,18 @@ func TestKindAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
@@ -953,7 +1024,7 @@ func TestKindAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1036,8 +1107,18 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 
 	a := newAuthorizerWithContents(t, `{"readonly": true}`)
 
@@ -1058,7 +1139,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		Authenticator:         getTestTokenAuth(),
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       map[string]string{"": testapi.Default.Version()},
+		StorageVersions:       storageVersions,
 	})
 
 	transport := http.DefaultTransport

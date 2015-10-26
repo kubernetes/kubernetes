@@ -29,10 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "extensions")
-	ingressStorage := NewREST(etcdStorage)
-	return ingressStorage, fakeClient
+	ingressStorage, statusStorage := NewREST(etcdStorage)
+	return ingressStorage, statusStorage, fakeClient
 }
 
 var (
@@ -107,7 +107,7 @@ func validIngress() *extensions.Ingress {
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	ingress := validIngress()
 	noDefaultBackendAndRules := validIngress()
@@ -125,7 +125,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestUpdate(
 		// valid
@@ -161,25 +161,25 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestDelete(validIngress())
 }
 
 func TestGet(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestGet(validIngress())
 }
 
 func TestList(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestList(validIngress())
 }
 
 func TestWatch(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validIngress(),
@@ -201,3 +201,5 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+// TODO TestUpdateStatus

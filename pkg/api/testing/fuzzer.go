@@ -364,6 +364,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			// string, which will cause tests failure.
 			s.APIGroup = "something"
 		},
+		func(s *extensions.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			minReplicas := c.Rand.Int()
+			s.MinReplicas = &minReplicas
+			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(c.RandUint64())}
+		},
 	)
 	return f
 }

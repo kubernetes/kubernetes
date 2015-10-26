@@ -852,6 +852,43 @@ _kubectl_expose()
     must_have_one_noun=()
 }
 
+_kubectl_autoscale()
+{
+    last_command="kubectl_autoscale"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--cpu-percent=")
+    flags+=("--dry-run")
+    flags+=("--filename=")
+    flags_with_completion+=("--filename")
+    flags_completion+=("__handle_filename_extension_flag json|stdin|yaml|yml")
+    two_word_flags+=("-f")
+    flags_with_completion+=("-f")
+    flags_completion+=("__handle_filename_extension_flag json|stdin|yaml|yml")
+    flags+=("--generator=")
+    flags+=("--max=")
+    flags+=("--min=")
+    flags+=("--name=")
+    flags+=("--no-headers")
+    flags+=("--output=")
+    two_word_flags+=("-o")
+    flags+=("--output-version=")
+    flags+=("--show-all")
+    flags+=("-a")
+    flags+=("--sort-by=")
+    flags+=("--template=")
+    two_word_flags+=("-t")
+
+    must_have_one_flag=()
+    must_have_one_flag+=("--max=")
+    must_have_one_noun=()
+}
+
 _kubectl_label()
 {
     last_command="kubectl_label"
@@ -1158,6 +1195,7 @@ _kubectl()
     commands+=("run")
     commands+=("stop")
     commands+=("expose")
+    commands+=("autoscale")
     commands+=("label")
     commands+=("annotate")
     commands+=("config")

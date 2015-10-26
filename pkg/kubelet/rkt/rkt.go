@@ -114,7 +114,9 @@ func New(config *Config,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
 	readinessManager *kubecontainer.ReadinessManager,
-	volumeGetter volumeGetter) (kubecontainer.Runtime, error) {
+	volumeGetter volumeGetter,
+	serializeImagePulls bool,
+) (kubecontainer.Runtime, error) {
 
 	systemdVersion, err := getSystemdVersion()
 	if err != nil {
@@ -154,8 +156,13 @@ func New(config *Config,
 		readinessManager:    readinessManager,
 		volumeGetter:        volumeGetter,
 	}
+
 	rkt.prober = prober.New(rkt, readinessManager, containerRefManager, recorder)
-	rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt)
+	if serializeImagePulls {
+		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt)
+	} else {
+		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt)
+	}
 
 	// Test the rkt version.
 	version, err := rkt.Version()

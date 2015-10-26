@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/fields"
@@ -643,6 +644,111 @@ func TestNodeDeletion(t *testing.T) {
 	}
 	if !podEvicted {
 		t.Error("expected pods to be evicted from the deleted node")
+	}
+}
+
+func TestCheckPod(t *testing.T) {
+
+	tcs := []struct {
+		pod   api.Pod
+		prune bool
+	}{
+
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: nil},
+				Spec:       api.PodSpec{NodeName: "new"},
+			},
+			prune: false,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: nil},
+				Spec:       api.PodSpec{NodeName: "old"},
+			},
+			prune: false,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: nil},
+				Spec:       api.PodSpec{NodeName: ""},
+			},
+			prune: false,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: nil},
+				Spec:       api.PodSpec{NodeName: "nonexistant"},
+			},
+			prune: false,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "new"},
+			},
+			prune: false,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "old"},
+			},
+			prune: true,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: ""},
+			},
+			prune: true,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "nonexistant"},
+			},
+			prune: true,
+		},
+	}
+
+	nc := NewNodeController(nil, nil, 0, nil, 0, 0, 0, nil, false)
+	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
+	nc.nodeStore.Store.Add(&api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "new",
+		},
+		Status: api.NodeStatus{
+			NodeInfo: api.NodeSystemInfo{
+				KubeletVersion: "v1.1.0",
+			},
+		},
+	})
+	nc.nodeStore.Store.Add(&api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "old",
+		},
+		Status: api.NodeStatus{
+			NodeInfo: api.NodeSystemInfo{
+				KubeletVersion: "v1.0.0",
+			},
+		},
+	})
+
+	for i, tc := range tcs {
+		var deleteCalls int
+		nc.forcefullyDeletePod = func(_ *api.Pod) {
+			deleteCalls++
+		}
+
+		nc.maybeDeleteTerminatingPod(&tc.pod)
+
+		if tc.prune && deleteCalls != 1 {
+			t.Errorf("[%v] expected number of delete calls to be 1 but got %v", i, deleteCalls)
+		}
+		if !tc.prune && deleteCalls != 0 {
+			t.Errorf("[%v] expected number of delete calls to be 0 but got %v", i, deleteCalls)
+		}
 	}
 }
 

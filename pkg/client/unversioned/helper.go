@@ -17,6 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -33,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -173,6 +175,65 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	}
 
 	return nil
+}
+
+func extractGroupVersions(l *unversioned.APIGroupList) []string {
+	var groupVersions []string
+	for _, g := range l.Groups {
+		for _, gv := range g.Versions {
+			groupVersions = append(groupVersions, gv.GroupVersion)
+		}
+	}
+	return groupVersions
+}
+
+// ServerAPIVersions returns the GroupVersions supported by the API server.
+// It creates a RESTClient based on the passed in config, but it doesn't rely
+// on the Version, Codec, and Prefix of the config, because it uses AbsPath and
+// takes the raw response.
+func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
+	transport, err := TransportFor(c)
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{Transport: transport}
+
+	configCopy := *c
+	configCopy.Version = ""
+	configCopy.Prefix = ""
+	baseURL, err := defaultServerUrlFor(c)
+	if err != nil {
+		return nil, err
+	}
+	// Get the groupVersions exposed at /api
+	baseURL.Path = "/api"
+	resp, err := client.Get(baseURL.String())
+	if err != nil {
+		return nil, err
+	}
+	var v unversioned.APIVersions
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&v)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+
+	groupVersions = append(groupVersions, v.Versions...)
+	// Get the groupVersions exposed at /apis
+	baseURL.Path = "/apis"
+	resp2, err := client.Get(baseURL.String())
+	if err != nil {
+		return nil, err
+	}
+	var apiGroupList unversioned.APIGroupList
+	defer resp2.Body.Close()
+	err = json.NewDecoder(resp2.Body).Decode(&apiGroupList)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+
+	return groupVersions, nil
 }
 
 // NegotiateVersion queries the server's supported api versions to find
@@ -472,9 +533,6 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	if version == "" {
-		return nil, fmt.Errorf("version must be set")
 	}
 	base := host
 	hostURL, err := url.Parse(base)

@@ -56,7 +56,7 @@ spec:
             memory: 50Mi
         args:
         # command = "/skydns"
-        - -machines=http://localhost:4001
+        - -machines=http://127.0.0.1:4001
         - -addr=0.0.0.0:53
         - -ns-rotate=false
         - -domain={{ pillar['dns_domain'] }}.

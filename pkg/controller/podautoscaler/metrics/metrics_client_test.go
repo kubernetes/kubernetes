@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -81,13 +81,24 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		for i := 0; i < tc.replicas; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := api.Pod{
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
-				},
 				ObjectMeta: api.ObjectMeta{
 					Name:      podName,
 					Namespace: namespace,
 					Labels:    selector,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									tc.targetResource: resource.MustParse("10"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodRunning,
 				},
 			}
 			obj.Items = append(obj.Items, pod)
@@ -122,7 +133,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	return fakeClient
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *extensions.ResourceConsumption, err error) {
+func (tc *testCase) verifyResults(t *testing.T, val *ResourceConsumption, err error) {
 	assert.Equal(t, tc.desiredError, err)
 	if tc.desiredError != nil {
 		return
@@ -138,7 +149,7 @@ func (tc *testCase) verifyResults(t *testing.T, val *extensions.ResourceConsumpt
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient)
-	val, err := metricsClient.ResourceConsumption(tc.namespace).Get(tc.targetResource, tc.selector)
+	val, _, err := metricsClient.GetResourceConsumptionAndRequest(tc.targetResource, tc.namespace, tc.selector)
 	tc.verifyResults(t, val, err)
 }
 
@@ -331,7 +342,7 @@ func TestCPUZeroReplicas(t *testing.T) {
 	tc := testCase{
 		replicas:              0,
 		targetResource:        api.ResourceCPU,
-		desiredValue:          0,
+		desiredError:          fmt.Errorf("some pods do not have request for cpu"),
 		reportedMetricsPoints: [][]metricPoint{},
 	}
 	tc.runTest(t)
@@ -341,7 +352,7 @@ func TestMemoryZeroReplicas(t *testing.T) {
 	tc := testCase{
 		replicas:              0,
 		targetResource:        api.ResourceMemory,
-		desiredValue:          0,
+		desiredError:          fmt.Errorf("some pods do not have request for memory"),
 		reportedMetricsPoints: [][]metricPoint{},
 	}
 	tc.runTest(t)
@@ -366,3 +377,5 @@ func TestMemoryEmptyMetricsForOnePod(t *testing.T) {
 	}
 	tc.runTest(t)
 }
+
+// TODO: add proper tests for request
