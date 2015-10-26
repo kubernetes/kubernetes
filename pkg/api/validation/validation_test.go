@@ -191,10 +191,10 @@ func TestValidateAnnotations(t *testing.T) {
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
 		{"UpperCase123": "bar"},
-		{"a": strings.Repeat("b", (64*1024)-1)},
+		{"a": strings.Repeat("b", totalAnnotationSizeLimitB-1)},
 		{
-			"a": strings.Repeat("b", (32*1024)-1),
-			"c": strings.Repeat("d", (32*1024)-1),
+			"a": strings.Repeat("b", totalAnnotationSizeLimitB/2-1),
+			"c": strings.Repeat("d", totalAnnotationSizeLimitB/2-1),
 		},
 	}
 	for i := range successCases {
@@ -221,10 +221,10 @@ func TestValidateAnnotations(t *testing.T) {
 		}
 	}
 	totalSizeErrorCases := []map[string]string{
-		{"a": strings.Repeat("b", 64*1024)},
+		{"a": strings.Repeat("b", totalAnnotationSizeLimitB)},
 		{
-			"a": strings.Repeat("b", 32*1024),
-			"c": strings.Repeat("d", 32*1024),
+			"a": strings.Repeat("b", totalAnnotationSizeLimitB/2),
+			"c": strings.Repeat("d", totalAnnotationSizeLimitB/2),
 		},
 	}
 	for i := range totalSizeErrorCases {
