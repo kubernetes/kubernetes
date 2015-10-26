@@ -1,0 +1,21 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: spark-driver-controller
+  labels:
+    component: spark-driver
+spec:
+  replicas: 1
+  selector:
+    component: spark-driver
+  template:
+    metadata:
+      labels:
+        component: spark-driver
+    spec:
+      containers:
+        - name: spark-driver
+          image: gcr.io/google_containers/spark-driver:1.5.1_v1
+          resources:
+            requests:
+              cpu: 100m

@@ -1,3 +1,3 @@
-FROM gcr.io/google_containers/spark-base:1.5.1_v1
+FROM gcr.io/google_containers/spark-base:latest
 ADD start.sh /start.sh
 CMD ["/start.sh"]

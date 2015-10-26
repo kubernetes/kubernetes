@@ -14,11 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-. /start-common.sh
+PROJECT_ID=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id)
 
-echo "$(hostname -i) spark-master" >> /etc/hosts
-export SPARK_LOCAL_HOSTNAME=spark-master
-export SPARK_MASTER_IP=spark-master
+if [[ -n "${PROJECT_ID}" ]]; then
+  sed -i "s/NOT_RUNNING_INSIDE_GCE/${PROJECT_ID}/" /opt/spark/conf/core-site.xml
+fi
 
-/opt/spark/sbin/start-master.sh
-tail -F /opt/spark/logs/*
+# We don't want any of the incoming service variables, we'd rather use
+# DNS. But this one interferes directly with Spark.
+unset SPARK_MASTER_PORT
+
+# spark.{executor,driver}.extraLibraryPath don't actually seem to
+# work, this seems to be the only reliable way to get the native libs
+# picked up.
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/hadoop/lib/native
