@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// clone of the upstream cmd/hypercube/k8sm-mesos_scheduler.go
+// clone of the upstream cmd/hypercube/k8sm-scheduler.go
 package main
 
 import (
