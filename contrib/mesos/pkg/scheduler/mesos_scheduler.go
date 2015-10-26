@@ -70,7 +70,7 @@ type MesosScheduler struct {
 	// and the invoking the pod registry interfaces.
 	// In particular, changes to podtask.T objects are currently guarded by this lock.
 	*sync.RWMutex
-	podschedulers.PodScheduler
+	podScheduler podschedulers.PodScheduler
 
 	// Config related, write-once
 
@@ -127,7 +127,7 @@ func New(config Config) *MesosScheduler {
 		RWMutex:           new(sync.RWMutex),
 		executor:          config.Executor,
 		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
-		PodScheduler:      config.PodScheduler,
+		podScheduler:      config.PodScheduler,
 		client:            config.Client,
 		etcdClient:        config.EtcdClient,
 		failoverTimeout:   config.FailoverTimeout,
