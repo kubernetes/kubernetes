@@ -124,7 +124,7 @@ func ensureIPTablesMasqRule() error {
 	if err := exec.Command("iptables",
 		"-t", "nat",
 		"-C", "POSTROUTING",
-		"!", "-d", "10.0.0.0/8",
+		"!", "-d", "172.0.0.0/8",
 		"-m", "addrtype", "!", "--dst-type", "LOCAL",
 		"-j", "MASQUERADE").Run(); err == nil {
 		// The MASQUERADE rule exists
@@ -135,7 +135,7 @@ func ensureIPTablesMasqRule() error {
 	if err := exec.Command("iptables",
 		"-t", "nat",
 		"-A", "POSTROUTING",
-		"!", "-d", "10.0.0.0/8",
+		"!", "-d", "172.0.0.0/8",
 		"-m", "addrtype", "!", "--dst-type", "LOCAL",
 		"-j", "MASQUERADE").Run(); err != nil {
 		return err
