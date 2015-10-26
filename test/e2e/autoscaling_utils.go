@@ -231,17 +231,6 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
 	Failf("timeout waiting %v for pods size to be %d", timeout, desiredReplicas)
 }
 
-func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout time.Duration) {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		actual := rc.GetReplicas()
-		if desiredReplicas != actual {
-			Failf("Number of replicas has changed: expected %v, got %v", desiredReplicas, actual)
-		}
-		Logf("Number of replicas is as expected")
-	}
-	Logf("Number of replicas was stable over %v", timeout)
-}
-
 func (rc *ResourceConsumer) CleanUp() {
 	By(fmt.Sprintf("Removing consuming RC %s", rc.name))
 	rc.stopCPU <- 0
