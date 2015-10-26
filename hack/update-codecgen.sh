@@ -35,11 +35,11 @@ generated_files=$(
 
 # Build codecgen binary from Godeps.
 function cleanup {
-  rm -rf "${KUBE_ROOT}/codecgen_binary"
+  rm -f "${CODECGEN:-}"
 }
 trap cleanup EXIT
-godep go build -o codecgen_binary github.com/ugorji/go/codec/codecgen
 CODECGEN="${PWD}/codecgen_binary"
+godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
 for generated_file in ${generated_files}; do
   initial_dir=${PWD}
