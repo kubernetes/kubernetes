@@ -402,6 +402,10 @@ func (a genericAccessor) Annotations() map[string]string {
 }
 
 func (a genericAccessor) SetAnnotations(annotations map[string]string) {
+	if a.annotations == nil {
+		emptyAnnotations := make(map[string]string)
+		a.annotations = &emptyAnnotations
+	}
 	*a.annotations = annotations
 }
 
