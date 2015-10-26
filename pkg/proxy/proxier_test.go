@@ -34,6 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
+const (
+	udpIdleTimeoutForTest = 250 * time.Millisecond
+)
+
 func joinHostPort(host string, port int) string {
 	return net.JoinHostPort(host, fmt.Sprintf("%d", port))
 }
@@ -206,7 +210,7 @@ func TestTCPProxy(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +237,7 @@ func TestUDPProxy(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +269,7 @@ func TestMultiPortProxy(t *testing.T) {
 		}},
 	}})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +296,7 @@ func TestMultiPortOnUpdate(t *testing.T) {
 	serviceQ := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "q"}
 	serviceX := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "x"}
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +359,7 @@ func TestTCPProxyStop(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +403,7 @@ func TestUDPProxyStop(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +441,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +478,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +515,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -563,7 +567,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -615,7 +619,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,7 +667,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -708,7 +712,7 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -760,7 +764,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 		},
 	})
 
-	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, udpIdleTimeoutForTest)
 	if err != nil {
 		t.Fatal(err)
 	}
