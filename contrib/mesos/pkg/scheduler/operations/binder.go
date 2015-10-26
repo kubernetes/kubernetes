@@ -29,12 +29,12 @@ import (
 )
 
 type Binder struct {
-	api schedapi.SchedulerApi
+	scheduler schedapi.Scheduler
 }
 
-func NewBinder(api schedapi.SchedulerApi) *Binder {
+func NewBinder(scheduler schedapi.Scheduler) *Binder {
 	return &Binder{
-		api: api,
+		scheduler: scheduler,
 	}
 }
 
@@ -49,10 +49,10 @@ func (b *Binder) Bind(binding *api.Binding) error {
 		return err
 	}
 
-	b.api.Lock()
-	defer b.api.Unlock()
+	b.scheduler.Lock()
+	defer b.scheduler.Unlock()
 
-	switch task, state := b.api.Tasks().ForPod(podKey); state {
+	switch task, state := b.scheduler.Tasks().ForPod(podKey); state {
 	case podtask.StatePending:
 		return b.bind(ctx, binding, task)
 	default:
@@ -66,7 +66,7 @@ func (b *Binder) Bind(binding *api.Binding) error {
 func (b *Binder) rollback(task *podtask.T, err error) error {
 	task.Offer.Release()
 	task.Reset()
-	if err2 := b.api.Tasks().Update(task); err2 != nil {
+	if err2 := b.scheduler.Tasks().Update(task); err2 != nil {
 		log.Errorf("failed to update pod task: %v", err2)
 	}
 	return err
@@ -88,7 +88,7 @@ func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 
 	// By this time, there is a chance that the slave is disconnected.
 	offerId := task.GetOfferId()
-	if offer, ok := b.api.Offers().Get(offerId); !ok || offer.HasExpired() {
+	if offer, ok := b.scheduler.Offers().Get(offerId); !ok || offer.HasExpired() {
 		// already rescinded or timed out or otherwise invalidated
 		return b.rollback(task, fmt.Errorf("failed prior to launchTask due to expired offer for task %v", task.ID))
 	}
@@ -96,10 +96,10 @@ func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
 		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\", cpu %.2f, mem %.2f MB",
 			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.CPU, task.Spec.Memory)
-		if err = b.api.LaunchTask(task); err == nil {
-			b.api.Offers().Invalidate(offerId)
+		if err = b.scheduler.LaunchTask(task); err == nil {
+			b.scheduler.Offers().Invalidate(offerId)
 			task.Set(podtask.Launched)
-			if err = b.api.Tasks().Update(task); err != nil {
+			if err = b.scheduler.Tasks().Update(task); err != nil {
 				// this should only happen if the task has been removed or has changed status,
 				// which SHOULD NOT HAPPEN as long as we're synchronizing correctly
 				log.Errorf("failed to update task w/ Launched status: %v", err)

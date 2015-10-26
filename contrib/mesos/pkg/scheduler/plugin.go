@@ -28,10 +28,10 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
@@ -102,7 +102,7 @@ func (k *mesosSchedulerApiAdapter) LaunchTask(task *podtask.T) error {
 
 // k8smSchedulingAlgorithm implements the algorithm.ScheduleAlgorithm interface
 type schedulerApiAlgorithmAdapter struct {
-	api        schedapi.SchedulerApi
+	scheduler  schedapi.Scheduler
 	podUpdates queue.FIFO
 }
 
@@ -118,10 +118,10 @@ func (k *schedulerApiAlgorithmAdapter) Schedule(pod *api.Pod, unused algorithm.N
 		return "", err
 	}
 
-	k.api.Lock()
-	defer k.api.Unlock()
+	k.scheduler.Lock()
+	defer k.scheduler.Unlock()
 
-	switch task, state := k.api.Tasks().ForPod(podKey); state {
+	switch task, state := k.scheduler.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		// There's a bit of a potential race here, a pod could have been yielded() and
 		// then before we get *here* it could be deleted.
@@ -136,7 +136,7 @@ func (k *schedulerApiAlgorithmAdapter) Schedule(pod *api.Pod, unused algorithm.N
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
 			return "", merrors.NoSuchPodErr
 		}
-		return k.doSchedule(k.api.Tasks().Register(k.api.CreatePodTask(ctx, pod)))
+		return k.doSchedule(k.scheduler.Tasks().Register(k.scheduler.CreatePodTask(ctx, pod)))
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
 	//we knew previously, we should probably update the task.Pod state here
@@ -166,19 +166,19 @@ func (k *schedulerApiAlgorithmAdapter) doSchedule(task *podtask.T, err error) (s
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table
 		offerId := task.GetOfferId()
-		if offer, ok := k.api.Offers().Get(offerId); ok && !offer.HasExpired() {
+		if offer, ok := k.scheduler.Offers().Get(offerId); ok && !offer.HasExpired() {
 			// skip tasks that have already have assigned offers
 			offer = task.Offer
 		} else {
 			task.Offer.Release()
 			task.Reset()
-			if err = k.api.Tasks().Update(task); err != nil {
+			if err = k.scheduler.Tasks().Update(task); err != nil {
 				return "", err
 			}
 		}
 	}
 	if err == nil && offer == nil {
-		offer, err = k.api.PodScheduler().SchedulePod(k.api.Offers(), k.api, task)
+		offer, err = k.scheduler.PodScheduler().SchedulePod(k.scheduler.Offers(), k.scheduler, task)
 	}
 	if err != nil {
 		return "", err
@@ -188,10 +188,10 @@ func (k *schedulerApiAlgorithmAdapter) doSchedule(task *podtask.T, err error) (s
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
 	slaveId := details.GetSlaveId().GetValue()
-	if slaveHostName := k.api.SlaveHostNameFor(slaveId); slaveHostName == "" {
+	if slaveHostName := k.scheduler.SlaveHostNameFor(slaveId); slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
-		k.api.Offers().Invalidate(details.Id.GetValue())
+		k.scheduler.Offers().Invalidate(details.Id.GetValue())
 		return "", fmt.Errorf("Slave disappeared (%v) while scheduling task %v", slaveId, task.ID)
 	} else {
 		if task.Offer != nil && task.Offer != offer {
@@ -199,9 +199,9 @@ func (k *schedulerApiAlgorithmAdapter) doSchedule(task *podtask.T, err error) (s
 		}
 
 		task.Offer = offer
-		k.api.PodScheduler().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
+		k.scheduler.PodScheduler().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
 
-		if err := k.api.Tasks().Update(task); err != nil {
+		if err := k.scheduler.Tasks().Update(task); err != nil {
 			offer.Release()
 			return "", err
 		}
@@ -210,9 +210,9 @@ func (k *schedulerApiAlgorithmAdapter) doSchedule(task *podtask.T, err error) (s
 }
 
 type errorHandler struct {
-	api     schedapi.SchedulerApi
-	backoff *backoff.Backoff
-	qr      *queuer.Queuer
+	scheduler schedapi.Scheduler
+	backoff   *backoff.Backoff
+	qr        *queuer.Queuer
 }
 
 // implementation of scheduling plugin's Error func; see plugin/pkg/scheduler
@@ -235,10 +235,10 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 	}
 
 	k.backoff.GC()
-	k.api.Lock()
-	defer k.api.Unlock()
+	k.scheduler.Lock()
+	defer k.scheduler.Unlock()
 
-	switch task, state := k.api.Tasks().ForPod(podKey); state {
+	switch task, state := k.scheduler.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		// if we don't have a mapping here any more then someone deleted the pod
 		log.V(2).Infof("Could not resolve pod to task, aborting pod reschdule: %s", podKey)
@@ -252,16 +252,16 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 		breakoutEarly := queue.BreakChan(nil)
 		if schedulingErr == podschedulers.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
-			breakoutEarly = queue.BreakChan(k.api.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
-				k.api.Lock()
-				defer k.api.Unlock()
-				switch task, state := k.api.Tasks().Get(task.ID); state {
+			breakoutEarly = queue.BreakChan(k.scheduler.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
+				k.scheduler.Lock()
+				defer k.scheduler.Unlock()
+				switch task, state := k.scheduler.Tasks().Get(task.ID); state {
 				case podtask.StatePending:
 					// Assess fitness of pod with the current offer. The scheduler normally
 					// "backs off" when it can't find an offer that matches up with a pod.
 					// The backoff period for a pod can terminate sooner if an offer becomes
 					// available that matches up.
-					return !task.Has(podtask.Launched) && k.api.PodScheduler().FitPredicate()(task, offer, nil)
+					return !task.Has(podtask.Launched) && k.scheduler.PodScheduler().FitPredicate()(task, offer, nil)
 				default:
 					// no point in continuing to check for matching offers
 					return true
@@ -279,31 +279,31 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 
 type PluginConfig struct {
 	*plugin.Config
-	api      schedapi.SchedulerApi
-	client   *client.Client
-	qr       *queuer.Queuer
-	deleter  *operations.Deleter
-	starting chan struct{} // startup latch
+	scheduler schedapi.Scheduler
+	client    *client.Client
+	qr        *queuer.Queuer
+	deleter   *operations.Deleter
+	starting  chan struct{} // startup latch
 }
 
 func NewPlugin(c *PluginConfig) PluginInterface {
 	return &schedulerPlugin{
-		config:   c.Config,
-		api:      c.api,
-		client:   c.client,
-		qr:       c.qr,
-		deleter:  c.deleter,
-		starting: c.starting,
+		config:    c.Config,
+		scheduler: c.scheduler,
+		client:    c.client,
+		qr:        c.qr,
+		deleter:   c.deleter,
+		starting:  c.starting,
 	}
 }
 
 type schedulerPlugin struct {
-	config   *plugin.Config
-	api      schedapi.SchedulerApi
-	client   *client.Client
-	qr       *queuer.Queuer
-	deleter  *operations.Deleter
-	starting chan struct{}
+	config    *plugin.Config
+	scheduler schedapi.Scheduler
+	client    *client.Client
+	qr        *queuer.Queuer
+	deleter   *operations.Deleter
+	starting  chan struct{}
 }
 
 func (s *schedulerPlugin) Run(done <-chan struct{}) {
@@ -391,10 +391,10 @@ func (s *schedulerPlugin) reconcileTask(t *podtask.T) {
 				return
 			}
 
-			s.api.Lock()
-			defer s.api.Unlock()
+			s.scheduler.Lock()
+			defer s.scheduler.Unlock()
 
-			if _, state := s.api.Tasks().ForPod(podKey); state != podtask.StateUnknown {
+			if _, state := s.scheduler.Tasks().ForPod(podKey); state != podtask.StateUnknown {
 				//TODO(jdef) reconcile the task
 				log.Errorf("task already registered for pod %v", pod.Name)
 				return

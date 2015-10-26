@@ -41,10 +41,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/util"
@@ -809,7 +809,7 @@ func TestPlugin_LifeCycle(t *testing.T) {
 
 	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
 	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
-		t, _ := lt.plugin.api.Tasks().ForPod(podKey)
+		t, _ := lt.plugin.scheduler.Tasks().ForPod(podKey)
 		return t == nil
 	})
 
