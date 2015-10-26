@@ -283,6 +283,7 @@ token-auth-file
 ttl-secs
 type-src
 udp-port
+udp-timeout
 unix-socket
 update-period
 upgrade-target
