@@ -3,6 +3,14 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
+---
+
+# WARNING:
+
+## This document is outdated. It is superseded by [the horizontal pod autoscaler design doc](../design/horizontal-pod-autoscaler.md).
+
+---
+
 ## Abstract
 
 Auto-scaling is a data-driven feature that allows users to increase or decrease capacity as needed by controlling the
