@@ -110,28 +110,31 @@ func TestStreamSurvivesPanic(t *testing.T) {
 }
 
 func TestStreamClosedDuringRead(t *testing.T) {
-	ch := make(chan struct{})
-	input := "some random text"
-	errs := &errorReader{
-		reads: [][]byte{
-			[]byte("some random"),
-			[]byte(" text"),
-		},
-		err:   fmt.Errorf("stuff"),
-		pause: ch,
-	}
-	r := NewReader(errs, false)
+	for i := 0; i < 25; i++ {
+		ch := make(chan struct{})
+		input := "some random text"
+		errs := &errorReader{
+			reads: [][]byte{
+				[]byte("some random"),
+				[]byte(" text"),
+			},
+			err:   fmt.Errorf("stuff"),
+			pause: ch,
+		}
+		r := NewReader(errs, false)
 
-	data, err := readWebSocket(r, t, func(c *websocket.Conn) {
-		c.Close()
-		time.Sleep(time.Millisecond)
-		close(ch)
-	})
-	if !reflect.DeepEqual(data, []byte(input)) {
-		t.Errorf("unexpected server read: %v", data)
-	}
-	if err == nil || !strings.Contains(err.Error(), "use of closed network connection") {
-		t.Fatal(err)
+		data, err := readWebSocket(r, t, func(c *websocket.Conn) {
+			c.Close()
+			close(ch)
+		})
+		// verify that the data returned by the server on an early close always has a specific error
+		if err == nil || !strings.Contains(err.Error(), "use of closed network connection") {
+			t.Fatal(err)
+		}
+		// verify that the data returned is a strict subset of the input
+		if !bytes.HasPrefix([]byte(input), data) && len(data) != 0 {
+			t.Fatalf("unexpected server read: %q", string(data))
+		}
 	}
 }
 
