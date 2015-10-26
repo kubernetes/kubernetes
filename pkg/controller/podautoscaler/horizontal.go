@@ -160,6 +160,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		CurrentReplicas:                 currentReplicas,
 		DesiredReplicas:                 desiredReplicas,
 		CurrentCPUUtilizationPercentage: currentUtilization,
+		LastScaleTime:                   hpa.Status.LastScaleTime,
 	}
 	if rescale {
 		now := unversioned.NewTime(now)
