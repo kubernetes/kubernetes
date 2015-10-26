@@ -74,9 +74,7 @@ func (deploymentStrategy) AllowUnconditionalUpdate() bool {
 
 // DeploymentToSelectableFields returns a field set that represents the object.
 func DeploymentToSelectableFields(deployment *extensions.Deployment) fields.Set {
-	return fields.Set{
-		"metadata.name": deployment.Name,
-	}
+	return generic.ObjectMetaFieldsSet(deployment.ObjectMeta)
 }
 
 // MatchDeployment is the filter used by the generic etcd backend to route

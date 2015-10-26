@@ -27,7 +27,7 @@ import (
 )
 
 func getIngressResourceName() string {
-	return "ingress"
+	return "ingresses"
 }
 
 func TestListIngress(t *testing.T) {

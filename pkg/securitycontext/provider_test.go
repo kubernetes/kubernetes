@@ -179,18 +179,34 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	supplementalGroupsSC.SupplementalGroups = []int64{2222}
 	supplementalGroupHC := fullValidHostConfig()
 	supplementalGroupHC.GroupAdd = []string{"2222"}
+	fsGroupHC := fullValidHostConfig()
+	fsGroupHC.GroupAdd = []string{"1234"}
+	bothHC := fullValidHostConfig()
+	bothHC.GroupAdd = []string{"2222", "1234"}
+	fsGroup := int64(1234)
 
 	testCases := map[string]struct {
 		securityContext *api.PodSecurityContext
 		expected        *docker.HostConfig
 	}{
-		"nil Security Context": {
+		"nil": {
 			securityContext: nil,
 			expected:        fullValidHostConfig(),
 		},
-		"Security Context with SupplementalGroup": {
+		"SupplementalGroup": {
 			securityContext: supplementalGroupsSC,
 			expected:        supplementalGroupHC,
+		},
+		"FSGroup": {
+			securityContext: &api.PodSecurityContext{FSGroup: &fsGroup},
+			expected:        fsGroupHC,
+		},
+		"FSGroup + SupplementalGroups": {
+			securityContext: &api.PodSecurityContext{
+				SupplementalGroups: []int64{2222},
+				FSGroup:            &fsGroup,
+			},
+			expected: bothHC,
 		},
 	}
 

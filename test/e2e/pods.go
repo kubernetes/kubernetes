@@ -304,7 +304,8 @@ var _ = Describe("Pods", func() {
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 		w, err := podClient.Watch(
-			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(), pods.ListMeta.ResourceVersion)
+			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(),
+			api.ListOptions{ResourceVersion: pods.ListMeta.ResourceVersion})
 		if err != nil {
 			Failf("Failed to set up watch: %v", err)
 		}

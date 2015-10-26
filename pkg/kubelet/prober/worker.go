@@ -24,7 +24,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -164,10 +163,9 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return true
 	}
 
-	// TODO: Move error handling out of prober.
-	result, _ := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
-	if result != probe.Unknown {
-		w.resultsManager.Set(w.containerID, result != probe.Failure, w.pod)
+	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
+	if err == nil {
+		w.resultsManager.Set(w.containerID, result, w.pod)
 	}
 
 	return true

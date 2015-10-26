@@ -192,6 +192,10 @@ type rbdBuilder struct {
 
 var _ volume.Builder = &rbdBuilder{}
 
+func (_ *rbdBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *rbdBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }

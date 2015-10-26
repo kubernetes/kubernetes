@@ -200,7 +200,7 @@ var _ = Describe("DaemonRestart", func() {
 
 		// These tests require SSH
 		// TODO(11834): Enable this test in GKE once experimental API there is switched on
-		SkipUnlessProviderIs("gce")
+		SkipUnlessProviderIs("gce", "aws")
 		framework.beforeEach()
 		ns = framework.Namespace.Name
 
@@ -225,7 +225,8 @@ var _ = Describe("DaemonRestart", func() {
 					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
 				},
 				WatchFunc: func(rv string) (watch.Interface, error) {
-					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), rv)
+					options := api.ListOptions{ResourceVersion: rv}
+					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), options)
 				},
 			},
 			&api.Pod{},

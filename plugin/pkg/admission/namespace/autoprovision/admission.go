@@ -88,7 +88,8 @@ func NewProvision(c client.Interface) admission.Interface {
 				return c.Namespaces().List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return c.Namespaces().Watch(labels.Everything(), fields.Everything(), resourceVersion)
+				options := api.ListOptions{ResourceVersion: resourceVersion}
+				return c.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Namespace{},

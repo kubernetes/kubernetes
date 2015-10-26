@@ -58,6 +58,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -99,8 +100,8 @@ type CMServer struct {
 
 	Master       string
 	Kubeconfig   string
-	KubeApiQps   float32
-	KubeApiBurst int
+	KubeAPIQPS   float32
+	KubeAPIBurst int
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -131,10 +132,31 @@ func NewCMServer() *CMServer {
 			PersistentVolumeRecyclerMinimumTimeoutHostPath:   60,
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 		},
-		KubeApiQps:   20.0,
-		KubeApiBurst: 30,
+		KubeAPIQPS:   20.0,
+		KubeAPIBurst: 30,
 	}
 	return &s
+}
+
+// NewControllerManagerCommand creates a *cobra.Command object with default parameters
+func NewControllerManagerCommand() *cobra.Command {
+	s := NewCMServer()
+	s.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use: "kube-controller-manager",
+		Long: `The Kubernetes controller manager is a daemon that embeds
+the core control loops shipped with Kubernetes. In applications of robotics and
+automation, a control loop is a non-terminating loop that regulates the state of
+the system. In Kubernetes, a controller is a control loop that watches the shared
+state of the cluster through the apiserver and makes changes attempting to move the
+current state towards the desired state. Examples of controllers that ship with
+Kubernetes today are the replication controller, endpoints controller, namespace
+controller, and serviceaccounts controller.`,
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+
+	return cmd
 }
 
 // VolumeConfigFlags is used to bind CLI flags to variables.  This top-level struct contains *all* enumerated
@@ -197,11 +219,11 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
-	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
-func (s *CMServer) resyncPeriod() time.Duration {
+func (s *CMServer) ResyncPeriod() time.Duration {
 	factor := rand.Float64() + 1
 	return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
 }
@@ -222,8 +244,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	// Override kubeconfig qps/burst settings from flags
-	kubeconfig.QPS = s.KubeApiQps
-	kubeconfig.Burst = s.KubeApiBurst
+	kubeconfig.QPS = s.KubeAPIQPS
+	kubeconfig.Burst = s.KubeAPIBurst
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
@@ -247,14 +269,14 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	go endpointcontroller.NewEndpointController(kubeClient, s.resyncPeriod).
+	go endpointcontroller.NewEndpointController(kubeClient, s.ResyncPeriod).
 		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	go replicationcontroller.NewReplicationManager(kubeClient, s.resyncPeriod, replicationcontroller.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(kubeClient, s.ResyncPeriod, replicationcontroller.BurstReplicas).
 		Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go gc.New(kubeClient, s.resyncPeriod, s.TerminatedPodGCThreshold).
+		go gc.New(kubeClient, s.ResyncPeriod, s.TerminatedPodGCThreshold).
 			Run(util.NeverStop)
 	}
 
@@ -313,13 +335,13 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
+			go daemon.NewDaemonSetsController(kubeClient, s.ResyncPeriod).
 				Run(s.ConcurrentDSCSyncs, util.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(kubeClient, s.resyncPeriod).
+			go job.NewJobController(kubeClient, s.ResyncPeriod).
 				Run(s.ConcurrentJobSyncs, util.NeverStop)
 		}
 

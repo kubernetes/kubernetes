@@ -111,6 +111,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expvalidation.ValidateJob(t)
+	case *extensions.Ingress:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expvalidation.ValidateIngress(t)
 	case *extensions.DaemonSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
@@ -222,6 +227,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
 			"job":         &extensions.Job{},
+			"ingress":     &extensions.Ingress{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
@@ -348,6 +354,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"spark-master":            &api.Pod{},
 			"spark-worker-controller": &api.ReplicationController{},
 			"spark-driver":            &api.Pod{},
+		},
+		"../examples/spark/spark-gluster": {
+			"spark-master-service":    &api.Service{},
+			"spark-master-controller": &api.ReplicationController{},
+			"spark-worker-controller": &api.ReplicationController{},
+			"glusterfs-endpoints":     &api.Endpoints{},
 		},
 		"../examples/storm": {
 			"storm-nimbus-service":    &api.Service{},

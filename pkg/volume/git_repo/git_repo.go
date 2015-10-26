@@ -109,6 +109,10 @@ type gitRepoVolumeBuilder struct {
 
 var _ volume.Builder = &gitRepoVolumeBuilder{}
 
+func (_ *gitRepoVolumeBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 // SetUp creates new directory and clones a git repo.
 func (b *gitRepoVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())

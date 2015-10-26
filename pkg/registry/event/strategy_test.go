@@ -42,7 +42,10 @@ func testEvent(name string) *api.Event {
 
 func TestGetAttrs(t *testing.T) {
 	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "f0118"},
+		ObjectMeta: api.ObjectMeta{
+			Name:      "f0118",
+			Namespace: "default",
+		},
 		InvolvedObject: api.ObjectReference{
 			Kind:            "Pod",
 			Name:            "foo",
@@ -64,6 +67,7 @@ func TestGetAttrs(t *testing.T) {
 	}
 	expect := fields.Set{
 		"metadata.name":                  "f0118",
+		"metadata.namespace":             "default",
 		"involvedObject.kind":            "Pod",
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",

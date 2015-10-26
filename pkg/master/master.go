@@ -1033,7 +1033,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // experimental returns the resources and codec for the experimental api
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	// All resources except these are disabled by default.
-	enabledResources := utilsets.NewString("jobs", "horizontalpodautoscalers", "ingress")
+	enabledResources := utilsets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
 	resourceOverrides := m.apiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
@@ -1049,7 +1049,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 
 	storage := map[string]rest.Storage{}
 	if isEnabled("horizontalpodautoscalers") {
-		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizonalpodautoscalers"))
+		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"))
 		storage["horizontalpodautoscalers"] = autoscalerStorage
 		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
 		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.get("", "replicationControllers"))
@@ -1088,10 +1088,10 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		storage["jobs"] = jobStorage
 		storage["jobs/status"] = jobStatusStorage
 	}
-	if isEnabled("ingress") {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingress"))
-		storage["ingress"] = ingressStorage
-		storage["ingress/status"] = ingressStatusStorage
+	if isEnabled("ingresses") {
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"))
+		storage["ingresses"] = ingressStorage
+		storage["ingresses/status"] = ingressStatusStorage
 	}
 
 	extensionsGroup := latest.GroupOrDie("extensions")

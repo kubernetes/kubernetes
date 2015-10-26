@@ -173,6 +173,25 @@ func TestRequestVersionedParams(t *testing.T) {
 	}
 }
 
+func TestRequestVersionedParamsFromListOptions(t *testing.T) {
+	r := &Request{apiVersion: "v1"}
+	r.VersionedParams(&api.ListOptions{ResourceVersion: "1"}, api.Scheme)
+	if !reflect.DeepEqual(r.params, url.Values{
+		"resourceVersion": []string{"1"},
+	}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+
+	var timeout int64 = 10
+	r.VersionedParams(&api.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, api.Scheme)
+	if !reflect.DeepEqual(r.params, url.Values{
+		"resourceVersion": []string{"1", "2"},
+		"timeoutSeconds":  []string{"10"},
+	}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+}
+
 func TestRequestURI(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
 	r.Prefix("other")

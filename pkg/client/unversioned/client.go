@@ -196,7 +196,7 @@ func (c *Client) SwaggerSchema(groupVersion string) (*swagger.ApiDeclaration, er
 	if err != nil {
 		return nil, err
 	}
-	groupVersions := extractGroupVersions(groupList)
+	groupVersions := ExtractGroupVersions(groupList)
 	// This check also takes care the case that kubectl is newer than the running endpoint
 	if stringDoesntExistIn(groupVersion, groupVersions) {
 		return nil, fmt.Errorf("API version: %s is not supported by the server. Use one of: %v", groupVersion, groupVersions)

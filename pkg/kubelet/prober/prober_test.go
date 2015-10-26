@@ -18,11 +18,13 @@ package prober
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -163,210 +165,84 @@ func TestGetTCPAddrParts(t *testing.T) {
 	}
 }
 
-// TestProbeContainer tests the functionality of probeContainer.
-// Test cases are:
-//
-// No probe.
-// Only LivenessProbe.
-// Only ReadinessProbe.
-// Both probes.
-//
-// Also, for each probe, there will be several cases covering whether the initial
-// delay has passed, whether the probe handler will return Success, Failure,
-// Unknown or error.
-//
-// PLEASE READ THE PROBE DOCS BEFORE CHANGING THIS TEST IF YOU ARE UNSURE HOW PROBES ARE SUPPOSED TO WORK:
-// (See https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/user-guide/pod-states.md#pod-conditions)
-func TestProbeContainer(t *testing.T) {
+func TestProbe(t *testing.T) {
 	prober := &prober{
 		refManager: kubecontainer.NewRefManager(),
 		recorder:   &record.FakeRecorder{},
 	}
 	containerID := kubecontainer.ContainerID{"test", "foobar"}
 
+	execProbe := &api.Probe{
+		Handler: api.Handler{
+			Exec: &api.ExecAction{},
+		},
+	}
 	tests := []struct {
-		testContainer     api.Container
-		expectError       bool
-		expectedLiveness  probe.Result
-		expectedReadiness probe.Result
+		probe          *api.Probe
+		execError      bool
+		expectError    bool
+		execResult     probe.Result
+		expectedResult results.Result
 	}{
-		// No probes.
-		{
-			testContainer:     api.Container{},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
+		{ // No probe
+			probe:          nil,
+			expectedResult: results.Success,
 		},
-		// Only LivenessProbe. expectedReadiness should always be true here.
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{},
-			},
-			expectedLiveness:  probe.Unknown,
-			expectedReadiness: probe.Success,
+		{ // No handler
+			probe:          &api.Probe{},
+			expectError:    true,
+			expectedResult: results.Failure,
 		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Failure,
-			expectedReadiness: probe.Success,
+		{ // Probe fails
+			probe:          execProbe,
+			execResult:     probe.Failure,
+			expectedResult: results.Failure,
 		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
+		{ // Probe succeeds
+			probe:          execProbe,
+			execResult:     probe.Success,
+			expectedResult: results.Success,
 		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Unknown,
-			expectedReadiness: probe.Success,
+		{ // Probe result is unknown
+			probe:          execProbe,
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
 		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectError:       true,
-			expectedLiveness:  probe.Unknown,
-			expectedReadiness: probe.Success,
-		},
-		// // Only ReadinessProbe. expectedLiveness should always be probe.Success here.
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectError:       false,
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
-		},
-		// Both LivenessProbe and ReadinessProbe.
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{},
-				ReadinessProbe: &api.Probe{},
-			},
-			expectedLiveness:  probe.Unknown,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-				ReadinessProbe: &api.Probe{},
-			},
-			expectedLiveness:  probe.Failure,
-			expectedReadiness: probe.Unknown,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-				ReadinessProbe: &api.Probe{
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedLiveness:  probe.Success,
-			expectedReadiness: probe.Success,
+		{ // Probe has an error
+			probe:          execProbe,
+			execError:      true,
+			expectError:    true,
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
 		},
 	}
 
 	for i, test := range tests {
-		if test.expectError {
-			prober.exec = fakeExecProber{test.expectedLiveness, errors.New("exec error")}
-		} else {
-			prober.exec = fakeExecProber{test.expectedLiveness, nil}
-		}
+		for _, probeType := range [...]probeType{liveness, readiness} {
+			testID := fmt.Sprintf("%d-%s", i, probeType)
+			testContainer := api.Container{}
+			switch probeType {
+			case liveness:
+				testContainer.LivenessProbe = test.probe
+			case readiness:
+				testContainer.ReadinessProbe = test.probe
+			}
+			if test.execError {
+				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
+			} else {
+				prober.exec = fakeExecProber{test.execResult, nil}
+			}
 
-		liveness, err := prober.probeLiveness(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID)
-		if test.expectError && err == nil {
-			t.Errorf("[%d] Expected liveness probe error but no error was returned.", i)
-		}
-		if !test.expectError && err != nil {
-			t.Errorf("[%d] Didn't expect liveness probe error but got: %v", i, err)
-		}
-		if test.expectedLiveness != liveness {
-			t.Errorf("[%d] Expected liveness result to be %v but was %v", i, test.expectedLiveness, liveness)
-		}
-
-		// TODO: Test readiness errors
-		prober.exec = fakeExecProber{test.expectedReadiness, nil}
-		readiness, err := prober.probeReadiness(&api.Pod{}, api.PodStatus{}, test.testContainer, containerID)
-		if err != nil {
-			t.Errorf("[%d] Unexpected readiness probe error: %v", i, err)
-		}
-		if test.expectedReadiness != readiness {
-			t.Errorf("[%d] Expected readiness result to be %v but was %v", i, test.expectedReadiness, readiness)
+			result, err := prober.probe(probeType, &api.Pod{}, api.PodStatus{}, testContainer, containerID)
+			if test.expectError && err == nil {
+				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
+			}
+			if test.expectedResult != result {
+				t.Errorf("[%s] Expected result to be %v but was %v", testID, test.expectedResult, result)
+			}
 		}
 	}
 }

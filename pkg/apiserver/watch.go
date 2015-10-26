@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"math/rand"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -66,12 +65,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch handles serving requests to the server
-func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, minRequestTimeout time.Duration) {
-	var timeout time.Duration
-	if minRequestTimeout > 0 {
-		// Each watch gets a random timeout between minRequestTimeout and 2*minRequestTimeout to avoid thundering herds.
-		timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
-	}
+func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, timeout time.Duration) {
 	watchServer := &WatchServer{watcher, scope.Codec, func(obj runtime.Object) {
 		if err := setSelfLink(obj, req, scope.Namer); err != nil {
 			glog.V(5).Infof("Failed to set self link for object %v: %v", reflect.TypeOf(obj), err)

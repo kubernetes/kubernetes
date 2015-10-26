@@ -91,6 +91,9 @@ export INSTANCE_PREFIX=k8s
 ...
 ```
 
+The scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_MINIONS}`, in particular for clusters less than 50 nodes it will
+use a `t2.micro` for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with greater than 150 nodes it will use a `t2.medium`.
+
 It will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
 If these already exist, make sure you want them to be used here.
 

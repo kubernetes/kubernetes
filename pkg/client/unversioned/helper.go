@@ -187,7 +187,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	return nil
 }
 
-func extractGroupVersions(l *unversioned.APIGroupList) []string {
+func ExtractGroupVersions(l *unversioned.APIGroupList) []string {
 	var groupVersions []string
 	for _, g := range l.Groups {
 		for _, gv := range g.Versions {
@@ -241,7 +241,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
-	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+	groupVersions = append(groupVersions, ExtractGroupVersions(&apiGroupList)...)
 
 	return groupVersions, nil
 }
@@ -630,4 +630,13 @@ func DefaultKubernetesUserAgent() string {
 	seg := strings.SplitN(version, "-", 2)
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
+}
+
+// TimeoutFromListOptions returns timeout to be set via TimeoutSeconds() method
+// based on given options.
+func TimeoutFromListOptions(options api.ListOptions) time.Duration {
+	if options.TimeoutSeconds != nil {
+		return time.Duration(*options.TimeoutSeconds) * time.Second
+	}
+	return 0
 }

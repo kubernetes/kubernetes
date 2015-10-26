@@ -52,6 +52,8 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/chmod"
+	"k8s.io/kubernetes/pkg/util/chown"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -59,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -144,8 +147,8 @@ type KubeletServer struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
-	KubeApiQps   float32
-	KubeApiBurst int
+	KubeAPIQPS   float32
+	KubeAPIBurst int
 
 	// Pull images one at a time.
 	SerializeImagePulls bool
@@ -188,8 +191,6 @@ func NewKubeletServer() *KubeletServer {
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
-		KubeApiQps:                  5.0,
-		KubeApiBurst:                10,
 		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		LowDiskSpaceThresholdMB:     256,
 		MasterServiceNamespace:      api.NamespaceDefault,
@@ -204,7 +205,6 @@ func NewKubeletServer() *KubeletServer {
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
 		Port:                ports.KubeletPort,
 		ReadOnlyPort:        ports.KubeletReadOnlyPort,
-		ReconcileCIDR:       true,
 		RegisterNode:        true, // will be ignored if no apiserver is configured
 		RegisterSchedulable: true,
 		RegistryBurst:       10,
@@ -214,7 +214,40 @@ func NewKubeletServer() *KubeletServer {
 		RootDirectory:       defaultRootDir,
 		SyncFrequency:       10 * time.Second,
 		SystemContainer:     "",
+		ReconcileCIDR:       true,
+		KubeAPIQPS:          5.0,
+		KubeAPIBurst:        10,
 	}
+}
+
+// NewKubeletCommand creates a *cobra.Command object with default parameters
+func NewKubeletCommand() *cobra.Command {
+	s := NewKubeletServer()
+	s.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use: "kubelet",
+		Long: `The kubelet is the primary "node agent" that runs on each
+node. The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
+that describes a pod. The kubelet takes a set of PodSpecs that are provided through
+various mechanisms (primarily through the apiserver) and ensures that the containers
+described in those PodSpecs are running and healthy.
+
+Other than from an PodSpec from the apiserver, there are three ways that a container
+manifest can be provided to the Kubelet.
+
+File: Path passed as a flag on the command line. This file is rechecked every 20
+seconds (configurable with a flag).
+
+HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
+is checked every 20 seconds (also configurable with a flag).
+
+HTTP server: The kubelet can also listen for HTTP and respond to a simple API
+(underspec'd currently) to submit a new manifest.`,
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
@@ -293,8 +326,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", 1000000, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
-	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 }
 
@@ -323,6 +356,9 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		mounter = mount.NewNsenterMounter()
 		writer = &io.NsenterWriter{}
 	}
+
+	chmodRunner := chmod.New()
+	chownRunner := chown.New()
 
 	tlsOptions, err := s.InitializeTLS()
 	if err != nil {
@@ -397,6 +433,8 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		MaxPods:                   s.MaxPods,
 		MinimumGCAge:              s.MinimumGCAge,
 		Mounter:                   mounter,
+		ChownRunner:               chownRunner,
+		ChmodRunner:               chmodRunner,
 		NetworkPluginName:         s.NetworkPluginName,
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
@@ -594,8 +632,8 @@ func (s *KubeletServer) CreateAPIServerClientConfig() (*client.Config, error) {
 	}
 
 	// Override kubeconfig qps/burst settings from flags
-	clientConfig.QPS = s.KubeApiQps
-	clientConfig.Burst = s.KubeApiBurst
+	clientConfig.QPS = s.KubeAPIQPS
+	clientConfig.Burst = s.KubeAPIBurst
 
 	s.addChaosToClientConfig(clientConfig)
 	return clientConfig, nil
@@ -666,6 +704,8 @@ func SimpleKubelet(client *client.Client,
 		MaxPods:                   maxPods,
 		MinimumGCAge:              minimumGCAge,
 		Mounter:                   mount.New(),
+		ChownRunner:               chown.New(),
+		ChmodRunner:               chmod.New(),
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
 		OSInterface:               osInterface,
@@ -849,6 +889,8 @@ type KubeletConfig struct {
 	MaxPods                        int
 	MinimumGCAge                   time.Duration
 	Mounter                        mount.Interface
+	ChownRunner                    chown.Interface
+	ChmodRunner                    chmod.Interface
 	NetworkPluginName              string
 	NetworkPlugins                 []network.NetworkPlugin
 	NodeName                       string
@@ -945,6 +987,8 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,
+		kc.ChownRunner,
+		kc.ChmodRunner,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
