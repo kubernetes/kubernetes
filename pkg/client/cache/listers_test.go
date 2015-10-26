@@ -142,9 +142,11 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 		if err != nil && c.expectErr {
 			continue
 		} else if c.expectErr {
-			t.Fatalf("Expected error, got none")
+			t.Error("Expected error, got none")
+			continue
 		} else if err != nil {
-			t.Fatalf("Unexpected error %#v", err)
+			t.Errorf("Unexpected error %#v", err)
+			continue
 		}
 		gotNames := make([]string, len(gotControllers))
 		for ix := range gotControllers {
@@ -264,9 +266,11 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		if err != nil && c.expectErr {
 			continue
 		} else if c.expectErr {
-			t.Fatalf("Expected error, got none")
+			t.Error("Expected error, got none")
+			continue
 		} else if err != nil {
-			t.Fatalf("Unexpected error %#v", err)
+			t.Errorf("Unexpected error %#v", err)
+			continue
 		}
 		daemonSetNames := make([]string, len(daemonSets))
 		for ix := range daemonSets {
@@ -491,7 +495,7 @@ func TestStoreToPodLister(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if exists {
-		t.Errorf("Unexpected pod exists")
+		t.Error("Unexpected pod exists")
 	}
 }
 
