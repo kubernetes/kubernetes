@@ -1,8 +1,9 @@
 all: push
 
 # To bump the Spark version, bump the version in base/Dockerfile, bump
-# this tag, and bump the uses of this tag in
-# worker/master/driver.
+# this tag and reset to v1. You should also double check the native
+# Hadoop libs at that point (we grab the 2.6.1 libs, which are
+# appropriate for 1.5.1-with-2.6).
 TAG = 1.5.1_v1
 
 containers:
