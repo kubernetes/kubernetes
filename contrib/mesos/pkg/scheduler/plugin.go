@@ -65,7 +65,7 @@ type mesosSchedulerApiAdapter struct {
 	mesosScheduler *MesosScheduler
 }
 
-func (k *mesosSchedulerApiAdapter) Algorithm() podschedulers.PodScheduler {
+func (k *mesosSchedulerApiAdapter) PodScheduler() podschedulers.PodScheduler {
 	return k.mesosScheduler.podScheduler
 }
 
@@ -178,7 +178,7 @@ func (k *schedulerApiAlgorithmAdapter) doSchedule(task *podtask.T, err error) (s
 		}
 	}
 	if err == nil && offer == nil {
-		offer, err = k.api.Algorithm().SchedulePod(k.api.Offers(), k.api, task)
+		offer, err = k.api.PodScheduler().SchedulePod(k.api.Offers(), k.api, task)
 	}
 	if err != nil {
 		return "", err
@@ -199,7 +199,7 @@ func (k *schedulerApiAlgorithmAdapter) doSchedule(task *podtask.T, err error) (s
 		}
 
 		task.Offer = offer
-		k.api.Algorithm().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
+		k.api.PodScheduler().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
 
 		if err := k.api.Tasks().Update(task); err != nil {
 			offer.Release()
@@ -261,7 +261,7 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 					// "backs off" when it can't find an offer that matches up with a pod.
 					// The backoff period for a pod can terminate sooner if an offer becomes
 					// available that matches up.
-					return !task.Has(podtask.Launched) && k.api.Algorithm().FitPredicate()(task, offer, nil)
+					return !task.Has(podtask.Launched) && k.api.PodScheduler().FitPredicate()(task, offer, nil)
 				default:
 					// no point in continuing to check for matching offers
 					return true

@@ -30,16 +30,14 @@ type SchedulerApi interface {
 	sync.Locker // synchronize scheduler plugin operations
 
 	podschedulers.SlaveIndex
-	Algorithm() podschedulers.PodScheduler
+	PodScheduler() podschedulers.PodScheduler
 	Offers() offers.Registry
 	Tasks() podtask.Registry
 
 	// driver calls
-
 	KillTask(taskId string) error
 	LaunchTask(*podtask.T) error
 
 	// convenience
-
 	CreatePodTask(api.Context, *api.Pod) (*podtask.T, error)
 }
