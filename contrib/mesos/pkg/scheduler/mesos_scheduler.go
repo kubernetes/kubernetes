@@ -939,11 +939,8 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 	scheduler := &mesosSchedulerApiAdapter{mesosScheduler: k}
 	q := queuer.New(podUpdates)
 	podDeleter := operations.NewDeleter(scheduler, q)
-	eh := &errorHandler{
-		scheduler: scheduler,
-		backoff:   backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration),
-		qr:        q,
-	}
+	bo := backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration)
+	eh := operations.NewErrorHandler(scheduler, bo, q)
 	startLatch := make(chan struct{})
 	eventBroadcaster := record.NewBroadcaster()
 	runtime.On(startLatch, func() {
@@ -964,7 +961,7 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 			},
 			Binder:   operations.NewBinder(scheduler),
 			NextPod:  q.Yield,
-			Error:    eh.handleSchedulingError,
+			Error:    eh.Error,
 			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
 		},
 		scheduler: scheduler,
