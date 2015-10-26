@@ -126,6 +126,7 @@ GKE_DEFAULT_SKIP_TESTS=(
 # Tests which cannot be run on AWS.
 AWS_REQUIRED_SKIP_TESTS=(
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "GCE\sL7\sLoadBalancer\sController" # GCE L7 loadbalancing
 )
 
 # The following tests are known to be flaky, and are thus run only in their own
@@ -149,6 +150,11 @@ GCE_FLAKY_TESTS=(
 # comments below, and for poorly implemented tests, please quote the
 # issue number tracking speed improvements.
 GCE_SLOW_TESTS=(
+    # Before enabling this loadbalancer test in any other test list you must
+    # make sure the associated project has enough quota. At the time of this
+    # writing a GCE project is allowed 3 backend services by default. This
+    # test requires at least 5.
+    "GCE\sL7\sLoadBalancer\sController"               # 10 min,       file: ingress.go,              slow by design
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
     "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
@@ -159,6 +165,7 @@ GCE_SLOW_TESTS=(
 GCE_PARALLEL_SKIP_TESTS=(
     "Etcd"
     "NetworkingNew"
+    "GCE\sL7\sLoadBalancer\sController" # TODO: This cannot run in parallel with other L4 tests till quota has been bumped up.
     "Nodes\sNetwork"
     "Nodes\sResize"
     "MaxPods"

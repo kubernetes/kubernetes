@@ -195,7 +195,7 @@ func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
 	return wait.Poll(pollInterval, serviceRespondingTimeout, func() (bool, error) {
-		body, err := simpleGET(httpClient, url)
+		body, err := simpleGET(httpClient, url, "")
 		if err != nil {
 			Logf("%v\n%v\n%v", url, body, err)
 			return false, nil
@@ -245,8 +245,13 @@ var _ = Describe("ServiceLoadBalancer", func() {
 })
 
 // simpleGET executes a get on the given url, returns error if non-200 returned.
-func simpleGET(c *http.Client, url string) (string, error) {
-	res, err := c.Get(url)
+func simpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
 	if err != nil {
 		return "", err
 	}

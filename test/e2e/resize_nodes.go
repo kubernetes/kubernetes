@@ -41,6 +41,7 @@ const (
 	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:1.1"
 	resizeNodeReadyTimeout    = 2 * time.Minute
 	resizeNodeNotReadyTimeout = 2 * time.Minute
+	testPort                  = 9376
 )
 
 func resizeGroup(size int) error {
@@ -111,25 +112,26 @@ func waitForGroupSize(size int) error {
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
 }
 
-func svcByName(name string) *api.Service {
+func svcByName(name string, port int) *api.Service {
 	return &api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name: "test-service",
+			Name: name,
 		},
 		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
 			Selector: map[string]string{
 				"name": name,
 			},
 			Ports: []api.ServicePort{{
-				Port:       9376,
-				TargetPort: util.NewIntOrStringFromInt(9376),
+				Port:       port,
+				TargetPort: util.NewIntOrStringFromInt(port),
 			}},
 		},
 	}
 }
 
 func newSVCByName(c *client.Client, ns, name string) error {
-	_, err := c.Services(ns).Create(svcByName(name))
+	_, err := c.Services(ns).Create(svcByName(name, testPort))
 	return err
 }
 
