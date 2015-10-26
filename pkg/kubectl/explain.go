@@ -41,11 +41,10 @@ func GetSwaggerSchema(apiVer string, kubeClient client.Interface) (*swagger.ApiD
 }
 
 // SplitAndParseResourceRequest separates the users input into a model and fields
-func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, string, []string, error) {
+func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
 	inResource, fieldsPath := splitDotNotation(inResource)
-	group, inResource := splitGroupFromResource(inResource)
 	inResource, _ = mapper.ResourceSingularizer(expandResourceShortcut(inResource))
-	return group, inResource, fieldsPath, nil
+	return inResource, fieldsPath, nil
 }
 
 // PrintModelDescription prints the description of a specific model or dot path
@@ -84,15 +83,6 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 		}
 	}
 	return printModelInfo(w, pointedModel, pointedModelAsProp)
-}
-
-func splitGroupFromResource(resource string) (string, string) {
-	seg := strings.SplitN(resource, "/", 2)
-	if len(seg) == 1 {
-		return "", seg[0]
-	} else {
-		return seg[0], seg[1]
-	}
 }
 
 func splitDotNotation(model string) (string, []string) {
