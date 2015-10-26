@@ -19,6 +19,7 @@ package etcd
 import (
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/atomic"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -42,6 +42,23 @@ const (
 	EtcdDelete = "delete"
 	EtcdExpire = "expire"
 )
+
+// HighWaterMark is a thread-safe object for tracking the maximum value seen
+// for some quantity.
+type HighWaterMark int64
+
+// Update returns true if and only if 'current' is the highest value ever seen.
+func (hwm *HighWaterMark) Update(current int64) bool {
+	for {
+		old := atomic.LoadInt64((*int64)(hwm))
+		if current <= old {
+			return false
+		}
+		if atomic.CompareAndSwapInt64((*int64)(hwm), old, current) {
+			return true
+		}
+	}
+}
 
 // TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(runtime.Object) (runtime.Object, error)
@@ -170,7 +187,7 @@ func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming
 }
 
 var (
-	watchChannelHWM atomic.HighWaterMark
+	watchChannelHWM HighWaterMark
 )
 
 // translate pulls stuff from etcd, converts, and pushes out the outgoing channel. Meant to be
@@ -215,7 +232,7 @@ func (w *etcdWatcher) translate() {
 			return
 		case res, ok := <-w.etcdIncoming:
 			if ok {
-				if curLen := int64(len(w.etcdIncoming)); watchChannelHWM.Check(curLen) {
+				if curLen := int64(len(w.etcdIncoming)); watchChannelHWM.Update(curLen) {
 					// Monitor if this gets backed up, and how much.
 					glog.V(2).Infof("watch: %v objects queued in channel.", curLen)
 				}

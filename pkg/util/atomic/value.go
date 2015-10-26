@@ -18,7 +18,6 @@ package atomic
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 // TODO(ArtfulCoder)
