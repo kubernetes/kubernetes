@@ -18,18 +18,14 @@ package scheduler
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	log "github.com/golang/glog"
-	mesos "github.com/mesos/mesos-go/mesosproto"
-	mutil "github.com/mesos/mesos-go/mesosutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
@@ -55,46 +51,6 @@ type PluginInterface interface {
 
 	// execute the Scheduling plugin, should start a go routine and return immediately
 	Run(<-chan struct{})
-}
-
-type mesosSchedulerApiAdapter struct {
-	sync.Mutex
-	mesosScheduler *MesosScheduler
-}
-
-func (k *mesosSchedulerApiAdapter) PodScheduler() podschedulers.PodScheduler {
-	return k.mesosScheduler.podScheduler
-}
-
-func (k *mesosSchedulerApiAdapter) Offers() offers.Registry {
-	return k.mesosScheduler.offers
-}
-
-func (k *mesosSchedulerApiAdapter) Tasks() podtask.Registry {
-	return k.mesosScheduler.taskRegistry
-}
-
-func (k *mesosSchedulerApiAdapter) CreatePodTask(ctx api.Context, pod *api.Pod) (*podtask.T, error) {
-	return podtask.New(ctx, "", *pod, k.mesosScheduler.executor)
-}
-
-func (k *mesosSchedulerApiAdapter) SlaveHostNameFor(id string) string {
-	return k.mesosScheduler.slaveHostNames.HostName(id)
-}
-
-func (k *mesosSchedulerApiAdapter) KillTask(taskId string) error {
-	killTaskId := mutil.NewTaskID(taskId)
-	_, err := k.mesosScheduler.driver.KillTask(killTaskId)
-	return err
-}
-
-func (k *mesosSchedulerApiAdapter) LaunchTask(task *podtask.T) error {
-	// assume caller is holding scheduler lock
-	taskList := []*mesos.TaskInfo{task.BuildTaskInfo()}
-	offerIds := []*mesos.OfferID{task.Offer.Details().Id}
-	filters := &mesos.Filters{}
-	_, err := k.mesosScheduler.driver.LaunchTasks(offerIds, taskList, filters)
-	return err
 }
 
 // k8smSchedulingAlgorithm implements the algorithm.ScheduleAlgorithm interface

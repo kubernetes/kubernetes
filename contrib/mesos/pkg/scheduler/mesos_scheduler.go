@@ -937,7 +937,7 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 	// lock that guards critial sections that involve transferring pods from
 	// the store (cache) to the scheduling queue; its purpose is to maintain
 	// an ordering (vs interleaving) of operations that's easier to reason about.
-	scheduler := &mesosSchedulerApiAdapter{mesosScheduler: k}
+	scheduler := &mesosFramework{mesosScheduler: k}
 	q := queuer.New(podUpdates)
 	podDeleter := operations.NewDeleter(scheduler, q)
 	bo := backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration)
