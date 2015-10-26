@@ -499,6 +499,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -563,7 +571,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_list_or_watch_objects_of_kind_ingress">list or watch objects of kind Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/extensions/v1beta1/ingress</pre>
+<pre>GET /apis/extensions/v1beta1/ingresses</pre>
 </div>
 </div>
 <div class="sect3">
@@ -626,6 +634,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -757,6 +773,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -884,6 +908,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1674,7 +1706,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_list_or_watch_objects_of_kind_ingress_2">list or watch objects of kind Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/extensions/v1beta1/namespaces/{namespace}/ingress</pre>
+<pre>GET /apis/extensions/v1beta1/namespaces/{namespace}/ingresses</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1737,6 +1769,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1811,7 +1851,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_create_a_ingress">create a Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>POST /apis/extensions/v1beta1/namespaces/{namespace}/ingress</pre>
+<pre>POST /apis/extensions/v1beta1/namespaces/{namespace}/ingresses</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1924,7 +1964,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_read_the_specified_ingress">read the specified Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}</pre>
+<pre>GET /apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2037,7 +2077,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_replace_the_specified_ingress">replace the specified Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}</pre>
+<pre>PUT /apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2158,7 +2198,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_delete_a_ingress">delete a Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>DELETE /apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}</pre>
+<pre>DELETE /apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2279,7 +2319,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_partially_update_the_specified_ingress">partially update the specified Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PATCH /apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}</pre>
+<pre>PATCH /apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2406,7 +2446,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_replace_status_of_the_specified_ingress">replace status of the specified Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}/status</pre>
+<pre>PUT /apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}/status</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2590,6 +2630,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -3806,6 +3854,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -3870,7 +3926,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_watch_individual_changes_to_a_list_of_ingress">watch individual changes to a list of Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/extensions/v1beta1/watch/ingress</pre>
+<pre>GET /apis/extensions/v1beta1/watch/ingresses</pre>
 </div>
 </div>
 <div class="sect3">
@@ -3933,6 +3989,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4064,6 +4128,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -4191,6 +4263,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4331,6 +4411,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
@@ -4410,7 +4498,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_watch_individual_changes_to_a_list_of_ingress_2">watch individual changes to a list of Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/extensions/v1beta1/watch/namespaces/{namespace}/ingress</pre>
+<pre>GET /apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses</pre>
 </div>
 </div>
 <div class="sect3">
@@ -4473,6 +4561,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4547,7 +4643,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_watch_changes_to_an_object_of_kind_ingress">watch changes to an object of kind Ingress</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/extensions/v1beta1/watch/namespaces/{namespace}/ingress/{name}</pre>
+<pre>GET /apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -4610,6 +4706,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4758,6 +4862,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
@@ -4895,6 +5007,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ref</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
@@ -4975,7 +5095,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-10-22 20:40:01 UTC
+Last updated 2015-10-26 09:18:25 UTC
 </div>
 </div>
 </body>
