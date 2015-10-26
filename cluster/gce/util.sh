@@ -502,6 +502,10 @@ function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
 }
 
+function write-network-provider-gw-env {
+  build-kube-env false "${KUBE_TEMP}/network-provider-gw-env.yaml"
+}
+
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.
 #
@@ -761,6 +765,16 @@ function kube-up {
       sleep 2
   done
 
+  if [ "$NETWORK_PROVIDER" == opencontrail ] && [ "$NETWORK_PROVIDER_GATEWAY_ON_MINION" != true ]; then
+     echo -e "\nCreating $NETWORK_PROVIDER gateway"
+
+     NETWORK_PROVIDER_GW_RESERVED_IP=$(gcloud compute addresses create "${NETWORK_PROVIDER_GATEWAY_NAME}-ip" \
+                                  --project "${PROJECT}" \
+                                  --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
+
+     create-network-provider-gw "${NETWORK_PROVIDER_GW_RESERVED_IP}" &
+  fi
+
   echo "Kubernetes cluster created."
 
   export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
@@ -781,7 +795,6 @@ function kube-up {
   echo
   echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
   echo
-
 }
 
 # Delete a kubernetes cluster. This is called from test-teardown.
@@ -863,14 +876,12 @@ function kube-down {
   fi
 
   # Delete disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    if gcloud compute disks describe "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-      gcloud compute disks delete \
+  if gcloud compute disks describe "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+     gcloud compute disks delete \
         --project "${PROJECT}" \
         --quiet \
         --zone "${ZONE}" \
         "${CLUSTER_REGISTRY_DISK}"
-    fi
   fi
 
   # Find out what minions are running.
@@ -890,6 +901,28 @@ function kube-down {
       "${minions[@]::10}"
     minions=( "${minions[@]:10}" )
   done
+
+  if [ "$NETWORK_PROVIDER" == opencontrail ]; then
+    # Delete network-provider-gateway
+    if gcloud compute instances describe "${NETWORK_PROVIDER_GATEWAY_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+       gcloud compute instances delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --delete-disks all \
+      --zone "${ZONE}" \
+      "${NETWORK_PROVIDER_GATEWAY_NAME}"
+    fi
+
+    # Delete network-provider-gateway's reserved IP
+    local REGION=${ZONE%-*}
+    if gcloud compute addresses describe "${NETWORK_PROVIDER_GATEWAY_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
+       gcloud compute addresses delete \
+      --project "${PROJECT}" \
+      --region "${REGION}" \
+      --quiet \
+      "${NETWORK_PROVIDER_GATEWAY_NAME}-ip"
+    fi
+  fi
 
   # Delete firewall rule for the master.
   if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
@@ -917,6 +950,18 @@ function kube-down {
   local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
     --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
+  while (( "${#routes[@]}" > 0 )); do
+    echo Deleting routes "${routes[*]::10}"
+    gcloud compute routes delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${routes[@]::10}"
+    routes=( "${routes[@]:10}" )
+  done
+
+  # Delete route for network-provider-gateway
+  routes=( $(gcloud compute routes list --project "${PROJECT}" \
+           | awk 'NR >= 2 { print $1 }' | grep ip-) )
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
     gcloud compute routes delete \

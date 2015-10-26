@@ -31,7 +31,7 @@
   {% set proxy_ssh_options = proxy_ssh_options + "                                        " -%}
 {% endif -%}
 
-{% set address = "--address=127.0.0.1" -%}
+{% set address = "--address=0.0.0.0" -%}
 
 {% set cluster_name = "" -%}
 {% if pillar['instance_prefix'] is defined -%}

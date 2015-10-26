@@ -40,6 +40,10 @@ network_provider: '$(echo "$NETWORK_PROVIDER")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW")'
+kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
+dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
+network_provider_gw_on_minion: '$(echo "$NETWORK_PROVIDER_GATEWAY_ON_MINION")'
 num_nodes: $(echo "${NUM_MINIONS}")
 EOF
 

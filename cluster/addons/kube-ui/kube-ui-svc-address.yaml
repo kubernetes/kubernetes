@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-ui-public
+  namespace: kube-system
+  labels:
+    k8s-app: kube-ui
+    kubernetes.io/name: "KubeUI"
+spec:
+  selector:
+    k8s-app: kube-ui
+  externalIPs: [ 10.1.4.80 ]
+  ports:
+  - port: 80
+    targetPort: 8080

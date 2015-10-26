@@ -550,11 +550,13 @@ function kube::build::run_build_command() {
 
   local -ra docker_cmd=(
     "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
-
+  
+  set -x
   # Clean up container from any previous run
   kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
   "${docker_cmd[@]}" "$@"
   kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
+  set +x
 }
 
 # Test if the output directory is remote (and can only be accessed through

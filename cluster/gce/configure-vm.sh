@@ -281,6 +281,10 @@ network_provider: '$(echo "$NETWORK_PROVIDER")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW")'
+kube_ui_public: '$(echo "$KUBE_UI_IP_PUBLIC")'
+dns_server_public: '$(echo "$DNS_SERVER_IP_PUBLIC")'
+network_provider_gw_on_minion: '$(echo "$NETWORK_PROVIDER_GATEWAY_ON_MINION")'
 enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
@@ -580,6 +584,7 @@ EOF
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   kubelet_api_servers: '${KUBELET_APISERVER}'
   cbr-cidr: 10.123.45.0/30
+  network_provider: '${NETWORK_PROVIDER}'
 EOF
   else
     # If the kubelet is running disconnected from a master, give it a fixed
@@ -603,6 +608,18 @@ grains:
   cbr-cidr: 10.123.45.0/30
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
+  network_provider: '${NETWORK_PROVIDER}'
+EOF
+}
+
+function salt-network-provider-gw-role() {
+  cat <<EOF >/etc/salt/minion.d/grains.conf
+grains:
+  roles:
+    - kubernetes-network-provider-gateway
+  cloud: gce
+  api_servers: '${KUBERNETES_MASTER_NAME}'
+  network_provider: '${NETWORK_PROVIDER}'
 EOF
 }
 
@@ -629,6 +646,8 @@ function configure-salt() {
     if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
         salt-apiserver-timeout-grain $KUBE_APISERVER_REQUEST_TIMEOUT
     fi
+  elif [[ "${KUBERNETES_MASTER}" == "false" ]] && [[ "${KUBERNETES_NETWORK_PROVIDER_GATEWAY}" ==  "true" ]]; then
+     salt-network-provider-gw-role
   else
     salt-node-role
     salt-docker-opts

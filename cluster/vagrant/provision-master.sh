@@ -132,6 +132,10 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
   opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/'/''/g")'
   opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
+  service_cluster_ip_gw: '$(echo "$SERVICE_CLUSTER_IP_GW" | sed -e "s/'/''/g")'
+  kube_ui_ip_public: '$(echo "$KUBE_UI_IP_PUBLIC" | sed -e "s/'/''/g")'
+  dns_server_ip_public: '$(echo "$DNS_SERVER_IP_PUBLIC" | sed -e "s/'/''/g")'
+  network_provider_gw_on_minion: '$(echo "$NETWORK_PROVIDER_GATEWAY_ON_MINION" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master

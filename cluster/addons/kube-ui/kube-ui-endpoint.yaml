@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    k8s-app: kube-ui
+    kubernetes.io/name: KubeUI
+  name: kube-ui
+  namespace: kube-system
+subsets:
+- addresses:
+  - ip: 10.1.4.80
+  ports:
+  - port: 8080
+    protocol: TCP
