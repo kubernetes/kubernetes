@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package types
 
 import (
 	"sync"
@@ -25,8 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// scheduler abstraction to allow for easier unit testing
-type Scheduler interface {
+// Framework abstracts everything other components of the scheduler need from
+// the actual MesosScheduler implementation.
+type Framework interface {
 	sync.Locker // synchronize scheduler plugin operations
 
 	podschedulers.SlaveIndex

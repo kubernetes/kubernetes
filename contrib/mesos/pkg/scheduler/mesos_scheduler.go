@@ -957,7 +957,7 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 		Config: &plugin.Config{
 			NodeLister: nil,
 			Algorithm: &schedulerApiAlgorithmAdapter{
-				scheduler:  scheduler,
+				fw:         scheduler,
 				podUpdates: podUpdates,
 			},
 			Binder:   operations.NewBinder(scheduler),
@@ -965,10 +965,10 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 			Error:    eh.Error,
 			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
 		},
-		scheduler: scheduler,
-		client:    k.client,
-		qr:        q,
-		deleter:   podDeleter,
-		starting:  startLatch,
+		fw:       scheduler,
+		client:   k.client,
+		qr:       q,
+		deleter:  podDeleter,
+		starting: startLatch,
 	}
 }

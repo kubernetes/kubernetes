@@ -22,22 +22,22 @@ import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	schedapi "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/api"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
+	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 type Deleter struct {
-	scheduler schedapi.Scheduler
-	qr        *queuer.Queuer
+	fw types.Framework
+	qr *queuer.Queuer
 }
 
-func NewDeleter(scheduler schedapi.Scheduler, qr *queuer.Queuer) *Deleter {
+func NewDeleter(fw types.Framework, qr *queuer.Queuer) *Deleter {
 	return &Deleter{
-		scheduler: scheduler,
-		qr:        qr,
+		fw: fw,
+		qr: qr,
 	}
 }
 
@@ -72,8 +72,8 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	// removing the pod from the scheduling queue. this makes the concurrent
 	// execution of scheduler-error-handling and delete-handling easier to
 	// reason about.
-	k.scheduler.Lock()
-	defer k.scheduler.Unlock()
+	k.fw.Lock()
+	defer k.fw.Unlock()
 
 	// prevent the scheduler from attempting to pop this; it's also possible that
 	// it's concurrently being scheduled (somewhere between pod scheduling and
@@ -81,7 +81,7 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	// will abort Bind()ing
 	k.qr.Dequeue(pod.GetUID())
 
-	switch task, state := k.scheduler.Tasks().ForPod(podKey); state {
+	switch task, state := k.fw.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		log.V(2).Infof("Could not resolve pod '%s' to task id", podKey)
 		return merrors.NoSuchPodErr
@@ -96,11 +96,11 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 				task.Reset()
 				task.Set(podtask.Deleted)
 				//TODO(jdef) probably want better handling here
-				if err := k.scheduler.Tasks().Update(task); err != nil {
+				if err := k.fw.Tasks().Update(task); err != nil {
 					return err
 				}
 			}
-			k.scheduler.Tasks().Unregister(task)
+			k.fw.Tasks().Unregister(task)
 			return nil
 		}
 		fallthrough
@@ -108,10 +108,10 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	case podtask.StateRunning:
 		// signal to watchers that the related pod is going down
 		task.Set(podtask.Deleted)
-		if err := k.scheduler.Tasks().Update(task); err != nil {
+		if err := k.fw.Tasks().Update(task); err != nil {
 			log.Errorf("failed to update task w/ Deleted status: %v", err)
 		}
-		return k.scheduler.KillTask(task.ID)
+		return k.fw.KillTask(task.ID)
 
 	default:
 		log.Infof("cannot kill pod '%s': non-terminal task not found %v", podKey, task.ID)
