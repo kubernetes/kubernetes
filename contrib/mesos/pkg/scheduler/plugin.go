@@ -196,7 +196,7 @@ func (s *schedulerPlugin) Run(done <-chan struct{}) {
 	go runtime.Until(s.scheduleOne, pluginRecoveryDelay, done)
 }
 
-// hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/mesos_scheduler.go,
+// hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/scheduler.go,
 // with the Modeler stuff removed since we don't use it because we have mesos.
 func (s *schedulerPlugin) scheduleOne() {
 	pod := s.config.NextPod()
