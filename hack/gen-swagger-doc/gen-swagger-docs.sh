@@ -25,8 +25,8 @@ echo $2
 
 cd /build/
 
-wget "$1" -O input.json
-wget "$2" -O register.go
+cp "$1" input.json
+cp "$2" register.go
 
 ./gradle-2.5/bin/gradle gendocs --info
 

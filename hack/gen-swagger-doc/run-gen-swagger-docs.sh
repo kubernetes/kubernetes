@@ -16,9 +16,14 @@
 
 if [ "$#" -lt 1 ]; then
     echo "Usage: run-gen-swagger-docs.sh <API version> <absolute output path, default to PWD>"
-    exit 
+    exit
 fi
 OUTPUT=${2:-${PWD}}
 
-docker run -v ${OUTPUT}:/output gcr.io/google_containers/gen-swagger-docs:v1 https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/api/swagger-spec/$1.json https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/pkg/api/$1/register.go
+KUBE_ROOT=$(realpath $(dirname "${BASH_SOURCE}")/../..)
+
+docker run \
+    -v ${OUTPUT}:/output \
+    -v ${KUBE_ROOT}:/kube \
+    gcr.io/google_containers/gen-swagger-docs:v1 /kube/api/swagger-spec/$1.json /kube/pkg/api/$1/register.go
 
