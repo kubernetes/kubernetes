@@ -2657,7 +2657,7 @@ func readyPodCondition(isPodReady bool, reason, message string) []api.PodConditi
 }
 
 // getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
-func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus) []api.PodCondition {
+func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, podPhase api.PodPhase) []api.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil {
 		return readyPodCondition(false, "UnknownContainerStatuses", "")
@@ -2673,6 +2673,12 @@ func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerSt
 			unknownContainers = append(unknownContainers, container.Name)
 		}
 	}
+
+	// In case of unexist unknowContainers, If pod has derminated successed and it has unreadyContainers, just return PodCompleted
+	if podPhase == api.PodSucceeded && len(unknownContainers) == 0 {
+		return readyPodCondition(false, fmt.Sprint("PodCompleted"), "")
+	}
+
 	unreadyMessages := []string{}
 	if len(unknownContainers) > 0 {
 		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unknown status: %s", unknownContainers))
@@ -2734,7 +2740,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	podStatus.Phase = GetPhase(spec, podStatus.ContainerStatuses)
 	kl.probeManager.UpdatePodStatus(pod.UID, podStatus)
 
-	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, podStatus.Phase)...)
 
 	if !kl.standaloneMode {
 		hostIP, err := kl.GetHostIP()

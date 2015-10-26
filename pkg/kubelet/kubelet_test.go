@@ -1875,16 +1875,19 @@ func TestGetPodReadyCondition(t *testing.T) {
 	tests := []struct {
 		spec              *api.PodSpec
 		containerStatuses []api.ContainerStatus
+		podPhase          api.PodPhase
 		expected          []api.PodCondition
 	}{
 		{
 			spec:              nil,
 			containerStatuses: nil,
+			podPhase:          api.PodRunning,
 			expected:          getReadyCondition(api.ConditionFalse, "UnknownContainerStatuses", ""),
 		},
 		{
 			spec:              &api.PodSpec{},
 			containerStatuses: []api.ContainerStatus{},
+			podPhase:          api.PodRunning,
 			expected:          getReadyCondition(api.ConditionTrue, "", ""),
 		},
 		{
@@ -1894,6 +1897,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 				},
 			},
 			containerStatuses: []api.ContainerStatus{},
+			podPhase:          api.PodRunning,
 			expected:          getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unknown status: [1234]"),
 		},
 		{
@@ -1907,6 +1911,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 				getReadyStatus("1234"),
 				getReadyStatus("5678"),
 			},
+			podPhase: api.PodRunning,
 			expected: getReadyCondition(api.ConditionTrue, "", ""),
 		},
 		{
@@ -1919,6 +1924,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 			containerStatuses: []api.ContainerStatus{
 				getReadyStatus("1234"),
 			},
+			podPhase: api.PodRunning,
 			expected: getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unknown status: [5678]"),
 		},
 		{
@@ -1932,12 +1938,25 @@ func TestGetPodReadyCondition(t *testing.T) {
 				getReadyStatus("1234"),
 				getNotReadyStatus("5678"),
 			},
+			podPhase: api.PodRunning,
 			expected: getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unready status: [5678]"),
+		},
+		{
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "1234"},
+				},
+			},
+			containerStatuses: []api.ContainerStatus{
+				getNotReadyStatus("1234"),
+			},
+			podPhase: api.PodSucceeded,
+			expected: getReadyCondition(api.ConditionFalse, "PodCompleted", ""),
 		},
 	}
 
 	for i, test := range tests {
-		condition := getPodReadyCondition(test.spec, test.containerStatuses)
+		condition := getPodReadyCondition(test.spec, test.containerStatuses, test.podPhase)
 		if !reflect.DeepEqual(condition, test.expected) {
 			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
 		}
