@@ -323,7 +323,11 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*api.Pod, error) {
 	nodeToDaemonPods := make(map[string][]*api.Pod)
-	daemonPods, err := dsc.podStore.Pods(ds.Namespace).List(labels.Set(ds.Spec.Selector).AsSelector())
+	selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	daemonPods, err := dsc.podStore.Pods(ds.Namespace).List(selector)
 	if err != nil {
 		return nodeToDaemonPods, err
 	}

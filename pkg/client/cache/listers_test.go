@@ -272,7 +272,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: map[string]string{"foo": "baz"},
+						Selector: &extensions.PodSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -311,13 +311,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: &extensions.PodSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: &extensions.PodSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
