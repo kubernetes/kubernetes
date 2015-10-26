@@ -216,9 +216,9 @@ func NewDockerManager(
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
-		dm.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, dm, imageBackOff)
+		dm.imagePuller = kubecontainer.NewSerializedImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
 	} else {
-		dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm, imageBackOff)
+		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
 	}
 	dm.containerGC = NewContainerGC(client, containerLogsDir)
 
@@ -766,15 +766,11 @@ func (dm *DockerManager) runContainer(
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
-		if ref != nil {
-			dm.recorder.Eventf(ref, "Failed", "Failed to create docker container with error: %v", err)
-		}
+		dm.recorder.Eventf(ref, "Failed", "Failed to create docker container with error: %v", err)
 		return kubecontainer.ContainerID{}, err
 	}
 
-	if ref != nil {
-		dm.recorder.Eventf(ref, "Created", "Created with docker id %v", util.ShortenString(dockerContainer.ID, 12))
-	}
+	dm.recorder.Eventf(ref, "Created", "Created with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
@@ -830,15 +826,11 @@ func (dm *DockerManager) runContainer(
 	securityContextProvider.ModifyHostConfig(pod, container, hc)
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
-		if ref != nil {
-			dm.recorder.Eventf(ref, "Failed",
-				"Failed to start with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
-		}
+		dm.recorder.Eventf(ref, "Failed",
+			"Failed to start with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
 	}
-	if ref != nil {
-		dm.recorder.Eventf(ref, "Started", "Started with docker id %v", util.ShortenString(dockerContainer.ID, 12))
-	}
+	dm.recorder.Eventf(ref, "Started", "Started with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 	return kubetypes.DockerID(dockerContainer.ID).ContainerID(), nil
 }
 
