@@ -18,49 +18,50 @@ package container
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/util"
 )
 
-// imagePuller pulls the image using Runtime.PullImage().
+type imagePullRequest struct {
+	spec        ImageSpec
+	container   *api.Container
+	pullSecrets []api.Secret
+	ref         *api.ObjectReference
+	returnChan  chan<- error
+}
+
+// serializedImagePuller pulls the image using Runtime.PullImage().
 // It will check the presence of the image, and report the 'image pulling',
 // 'image pulled' events correspondingly.
-type imagePuller struct {
-	recorder record.EventRecorder
-	runtime  Runtime
+type serializedImagePuller struct {
+	recorder     record.EventRecorder
+	runtime      Runtime
+	pullRequests chan *imagePullRequest
 }
 
 // enforce compatibility.
-var _ ImagePuller = &imagePuller{}
+var _ ImagePuller = &serializedImagePuller{}
 
-// NewImagePuller takes an event recorder and container runtime to create a
+// NewSerializedImagePuller takes an event recorder and container runtime to create a
 // image puller that wraps the container runtime's PullImage interface.
-func NewImagePuller(recorder record.EventRecorder, runtime Runtime) ImagePuller {
-	return &imagePuller{
-		recorder: recorder,
-		runtime:  runtime,
+// Pulls one image at a time.
+// Issue #10959 has the rationale behind serializing image pulls.
+func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime) ImagePuller {
+	imagePuller := &serializedImagePuller{
+		recorder:     recorder,
+		runtime:      runtime,
+		pullRequests: make(chan *imagePullRequest, 10),
 	}
-}
-
-// shouldPullImage returns whether we should pull an image according to
-// the presence and pull policy of the image.
-func shouldPullImage(container *api.Container, imagePresent bool) bool {
-	if container.ImagePullPolicy == api.PullNever {
-		return false
-	}
-
-	if container.ImagePullPolicy == api.PullAlways ||
-		(container.ImagePullPolicy == api.PullIfNotPresent && (!imagePresent)) {
-		return true
-	}
-
-	return false
+	go util.Until(imagePuller.pullImages, time.Second, util.NeverStop)
+	return imagePuller
 }
 
 // reportImagePull reports 'image pulling', 'image pulled' or 'image pulling failed' events.
-func (puller *imagePuller) reportImagePull(ref *api.ObjectReference, event string, image string, pullError error) {
+func (puller *serializedImagePuller) reportImagePull(ref *api.ObjectReference, event string, image string, pullError error) {
 	if ref == nil {
 		return
 	}
@@ -77,7 +78,7 @@ func (puller *imagePuller) reportImagePull(ref *api.ObjectReference, event strin
 }
 
 // PullImage pulls the image for the specified pod and container.
-func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
+func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
 	ref, err := GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -99,11 +100,26 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 		return nil
 	}
 
-	puller.reportImagePull(ref, "pulling", container.Image, nil)
-	if err := puller.runtime.PullImage(spec, pullSecrets); err != nil {
+	// enqueue image pull request and wait for response.
+	returnChan := make(chan error)
+	puller.pullRequests <- &imagePullRequest{
+		spec:        spec,
+		container:   container,
+		pullSecrets: pullSecrets,
+		ref:         ref,
+		returnChan:  returnChan,
+	}
+	if err := <-returnChan; err != nil {
 		puller.reportImagePull(ref, "failed", container.Image, err)
 		return err
 	}
 	puller.reportImagePull(ref, "pulled", container.Image, nil)
 	return nil
+}
+
+func (puller *serializedImagePuller) pullImages() {
+	for pullRequest := range puller.pullRequests {
+		puller.reportImagePull(pullRequest.ref, "pulling", pullRequest.container.Image, nil)
+		pullRequest.returnChan <- puller.runtime.PullImage(pullRequest.spec, pullRequest.pullSecrets)
+	}
 }

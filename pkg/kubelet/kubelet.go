@@ -178,7 +178,9 @@ func NewMainKubelet(
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
 	cpuCFSQuota bool,
-	daemonEndpoints *api.NodeDaemonEndpoints) (*Kubelet, error) {
+	daemonEndpoints *api.NodeDaemonEndpoints,
+	serializeImagePulls bool,
+) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -335,7 +337,10 @@ func NewMainKubelet(
 			dockerExecHandler,
 			oomAdjuster,
 			procFs,
-			klet.cpuCFSQuota)
+			klet.cpuCFSQuota,
+			serializeImagePulls,
+		)
+
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -348,7 +353,9 @@ func NewMainKubelet(
 			recorder,
 			containerRefManager,
 			readinessManager,
-			klet.volumeManager)
+			klet.volumeManager,
+			serializeImagePulls,
+		)
 		if err != nil {
 			return nil, err
 		}

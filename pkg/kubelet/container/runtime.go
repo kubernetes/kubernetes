@@ -50,6 +50,7 @@ type ImageSpec struct {
 
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.
+// Thread safety is required from implementations of this interface.
 type Runtime interface {
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)

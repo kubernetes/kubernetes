@@ -248,6 +248,7 @@ runtime-config
 scheduler-config
 schema-cache-dir
 secure-port
+serialize-image-pulls
 service-account-key-file
 service-account-lookup
 service-account-private-key-file
