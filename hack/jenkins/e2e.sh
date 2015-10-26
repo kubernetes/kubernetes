@@ -1022,7 +1022,7 @@ case ${JOB_NAME} in
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     NUM_MINIONS="6"
     MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-stadnard-8"
+    MINION_SIZE="n1-standard-8"
     KUBE_GCE_INSTANCE_PREFIX="kubemark500"
     E2E_ZONE="asia-east1-a"
     KUBEMARK_MASTER_SIZE="n1-standard-16"
