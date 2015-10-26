@@ -94,6 +94,11 @@ func (f *FakeCloud) ProviderName() string {
 	return ProviderName
 }
 
+// ScrubDNS filters DNS settings for pods.
+func (f *FakeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
+}
+
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
 // Actually it just returns f itself.
 func (f *FakeCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
