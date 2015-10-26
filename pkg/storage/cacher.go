@@ -351,8 +351,8 @@ func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 }
 
 // Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) Watch(resourceVersion string) (watch.Interface, error) {
-	version, err := ParseWatchResourceVersion(resourceVersion, lw.resourcePrefix)
+func (lw *cacherListerWatcher) Watch(options api.ListOptions) (watch.Interface, error) {
+	version, err := ParseWatchResourceVersion(options.ResourceVersion, lw.resourcePrefix)
 	if err != nil {
 		return nil, err
 	}

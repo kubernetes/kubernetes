@@ -213,8 +213,7 @@ func NewMainKubelet(
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: resourceVersion}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		}
@@ -231,8 +230,7 @@ func NewMainKubelet(
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: resourceVersion}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, options)
 			},
 		}

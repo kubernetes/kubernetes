@@ -144,8 +144,7 @@ func newPodStore(c *client.Client, namespace string, label labels.Selector, fiel
 		ListFunc: func() (runtime.Object, error) {
 			return c.Pods(namespace).List(label, field)
 		},
-		WatchFunc: func(rv string) (watch.Interface, error) {
-			options := api.ListOptions{ResourceVersion: rv}
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return c.Pods(namespace).Watch(label, field, options)
 		},
 	}

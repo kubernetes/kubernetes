@@ -152,8 +152,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 			ListFunc: func() (runtime.Object, error) {
 				return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: rv}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), options)
 			},
 		},

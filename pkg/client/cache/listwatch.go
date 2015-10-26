@@ -17,6 +17,9 @@ limitations under the License.
 package cache
 
 import (
+	"time"
+
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -27,7 +30,7 @@ import (
 type ListFunc func() (runtime.Object, error)
 
 // WatchFunc knows how to watch resources
-type WatchFunc func(resourceVersion string) (watch.Interface, error)
+type WatchFunc func(options api.ListOptions) (watch.Interface, error)
 
 // ListWatch knows how to list and watch a set of apiserver resources.  It satisfies the ListerWatcher interface.
 // It is a convenience function for users of NewReflector, etc.
@@ -52,15 +55,25 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 			Do().
 			Get()
 	}
-	watchFunc := func(resourceVersion string) (watch.Interface, error) {
+	watchFunc := func(options api.ListOptions) (watch.Interface, error) {
 		return c.Get().
 			Prefix("watch").
 			Namespace(namespace).
 			Resource(resource).
+			// TODO: Use VersionedParams once this is supported for non v1 API.
+			Param("resourceVersion", options.ResourceVersion).
+			TimeoutSeconds(timeoutFromListOptions(options)).
 			FieldsSelectorParam(fieldSelector).
-			Param("resourceVersion", resourceVersion).Watch()
+			Watch()
 	}
 	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
+}
+
+func timeoutFromListOptions(options api.ListOptions) time.Duration {
+	if options.TimeoutSeconds != nil {
+		return time.Duration(*options.TimeoutSeconds) * time.Second
+	}
+	return 0
 }
 
 // List a set of apiserver resources
@@ -69,6 +82,6 @@ func (lw *ListWatch) List() (runtime.Object, error) {
 }
 
 // Watch a set of apiserver resources
-func (lw *ListWatch) Watch(resourceVersion string) (watch.Interface, error) {
-	return lw.WatchFunc(resourceVersion)
+func (lw *ListWatch) Watch(options api.ListOptions) (watch.Interface, error) {
+	return lw.WatchFunc(options)
 }
