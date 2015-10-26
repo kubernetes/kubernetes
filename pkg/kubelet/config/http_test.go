@@ -149,11 +149,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				kubelet.HTTPSource,
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						UID:       "111",
-						Name:      "foo" + "-" + hostname,
-						Namespace: "mynamespace",
-
-						SelfLink: getSelfLink("foo-"+hostname, "mynamespace"),
+						UID:         "111",
+						Name:        "foo" + "-" + hostname,
+						Namespace:   "mynamespace",
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						SelfLink:    getSelfLink("foo-"+hostname, "mynamespace"),
 					},
 					Spec: api.PodSpec{
 						NodeName:      hostname,
@@ -202,11 +202,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				kubelet.HTTPSource,
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						UID:       "111",
-						Name:      "foo" + "-" + hostname,
-						Namespace: "default",
-
-						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
+						UID:         "111",
+						Name:        "foo" + "-" + hostname,
+						Namespace:   "default",
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						SelfLink:    getSelfLink("foo-"+hostname, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						NodeName:      hostname,
@@ -222,11 +222,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				},
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						UID:       "222",
-						Name:      "bar" + "-" + hostname,
-						Namespace: "default",
-
-						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
+						UID:         "222",
+						Name:        "bar" + "-" + hostname,
+						Namespace:   "default",
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
+						SelfLink:    getSelfLink("bar-"+hostname, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						NodeName:      hostname,
