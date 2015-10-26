@@ -279,7 +279,7 @@ function verify-cluster {
 
 # Instantiate a kubernetes cluster
 function kube-up {
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
   get-tokens
   create-provision-scripts
 

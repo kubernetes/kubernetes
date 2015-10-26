@@ -287,7 +287,7 @@ kube-up() {
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
   python2.7 $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
