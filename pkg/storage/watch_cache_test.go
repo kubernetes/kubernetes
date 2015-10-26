@@ -232,12 +232,12 @@ func TestEvents(t *testing.T) {
 
 type testLW struct {
 	ListFunc  func() (runtime.Object, error)
-	WatchFunc func(resourceVersion string) (watch.Interface, error)
+	WatchFunc func(options api.ListOptions) (watch.Interface, error)
 }
 
 func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
-func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
-	return t.WatchFunc(resourceVersion)
+func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
+	return t.WatchFunc(options)
 }
 
 func TestReflectorForWatchCache(t *testing.T) {
@@ -251,7 +251,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	}
 
 	lw := &testLW{
-		WatchFunc: func(rv string) (watch.Interface, error) {
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
 			go fw.Stop()
 			return fw, nil

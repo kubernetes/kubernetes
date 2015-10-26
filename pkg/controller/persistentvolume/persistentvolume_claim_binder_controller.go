@@ -58,8 +58,7 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.PersistentVolumes().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: resourceVersion}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
@@ -77,8 +76,7 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: resourceVersion}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
