@@ -1237,7 +1237,7 @@ func TestPrintDeployment(t *testing.T) {
 				},
 				Spec: extensions.DeploymentSpec{
 					Replicas: 5,
-					Template: &api.PodTemplateSpec{
+					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
 					},
 				},
