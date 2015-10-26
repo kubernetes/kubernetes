@@ -400,6 +400,16 @@ func TestCreateObj(t *testing.T) {
 	}
 }
 
+func TestCreateObjBadPath(t *testing.T) {
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	err := helper.CreateObj("/some/../key", obj, &api.Pod{}, 5)
+	if err == nil {
+		t.Error("Unexpected non error")
+	}
+}
+
 func TestCreateObjNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
@@ -443,6 +453,16 @@ func TestSetObjFailCAS(t *testing.T) {
 	fakeClient.CasErr = fakeClient.NewError(123)
 	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	err := helper.SetObj("/some/key", obj, nil, 5)
+	if err == nil {
+		t.Errorf("Expecting error.")
+	}
+}
+
+func TestSetObjFailBadPath(t *testing.T) {
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	err := helper.SetObj("/some/../key", obj, nil, 5)
 	if err == nil {
 		t.Errorf("Expecting error.")
 	}
@@ -736,6 +756,23 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
 	if err != nil {
 		t.Errorf("Unexpected error %v.", err)
+	}
+}
+
+func TestGuaranteedUpdateBadPath(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	f := SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		return obj, nil
+	})
+
+	ignoreNotFound := false
+	err := helper.GuaranteedUpdate("/some/../key", &TestResource{}, ignoreNotFound, f)
+	if err == nil {
+		t.Errorf("Expected error for key with bad path.")
 	}
 }
 
