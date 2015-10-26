@@ -37,7 +37,6 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
@@ -345,12 +344,4 @@ func (s *schedulerPlugin) reconcileTask(t *podtask.T) {
 		//and assume that our knowledge of the pod aligns with that of the apiserver
 		log.Error("pod reconciliation does not support updates; not yet implemented")
 	}
-}
-
-func parseSelectorOrDie(s string) fields.Selector {
-	selector, err := fields.ParseSelector(s)
-	if err != nil {
-		panic(err)
-	}
-	return selector
 }
