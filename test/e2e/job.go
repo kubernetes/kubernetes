@@ -84,7 +84,7 @@ var _ = Describe("Job", func() {
 		// Can't use the failOnce approach because that relies
 		// on an emptyDir, which is not preserved across new pods.
 		// Worst case analysis: 15 failures, each taking 1 minute to
-		// run doe to some slowness, 1 in 2^15 chance of happening,
+		// run due to some slowness, 1 in 2^15 chance of happening,
 		// causing test flake.  Should be very rare.
 		job := newTestJob("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
