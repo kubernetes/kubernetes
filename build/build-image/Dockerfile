@@ -35,11 +35,12 @@ RUN rm -rf /var/lib/apt/lists/
 RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
 
 # Download and symlink etcd.  We need this for our integration tests.
+ENV ETCD_VERSION v2.0.12
 RUN mkdir -p /usr/local/src/etcd &&\
     cd /usr/local/src/etcd &&\
-    curl -L -O -s https://github.com/coreos/etcd/releases/download/v2.0.0/etcd-v2.0.0-linux-amd64.tar.gz &&\
-    tar xzf etcd-v2.0.0-linux-amd64.tar.gz &&\
-    ln -s ../src/etcd/etcd-v2.0.0-linux-amd64/etcd /usr/local/bin/
+    curl -fsSLO https://github.com/coreos/etcd/releases/download/$ETCD_VERSION/etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
+    tar xzf etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
+    ln -s ../src/etcd/etcd-$ETCD_VERSION-linux-amd64/etcd /usr/local/bin/
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
