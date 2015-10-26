@@ -64,6 +64,7 @@ kube::golang::test_targets() {
   local targets=(
     cmd/integration
     cmd/gendocs
+    cmd/genkubedocs
     cmd/genman
     cmd/mungedocs
     cmd/genbashcomp

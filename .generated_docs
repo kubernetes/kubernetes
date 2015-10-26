@@ -1,5 +1,10 @@
 .generated_docs
 contrib/completions/bash/kubectl
+docs/admin/kube-apiserver.md
+docs/admin/kube-controller-manager.md
+docs/admin/kube-proxy.md
+docs/admin/kube-scheduler.md
+docs/admin/kubelet.md
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply.1
