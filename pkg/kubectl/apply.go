@@ -163,16 +163,25 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 	return modified, nil
 }
 
+// If the last applied configuration annotation is already present, then
 // UpdateApplyAnnotation gets the modified configuration of the object,
 // without embedding it again, and then sets it on the object as the annotation.
+// Otherwise, it does nothing.
 func UpdateApplyAnnotation(info *resource.Info) error {
-	modified, err := GetModifiedConfiguration(info, false)
+	original, err := GetOriginalConfiguration(info)
 	if err != nil {
 		return err
 	}
 
-	if err := SetOriginalConfiguration(info, modified); err != nil {
-		return err
+	if len(original) > 0 {
+		modified, err := GetModifiedConfiguration(info, false)
+		if err != nil {
+			return err
+		}
+
+		if err := SetOriginalConfiguration(info, modified); err != nil {
+			return err
+		}
 	}
 
 	return nil
