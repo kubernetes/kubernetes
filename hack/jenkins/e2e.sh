@@ -138,8 +138,6 @@ GCE_FLAKY_TESTS=(
     "Jobs\sare\slocally\srestarted"
     "Resource\susage\sof\ssystem\scontainers"
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
-    "pod\sw/two\sRW\sPDs\sboth\smounted\sto\sone\scontainer,\swrite\sto\sPD" # file: pd.go, issue: #15382 
-    "pod\sw/\sa\sreadonly\sPD\son\stwo\shosts,\sthen\sremove\sboth" # file: pd.go, issue: #15382
     "deployment.*\sin\sthe\sright\sorder" # issue: #15369
     )
 
@@ -174,7 +172,6 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "DaemonRestart"
     "Elasticsearch"
     "Namespaces.*should\sdelete\sfast"
-    "PD"
     "ServiceAccounts"
     "Networking\sshould\sfunction\sfor\sintra-pod\scommunication"  # possibly causing Ginkgo to get stuck, issue: #13485
     )
