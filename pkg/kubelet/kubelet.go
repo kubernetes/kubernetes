@@ -475,6 +475,7 @@ type Kubelet struct {
 	rootDirectory  string
 	podWorkers     PodWorkers
 	resyncInterval time.Duration
+	resyncTicker   *time.Ticker
 	sourcesReady   SourcesReadyFn
 	// sourcesSeen records the sources seen by kubelet. This set is not thread
 	// safe and should only be access by the main kubelet syncloop goroutine.
@@ -2010,6 +2011,7 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 // state every sync-frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
+	kl.resyncTicker = time.NewTicker(kl.resyncInterval)
 	var housekeepingTimestamp time.Time
 	for {
 		if !kl.containerRuntimeUp() {
@@ -2073,7 +2075,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
-	case <-time.After(kl.resyncInterval):
+	case <-kl.resyncTicker.C:
 		// Periodically syncs all the pods and performs cleanup tasks.
 		glog.V(4).Infof("SyncLoop (periodic sync)")
 		handler.HandlePodSyncs(kl.podManager.GetPods())
