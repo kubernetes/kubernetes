@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -28,35 +27,21 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
 var _ = Describe("hostPath", func() {
-	var (
-		c         *client.Client
-		namespace *api.Namespace
-	)
+	framework := NewFramework("hostpath")
+	var c *client.Client
+	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Building a namespace api object")
-		namespace, err = createTestingNS("hostpath", c)
-		Expect(err).NotTo(HaveOccurred())
+		c = framework.Client
+		namespace = framework.Namespace
 
 		//cleanup before running the test.
 		_ = os.Remove("/tmp/test-file")
-	})
-
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
-		if err := deleteNS(c, namespace.Name, 5*time.Minute /* namespace deletion timeout */); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
 	})
 
 	It("should give a volume the correct mode [Conformance]", func() {
