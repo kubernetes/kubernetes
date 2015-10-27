@@ -306,7 +306,7 @@ func handleVersion(req *restful.Request, resp *restful.Response) {
 func APIVersionHandler(versions ...string) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, unversioned.APIVersions{Versions: versions}, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIVersions{Versions: versions}, resp.ResponseWriter, true)
 	}
 }
 
@@ -314,7 +314,7 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 func RootAPIHandler(groups []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, unversioned.APIGroupList{Groups: groups}, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIGroupList{Groups: groups}, resp.ResponseWriter, true)
 	}
 }
 
@@ -323,7 +323,7 @@ func RootAPIHandler(groups []unversioned.APIGroup) restful.RouteFunction {
 func GroupHandler(group unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, group, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &group, resp.ResponseWriter, true)
 	}
 }
 
@@ -331,7 +331,7 @@ func GroupHandler(group unversioned.APIGroup) restful.RouteFunction {
 func SupportedResourcesHandler(groupVersion string, apiResources []unversioned.APIResource) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, unversioned.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter, true)
 	}
 }
 
