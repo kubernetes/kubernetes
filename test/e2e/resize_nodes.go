@@ -384,17 +384,14 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 }
 
 var _ = Describe("Nodes", func() {
-	framework := Framework{BaseName: "resize-nodes"}
+	framework := NewFramework("resize-nodes")
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		c = framework.Client
 		ns = framework.Namespace.Name
 	})
-
-	AfterEach(framework.afterEach)
 
 	Describe("Resize", func() {
 		var skipped bool
