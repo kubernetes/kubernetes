@@ -466,7 +466,8 @@ func (r *Request) TimeoutSeconds(d time.Duration) *Request {
 		return r
 	}
 	if d != 0 {
-		r.Param("timeoutSeconds", d.String())
+		timeout := int64(d.Seconds())
+		r.Param("timeoutSeconds", strconv.FormatInt(timeout, 10))
 	}
 	return r
 }
