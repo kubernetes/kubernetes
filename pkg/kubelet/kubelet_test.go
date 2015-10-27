@@ -145,6 +145,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)
+	kubelet.resyncInterval = 10 * time.Second
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient}
 }
 
@@ -332,6 +333,9 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 		t.Errorf("Unexpected sync loop time: %s, expected 0", loopTime1)
 	}
 
+	// Start sync ticker.
+	kubelet.resyncTicker = time.NewTicker(time.Millisecond)
+
 	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet)
 	loopTime2 := kubelet.LatestLoopEntryTime()
 	if loopTime2.IsZero() {
@@ -350,9 +354,9 @@ func TestSyncLoopAbort(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.lastTimestampRuntimeUp = time.Now()
 	kubelet.networkConfigured = true
-	// The syncLoop waits on time.After(resyncInterval), set it really big so that we don't race for
-	// the channel close
-	kubelet.resyncInterval = time.Second * 30
+	// The syncLoop waits on the resyncTicker, so we stop it immediately to avoid a race.
+	kubelet.resyncTicker = time.NewTicker(time.Second)
+	kubelet.resyncTicker.Stop()
 
 	ch := make(chan kubetypes.PodUpdate)
 	close(ch)
