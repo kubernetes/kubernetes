@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cd /build/
+cd /build
 
 wget "$2" -O register.go
 
