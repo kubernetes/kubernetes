@@ -210,12 +210,17 @@ var _ = Describe("ServiceLoadBalancer", func() {
 	var repoRoot string
 	var client *client.Client
 
-	framework := NewFramework("servicelb")
+	framework := Framework{BaseName: "servicelb"}
 
 	BeforeEach(func() {
+		framework.beforeEach()
 		client = framework.Client
 		ns = framework.Namespace.Name
 		repoRoot = testContext.RepoRoot
+	})
+
+	AfterEach(func() {
+		framework.afterEach()
 	})
 
 	It("should support simple GET on Ingress ips", func() {

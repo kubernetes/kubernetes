@@ -185,7 +185,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 
 var _ = Describe("DaemonRestart", func() {
 
-	framework := NewFramework("daemonrestart")
+	framework := Framework{BaseName: "daemonrestart"}
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -197,9 +197,11 @@ var _ = Describe("DaemonRestart", func() {
 	var tracker *podTracker
 
 	BeforeEach(func() {
+
 		// These tests require SSH
 		// TODO(11834): Enable this test in GKE once experimental API there is switched on
 		SkipUnlessProviderIs("gce", "aws")
+		framework.beforeEach()
 		ns = framework.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -244,6 +246,7 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	AfterEach(func() {
+		defer framework.afterEach()
 		close(stopCh)
 		expectNoError(DeleteRC(framework.Client, ns, rcName))
 	})
