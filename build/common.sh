@@ -104,6 +104,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables:v1
+          hyperkube,custom_dockerfile
         );;
     "arm") # TODO: Use image with iptables installed for kube-proxy for arm, arm64 and ppc64le
         local targets=(
@@ -818,8 +819,6 @@ function kube::release::create_docker_images_for_server() {
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
-        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         if [[ ${arch} == "amd64" ]]; then
           # If we are building a amd64 docker image, preserve the original image name
@@ -829,8 +828,18 @@ function kube::release::create_docker_images_for_server() {
           local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
         fi
 
+       ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+
+        if [ "${base_image}" == "custom_dockerfile" ]; then
+          kube::log::status "Using custom Dockerfile"
+          cp ${KUBE_ROOT}/build/dockerfiles/${binary_name}/* ${docker_build_path}/
+        else
+          printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+        fi
+
         "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
