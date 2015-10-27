@@ -23,9 +23,11 @@ It defines [index.php](image/index.php) page which performs some CPU intensive c
 
 First, we will start a replication controller running the image and expose it as an external service:
 
+<a name="kubectl-run"></a>
+
 ```console
-$ kubectl create -f docs/user-guide/horizontal-pod-autoscaling/rc-php-apache.yaml
-replicationcontrollers/php-apache
+$ kubectl run php-apache --image=gcr.io/google_containers/hpa-example --requests=cpu=200m
+replicationcontroller "php-apache" created
 
 $ kubectl expose rc php-apache --port=80 --type=LoadBalancer
 service "php-apache" exposed
@@ -88,10 +90,10 @@ spec:
 ```
 
 This defines a horizontal pod autoscaler that maintains between 1 and 10 replicas of the Pods
-controlled by the php-apache replication controller you created in the first step of these instructions.
+controlled by the php-apache replication controller we created in the first step of these instructions.
 Roughly speaking, the horizontal autoscaler will increase and decrease the number of replicas
 (via the replication controller) so as to maintain an average CPU utilization across all Pods of 50%
-(since each pod requests 200 milli-cores in [rc-php-apache.yaml](rc-php-apache.yaml), this means average CPU utilization of 100 milli-cores).
+(since each pod requests 200 milli-cores by [kubectl run](#kubectl-run), this means average CPU utilization of 100 milli-cores).
 See [here](../../../docs/design/horizontal-pod-autoscaler.md#autoscaling-algorithm) for more details on the algorithm.
 
 We will create the autoscaler by executing the following command:
@@ -99,6 +101,14 @@ We will create the autoscaler by executing the following command:
 ```console
 $ kubectl create -f docs/user-guide/horizontal-pod-autoscaling/hpa-php-apache.yaml
 horizontalpodautoscaler "php-apache" created
+```
+
+Alternatively, we can create the autoscaler using [kubectl autoscale](../kubectl/kubectl_autoscale.md).
+The following command will create the equivalent autoscaler as defined in the [hpa-php-apache.yaml](hpa-php-apache.yaml) file:
+
+```
+$ kubectl autoscale rc php-apache --cpu-percent=50 --min=1 --max=10
+replicationcontroller "php-apache" autoscaled
 ```
 
 We may check the current status of autoscaler by running:
@@ -121,7 +131,7 @@ We will start an infinite loop of queries to our server (please run it in a diff
 $ while true; do curl http://146.148.6.244; done
 ```
 
-We may examine, how CPU load was increased (the results should be visible after about 2 minutes) by executing:
+We may examine, how CPU load was increased (the results should be visible after about 3-4 minutes) by executing:
 
 ```console
 $ kubectl get hpa
