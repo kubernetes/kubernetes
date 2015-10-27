@@ -57,7 +57,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
-	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
 )
 
 // KubernetesScheduler implements:
@@ -100,8 +99,8 @@ type MesosScheduler struct {
 
 	// via deferred init
 
-	plugin             PluginInterface
-	reconciler         *operations.Reconciler
+	loop               operations.SchedulerLoopInterface
+	reconciler         *operations.TasksReconciler
 	reconcileCooldown  time.Duration
 	asRegisteredMaster proc.Doer
 	terminate          <-chan struct{} // signal chan, closes when we should kill background tasks
@@ -119,7 +118,7 @@ type Config struct {
 	LookupNode        node.LookupFunc
 }
 
-// New creates a new KubernetesScheduler
+// New creates a new MesosScheduler
 func New(config Config) *MesosScheduler {
 	var k *MesosScheduler
 	k = &MesosScheduler{
@@ -178,7 +177,7 @@ func New(config Config) *MesosScheduler {
 	return k
 }
 
-func (k *MesosScheduler) Init(electedMaster proc.Process, pl PluginInterface, mux *http.ServeMux) error {
+func (k *MesosScheduler) Init(electedMaster proc.Process, sl operations.SchedulerLoopInterface, mux *http.ServeMux) error {
 	log.V(1).Infoln("initializing kubernetes mesos scheduler")
 
 	k.asRegisteredMaster = proc.DoerFunc(func(a proc.Action) <-chan error {
@@ -188,7 +187,7 @@ func (k *MesosScheduler) Init(electedMaster proc.Process, pl PluginInterface, mu
 		return electedMaster.Do(a)
 	})
 	k.terminate = electedMaster.Done()
-	k.plugin = pl
+	k.loop = sl
 	k.offers.Init(k.terminate)
 	k.InstallDebugHandlers(mux)
 	k.nodeRegistrator.Run(k.terminate)
@@ -296,7 +295,7 @@ func (k *MesosScheduler) onInitialRegistration(driver bindings.SchedulerDriver) 
 	r1 := k.makeTaskRegistryReconciler()
 	r2 := k.makePodRegistryReconciler()
 
-	k.reconciler = operations.NewReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
+	k.reconciler = operations.NewTasksReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
 		k.reconcileCooldown, k.schedulerConfig.ExplicitReconciliationAbortTimeout.Duration, k.terminate)
 	go k.reconciler.Run(driver)
 
@@ -398,7 +397,7 @@ func (k *MesosScheduler) StatusUpdate(driver bindings.SchedulerDriver, taskStatu
 	case mesos.TaskState_TASK_FAILED, mesos.TaskState_TASK_ERROR:
 		if task, _ := k.taskRegistry.UpdateStatus(taskStatus); task != nil {
 			if task.Has(podtask.Launched) && !task.Has(podtask.Bound) {
-				go k.plugin.reconcileTask(task)
+				go k.loop.ReconcilePodTask(task)
 				return
 			}
 		} else {
@@ -760,14 +759,14 @@ func (ks *MesosScheduler) recoverTasks() error {
 }
 
 // Create creates a scheduler plugin and all supporting background functions.
-func (k *MesosScheduler) NewDefaultPluginConfig(terminate <-chan struct{}, mux *http.ServeMux) *PluginConfig {
+func (k *MesosScheduler) NewDefaultSchedulerLoopConfig(terminate <-chan struct{}, mux *http.ServeMux) *operations.SchedulerLoopConfig {
 	// use ListWatch watching pods using the client by default
 	lw := cache.NewListWatchFromClient(k.client, "pods", api.NamespaceAll, fields.Everything())
-	return k.NewPluginConfig(terminate, mux, lw)
+	return k.NewSchedulerLoopConfig(terminate, mux, lw)
 }
 
-func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.ServeMux,
-	podsWatcher *cache.ListWatch) *PluginConfig {
+func (k *MesosScheduler) NewSchedulerLoopConfig(terminate <-chan struct{}, mux *http.ServeMux,
+	podsWatcher *cache.ListWatch) *operations.SchedulerLoopConfig {
 
 	// Watch and queue pods that need scheduling.
 	updates := make(chan queue.Entry, k.schedulerConfig.UpdatesBacklog)
@@ -780,6 +779,7 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 	scheduler := &mesosFramework{mesosScheduler: k}
 	q := queuer.New(podUpdates)
 	podDeleter := operations.NewDeleter(scheduler, q)
+	podReconciler := operations.NewPodReconciler(scheduler, k.client, q, podDeleter)
 	bo := backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration)
 	eh := operations.NewErrorHandler(scheduler, bo, q)
 	startLatch := make(chan struct{})
@@ -793,22 +793,16 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 		q.InstallDebugHandlers(mux)
 		podtask.InstallDebugHandlers(k.taskRegistry, mux)
 	})
-	return &PluginConfig{
-		Config: &plugin.Config{
-			NodeLister: nil,
-			Algorithm: &mesosSchedulerAlgorithm{
-				fw:         scheduler,
-				podUpdates: podUpdates,
-			},
-			Binder:   operations.NewBinder(scheduler),
-			NextPod:  q.Yield,
-			Error:    eh.Error,
-			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
-		},
-		fw:       scheduler,
-		client:   k.client,
-		qr:       q,
-		deleter:  podDeleter,
-		starting: startLatch,
+	return &operations.SchedulerLoopConfig{
+		Algorithm: operations.NewSchedulerAlgorithm(scheduler, podUpdates),
+		Binder:    operations.NewBinder(scheduler),
+		NextPod:   q.Yield,
+		Error:     eh.Error,
+		Recorder:  eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
+		Fw:        scheduler,
+		Client:    k.client,
+		Qr:        q,
+		Pr:        podReconciler,
+		Starting:  startLatch,
 	}
 }

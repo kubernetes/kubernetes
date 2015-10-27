@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package operations implements independent aspects of the scheduler which
-// do not use MesosScheduler internals, but rely solely on the Framework
-// interface.
-package operations
+// Package mock contains a Mesos scheduler driver mock
+package mock

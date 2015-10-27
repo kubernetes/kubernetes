@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package mock
 
 import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -145,13 +145,13 @@ func (m *MockSchedulerDriver) Wait() {
 	m.Called()
 }
 
-type joinableDriver struct {
+type JoinableDriver struct {
 	MockSchedulerDriver
 	joinFunc func() (mesos.Status, error)
 }
 
 // Join invokes joinFunc if it has been set, otherwise blocks forever
-func (m *joinableDriver) Join() (mesos.Status, error) {
+func (m *JoinableDriver) Join() (mesos.Status, error) {
 	if m.joinFunc != nil {
 		return m.joinFunc()
 	}
