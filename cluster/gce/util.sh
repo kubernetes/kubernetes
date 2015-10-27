@@ -71,6 +71,13 @@ function verify-prereqs {
       RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
     fi
   fi
+  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
+    else
+      RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
+    fi
+  fi
 
 
   local cmd

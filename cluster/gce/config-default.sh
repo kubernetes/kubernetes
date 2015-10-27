@@ -108,6 +108,11 @@ ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
 if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
+# Optional: Enable daemonset experimental feature, not ready for production use.
+ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-false}"
+if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
