@@ -41,6 +41,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -424,7 +425,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	// Create a master and install handlers into mux.
 	m = master.New(&master.Config{
 		StorageDestinations: storageDestinations,
-		KubeletClient:       client.FakeKubeletClient{},
+		KubeletClient:       kubeletclient.FakeKubeletClient{},
 		EnableLogsSupport:   false,
 		EnableUISupport:     false,
 		EnableIndex:         true,

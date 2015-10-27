@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package client
 
 import (
 	"encoding/json"
@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"testing"
 
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -40,18 +41,17 @@ func TestHTTPKubeletClient(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	_, err = url.Parse(testServer.URL)
-	if err != nil {
+	if _, err := url.Parse(testServer.URL); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestNewKubeletClient(t *testing.T) {
-	config := &KubeletConfig{
+	config := &KubeletClientConfig{
 		EnableHttps: false,
 	}
 
-	client, err := NewKubeletClient(config)
+	client, err := NewStaticKubeletClient(config)
 	if err != nil {
 		t.Errorf("Error while trying to create a client: %v", err)
 	}
@@ -61,17 +61,17 @@ func TestNewKubeletClient(t *testing.T) {
 }
 
 func TestNewKubeletClientTLSInvalid(t *testing.T) {
-	config := &KubeletConfig{
+	config := &KubeletClientConfig{
 		EnableHttps: true,
 		//Invalid certificate and key path
-		TLSClientConfig: TLSClientConfig{
-			CertFile: "../testdata/mycertinvalid.cer",
-			KeyFile:  "../testdata/mycertinvalid.key",
-			CAFile:   "../testdata/myCA.cer",
+		TLSClientConfig: client.TLSClientConfig{
+			CertFile: "../../client/testdata/mycertinvalid.cer",
+			KeyFile:  "../../client/testdata/mycertinvalid.key",
+			CAFile:   "../../client/testdata/myCA.cer",
 		},
 	}
 
-	client, err := NewKubeletClient(config)
+	client, err := NewStaticKubeletClient(config)
 	if err == nil {
 		t.Errorf("Expected an error")
 	}
@@ -81,18 +81,18 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 }
 
 func TestNewKubeletClientTLSValid(t *testing.T) {
-	config := &KubeletConfig{
+	config := &KubeletClientConfig{
 		EnableHttps: true,
-		TLSClientConfig: TLSClientConfig{
-			CertFile: "../testdata/mycertvalid.cer",
+		TLSClientConfig: client.TLSClientConfig{
+			CertFile: "../../client/testdata/mycertvalid.cer",
 			// TLS Configuration, only applies if EnableHttps is true.
-			KeyFile: "../testdata/mycertvalid.key",
+			KeyFile: "../../client/testdata/mycertvalid.key",
 			// TLS Configuration, only applies if EnableHttps is true.
-			CAFile: "../testdata/myCA.cer",
+			CAFile: "../../client/testdata/myCA.cer",
 		},
 	}
 
-	client, err := NewKubeletClient(config)
+	client, err := NewStaticKubeletClient(config)
 	if err != nil {
 		t.Errorf("Not expecting an error #%v", err)
 	}

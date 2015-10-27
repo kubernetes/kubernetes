@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/client"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/registry/pod"
@@ -32,8 +32,8 @@ import (
 
 // LogREST implements the log endpoint for a Pod
 type LogREST struct {
-	Store       *etcdgeneric.Etcd
 	KubeletConn client.ConnectionInfoGetter
+	Store       *etcdgeneric.Etcd
 }
 
 // LogREST implements GetterWithOptions
@@ -49,7 +49,7 @@ func (r *LogREST) New() runtime.Object {
 func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
 	logOpts, ok := opts.(*api.PodLogOptions)
 	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
 		return nil, errors.NewInvalid("podlogs", name, errs)
