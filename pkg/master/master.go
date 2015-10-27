@@ -42,9 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/componentstatus"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
@@ -935,7 +933,7 @@ func (m *Master) RemoveThirdPartyResource(path string) error {
 
 func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
 	ctx := api.NewDefaultContext()
-	existingData, err := registry.List(ctx, labels.Everything(), fields.Everything(), nil)
+	existingData, err := registry.List(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -1138,7 +1136,7 @@ func findExternalAddress(node *api.Node) (string, error) {
 }
 
 func (m *Master) getNodeAddresses() ([]string, error) {
-	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), labels.Everything(), fields.Everything(), nil)
+	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), nil)
 	if err != nil {
 		return nil, err
 	}

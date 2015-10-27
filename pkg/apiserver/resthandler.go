@@ -267,7 +267,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
-			watcher, err := rw.Watch(ctx, opts.LabelSelector, opts.FieldSelector, opts.ResourceVersion)
+			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -284,7 +284,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 
-		result, err := r.List(ctx, opts.LabelSelector, opts.FieldSelector, &opts)
+		result, err := r.List(ctx, &opts)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return

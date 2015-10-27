@@ -853,7 +853,7 @@ func (t *Tester) testListError() {
 
 	storageError := fmt.Errorf("test error")
 	t.withStorageError(storageError, func() {
-		_, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything(), nil)
+		_, err := t.storage.(rest.Lister).List(ctx, nil)
 		if err != storageError {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -870,7 +870,7 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 
 	existing := assignFn([]runtime.Object{foo1, foo2})
 
-	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything(), nil)
+	listObj, err := t.storage.(rest.Lister).List(ctx, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -902,7 +902,8 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	filtered := []runtime.Object{existing[1]}
 
 	selector := labels.SelectorFromSet(labels.Set(testLabels))
-	listObj, err := t.storage.(rest.Lister).List(ctx, selector, fields.Everything(), nil)
+	options := &api.ListOptions{LabelSelector: selector}
+	listObj, err := t.storage.(rest.Lister).List(ctx, options)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -924,7 +925,7 @@ func (t *Tester) testListNotFound(assignFn AssignFunc, setRVFn SetRVFunc) {
 	setRVFn(uint64(123))
 	_ = assignFn([]runtime.Object{})
 
-	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything(), nil)
+	listObj, err := t.storage.(rest.Lister).List(ctx, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -950,7 +951,7 @@ func (t *Tester) testListNotFound(assignFn AssignFunc, setRVFn SetRVFunc) {
 
 func (t *Tester) testWatch(initWatchFn InitWatchFunc, injectErrFn InjectErrFunc) {
 	ctx := t.TestContext()
-	watcher, err := t.storage.(rest.Watcher).Watch(ctx, labels.Everything(), fields.Everything(), "1")
+	watcher, err := t.storage.(rest.Watcher).Watch(ctx, &api.ListOptions{ResourceVersion: "1"})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -976,7 +977,8 @@ func (t *Tester) testWatchFields(obj runtime.Object, initWatchFn InitWatchFunc, 
 
 	for _, field := range fieldsPass {
 		for _, action := range actions {
-			watcher, err := t.storage.(rest.Watcher).Watch(ctx, labels.Everything(), field.AsSelector(), "1")
+			options := &api.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -999,7 +1001,8 @@ func (t *Tester) testWatchFields(obj runtime.Object, initWatchFn InitWatchFunc, 
 
 	for _, field := range fieldsFail {
 		for _, action := range actions {
-			watcher, err := t.storage.(rest.Watcher).Watch(ctx, labels.Everything(), field.AsSelector(), "1")
+			options := &api.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1024,7 +1027,8 @@ func (t *Tester) testWatchLabels(obj runtime.Object, initWatchFn InitWatchFunc, 
 
 	for _, label := range labelsPass {
 		for _, action := range actions {
-			watcher, err := t.storage.(rest.Watcher).Watch(ctx, label.AsSelector(), fields.Everything(), "1")
+			options := &api.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1047,7 +1051,8 @@ func (t *Tester) testWatchLabels(obj runtime.Object, initWatchFn InitWatchFunc, 
 
 	for _, label := range labelsFail {
 		for _, action := range actions {
-			watcher, err := t.storage.(rest.Watcher).Watch(ctx, label.AsSelector(), fields.Everything(), "1")
+			options := &api.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
+			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

@@ -159,7 +159,15 @@ func (e *Etcd) NewList() runtime.Object {
 }
 
 // List returns a list of items matching labels and field
-func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (runtime.Object, error) {
+func (e *Etcd) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+	label := labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		label = options.LabelSelector
+	}
+	field := fields.Everything()
+	if options != nil && options.FieldSelector != nil {
+		field = options.FieldSelector
+	}
 	return e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
 }
 
@@ -463,7 +471,19 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
 // matcher that matches by key. generic.SelectionPredicate does this for you
 // automatically.
-func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (e *Etcd) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	label := labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		label = options.LabelSelector
+	}
+	field := fields.Everything()
+	if options != nil && options.FieldSelector != nil {
+		field = options.FieldSelector
+	}
+	resourceVersion := ""
+	if options != nil {
+		resourceVersion = options.ResourceVersion
+	}
 	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }
 
