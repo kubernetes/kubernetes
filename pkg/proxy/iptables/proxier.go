@@ -62,19 +62,24 @@ const iptablesNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
 // the mark we apply to traffic needing SNAT
 const iptablesMasqueradeMark = "0x4d415351"
 
-// ShouldUseIptablesProxier returns true if we should use the iptables Proxier
+// IptablesVersioner can query the current iptables version.
+type IptablesVersioner interface {
+	// returns "X.Y.Z"
+	GetVersion() (string, error)
+}
+
+// CanUseIptablesProxier returns true if we should use the iptables Proxier
 // instead of the "classic" userspace Proxier.  This is determined by checking
 // the iptables version and for the existence of kernel features. It may return
 // an error if it fails to get the iptables version without error, in which
 // case it will also return false.
-func ShouldUseIptablesProxier() (bool, error) {
-	exec := utilexec.New()
+func CanUseIptablesProxier(iptver IptablesVersioner) (bool, error) {
 	minVersion, err := semver.NewVersion(iptablesMinVersion)
 	if err != nil {
 		return false, err
 	}
-	// returns "X.X.X", err
-	versionString, err := utiliptables.GetIptablesVersionString(exec)
+	// returns "X.Y.Z"
+	versionString, err := iptver.GetVersion()
 	if err != nil {
 		return false, err
 	}
@@ -89,6 +94,7 @@ func ShouldUseIptablesProxier() (bool, error) {
 	// Check for the required sysctls.  We don't care about the value, just
 	// that it exists.  If this Proxier is chosen, we'll iniialize it as we
 	// need.
+	// TODO: we should inject a sysctl.Interface like we do for iptables
 	_, err = utilsysctl.GetSysctl(sysctlRouteLocalnet)
 	if err != nil {
 		return false, err
