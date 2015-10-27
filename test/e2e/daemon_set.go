@@ -48,7 +48,14 @@ const (
 )
 
 var _ = Describe("Daemon set", func() {
-	f := &Framework{BaseName: "daemonsets"}
+	var f *Framework
+
+	AfterEach(func() {
+		err := clearDaemonSetNodeLabels(f.Client)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	f = NewFramework("daemonsets")
 
 	image := "gcr.io/google_containers/serve_hostname:1.1"
 	dsName := "daemon-set"
@@ -57,16 +64,9 @@ var _ = Describe("Daemon set", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		f.beforeEach()
 		ns = f.Namespace.Name
 		c = f.Client
 		err := clearDaemonSetNodeLabels(c)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		defer f.afterEach()
-		err := clearDaemonSetNodeLabels(f.Client)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
