@@ -140,7 +140,6 @@ DISRUPTIVE_TESTS=(
 GCE_FLAKY_TESTS=(
     "DaemonRestart\sController\sManager"
     "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
-    "Jobs\sare\slocally\srestarted"
     "Resource\susage\sof\ssystem\scontainers"
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
     "deployment.*\sin\sthe\sright\sorder" # issue: #15369
