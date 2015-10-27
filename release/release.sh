@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,136 +14,127 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO What does this script do?
+# This script automates the release processes for all pre-releases and official
+# releases for Kubernetes.  See docs/devel/releasing.md for more info.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 # TODO Audit echos to make sure they're all consistent.
-# TODO Refactor to remove globals?
 
+# Sets global DRY_RUN
 function main() {
-  if [ "$#" -gt 3 ]; then
+  # Parse arguments
+  if [[ "$#" -ne 2 && "$#" -ne 3 ]]; then
     usage
     exit 1
   fi
-
-  declare -r NEW_VERSION=${1-}
+  local -r new_version=${1-}
   # TODO(ihmccreery) Stop calling it githash; it's not a githash.
-  declare -r GITHASH=${2-}
+  local -r githash=${2-}
   DRY_RUN=true
   if [[ "${3-}" == "--no-dry-run" ]]; then
     DRY_RUN=false
   else
-    echo "!!! THIS IS A DRY RUN"
+    echo "THIS IS A DRY RUN"
   fi
 
-  declare -r ALPHA_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.0-alpha\\.([1-9][0-9]*)$"
-  declare -r OFFICIAL_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-  declare -r SERIES_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-  if [[ "${NEW_VERSION}" =~ $ALPHA_VERSION_REGEX ]]; then
-    RELEASE_TYPE='alpha'
-    VERSION_MAJOR="${BASH_REMATCH[1]}"
-    VERSION_MINOR="${BASH_REMATCH[2]}"
-    VERSION_ALPHA_REV="${BASH_REMATCH[3]}"
-    ANCESTOR="v${VERSION_MAJOR}.${VERSION_MINOR}.0-alpha.$((VERSION_ALPHA_REV-1))"
-  elif [[ "${NEW_VERSION}" =~ $OFFICIAL_VERSION_REGEX ]]; then
-    RELEASE_TYPE='official'
-    VERSION_MAJOR="${BASH_REMATCH[1]}"
-    VERSION_MINOR="${BASH_REMATCH[2]}"
-    VERSION_PATCH="${BASH_REMATCH[3]}"
-    ANCESTOR="${NEW_VERSION}-beta"
-    RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
-  elif [[ "${NEW_VERSION}" =~ $SERIES_VERSION_REGEX ]]; then
-    RELEASE_TYPE='series'
-    VERSION_MAJOR="${BASH_REMATCH[1]}"
-    VERSION_MINOR="${BASH_REMATCH[2]}"
-    # NOTE: We check the second alpha version, ...-alpha.1, because ...-alpha.0
-    # is the branch point for the previous release cycle, so could provide a
-    # false positive if we accidentally try to release off of the old release
-    # branch.
-    ANCESTOR="v${VERSION_MAJOR}.${VERSION_MINOR}.0-alpha.1"
-    RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
+  # Get and verify version info
+  local -r alpha_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.0-alpha\\.([1-9][0-9]*)$"
+  local -r official_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  local -r series_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  if [[ "${new_version}" =~ $alpha_version_regex ]]; then
+    local -r release_type='alpha'
+    local -r version_major="${BASH_REMATCH[1]}"
+    local -r version_minor="${BASH_REMATCH[2]}"
+    local -r version_alpha_rev="${BASH_REMATCH[3]}"
+  elif [[ "${new_version}" =~ $official_version_regex ]]; then
+    local -r release_type='official'
+    local -r version_major="${BASH_REMATCH[1]}"
+    local -r version_minor="${BASH_REMATCH[2]}"
+    local -r version_patch="${BASH_REMATCH[3]}"
+  elif [[ "${new_version}" =~ $series_version_regex ]]; then
+    local -r release_type='series'
+    local -r version_major="${BASH_REMATCH[1]}"
+    local -r version_minor="${BASH_REMATCH[2]}"
   else
     usage
     echo
-    echo "!!! You specified an invalid version '${NEW_VERSION}'."
+    echo "!!! You specified an invalid version '${new_version}'."
     exit 1
   fi
 
   # Get the git commit from the githash and verify it
-  declare -r GIT_COMMIT_REGEX="^[0-9a-f]{7}$"
-  declare -r GIT_COMMIT=$(echo "${GITHASH}" | awk -F'+' '{print $2}' | head -c7)
-  if ! [[ "${GIT_COMMIT}" =~ $GIT_COMMIT_REGEX ]]; then
+  local -r git_commit_regex="^[0-9a-f]{7}$"
+  local -r git_commit=$(echo "${githash}" | awk -F'+' '{print $2}' | head -c7)
+  if ! [[ "${git_commit}" =~ $git_commit_regex ]]; then
     usage
     echo
-    echo "!!! You specified an invalid githash '${GITHASH}'."
-    echo "!!! Tried to extract commit, got ${GIT_COMMIT}."
+    echo "!!! You specified an invalid githash '${githash}'."
+    echo "!!! Tried to extract commit, got ${git_commit}."
     exit 1
   fi
-  echo "Doing ${RELEASE_TYPE} release '${NEW_VERSION}'."
+  echo "Doing ${release_type} release '${new_version}'."
 
   # Set the default umask for the release. This ensures consistency
   # across our release builds.
   #
   # TODO(ihmccreery): This should be in our build process, not our release
   # process.
-  declare -r RELEASE_UMASK=${RELEASE_UMASK:-022}
-  umask "${RELEASE_UMASK}"
+  local -r release_umask=${release_umask:-022}
+  umask "${release_umask}"
 
-  declare -r GITHUB="https://github.com/kubernetes/kubernetes.git"
-  declare -r DIR="/tmp/kubernetes-${RELEASE_TYPE}-release-${NEW_VERSION}-$(date +%s)"
-  echo "Cloning from '${GITHUB}'..."
-  git clone "${GITHUB}" "${DIR}"
+  local -r github="https://github.com/kubernetes/kubernetes.git"
+  local -r dir="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)"
+  echo "Cloning from '${github}'..."
+  git clone "${github}" "${dir}"
 
   # !!! REMINDER !!!
   #
   # Past this point, you are dealing with a different clone of the repo at some
   # version. Don't assume you're executing code from the same repo as this script
   # is running in. This is a version agnostic process.
-  pushd "${DIR}"
+  pushd "${dir}"
 
-  if [[ "${RELEASE_TYPE}" == 'alpha' ]]; then
-    git checkout "${GIT_COMMIT}"
-    verify-at-git-commit
-    verify-ancestor
+  if [[ "${release_type}" == 'alpha' ]]; then
+    git checkout "${git_commit}"
+    verify-at-git-commit "${git_commit}"
+    verify-ancestor "v${version_major}.${version_minor}.0-alpha.$((${version_alpha_rev}-1))"
 
-    alpha-release "${NEW_VERSION}"
-  elif [[ "${RELEASE_TYPE}" == 'official' ]]; then
-    declare -r RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
-    declare -r BETA_VERSION="v${VERSION_MAJOR}.${VERSION_MINOR}.$((${VERSION_PATCH}+1))-beta"
+    alpha-release "${new_version}"
+  elif [[ "${release_type}" == 'official' ]]; then
+    local -r release_branch="release-${version_major}.${version_minor}"
+    local -r beta_version="v${version_major}.${version_minor}.$((${version_patch}+1))-beta"
 
-    git checkout "${RELEASE_BRANCH}"
-    verify-at-git-commit
-    # TODO uncomment this once we've pushed v1.1.1-beta
-    #verify-ancestor
+    git checkout "${release_branch}"
+    verify-at-git-commit "${git_commit}"
+    verify-ancestor "${new_version}-beta"
 
-    official-release "${NEW_VERSION}"
-    beta-release "${BETA_VERSION}"
-  else # [[ "${RELEASE_TYPE}" == 'series' ]]
-    declare -r RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
-    declare -r ALPHA_VERSION="v${VERSION_MAJOR}.$((${VERSION_MINOR}+1)).0-alpha.0"
-    declare -r BETA_VERSION="v${VERSION_MAJOR}.${VERSION_MINOR}.0-beta"
+    official-release "${new_version}"
+    beta-release "${beta_version}"
+  else # [[ "${release_type}" == 'series' ]]
+    local -r release_branch="release-${version_major}.${version_minor}"
+    local -r alpha_version="v${version_major}.$((${version_minor}+1)).0-alpha.0"
+    local -r beta_version="v${version_major}.${version_minor}.0-beta"
 
-    git checkout "${GIT_COMMIT}"
-    verify-at-git-commit
-    verify-ancestor
+    git checkout "${git_commit}"
+    verify-at-git-commit "${git_commit}"
+    # NOTE: We check the second alpha version, ...-alpha.1, because ...-alpha.0
+    # is the branch point for the previous release cycle, so could provide a
+    # false positive if we accidentally try to release off of the old release
+    # branch.
+    verify-ancestor "v${version_major}.${version_minor}.0-alpha.1"
 
-    # TODO (Fix versioning.md if you don't do this.)  We maybe could actually do
-    # the alpha rev (in a series release) at HEAD, and patch the version/base.go
-    # logic then.  We'd then have some part of the tree between the branch of
-    # vX.Y series and the vX.(Y+1).0-alpha.0 tag, but I don't think that's a
-    # problem.
-    alpha-release "${ALPHA_VERSION}"
+    alpha-release "${alpha_version}"
 
-    echo "Branching ${RELEASE_BRANCH}."
-    git checkout -b "${RELEASE_BRANCH}"
+    echo "Branching ${release_branch}."
+    git checkout -b "${release_branch}"
 
-    beta-release "${BETA_VERSION}"
+    beta-release "${beta_version}"
   fi
 
-  cleanup
+  cleanup "${dir}"
 }
 
 function usage() {
@@ -157,7 +148,7 @@ function alpha-release() {
 
   echo "Doing an alpha release of ${alpha_version}."
 
-  echo "Tagging ${alpha_version} at $(git rev-parse --short HEAD)."
+  echo "Tagging ${alpha_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes pre-release ${alpha_version}" "${alpha_version}"
   git-push "${alpha_version}"
   build
@@ -170,13 +161,10 @@ function beta-release() {
 
   echo "Doing a beta release of ${beta_version}."
 
-  # TODO We need to rev something so that we have a separate commit on the
-  # release-X.Y branch, since we don't want master to pick up with beta tag.
-  # TODO rev-docs and/or version?
-  versionize-docs-and-commit
+  versionize-docs-and-commit "${beta_version}"
   rev-version-and-commit
 
-  echo "Tagging ${beta_version} at $(git rev-parse --short HEAD)."
+  echo "Tagging ${beta_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes pre-release ${beta_version}" "${beta_version}"
   git-push "${beta_version}"
   build
@@ -189,11 +177,10 @@ function official-release() {
 
   echo "Doing an official release of ${official_version}."
 
-  # TODO rev-docs and/or version?
-  versionize-docs-and-commit
+  versionize-docs-and-commit "${official_version}"
   rev-version-and-commit
 
-  echo "Tagging ${official_version} at $(git rev-parse --short HEAD)."
+  echo "Tagging ${official_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes release ${official_version}" "${official_version}"
   git-push "${official_version}"
   build
@@ -202,20 +189,26 @@ function official-release() {
 }
 
 function verify-at-git-commit() {
-  echo "Verifying we are at ${GIT_COMMIT}."
-  if [[ $(git rev-parse --short HEAD) != ${GIT_COMMIT} ]]; then
-    echo "!!! We are not at commit ${GIT_COMMIT}!"
-    cleanup
+  local -r git_commit="${1}"
+  echo "Verifying we are at ${git_commit}."
+  if [[ $(current-git-commit) != ${git_commit} ]]; then
+    echo "!!! We are not at commit ${git_commit}!"
+    cleanup "${dir}"
     exit 1
   fi
 }
 
+function current-git-commit() {
+  git rev-parse --short HEAD
+}
+
 function verify-ancestor() {
+  local -r ancestor="${1}"
   # Check to make sure the/a previous version is an ancestor.
-  echo "Checking that previous version '${ANCESTOR}' is an ancestor."
-  if ! git merge-base --is-ancestor "${ANCESTOR}" HEAD; then
-    echo "!!! Previous version '${ANCESTOR}' is not an ancestor!"
-    cleanup
+  echo "Checking that previous version '${ancestor}' is an ancestor."
+  if ! git merge-base --is-ancestor "${ancestor}" HEAD; then
+    echo "!!! Previous version '${ancestor}' is not an ancestor!"
+    cleanup "${dir}"
     exit 1
   fi
 }
@@ -230,12 +223,12 @@ function git-push() {
   fi
 }
 
-# TODO(ihmccreery): Review and fix this function.
 function versionize-docs-and-commit() {
-  echo "FAKE versionize-docs-and-commit"
-  # # NOTE: This is using versionize-docs.sh at the release point.
-  # ./build/versionize-docs.sh ${NEW_VERSION}
-  # git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+  local -r version="${1}"
+  echo "Versionizing docs and committing."
+  # NOTE: This is using versionize-docs.sh at the release point.
+  ./build/versionize-docs.sh ${version}
+  git commit -am "Versioning docs and examples for ${version}."
 }
 
 # TODO(ihmccreery): Review and fix this function.
@@ -253,9 +246,9 @@ function rev-version-and-commit() {
 
   # VERSION_FILE="./pkg/version/base.go"
 
-  # GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
+  # GIT_MINOR="${version_minor}.${VERSION_PATCH}"
   # echo "+++ Updating to ${NEW_VERSION}"
-  # $SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
+  # $SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${version_major}\"/" "${VERSION_FILE}"
   # $SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
   # $SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-${release_branch}+\$Format:%h\$\"/" "${VERSION_FILE}"
   # gofmt -s -w "${VERSION_FILE}"
@@ -272,9 +265,10 @@ function build() {
 }
 
 function cleanup() {
+  local -r dir="${1}"
   if ${DRY_RUN}; then
     echo "Dry run:"
-    echo "  pushd ${DIR}"
+    echo "  pushd ${dir}"
     echo "to have a look around."
   else
     popd
