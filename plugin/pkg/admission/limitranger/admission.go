@@ -102,8 +102,7 @@ func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Inte
 		ListFunc: func() (runtime.Object, error) {
 			return client.LimitRanges(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
-		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			options := api.ListOptions{ResourceVersion: resourceVersion}
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 		},
 	}

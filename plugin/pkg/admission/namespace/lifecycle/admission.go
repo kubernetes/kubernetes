@@ -111,8 +111,7 @@ func NewLifecycle(c client.Interface) admission.Interface {
 			ListFunc: func() (runtime.Object, error) {
 				return c.Namespaces().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: resourceVersion}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return c.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

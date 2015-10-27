@@ -165,7 +165,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.Watch(item.rv)
+		lw.Watch(api.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }

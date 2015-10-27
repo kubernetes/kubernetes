@@ -35,7 +35,7 @@ func (lw fakeLW) List() (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakeLW) Watch(resourceVersion string) (watch.Interface, error) {
+func (lw fakeLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 

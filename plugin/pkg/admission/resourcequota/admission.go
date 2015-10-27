@@ -53,8 +53,7 @@ func NewResourceQuota(client client.Interface) admission.Interface {
 		ListFunc: func() (runtime.Object, error) {
 			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		},
-		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			options := api.ListOptions{ResourceVersion: resourceVersion}
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 		},
 	}
