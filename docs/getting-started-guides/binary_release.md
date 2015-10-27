@@ -31,8 +31,8 @@ For more details on the release process see the [`build/` directory](http://rele
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

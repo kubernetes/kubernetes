@@ -34,8 +34,8 @@ If you have the fswatch utility installed, you can have it monitor the file syst
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

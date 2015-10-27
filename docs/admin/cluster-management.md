@@ -200,8 +200,8 @@ $ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yam
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

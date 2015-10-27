@@ -136,14 +136,14 @@ spec.containers[0].securityContext.privileged: forbidden '<*>(0xc20b222db0)true'
 
 Pod is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Pod API
-object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/v1.1.0/docs/api-reference/definitions.html#_v1_pod).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/v1.1.0/docs/api-reference/definitions.html#_v1_pod).
 
 
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

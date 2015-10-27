@@ -81,7 +81,7 @@ pods/hello-world
 
 `kubectl create --validate` currently warns about problems it detects, but creates the resource anyway, unless a required field is absent or a field value is invalid. Unknown API fields are ignored, so be careful. This pod was created, but with no `command`, which is an optional field, since the image may specify an `Entrypoint`.
 View the [Pod API
-object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/v1.1.0/docs/api-reference/definitions.html#_v1_pod)
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/v1.1.0/docs/api-reference/definitions.html#_v1_pod)
 to see the list of valid fields.
 
 ## Environment variables and variable expansion
@@ -183,8 +183,8 @@ On the other hand, containers and their logs are eventually deleted automaticall
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

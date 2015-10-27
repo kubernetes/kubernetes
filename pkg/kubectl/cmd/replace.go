@@ -44,7 +44,7 @@ JSON and YAML formats are accepted. If replacing an existing resource, the
 complete resource spec must be provided. This can be obtained by
 $ kubectl get TYPE NAME -o yaml
 
-Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.`
+Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/v1.1.0/docs/api-reference/definitions.html to find if a field is mutable.`
 	replace_example = `# Replace a pod using the data in pod.json.
 $ kubectl replace -f ./pod.json
 

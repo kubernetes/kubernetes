@@ -49,27 +49,45 @@ HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/kubernet
 md_dirs=(docs examples)
 md_files=()
 for dir in "${md_dirs[@]}"; do
-  mdfiles+=($( find "${dir}" -name "*.md" -type f ))
+  md_files+=($( find "${dir}" -name "*.md" -type f ))
 done
-for doc in "${mdfiles[@]}"; do
+for doc in "${md_files[@]}"; do
   $SED -ri \
       -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
       -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|g" \
       "${doc}"
 
   # Replace /HEAD in html preview links with /NEW_VERSION.
-  $SED -ri -e "s|(${HTML_PREVIEW_PREFIX}/HEAD)|${HTML_PREVIEW_PREFIX}/${NEW_VERSION}|" "${doc}"
+  $SED -ri -e "s|(${HTML_PREVIEW_PREFIX})/HEAD|\1/blob/${NEW_VERSION}|g" "${doc}"
 
   is_versioned_tag="<!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->"
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->"
   if ! grep -q "${is_versioned_tag}" "${doc}"; then
     echo -e "\n\n${is_versioned_tag}\n\n" >> "${doc}"
   fi
 done
 
-# Update API descriptions to match this version.
-$SED -ri -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
+# Update kubectl cmd files so that kubectl docs generated from them are as
+# expected.
+go_dirs=(pkg/kubectl/cmd)
+go_files=()
+for dir in "${go_dirs[@]}"; do
+  go_files+=($( find "${dir}" -name "*.go" -type f ))
+done
+# Update API descriptions as well
+go_files+=(pkg/api/v[0-9]*/types.go)
+go_files+=(pkg/api/unversioned/types.go)
+go_files+=(pkg/apis/*/v[0-9]*/types.go)
+go_files+=(pkg/apis/*/types.go)
+
+for file in "${go_files[@]}"; do
+  $SED -ri \
+      -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|g" \
+      -e "s|(${HTML_PREVIEW_PREFIX})/HEAD|\1/blob/${NEW_VERSION}|g" \
+      "${file}"
+done
 
 ${KUBE_ROOT}/hack/update-generated-docs.sh
 ${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
+"./hack/gen-swagger-doc/run-gen-swagger-docs.sh" "v1"
