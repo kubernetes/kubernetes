@@ -33,8 +33,6 @@ else
     echo "k8s version is set to: ${K8S_VERSION}"
 fi
 
-
-
 # Run as root
 if [ "$(id -u)" != "0" ]; then
     echo >&2 "Please run as root"
@@ -137,7 +135,14 @@ start_k8s() {
             DOCKER_CONF="/etc/default/docker"
             echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
             ifconfig docker0 down
-            apt-get install bridge-utils && brctl delbr docker0 && service docker restart
+            apt-get install bridge-utils
+            brctl delbr docker0
+            service docker stop
+            while [ `ps aux | grep /usr/bin/docker | grep -v grep | wc -l` -gt 0 ]; do
+                echo "Waiting for docker to terminate"
+                sleep 1
+            done
+            service docker start
             ;;
         *)
             echo "Unsupported operations system ${lsb_dist}"
