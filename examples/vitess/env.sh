@@ -21,7 +21,7 @@
 KUBECTL=${KUBECTL:-kubectl}
 
 # This should match the nodePort in vtctld-service.yaml
-VTCTLD_PORT=${VTCTLD_PORT:-30000}
+VTCTLD_PORT=${VTCTLD_PORT:-30001}
 
 # Customizable parameters
 SHARDS=${SHARDS:-'-80,80-'}
@@ -52,4 +52,12 @@ get_vtctld_addr() {
   fi
   echo "$VTCTLD_ADDR"
 }
+
+config_file=`dirname "${BASH_SOURCE}"`/config.sh
+if [ ! -f $config_file ]; then
+  echo "Please run ./configure.sh first to generate config.sh file."
+  exit 1
+fi
+
+source $config_file
 
