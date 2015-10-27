@@ -25,6 +25,7 @@ import (
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
 const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
 const ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
+const ConfigHashAnnotationKey = "kubernetes.io/config.hash"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
@@ -87,4 +88,14 @@ func GetValidatedSources(sources []string) ([]string, error) {
 		}
 	}
 	return validated, nil
+}
+
+// GetPodSource returns the source of the pod based on the annotation.
+func GetPodSource(pod *api.Pod) (string, error) {
+	if pod.Annotations != nil {
+		if source, ok := pod.Annotations[ConfigSourceAnnotationKey]; ok {
+			return source, nil
+		}
+	}
+	return "", fmt.Errorf("cannot get source of pod %q", pod.UID)
 }

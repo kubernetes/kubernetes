@@ -64,6 +64,12 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 	pod.Spec.NodeName = nodeName
 
 	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	// The generated UID is the hash of the file.
+	pod.Annotations[kubelet.ConfigHashAnnotationKey] = string(pod.UID)
 	return nil
 }
 
