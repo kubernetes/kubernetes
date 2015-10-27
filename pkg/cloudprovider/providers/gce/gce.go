@@ -968,6 +968,11 @@ func (gce *GCECloud) DeleteUrlMap(name string) error {
 	return gce.waitForGlobalOp(op)
 }
 
+// ListUrlMaps lists all UrlMaps in the project.
+func (gce *GCECloud) ListUrlMaps() (*compute.UrlMapList, error) {
+	return gce.service.UrlMaps.List(gce.projectID).Do()
+}
+
 // TargetHttpProxy management
 
 // GetTargetHttpProxy returns the UrlMap by name.
@@ -1010,6 +1015,11 @@ func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 		return err
 	}
 	return gce.waitForGlobalOp(op)
+}
+
+// ListTargetHttpProxies lists all TargetHttpProxies in the project.
+func (gce *GCECloud) ListTargetHttpProxies() (*compute.TargetHttpProxyList, error) {
+	return gce.service.TargetHttpProxies.List(gce.projectID).Do()
 }
 
 // GlobalForwardingRule management
@@ -1058,6 +1068,11 @@ func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRu
 	return gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
 }
 
+// ListGlobalForwardingRules lists all GlobalForwardingRules in the project.
+func (gce *GCECloud) ListGlobalForwardingRules() (*compute.ForwardingRuleList, error) {
+	return gce.service.GlobalForwardingRules.List(gce.projectID).Do()
+}
+
 // BackendService Management
 
 // GetBackendService retrieves a backend by name.
@@ -1093,6 +1108,19 @@ func (gce *GCECloud) CreateBackendService(bg *compute.BackendService) error {
 		return err
 	}
 	return gce.waitForGlobalOp(op)
+}
+
+// ListBackendServices lists all backend services in the project.
+func (gce *GCECloud) ListBackendServices() (*compute.BackendServiceList, error) {
+	return gce.service.BackendServices.List(gce.projectID).Do()
+}
+
+// GetHealth returns the health of the BackendService identified by the given
+// name, in the given instanceGroup. The instanceGroupLink is the fully
+// qualified self link of an instance group.
+func (gce *GCECloud) GetHealth(name string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
+	groupRef := &compute.ResourceGroupReference{instanceGroupLink}
+	return gce.service.BackendServices.GetHealth(gce.projectID, name, groupRef).Do()
 }
 
 // Health Checks
@@ -1132,6 +1160,11 @@ func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 	return gce.waitForGlobalOp(op)
 }
 
+// ListHttpHealthCheck lists all HttpHealthChecks in the project.
+func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error) {
+	return gce.service.HttpHealthChecks.List(gce.projectID).Do()
+}
+
 // InstanceGroup Management
 
 // CreateInstanceGroup creates an instance group with the given instances. It is the callers responsibility to add named ports.
@@ -1155,6 +1188,11 @@ func (gce *GCECloud) DeleteInstanceGroup(name string) error {
 		return err
 	}
 	return gce.waitForZoneOp(op)
+}
+
+// ListInstanceGroups lists all InstanceGroups in the project and zone.
+func (gce *GCECloud) ListInstanceGroups() (*compute.InstanceGroupList, error) {
+	return gce.service.InstanceGroups.List(gce.projectID, gce.zone).Do()
 }
 
 // ListInstancesInInstanceGroup lists all the instances in a given istance group and state.
