@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	IngressPath string = "/ingress"
+	IngressPath = "/ingress"
 )
 
 // rest implements a RESTStorage for replication controllers against etcd

@@ -35,7 +35,7 @@ const (
 	VersionRaw   versionValue = 2
 )
 
-const strRawVersion string = "raw"
+const strRawVersion = "raw"
 
 func (v *versionValue) IsBoolFlag() bool {
 	return true

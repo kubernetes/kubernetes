@@ -57,9 +57,9 @@ func NewAlwaysDenyAuthorizer() authorizer.Authorizer {
 }
 
 const (
-	ModeAlwaysAllow string = "AlwaysAllow"
-	ModeAlwaysDeny  string = "AlwaysDeny"
-	ModeABAC        string = "ABAC"
+	ModeAlwaysAllow = "AlwaysAllow"
+	ModeAlwaysDeny  = "AlwaysDeny"
+	ModeABAC        = "ABAC"
 )
 
 // Keep this list in sync with constant list above.

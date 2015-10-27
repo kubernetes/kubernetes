@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	PodInfraOOMAdj       int = -999
-	KubeletOOMScoreAdj   int = -999
-	KubeProxyOOMScoreAdj int = -999
+	PodInfraOOMAdj       = -999
+	KubeletOOMScoreAdj   = -999
+	KubeProxyOOMScoreAdj = -999
 )
 
 // isMemoryBestEffort returns true if the container's memory requirements are best-effort.
