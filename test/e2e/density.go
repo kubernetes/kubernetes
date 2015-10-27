@@ -80,39 +80,10 @@ var _ = Describe("Density", func() {
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
-
-	// Gathers data prior to framework namespace teardown
-	AfterEach(func() {
-		// Remove any remaining pods from this test if the
-		// replication controller still exists and the replica count
-		// isn't 0.  This means the controller wasn't cleaned up
-		// during the test so clean it up here. We want to do it separately
-		// to not cause a timeout on Namespace removal.
-		rc, err := c.ReplicationControllers(ns).Get(RCName)
-		if err == nil && rc.Spec.Replicas != 0 {
-			By("Cleaning up the replication controller")
-			err := DeleteRC(c, ns, RCName)
-			expectNoError(err)
-		}
-
-		By("Removing additional pods if any")
-		for i := 1; i <= nodeCount; i++ {
-			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-			c.Pods(ns).Delete(name, nil)
-		}
-
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
-
-		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c)
-		expectNoError(err)
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
-	})
-
-	framework := NewFramework("density")
-	framework.NamespaceDeletionTimeout = time.Hour
+	framework := Framework{BaseName: "density", NamespaceDeletionTimeout: time.Hour}
 
 	BeforeEach(func() {
+		framework.beforeEach()
 		c = framework.Client
 		ns = framework.Namespace.Name
 		var err error
@@ -142,6 +113,37 @@ var _ = Describe("Density", func() {
 				}
 			}
 		}
+	})
+
+	AfterEach(func() {
+		// We can't call it explicitly at the end, because it will not be called
+		// if Expect() fails.
+		defer framework.afterEach()
+
+		// Remove any remaining pods from this test if the
+		// replication controller still exists and the replica count
+		// isn't 0.  This means the controller wasn't cleaned up
+		// during the test so clean it up here. We want to do it separately
+		// to not cause a timeout on Namespace removal.
+		rc, err := c.ReplicationControllers(ns).Get(RCName)
+		if err == nil && rc.Spec.Replicas != 0 {
+			By("Cleaning up the replication controller")
+			err := DeleteRC(c, ns, RCName)
+			expectNoError(err)
+		}
+
+		By("Removing additional pods if any")
+		for i := 1; i <= nodeCount; i++ {
+			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+			c.Pods(ns).Delete(name, nil)
+		}
+
+		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
+
+		// Verify latency metrics
+		highLatencyRequests, err := HighLatencyRequests(c)
+		expectNoError(err)
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
