@@ -697,12 +697,12 @@ function kube-up {
     echo "Creating subnet."
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $SUBNET_IP_RANGE --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
     add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
-    add-tag $SUBNET_IP Name $KUBE_AWS_INSTANCE_PREFIX
+    add-tag $SUBNET_ID Name $KUBE_AWS_INSTANCE_PREFIX
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
     echo "Using existing CIDR $EXISTING_CIDR"
     INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
-    if [[ -z "$MASTER_INTERNAL_IP" ]]; then 
+    if [[ -z "$MASTER_INTERNAL_IP" ]]; then
       MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
     fi
   fi
