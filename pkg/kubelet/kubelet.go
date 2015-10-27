@@ -2461,7 +2461,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		addresses, err := kl.getNodeAddress(addr)
 		if err != nil || len(addresses) == 0 {
-			return err
+			return fmt.Errorf("can't get ip network of node %s", node.Name)
 		}
 		node.Status.Addresses = addresses
 	}
