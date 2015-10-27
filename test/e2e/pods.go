@@ -828,39 +828,6 @@ var _ = Describe("Pods", func() {
 		}
 	})
 
-	It("should have their container restart back-off timer increase exponentially", func() {
-		podName := "pod-back-off-exponentially"
-		containerName := "back-off"
-		podClient := framework.Client.Pods(framework.Namespace.Name)
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
-				Labels: map[string]string{"test": "back-off-image"},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
-					},
-				},
-			},
-		}
-
-		defer func() {
-			By("deleting the pod")
-			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		}()
-
-		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
-		delay1 += 1 // divide by zero
-		ratio := float64(delay2) / float64(delay1)
-		if math.Floor(ratio) != 2 && math.Ceil(ratio) != 2 {
-			Failf("back-off gap is not increasing exponentially pod=%s/%s delay1=%s delay2=%s", podName, containerName, delay1, delay2)
-		}
-	})
-
 	It("should have their auto-restart back-off timer reset on image update", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
@@ -907,7 +874,7 @@ var _ = Describe("Pods", func() {
 			Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
 
-		if delayAfterUpdate > delay2 || delayAfterUpdate > delay1 {
+		if delayAfterUpdate > 2*delay2 || delayAfterUpdate > 2*delay1 {
 			Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
 		}
 	})
