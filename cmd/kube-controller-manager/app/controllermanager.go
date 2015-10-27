@@ -284,7 +284,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	versions := &unversioned.APIVersions{Versions: versionStrings}
 
-	resourceMap, err := client.SupportedResources(kubeClient, kubeconfig)
+	resourceMap, err := kubeClient.Discovery().ServerResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}

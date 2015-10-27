@@ -350,7 +350,7 @@ func TestGetServerResources(t *testing.T) {
 	}))
 	client := NewOrDie(&Config{Host: server.URL})
 	for _, test := range tests {
-		got, err := client.SupportedResourcesForGroupVersion(test.request)
+		got, err := client.Discovery().ServerResourcesForGroupVersion(test.request)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -366,7 +366,7 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	resourceMap, err := SupportedResources(client, &Config{Host: server.URL})
+	resourceMap, err := client.Discovery().ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

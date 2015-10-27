@@ -57,7 +57,7 @@ type Fake struct {
 	// ProxyReactionChain is the list of proxy reactors that will be attempted for every request in the order they are tried
 	ProxyReactionChain []ProxyReactor
 
-	Resources []unversioned.APIResourceList
+	Resources map[string]*unversioned.APIResourceList
 }
 
 // Reactor is an interface to allow the composition of reaction functions.
@@ -262,18 +262,8 @@ func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
 
-func (c *Fake) SupportedResourcesForGroupVersion(version string) (*unversioned.APIResourceList, error) {
-	action := ActionImpl{
-		Verb:     "get",
-		Resource: "resource",
-	}
-	c.Invokes(action, nil)
-	for _, resource := range c.Resources {
-		if resource.GroupVersion == version {
-			return &resource, nil
-		}
-	}
-	return nil, nil
+func (c *Fake) Discovery() client.DiscoveryInterface {
+	return &FakeDiscovery{c}
 }
 
 func (c *Fake) ServerVersion() (*version.Info, error) {
@@ -325,4 +315,30 @@ func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
 
 func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 	return &FakeIngress{Fake: c, Namespace: namespace}
+}
+
+type FakeDiscovery struct {
+	*Fake
+}
+
+func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+	action := ActionImpl{
+		Verb:     "get",
+		Resource: "resource",
+	}
+	c.Invokes(action, nil)
+	return c.Resources[groupVersion], nil
+}
+
+func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+	action := ActionImpl{
+		Verb:     "get",
+		Resource: "resource",
+	}
+	c.Invokes(action, nil)
+	return c.Resources, nil
+}
+
+func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
+	return nil, nil
 }
