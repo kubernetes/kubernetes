@@ -149,6 +149,7 @@ start_k8s() {
     sleep 5
     
     # Start kubelet & proxy in container
+    # TODO: Use secure port for communication
     docker run \
         --net=host \
         --pid=host \
@@ -157,15 +158,16 @@ start_k8s() {
         -d \
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw  \
+        -v /:/rootfs:ro \
         -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
         /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 \
         --v=2 --address=0.0.0.0 --enable-server \
-        --hostname-override=$(hostname -i) \
         --cluster-dns=10.0.0.10 \
-        --cluster-domain=cluster.local
+        --cluster-domain=cluster.local \
+        --containerized
     
     docker run \
         -d \
