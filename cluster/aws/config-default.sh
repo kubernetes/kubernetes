@@ -59,6 +59,9 @@ MASTER_IP_SUFFIX="${MASTER_IP_SUFFIX:-.9}"
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+VPC_IP_RANGE="${VPC_IP_RANGE:-$INTERNAL_IP_BASE.0/16}"
+SUBNET_IP_RANGE="${SUBNET_IP_RANGE:-$INTERNAL_IP_BASE.0/24}"
+
 # If set to Elastic IP, master instance will be associated with this IP.
 # If set to auto, a new Elastic IP will be acquired
 # Otherwise amazon-given public ip will be used (it'll change with reboot).
