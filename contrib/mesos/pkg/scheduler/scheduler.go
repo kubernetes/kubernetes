@@ -796,7 +796,7 @@ func (k *MesosScheduler) NewPluginConfig(terminate <-chan struct{}, mux *http.Se
 	return &PluginConfig{
 		Config: &plugin.Config{
 			NodeLister: nil,
-			Algorithm: &schedulerApiAlgorithmAdapter{
+			Algorithm: &mesosSchedulerAlgorithm{
 				fw:         scheduler,
 				podUpdates: podUpdates,
 			},
