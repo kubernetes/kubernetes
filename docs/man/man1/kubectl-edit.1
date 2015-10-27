@@ -18,15 +18,16 @@ Edit a resource from the default editor.
 .PP
 The edit command allows you to directly edit any API resource you can retrieve via the
 command line tools. It will open the editor defined by your KUBE\_EDITOR, GIT\_EDITOR,
-or EDITOR environment variables, or fall back to 'vi'. You can edit multiple objects,
-although changes are applied one at a time. The command accepts filenames as well as
-command line arguments, although the files you point to must be previously saved
-versions of resources.
+or EDITOR environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
+You can edit multiple objects, although changes are applied one at a time. The command
+accepts filenames as well as command line arguments, although the files you point to must
+be previously saved versions of resources.
 
 .PP
 The files to edit will be output in the default API version, or a version specified
 by \-\-output\-version. The default format is YAML \- if you would like to edit in JSON
-pass \-o json.
+pass \-o json. The flag \-\-windows\-line\-endings can be used to force Windows line endings,
+otherwise the default for your operating system will be used.
 
 .PP
 In the event an error occurs while updating, a temporary file will be created on disk
@@ -48,6 +49,10 @@ saved copy to include the latest resource version.
 .PP
 \fB\-\-output\-version\fP=""
     Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-\-windows\-line\-endings\fP=false
+    Use Windows line\-endings (default Unix line\-endings)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

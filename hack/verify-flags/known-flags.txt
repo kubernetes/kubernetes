@@ -304,6 +304,7 @@ user-whitelist
 watch-cache
 watch-only
 whitelist-override-label
+windows-line-endings
 www-prefix
 retry_time
 file_content_in_loop

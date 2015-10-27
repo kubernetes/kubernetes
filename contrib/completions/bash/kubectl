@@ -498,6 +498,7 @@ _kubectl_edit()
     flags+=("--output=")
     two_word_flags+=("-o")
     flags+=("--output-version=")
+    flags+=("--windows-line-endings")
 
     must_have_one_flag=()
     must_have_one_noun=()
