@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
@@ -543,7 +541,7 @@ func TestServiceRegistryList(t *testing.T) {
 		},
 	})
 	registry.List.ResourceVersion = "1"
-	s, _ := storage.List(ctx, labels.Everything(), fields.Everything(), nil)
+	s, _ := storage.List(ctx, nil)
 	sl := s.(*api.ServiceList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 services, but got %v", len(sl.Items))
