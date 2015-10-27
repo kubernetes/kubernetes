@@ -766,11 +766,11 @@ func (dm *DockerManager) runContainer(
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
-		dm.recorder.Eventf(ref, "Failed", "Failed to create docker container with error: %v", err)
+		dm.recorder.Eventf(ref, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 		return kubecontainer.ContainerID{}, err
 	}
 
-	dm.recorder.Eventf(ref, "Created", "Created container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, kubecontainer.CreatedContainer, "Created container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
@@ -826,11 +826,11 @@ func (dm *DockerManager) runContainer(
 	securityContextProvider.ModifyHostConfig(pod, container, hc)
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
-		dm.recorder.Eventf(ref, "Failed",
+		dm.recorder.Eventf(ref, kubecontainer.FailedToStartContainer,
 			"Failed to start container with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
 	}
-	dm.recorder.Eventf(ref, "Started", "Started container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, kubecontainer.StartedContainer, "Started container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 
 	return kubetypes.DockerID(dockerContainer.ID).ContainerID(), nil
 }
@@ -1446,7 +1446,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		if reason != "" {
 			message = fmt.Sprint(message, ": ", reason)
 		}
-		dm.recorder.Event(ref, "Killing", message)
+		dm.recorder.Event(ref, kubecontainer.KillingContainer, message)
 		dm.containerRefManager.ClearRef(containerID)
 	}
 	return err
@@ -2058,7 +2058,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 		stableName, _ := BuildDockerName(dockerName, container)
 		if backOff.IsInBackOffSince(stableName, ts.Time) {
 			if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
-				dm.recorder.Eventf(ref, "Backoff", "Back-off restarting failed docker container")
+				dm.recorder.Eventf(ref, kubecontainer.BackOffStartContainer, "Back-off restarting failed docker container")
 			}
 			err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, kubecontainer.GetPodFullName(pod))
 			dm.updateReasonCache(pod, container, kubecontainer.ErrCrashLoopBackOff.Error(), err)
