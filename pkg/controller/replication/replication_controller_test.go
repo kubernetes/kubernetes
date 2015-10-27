@@ -39,10 +39,6 @@ import (
 
 var alwaysReady = func() bool { return true }
 
-func init() {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
-}
-
 func getKey(rc *api.ReplicationController, t *testing.T) string {
 	if key, err := controller.KeyFunc(rc); err != nil {
 		t.Errorf("Unexpected error getting key for rc %v: %v", rc.Name, err)

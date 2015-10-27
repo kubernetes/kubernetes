@@ -39,10 +39,6 @@ type describeClient struct {
 	client.Interface
 }
 
-func init() {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
-}
-
 func TestDescribePod(t *testing.T) {
 	fake := testclient.NewSimpleFake(&api.Pod{
 		ObjectMeta: api.ObjectMeta{

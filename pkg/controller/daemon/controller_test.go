@@ -38,10 +38,6 @@ var (
 	alwaysReady           = func() bool { return true }
 )
 
-func init() {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
-}
-
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 	if key, err := controller.KeyFunc(ds); err != nil {
 		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)

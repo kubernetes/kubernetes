@@ -972,7 +972,6 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 }
 
 func TestSyncPodWithPullPolicy(t *testing.T) {
-	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	dm, fakeDocker := newTestDockerManager()
 	puller := dm.dockerPuller.(*FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
