@@ -84,7 +84,7 @@ go_files+=(pkg/apis/*/types.go)
 for file in "${go_files[@]}"; do
   $SED -ri \
       -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|g" \
-      -e "s|(${HTML_PREVIEW_PREFIX})/HEAD)|\1/blob/${NEW_VERSION}|g" \
+      -e "s|(${HTML_PREVIEW_PREFIX})/HEAD|\1/blob/${NEW_VERSION}|g" \
       "${file}"
 done
 
