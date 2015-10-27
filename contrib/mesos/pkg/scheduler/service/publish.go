@@ -42,7 +42,7 @@ func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
 				glog.Errorf("Can't create scheduler service: %v", err)
 			}
 
-			if err := m.setEndpoints(SCHEDULER_SERVICE_NAME, net.IP(m.Address), m.Port); err != nil {
+			if err := m.setEndpoints(SCHEDULER_SERVICE_NAME, net.IP(m.address), m.port); err != nil {
 				glog.Errorf("Can't create scheduler endpoints: %v", err)
 			}
 
@@ -76,8 +76,8 @@ func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, ser
 			SessionAffinity: api.ServiceAffinityNone,
 		},
 	}
-	if m.ServiceAddress != nil {
-		svc.Spec.ClusterIP = m.ServiceAddress.String()
+	if m.serviceAddress != nil {
+		svc.Spec.ClusterIP = m.serviceAddress.String()
 	}
 	_, err := m.client.Services(api.NamespaceValue(ctx)).Create(svc)
 	if err != nil && errors.IsAlreadyExists(err) {
