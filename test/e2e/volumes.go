@@ -219,27 +219,18 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 }
 
 var _ = Describe("Volumes", func() {
-	clean := true // If 'false', the test won't clear its namespace (and pods and services) upon completion. Useful for debugging.
+	framework := NewFramework("volume")
 
+	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
+	// note that namespace deletion is handled by delete-namespace flag
+	clean := true
 	// filled in BeforeEach
 	var c *client.Client
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		By("Building a namespace api object")
-		namespace, err = createTestingNS("volume", c)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		if clean {
-			if err := deleteNS(c, namespace.Name, 5*time.Minute /* namespace deletion timeout */); err != nil {
-				Failf("Couldn't delete ns %s", err)
-			}
-		}
+		c = framework.Client
+		namespace = framework.Namespace
 	})
 
 	////////////////////////////////////////////////////////////////////////
