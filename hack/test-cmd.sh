@@ -213,6 +213,8 @@ runTests() {
   rc_container_image_field=".spec.template.spec.containers"
   port_field="(index .spec.ports 0).port"
   port_name="(index .spec.ports 0).name"
+  second_port_field="(index .spec.ports 1).port"
+  second_port_name="(index .spec.ports 1).name"
   image_field="(index .spec.containers 0).image"
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
@@ -780,6 +782,17 @@ __EOF__
   kube::test::if_has_string "${output_message}" '\"kubernetes-serve-hostnam\" exposed'
   # Clean-up
   kubectl delete svc kubernetes-serve-hostnam "${kube_flags[@]}"
+
+  ### Expose multiport object as a new service
+  # Pre-condition: don't use --port flag
+  output_message=$(kubectl expose -f docs/admin/high-availability/etcd.yaml --selector=test=etcd 2>&1 "${kube_flags[@]}")
+  # Post-condition: expose succeeded
+  kube::test::if_has_string "${output_message}" '\"etcd-server\" exposed'
+  # Post-condition: generated service has both ports from the exposed pod
+  kube::test::get_object_assert 'service etcd-server' "{{$port_name}} {{$port_field}}" 'port-1 2380'
+  kube::test::get_object_assert 'service etcd-server' "{{$second_port_name}} {{$second_port_field}}" 'port-2 4001'
+  # Clean-up
+  kubectl delete svc etcd-server "${kube_flags[@]}"
 
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running

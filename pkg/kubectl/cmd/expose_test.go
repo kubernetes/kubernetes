@@ -286,6 +286,54 @@ func TestRunExposeService(t *testing.T) {
 			expected: "service \"a-name-that-is-toooo-big\" exposed",
 			status:   200,
 		},
+		{
+			name: "expose-multiport-object",
+			args: []string{"service", "foo"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/foo",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Protocol:   api.ProtocolTCP,
+							Port:       80,
+							TargetPort: util.NewIntOrStringFromInt(80),
+						},
+						{
+							Protocol:   api.ProtocolTCP,
+							Port:       443,
+							TargetPort: util.NewIntOrStringFromInt(443),
+						},
+					},
+				},
+			},
+			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "true"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Protocol:   api.ProtocolTCP,
+							Port:       80,
+							TargetPort: util.NewIntOrStringFromInt(80),
+						},
+						{
+							Name:       "port-2",
+							Protocol:   api.ProtocolTCP,
+							Port:       443,
+							TargetPort: util.NewIntOrStringFromInt(443),
+						},
+					},
+					Selector: map[string]string{"svc": "fromfoo"},
+				},
+			},
+			status: 200,
+		},
 	}
 
 	for _, test := range tests {

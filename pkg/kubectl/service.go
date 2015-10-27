@@ -19,6 +19,7 @@ package kubectl
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -52,7 +53,12 @@ func paramNames() []GeneratorParam {
 		{"default-name", true},
 		{"name", false},
 		{"selector", true},
-		{"port", true},
+		// port will be used if a user specifies --port OR the exposed object
+		// has one port
+		{"port", false},
+		// ports will be used iff a user doesn't specify --port AND the
+		// exposed object has multiple ports
+		{"ports", false},
 		{"labels", false},
 		{"external-ip", false},
 		{"create-external-load-balancer", false},
@@ -100,19 +106,41 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			return nil, fmt.Errorf("'name' is a required parameter.")
 		}
 	}
-	portString, found := params["port"]
-	if !found {
-		return nil, fmt.Errorf("'port' is a required parameter.")
-	}
-	port, err := strconv.Atoi(portString)
-	if err != nil {
-		return nil, err
-	}
+	ports := []api.ServicePort{}
 	servicePortName, found := params["port-name"]
 	if !found {
 		// Leave the port unnamed.
 		servicePortName = ""
 	}
+	// ports takes precedence over port since it will be
+	// specified only when the user hasn't specified a port
+	// via --port and the exposed object has multiple ports.
+	var portString string
+	if portString, found = params["ports"]; !found {
+		portString, found = params["port"]
+		if !found {
+			return nil, fmt.Errorf("'port' is a required parameter.")
+		}
+	}
+	portStringSlice := strings.Split(portString, ",")
+	for i, stillPortString := range portStringSlice {
+		port, err := strconv.Atoi(stillPortString)
+		if err != nil {
+			return nil, err
+		}
+		name := servicePortName
+		// If we are going to assign multiple ports to a service, we need to
+		// generate a different name for each one.
+		if len(portStringSlice) > 1 {
+			name = fmt.Sprintf("port-%d", i+1)
+		}
+		ports = append(ports, api.ServicePort{
+			Name:     name,
+			Port:     port,
+			Protocol: api.Protocol(params["protocol"]),
+		})
+	}
+
 	service := api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -120,27 +148,31 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		},
 		Spec: api.ServiceSpec{
 			Selector: selector,
-			Ports: []api.ServicePort{
-				{
-					Name:     servicePortName,
-					Port:     port,
-					Protocol: api.Protocol(params["protocol"]),
-				},
-			},
+			Ports:    ports,
 		},
 	}
-	targetPort, found := params["target-port"]
+	targetPortString, found := params["target-port"]
 	if !found {
-		targetPort, found = params["container-port"]
+		targetPortString, found = params["container-port"]
 	}
-	if found && len(targetPort) > 0 {
-		if portNum, err := strconv.Atoi(targetPort); err != nil {
-			service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString(targetPort)
+	if found && len(targetPortString) > 0 {
+		var targetPort util.IntOrString
+		if portNum, err := strconv.Atoi(targetPortString); err != nil {
+			targetPort = util.NewIntOrStringFromString(targetPortString)
 		} else {
-			service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(portNum)
+			targetPort = util.NewIntOrStringFromInt(portNum)
+		}
+		// Use the same target-port for every port
+		for i := range service.Spec.Ports {
+			service.Spec.Ports[i].TargetPort = targetPort
 		}
 	} else {
-		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(port)
+		// If --target-port or --container-port haven't been specified, this
+		// should be the same as Port
+		for i := range service.Spec.Ports {
+			port := service.Spec.Ports[i].Port
+			service.Spec.Ports[i].TargetPort = util.NewIntOrStringFromInt(port)
+		}
 	}
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.Type = api.ServiceTypeLoadBalancer
