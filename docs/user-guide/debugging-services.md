@@ -181,8 +181,7 @@ walk-through - you can use your own `Service`'s details here.
 
 ```console
 $ kubectl expose rc hostnames --port=80 --target-port=9376
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
-hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
+service "hostnames" exposed
 ```
 
 And read it back, just to be sure:

@@ -35,17 +35,22 @@ now run `docker ps` you should see nginx running.  You may need to wait a few mi
 kubectl expose rc nginx --port=80
 ```
 
-This should print:
-
-```console
-NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
-nginx        10.179.240.1     <none>            80/TCP                 run=nginx    8d
-```
-
-Hit the webserver:
+Run the following command to obtain the IP of this service we just created. There are two IPs, the first one is internal (CLUSTER_IP), and the second one is the external load-balanced IP.
 
 ```sh
-curl <insert-ip-from-above-here>
+kubectl get svc nginx
+```
+
+Alternatively, you can obtain only the first IP (CLUSTER_IP) by running:
+
+```sh
+kubectl get svc nginx --template={{.spec.clusterIP}}
+```
+
+Hit the webserver with the first IP (CLUSTER_IP):
+
+```sh
+curl <insert-cluster-ip-here>
 ```
 
 Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
