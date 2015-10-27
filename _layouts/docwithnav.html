@@ -85,13 +85,43 @@
 		    });
 		}
 		loadonstatechange();
-		/* Watch for any click in the content area and close the nav menu if its open (for small res. desiplays) */
-		$('.bodywrapper').on("click", function(e) {
+		/* Watch for any click in the content area and if they are open, close the version selector menu and the nav menu (for small res. desiplays). */
+		$('.bodywrapper').on("click", function() {
 			if($('#wrapper').hasClass('col-sm-5')) {
 				togglenavmenu();
 			}
+			//$('.versionselector .dropdown-menu').hide();
 		});
-		/* Handle clicks in nav menu, content body, and header. Also track history by pushing state (so back/forward browser buttons work)*/
+		/* Get and display the current doc version in the version selector button */
+		function setcurdocver(){
+			var urlsplit = window.location.pathname.split('/'),
+			    curversion = urlsplit[1],
+				curdocver = "Click Here";
+			switch (curversion) {
+				case 'v1.0':
+					curdocver = curversion;
+					$('.versionselector a#v10').addClass('active');
+					$('.versionselector a#v11').removeClass('active');
+					break;
+				case 'v1.1':
+					curdocver = curversion;
+					$('.versionselector a#v11').addClass('active');
+					$('.versionselector a#v10').removeClass('active');
+					break;
+				default:
+					curdocver = curversion;
+			}
+			$('.versionselector button').text("Version: " + curdocver);
+		}
+		setcurdocver();
+		$(window).load(function() { //temporary fix to close the menu (it stays open for some reason)
+			$('.versionselector .dropdown-menu').slideUp(1200);
+		});
+		/* Toggle the version selector menu on button click */
+		$('.versionselector').on("click", function() {
+			$('.versionselector .dropdown-menu').toggle('display');
+			});
+		/* Handle clicks on 'a' elements in nav menu, content body, and header. Also track history by pushing state (so back/forward browser buttons work)*/
 	    $(document).on("click", 'a', function(e) {
 	        e.preventDefault();
 			var clickedon = $(this),
@@ -117,8 +147,11 @@
 				if($('#wrapper').hasClass('col-sm-5') && !(clickedon.parent().hasClass('haschild'))) {
 					togglenavmenu();
 				}
+				//perform an action base on the type of 'a' element clicked
 				if(this.host != location.host) {//open external links in new tab/window
 					window.open(href, '_blank');
+				} else if(clickedon.is('.versionselector .dropdown-menu a')) {//perform a full page load when clicking on a doc version from the drop-down menu
+					window.location=href;
 				} else if(href != "#" && !clickedon.parents('header').is('#nav') && !clickedon.parents('div').is('#mobile-nav-container')) {//skip empty nav menu containers and any clicks in the banner and banner menu
 					//track all history but exclude clicks that only toggle open/closed container menus
 					if (!(clickedon.hasClass('active') && clickedon.parent('li').hasClass('haschild'))) {
