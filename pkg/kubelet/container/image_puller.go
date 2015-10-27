@@ -83,7 +83,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
-		puller.logIt(ref, "Failed", logPrefix, msg, glog.Warning)
+		puller.logIt(ref, FailedToInspectImage, logPrefix, msg, glog.Warning)
 		return ErrImageInspect, msg
 	}
 
@@ -94,7 +94,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 			return nil, ""
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
-			puller.logIt(ref, "ErrImageNeverPull", logPrefix, msg, glog.Warning)
+			puller.logIt(ref, ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
 			return ErrImageNeverPull, msg
 		}
 	}
@@ -102,7 +102,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	backOffKey := fmt.Sprintf("%s_%s", pod.Name, container.Image)
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
-		puller.logIt(ref, "Back-off", logPrefix, msg, glog.Info)
+		puller.logIt(ref, BackOffPullImage, logPrefix, msg, glog.Info)
 		return ErrImagePullBackOff, msg
 	}
 	puller.logIt(ref, "Pulling", logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
