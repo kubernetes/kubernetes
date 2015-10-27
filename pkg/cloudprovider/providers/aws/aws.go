@@ -589,6 +589,11 @@ func (aws *AWSCloud) ProviderName() string {
 	return ProviderName
 }
 
+// ScrubDNS filters DNS settings for pods.
+func (aws *AWSCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
 func (s *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return s, true
