@@ -2401,8 +2401,8 @@ FIND:
 				if addrOri, ok := addr.(*net.IPNet); ok {
 					if addrOri.IP.Equal(ip) {
 						addresses = []api.NodeAddress{
-							api.NodeAddress{api.NodeLegacyHostIP, addrOri.String()},
-							api.NodeAddress{api.NodeInternalIP, addrOri.String()},
+							{api.NodeLegacyHostIP, addrOri.String()},
+							{api.NodeInternalIP, addrOri.String()},
 						}
 						break FIND
 					}
