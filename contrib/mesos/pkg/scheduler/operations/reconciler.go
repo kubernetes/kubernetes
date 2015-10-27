@@ -14,21 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package operations
 
 import (
-	"fmt"
 	"time"
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	bindings "github.com/mesos/mesos-go/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
+	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-)
-
-var (
-	reconciliationCancelledErr = fmt.Errorf("explicit task reconciliation cancelled")
 )
 
 type ReconcilerAction func(driver bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error
@@ -43,7 +39,7 @@ type Reconciler struct {
 	explicitReconciliationAbortTimeout time.Duration
 }
 
-func newReconciler(doer proc.Doer, action ReconcilerAction,
+func NewReconciler(doer proc.Doer, action ReconcilerAction,
 	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) *Reconciler {
 	return &Reconciler{
 		Doer:     doer,
@@ -164,7 +160,7 @@ requestLoop:
 			metrics.ReconciliationExecuted.WithLabelValues("explicit").Inc()
 			defer close(fin)
 			err := <-r.Action(driver, cancel)
-			if err == reconciliationCancelledErr {
+			if err == merrors.ReconciliationCancelledErr {
 				metrics.ReconciliationCancelled.WithLabelValues("explicit").Inc()
 				log.Infoln(err.Error())
 			} else if err != nil {
