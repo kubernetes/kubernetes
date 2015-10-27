@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package operations
 
 import (
 	"fmt"
@@ -27,18 +27,24 @@ import (
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
-// mesosSchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
-type mesosSchedulerAlgorithm struct {
+// SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
+type SchedulerAlgorithm struct {
 	fw         types.Framework
 	podUpdates queue.FIFO
 }
 
+func NewSchedulerAlgorithm(fw types.Framework, podUpdates queue.FIFO) *SchedulerAlgorithm {
+	return &SchedulerAlgorithm{
+		fw:         fw,
+		podUpdates: podUpdates,
+	}
+}
+
 // Schedule implements the Scheduler interface of Kubernetes.
 // It returns the selectedMachine's name and error (if there's any).
-func (k *mesosSchedulerAlgorithm) Schedule(pod *api.Pod, unused algorithm.NodeLister) (string, error) {
+func (k *SchedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 	log.Infof("Try to schedule pod %v\n", pod.Name)
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 
@@ -91,7 +97,7 @@ func (k *mesosSchedulerAlgorithm) Schedule(pod *api.Pod, unused algorithm.NodeLi
 }
 
 // Call ScheduleFunc and subtract some resources, returning the name of the machine the task is scheduled on
-func (k *mesosSchedulerAlgorithm) doSchedule(task *podtask.T, err error) (string, error) {
+func (k *SchedulerAlgorithm) doSchedule(task *podtask.T, err error) (string, error) {
 	var offer offers.Perishable
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table

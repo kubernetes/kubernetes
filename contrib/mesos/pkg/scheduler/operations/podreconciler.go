@@ -14,110 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package operations
 
 import (
 	"time"
 
 	log "github.com/golang/glog"
-	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
-	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
 )
 
-const (
-	pluginRecoveryDelay = 100 * time.Millisecond // delay after scheduler plugin crashes, before we resume scheduling
-
-	FailedScheduling = "FailedScheduling"
-	Scheduled        = "Scheduled"
-)
-
-type PluginInterface interface {
-	// the apiserver may have a different state for the pod than we do
-	// so reconcile our records, but only for this one pod
-	reconcileTask(*podtask.T)
-
-	// execute the Scheduling plugin, should start a go routine and return immediately
-	Run(<-chan struct{})
+// PodReconciler reconciles a pod with the apiserver
+type PodReconciler struct {
+	fw      types.Framework
+	client  *client.Client
+	qr      *queuer.Queuer
+	deleter *Deleter
 }
 
-type PluginConfig struct {
-	*plugin.Config
-	fw       types.Framework
-	client   *client.Client
-	qr       *queuer.Queuer
-	deleter  *operations.Deleter
-	starting chan struct{} // startup latch
-}
-
-func NewPlugin(c *PluginConfig) PluginInterface {
-	return &schedulerPlugin{
-		config:   c.Config,
-		fw:       c.fw,
-		client:   c.client,
-		qr:       c.qr,
-		deleter:  c.deleter,
-		starting: c.starting,
+func NewPodReconciler(fw types.Framework, client *client.Client, qr *queuer.Queuer, deleter *Deleter) *PodReconciler {
+	return &PodReconciler{
+		fw:      fw,
+		client:  client,
+		qr:      qr,
+		deleter: deleter,
 	}
-}
-
-type schedulerPlugin struct {
-	config   *plugin.Config
-	fw       types.Framework
-	client   *client.Client
-	qr       *queuer.Queuer
-	deleter  *operations.Deleter
-	starting chan struct{}
-}
-
-func (s *schedulerPlugin) Run(done <-chan struct{}) {
-	defer close(s.starting)
-	go runtime.Until(s.scheduleOne, pluginRecoveryDelay, done)
-}
-
-// hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/scheduler.go,
-// with the Modeler stuff removed since we don't use it because we have mesos.
-func (s *schedulerPlugin) scheduleOne() {
-	pod := s.config.NextPod()
-
-	// pods which are pre-scheduled (i.e. NodeName is set) are deleted by the kubelet
-	// in upstream. Not so in Mesos because the kubelet hasn't see that pod yet. Hence,
-	// the scheduler has to take care of this:
-	if pod.Spec.NodeName != "" && pod.DeletionTimestamp != nil {
-		log.V(3).Infof("deleting pre-scheduled, not yet running pod: %s/%s", pod.Namespace, pod.Name)
-		s.client.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
-		return
-	}
-
-	log.V(3).Infof("Attempting to schedule: %+v", pod)
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister) // call kubeScheduler.Schedule
-	if err != nil {
-		log.V(1).Infof("Failed to schedule: %+v", pod)
-		s.config.Recorder.Eventf(pod, FailedScheduling, "Error scheduling: %v", err)
-		s.config.Error(pod, err)
-		return
-	}
-	b := &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
-		Target: api.ObjectReference{
-			Kind: "Node",
-			Name: dest,
-		},
-	}
-	if err := s.config.Binder.Bind(b); err != nil {
-		log.V(1).Infof("Failed to bind pod: %+v", err)
-		s.config.Recorder.Eventf(pod, FailedScheduling, "Binding rejected: %v", err)
-		s.config.Error(pod, err)
-		return
-	}
-	s.config.Recorder.Eventf(pod, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
 }
 
 // this pod may be out of sync with respect to the API server registry:
@@ -131,7 +57,7 @@ func (s *schedulerPlugin) scheduleOne() {
 //      host="..." |  host="..."    ; perhaps no updates to process?
 //
 // TODO(jdef) this needs an integration test
-func (s *schedulerPlugin) reconcileTask(t *podtask.T) {
+func (s *PodReconciler) Reconcile(t *podtask.T) {
 	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
 	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)

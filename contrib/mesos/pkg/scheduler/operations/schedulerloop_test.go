@@ -14,7 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package operations implements independent aspects of the scheduler which
-// do not use MesosScheduler internals, but rely solely on the Framework
-// interface.
 package operations
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// Test to create the scheduler loop with an empty lopp config
+func TestPlugin_New(t *testing.T) {
+	assert := assert.New(t)
+
+	c := SchedulerLoopConfig{}
+	p := NewSchedulerLoop(&c)
+	assert.NotNil(p)
+}

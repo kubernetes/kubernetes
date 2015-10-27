@@ -73,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
 )
 
 const (
@@ -758,13 +759,13 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		},
 	}
 
-	kpl := scheduler.NewPlugin(mesosPodScheduler.NewDefaultPluginConfig(schedulerProcess.Terminal(), s.mux))
-	runtime.On(mesosPodScheduler.Registration(), func() { kpl.Run(schedulerProcess.Terminal()) })
+	loop := operations.NewSchedulerLoop(mesosPodScheduler.NewDefaultSchedulerLoopConfig(schedulerProcess.Terminal(), s.mux))
+	runtime.On(mesosPodScheduler.Registration(), func() { loop.Run(schedulerProcess.Terminal()) })
 	runtime.On(mesosPodScheduler.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {
 		log.V(1).Infoln("performing deferred initialization")
-		if err = mesosPodScheduler.Init(schedulerProcess.Master(), kpl, s.mux); err != nil {
+		if err = mesosPodScheduler.Init(schedulerProcess.Master(), loop, s.mux); err != nil {
 			return nil, fmt.Errorf("failed to initialize pod scheduler: %v", err)
 		}
 		log.V(1).Infoln("deferred init complete")

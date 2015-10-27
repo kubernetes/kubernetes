@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/mock"
 )
 
 //get number of non-expired offers from  offer registry
@@ -283,7 +284,7 @@ func TestDisconnect(t *testing.T) {
 //test we can handle different status updates, TODO check state transitions
 func TestStatus_Update(t *testing.T) {
 
-	mockdriver := MockSchedulerDriver{}
+	mockdriver := mock.MockSchedulerDriver{}
 	// setup expectations
 	mockdriver.On("KillTask", util.NewTaskID("test-task-001")).Return(mesos.Status_DRIVER_RUNNING, nil)
 

@@ -29,7 +29,7 @@ import (
 
 type ReconcilerAction func(driver bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error
 
-type Reconciler struct {
+type TasksReconciler struct {
 	proc.Doer
 	Action                             ReconcilerAction
 	explicit                           chan struct{}   // send an empty struct to trigger explicit reconciliation
@@ -39,9 +39,9 @@ type Reconciler struct {
 	explicitReconciliationAbortTimeout time.Duration
 }
 
-func NewReconciler(doer proc.Doer, action ReconcilerAction,
-	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) *Reconciler {
-	return &Reconciler{
+func NewTasksReconciler(doer proc.Doer, action ReconcilerAction,
+	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) *TasksReconciler {
+	return &TasksReconciler{
 		Doer:     doer,
 		explicit: make(chan struct{}, 1),
 		implicit: make(chan struct{}, 1),
@@ -67,14 +67,14 @@ func NewReconciler(doer proc.Doer, action ReconcilerAction,
 	}
 }
 
-func (r *Reconciler) RequestExplicit() {
+func (r *TasksReconciler) RequestExplicit() {
 	select {
 	case r.explicit <- struct{}{}: // noop
 	default: // request queue full; noop
 	}
 }
 
-func (r *Reconciler) RequestImplicit() {
+func (r *TasksReconciler) RequestImplicit() {
 	select {
 	case r.implicit <- struct{}{}: // noop
 	default: // request queue full; noop
@@ -84,7 +84,7 @@ func (r *Reconciler) RequestImplicit() {
 // execute task reconciliation, returns when r.done is closed. intended to run as a goroutine.
 // if reconciliation is requested while another is in progress, the in-progress operation will be
 // cancelled before the new reconciliation operation begins.
-func (r *Reconciler) Run(driver bindings.SchedulerDriver) {
+func (r *TasksReconciler) Run(driver bindings.SchedulerDriver) {
 	var cancel, finished chan struct{}
 requestLoop:
 	for {
