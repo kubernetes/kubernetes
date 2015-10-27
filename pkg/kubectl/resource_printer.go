@@ -738,7 +738,7 @@ func printJob(job *extensions.Job, w io.Writer, withNamespace bool, wide bool, s
 	}
 
 	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d",
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
