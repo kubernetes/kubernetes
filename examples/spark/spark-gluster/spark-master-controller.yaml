@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: spark-master
-          image: gcr.io/google_containers/spark-master
+          image: gcr.io/google_containers/spark-master:1.5.1_v1
           ports:
             - containerPort: 7077
           volumeMounts:
