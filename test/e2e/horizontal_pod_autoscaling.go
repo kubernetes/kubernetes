@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
@@ -24,8 +26,9 @@ import (
 )
 
 const (
-	kind        = "replicationController"
-	subresource = "scale"
+	kind             = "replicationController"
+	subresource      = "scale"
+	stabilityTimeout = 10 * time.Minute
 )
 
 var _ = Describe("Horizontal pod autoscaling", func() {
@@ -38,6 +41,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 		defer rc.CleanUp()
 		createCPUHorizontalPodAutoscaler(rc, 20)
 		rc.WaitForReplicas(3)
+		rc.EnsureDesiredReplicas(3, stabilityTimeout)
 		rc.ConsumeCPU(700)
 		rc.WaitForReplicas(5)
 	})
@@ -47,6 +51,7 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 		defer rc.CleanUp()
 		createCPUHorizontalPodAutoscaler(rc, 30)
 		rc.WaitForReplicas(3)
+		rc.EnsureDesiredReplicas(3, stabilityTimeout)
 		rc.ConsumeCPU(100)
 		rc.WaitForReplicas(1)
 	})
