@@ -79,8 +79,7 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), accountSelector)
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: rv}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return e.client.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), accountSelector, options)
 			},
 		},
@@ -97,8 +96,7 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.Namespaces().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: rv}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return e.client.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

@@ -281,8 +281,7 @@ func startEndpointWatcher(f *Framework, q *endpointQueries) {
 			ListFunc: func() (runtime.Object, error) {
 				return f.Client.Endpoints(f.Namespace.Name).List(labels.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				options := api.ListOptions{ResourceVersion: rv}
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return f.Client.Endpoints(f.Namespace.Name).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

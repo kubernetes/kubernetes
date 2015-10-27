@@ -150,10 +150,10 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 
 // Watch returns a watch, which will be pre-populated with all changes
 // after resourceVersion.
-func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, error) {
+func (f *FakeControllerSource) Watch(options api.ListOptions) (watch.Interface, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	rc, err := strconv.Atoi(resourceVersion)
+	rc, err := strconv.Atoi(options.ResourceVersion)
 	if err != nil {
 		return nil, err
 	}
