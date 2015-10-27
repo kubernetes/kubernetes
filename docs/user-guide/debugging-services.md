@@ -55,6 +55,8 @@ This document will hopefully help you to figure out what's going wrong.
   - [Is the kube-proxy working?](#is-the-kube-proxy-working)
     - [Is kube-proxy running?](#is-kube-proxy-running)
     - [Is kube-proxy writing iptables rules?](#is-kube-proxy-writing-iptables-rules)
+      - [Userspace](#userspace)
+      - [Iptables](#iptables)
     - [Is kube-proxy proxying?](#is-kube-proxy-proxying)
   - [Seek help](#seek-help)
   - [More information](#more-information)
@@ -468,24 +470,16 @@ depends on your `Node` OS.  On some OSes it is a file, such as
 should see something like:
 
 ```console
-I0707 17:34:53.945651   30031 server.go:88] Running in resource-only container "/kube-proxy"
-I0707 17:34:53.945921   30031 proxier.go:121] Setting proxy IP to 10.240.115.247 and initializing iptables
-I0707 17:34:54.053023   30031 roundrobin.go:262] LoadBalancerRR: Setting endpoints for default/kubernetes: to [10.240.169.188:443]
-I0707 17:34:54.053175   30031 roundrobin.go:262] LoadBalancerRR: Setting endpoints for default/hostnames:default to [10.244.0.5:9376 10.244.0.6:9376 10.244.0.7:9376]
-I0707 17:34:54.053284   30031 roundrobin.go:262] LoadBalancerRR: Setting endpoints for default/kube-dns:dns to [10.244.3.3:53]
-I0707 17:34:54.053310   30031 roundrobin.go:262] LoadBalancerRR: Setting endpoints for default/kube-dns:dns-tcp to [10.244.3.3:53]
-I0707 17:34:54.054780   30031 proxier.go:306] Adding new service "default/kubernetes:" at 10.0.0.1:443/TCP
-I0707 17:34:54.054903   30031 proxier.go:247] Proxying for service "default/kubernetes:" on TCP port 40074
-I0707 17:34:54.079181   30031 proxier.go:306] Adding new service "default/hostnames:default" at 10.0.1.175:80/TCP
-I0707 17:34:54.079273   30031 proxier.go:247] Proxying for service "default/hostnames:default" on TCP port 48577
-I0707 17:34:54.113665   30031 proxier.go:306] Adding new service "default/kube-dns:dns" at 10.0.0.10:53/UDP
-I0707 17:34:54.113776   30031 proxier.go:247] Proxying for service "default/kube-dns:dns" on UDP port 34149
-I0707 17:34:54.120224   30031 proxier.go:306] Adding new service "default/kube-dns:dns-tcp" at 10.0.0.10:53/TCP
-I0707 17:34:54.120297   30031 proxier.go:247] Proxying for service "default/kube-dns:dns-tcp" on TCP port 53476
-I0707 17:34:54.902313   30031 proxysocket.go:130] Accepted TCP connection from 10.244.3.3:42670 to 10.244.3.1:40074
-I0707 17:34:54.903107   30031 proxysocket.go:130] Accepted TCP connection from 10.244.3.3:42671 to 10.244.3.1:40074
-I0707 17:35:46.015868   30031 proxysocket.go:246] New UDP connection from 10.244.3.2:57493
-I0707 17:35:46.017061   30031 proxysocket.go:246] New UDP connection from 10.244.3.2:55471
+I1027 22:14:53.995134    5063 server.go:200] Running in resource-only container "/kube-proxy"
+I1027 22:14:53.998163    5063 server.go:247] Using iptables Proxier.
+I1027 22:14:53.999055    5063 server.go:255] Tearing down userspace rules. Errors here are acceptable.
+I1027 22:14:54.038140    5063 proxier.go:352] Setting endpoints for "kube-system/kube-dns:dns-tcp" to [10.244.1.3:53]
+I1027 22:14:54.038164    5063 proxier.go:352] Setting endpoints for "kube-system/kube-dns:dns" to [10.244.1.3:53]
+I1027 22:14:54.038209    5063 proxier.go:352] Setting endpoints for "default/kubernetes:https" to [10.240.0.2:443]
+I1027 22:14:54.038238    5063 proxier.go:429] Not syncing iptables until Services and Endpoints have been received from master
+I1027 22:14:54.040048    5063 proxier.go:294] Adding new service "default/kubernetes:https" at 10.0.0.1:443/TCP
+I1027 22:14:54.040154    5063 proxier.go:294] Adding new service "kube-system/kube-dns:dns" at 10.0.0.10:53/UDP
+I1027 22:14:54.040223    5063 proxier.go:294] Adding new service "kube-system/kube-dns:dns-tcp" at 10.0.0.10:53/TCP
 ```
 
 If you see error messages about not being able to contact the master, you
@@ -496,6 +490,12 @@ should double-check your `Node` configuration and installation steps.
 One of the main responsibilities of `kube-proxy` is to write the `iptables`
 rules which implement `Service`s.  Let's check that those rules are getting
 written.
+
+The kube-proxy can run in either "userspace" mode or "iptables" mode.
+Hopefully you are using the newer, faster, more stable "iptables" mode.  You
+should see one of the following cases.
+
+#### Userspace
 
 ```console
 u@node$ iptables-save | grep hostnames
@@ -508,6 +508,27 @@ example) - a "KUBE-PORTALS-CONTAINER" and a "KUBE-PORTALS-HOST".  If you do
 not see these, try restarting `kube-proxy` with the `-V` flag set to 4, and
 then look at the logs again.
 
+#### Iptables
+
+```console
+u@node$ iptables-save | grep hostnames
+-A KUBE-SEP-57KPRZ3JQVENLNBR -s 10.244.3.6/32 -m comment --comment "default/hostnames:" -j MARK --set-xmark 0x4d415351/0xffffffff
+-A KUBE-SEP-57KPRZ3JQVENLNBR -p tcp -m comment --comment "default/hostnames:" -m tcp -j DNAT --to-destination 10.244.3.6:9376
+-A KUBE-SEP-WNBA2IHDGP2BOBGZ -s 10.244.1.7/32 -m comment --comment "default/hostnames:" -j MARK --set-xmark 0x4d415351/0xffffffff
+-A KUBE-SEP-WNBA2IHDGP2BOBGZ -p tcp -m comment --comment "default/hostnames:" -m tcp -j DNAT --to-destination 10.244.1.7:9376
+-A KUBE-SEP-X3P2623AGDH6CDF3 -s 10.244.2.3/32 -m comment --comment "default/hostnames:" -j MARK --set-xmark 0x4d415351/0xffffffff
+-A KUBE-SEP-X3P2623AGDH6CDF3 -p tcp -m comment --comment "default/hostnames:" -m tcp -j DNAT --to-destination 10.244.2.3:9376
+-A KUBE-SERVICES -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames: cluster IP" -m tcp --dport 80 -j KUBE-SVC-NWV5X2332I4OT4T3
+-A KUBE-SVC-NWV5X2332I4OT4T3 -m comment --comment "default/hostnames:" -m statistic --mode random --probability 0.33332999982 -j KUBE-SEP-WNBA2IHDGP2BOBGZ
+-A KUBE-SVC-NWV5X2332I4OT4T3 -m comment --comment "default/hostnames:" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-X3P2623AGDH6CDF3
+-A KUBE-SVC-NWV5X2332I4OT4T3 -m comment --comment "default/hostnames:" -j KUBE-SEP-57KPRZ3JQVENLNBR
+```
+
+There should be 1 rule in `KUBE-SERVICES`, 1 or 2 rules per endpoint in
+`KUBE-SVC-(hash)` (depending on `SessionAffinity`), one `KUBE-SEP-(hash)` chain
+per endpoint, and a few rules in each `KUBE-SEP-(hash)` chain.  The exact rules
+will vary based on your exact config (including node-ports and load-balancers).
+
 ### Is kube-proxy proxying?
 
 Assuming you do see the above rules, try again to access your `Service` by IP:
@@ -517,10 +538,12 @@ u@node$ curl 10.0.1.175:80
 hostnames-0uton
 ```
 
-If this fails, we can try accessing the proxy directly.  Look back at the
-`iptables-save` output above, and extract the port number that `kube-proxy` is
-using for your `Service`.  In the above examples it is "48577".  Now connect to
-that:
+If this fails and you are using the userspace proxy, you can try accessing the
+proxy directly.  If you are using the iptables proxy, skip this section.
+
+Look back at the `iptables-save` output above, and extract the
+port number that `kube-proxy` is using for your `Service`.  In the above
+examples it is "48577".  Now connect to that:
 
 ```console
 u@node$ curl localhost:48577
