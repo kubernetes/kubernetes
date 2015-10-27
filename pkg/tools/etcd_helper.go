@@ -391,6 +391,9 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 // and 0 means forever. If no error is returned and out is not nil, out will be set to the read value
 // from etcd.
 func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) error {
+	if strings.Contains(key, "../") {
+		return fmt.Errorf("Illegal path, moving to parent directories not supported")
+	}
 	key = h.PrefixEtcdKey(key)
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
@@ -453,6 +456,9 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
+	}
+	if strings.Contains(key, "../") {
+		return fmt.Errorf("Illegal path, moving to parent directories not supported")
 	}
 	key = h.PrefixEtcdKey(key)
 
@@ -543,6 +549,9 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
 		panic("need ptr to type")
+	}
+	if strings.Contains(key, "../") {
+		return fmt.Errorf("Illegal path, moving to parent directories not supported")
 	}
 	key = h.PrefixEtcdKey(key)
 	for {
