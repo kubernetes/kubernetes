@@ -59,6 +59,9 @@ go get -u github.com/tools/godep 2>/dev/null
 go install github.com/tools/godep 2>/dev/null
 GODEP="${_tmpdir}/bin/godep"
 
+echo "Preloading aws-sdk-go godep - see https://github.com/kubernetes/kubernetes/issues/16238"
+preload-dep github.com/aws aws-sdk-go v0.9.9
+
 # fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
 
