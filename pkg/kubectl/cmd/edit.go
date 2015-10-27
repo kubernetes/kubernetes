@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
@@ -45,14 +47,15 @@ const (
 
 The edit command allows you to directly edit any API resource you can retrieve via the
 command line tools. It will open the editor defined by your KUBE_EDITOR, GIT_EDITOR,
-or EDITOR environment variables, or fall back to 'vi'. You can edit multiple objects,
-although changes are applied one at a time. The command accepts filenames as well as
-command line arguments, although the files you point to must be previously saved
-versions of resources.
+or EDITOR environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
+You can edit multiple objects, although changes are applied one at a time. The command 
+accepts filenames as well as command line arguments, although the files you point to must
+be previously saved versions of resources.
 
 The files to edit will be output in the default API version, or a version specified
 by --output-version. The default format is YAML - if you would like to edit in JSON
-pass -o json.
+pass -o json. The flag --windows-line-endings can be used to force Windows line endings,
+otherwise the default for your operating system will be used.
 
 In the event an error occurs while updating, a temporary file will be created on disk
 that contains your unapplied changes. The most common error when updating a resource
@@ -91,6 +94,7 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
+	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	return cmd
 }
 
@@ -142,6 +146,8 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return err
 	}
 
+	windowsLineEndings := cmdutil.GetFlagBool(cmd, "windows-line-endings")
+	edit := editor.NewDefaultEditor()
 	defaultVersion := cmdutil.OutputVersion(cmd, clientConfig.Version)
 	results := editResults{}
 	for {
@@ -156,16 +162,19 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 			// generate the file to edit
 			buf := &bytes.Buffer{}
-			if err := results.header.writeTo(buf); err != nil {
+			var w io.Writer = buf
+			if windowsLineEndings {
+				w = util.NewCRLFWriter(w)
+			}
+			if err := results.header.writeTo(w); err != nil {
 				return preservedFile(err, results.file, out)
 			}
-			if err := printer.PrintObj(obj, buf); err != nil {
+			if err := printer.PrintObj(obj, w); err != nil {
 				return preservedFile(err, results.file, out)
 			}
 			original := buf.Bytes()
 
 			// launch the editor
-			edit := editor.NewDefaultEditor()
 			edited, file, err := edit.LaunchTempFile("kubectl-edit-", ext, buf)
 			if err != nil {
 				return preservedFile(err, results.file, out)
