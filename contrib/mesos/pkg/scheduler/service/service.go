@@ -55,11 +55,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
@@ -723,11 +723,17 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		Executor:          executor,
 		PodScheduler:      fcfs,
 		Client:            client,
-		EtcdClient:        etcdClient,
 		FailoverTimeout:   s.FailoverTimeout,
 		ReconcileInterval: s.ReconcileInterval,
 		ReconcileCooldown: s.ReconcileCooldown,
 		LookupNode:        lookupNode,
+		StoreFrameworkId: func(id string) {
+			// TODO(jdef): port FrameworkId store to generic Kubernetes config store as soon as available
+			_, err := etcdClient.Set(meta.FrameworkIDKey, id, uint64(s.FailoverTimeout))
+			if err != nil {
+				log.Errorf("failed to renew frameworkId TTL: %v", err)
+			}
+		},
 	})
 
 	masterUri := s.MesosMaster
