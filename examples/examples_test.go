@@ -111,6 +111,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expValidation.ValidateJob(t)
+	case *extensions.Ingress:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateIngress(t)
 	case *extensions.DaemonSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
@@ -222,6 +227,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
 			"job":         &extensions.Job{},
+			"ingress":     &extensions.Ingress{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
