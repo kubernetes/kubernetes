@@ -44,7 +44,7 @@ func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string)
 		codec:      codec,
 		versioner:  APIObjectVersioner{},
 		copier:     api.Scheme,
-		pathPrefix: prefix,
+		pathPrefix: path.Join("/", prefix),
 		cache:      util.NewCache(maxEtcdCacheEntries),
 	}
 }
@@ -489,10 +489,10 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 }
 
 func (h *etcdHelper) prefixEtcdKey(key string) string {
-	if strings.HasPrefix(key, path.Join("/", h.pathPrefix)) {
+	if strings.HasPrefix(key, h.pathPrefix) {
 		return key
 	}
-	return path.Join("/", h.pathPrefix, key)
+	return path.Join(h.pathPrefix, key)
 }
 
 // etcdCache defines interface used for caching objects stored in etcd. Objects are keyed by
