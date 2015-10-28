@@ -2398,11 +2398,9 @@ FIND:
 		addrs, err := i.Addrs()
 		if err == nil {
 			for _, addr := range addrs {
-				if addrOri, ok := addr.(*net.IPNet); ok {
-					if addrOri.IP.Equal(ip) {
-						network = addrOri.String()
-						break FIND
-					}
+				if addrOri, ok := addr.(*net.IPNet); ok && addrOri.IP.Equal(ip) {
+					network = addrOri.String()
+					break FIND
 				}
 			}
 		}
