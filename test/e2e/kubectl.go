@@ -222,7 +222,7 @@ var _ = Describe("Kubectl client", func() {
 
 			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
 			// to loop test.
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 				if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, 1*time.Second) {
 					Failf("Pod %q should still be running", "run-test-3")
 				}
