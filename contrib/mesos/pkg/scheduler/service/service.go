@@ -67,6 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	"k8s.io/kubernetes/pkg/fields"
@@ -759,8 +760,13 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		},
 	}
 
+	// create scheduler loop
 	fw := &scheduler.MesosFramework{MesosScheduler: mesosScheduler}
-	loop := operations.NewSchedulerLoop(operations.NewDefaultSchedulerLoopConfig(sc, fw, client, schedulerProcess.Terminal(), s.mux))
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
+	loop := operations.NewSchedulerLoop(sc, fw, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
+
 	runtime.On(mesosScheduler.Registration(), func() { loop.Run(schedulerProcess.Terminal()) })
 	runtime.On(mesosScheduler.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
 

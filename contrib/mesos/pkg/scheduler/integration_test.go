@@ -482,17 +482,10 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	// create scheduler process
 	schedulerProc := ha.New(mesosScheduler)
 
-	// get SchedulerLoop config from it
+	// create scheduler loop
 	fw := &MesosFramework{MesosScheduler: mesosScheduler}
-	config := operations.NewSchedulerLoopConfig(&c, fw, client, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
-	assert.NotNil(config)
-
-	// make events observable
 	eventObs := NewEventObserver()
-	config.Recorder = eventObs
-
-	// create loop
-	loop := operations.NewSchedulerLoop(config)
+	loop := operations.NewSchedulerLoop(&c, fw, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(loop)
 
 	// create mock mesos scheduler driver

@@ -17,6 +17,7 @@ limitations under the License.
 package operations
 
 import (
+	"net/http"
 	"time"
 
 	log "github.com/golang/glog"
@@ -31,8 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"net/http"
 )
 
 const (
@@ -49,26 +48,19 @@ type SchedulerLoopInterface interface {
 	Run(<-chan struct{})
 }
 
-type SchedulerLoopConfig struct {
-	Algorithm *SchedulerAlgorithm
-	Binder    *Binder
-	NextPod   func() *api.Pod
-	Error     func(*api.Pod, error)
-	Recorder  record.EventRecorder
-	Client    *client.Client
-	Pr        *PodReconciler
-	Starting  chan struct{} // startup latch
+type SchedulerLoop struct {
+	algorithm *SchedulerAlgorithm
+	binder    *Binder
+	nextPod   func() *api.Pod
+	error     func(*api.Pod, error)
+	recorder  record.EventRecorder
+	client    *client.Client
+	pr        *PodReconciler
+	starting  chan struct{} // startup latch
 }
 
-// NewDefaultSchedulerLoopConfig creates a SchedulerLoop
-func NewDefaultSchedulerLoopConfig(c *config.Config, fw types.Framework, client *client.Client, terminate <-chan struct{}, mux *http.ServeMux) *SchedulerLoopConfig {
-	// use ListWatch watching pods using the client by default
-	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
-	return NewSchedulerLoopConfig(c, fw, client, terminate, mux, lw)
-}
-
-func NewSchedulerLoopConfig(c *config.Config, fw types.Framework, client *client.Client, terminate <-chan struct{}, mux *http.ServeMux,
-	podsWatcher *cache.ListWatch) *SchedulerLoopConfig {
+func NewSchedulerLoop(c *config.Config, fw types.Framework, client *client.Client, recorder record.EventRecorder,
+	terminate <-chan struct{}, mux *http.ServeMux, podsWatcher *cache.ListWatch) *SchedulerLoop {
 
 	// Watch and queue pods that need scheduling.
 	updates := make(chan queue.Entry, c.UpdatesBacklog)
@@ -95,40 +87,16 @@ func NewSchedulerLoopConfig(c *config.Config, fw types.Framework, client *client
 		q.InstallDebugHandlers(mux)
 		podtask.InstallDebugHandlers(fw.Tasks(), mux)
 	})
-	return &SchedulerLoopConfig{
-		Algorithm: NewSchedulerAlgorithm(fw, podUpdates),
-		Binder:    NewBinder(fw),
-		NextPod:   q.Yield,
-		Error:     eh.Error,
-		Recorder:  eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
-		Client:    client,
-		Pr:        podReconciler,
-		Starting:  startLatch,
-	}
-}
-
-func NewSchedulerLoop(c *SchedulerLoopConfig) SchedulerLoopInterface {
 	return &SchedulerLoop{
-		algorithm: c.Algorithm,
-		binder:    c.Binder,
-		nextPod:   c.NextPod,
-		error:     c.Error,
-		recorder:  c.Recorder,
-		client:    c.Client,
-		pr:        c.Pr,
-		starting:  c.Starting,
+		algorithm: NewSchedulerAlgorithm(fw, podUpdates),
+		binder:    NewBinder(fw),
+		nextPod:   q.Yield,
+		error:     eh.Error,
+		recorder:  recorder,
+		client:    client,
+		pr:        podReconciler,
+		starting:  startLatch,
 	}
-}
-
-type SchedulerLoop struct {
-	algorithm *SchedulerAlgorithm
-	binder    *Binder
-	nextPod   func() *api.Pod
-	error     func(*api.Pod, error)
-	recorder  record.EventRecorder
-	client    *client.Client
-	pr        *PodReconciler
-	starting  chan struct{}
 }
 
 func (s *SchedulerLoop) Run(done <-chan struct{}) {
