@@ -753,12 +753,15 @@ func cleanup(filePath string, ns string, selectors ...string) {
 	}
 	runKubectl("stop", "--grace-period=0", "-f", filePath, nsArg)
 
-	for _, selector := range selectors {
-		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers", nsArg)
-		if resources != "" {
-			Failf("Resources left running after stop:\n%s", resources)
+	Expect(wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		for _, selector := range selectors {
+			resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers", nsArg)
+			if resources != "" {
+				return false, nil
+			}
 		}
-	}
+		return true, nil
+	})).NotTo(HaveOccurred(), "timed out waiting for namespace to cleanup")
 }
 
 // validatorFn is the function which is individual tests will implement.
