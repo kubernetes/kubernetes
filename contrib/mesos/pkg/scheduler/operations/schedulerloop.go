@@ -68,8 +68,17 @@ func NewScheduler(c *config.Config, fw types.Framework, client *client.Client, r
 	// an ordering (vs interleaving) of operations that's easier to reason about.
 
 	q := queuer.New(podUpdates)
+
+	algorithm := NewSchedulerAlgorithm(fw, podUpdates)
+
 	podDeleter := NewDeleter(fw, q)
+
 	podReconciler := NewPodReconciler(fw, client, q, podDeleter)
+
+	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
+	errorHandler := NewErrorHandler(fw, bo, q)
+
+	binder := NewBinder(fw)
 
 	startLatch := make(chan struct{})
 	eventBroadcaster := record.NewBroadcaster()
@@ -84,18 +93,17 @@ func NewScheduler(c *config.Config, fw types.Framework, client *client.Client, r
 		podtask.InstallDebugHandlers(fw.Tasks(), mux)
 	})
 
-	return NewSchedulerLoop(c, fw, client, recorder, podUpdates, q, startLatch), podReconciler
+	return NewSchedulerLoop(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch), podReconciler
 }
 
-func NewSchedulerLoop(c *config.Config, fw types.Framework, client *client.Client,
-	recorder record.EventRecorder, podUpdates queue.FIFO, q *queuer.Queuer,
-	started chan<- struct{}) *SchedulerLoop {
-	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
+func NewSchedulerLoop(client *client.Client, algorithm *SchedulerAlgorithm,
+	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
+	binder *Binder, started chan<- struct{}) *SchedulerLoop {
 	return &SchedulerLoop{
-		algorithm: NewSchedulerAlgorithm(fw, podUpdates),
-		binder:    NewBinder(fw),
-		nextPod:   q.Yield,
-		error:     NewErrorHandler(fw, bo, q).Error,
+		algorithm: algorithm,
+		binder:    binder,
+		nextPod:   nextPod,
+		error:     error,
 		recorder:  recorder,
 		client:    client,
 		started:   started,
