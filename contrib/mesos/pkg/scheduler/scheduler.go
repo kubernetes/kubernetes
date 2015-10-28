@@ -56,8 +56,7 @@ import (
 
 // KubernetesScheduler implements:
 // 1: A mesos scheduler.
-// 2: A kubernetes scheduler plugin.
-// 3: A kubernetes pod.Registry.
+// 2: A kubernetes pod.Registry.
 type MesosScheduler struct {
 	// We use a lock here to avoid races
 	// between invoking the mesos callback
@@ -93,9 +92,8 @@ type MesosScheduler struct {
 	taskRegistry podtask.Registry
 
 	// via deferred init
-
-	loop               operations.SchedulerLoopInterface
-	reconciler         *operations.TasksReconciler
+	podReconciler      *operations.PodReconciler
+	tasksReconciler    *operations.TasksReconciler
 	reconcileCooldown  time.Duration
 	asRegisteredMaster proc.Doer
 	terminate          <-chan struct{} // signal chan, closes when we should kill background tasks
@@ -172,7 +170,7 @@ func New(config Config) *MesosScheduler {
 	return k
 }
 
-func (k *MesosScheduler) Init(electedMaster proc.Process, sl operations.SchedulerLoopInterface, mux *http.ServeMux) error {
+func (k *MesosScheduler) Init(electedMaster proc.Process, pr *operations.PodReconciler, mux *http.ServeMux) error {
 	log.V(1).Infoln("initializing kubernetes mesos scheduler")
 
 	k.asRegisteredMaster = proc.DoerFunc(func(a proc.Action) <-chan error {
@@ -182,7 +180,7 @@ func (k *MesosScheduler) Init(electedMaster proc.Process, sl operations.Schedule
 		return electedMaster.Do(a)
 	})
 	k.terminate = electedMaster.Done()
-	k.loop = sl
+	k.podReconciler = pr
 	k.offers.Init(k.terminate)
 	k.InstallDebugHandlers(mux)
 	k.nodeRegistrator.Run(k.terminate)
@@ -223,8 +221,8 @@ func (k *MesosScheduler) InstallDebugHandlers(mux *http.ServeMux) {
 			w.WriteHeader(http.StatusNoContent)
 		}))
 	}
-	requestReconciliation("/debug/actions/requestExplicit", k.reconciler.RequestExplicit)
-	requestReconciliation("/debug/actions/requestImplicit", k.reconciler.RequestImplicit)
+	requestReconciliation("/debug/actions/requestExplicit", k.tasksReconciler.RequestExplicit)
+	requestReconciliation("/debug/actions/requestImplicit", k.tasksReconciler.RequestImplicit)
 
 	wrappedHandler("/debug/actions/kamikaze", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slaves := k.slaveHostNames.SlaveIDs()
@@ -257,7 +255,7 @@ func (k *MesosScheduler) Registered(drv bindings.SchedulerDriver, fid *mesos.Fra
 	k.registered = true
 
 	k.onRegistration.Do(func() { k.onInitialRegistration(drv) })
-	k.reconciler.RequestExplicit()
+	k.tasksReconciler.RequestExplicit()
 }
 
 // Reregistered is called when the scheduler re-registered with the master successfully.
@@ -270,7 +268,7 @@ func (k *MesosScheduler) Reregistered(drv bindings.SchedulerDriver, mi *mesos.Ma
 	k.registered = true
 
 	k.onRegistration.Do(func() { k.onInitialRegistration(drv) })
-	k.reconciler.RequestExplicit()
+	k.tasksReconciler.RequestExplicit()
 }
 
 // perform one-time initialization actions upon the first registration event received from Mesos.
@@ -290,13 +288,13 @@ func (k *MesosScheduler) onInitialRegistration(driver bindings.SchedulerDriver) 
 	r1 := k.makeTaskRegistryReconciler()
 	r2 := k.makePodRegistryReconciler()
 
-	k.reconciler = operations.NewTasksReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
+	k.tasksReconciler = operations.NewTasksReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
 		k.reconcileCooldown, k.schedulerConfig.ExplicitReconciliationAbortTimeout.Duration, k.terminate)
-	go k.reconciler.Run(driver)
+	go k.tasksReconciler.Run(driver)
 
 	if k.reconcileInterval > 0 {
 		ri := time.Duration(k.reconcileInterval) * time.Second
-		time.AfterFunc(k.schedulerConfig.InitialImplicitReconciliationDelay.Duration, func() { runtime.Until(k.reconciler.RequestImplicit, ri, k.terminate) })
+		time.AfterFunc(k.schedulerConfig.InitialImplicitReconciliationDelay.Duration, func() { runtime.Until(k.tasksReconciler.RequestImplicit, ri, k.terminate) })
 		log.Infof("will perform implicit task reconciliation at interval: %v after %v", ri, k.schedulerConfig.InitialImplicitReconciliationDelay.Duration)
 	}
 }
@@ -392,7 +390,7 @@ func (k *MesosScheduler) StatusUpdate(driver bindings.SchedulerDriver, taskStatu
 	case mesos.TaskState_TASK_FAILED, mesos.TaskState_TASK_ERROR:
 		if task, _ := k.taskRegistry.UpdateStatus(taskStatus); task != nil {
 			if task.Has(podtask.Launched) && !task.Has(podtask.Bound) {
-				go k.loop.ReconcilePodTask(task)
+				go k.podReconciler.Reconcile(task)
 				return
 			}
 		} else {
@@ -440,7 +438,7 @@ func (k *MesosScheduler) reconcileTerminalTask(driver bindings.SchedulerDriver, 
 	} else if taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED || taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED {
 		// attempt to prevent dangling pods in the pod and task registries
 		log.V(1).Infof("request explicit reconciliation to clean up for task %v after executor reported (terminated/unregistered)", taskStatus.TaskId.GetValue())
-		k.reconciler.RequestExplicit()
+		k.tasksReconciler.RequestExplicit()
 	} else if taskStatus.GetState() == mesos.TaskState_TASK_LOST && state == podtask.StateRunning && taskStatus.ExecutorId != nil && taskStatus.SlaveId != nil {
 		//TODO(jdef) this may not be meaningful once we have proper checkpointing and master detection
 		//If we're reconciling and receive this then the executor may be

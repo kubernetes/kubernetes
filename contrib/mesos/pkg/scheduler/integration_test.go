@@ -427,6 +427,7 @@ type lifecycleTest struct {
 	driver        *mmock.JoinableDriver
 	eventObs      *EventObserver
 	loop          operations.SchedulerLoopInterface
+	podReconciler *operations.PodReconciler
 	podsListWatch *MockPodsListWatch
 	scheduler     *MesosScheduler
 	schedulerProc *ha.SchedulerProcess
@@ -485,7 +486,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	// create scheduler loop
 	fw := &MesosFramework{MesosScheduler: mesosScheduler}
 	eventObs := NewEventObserver()
-	loop := operations.NewSchedulerLoop(&c, fw, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	loop, _ := operations.NewScheduler(&c, fw, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(loop)
 
 	// create mock mesos scheduler driver
@@ -510,7 +511,7 @@ func (lt lifecycleTest) Start() <-chan LaunchedTask {
 	// init scheduler
 	err := lt.scheduler.Init(
 		lt.schedulerProc.Master(),
-		lt.loop,
+		lt.podReconciler,
 		http.DefaultServeMux,
 	)
 	assert.NoError(err)

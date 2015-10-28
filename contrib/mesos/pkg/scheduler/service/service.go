@@ -765,14 +765,14 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
 	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
-	loop := operations.NewSchedulerLoop(sc, fw, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
+	loop, pr := operations.NewScheduler(sc, fw, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
 
 	runtime.On(mesosScheduler.Registration(), func() { loop.Run(schedulerProcess.Terminal()) })
 	runtime.On(mesosScheduler.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {
 		log.V(1).Infoln("performing deferred initialization")
-		if err = mesosScheduler.Init(schedulerProcess.Master(), loop, s.mux); err != nil {
+		if err = mesosScheduler.Init(schedulerProcess.Master(), pr, s.mux); err != nil {
 			return nil, fmt.Errorf("failed to initialize pod scheduler: %v", err)
 		}
 		log.V(1).Infoln("deferred init complete")
