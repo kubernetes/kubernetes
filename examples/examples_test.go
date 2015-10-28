@@ -225,7 +225,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../docs/user-guide": {
 			"multi-pod":            nil,
 			"pod":                  &api.Pod{},
-			"replication":          &api.ReplicationController{},
 			"job":                  &extensions.Job{},
 			"ingress":              &extensions.Ingress{},
 			"nginx-deployment":     &extensions.Deployment{},
@@ -464,7 +463,6 @@ func TestReadme(t *testing.T) {
 		{"../README.md", []runtime.Object{&api.Pod{}}},
 		{"../docs/user-guide/walkthrough/README.md", []runtime.Object{&api.Pod{}}},
 		{"../examples/iscsi/README.md", []runtime.Object{&api.Pod{}}},
-		{"../docs/user-guide/simple-yaml.md", []runtime.Object{&api.Pod{}, &api.ReplicationController{}}},
 	}
 
 	for _, path := range paths {
