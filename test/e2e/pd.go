@@ -221,7 +221,7 @@ var _ = Describe("Pod Disks", func() {
 			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
-			expectNoError(podClient.Delete(host0Pod.Name, nil), "Failed to delete host0Pod")
+			expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		}
 
 		By(fmt.Sprintf("deleting PD %q", diskName))

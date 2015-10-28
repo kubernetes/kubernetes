@@ -245,7 +245,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("deleting the pod")
-		podClient.Delete(pod.Name, nil)
+		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to delete pod: %v", err))

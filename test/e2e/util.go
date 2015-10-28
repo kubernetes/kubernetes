@@ -751,7 +751,7 @@ func cleanup(filePath string, ns string, selectors ...string) {
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	runKubectl("stop", "-f", filePath, nsArg)
+	runKubectl("stop", "--grace-period=0", "-f", filePath, nsArg)
 
 	for _, selector := range selectors {
 		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers", nsArg)
