@@ -41,6 +41,14 @@ trap cleanup EXIT
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
+# Running codecgen fails if some of the files doesn't compile.
+# Thus (since all the files are completely auto-generated and
+# not required for the code to be compilable, we first remove
+# them and the regenerate them.
+for generated_file in ${generated_files}; do
+	rm -f "${generated_file}"
+done
+
 for generated_file in ${generated_files}; do
   initial_dir=${PWD}
   file=${generated_file//\.generated\.go/.go}
