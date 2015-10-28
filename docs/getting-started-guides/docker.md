@@ -31,13 +31,13 @@ Here's a diagram of what the final result will look like:
 ### Step One: Run etcd
 
 ```sh
-docker run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+docker run --net=host -d gcr.io/google_containers/etcd:2.0.13 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 ```
 
 ### Step Two: Run the master
 
 ```sh
-docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
+docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v1.0.7 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
 ```
 
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
@@ -47,15 +47,15 @@ This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md
 *Note, this could be combined with master above, but it requires --privileged for iptables manipulation*
 
 ```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.7 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 
 At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl 
 binary
-([OS X](https://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/darwin/amd64/kubectl))
-([linux](https://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/linux/amd64/kubectl))
+([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/darwin/amd64/kubectl))
+([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/linux/amd64/kubectl))
 
 *Note:*
 On OS/X you will need to set up port forwarding via ssh:
