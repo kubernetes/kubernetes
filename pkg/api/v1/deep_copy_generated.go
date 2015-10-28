@@ -957,6 +957,7 @@ func deepCopy_v1_Node(in Node, out *Node, c *conversion.Cloner) error {
 func deepCopy_v1_NodeAddress(in NodeAddress, out *NodeAddress, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Address = in.Address
+	out.Subnet = in.Subnet
 	return nil
 }
 
