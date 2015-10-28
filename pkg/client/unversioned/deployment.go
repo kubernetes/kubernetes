@@ -34,8 +34,9 @@ type DeploymentInterface interface {
 	List(label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error)
 	Get(name string) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Create(Deployment *extensions.Deployment) (*extensions.Deployment, error)
-	Update(Deployment *extensions.Deployment) (*extensions.Deployment, error)
+	Create(*extensions.Deployment) (*extensions.Deployment, error)
+	Update(*extensions.Deployment) (*extensions.Deployment, error)
+	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
 	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
@@ -90,6 +91,12 @@ func (c *deployments) Create(deployment *extensions.Deployment) (result *extensi
 func (c *deployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
 	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(deployment).Do().Into(result)
+	return
+}
+
+func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).SubResource("status").Body(deployment).Do().Into(result)
 	return
 }
 
