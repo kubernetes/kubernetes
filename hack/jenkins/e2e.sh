@@ -765,6 +765,9 @@ case ${JOB_NAME} in
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
+    # TODO(15011): these really shouldn't be (very) version skewed, but because
+    # we have to get ci/latest-1.1 again, it could get slightly out of whack.
+    : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
@@ -991,6 +994,9 @@ case ${JOB_NAME} in
   kubernetes-upgrade-1.0-1.1-gce-step6-e2e-new)
     : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
     : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    # TODO(15011): these really shouldn't be (very) version skewed, but because
+    # we have to get ci/latest-1.1 again, it could get slightly out of whack.
+    : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
