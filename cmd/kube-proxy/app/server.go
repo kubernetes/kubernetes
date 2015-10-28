@@ -63,7 +63,7 @@ type ProxyServerConfig struct {
 	ProxyMode          string
 	IptablesSyncPeriod time.Duration
 	ConfigSyncPeriod   time.Duration
-	nodeRef            *api.ObjectReference // Reference to this node.
+	NodeRef            *api.ObjectReference // Reference to this node.
 	MasqueradeAll      bool
 	CleanupAndExit     bool
 	KubeAPIQPS         float32
@@ -72,9 +72,11 @@ type ProxyServerConfig struct {
 }
 
 type ProxyServer struct {
+	Client       *kubeclient.Client
 	Config       *ProxyServerConfig
 	IptInterface utiliptables.Interface
 	Proxier      proxy.ProxyProvider
+	Broadcaster  record.EventBroadcaster
 	Recorder     record.EventRecorder
 }
 
@@ -130,15 +132,19 @@ func NewProxyConfig() *ProxyServerConfig {
 }
 
 func NewProxyServer(
+	client *kubeclient.Client,
 	config *ProxyServerConfig,
 	iptInterface utiliptables.Interface,
 	proxier proxy.ProxyProvider,
+	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
+		Client:       client,
 		Config:       config,
 		IptInterface: iptInterface,
 		Proxier:      proxier,
+		Broadcaster:  broadcaster,
 		Recorder:     recorder,
 	}, nil
 }
@@ -228,7 +234,6 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	hostname := nodeutil.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: hostname})
-	eventBroadcaster.StartRecordingToSink(client.Events(""))
 
 	var proxier proxy.ProxyProvider
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
@@ -290,13 +295,13 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		endpointsConfig.Channel("api"),
 	)
 
-	config.nodeRef = &api.ObjectReference{
+	config.NodeRef = &api.ObjectReference{
 		Kind:      "Node",
 		Name:      hostname,
 		UID:       types.UID(hostname),
 		Namespace: "",
 	}
-	return NewProxyServer(config, iptInterface, proxier, recorder)
+	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -310,6 +315,8 @@ func (s *ProxyServer) Run(_ []string) error {
 		}
 		return nil
 	}
+
+	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
@@ -374,5 +381,5 @@ func mayTryIptablesProxy(proxyMode string, client nodeGetter, hostname string) b
 }
 
 func (s *ProxyServer) birthCry() {
-	s.Recorder.Eventf(s.Config.nodeRef, "Starting", "Starting kube-proxy.")
+	s.Recorder.Eventf(s.Config.NodeRef, "Starting", "Starting kube-proxy.")
 }
