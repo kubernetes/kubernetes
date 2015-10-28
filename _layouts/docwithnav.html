@@ -16,6 +16,7 @@
 	<div class="row">
 		<!-- Navigation menu -->
 		<div class="col-md-3 hidden-sm hidden-xs" id="wrapper">
+			{% include docversionselector.html %}
 			{% case page.collection %}
 				{% when 'v1.1' %}
 					{% include nav_v1.1.html %}
@@ -25,6 +26,9 @@
 		</div>
 		<!-- Content body -->
 		<div class="col-md-8 col-sm-11 col-xs-11 bodywrapper">
+			{% if page.collection == 'v1.0' %}
+				{% include archivedocnotice.html %}
+			{% endif %}
 			{% include documentation.html %}
 		</div>
 	</div>
@@ -115,7 +119,7 @@
 		}
 		setcurdocver();
 		$(window).load(function() { //temporary fix to close the menu (it stays open for some reason)
-			$('.versionselector .dropdown-menu').slideUp(1200);
+			$('.versionselector .dropdown-menu').slideUp(900);
 		});
 		/* Toggle the version selector menu on button click */
 		$('.versionselector').on("click", function() {
