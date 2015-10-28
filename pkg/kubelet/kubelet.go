@@ -20,6 +20,7 @@ package kubelet
 // contrib/mesos/pkg/executor/.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -99,6 +100,8 @@ const (
 	// Minimum period for performing global cleanup tasks, i.e., housekeeping
 	// will not be performed more than once per housekeepingMinimumPeriod.
 	housekeepingMinimumPeriod = time.Second * 2
+
+	etcHostsPath = "/etc/hosts"
 )
 
 var (
@@ -915,8 +918,17 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
-func makeMounts(container *api.Container, podVolumes kubecontainer.VolumeMap) (mounts []kubecontainer.Mount) {
+func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
+	// Kubernetes only mounts on /etc/hosts if :
+	// - container does not use hostNetwork and
+	// - container is not a infrastructure(pause) container
+	// - container is not already mounting on /etc/hosts
+	// When the pause container is being created, its IP is still unknown. Hence, PodIP will not have been set.
+	mountEtcHostsFile := !pod.Spec.HostNetwork && len(pod.Status.PodIP) > 0
+	glog.V(4).Infof("Will create hosts mount for container:%q, podIP:%s: %v", container.Name, pod.Status.PodIP, mountEtcHostsFile)
+	mounts := []kubecontainer.Mount{}
 	for _, mount := range container.VolumeMounts {
+		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
 			glog.Warningf("Mount cannot be satisified for container %q, because the volume is missing: %q", container.Name, mount)
@@ -929,7 +941,44 @@ func makeMounts(container *api.Container, podVolumes kubecontainer.VolumeMap) (m
 			ReadOnly:      mount.ReadOnly,
 		})
 	}
-	return
+	if mountEtcHostsFile {
+		hostsMount, err := makeHostsMount(podDir, pod.Status.PodIP, pod.Name)
+		if err != nil {
+			return nil, err
+		}
+		mounts = append(mounts, *hostsMount)
+	}
+	return mounts, nil
+}
+
+func makeHostsMount(podDir, podIP, podName string) (*kubecontainer.Mount, error) {
+	hostsFilePath := path.Join(podDir, "etc-hosts")
+	if err := ensureHostsFile(hostsFilePath, podIP, podName); err != nil {
+		return nil, err
+	}
+	return &kubecontainer.Mount{
+		Name:          "k8s-managed-etc-hosts",
+		ContainerPath: etcHostsPath,
+		HostPath:      hostsFilePath,
+		ReadOnly:      false,
+	}, nil
+}
+
+func ensureHostsFile(fileName string, hostIP, hostName string) error {
+	if _, err := os.Stat(fileName); os.IsExist(err) {
+		glog.V(4).Infof("kubernetes-managed etc-hosts file exits. Will not be recreated: %q", fileName)
+		return nil
+	}
+	var buffer bytes.Buffer
+	buffer.WriteString("# Kubernetes-managed hosts file.\n")
+	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
+	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
+	buffer.WriteString("fe00::0\tip6-localnet\n")
+	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
+	buffer.WriteString("fe00::1\tip6-allnodes\n")
+	buffer.WriteString("fe00::2\tip6-allrouters\n")
+	buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
+	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
 func makePortMappings(container *api.Container) (ports []kubecontainer.PortMapping) {
@@ -974,7 +1023,10 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	}
 
 	opts.PortMappings = makePortMappings(container)
-	opts.Mounts = makeMounts(container, vol)
+	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, vol)
+	if err != nil {
+		return nil, err
+	}
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container)
 	if err != nil {
 		return nil, err
