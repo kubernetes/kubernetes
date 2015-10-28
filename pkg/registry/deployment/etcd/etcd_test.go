@@ -236,3 +236,39 @@ func TestScaleUpdate(t *testing.T) {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
 	}
 }
+
+func TestStatusUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
+	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Extensions.Codec(), &validDeployment), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	update := extensions.Deployment{
+		ObjectMeta: validDeployment.ObjectMeta,
+		Spec: extensions.DeploymentSpec{
+			Replicas: 100,
+		},
+		Status: extensions.DeploymentStatus{
+			Replicas: 100,
+		},
+	}
+
+	if _, _, err := storage.Status.Update(ctx, &update); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	response, err := fakeClient.Get(key, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var deployment extensions.Deployment
+	testapi.Extensions.Codec().DecodeInto([]byte(response.Node.Value), &deployment)
+	if deployment.Spec.Replicas != 7 {
+		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", deployment.Spec.Replicas)
+	}
+	if deployment.Status.Replicas != 100 {
+		t.Errorf("we expected .status.replicas to be updated to 100 but it was %v", deployment.Status.Replicas)
+	}
+}

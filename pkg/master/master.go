@@ -1081,6 +1081,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	if isEnabled("deployments") {
 		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"))
 		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if isEnabled("jobs") {
