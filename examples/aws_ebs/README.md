@@ -33,9 +33,15 @@ Documentation for other releases can be found at
 This is a simple web server pod which serves HTML from an AWS EBS
 volume.
 
-Create a volume in the same region as your node add your volume
-information in the pod description file aws-ebs-web.yaml then create
-the pod:
+Create an EBS volume in the same region as your node.
+
+Edit `aws-ebs-web.yaml` and add the volume ID - which can be found in the EC2 console or using the AWS CLI:
+
+```sh
+  $ aws ec2 describe-volumes
+```
+
+Create the pod using the edited definition:
 
 ```sh
   $ kubectl create -f examples/aws_ebs/aws-ebs-web.yaml
@@ -51,7 +57,7 @@ You should now be able to query your web server:
 
 ```sh
   $ curl <Pod IP address>
-  $ Hello World
+  Hello World
 ```
 
 
