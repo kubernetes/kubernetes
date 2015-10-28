@@ -63,22 +63,22 @@ type ResourceConsumer struct {
 	requestSizeInMegabytes   int
 }
 
-func NewDynamicResourceConsumer(name string, replicas, initCPU, initMemory int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
-	return newResourceConsumer(name, replicas, initCPU, initMemory, dynamicConsumptionTimeInSeconds, dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, cpuLimit, memLimit, framework)
+func NewDynamicResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	return newResourceConsumer(name, replicas, initCPUTotal, initMemoryTotal, dynamicConsumptionTimeInSeconds, dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, cpuLimit, memLimit, framework)
 }
 
-func NewStaticResourceConsumer(name string, replicas, initCPU, initMemory int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
-	return newResourceConsumer(name, replicas, initCPU, initMemory, staticConsumptionTimeInSeconds, initCPU/replicas, initMemory/replicas, cpuLimit, memLimit, framework)
+func NewStaticResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	return newResourceConsumer(name, replicas, initCPUTotal, initMemoryTotal, staticConsumptionTimeInSeconds, initCPUTotal/replicas, initMemoryTotal/replicas, cpuLimit, memLimit, framework)
 }
 
 /*
 NewResourceConsumer creates new ResourceConsumer
-initCPU argument is in millicores
-initMemory argument is in megabytes
+initCPUTotal argument is in millicores
+initMemoryTotal argument is in megabytes
 memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
-func newResourceConsumer(name string, replicas, initCPU, initMemory, consumptionTimeInSeconds, requestSizeInMillicores, requestSizeInMegabytes int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+func newResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal, consumptionTimeInSeconds, requestSizeInMillicores, requestSizeInMegabytes int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
 	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
@@ -93,9 +93,9 @@ func newResourceConsumer(name string, replicas, initCPU, initMemory, consumption
 		requestSizeInMegabytes:   requestSizeInMegabytes,
 	}
 	go rc.makeConsumeCPURequests()
-	rc.ConsumeCPU(initCPU)
+	rc.ConsumeCPU(initCPUTotal)
 	go rc.makeConsumeMemRequests()
-	rc.ConsumeMem(initMemory)
+	rc.ConsumeMem(initMemoryTotal)
 	return rc
 }
 
