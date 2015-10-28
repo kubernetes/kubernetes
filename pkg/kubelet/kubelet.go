@@ -2451,6 +2451,28 @@ func (kl *Kubelet) syncNetworkStatus() {
 	kl.networkConfigured = networkConfigured
 }
 
+func (kl *Kubelet) getNodeAddress(ip net.IP) (string, error) {
+	var network string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+FIND:
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err == nil {
+			for _, addr := range addrs {
+				if addrOri, ok := addr.(*net.IPNet); ok && addrOri.IP.Equal(ip) {
+					network = addrOri.String()
+					break FIND
+				}
+			}
+		}
+	}
+
+	return network, nil
+}
+
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
@@ -2472,46 +2494,40 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.Addresses = nodeAddresses
 	} else {
 		addr := net.ParseIP(kl.hostname)
-		if addr != nil {
-			node.Status.Addresses = []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: addr.String()},
-				{Type: api.NodeInternalIP, Address: addr.String()},
-			}
-		} else {
+		if addr == nil {
 			addrs, err := net.LookupIP(node.Name)
 			if err != nil {
 				return fmt.Errorf("can't get ip address of node %s: %v", node.Name, err)
 			} else if len(addrs) == 0 {
 				return fmt.Errorf("no ip address for node %v", node.Name)
-			} else {
-				// check all ip addresses for this node.Name and try to find the first non-loopback IPv4 address.
-				// If no match is found, it uses the IP of the interface with gateway on it.
-				for _, ip := range addrs {
-					if ip.IsLoopback() {
-						continue
-					}
-
-					if ip.To4() != nil {
-						node.Status.Addresses = []api.NodeAddress{
-							{Type: api.NodeLegacyHostIP, Address: ip.String()},
-							{Type: api.NodeInternalIP, Address: ip.String()},
-						}
-						break
-					}
+			}
+			// check all ip addresses for this node.Name and try to find the first non-loopback IPv4 address.
+			// If no match is found, it uses the IP of the interface with gateway on it.
+			for _, ip := range addrs {
+				if ip.IsLoopback() {
+					continue
 				}
 
-				if len(node.Status.Addresses) == 0 {
-					ip, err := util.ChooseHostInterface()
-					if err != nil {
-						return err
-					}
-
-					node.Status.Addresses = []api.NodeAddress{
-						{Type: api.NodeLegacyHostIP, Address: ip.String()},
-						{Type: api.NodeInternalIP, Address: ip.String()},
-					}
+				if ip.To4() != nil {
+					addr = ip
+					break
 				}
 			}
+			if addr == nil {
+				ip, err := util.ChooseHostInterface()
+				if err != nil {
+					return err
+				}
+				addr = ip
+			}
+		}
+		network, err := kl.getNodeAddress(addr)
+		if err != nil || len(network) == 0 {
+			return fmt.Errorf("can't get ip network of node %s", node.Name)
+		}
+		node.Status.Addresses = []api.NodeAddress{
+			{Type: api.NodeLegacyHostIP, Address: addr.String(), Subnet: network},
+			{Type: api.NodeInternalIP, Address: addr.String(), Subnet: network},
 		}
 	}
 

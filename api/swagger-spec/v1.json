@@ -12382,7 +12382,8 @@
     "description": "NodeAddress contains information for the node's address.",
     "required": [
      "type",
-     "address"
+     "address",
+     "subnet"
     ],
     "properties": {
      "type": {
@@ -12392,6 +12393,10 @@
      "address": {
       "type": "string",
       "description": "The node address."
+     },
+     "subnet": {
+      "type": "string",
+      "description": "The node subnet."
      }
     }
    },

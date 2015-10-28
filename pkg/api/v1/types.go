@@ -1904,6 +1904,8 @@ type NodeAddress struct {
 	Type NodeAddressType `json:"type"`
 	// The node address.
 	Address string `json:"address"`
+	// The node subnet.
+	Subnet string `json:"subnet"`
 }
 
 // ResourceName is the name identifying various resources in a ResourceList.

@@ -1310,6 +1310,7 @@ func autoconvert_api_NodeAddress_To_v1_NodeAddress(in *api.NodeAddress, out *Nod
 	}
 	out.Type = NodeAddressType(in.Type)
 	out.Address = in.Address
+	out.Subnet = in.Subnet
 	return nil
 }
 
@@ -4331,6 +4332,7 @@ func autoconvert_v1_NodeAddress_To_api_NodeAddress(in *NodeAddress, out *api.Nod
 	}
 	out.Type = api.NodeAddressType(in.Type)
 	out.Address = in.Address
+	out.Subnet = in.Subnet
 	return nil
 }
 
