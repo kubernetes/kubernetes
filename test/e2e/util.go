@@ -2048,6 +2048,26 @@ func LogSSHResult(result SSHResult) {
 	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
+func issueSSHCommand(cmd, provider string, node *api.Node) error {
+	Logf("Getting external IP address for %s", node.Name)
+	host := ""
+	for _, a := range node.Status.Addresses {
+		if a.Type == api.NodeExternalIP {
+			host = a.Address + ":22"
+			break
+		}
+	}
+	if host == "" {
+		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+	}
+	Logf("Calling %s on %s", cmd, node.Name)
+	if result, err := SSH(cmd, host, provider); result.Code != 0 || err != nil {
+		LogSSHResult(result)
+		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
+	}
+	return nil
+}
+
 // NewHostExecPodSpec returns the pod spec of hostexec pod
 func NewHostExecPodSpec(ns, name string) *api.Pod {
 	pod := &api.Pod{
@@ -2157,38 +2177,37 @@ func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeo
 
 // waitForNodeToBeReady returns whether node name is ready within timeout.
 func waitForNodeToBeReady(c *client.Client, name string, timeout time.Duration) bool {
-	return waitForNodeToBe(c, name, true, timeout)
+	return waitForNodeToBe(c, name, api.NodeReady, true, timeout)
 }
 
 // waitForNodeToBeNotReady returns whether node name is not ready (i.e. the
 // readiness condition is anything but ready, e.g false or unknown) within
 // timeout.
 func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duration) bool {
-	return waitForNodeToBe(c, name, false, timeout)
+	return waitForNodeToBe(c, name, api.NodeReady, false, timeout)
 }
 
-func isNodeReadySetAsExpected(node *api.Node, wantReady bool) bool {
+func isNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
 	// Check the node readiness condition (logging all).
 	for i, cond := range node.Status.Conditions {
 		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transition time: %v",
 			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
 			cond.Reason, cond.Message, cond.LastTransitionTime)
-		// Ensure that the condition type is readiness and the status
-		// matches as desired.
-		if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
-			Logf("Successfully found node %s readiness to be %t", node.Name, wantReady)
+		// Ensure that the condition type and the status matches as desired.
+		if cond.Type == conditionType && (cond.Status == api.ConditionTrue) == wantTrue {
+			Logf("Successfully found condition %s of node %s to be %t", conditionType, node.Name, wantTrue)
 			return true
 		}
 	}
 	return false
 }
 
-// waitForNodeToBe returns whether node name's readiness state matches wantReady
-// within timeout. If wantReady is true, it will ensure the node is ready; if
-// it's false, it ensures the node is in any state other than ready (e.g. not
-// ready or unknown).
-func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time.Duration) bool {
-	Logf("Waiting up to %v for node %s readiness to be %t", timeout, name, wantReady)
+// waitForNodeToBe returns whether node "name's" condition state matches wantTrue
+// within timeout. If wantTrue is true, it will ensure the node condition status
+// is ConditionTrue; if it's false, it ensures the node condition is in any state
+// other than ConditionTrue (e.g. not true or unknown).
+func waitForNodeToBe(c *client.Client, name string, conditionType api.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
+	Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		node, err := c.Nodes().Get(name)
 		if err != nil {
@@ -2196,11 +2215,11 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 			continue
 		}
 
-		if isNodeReadySetAsExpected(node, wantReady) {
+		if isNodeConditionSetAsExpected(node, conditionType, wantTrue) {
 			return true
 		}
 	}
-	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
+	Logf("Node %s didn't reach desired %s condition status (%t) within %v", name, conditionType, wantTrue, timeout)
 	return false
 }
 
@@ -2216,7 +2235,7 @@ func allNodesReady(c *client.Client, timeout time.Duration) error {
 			return false, err
 		}
 		for _, node := range nodes.Items {
-			if !isNodeReadySetAsExpected(&node, true) {
+			if !isNodeConditionSetAsExpected(&node, api.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
@@ -2339,7 +2358,7 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 
 		// Filter out not-ready nodes.
 		filterNodes(nodes, func(node api.Node) bool {
-			return isNodeReadySetAsExpected(&node, true)
+			return isNodeConditionSetAsExpected(&node, api.NodeReady, true)
 		})
 		numReady := len(nodes.Items)
 
