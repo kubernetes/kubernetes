@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Developer Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -81,6 +81,13 @@ Guide](../admin/README.html).
 
 * **Releasing Kubernetes** ([releasing.md](releasing.html)): How to create a Kubernetes release (as in version)
   and how the version information gets embedded into the built binaries.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

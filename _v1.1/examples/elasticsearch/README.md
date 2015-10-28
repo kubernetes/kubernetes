@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Elasticsearch for Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -188,6 +188,13 @@ You should see something similar to the following:
 }
 {% endraw %}
 {% endhighlight %}
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/elasticsearch/README.md?pixel)]()

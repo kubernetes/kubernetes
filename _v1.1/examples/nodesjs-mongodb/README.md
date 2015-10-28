@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Node.js and MongoDB on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -317,6 +317,13 @@ With Google Cloud Platform, get the IP address of all load balancers with the fo
 gcloud compute forwarding-rules list
 {% endraw %}
 {% endhighlight %}
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nodesjs-mongodb/README.md?pixel)]()

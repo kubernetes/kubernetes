@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Cluster Level Logging to Google Cloud Logging"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -189,7 +189,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](https://releases.k8s.io/v1.1.0/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml?raw=true)
+[Download example](https://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE ../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml -->
 
 This pod specification maps the directory on the host containing the Docker log files, `/var/lib/docker/containers`, to a directory inside the container which has the same path. The pod runs one image, `gcr.io/google_containers/fluentd-gcp:1.6`, which is configured to collect the Docker log files from the logs directory and ingest them into Google Cloud Logging. One instance of this pod runs on each node of the cluster. Kubernetes will notice if this pod fails and automatically restart it.
@@ -247,9 +247,16 @@ $ cat 21\:00\:00_21\:59\:59_S0.json | jq '.structPayload.log'
 {% endraw %}
 {% endhighlight %}
 
-This page has touched briefly on the underlying mechanisms that support gathering cluster level logs on a Kubernetes deployment. The approach here only works for gathering the standard output and standard error output of the processes running in the pod’s containers. To gather other logs that are stored in files one can use a sidecar container to gather the required files as described at the page [Collecting log files within containers with Fluentd](http://releases.k8s.io/release-1.0/contrib/logging/fluentd-sidecar-gcp/README.md) and sending them to the Google Cloud Logging service.
+This page has touched briefly on the underlying mechanisms that support gathering cluster level logs on a Kubernetes deployment. The approach here only works for gathering the standard output and standard error output of the processes running in the pod’s containers. To gather other logs that are stored in files one can use a sidecar container to gather the required files as described at the page [Collecting log files within containers with Fluentd](http://releases.k8s.io/v1.1.0/contrib/logging/fluentd-sidecar-gcp/README.md) and sending them to the Google Cloud Logging service.
 
 Some of the material in this section also appears in the blog article [Cluster Level Logging with Kubernetes](http://blog.kubernetes.io/2015/06/cluster-level-logging-with-kubernetes.html).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

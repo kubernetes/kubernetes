@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Large Cluster"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -40,7 +40,7 @@ To avoid running into cloud provider quota issues, when creating a cluster with 
 
 ### Addon Resources
 
-To prevent memory leaks or other resource issues in [cluster addons](https://releases.k8s.io/v1.1.0/cluster/addons) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](http://pr.k8s.io/10653/files) and [#10778](http://pr.k8s.io/10778/files)).
+To prevent memory leaks or other resource issues in [cluster addons](https://releases.k8s.io/HEAD/cluster/addons) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](http://pr.k8s.io/10653/files) and [#10778](http://pr.k8s.io/10778/files)).
 
 For example:
 
@@ -71,6 +71,13 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
   * [FluentD with GCP Plugin](http://releases.k8s.io/v1.1.0/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.html#troubleshooting).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

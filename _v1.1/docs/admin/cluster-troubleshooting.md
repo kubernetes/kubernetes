@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Cluster Troubleshooting"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -117,6 +117,13 @@ Mitigations:
 
 - Action: [Multiple independent clusters](multi-cluster.html) (and avoid making risky changes to all clusters at once)
   - Mitigates: Everything listed above.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Elasticsearch/Kibana Logging Demonstration"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -21,6 +21,13 @@ at [Cluster Level Logging to Google Cloud Logging](../../../docs/getting-started
 To observe the ingested log lines when using Elasticsearch and Kibana please see the getting
 started instructions
 at [Cluster Level Logging with Elasticsearch and Kibana](../../../docs/getting-started-guides/logging-elasticsearch.html).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

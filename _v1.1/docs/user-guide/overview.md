@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Overview"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -28,6 +28,13 @@ Kubernetes supports a unique [networking model](../admin/networking.html). Kuber
 Modern Internet applications are commonly built by layering micro-services, for example a set of web front-ends talking to a distributed in-memory key-value store talking to a replicated storage service. To facilitate this architecture, Kubernetes offers the [service](services.html) abstraction, which provides a stable IP address and [DNS name](../admin/dns.html) that corresponds to a dynamic set of pods such as the set of pods constituting a micro-service. The set is defined using a label selector and thus can refer to any set of pods. When a container running in a Kubernetes pod connects to this address, the connection is forwarded by a local agent (called the kube proxy) running on the source machine, to one of the corresponding back-end containers. The exact back-end is chosen using a round-robin policy to balance load. The kube proxy takes care of tracking the dynamic set of back-ends as pods are replaced by new pods on new hosts, so that the service IP address (and DNS name) never changes.
 
 Every resource in Kubernetes, such as a pod, is identified by a URI and has a UID. Important components of the URI are the kind of object (e.g. pod), the object’s name, and the object’s [namespace](namespaces.html). For a certain object kind, every name is unique within its namespace. In contexts where an object name is provided without a namespace, it is assumed to be in the default namespace. UID is unique across time and space.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Sharing Clusters\""
+---
+---
+layout: docwithnav
+title: "Sharing Clusters"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -70,6 +74,7 @@ And kubectl get nodes should agree:
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl get nodes
 NAME             LABELS                                  STATUS
 eu-minion-0n61   kubernetes.io/hostname=eu-minion-0n61   Ready
@@ -85,6 +90,7 @@ kubernetes-minion-lqfc   kubernetes.io/hostname=kubernetes-minion-lqfc          
 kubernetes-minion-sjra   kubernetes.io/hostname=kubernetes-minion-sjra                     Ready
 kubernetes-minion-wul8   kubernetes.io/hostname=kubernetes-minion-wul8                     Ready
 {% endraw %}
+{% endraw %}
 ```
 
 ## Testing reachability
@@ -92,6 +98,7 @@ kubernetes-minion-wul8   kubernetes.io/hostname=kubernetes-minion-wul8          
 For this test to work we'll need to create a service in europe:
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl config use-context <clustername_eu>
 $ kubectl create -f /tmp/secret.json
@@ -101,6 +108,7 @@ $ kubectl get ep
 NAME         ENDPOINTS
 kubernetes   10.240.249.92:443
 nginxsvc     10.244.0.4:80,10.244.0.4:443
+{% endraw %}
 {% endraw %}
 ```
 
@@ -128,10 +136,12 @@ And test that you can actually reach the test nginx service across continents
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl config use-context <clustername_us>
 $ kubectl -it exec curlpod -- /bin/sh
 [ root@curlpod:/ ]$ curl http://10.244.0.4:80
 Europe nginx
+{% endraw %}
 {% endraw %}
 ```
 
@@ -213,7 +223,15 @@ eu-minion-loh2   kubernetes.io/hostname=eu-minion-loh2   Ready
 For a more advanced example of sharing clusters, see the [service-loadbalancer](https://github.com/kubernetes/contrib/tree/master/service-loadbalancer/README.md)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/sharing-clusters/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

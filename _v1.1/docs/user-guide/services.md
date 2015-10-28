@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Services in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -190,11 +190,11 @@ this example).
 Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
 watches the Kubernetes master for the addition and removal of `Service`
 and `Endpoints` objects. For each `Service` it opens a port (randomly chosen)
-on the local node.  Any connections to `service`  port will be proxied to one of
-the corresponding backend `Pods`.  Which backend `Pod`  to use is decided based on the
+on the local node.  Any connections made to that port will be proxied to one of
+the corresponding backend `Pods`.  Which backend to use is decided based on the
 `SessionAffinity` of the `Service`.  Lastly, it installs iptables rules which
-capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` then
-redirects that traffic to the backend `Pod` (`Endpoints`).
+capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` and
+redirects that traffic to the previously described port.
 
 The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
@@ -577,7 +577,14 @@ of which `Pods` they are actually accessing.
 
 Service is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Service API
-object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html#_v1_service).
+object](http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html#_v1_service).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

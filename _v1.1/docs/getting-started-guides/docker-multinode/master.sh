@@ -50,12 +50,12 @@ lsb_dist=""
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
 detect_lsb() {
     case "$(uname -m)" in
-        *64)
-            ;;
-         *)
-            echo "Error: We currently only support 64-bit platforms."       
-            exit 1
-            ;;
+    *64)
+        ;;
+    *)
+        echo "Error: We currently only support 64-bit platforms."       
+        exit 1
+        ;;
     esac
 
     if command_exists lsb_release; then
@@ -75,15 +75,6 @@ detect_lsb() {
     fi
 
     lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
-
-    case "${lsb_dist}" in
-        amzn|centos|debian|ubuntu)
-            ;;
-        *)
-            echo "Error: We currently only support ubuntu|debian|amzn|centos."
-            exit 1
-            ;;
-    esac
 }
 
 
@@ -106,7 +97,7 @@ start_k8s(){
     docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
 
     # iface may change to a private network interface, eth0 is for default
-    flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run --restart=always -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld -iface="eth0")
+    flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run --restart=always -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld -iface="eth0")
 
     sleep 8
 
@@ -115,32 +106,29 @@ start_k8s(){
     source subnet.env
 
     # Configure docker net settings, then restart it
-    case "${lsb_dist}" in
-        amzn)
+    case "$lsb_dist" in
+        fedora|centos|amzn)
             DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-            ifconfig docker0 down
-            yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
-            ;;
-        centos)
-            DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-            if ! command_exists ifconfig; then
-                yum -y -q install net-tools
-            fi
-            ifconfig docker0 down
-            yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
-            ;;
-        ubuntu|debian)
+        ;;
+        ubuntu|debian|linuxmint)
             DOCKER_CONF="/etc/default/docker"
-            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-            ifconfig docker0 down
+        ;;
+    esac
+
+    # Append the docker opts
+    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+
+
+    # sleep a little bit
+    ifconfig docker0 down
+
+    case "$lsb_dist" in
+        fedora|centos|amzn)
+            yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
+        ;;
+        ubuntu|debian|linuxmint)
             apt-get install bridge-utils && brctl delbr docker0 && service docker restart
-            ;;
-        *)
-            echo "Unsupported operations system ${lsb_dist}"
-            exit 1
-            ;;
+        ;;
     esac
 
     # sleep a little bit
@@ -157,7 +145,7 @@ start_k8s(){
         -v /var/run:/var/run:rw \
         -v /:/rootfs:ro \
         -v /dev:/dev \
-        -v /var/lib/docker/:/var/lib/docker:rw \
+        -v /var/lib/docker/:/var/lib/docker:ro \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
         /hyperkube kubelet \

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Secrets example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -73,6 +73,13 @@ $ kubectl logs secret-test-pod
 2015-04-29T21:17:24.712206409Z content of file "/etc/secret-volume/data-1": value-1
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

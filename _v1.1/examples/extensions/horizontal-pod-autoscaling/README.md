@@ -1,5 +1,9 @@
 ---
 layout: docwithnav
+title: "title: \"</strong>\""
+---
+---
+layout: docwithnav
 title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -206,4 +210,5 @@ As we see, in the presented case CPU utilization dropped to 0, and the number of
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/extensions/horizontal-pod-autoscaling/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

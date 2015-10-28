@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Cloud Native Deployments of Cassandra using Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -83,7 +83,7 @@ spec:
 
 There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
 
-You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```) and adding information about the [namespace](../../docs/user-guide/namespaces.html).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.1 cpu (0.1 core).
+You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```) and adding information about the [namespace](../../docs/user-guide/namespaces.html).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.5 cpu (0.5 core).
 
 In theory could create a single Cassandra pod right now but since `KubernetesSeedProvider` needs to learn what nodes are in the Cassandra deployment we need to create a service first.
 
@@ -336,6 +336,13 @@ kubectl scale rc cassandra --replicas=4
 ### Seed Provider Source
 
 See [here](java/src/io/k8s/cassandra/KubernetesSeedProvider.java).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

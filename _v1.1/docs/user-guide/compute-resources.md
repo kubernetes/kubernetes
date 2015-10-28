@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Compute Resources"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -276,6 +276,13 @@ machine types within the same cloud providers.  For example, on AWS, the capacit
 is reported in [ECUs](http://aws.amazon.com/ec2/faqs/), while in GCE it is reported in logical
 cores.  We plan to revise the definition of the cpu resource to allow for more consistency
 across providers and platforms.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

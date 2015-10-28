@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "On Collaborative Development"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -47,6 +47,13 @@ PRs that are incorrectly judged to be merge-able, may be reverted and subject to
 ## Holds
 
 Any maintainer or core contributor who wants to review a PR but does not have time immediately may put a hold on a PR simply by saying so on the PR discussion and offering an ETA measured in single-digit days at most.  Any PR that has a hold shall not be merged until the person who requested the hold acks the review, withdraws their hold, or is overruled by a preponderance of maintainers.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Cluster Federation"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -648,6 +648,13 @@ does each replica find the other replicas and how do clients find
 their primary zookeeper replica? And now how do I do a shared, highly
 available redis database?  Use a few common specific use cases like
 this to flesh out the detailed API and semantics of Ubernetes.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

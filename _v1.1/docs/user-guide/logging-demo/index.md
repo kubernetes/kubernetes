@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Elasticsearch/Kibana Logging Demonstration\""
+---
+---
+layout: docwithnav
+title: "Elasticsearch/Kibana Logging Demonstration"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -23,7 +27,15 @@ started instructions
 at [Cluster Level Logging with Elasticsearch and Kibana](../../../docs/getting-started-guides/logging-elasticsearch.html).
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/logging-demo/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

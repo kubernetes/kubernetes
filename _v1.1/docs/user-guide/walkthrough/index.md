@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Kubernetes 101 - Kubectl CLI and Pods\""
+---
+---
+layout: docwithnav
+title: "Kubernetes 101 - Kubectl CLI and Pods"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -161,12 +165,12 @@ spec:
 <!-- END MUNGE: EXAMPLE pod-redis.yaml -->
 
 Notes:
-- The `volumeMounts` `name` is a reference to a specific  `volumes` `name`.
-- The `volumeMounts` `mountPath` is the path to mount the volume within the container.
+- The volume mount name is a reference to a specific empty dir volume.
+- The volume mount path is the path to mount the empty dir volume within the container.
 
 ##### Volume Types
 
-- **EmptyDir**: Creates a new directory that will exist as long as the Pod is running on the node, but it can persist across container failures and restarts.
+- **EmptyDir**: Creates a new directory that will persist across container failures and restarts.
 - **HostPath**: Mounts an existing directory on the node's file system (e.g. `/var/logs`).
 
 See [volumes](../../../docs/user-guide/volumes.html) for more details.
@@ -219,7 +223,15 @@ Continue on to [Kubernetes 201](k8s201.html) or
 for a complete application see the [guestbook example](../../../examples/guestbook/README.html)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/walkthrough/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Guestbook Example\""
+---
+---
+layout: docwithnav
+title: "Guestbook Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -126,7 +130,9 @@ redis-master-dz33o                             1/1       Running   0          2h
 
 ```
 {% raw %}
+{% raw %}
 kubectl get pods -o wide --all-namespaces=true
+{% endraw %}
 {% endraw %}
 ```
 
@@ -682,7 +688,15 @@ If you are having trouble bringing up your guestbook app, double check that your
 Then, see the [troubleshooting documentation](../../docs/troubleshooting.html) for a further list of common issues and how you can diagnose them.
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
