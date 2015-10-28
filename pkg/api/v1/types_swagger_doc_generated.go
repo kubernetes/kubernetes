@@ -646,6 +646,7 @@ var map_NodeAddress = map[string]string{
 	"":        "NodeAddress contains information for the node's address.",
 	"type":    "Node address type, one of Hostname, ExternalIP or InternalIP.",
 	"address": "The node address.",
+	"subnet":  "The node subnet.",
 }
 
 func (NodeAddress) SwaggerDoc() map[string]string {
