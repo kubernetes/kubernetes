@@ -147,9 +147,25 @@ var _ = Describe("MaxPods", func() {
 				"involvedObject.name":      "additional-pod",
 				"involvedObject.namespace": ns,
 				"source":                   "scheduler",
-				"reason":                   "failedScheduling",
+				"reason":                   "FailedScheduling",
 			}.AsSelector())
 		expectNoError(err)
+		// If we failed to find event with a capitalized first letter of reason
+		// try looking for one starting with a small one for backward compatibility.
+		// If we don't do it we end up in #15806.
+		// TODO: remove this block when we don't care about supporting v1.0 too much.
+		if len(schedEvents.Items) == 0 {
+			schedEvents, err = c.Events(ns).List(
+				labels.Everything(),
+				fields.Set{
+					"involvedObject.kind":      "Pod",
+					"involvedObject.name":      "additional-pod",
+					"involvedObject.namespace": ns,
+					"source":                   "scheduler",
+					"reason":                   "failedScheduling",
+				}.AsSelector())
+			expectNoError(err)
+		}
 
 		Expect(runningPods).To(Equal(int(totalPodCapacity)))
 		Expect(len(notRunningPods)).To(Equal(1))
