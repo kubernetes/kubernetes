@@ -976,9 +976,18 @@ type Container struct {
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
 
-	// Whether this container should allocate a buffer for stdin in the container runtime.
+	// Whether this container should allocate a buffer for stdin in the container runtime. If this
+	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
 	Stdin bool `json:"stdin,omitempty"`
+	// Whether the container runtime should close the stdin channel after it has been opened by
+	// a single attach. When stdin is true the stdin stream will remain open across multiple attach
+	// sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the
+	// first client attaches to stdin, and then remains open and accepts data until the client disconnects,
+	// at which time stdin is closed and remains closed until the container is restarted. If this
+	// flag is false, a container processes that reads from stdin will never receive an EOF.
+	// Default is false
+	StdinOnce bool `json:"stdinOnce,omitempty"`
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty"`

@@ -65,10 +65,7 @@ const (
 	simplePodPort            = 80
 )
 
-var (
-	portForwardRegexp = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
-	proxyRegexp       = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-)
+var proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 
 var _ = Describe("Kubectl client", func() {
 	defer GinkgoRecover()
@@ -196,41 +193,58 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should support inline execution and attach", func() {
-			By("executing a command with run and attach")
-			runOutput := runKubectl(fmt.Sprintf("--namespace=%v", ns), "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "echo", "running", "in", "container")
-			expectedRunOutput := "running in container"
-			Expect(runOutput).To(ContainSubstring(expectedRunOutput))
-			// everything in the ns will be deleted at the end of the test
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("executing a command with run and attach with stdin")
+			runOutput := newKubectlCommand(nsFlag, "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234").
+				exec()
+			Expect(runOutput).To(ContainSubstring("abcd1234"))
+			Expect(runOutput).To(ContainSubstring("stdin closed"))
+			Expect(c.Pods(ns).Delete("run-test", api.NewDeleteOptions(0))).To(BeNil())
+
+			By("executing a command with run and attach without stdin")
+			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234").
+				exec()
+			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
+			Expect(runOutput).To(ContainSubstring("stdin closed"))
+			Expect(c.Pods(ns).Delete("run-test-2", api.NewDeleteOptions(0))).To(BeNil())
+
+			By("executing a command with run and attach with stdin with open stdin should remain running")
+			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234\n").
+				exec()
+			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
+			if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, time.Minute) {
+				Failf("Pod %q should still be running", "run-test-3")
+			}
+
+			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
+			// to loop test.
+			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+				if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, 1*time.Second) {
+					Failf("Pod %q should still be running", "run-test-3")
+				}
+				logOutput := runKubectl(nsFlag, "logs", "run-test-3")
+				Expect(logOutput).ToNot(ContainSubstring("stdin closed"))
+				return strings.Contains(logOutput, "abcd1234"), nil
+			})
+			if err != nil {
+				os.Exit(1)
+			}
+			Expect(err).To(BeNil())
+
+			Expect(c.Pods(ns).Delete("run-test-3", api.NewDeleteOptions(0))).To(BeNil())
 		})
 
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
-			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), simplePodName, fmt.Sprintf(":%d", simplePodPort))
+			cmd, listenPort := runPortForward(ns, simplePodName, simplePodPort)
 			defer tryKill(cmd)
-			// This is somewhat ugly but is the only way to retrieve the port that was picked
-			// by the port-forward command. We don't want to hard code the port as we have no
-			// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
-			Logf("starting port-forward command and streaming output")
-			stdout, stderr, err := startCmdAndStreamOutput(cmd)
-			if err != nil {
-				Failf("Failed to start port-forward command: %v", err)
-			}
-			defer stdout.Close()
-			defer stderr.Close()
 
-			buf := make([]byte, 128)
-			var n int
-			Logf("reading from `kubectl port-forward` command's stderr")
-			if n, err = stderr.Read(buf); err != nil {
-				Failf("Failed to read from kubectl port-forward stderr: %v", err)
-			}
-			portForwardOutput := string(buf[:n])
-			match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
-			if len(match) != 2 {
-				Failf("Failed to parse kubectl port-forward output: %s", portForwardOutput)
-			}
 			By("curling local port output")
-			localAddr := fmt.Sprintf("http://localhost:%s", match[1])
+			localAddr := fmt.Sprintf("http://localhost:%d", listenPort)
 			body, err := curl(localAddr)
 			Logf("got: %s", body)
 			if err != nil {

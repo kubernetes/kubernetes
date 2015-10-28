@@ -794,8 +794,9 @@ type Container struct {
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
-	Stdin bool `json:"stdin,omitempty"`
-	TTY   bool `json:"tty,omitempty"`
+	Stdin     bool `json:"stdin,omitempty"`
+	StdinOnce bool `json:"stdinOnce,omitempty"`
+	TTY       bool `json:"tty,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -1965,14 +1966,24 @@ const (
 	// Command to run for remote command execution
 	ExecCommandParamm = "command"
 
-	StreamType       = "streamType"
-	StreamTypeStdin  = "stdin"
+	// Name of header that specifies stream type
+	StreamType = "streamType"
+	// Value for streamType header for stdin stream
+	StreamTypeStdin = "stdin"
+	// Value for streamType header for stdout stream
 	StreamTypeStdout = "stdout"
+	// Value for streamType header for stderr stream
 	StreamTypeStderr = "stderr"
-	StreamTypeData   = "data"
-	StreamTypeError  = "error"
+	// Value for streamType header for data stream
+	StreamTypeData = "data"
+	// Value for streamType header for error stream
+	StreamTypeError = "error"
 
+	// Name of header that specifies the port being forwarded
 	PortHeader = "port"
+	// Name of header that specifies a request ID used to associate the error
+	// and data streams for a single forwarded connection
+	PortForwardRequestIDHeader = "requestID"
 )
 
 // Similarly to above, these are constants to support HTTP PATCH utilized by
