@@ -195,13 +195,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			return err
 		}
 
-		// Serialize the object with the annotation applied.
-		data, err := mapping.Codec.Encode(info.Object)
-		if err != nil {
-			return err
-		}
-
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, data)
+		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
 		if err != nil {
 			return err
 		}
