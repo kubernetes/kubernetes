@@ -83,6 +83,9 @@ parameters as follows:
     swapaccount=1
     ```
 
+4. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
+   a value such as "1.0.7".
+
 ### Step One: Run etcd
 
 ```sh
@@ -103,7 +106,7 @@ docker run \
     --pid=host \
     --privileged=true \
     -d \
-    gcr.io/google_containers/hyperkube:v1.0.6 \
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
     /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
 ```
 
@@ -112,15 +115,33 @@ This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md
 ### Step Three: Run the service proxy
 
 ```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.6 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 
-At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl
-binary
-([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
-([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
+At this point you should have a running Kubernetes cluster.  You can test this
+by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
+following links) and make it available by editing your PATH environment
+variable.
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/linux/amd64/kubectl))
+
+For example, OS X:
+
+```console
+$ wget http://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/darwin/amd64/kubectl
+$ chmod 755 kubectl
+$ PATH=$PATH:`pwd`
+```
+
+Linux:
+
+```console
+$ wget http://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
+$ chmod 755 kubectl
+$ PATH=$PATH:`pwd`
+```
 
 <hr>
 
