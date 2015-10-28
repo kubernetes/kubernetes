@@ -228,4 +228,102 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 }
 
+func TestHostsFromNodeList(t *testing.T) {
+	tests := []struct {
+		nodes         *api.NodeList
+		expectedHosts []string
+	}{
+		{
+			nodes:         &api.NodeList{},
+			expectedHosts: []string{},
+		},
+		{
+			nodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "foo"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "bar"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+				},
+			},
+			expectedHosts: []string{"foo", "bar"},
+		},
+		{
+			nodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "foo"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "bar"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "unschedulable"},
+						Spec:       api.NodeSpec{Unschedulable: true},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+				},
+			},
+			expectedHosts: []string{"foo", "bar"},
+		},
+	}
+
+	for _, test := range tests {
+		hosts := hostsFromNodeList(test.nodes)
+		if !reflect.DeepEqual(hosts, test.expectedHosts) {
+			t.Errorf("expected: %v, saw: %v", test.expectedHosts, hosts)
+		}
+	}
+}
+
+func TestGetNodeConditionPredicate(t *testing.T) {
+	tests := []struct {
+		node         api.Node
+		expectAccept bool
+		name         string
+	}{
+		{
+			node:         api.Node{},
+			expectAccept: false,
+			name:         "empty",
+		},
+		{
+			node: api.Node{
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{Type: api.NodeReady, Status: api.ConditionTrue},
+					},
+				},
+			},
+			expectAccept: true,
+			name:         "basic",
+		},
+		{
+			node: api.Node{
+				Spec: api.NodeSpec{Unschedulable: true},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{Type: api.NodeReady, Status: api.ConditionTrue},
+					},
+				},
+			},
+			expectAccept: false,
+			name:         "unschedulable",
+		},
+	}
+	pred := getNodeConditionPredicate()
+	for _, test := range tests {
+		accept := pred(test.node)
+		if accept != test.expectAccept {
+			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
+		}
+	}
+}
+
 // TODO(a-robinson): Add tests for update/sync/delete.
