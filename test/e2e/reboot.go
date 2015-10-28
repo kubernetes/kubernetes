@@ -149,25 +149,6 @@ func testReboot(c *client.Client, rebootCmd string) {
 	}
 }
 
-func issueSSHCommand(node *api.Node, provider, cmd string) error {
-	Logf("Getting external IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == api.NodeExternalIP {
-			host = a.Address + ":22"
-			break
-		}
-	}
-	if host == "" {
-		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
-	}
-	Logf("Calling %s on %s", cmd, node.Name)
-	if _, _, code, err := SSH(cmd, host, provider); code != 0 || err != nil {
-		return fmt.Errorf("when running %s on %s, got %d and %v", cmd, node.Name, code, err)
-	}
-	return nil
-}
-
 // rebootNode takes node name on provider through the following steps using c:
 //  - ensures the node is ready
 //  - ensures all pods on the node are running and ready
@@ -222,7 +203,7 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	}
 
 	// Reboot the node.
-	if err = issueSSHCommand(node, provider, rebootCmd); err != nil {
+	if err = issueSSHCommand(rebootCmd, provider, node); err != nil {
 		Logf("Error while issuing ssh command: %v", err)
 		return false
 	}
