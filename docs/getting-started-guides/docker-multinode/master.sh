@@ -137,6 +137,7 @@ start_k8s(){
     # Start kubelet & proxy, then start master components as pods
     docker run \
         --net=host \
+        --pid=host \
         --privileged \
         --restart=always \
         -d \

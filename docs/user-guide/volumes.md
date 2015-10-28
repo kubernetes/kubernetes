@@ -348,6 +348,27 @@ mounts an empty directory and clones a git repository into it for your pod to
 use.  In the future, such volumes may be moved to an even more decoupled model,
 rather than extending the Kubernetes API for every such use case.
 
+Here is a example for gitRepo volume:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: server
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    volumeMounts:
+    - mountPath: /mypath
+      name: git-volume
+  volumes:
+  - name: git-volume
+    gitRepo:
+      repository: "git@somewhere:me/my-git-repository.git"
+      revision: "22f1d8406d464b0c0874075539c1f2e96c253775"
+```
+
 ### secret
 
 A `secret` volume is used to pass sensitive information, such as passwords, to

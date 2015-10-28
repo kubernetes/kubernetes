@@ -213,9 +213,12 @@ value is `Always`.)
 
 ## Caveats
 
-Job is part of the experimental API group, so it is not subject to the same compatibility
-guarantees as objects in the main API.  It may not be enabled.  Enable by setting
-`--runtime-config=experimental/v1alpha1` on the apiserver.
+Job objects are in the [`extensions` API Group](../api.md#api-groups).  This API group may or
+may not be enabled on your cluster.
+
+Job objects have [API version `v1beta1`](../api.md#api-versioning).  Beta objects may
+undergo changes to their schema and/or semantics in future software releases, but
+similar functionality will be supported.
 
 ## Future work
 

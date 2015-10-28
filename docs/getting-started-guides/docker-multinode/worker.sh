@@ -136,6 +136,7 @@ start_k8s() {
     # Start kubelet & proxy in container
     docker run \
         --net=host \
+        --pid=host \
         --privileged \
         --restart=always \
         -d \

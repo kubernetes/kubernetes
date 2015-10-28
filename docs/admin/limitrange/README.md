@@ -35,7 +35,7 @@ Step 0: Prerequisites
 -----------------------------------------
 This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../../docs/getting-started-guides/) for how to get started.
 
-Change to the `<kubernetes>/examples/limitrange` directory if you're not already there.
+Change to the `<kubernetes>` directory if you're not already there.
 
 Step 1: Create a namespace
 -----------------------------------------
@@ -45,11 +45,11 @@ Let's create a new namespace called limit-example:
 
 ```console
 $ kubectl create -f docs/admin/limitrange/namespace.yaml
-namespaces/limit-example
+namespace "limit-example" created
 $ kubectl get namespaces
-NAME            LABELS             STATUS
-default         <none>             Active
-limit-example   <none>             Active
+NAME            LABELS    STATUS    AGE
+default         <none>    Active    5m
+limit-example   <none>    Active    53s
 ```
 
 Step 2: Apply a limit to the namespace
@@ -58,7 +58,7 @@ Let's create a simple limit in our namespace.
 
 ```console
 $ kubectl create -f docs/admin/limitrange/limits.yaml --namespace=limit-example
-limitranges/mylimits
+limitrange "mylimits" created
 ```
 
 Let's describe the limits that we have imposed in our namespace.
@@ -66,22 +66,28 @@ Let's describe the limits that we have imposed in our namespace.
 ```console
 $ kubectl describe limits mylimits --namespace=limit-example
 Name:   mylimits
-Type      Resource  Min  Max Default
-----      --------  ---  --- ---
-Pod       memory    6Mi  1Gi -
-Pod       cpu       250m   2 -
-Container memory    6Mi  1Gi 100Mi
-Container cpu       250m   2 250m
+Namespace:  limit-example
+Type        Resource      Min      Max      Request      Limit      Limit/Request
+----        --------      ---      ---      -------      -----      -------------
+Pod         cpu           200m     2        -            -          -
+Pod         memory        6Mi      1Gi      -            -          -
+Container   cpu           100m     2        200m         300m       -
+Container   memory        3Mi      1Gi      100Mi        200Mi      -
 ```
 
 In this scenario, we have said the following:
 
-1. The total memory usage of a pod across all of its container must fall between 6Mi and 1Gi.
-2. The total cpu usage of a pod across all of its containers must fall between 250m and 2 cores.
-3. A container in a pod may consume between 6Mi and 1Gi of memory.  If the container does not
-specify an explicit resource limit, each container in a pod will get 100Mi of memory.
-4. A container in a pod may consume between 250m and 2 cores of cpu.  If the container does
-not specify an explicit resource limit, each container in a pod will get 250m of cpu.
+1. If a max constraint is specified for a resource (2 CPU and 1Gi memory in this case), then a limit
+must be specified for that resource across all containers. Failure to specify a limit will result in
+a validation error when attempting to create the pod. Note that a default value of limit is set by
+*default* in file `limits.yaml` (300m CPU and 200Mi memory).
+2. If a min constraint is specified for a resource (100m CPU and 3Mi memory in this case), then a
+request must be specified for that resource across all containers. Failure to specify a request will
+result in a validation error when attempting to create the pod. Note that a default value of request is
+set by *defaultRequest* in file `limits.yaml` (200m CPU and 100Mi memory).
+3. For any pod, the sum of all containers memory requests must be >= 6Mi and the sum of all containers
+memory limits must be <= 1Gi; the sum of all containers CPU requests must be >= 200m and the sum of all
+containers CPU limits must be <= 2.
 
 Step 3: Enforcing limits at point of creation
 -----------------------------------------
@@ -97,61 +103,79 @@ how default values are applied to each pod.
 
 ```console
 $ kubectl run nginx --image=nginx --replicas=1 --namespace=limit-example
-CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
-nginx        nginx          nginx      run=nginx   1
+replicationcontroller "nginx" created
 $ kubectl get pods --namespace=limit-example
-POD           IP           CONTAINER(S)   IMAGE(S)   HOST          LABELS      STATUS    CREATED          MESSAGE
-nginx-ykj4j   10.246.1.3                             10.245.1.3/   run=nginx   Running   About a minute
-                           nginx          nginx                                Running   54 seconds
-$ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml | grep resources -C 5
+NAME          READY     STATUS    RESTARTS   AGE
+nginx-aq0mf   1/1       Running   0          35s
+$ kubectl get pods nginx-aq0mf --namespace=limit-example -o yaml | grep resources -C 8
 ```
 
 ```yaml
+  resourceVersion: "127"
+  selfLink: /api/v1/namespaces/limit-example/pods/nginx-aq0mf
+  uid: 51be42a7-7156-11e5-9921-286ed488f785
+spec:
   containers:
-  - capabilities: {}
-    image: nginx
+  - image: nginx
     imagePullPolicy: IfNotPresent
     name: nginx
     resources:
       limits:
-        cpu: 250m
+        cpu: 300m
+        memory: 200Mi
+      requests:
+        cpu: 200m
         memory: 100Mi
     terminationMessagePath: /dev/termination-log
     volumeMounts:
 ```
 
-Note that our nginx container has picked up the namespace default cpu and memory resource limits.
+Note that our nginx container has picked up the namespace default cpu and memory resource *limits* and *requests*.
 
 Let's create a pod that exceeds our allowed limits by having it have a container that requests 3 cpu cores.
 
 ```console
 $ kubectl create -f docs/admin/limitrange/invalid-pod.yaml --namespace=limit-example
-Error from server: Pod "invalid-pod" is forbidden: Maximum CPU usage per pod is 2, but requested 3
+Error from server: error when creating "docs/admin/limitrange/invalid-pod.yaml": Pod "invalid-pod" is forbidden: [Maximum cpu usage per Pod is 2, but limit is 3., Maximum cpu usage per Container is 2, but limit is 3.]
 ```
 
 Let's create a pod that falls within the allowed limit boundaries.
 
 ```console
 $ kubectl create -f docs/admin/limitrange/valid-pod.yaml --namespace=limit-example
-pods/valid-pod
-$ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 resources
+pod "valid-pod" created
+$ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 6 resources
 ```
 
 ```yaml
+ uid: 162a12aa-7157-11e5-9921-286ed488f785
+spec:
   containers:
-  - capabilities: {}
-    image: gcr.io/google_containers/serve_hostname
+  - image: gcr.io/google_containers/serve_hostname
     imagePullPolicy: IfNotPresent
-    name: nginx
+    name: kubernetes-serve-hostname
     resources:
       limits:
         cpu: "1"
         memory: 512Mi
-    securityContext:
-      capabilities: {}
+      requests:
+        cpu: "1"
+        memory: 512Mi
 ```
 
-Note that this pod specifies explicit resource limits so it did not pick up the namespace default values.
+Note that this pod specifies explicit resource *limits* and *requests* so it did not pick up the namespace
+default values.
+
+Note: The *limits* for CPU resource are not enforced in the default Kubernetes setup on the physical node
+that runs the container unless the administrator deploys the kubelet with the folllowing flag:
+
+```
+$ kubelet --help
+Usage of kubelet
+....
+  --cpu-cfs-quota[=false]: Enable CPU CFS quota enforcement for containers that specify CPU limits
+$ kubelet --cpu-cfs-quota=true ...
+```
 
 Step 4: Cleanup
 ----------------------------
@@ -159,18 +183,18 @@ To remove the resources used by this example, you can just delete the limit-exam
 
 ```console
 $ kubectl delete namespace limit-example
-namespaces/limit-example
+namespace "limit-example" deleted
 $ kubectl get namespaces
-NAME      LABELS    STATUS
-default   <none>    Active
+NAME      LABELS    STATUS    AGE
+default   <none>    Active    20m
 ```
 
 Summary
 ----------------------------
 Cluster operators that want to restrict the amount of resources a single container or pod may consume
-are able to define allowable ranges per Kubernetes namespace.  In the absence of any hard limits,
-the Kubernetes system is able to apply default resource limits if desired in order to constrain the
-amount of resource a pod consumes on a node.
+are able to define allowable ranges per Kubernetes namespace.  In the absence of any explicit assignments,
+the Kubernetes system is able to apply default resource *limits* and *requests* if desired in order to
+constrain the amount of resource a pod consumes on a node.
 
 
 

@@ -72,6 +72,7 @@ docker run \
     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
     --volume=/var/run:/var/run:rw \
     --net=host \
+    --pid=host \ 
     --privileged=true \
     -d \
     gcr.io/google_containers/hyperkube:v1.0.1 \

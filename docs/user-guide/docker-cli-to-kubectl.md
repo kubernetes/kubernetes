@@ -5,7 +5,7 @@
 
 # kubectl for docker users
 
-In this doc, we introduce the Kubernetes command line to for interacting with the api to docker-cli users. The tool, kubectl, is designed to be familiar to docker-cli users but there are a few necessary differences. Each section of this doc highlights a docker subcommand explains the kubectl equivalent.
+In this doc, we introduce the Kubernetes command line for interacting with the api to docker-cli users. The tool, kubectl, is designed to be familiar to docker-cli users but there are a few necessary differences. Each section of this doc highlights a docker subcommand explains the kubectl equivalent.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -41,9 +41,8 @@ With kubectl:
 
 ```console
 # start the pod running nginx
-$ kubectl run --image=nginx nginx-app --port=80 --env="DOMAIN=local"
-CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR        REPLICAS
-nginx-app    nginx-app      nginx      run=nginx-app   1
+$ kubectl run --image=nginx nginx-app --port=80 --env="DOMAIN=cluster"
+replicationcontroller "nginx-app" created
 # expose a port through with a service
 $ kubectl expose rc nginx-app --port=80 --name=nginx-http
 ```
