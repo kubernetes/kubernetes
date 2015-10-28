@@ -178,6 +178,7 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Namespaces.*should\sdelete\sfast"
     "ServiceAccounts"
     "Networking\sshould\sfunction\sfor\sintra-pod\scommunication"  # possibly causing Ginkgo to get stuck, issue: #13485
+    "Services.*identically\snamed" # error waiting for reachability, issue: #16285
     )
 
 # Tests that should not run on soak cluster.
