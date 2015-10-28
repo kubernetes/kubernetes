@@ -55,9 +55,7 @@ type SchedulerLoopConfig struct {
 	NextPod   func() *api.Pod
 	Error     func(*api.Pod, error)
 	Recorder  record.EventRecorder
-	Fw        types.Framework
 	Client    *client.Client
-	Qr        *queuer.Queuer
 	Pr        *PodReconciler
 	Starting  chan struct{} // startup latch
 }
@@ -103,9 +101,7 @@ func NewSchedulerLoopConfig(c *config.Config, fw types.Framework, client *client
 		NextPod:   q.Yield,
 		Error:     eh.Error,
 		Recorder:  eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
-		Fw:        fw,
 		Client:    client,
-		Qr:        q,
 		Pr:        podReconciler,
 		Starting:  startLatch,
 	}
@@ -118,9 +114,7 @@ func NewSchedulerLoop(c *SchedulerLoopConfig) SchedulerLoopInterface {
 		nextPod:   c.NextPod,
 		error:     c.Error,
 		recorder:  c.Recorder,
-		fw:        c.Fw,
 		client:    c.Client,
-		qr:        c.Qr,
 		pr:        c.Pr,
 		starting:  c.Starting,
 	}
@@ -132,12 +126,9 @@ type SchedulerLoop struct {
 	nextPod   func() *api.Pod
 	error     func(*api.Pod, error)
 	recorder  record.EventRecorder
-
-	fw       types.Framework
-	client   *client.Client
-	qr       *queuer.Queuer
-	pr       *PodReconciler
-	starting chan struct{}
+	client    *client.Client
+	pr        *PodReconciler
+	starting  chan struct{}
 }
 
 func (s *SchedulerLoop) Run(done <-chan struct{}) {
