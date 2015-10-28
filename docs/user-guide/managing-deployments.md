@@ -47,6 +47,7 @@ You’ve deployed your application and exposed it via a service. Now what? Kuber
   - [Scaling your application](#scaling-your-application)
   - [Updating your application without a service outage](#updating-your-application-without-a-service-outage)
   - [In-place updates of resources](#in-place-updates-of-resources)
+  - [Using configuration files](#using-configuration-files)
   - [Disruptive updates](#disruptive-updates)
   - [What's next?](#whats-next)
 
@@ -411,7 +412,9 @@ You can also run the [update demo](update-demo/) to see a visual representation 
 
 ## In-place updates of resources
 
-Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object. That’s easiest to do with `kubectl patch`:
+Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object.
+
+One way to do that is with `kubectl patch`:
 
 ```console
 $ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
@@ -438,6 +441,27 @@ $ rm $TMP
 ```
 
 The system ensures that you don’t clobber changes made by other users or components by confirming that the `resourceVersion` doesn’t differ from the version you edited. If you want to update regardless of other changes, remove the `resourceVersion` field when you edit the resource. However, if you do this, don’t use your original configuration file as the source since additional fields most likely were set in the live state.
+
+## Using configuration files
+
+A more disciplined alternative to patch and edit is `kubectl apply`.
+
+With apply, you can keep a set of configuration files in source control, where they can be maintained and versioned along with the code for the resources they configure. Then, when you're ready to push configuration changes to the cluster, you can run `kubectl apply`.
+
+This command will compare the version of the configuration that you're pushing with the previous version and apply the changes you've made, without overwriting any automated changes to properties you haven't specified.
+
+```console
+$ kubectl apply -f ./nginx-rc.yaml
+replicationcontroller "my-nginx-v4" configured
+```
+
+As shown in the example above, the configuration used with `kubectl apply` is the same as the one used with `kubectl replace`. However, instead of deleting the existing resource and replacing it with a new one, `kubectl apply` modifies the configuration of the existing resource.
+
+Note that `kubectl apply` attaches an annotation to the resource in order to determine the changes to the configuration since the previous invocation. When it's invoked, `kubectl apply` does a three-way diff between the previous configuration, the provided input and the current configuration of the resource, in order to determine how to modify the resource.
+
+Currently, resources are created without this annotation, so the first invocation of `kubectl apply` will fall back to a two-way diff between the provided input and the current configuration of the resource. During this first invocation, it cannot detect the deletion of properties set when the resource was created. For this reason, it will not remove them.
+
+All subsequent calls to `kubectl apply`, and other commands that modify the configuration, such as `kubectl replace` and `kubectl edit`, will update the annotation, allowing subsequent calls to `kubectl apply` to detect and perform deletions using a three-way diff.
 
 ## Disruptive updates
 
