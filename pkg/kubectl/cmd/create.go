@@ -112,13 +112,7 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
-		// Serialize the object with the annotation applied.
-		data, err := info.Mapping.Codec.Encode(info.Object)
-		if err != nil {
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
-		}
-
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}

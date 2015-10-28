@@ -376,13 +376,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			return nil, "", nil, nil, err
 		}
 
-		// Serialize the object with the annotation applied.
-		data, err := mapping.Codec.Encode(info.Object)
-		if err != nil {
-			return nil, "", nil, nil, err
-		}
-
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, data)
+		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}

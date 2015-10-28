@@ -99,37 +99,26 @@ func (m *Helper) Delete(namespace, name string) error {
 		Error()
 }
 
-func (m *Helper) Create(namespace string, modify bool, data []byte) (runtime.Object, error) {
+func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
 	if modify {
-		obj, err := m.Codec.Decode(data)
-		if err != nil {
-			// We don't know how to check a version on this object, but create it anyway
-			return m.createResource(m.RESTClient, m.Resource, namespace, data)
-		}
-
 		// Attempt to version the object based on client logic.
 		version, err := m.Versioner.ResourceVersion(obj)
 		if err != nil {
 			// We don't know how to clear the version on this object, so send it to the server as is
-			return m.createResource(m.RESTClient, m.Resource, namespace, data)
+			return m.createResource(m.RESTClient, m.Resource, namespace, obj)
 		}
 		if version != "" {
 			if err := m.Versioner.SetResourceVersion(obj, ""); err != nil {
 				return nil, err
 			}
-			newData, err := m.Codec.Encode(obj)
-			if err != nil {
-				return nil, err
-			}
-			data = newData
 		}
 	}
 
-	return m.createResource(m.RESTClient, m.Resource, namespace, data)
+	return m.createResource(m.RESTClient, m.Resource, namespace, obj)
 }
 
-func (m *Helper) createResource(c RESTClient, resource, namespace string, data []byte) (runtime.Object, error) {
-	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(data).Do().Get()
+func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
+	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
 }
 func (m *Helper) Patch(namespace, name string, pt api.PatchType, data []byte) (runtime.Object, error) {
 	return m.RESTClient.Patch(pt).
@@ -141,27 +130,21 @@ func (m *Helper) Patch(namespace, name string, pt api.PatchType, data []byte) (r
 		Get()
 }
 
-func (m *Helper) Replace(namespace, name string, overwrite bool, data []byte) (runtime.Object, error) {
+func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
 	c := m.RESTClient
-
-	obj, err := m.Codec.Decode(data)
-	if err != nil {
-		// We don't know how to handle this object, but replace it anyway
-		return m.replaceResource(c, m.Resource, namespace, name, data)
-	}
 
 	// Attempt to version the object based on client logic.
 	version, err := m.Versioner.ResourceVersion(obj)
 	if err != nil {
 		// We don't know how to version this object, so send it to the server as is
-		return m.replaceResource(c, m.Resource, namespace, name, data)
+		return m.replaceResource(c, m.Resource, namespace, name, obj)
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
 		serverObj, err := c.Get().Namespace(namespace).Resource(m.Resource).Name(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
-			return m.replaceResource(c, m.Resource, namespace, name, data)
+			return m.replaceResource(c, m.Resource, namespace, name, obj)
 		}
 		serverVersion, err := m.Versioner.ResourceVersion(serverObj)
 		if err != nil {
@@ -170,16 +153,11 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, data []byte) (r
 		if err := m.Versioner.SetResourceVersion(obj, serverVersion); err != nil {
 			return nil, err
 		}
-		newData, err := m.Codec.Encode(obj)
-		if err != nil {
-			return nil, err
-		}
-		data = newData
 	}
 
-	return m.replaceResource(c, m.Resource, namespace, name, data)
+	return m.replaceResource(c, m.Resource, namespace, name, obj)
 }
 
-func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string, data []byte) (runtime.Object, error) {
-	return c.Put().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Name(name).Body(data).Do().Get()
+func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string, obj runtime.Object) (runtime.Object, error) {
+	return c.Put().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Name(name).Body(obj).Do().Get()
 }
