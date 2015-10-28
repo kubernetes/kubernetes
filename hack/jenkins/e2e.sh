@@ -682,7 +682,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
     : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
     : ${JENKINS_PUBLISHED_VERSION:="release/stable"}
-    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
@@ -697,7 +697,7 @@ case ${JOB_NAME} in
     # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
     # get the latest upgrade logic.
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
@@ -713,7 +713,7 @@ case ${JOB_NAME} in
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
     : ${JENKINS_PUBLISHED_VERSION:="release/stable"}
-    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
@@ -733,7 +733,7 @@ case ${JOB_NAME} in
     # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
     # get the latest upgrade logic.
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
@@ -749,7 +749,7 @@ case ${JOB_NAME} in
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
     : ${JENKINS_PUBLISHED_VERSION:="release/stable"}
-    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
@@ -767,7 +767,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
-    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="true"}
