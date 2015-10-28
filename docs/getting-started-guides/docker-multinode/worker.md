@@ -37,7 +37,8 @@ Documentation for other releases can be found at
 
 These instructions are very similar to the master set-up above, but they are duplicated for clarity.
 You need to repeat these instructions for each node you want to join the cluster.
-We will assume that the IP address of this node is `${NODE_IP}` and you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.md).
+We will assume that the IP address of this node is `${NODE_IP}` and you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.md).  We'll need to run several versioned Kubernetes components, so we'll assume that the version we want
+to run is `${K8S_VERSION}`, which should hold a value such as "1.0.7".
 
 For each worker node, there are three steps:
    * [Set up `flanneld` on the worker node](#set-up-flanneld-on-the-worker-node)
@@ -50,7 +51,7 @@ As before, the Flannel daemon is going to provide network connectivity.
 
 _Note_:
 There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
-Please install Docker 1.6.2 or wait for Docker 1.7.1.
+Please install Docker 1.6.2 or Docker 1.7.1 or Docker 1.8.3.
 
 
 #### Set up a bootstrap docker
@@ -157,7 +158,7 @@ sudo docker run \
     --privileged=true \
     --pid=host \ 
     -d \
-    gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=$(hostname -i) --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=$(hostname -i) --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
 ```
 
 #### Run the service proxy
@@ -165,7 +166,7 @@ sudo docker run \
 The service proxy provides load-balancing between groups of containers defined by Kubernetes `Services`
 
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
 ```
 
 ### Next steps
