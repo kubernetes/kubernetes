@@ -21,6 +21,66 @@ ul, ul ul {
         margin-left: $searchboxpadding - 1px;
     }
 }
+.versionselector {
+	position: relative;
+	left: 0;
+	display: inline-block;
+	padding: 5px 5px 0 10px;
+	button {
+		border-style: solid;
+		border-width: 1px;
+		border-radius: 2px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.2),0 1px 2px rgba(0,0,0,0.25);
+		background-color: #ffffff;
+		margin: 0;
+		padding: 0.4em 0.8em;
+		font-size: 1em;
+		text-align: center;
+		white-space: nowrap;
+		vertical-align: middle;
+	}
+	button:hover {
+		font-weight: bold;
+		box-shadow: inset 0 2px 0 rgba(255,255,255,0.2),0 2px 3px rgba(0,0,0,0.25);
+	}
+}.versionselector .dropdown-menu {
+	position: absolute;
+	list-style: none;
+	display: none;
+	top: 100%;
+	left: 5px;
+	width: 150%;
+	margin: 0;
+	padding: 5px;
+	border-color: #f6f6f6;
+	border-style: ridge;
+	border-width: .25px;
+	border-radius: 1px;
+	background: white;
+	box-shadow: 3px 3px 6px #888888;
+	li {
+		left: 10px;
+	}
+	li.text-only {
+		left: 5px;
+		color: #000000;
+		font-style: italic;
+		text-decoration: none;
+		border-bottom: 1px solid #000000;
+		padding-top: 5px;
+	}
+	a {
+		left: 25%;
+		display: block;
+		padding: 0.5em 0.5em;
+	}
+	a.active {
+		color: #428BCB;
+	}
+	a:hover {
+		font-weight: bold;
+	}
+}
 #wrapper {
 	position: fixed;
 	left: 3px;
@@ -58,7 +118,7 @@ ul, ul ul {
 	text-indent: .75em;
 	position: center;
 }
-.menu > li > a:hover, .menu > li > a.active {
+.menu > li > a:hover, .menu > li > a.active, .menu > li > ul > li > a.active {
 	color: #428BCB;
 }
 /* add caret to container topics (that have sub-menus) */
