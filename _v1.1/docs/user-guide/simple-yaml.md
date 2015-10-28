@@ -44,7 +44,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](pod.yaml?raw=true)
+[Download example](pod.yaml)
 <!-- END MUNGE: EXAMPLE pod.yaml -->
 
 You can see your cluster's pods:
