@@ -184,7 +184,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 	return nil
 }
 
-func extractGroupVersions(l *unversioned.APIGroupList) []string {
+func ExtractGroupVersions(l *unversioned.APIGroupList) []string {
 	var groupVersions []string
 	for _, g := range l.Groups {
 		for _, gv := range g.Versions {
@@ -238,7 +238,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
-	groupVersions = append(groupVersions, extractGroupVersions(&apiGroupList)...)
+	groupVersions = append(groupVersions, ExtractGroupVersions(&apiGroupList)...)
 
 	return groupVersions, nil
 }
