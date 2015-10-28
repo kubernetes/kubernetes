@@ -2385,11 +2385,11 @@ func (kl *Kubelet) syncNetworkStatus() {
 	kl.networkConfigured = networkConfigured
 }
 
-func (kl *Kubelet) getNodeAddress(ip net.IP) ([]api.NodeAddress, error) {
-	var addresses []api.NodeAddress
+func (kl *Kubelet) getNodeAddress(ip net.IP) (string, error) {
+	var network string
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return []api.NodeAddress{}, err
+		return "", err
 	}
 FIND:
 	for _, i := range ifaces {
@@ -2398,10 +2398,7 @@ FIND:
 			for _, addr := range addrs {
 				if addrOri, ok := addr.(*net.IPNet); ok {
 					if addrOri.IP.Equal(ip) {
-						addresses = []api.NodeAddress{
-							{api.NodeLegacyHostIP, addrOri.String()},
-							{api.NodeInternalIP, addrOri.String()},
-						}
+						network = addrOri.String()
 						break FIND
 					}
 				}
@@ -2409,7 +2406,7 @@ FIND:
 		}
 	}
 
-	return addresses, nil
+	return network, nil
 }
 
 // setNodeStatus fills in the Status fields of the given Node, overwriting
@@ -2458,11 +2455,14 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 				addr = ip
 			}
 		}
-		addresses, err := kl.getNodeAddress(addr)
-		if err != nil || len(addresses) == 0 {
+		network, err := kl.getNodeAddress(addr)
+		if err != nil || len(network) == 0 {
 			return fmt.Errorf("can't get ip network of node %s", node.Name)
 		}
-		node.Status.Addresses = addresses
+		node.Status.Addresses = []api.NodeAddress{
+			{Type: api.NodeLegacyHostIP, Address: addr.String(), Subnet: network},
+			{Type: api.NodeInternalIP, Address: addr.String(), Subnet: network},
+		}
 	}
 
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start

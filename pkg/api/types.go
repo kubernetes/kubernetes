@@ -1516,6 +1516,7 @@ const (
 type NodeAddress struct {
 	Type    NodeAddressType `json:"type"`
 	Address string          `json:"address"`
+	Subnet  string          `json:"subnet"`
 }
 
 // NodeResources is an object for conveying resource information about a node.
