@@ -52,10 +52,22 @@ var _ = Describe("Load capacity", func() {
 	var nodeCount int
 	var ns string
 	var configs []*RCConfig
-	framework := Framework{BaseName: "load", NamespaceDeletionTimeout: time.Hour}
+
+	// Gathers metrics before teardown
+	// TODO add flag that allows to skip cleanup on failure
+	AfterEach(func() {
+		deleteAllRC(configs)
+
+		// Verify latency metrics
+		highLatencyRequests, err := HighLatencyRequests(c)
+		expectNoError(err, "Too many instances metrics above the threshold")
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+	})
+
+	framework := NewFramework("load")
+	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		c = framework.Client
 		ns = framework.Namespace.Name
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
@@ -70,20 +82,6 @@ var _ = Describe("Load capacity", func() {
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
-	})
-
-	// TODO add flag that allows to skip cleanup on failure
-	AfterEach(func() {
-		// We can't call it explicitly at the end, because it will not be called
-		// if Expect() fails.
-		defer framework.afterEach()
-
-		deleteAllRC(configs)
-
-		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c)
-		expectNoError(err, "Too many instances metrics above the threshold")
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	type Load struct {

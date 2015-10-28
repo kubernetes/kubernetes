@@ -29,16 +29,13 @@ import (
 )
 
 var _ = Describe("Probing container", func() {
-	framework := Framework{BaseName: "container-probe"}
+	framework := NewFramework("container-probe")
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		podClient = framework.Client.Pods(framework.Namespace.Name)
 	})
-
-	AfterEach(framework.afterEach)
 
 	It("with readiness probe should not be ready before initial delay and never restart [Conformance]", func() {
 		p, err := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
