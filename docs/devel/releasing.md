@@ -44,6 +44,7 @@ release breaks down into four pieces:
 
 1. selecting release components;
 1. cutting/branching the release;
+1. building and pushing the binaries; and
 1. publishing binaries and release notes.
 
 You should progress in this strict order.
@@ -77,7 +78,7 @@ No matter what you're cutting, you're going to want to look at
 (see above,) and look at the critical jobs building from that branch.  First
 glance through builds and look for nice solid rows of green builds, and then
 check temporally with the other critical builds to make sure they're solid
-around then as well. Once you find some greens, you can find the Git hash for a
+around then as well. Once you find some greens, you can find the git hash for a
 build by looking at the Full Console Output and searching for `githash=`. You
 should see a line:
 
@@ -106,7 +107,7 @@ Before proceeding to the next step:
 export GITHASH=v1.2.0-alpha.2.164+b44c7d79d6c9bb
 ```
 
-Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the Git hash you decided on. This
+Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the git hash you decided on. This
 will become your release point.
 
 ### Cutting/branching the release
@@ -123,50 +124,46 @@ cd contrib/release
 Figure out what version you're cutting, and
 
 ```console
-export VER=vX.Y.0-alpha.W
+export VER="vX.Y.0-alpha.W"
 ```
 
 then, from `contrib/release`, run
 
 ```console
-cut-alpha.sh "${VER}" "${GITHASH}"
+cut.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
 
-1. clone a temporary copy of the [kubernetes repo](https://github.com/kubernetes/kubernetes);
-1. mark the `vX.Y.0-alpha.W` tag at the given Git hash;
-1. push the tag to GitHub;
-1. build the release binaries at the given Git hash;
-1. publish the binaries to GCS;
-1. prompt you to do the remainder of the work.
+1. mark the `vX.Y.0-alpha.W` tag at the given git hash;
+1. prompt you to do the remainder of the work, including building the
+   appropriate binaries and pushing them to the appropriate places.
 
 #### Cutting an official release (`vX.Y.Z`)
 
 Figure out what version you're cutting, and
 
 ```console
-export VER=vX.Y.Z
+export VER="vX.Y.Z"
 ```
 
 then, from `contrib/release`, run
 
 ```console
-cut-official.sh "${VER}" "${GITHASH}"
+cut.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
 
-1. clone a temporary copy of the [kubernetes repo](https://github.com/kubernetes/kubernetes);
-1. do a series of commits on the branch, including forking the documentation
-   and doing the release version commit;
-  * TODO(ihmccreery) it's not yet clear what exactly this is going to look like.
-1. mark both the `vX.Y.Z` and `vX.Y.(Z+1)-beta` tags at the given Git hash;
-1. push the tags to GitHub;
-1. build the release binaries at the given Git hash (on the appropriate
-   branch);
-1. publish the binaries to GCS;
-1. prompt you to do the remainder of the work.
+1. do a series of commits on the branch for `vX.Y.Z`, including versionizing
+   the documentation and doing the release version commit;
+1. mark the `vX.Y.Z` tag at the release version commit;
+1. do a series of commits on the branch for `vX.Y.(Z+1)-beta` on top of the
+   previous commits, including versionizing the documentation and doing the
+   beta version commit;
+1. mark the `vX.Y.(Z+1)-beta` tag at the release version commit;
+1. prompt you to do the remainder of the work, including building the
+   appropriate binaries and pushing them to the appropriate places.
 
 #### Branching a new release series (`vX.Y`)
 
@@ -177,38 +174,29 @@ on the release team.
 Figure out what series you're cutting, and
 
 ```console
-export VER=vX.Y
+export VER="vX.Y"
 ```
 
 then, from `contrib/release`, run
 
 ```console
-branch-series.sh "${VER}" "${GITHASH}"
+cut.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
 
-1. clone a temporary copy of the [kubernetes repo](https://github.com/kubernetes/kubernetes);
-1. mark the `vX.(Y+1).0-alpha.0` tag at the given Git hash on `master`;
-1. fork a new branch `release-X.Y` off of `master` at the Given Git hash;
-1. do a series of commits on the branch, including forking the documentation
-   and doing the release version commit;
-  * TODO(ihmccreery) it's not yet clear what exactly this is going to look like.
-1. mark the `vX.Y.0-beta` tag at the appropriate commit on the new `release-X.Y` branch;
-1. push the tags to GitHub;
-1. build the release binaries at the appropriate Git hash on the appropriate
-   branches, (for both the new alpha and beta releases);
-1. publish the binaries to GCS;
-1. prompt you to do the remainder of the work.
-
-**TODO(ihmccreery)**: can we fix tags, etc., if you have to shift the release branchpoint?
+1. mark the `vX.(Y+1).0-alpha.0` tag at the given git hash on `master`;
+1. fork a new branch `release-X.Y` off of `master` at the given git hash;
+1. do a series of commits on the branch for `vX.Y.0-beta`, including versionizing
+   the documentation and doing the release version commit;
+1. mark the `vX.Y.(Z+1)-beta` tag at the beta version commit;
+1. prompt you to do the remainder of the work, including building the
+   appropriate binaries and pushing them to the appropriate places.
 
 ### Publishing binaries and release notes
 
 Whichever script you ran above will prompt you to take any remaining steps,
 including publishing binaries and release notes.
-
-**TODO(ihmccreery)**: deal with the `making-release-notes` doc in `docs/devel`.
 
 ## Origin of the Sources
 
