@@ -42,9 +42,6 @@ const (
 )
 
 type SchedulerLoopInterface interface {
-	ReconcilePodTask(t *podtask.T)
-
-	// execute the Scheduling plugin, should start a go routine and return immediately
 	Run(<-chan struct{})
 }
 
@@ -55,12 +52,11 @@ type SchedulerLoop struct {
 	error     func(*api.Pod, error)
 	recorder  record.EventRecorder
 	client    *client.Client
-	pr        *PodReconciler
-	starting  chan struct{} // startup latch
+	started   chan<- struct{} // startup latch
 }
 
-func NewSchedulerLoop(c *config.Config, fw types.Framework, client *client.Client, recorder record.EventRecorder,
-	terminate <-chan struct{}, mux *http.ServeMux, podsWatcher *cache.ListWatch) *SchedulerLoop {
+func NewScheduler(c *config.Config, fw types.Framework, client *client.Client, recorder record.EventRecorder,
+	terminate <-chan struct{}, mux *http.ServeMux, podsWatcher *cache.ListWatch) (SchedulerLoopInterface, *PodReconciler) {
 
 	// Watch and queue pods that need scheduling.
 	updates := make(chan queue.Entry, c.UpdatesBacklog)
@@ -74,10 +70,10 @@ func NewSchedulerLoop(c *config.Config, fw types.Framework, client *client.Clien
 	q := queuer.New(podUpdates)
 	podDeleter := NewDeleter(fw, q)
 	podReconciler := NewPodReconciler(fw, client, q, podDeleter)
-	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
-	eh := NewErrorHandler(fw, bo, q)
+
 	startLatch := make(chan struct{})
 	eventBroadcaster := record.NewBroadcaster()
+
 	runtime.On(startLatch, func() {
 		eventBroadcaster.StartRecordingToSink(client.Events(""))
 		reflector.Run() // TODO(jdef) should listen for termination
@@ -87,20 +83,27 @@ func NewSchedulerLoop(c *config.Config, fw types.Framework, client *client.Clien
 		q.InstallDebugHandlers(mux)
 		podtask.InstallDebugHandlers(fw.Tasks(), mux)
 	})
+
+	return NewSchedulerLoop(c, fw, client, recorder, podUpdates, q, startLatch), podReconciler
+}
+
+func NewSchedulerLoop(c *config.Config, fw types.Framework, client *client.Client,
+	recorder record.EventRecorder, podUpdates queue.FIFO, q *queuer.Queuer,
+	started chan<- struct{}) *SchedulerLoop {
+	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
 	return &SchedulerLoop{
 		algorithm: NewSchedulerAlgorithm(fw, podUpdates),
 		binder:    NewBinder(fw),
 		nextPod:   q.Yield,
-		error:     eh.Error,
+		error:     NewErrorHandler(fw, bo, q).Error,
 		recorder:  recorder,
 		client:    client,
-		pr:        podReconciler,
-		starting:  startLatch,
+		started:   started,
 	}
 }
 
 func (s *SchedulerLoop) Run(done <-chan struct{}) {
-	defer close(s.starting)
+	defer close(s.started)
 	go runtime.Until(s.scheduleOne, recoveryDelay, done)
 }
 
@@ -140,8 +143,4 @@ func (s *SchedulerLoop) scheduleOne() {
 		return
 	}
 	s.recorder.Eventf(pod, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
-}
-
-func (s *SchedulerLoop) ReconcilePodTask(t *podtask.T) {
-	s.pr.Reconcile(t)
 }
