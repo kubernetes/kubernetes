@@ -27,6 +27,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
 
+# NEW_VERSION is expected to be vMajor.Minor.Micro.
+MAJOR_AND_MINOR_VERSION=${NEW_VERSION%.*}
+
 if [ "$#" -lt 1 ]; then
     echo "Usage: versionize-docs <release-version>"
     exit 1
@@ -45,6 +48,8 @@ echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
 HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/kubernetes/kubernetes"
+# Update the include directory in definitions.md and operations.md.
+DIRECTORY_KEY_WORDS="<REPLACE-WITH-RELEASE-VERSION>"
 
 md_dirs=(docs examples)
 md_files=()
@@ -59,6 +64,9 @@ for doc in "${md_files[@]}"; do
 
   # Replace /HEAD in html preview links with /NEW_VERSION.
   $SED -ri -e "s|(${HTML_PREVIEW_PREFIX})/HEAD|\1/blob/${NEW_VERSION}|g" "${doc}"
+
+  # Replace <REPLACE-WITH-RELEASE-VERSION> with MAJOR_AND_MINOR_VERSION.
+  $SED -ri -e "s|${DIRECTORY_KEY_WORDS}|${MAJOR_AND_MINOR_VERSION}|g" "${doc}"
 
   is_versioned_tag="<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
