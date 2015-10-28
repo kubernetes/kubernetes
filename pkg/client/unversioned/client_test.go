@@ -282,7 +282,7 @@ func TestGetServerResources(t *testing.T) {
 		GroupVersion: "extensions/v1",
 		APIResources: []unversioned.APIResource{
 			{"deployments", true},
-			{"ingress", true},
+			{"ingresses", true},
 			{"jobs", true},
 		},
 	}

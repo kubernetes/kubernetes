@@ -688,7 +688,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingress",
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingresses",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
@@ -808,7 +808,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingress",
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
@@ -883,7 +883,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}",
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
@@ -1095,7 +1095,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingress/{name}",
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses/{name}",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
@@ -1178,7 +1178,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/ingress",
+    "path": "/apis/extensions/v1beta1/ingresses",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
@@ -1245,7 +1245,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/watch/ingress",
+    "path": "/apis/extensions/v1beta1/watch/ingresses",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
@@ -1312,7 +1312,7 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingress/{name}/status",
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/ingresses/{name}/status",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
