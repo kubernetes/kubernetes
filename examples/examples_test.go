@@ -223,11 +223,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"http-liveness": &api.Pod{},
 		},
 		"../docs/user-guide": {
-			"multi-pod":   nil,
-			"pod":         &api.Pod{},
-			"replication": &api.ReplicationController{},
-			"job":         &extensions.Job{},
-			"ingress":     &extensions.Ingress{},
+			"multi-pod":            nil,
+			"pod":                  &api.Pod{},
+			"replication":          &api.ReplicationController{},
+			"job":                  &extensions.Job{},
+			"ingress":              &extensions.Ingress{},
+			"nginx-deployment":     &extensions.Deployment{},
+			"new-nginx-deployment": &extensions.Deployment{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
