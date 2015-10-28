@@ -27,42 +27,42 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-type mesosFramework struct {
+type MesosFramework struct {
 	sync.Mutex
-	mesosScheduler *MesosScheduler
+	MesosScheduler *MesosScheduler
 }
 
-func (fw *mesosFramework) PodScheduler() podschedulers.PodScheduler {
-	return fw.mesosScheduler.podScheduler
+func (fw *MesosFramework) PodScheduler() podschedulers.PodScheduler {
+	return fw.MesosScheduler.podScheduler
 }
 
-func (fw *mesosFramework) Offers() offers.Registry {
-	return fw.mesosScheduler.offers
+func (fw *MesosFramework) Offers() offers.Registry {
+	return fw.MesosScheduler.offers
 }
 
-func (fw *mesosFramework) Tasks() podtask.Registry {
-	return fw.mesosScheduler.taskRegistry
+func (fw *MesosFramework) Tasks() podtask.Registry {
+	return fw.MesosScheduler.taskRegistry
 }
 
-func (fw *mesosFramework) CreatePodTask(ctx api.Context, pod *api.Pod) (*podtask.T, error) {
-	return podtask.New(ctx, "", *pod, fw.mesosScheduler.executor)
+func (fw *MesosFramework) CreatePodTask(ctx api.Context, pod *api.Pod) (*podtask.T, error) {
+	return podtask.New(ctx, "", *pod, fw.MesosScheduler.executor)
 }
 
-func (fw *mesosFramework) SlaveHostNameFor(id string) string {
-	return fw.mesosScheduler.slaveHostNames.HostName(id)
+func (fw *MesosFramework) SlaveHostNameFor(id string) string {
+	return fw.MesosScheduler.slaveHostNames.HostName(id)
 }
 
-func (fw *mesosFramework) KillTask(taskId string) error {
+func (fw *MesosFramework) KillTask(taskId string) error {
 	killTaskId := mutil.NewTaskID(taskId)
-	_, err := fw.mesosScheduler.driver.KillTask(killTaskId)
+	_, err := fw.MesosScheduler.driver.KillTask(killTaskId)
 	return err
 }
 
-func (fw *mesosFramework) LaunchTask(task *podtask.T) error {
+func (fw *MesosFramework) LaunchTask(task *podtask.T) error {
 	// assume caller is holding scheduler lock
 	taskList := []*mesos.TaskInfo{task.BuildTaskInfo()}
 	offerIds := []*mesos.OfferID{task.Offer.Details().Id}
 	filters := &mesos.Filters{}
-	_, err := fw.mesosScheduler.driver.LaunchTasks(offerIds, taskList, filters)
+	_, err := fw.MesosScheduler.driver.LaunchTasks(offerIds, taskList, filters)
 	return err
 }

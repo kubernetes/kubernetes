@@ -20,13 +20,19 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
+	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"net/http"
 )
 
 const (
@@ -54,6 +60,55 @@ type SchedulerLoopConfig struct {
 	Qr        *queuer.Queuer
 	Pr        *PodReconciler
 	Starting  chan struct{} // startup latch
+}
+
+// NewDefaultSchedulerLoopConfig creates a SchedulerLoop
+func NewDefaultSchedulerLoopConfig(c *config.Config, fw types.Framework, client *client.Client, terminate <-chan struct{}, mux *http.ServeMux) *SchedulerLoopConfig {
+	// use ListWatch watching pods using the client by default
+	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
+	return NewSchedulerLoopConfig(c, fw, client, terminate, mux, lw)
+}
+
+func NewSchedulerLoopConfig(c *config.Config, fw types.Framework, client *client.Client, terminate <-chan struct{}, mux *http.ServeMux,
+	podsWatcher *cache.ListWatch) *SchedulerLoopConfig {
+
+	// Watch and queue pods that need scheduling.
+	updates := make(chan queue.Entry, c.UpdatesBacklog)
+	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
+	reflector := cache.NewReflector(podsWatcher, &api.Pod{}, podUpdates, 0)
+
+	// lock that guards critial sections that involve transferring pods from
+	// the store (cache) to the scheduling queue; its purpose is to maintain
+	// an ordering (vs interleaving) of operations that's easier to reason about.
+
+	q := queuer.New(podUpdates)
+	podDeleter := NewDeleter(fw, q)
+	podReconciler := NewPodReconciler(fw, client, q, podDeleter)
+	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
+	eh := NewErrorHandler(fw, bo, q)
+	startLatch := make(chan struct{})
+	eventBroadcaster := record.NewBroadcaster()
+	runtime.On(startLatch, func() {
+		eventBroadcaster.StartRecordingToSink(client.Events(""))
+		reflector.Run() // TODO(jdef) should listen for termination
+		podDeleter.Run(updates, terminate)
+		q.Run(terminate)
+
+		q.InstallDebugHandlers(mux)
+		podtask.InstallDebugHandlers(fw.Tasks(), mux)
+	})
+	return &SchedulerLoopConfig{
+		Algorithm: NewSchedulerAlgorithm(fw, podUpdates),
+		Binder:    NewBinder(fw),
+		NextPod:   q.Yield,
+		Error:     eh.Error,
+		Recorder:  eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
+		Fw:        fw,
+		Client:    client,
+		Qr:        q,
+		Pr:        podReconciler,
+		Starting:  startLatch,
+	}
 }
 
 func NewSchedulerLoop(c *SchedulerLoopConfig) SchedulerLoopInterface {

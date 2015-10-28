@@ -461,14 +461,16 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		),
 	)
 
+	client := client.NewOrDie(&client.Config{
+		Host:    apiServer.server.URL,
+		Version: testapi.Default.Version(),
+	})
+	c := *schedcfg.CreateDefaultConfig()
 	mesosScheduler := New(Config{
-		Executor: ei,
-		Client: client.NewOrDie(&client.Config{
-			Host:    apiServer.server.URL,
-			Version: testapi.Default.Version(),
-		}),
+		Executor:        ei,
+		Client:          client,
 		PodScheduler:    podschedulers.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
-		SchedulerConfig: *schedcfg.CreateDefaultConfig(),
+		SchedulerConfig: c,
 		LookupNode:      apiServer.LookupNode,
 	})
 
@@ -480,12 +482,9 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	// create scheduler process
 	schedulerProc := ha.New(mesosScheduler)
 
-	// get plugin config from it
-	config := mesosScheduler.NewSchedulerLoopConfig(
-		schedulerProc.Terminal(),
-		http.DefaultServeMux,
-		&podsListWatch.ListWatch,
-	)
+	// get SchedulerLoop config from it
+	fw := &MesosFramework{MesosScheduler: mesosScheduler}
+	config := operations.NewSchedulerLoopConfig(&c, fw, client, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(config)
 
 	// make events observable

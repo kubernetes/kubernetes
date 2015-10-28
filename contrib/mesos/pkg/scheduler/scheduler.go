@@ -28,14 +28,12 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
-	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	offermetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
-	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
@@ -44,13 +42,10 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -756,53 +751,4 @@ func (ks *MesosScheduler) recoverTasks() error {
 		}
 	}
 	return nil
-}
-
-// Create creates a scheduler plugin and all supporting background functions.
-func (k *MesosScheduler) NewDefaultSchedulerLoopConfig(terminate <-chan struct{}, mux *http.ServeMux) *operations.SchedulerLoopConfig {
-	// use ListWatch watching pods using the client by default
-	lw := cache.NewListWatchFromClient(k.client, "pods", api.NamespaceAll, fields.Everything())
-	return k.NewSchedulerLoopConfig(terminate, mux, lw)
-}
-
-func (k *MesosScheduler) NewSchedulerLoopConfig(terminate <-chan struct{}, mux *http.ServeMux,
-	podsWatcher *cache.ListWatch) *operations.SchedulerLoopConfig {
-
-	// Watch and queue pods that need scheduling.
-	updates := make(chan queue.Entry, k.schedulerConfig.UpdatesBacklog)
-	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
-	reflector := cache.NewReflector(podsWatcher, &api.Pod{}, podUpdates, 0)
-
-	// lock that guards critial sections that involve transferring pods from
-	// the store (cache) to the scheduling queue; its purpose is to maintain
-	// an ordering (vs interleaving) of operations that's easier to reason about.
-	scheduler := &mesosFramework{mesosScheduler: k}
-	q := queuer.New(podUpdates)
-	podDeleter := operations.NewDeleter(scheduler, q)
-	podReconciler := operations.NewPodReconciler(scheduler, k.client, q, podDeleter)
-	bo := backoff.New(k.schedulerConfig.InitialPodBackoff.Duration, k.schedulerConfig.MaxPodBackoff.Duration)
-	eh := operations.NewErrorHandler(scheduler, bo, q)
-	startLatch := make(chan struct{})
-	eventBroadcaster := record.NewBroadcaster()
-	runtime.On(startLatch, func() {
-		eventBroadcaster.StartRecordingToSink(k.client.Events(""))
-		reflector.Run() // TODO(jdef) should listen for termination
-		podDeleter.Run(updates, terminate)
-		q.Run(terminate)
-
-		q.InstallDebugHandlers(mux)
-		podtask.InstallDebugHandlers(k.taskRegistry, mux)
-	})
-	return &operations.SchedulerLoopConfig{
-		Algorithm: operations.NewSchedulerAlgorithm(scheduler, podUpdates),
-		Binder:    operations.NewBinder(scheduler),
-		NextPod:   q.Yield,
-		Error:     eh.Error,
-		Recorder:  eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
-		Fw:        scheduler,
-		Client:    k.client,
-		Qr:        q,
-		Pr:        podReconciler,
-		Starting:  startLatch,
-	}
 }
