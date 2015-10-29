@@ -81,7 +81,7 @@ in more detail in the [API Changes documentation](devel/api_changes.md#alpha-bet
   - Support for the overall feature will not be dropped, though details may change.
   - The schema and/or semantics of objects may change in incompatible ways in a subsequent beta or stable release.  When this happens,
     we will provide instructions for migrating to the next version.  This may require deleting, editing, and re-creating
-    API objects.  The editing process may require some thought.   This may require downtime for appplications that rely on the feature.
+    API objects.  The editing process may require some thought.   This may require downtime for applications that rely on the feature.
   - Recommended for only non-business-critical uses because of potential for incompatible changes in subsequent releases.  If you have
     multiple clusters which can be upgraded independently, you may be able to relax this restriction.
   - **Please do try our beta features and give feedback on them!  Once they exit beta, it may not be practical for us to make more changes.**

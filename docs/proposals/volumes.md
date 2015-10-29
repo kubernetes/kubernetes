@@ -45,7 +45,7 @@ Goals of this design:
 
 1.  Enumerate the different use-cases for volume usage in pods
 2.  Define the desired goal state for ownership and permission management in Kubernetes
-3.  Describe the changes necessary to acheive desired state
+3.  Describe the changes necessary to achieve desired state
 
 ## Constraints and Assumptions
 
@@ -250,7 +250,7 @@ override the primary GID and should be safe to use in images that expect GID 0.
 ### Setting ownership and permissions on volumes
 
 For `EmptyDir`-based volumes and unshared storage, `chown` and `chmod` on the node are sufficient to
-set ownershp and permissions.  Shared storage is different because:
+set ownership and permissions.  Shared storage is different because:
 
 1.  Shared storage may not live on the node a pod that uses it runs on
 2.  Shared storage may be externally managed

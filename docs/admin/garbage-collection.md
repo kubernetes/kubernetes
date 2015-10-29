@@ -66,7 +66,7 @@ pod (UID, container name) pair is allowed to have, less than zero for no limit.
 `MaxContainers` is the max number of total dead containers, less than zero for no limit as well.
 
 kubelet sorts out containers which are unidentified or stay out of bounds set by previous
-mentioned three flags. Gernerally the oldest containers are removed first. Since we take both
+mentioned three flags. Generally the oldest containers are removed first. Since we take both
 `MaxPerPodContainer` and `MaxContainers` into consideration, it could happen when they
 have conflict -- retaining the max number of containers per pod goes out of range set by max
 number of global dead containers. In this case, we would sacrifice the `MaxPerPodContainer`

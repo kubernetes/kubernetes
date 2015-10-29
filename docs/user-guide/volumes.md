@@ -138,7 +138,7 @@ volume is safe across container crashes.
 
 Some uses for an `emptyDir` are:
 
-* scratch space, such as for a disk-based mergesortcw
+* scratch space, such as for a disk-based merge sort
 * checkpointing a long computation for recovery from crashes
 * holding files that a content-manager container fetches while a webserver
   container serves the data
