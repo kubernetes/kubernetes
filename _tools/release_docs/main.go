@@ -253,8 +253,8 @@ var (
 // to
 // "[Download example](pod.yaml)"
 func rewriteDownloadLinks(fileBytes []byte) []byte {
-	return downloadLinkRE.ReplaceAllFunc(fileBytes, func([]byte) []byte {
-		matches := downloadLinkRE.FindSubmatch(fileBytes)
+	return downloadLinkRE.ReplaceAllFunc(fileBytes, func(in []byte) []byte {
+		matches := downloadLinkRE.FindSubmatch(in)
 		fileName := string(matches[1])
 		extension := string(matches[2])
 		newLink := "[Download example](" + fileName + extension + ")"
