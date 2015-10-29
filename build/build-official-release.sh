@@ -45,7 +45,7 @@ declare -r KUBE_GITHUB="https://github.com/kubernetes/kubernetes.git"
 declare -r KUBE_RELEASE_VERSION=${1-}
 declare -r KUBE_RELEASE_UMASK=${KUBE_RELEASE_UMASK:-022}
 
-VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-beta|-alpha\\.(0|[1-9][0-9]*))?$"
 [[ ${KUBE_RELEASE_VERSION} =~ ${VERSION_REGEX} ]] || {
   echo "!!! You must specify the version you are releasing in the form of '${VERSION_REGEX}'" >&2
   exit 1
