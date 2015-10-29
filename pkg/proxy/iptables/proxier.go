@@ -765,31 +765,82 @@ func makeChainLine(chain utiliptables.Chain) string {
 // getChainLines parses a table's iptables-save data to find chains in the table.
 // It returns a map of iptables.Chain to string where the string is the chain line from the save (with counters etc).
 func getChainLines(table utiliptables.Table, save []byte) map[utiliptables.Chain]string {
-	// get lines
-	lines := strings.Split(string(save), "\n")
 	chainsMap := make(map[utiliptables.Chain]string)
 	tablePrefix := "*" + string(table)
-	lineNum := 0
+	readIndex := 0
 	// find beginning of table
-	for ; lineNum < len(lines); lineNum++ {
-		if strings.HasPrefix(strings.TrimSpace(lines[lineNum]), tablePrefix) {
-			lineNum++
+	for readIndex < len(save) {
+		line, n := readLine(readIndex, save)
+		readIndex = n
+		if strings.HasPrefix(line, tablePrefix) {
 			break
 		}
 	}
 	// parse table lines
-	for ; lineNum < len(lines); lineNum++ {
-		line := strings.TrimSpace(lines[lineNum])
+	for readIndex < len(save) {
+		line, n := readLine(readIndex, save)
+		readIndex = n
+		if len(line) == 0 {
+			continue
+		}
 		if strings.HasPrefix(line, "COMMIT") || strings.HasPrefix(line, "*") {
 			break
-		} else if len(line) == 0 || strings.HasPrefix(line, "#") {
+		} else if strings.HasPrefix(line, "#") {
 			continue
 		} else if strings.HasPrefix(line, ":") && len(line) > 1 {
 			chain := utiliptables.Chain(strings.SplitN(line[1:], " ", 2)[0])
-			chainsMap[chain] = lines[lineNum]
+			chainsMap[chain] = line
 		}
 	}
 	return chainsMap
+}
+
+func readLine(readIndex int, byteArray []byte) (string, int) {
+	currentReadIndex := readIndex
+
+	// consume left spaces
+	for currentReadIndex < len(byteArray) {
+		if byteArray[currentReadIndex] == ' ' {
+			currentReadIndex++
+		} else {
+			break
+		}
+	}
+
+	// leftTrimIndex stores the left index of the line after the line is left-trimmed
+	leftTrimIndex := currentReadIndex
+
+	// rightTrimIndex stores the right index of the line after the line is right-trimmed
+	// it is set to -1 since the correct value has not yet been determined.
+	rightTrimIndex := -1
+
+	for ; currentReadIndex < len(byteArray); currentReadIndex++ {
+		if byteArray[currentReadIndex] == ' ' {
+			// set rightTrimIndex
+			if rightTrimIndex == -1 {
+				rightTrimIndex = currentReadIndex
+			}
+		} else if (byteArray[currentReadIndex] == '\n') || (currentReadIndex == (len(byteArray) - 1)) {
+			// end of line or byte buffer is reached
+			if currentReadIndex <= leftTrimIndex {
+				return "", currentReadIndex + 1
+			}
+			// set the rightTrimIndex
+			if rightTrimIndex == -1 {
+				rightTrimIndex = currentReadIndex
+				if currentReadIndex == (len(byteArray)-1) && (byteArray[currentReadIndex] != '\n') {
+					// ensure that the last character is part of the returned string,
+					// unless the last character is '\n'
+					rightTrimIndex = currentReadIndex + 1
+				}
+			}
+			return string(byteArray[leftTrimIndex:rightTrimIndex]), currentReadIndex + 1
+		} else {
+			// unset rightTrimIndex
+			rightTrimIndex = -1
+		}
+	}
+	return "", currentReadIndex
 }
 
 func isLocalIP(ip string) (bool, error) {
