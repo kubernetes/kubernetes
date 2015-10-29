@@ -509,7 +509,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
     : ${E2E_NETWORK:="e2e-gke-test"}
     : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-test"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
@@ -540,9 +540,9 @@ case ${JOB_NAME} in
     : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
-    : ${E2E_NETWORK:="e2e-gke-ci"}
+    : ${E2E_NETWORK:="e2e-gke-ci-reboot"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
