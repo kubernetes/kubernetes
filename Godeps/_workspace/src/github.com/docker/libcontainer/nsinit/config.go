@@ -19,30 +19,34 @@ import (
 const defaultMountFlags = syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
 
 var createFlags = []cli.Flag{
-	cli.IntFlag{Name: "parent-death-signal", Usage: "set the signal that will be delivered to the process in case the parent dies"},
+	cli.BoolFlag{Name: "cgroup", Usage: "mount the cgroup data for the container"},
 	cli.BoolFlag{Name: "read-only", Usage: "set the container's rootfs as read-only"},
-	cli.StringSliceFlag{Name: "bind", Value: &cli.StringSlice{}, Usage: "add bind mounts to the container"},
-	cli.StringSliceFlag{Name: "tmpfs", Value: &cli.StringSlice{}, Usage: "add tmpfs mounts to the container"},
 	cli.IntFlag{Name: "cpushares", Usage: "set the cpushares for the container"},
 	cli.IntFlag{Name: "memory-limit", Usage: "set the memory limit for the container"},
 	cli.IntFlag{Name: "memory-swap", Usage: "set the memory swap limit for the container"},
+	cli.IntFlag{Name: "parent-death-signal", Usage: "set the signal that will be delivered to the process in case the parent dies"},
+	cli.IntFlag{Name: "userns-root-uid", Usage: "set the user namespace root uid"},
+	cli.IntFlag{Name: "veth-mtu", Usage: "veth mtu"},
+	cli.StringFlag{Name: "apparmor-profile", Usage: "set the apparmor profile"},
 	cli.StringFlag{Name: "cpuset-cpus", Usage: "set the cpuset cpus"},
 	cli.StringFlag{Name: "cpuset-mems", Usage: "set the cpuset mems"},
-	cli.StringFlag{Name: "apparmor-profile", Usage: "set the apparmor profile"},
-	cli.StringFlag{Name: "process-label", Usage: "set the process label"},
-	cli.StringFlag{Name: "mount-label", Usage: "set the mount label"},
-	cli.StringFlag{Name: "rootfs", Usage: "set the rootfs"},
-	cli.IntFlag{Name: "userns-root-uid", Usage: "set the user namespace root uid"},
 	cli.StringFlag{Name: "hostname", Value: "nsinit", Usage: "hostname value for the container"},
-	cli.StringFlag{Name: "net", Value: "", Usage: "network namespace"},
 	cli.StringFlag{Name: "ipc", Value: "", Usage: "ipc namespace"},
-	cli.StringFlag{Name: "pid", Value: "", Usage: "pid namespace"},
-	cli.StringFlag{Name: "uts", Value: "", Usage: "uts namespace"},
 	cli.StringFlag{Name: "mnt", Value: "", Usage: "mount namespace"},
-	cli.StringFlag{Name: "veth-bridge", Usage: "veth bridge"},
+	cli.StringFlag{Name: "mount-label", Usage: "set the mount label"},
+	cli.StringFlag{Name: "net", Value: "", Usage: "network namespace"},
+	cli.StringFlag{Name: "pid", Value: "", Usage: "pid namespace"},
+	cli.StringFlag{Name: "process-label", Usage: "set the process label"},
+	cli.StringFlag{Name: "rootfs", Usage: "set the rootfs"},
+	cli.StringFlag{Name: "security", Value: "", Usage: "set the security profile (high, medium, low)"},
+	cli.StringFlag{Name: "uts", Value: "", Usage: "uts namespace"},
 	cli.StringFlag{Name: "veth-address", Usage: "veth ip address"},
+	cli.StringFlag{Name: "veth-bridge", Usage: "veth bridge"},
 	cli.StringFlag{Name: "veth-gateway", Usage: "veth gateway address"},
-	cli.IntFlag{Name: "veth-mtu", Usage: "veth mtu"},
+	cli.StringSliceFlag{Name: "bind", Value: &cli.StringSlice{}, Usage: "add bind mounts to the container"},
+	cli.StringSliceFlag{Name: "sysctl", Value: &cli.StringSlice{}, Usage: "set system properties in the container"},
+	cli.StringSliceFlag{Name: "tmpfs", Value: &cli.StringSlice{}, Usage: "add tmpfs mounts to the container"},
+	cli.StringSliceFlag{Name: "groups", Value: &cli.StringSlice{}, Usage: "add additional groups"},
 }
 
 var configCommand = cli.Command{
@@ -110,6 +114,20 @@ func modify(config *configs.Config, context *cli.Context) {
 			node.Gid = uint32(userns_uid)
 		}
 	}
+
+	config.SystemProperties = make(map[string]string)
+	for _, sysProp := range context.StringSlice("sysctl") {
+		parts := strings.SplitN(sysProp, "=", 2)
+		if len(parts) != 2 {
+			logrus.Fatalf("invalid system property %s", sysProp)
+		}
+		config.SystemProperties[parts[0]] = parts[1]
+	}
+
+	for _, group := range context.StringSlice("groups") {
+		config.AdditionalGroups = append(config.AdditionalGroups, group)
+	}
+
 	for _, rawBind := range context.StringSlice("bind") {
 		mount := &configs.Mount{
 			Device: "bind",
@@ -187,6 +205,30 @@ func modify(config *configs.Config, context *cli.Context) {
 		}
 		config.Networks = append(config.Networks, network)
 	}
+	if context.Bool("cgroup") {
+		config.Mounts = append(config.Mounts, &configs.Mount{
+			Destination: "/sys/fs/cgroup",
+			Device:      "cgroup",
+		})
+	}
+	modifySecurityProfile(context, config)
+}
+
+func modifySecurityProfile(context *cli.Context, config *configs.Config) {
+	profileName := context.String("security")
+	if profileName == "" {
+		return
+	}
+	profile := profiles[profileName]
+	if profile == nil {
+		logrus.Fatalf("invalid profile name %q", profileName)
+	}
+	config.Rlimits = profile.Rlimits
+	config.Capabilities = profile.Capabilities
+	config.Seccomp = profile.Seccomp
+	config.AppArmorProfile = profile.ApparmorProfile
+	config.MountLabel = profile.MountLabel
+	config.ProcessLabel = profile.ProcessLabel
 }
 
 func getTemplate() *configs.Config {
@@ -274,13 +316,5 @@ func getTemplate() *configs.Config {
 				Flags:       defaultMountFlags | syscall.MS_RDONLY,
 			},
 		},
-		Rlimits: []configs.Rlimit{
-			{
-				Type: syscall.RLIMIT_NOFILE,
-				Hard: 1024,
-				Soft: 1024,
-			},
-		},
 	}
-
 }

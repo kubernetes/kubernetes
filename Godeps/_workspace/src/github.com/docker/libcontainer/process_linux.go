@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/docker/libcontainer/cgroups"
@@ -31,6 +33,10 @@ type parentProcess interface {
 	startTime() (string, error)
 
 	signal(os.Signal) error
+
+	externalDescriptors() []string
+
+	setExternalDescriptors(fds []string)
 }
 
 type setnsProcess struct {
@@ -39,6 +45,7 @@ type setnsProcess struct {
 	childPipe   *os.File
 	cgroupPaths map[string]string
 	config      *initConfig
+	fds         []string
 }
 
 func (p *setnsProcess) startTime() (string, error) {
@@ -119,6 +126,9 @@ func (p *setnsProcess) execSetns() error {
 // terminate sends a SIGKILL to the forked process for the setns routine then waits to
 // avoid the process becomming a zombie.
 func (p *setnsProcess) terminate() error {
+	if p.cmd.Process == nil {
+		return nil
+	}
 	err := p.cmd.Process.Kill()
 	if _, werr := p.wait(); err == nil {
 		err = werr
@@ -139,16 +149,30 @@ func (p *setnsProcess) pid() int {
 	return p.cmd.Process.Pid
 }
 
+func (p *setnsProcess) externalDescriptors() []string {
+	return p.fds
+}
+
+func (p *setnsProcess) setExternalDescriptors(newFds []string) {
+	p.fds = newFds
+}
+
 type initProcess struct {
 	cmd        *exec.Cmd
 	parentPipe *os.File
 	childPipe  *os.File
 	config     *initConfig
 	manager    cgroups.Manager
+	container  *linuxContainer
+	fds        []string
 }
 
 func (p *initProcess) pid() int {
 	return p.cmd.Process.Pid
+}
+
+func (p *initProcess) externalDescriptors() []string {
+	return p.fds
 }
 
 func (p *initProcess) start() error {
@@ -158,6 +182,15 @@ func (p *initProcess) start() error {
 	if err != nil {
 		return newSystemError(err)
 	}
+	// Save the standard descriptor names before the container process
+	// can potentially move them (e.g., via dup2()).  If we don't do this now,
+	// we won't know at checkpoint time which file descriptor to look up.
+	fds, err := getPipeFds(p.pid())
+	if err != nil {
+		return newSystemError(err)
+	}
+	p.setExternalDescriptors(fds)
+
 	// Do this before syncing with child so that no children
 	// can escape the cgroup
 	if err := p.manager.Apply(p.pid()); err != nil {
@@ -246,4 +279,25 @@ func (p *initProcess) signal(sig os.Signal) error {
 		return errors.New("os: unsupported signal type")
 	}
 	return syscall.Kill(p.cmd.Process.Pid, s)
+}
+
+func (p *initProcess) setExternalDescriptors(newFds []string) {
+	p.fds = newFds
+}
+
+func getPipeFds(pid int) ([]string, error) {
+	var fds []string
+
+	fds = make([]string, 3)
+
+	dirPath := filepath.Join("/proc", strconv.Itoa(pid), "/fd")
+	for i := 0; i < 3; i++ {
+		f := filepath.Join(dirPath, strconv.Itoa(i))
+		target, err := os.Readlink(f)
+		if err != nil {
+			return fds, err
+		}
+		fds[i] = target
+	}
+	return fds, nil
 }

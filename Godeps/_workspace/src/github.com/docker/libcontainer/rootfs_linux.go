@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/docker/docker/pkg/symlink"
+	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/configs"
 	"github.com/docker/libcontainer/label"
 )
@@ -24,19 +28,25 @@ func setupRootfs(config *configs.Config, console *linuxConsole) (err error) {
 		return newSystemError(err)
 	}
 	for _, m := range config.Mounts {
+		for _, precmd := range m.PremountCmds {
+			if err := mountCmd(precmd); err != nil {
+				return newSystemError(err)
+			}
+		}
 		if err := mountToRootfs(m, config.Rootfs, config.MountLabel); err != nil {
 			return newSystemError(err)
+		}
+
+		for _, postcmd := range m.PostmountCmds {
+			if err := mountCmd(postcmd); err != nil {
+				return newSystemError(err)
+			}
 		}
 	}
 	if err := createDevices(config); err != nil {
 		return newSystemError(err)
 	}
 	if err := setupPtmx(config, console); err != nil {
-		return newSystemError(err)
-	}
-	// stdin, stdout and stderr could be pointing to /dev/null from parent namespace.
-	// re-open them inside this namespace.
-	if err := reOpenDevNull(config.Rootfs); err != nil {
 		return newSystemError(err)
 	}
 	if err := setupDevSymlinks(config.Rootfs); err != nil {
@@ -53,12 +63,27 @@ func setupRootfs(config *configs.Config, console *linuxConsole) (err error) {
 	if err != nil {
 		return newSystemError(err)
 	}
+	if err := reOpenDevNull(config.Rootfs); err != nil {
+		return newSystemError(err)
+	}
 	if config.Readonlyfs {
 		if err := setReadonly(); err != nil {
 			return newSystemError(err)
 		}
 	}
 	syscall.Umask(0022)
+	return nil
+}
+
+func mountCmd(cmd configs.Command) error {
+
+	command := exec.Command(cmd.Path, cmd.Args[:]...)
+	command.Env = cmd.Env
+	command.Dir = cmd.Dir
+	if out, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("%#v failed: %s: %v", cmd, string(out), err)
+	}
+
 	return nil
 }
 
@@ -113,6 +138,16 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 			// unable to bind anything to it.
 			return err
 		}
+		// ensure that the destination of the bind mount is resolved of symlinks at mount time because
+		// any previous mounts can invalidate the next mount's destination.
+		// this can happen when a user specifies mounts within other mounts to cause breakouts or other
+		// evil stuff to try to escape the container's rootfs.
+		if dest, err = symlink.FollowSymlinkInScope(filepath.Join(rootfs, m.Destination), rootfs); err != nil {
+			return err
+		}
+		if err := checkMountDestination(rootfs, dest); err != nil {
+			return err
+		}
 		if err := createIfNotExists(dest, stat.IsDir()); err != nil {
 			return err
 		}
@@ -134,8 +169,61 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 				return err
 			}
 		}
+	case "cgroup":
+		mounts, err := cgroups.GetCgroupMounts()
+		if err != nil {
+			return err
+		}
+		var binds []*configs.Mount
+		for _, mm := range mounts {
+			dir, err := mm.GetThisCgroupDir()
+			if err != nil {
+				return err
+			}
+			binds = append(binds, &configs.Mount{
+				Device:      "bind",
+				Source:      filepath.Join(mm.Mountpoint, dir),
+				Destination: filepath.Join(m.Destination, strings.Join(mm.Subsystems, ",")),
+				Flags:       syscall.MS_BIND | syscall.MS_REC | syscall.MS_RDONLY,
+			})
+		}
+		tmpfs := &configs.Mount{
+			Device:      "tmpfs",
+			Destination: m.Destination,
+			Flags:       syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV,
+		}
+		if err := mountToRootfs(tmpfs, rootfs, mountLabel); err != nil {
+			return err
+		}
+		for _, b := range binds {
+			if err := mountToRootfs(b, rootfs, mountLabel); err != nil {
+				return err
+			}
+		}
 	default:
 		return fmt.Errorf("unknown mount device %q to %q", m.Device, m.Destination)
+	}
+	return nil
+}
+
+// checkMountDestination checks to ensure that the mount destination is not over the
+// top of /proc or /sys.
+// dest is required to be an abs path and have any symlinks resolved before calling this function.
+func checkMountDestination(rootfs, dest string) error {
+	if filepath.Clean(rootfs) == filepath.Clean(dest) {
+		return fmt.Errorf("mounting into / is prohibited")
+	}
+	invalidDestinations := []string{
+		"/proc",
+	}
+	for _, invalid := range invalidDestinations {
+		path, err := filepath.Rel(filepath.Join(rootfs, invalid), dest)
+		if err != nil {
+			return err
+		}
+		if path == "." || !strings.HasPrefix(path, "..") {
+			return fmt.Errorf("%q cannot be mounted because it is located inside %q", dest, invalid)
+		}
 	}
 	return nil
 }
@@ -164,11 +252,13 @@ func setupDevSymlinks(rootfs string) error {
 	return nil
 }
 
-// If stdin, stdout or stderr are pointing to '/dev/null' in the global mount namespace,
-// this method will make them point to '/dev/null' in this namespace.
+// If stdin, stdout, and/or stderr are pointing to `/dev/null` in the parent's rootfs
+// this method will make them point to `/dev/null` in this container's rootfs.  This
+// needs to be called after we chroot/pivot into the container's rootfs so that any
+// symlinks are resolved locally.
 func reOpenDevNull(rootfs string) error {
 	var stat, devNullStat syscall.Stat_t
-	file, err := os.Open(filepath.Join(rootfs, "/dev/null"))
+	file, err := os.Open("/dev/null")
 	if err != nil {
 		return fmt.Errorf("Failed to open /dev/null - %s", err)
 	}
@@ -182,7 +272,7 @@ func reOpenDevNull(rootfs string) error {
 		}
 		if stat.Rdev == devNullStat.Rdev {
 			// Close and re-open the fd.
-			if err := syscall.Dup2(int(file.Fd()), fd); err != nil {
+			if err := syscall.Dup3(int(file.Fd()), fd, 0); err != nil {
 				return err
 			}
 		}
@@ -248,9 +338,9 @@ func mknodDevice(dest string, node *configs.Device) error {
 }
 
 func prepareRoot(config *configs.Config) error {
-	flag := syscall.MS_PRIVATE | syscall.MS_REC
-	if config.NoPivotRoot {
-		flag = syscall.MS_SLAVE | syscall.MS_REC
+	flag := syscall.MS_SLAVE | syscall.MS_REC
+	if config.Privatefs {
+		flag = syscall.MS_PRIVATE | syscall.MS_REC
 	}
 	if err := syscall.Mount("", "/", "", uintptr(flag), ""); err != nil {
 		return err
@@ -362,4 +452,11 @@ func maskFile(path string) error {
 		return err
 	}
 	return nil
+}
+
+// writeSystemProperty writes the value to a path under /proc/sys as determined from the key.
+// For e.g. net.ipv4.ip_forward translated to /proc/sys/net/ipv4/ip_forward.
+func writeSystemProperty(key, value string) error {
+	keyPath := strings.Replace(key, ".", "/", -1)
+	return ioutil.WriteFile(path.Join("/proc/sys", keyPath), []byte(value), 0644)
 }

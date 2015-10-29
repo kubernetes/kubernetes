@@ -3,7 +3,7 @@ package main
 import (
 	"runtime"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/libcontainer"
 	_ "github.com/docker/libcontainer/nsenter"
@@ -13,7 +13,7 @@ var initCommand = cli.Command{
 	Name:  "init",
 	Usage: "runs the init process inside the namespace",
 	Action: func(context *cli.Context) {
-		log.SetLevel(log.DebugLevel)
+		logrus.SetLevel(logrus.DebugLevel)
 		runtime.GOMAXPROCS(1)
 		runtime.LockOSThread()
 		factory, err := libcontainer.New("")

@@ -1,3 +1,5 @@
+// +build linux freebsd
+
 package configs
 
 var (

@@ -9,6 +9,8 @@ const (
 	Wildcard = -1
 )
 
+// TODO Windows: This can be factored out in the future
+
 type Device struct {
 	// Device type, block, char, etc.
 	Type rune `json:"type"`

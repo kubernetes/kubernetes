@@ -8,6 +8,9 @@ const (
 	Thawed    FreezerState = "THAWED"
 )
 
+// TODO Windows: This can be factored out in the future as Cgroups are not
+// supported on the Windows platform.
+
 type Cgroup struct {
 	Name string `json:"name"`
 
@@ -19,6 +22,8 @@ type Cgroup struct {
 
 	AllowedDevices []*Device `json:"allowed_devices"`
 
+	DeniedDevices []*Device `json:"denied_devices"`
+
 	// Memory limit (in bytes)
 	Memory int64 `json:"memory"`
 
@@ -27,6 +32,9 @@ type Cgroup struct {
 
 	// Total memory usage (memory + swap); set `-1' to disable swap
 	MemorySwap int64 `json:"memory_swap"`
+
+	// Kernel memory limit (in bytes)
+	KernelMemory int64 `json:"kernel_memory"`
 
 	// CPU shares (relative weight vs. other containers)
 	CpuShares int64 `json:"cpu_shares"`
@@ -37,11 +45,29 @@ type Cgroup struct {
 	// CPU period to be used for hardcapping (in usecs). 0 to use system default.
 	CpuPeriod int64 `json:"cpu_period"`
 
+	// How many time CPU will use in realtime scheduling (in usecs).
+	CpuRtRuntime int64 `json:"cpu_quota"`
+
+	// CPU period to be used for realtime scheduling (in usecs).
+	CpuRtPeriod int64 `json:"cpu_period"`
+
 	// CPU to use
 	CpusetCpus string `json:"cpuset_cpus"`
 
 	// MEM to use
 	CpusetMems string `json:"cpuset_mems"`
+
+	// IO read rate limit per cgroup per device, bytes per second.
+	BlkioThrottleReadBpsDevice string `json:"blkio_throttle_read_bps_device"`
+
+	// IO write rate limit per cgroup per divice, bytes per second.
+	BlkioThrottleWriteBpsDevice string `json:"blkio_throttle_write_bps_device"`
+
+	// IO read rate limit per cgroup per device, IO per second.
+	BlkioThrottleReadIOpsDevice string `json:"blkio_throttle_read_iops_device"`
+
+	// IO write rate limit per cgroup per device, IO per second.
+	BlkioThrottleWriteIOpsDevice string `json:"blkio_throttle_write_iops_device"`
 
 	// Specifies per cgroup weight, range is from 10 to 1000.
 	BlkioWeight int64 `json:"blkio_weight"`
@@ -52,9 +78,21 @@ type Cgroup struct {
 	// set the freeze value for the process
 	Freezer FreezerState `json:"freezer"`
 
+	// Hugetlb limit (in bytes)
+	HugetlbLimit []*HugepageLimit `json:"hugetlb_limit"`
+
 	// Parent slice to use for systemd TODO: remove in favor or parent
 	Slice string `json:"slice"`
 
 	// Whether to disable OOM Killer
 	OomKillDisable bool `json:"oom_kill_disable"`
+
+	// Tuning swappiness behaviour per cgroup
+	MemorySwappiness int64 `json:"memory_swappiness"`
+
+	// Set priority of network traffic for container
+	NetPrioIfpriomap []*IfPrioMap `json:"net_prio_ifpriomap"`
+
+	// Set class identifier for container's network packets
+	NetClsClassid string `json:"net_cls_classid"`
 }

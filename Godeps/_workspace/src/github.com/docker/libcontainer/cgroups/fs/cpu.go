@@ -1,3 +1,5 @@
+// +build linux
+
 package fs
 
 import (
@@ -17,7 +19,7 @@ func (s *CpuGroup) Apply(d *data) error {
 	// We always want to join the cpu group, to allow fair cpu scheduling
 	// on a container basis
 	dir, err := d.join("cpu")
-	if err != nil {
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 
@@ -41,6 +43,16 @@ func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
 	}
 	if cgroup.CpuQuota != 0 {
 		if err := writeFile(path, "cpu.cfs_quota_us", strconv.FormatInt(cgroup.CpuQuota, 10)); err != nil {
+			return err
+		}
+	}
+	if cgroup.CpuRtPeriod != 0 {
+		if err := writeFile(path, "cpu.rt_period_us", strconv.FormatInt(cgroup.CpuRtPeriod, 10)); err != nil {
+			return err
+		}
+	}
+	if cgroup.CpuRtRuntime != 0 {
+		if err := writeFile(path, "cpu.rt_runtime_us", strconv.FormatInt(cgroup.CpuRtRuntime, 10)); err != nil {
 			return err
 		}
 	}

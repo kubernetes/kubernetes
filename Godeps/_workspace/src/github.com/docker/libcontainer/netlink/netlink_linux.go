@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -26,6 +27,7 @@ const (
 	SIOC_BRADDBR      = 0x89a0
 	SIOC_BRDELBR      = 0x89a1
 	SIOC_BRADDIF      = 0x89a2
+	SIOC_BRDELIF      = 0x89a3
 )
 
 const (
@@ -53,6 +55,8 @@ type ifreqFlags struct {
 }
 
 var native binary.ByteOrder
+
+var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func init() {
 	var x uint32 = 0x01020304
@@ -1188,9 +1192,7 @@ func DeleteBridge(name string) error {
 	return nil
 }
 
-// Add a slave to abridge device.  This is more backward-compatible than
-// netlink.NetworkSetMaster and works on RHEL 6.
-func AddToBridge(iface, master *net.Interface) error {
+func ifIoctBridge(iface, master *net.Interface, op uintptr) error {
 	if len(master.Name) >= IFNAMSIZ {
 		return fmt.Errorf("Interface name %s too long", master.Name)
 	}
@@ -1205,17 +1207,29 @@ func AddToBridge(iface, master *net.Interface) error {
 	copy(ifr.IfrnName[:len(ifr.IfrnName)-1], master.Name)
 	ifr.IfruIndex = int32(iface.Index)
 
-	if _, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(s), SIOC_BRADDIF, uintptr(unsafe.Pointer(&ifr))); err != 0 {
+	if _, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(s), op, uintptr(unsafe.Pointer(&ifr))); err != 0 {
 		return err
 	}
 
 	return nil
 }
 
+// Add a slave to a bridge device.  This is more backward-compatible than
+// netlink.NetworkSetMaster and works on RHEL 6.
+func AddToBridge(iface, master *net.Interface) error {
+	return ifIoctBridge(iface, master, SIOC_BRADDIF)
+}
+
+// Detach a slave from a bridge device.  This is more backward-compatible than
+// netlink.NetworkSetMaster and works on RHEL 6.
+func DelFromBridge(iface, master *net.Interface) error {
+	return ifIoctBridge(iface, master, SIOC_BRDELIF)
+}
+
 func randMacAddr() string {
 	hw := make(net.HardwareAddr, 6)
 	for i := 0; i < 6; i++ {
-		hw[i] = byte(rand.Intn(255))
+		hw[i] = byte(rnd.Intn(255))
 	}
 	hw[0] &^= 0x1 // clear multicast bit
 	hw[0] |= 0x2  // set local assignment bit (IEEE802)

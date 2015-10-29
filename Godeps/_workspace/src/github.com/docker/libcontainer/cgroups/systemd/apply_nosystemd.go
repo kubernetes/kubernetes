@@ -46,10 +46,6 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 	return fmt.Errorf("Systemd not supported")
 }
 
-func ApplyDevices(c *configs.Cgroup, pid int) error {
-	return fmt.Errorf("Systemd not supported")
-}
-
 func Freeze(c *configs.Cgroup, state configs.FreezerState) error {
 	return fmt.Errorf("Systemd not supported")
 }

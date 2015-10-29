@@ -15,7 +15,7 @@ with a strong security configuration.
 ### System Requirements and Compatibility
 
 Minimum requirements:
-* Kernel version - 3.8 recommended 2.6.2x minimum(with backported patches) 
+* Kernel version - 3.10 recommended 2.6.2x minimum(with backported patches)
 * Mounted cgroups with each subsystem in its own hierarchy
 
 
@@ -28,11 +28,9 @@ Minimum requirements:
 | CLONE_NEWIPC  |    1    |
 | CLONE_NEWNET  |    1    |
 | CLONE_NEWNS   |    1    |
-| CLONE_NEWUSER |    0    |
+| CLONE_NEWUSER |    1    |
 
-In v1 the user namespace is not enabled by default for support of older kernels
-where the user namespace feature is not fully implemented.  Namespaces are 
-created for the container via the `clone` syscall.  
+Namespaces are created for the container via the `clone` syscall.  
 
 
 ### Filesystem
@@ -49,14 +47,14 @@ unmount all the mounts that were setup within that namespace.
 For a container to execute properly there are certain filesystems that 
 are required to be mounted within the rootfs that the runtime will setup.
 
-|     Path    |  Type  |                  Flags                 |                 Data                    |
-| ----------- | ------ | -------------------------------------- | --------------------------------------- |
-| /proc       | proc   | MS_NOEXEC,MS_NOSUID,MS_NODEV           |                                         |
-| /dev        | tmpfs  | MS_NOEXEC,MS_STRICTATIME               | mode=755                                |
-| /dev/shm    | shm    | MS_NOEXEC,MS_NOSUID,MS_NODEV           | mode=1777,size=65536k                   |
-| /dev/mqueue | mqueue | MS_NOEXEC,MS_NOSUID,MS_NODEV           |                                         |
-| /dev/pts    | devpts | MS_NOEXEC,MS_NOSUID                    | newinstance,ptmxmode=0666,mode=620,gid5 |
-| /sys        | sysfs  | MS_NOEXEC,MS_NOSUID,MS_NODEV,MS_RDONLY |                                         |
+|     Path    |  Type  |                  Flags                 |                 Data                     |
+| ----------- | ------ | -------------------------------------- | ---------------------------------------- |
+| /proc       | proc   | MS_NOEXEC,MS_NOSUID,MS_NODEV           |                                          |
+| /dev        | tmpfs  | MS_NOEXEC,MS_STRICTATIME               | mode=755                                 |
+| /dev/shm    | tmpfs  | MS_NOEXEC,MS_NOSUID,MS_NODEV           | mode=1777,size=65536k                    |
+| /dev/mqueue | mqueue | MS_NOEXEC,MS_NOSUID,MS_NODEV           |                                          |
+| /dev/pts    | devpts | MS_NOEXEC,MS_NOSUID                    | newinstance,ptmxmode=0666,mode=620,gid=5 |
+| /sys        | sysfs  | MS_NOEXEC,MS_NOSUID,MS_NODEV,MS_RDONLY |                                          |
 
 
 After a container's filesystems are mounted within the newly created 
@@ -143,6 +141,7 @@ system resources like cpu, memory, and device access.
 | blkio      | 1       |
 | perf_event | 1       |
 | freezer    | 1       |
+| hugetlb    | 1       |
 
 
 All cgroup subsystem are joined so that statistics can be collected from
@@ -165,6 +164,7 @@ provide a good default for security and flexibility for the applications.
 | -------------------- | ------- |
 | CAP_NET_RAW          | 1       |
 | CAP_NET_BIND_SERVICE | 1       |
+| CAP_AUDIT_READ       | 1       |
 | CAP_AUDIT_WRITE      | 1       |
 | CAP_DAC_OVERRIDE     | 1       |
 | CAP_SETFCAP          | 1       |
@@ -217,17 +217,6 @@ profile <profile_name> flags=(attach_disconnected,mediate_deleted) {
   file,
   umount,
 
-  mount fstype=tmpfs,
-  mount fstype=mqueue,
-  mount fstype=fuse.*,
-  mount fstype=binfmt_misc -> /proc/sys/fs/binfmt_misc/,
-  mount fstype=efivarfs -> /sys/firmware/efi/efivars/,
-  mount fstype=fusectl -> /sys/fs/fuse/connections/,
-  mount fstype=securityfs -> /sys/kernel/security/,
-  mount fstype=debugfs -> /sys/kernel/debug/,
-  mount fstype=proc -> /proc/,
-  mount fstype=sysfs -> /sys/,
-
   deny @{PROC}/sys/fs/** wklx,
   deny @{PROC}/sysrq-trigger rwklx,
   deny @{PROC}/mem rwklx,
@@ -235,9 +224,7 @@ profile <profile_name> flags=(attach_disconnected,mediate_deleted) {
   deny @{PROC}/sys/kernel/[^s][^h][^m]* wklx,
   deny @{PROC}/sys/kernel/*/** wklx,
 
-  deny mount options=(ro, remount) -> /,
-  deny mount fstype=debugfs -> /var/lib/ureadahead/debugfs/,
-  deny mount fstype=devpts,
+  deny mount,
 
   deny /sys/[^f]*/** wklx,
   deny /sys/f[^s]*/** wklx,
@@ -317,6 +304,7 @@ a container.
 | Pause          | Pause all processes inside the container                           |
 | Resume         | Resume all processes inside the container if paused                |
 | Exec           | Execute a new process inside of the container  ( requires setns )  |
+| Set            | Setup configs of the container after it's created                  |
 
 ### Execute a new process inside of a running container.
 
