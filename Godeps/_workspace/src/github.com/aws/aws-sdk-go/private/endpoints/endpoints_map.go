@@ -26,6 +26,10 @@ var endpointsMap = endpointStruct{
 			Endpoint:      "",
 			SigningRegion: "us-east-1",
 		},
+		"*/data.iot": {
+			Endpoint:      "",
+			SigningRegion: "us-east-1",
+		},
 		"*/iam": {
 			Endpoint:      "iam.amazonaws.com",
 			SigningRegion: "us-east-1",

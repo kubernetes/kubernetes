@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 )
 
-// ValidateParameters is a request handler to validate the input parameters.
+// ValidateParametersHandler is a request handler to validate the input parameters.
 // Validating parameters only has meaning if done prior to the request being sent.
 var ValidateParametersHandler = request.NamedHandler{"core.ValidateParametersHandler", func(r *request.Request) {
 	if r.ParamsFilled() {
