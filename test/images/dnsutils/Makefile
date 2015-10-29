@@ -1,8 +1,13 @@
-all:
-	@echo "try 'make image' or 'make push'"
+# This image does not tag
+#TAG =
+PREFIX = gcr.io/google_containers
+
+all: push
 
 image:
-	docker build -t gcr.io/google_containers/dnsutils .
+	docker build -t $(PREFIX)/dnsutils .
 
-push:
-	gcloud docker push gcr.io/google_containers/dnsutils
+push: image
+	gcloud docker push $(PREFIX)/dnsutils
+
+clean:
