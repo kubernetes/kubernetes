@@ -52,6 +52,30 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		panic(err)
 	}
 
+	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
+	for _, kind := range []string{
+		"Endpoints",
+		"ResourceQuota",
+		"PersistentVolumeClaim",
+		"Service",
+		"ServiceAccount",
+	} {
+		err = api.Scheme.AddFieldLabelConversionFunc("v1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.namespace",
+					"metadata.name":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			})
+		if err != nil {
+			// If one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	}
+
 	// Add field conversion funcs.
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
@@ -143,53 +167,24 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "PersistentVolume",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Secret",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "type",
 				"metadata.namespace",
-				"metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1", "ServiceAccount",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name",
-				"metadata.namespace":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Endpoints",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.namespace",
-				"metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Service",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.namespace",
 				"metadata.name":
 				return label, value, nil
 			default:
