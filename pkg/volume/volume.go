@@ -53,6 +53,10 @@ type Builder interface {
 	// 2. Set the setgid bit is set (new files created in the volume will be owned by FSGroup)
 	// 3. Logical OR the permission bits with rw-rw----
 	SupportsOwnershipManagement() bool
+	// SupportsSELinux reports whether the given builder supports
+	// SELinux and would like the kubelet to relabel the volume to
+	// match the pod to which it will be attached.
+	SupportsSELinux() bool
 }
 
 // Cleaner interface provides methods to cleanup/unmount the volumes.

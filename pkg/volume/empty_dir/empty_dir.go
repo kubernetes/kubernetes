@@ -70,10 +70,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts, newChconRunner())
+	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions, chconRunner chconRunner) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
 	medium := api.StorageMediumDefault
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
@@ -86,7 +86,6 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 		mountDetector: mountDetector,
 		plugin:        plugin,
 		rootContext:   opts.RootContext,
-		chconRunner:   chconRunner,
 	}, nil
 }
 
@@ -134,7 +133,6 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
-	chconRunner   chconRunner
 }
 
 func (_ *emptyDir) SupportsOwnershipManagement() bool {
@@ -175,7 +173,7 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 
 	switch ed.medium {
 	case api.StorageMediumDefault:
-		err = ed.setupDir(dir, securityContext)
+		err = ed.setupDir(dir)
 	case api.StorageMediumMemory:
 		err = ed.setupTmpfs(dir, securityContext)
 	default:
@@ -193,13 +191,17 @@ func (ed *emptyDir) IsReadOnly() bool {
 	return false
 }
 
+func (ed *emptyDir) SupportsSELinux() bool {
+	return true
+}
+
 // setupTmpfs creates a tmpfs mount at the specified directory with the
 // specified SELinux context.
 func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.setupDir(dir, selinuxContext); err != nil {
+	if err := ed.setupDir(dir); err != nil {
 		return err
 	}
 	// Make SetUp idempotent.
@@ -228,7 +230,7 @@ func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
 
 // setupDir creates the directory with the specified SELinux context and
 // the default permissions specified by the perm constant.
-func (ed *emptyDir) setupDir(dir, selinuxContext string) error {
+func (ed *emptyDir) setupDir(dir string) error {
 	// Create the directory if it doesn't already exist.
 	if err := os.MkdirAll(dir, perm); err != nil {
 		return err
@@ -260,12 +262,6 @@ func (ed *emptyDir) setupDir(dir, selinuxContext string) error {
 		if fileinfo.Mode().Perm() != perm.Perm() {
 			glog.Errorf("Expected directory %q permissions to be: %s; got: %s", dir, perm.Perm(), fileinfo.Mode().Perm())
 		}
-	}
-
-	// Set the context on the directory, if appropriate
-	if selinuxContext != "" {
-		glog.V(3).Infof("Setting SELinux context for %v to %v", dir, selinuxContext)
-		return ed.chconRunner.SetContext(dir, selinuxContext)
 	}
 
 	return nil

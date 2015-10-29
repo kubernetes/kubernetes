@@ -205,6 +205,10 @@ func (b flockerBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b flockerBuilder) SupportsSELinux() bool {
+	return false
+}
+
 // updateDatasetPrimary will update the primary in Flocker and wait for it to
 // be ready. If it never gets to ready state it will timeout and error.
 func (b flockerBuilder) updateDatasetPrimary(datasetID, primaryUUID string) error {

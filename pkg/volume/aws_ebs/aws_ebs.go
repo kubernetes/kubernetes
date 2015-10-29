@@ -250,6 +250,10 @@ func (b *awsElasticBlockStoreBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *awsElasticBlockStoreBuilder) SupportsSELinux() bool {
+	return true
+}
+
 func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {
 	// Clean up the URI to be more fs-friendly
 	name := volumeID

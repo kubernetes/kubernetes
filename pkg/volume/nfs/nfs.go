@@ -226,6 +226,10 @@ func (b *nfsBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *nfsBuilder) SupportsSELinux() bool {
+	return false
+}
+
 //
 //func (c *nfsCleaner) GetPath() string {
 //	name := nfsPluginName

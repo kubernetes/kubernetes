@@ -238,6 +238,8 @@ type Mount struct {
 	HostPath string
 	// Whether the mount is read-only.
 	ReadOnly bool
+	// Whether the mount needs SELinux relabeling
+	SELinuxRelabel bool
 }
 
 type PortMapping struct {
@@ -273,7 +275,16 @@ type RunContainerOptions struct {
 	CgroupParent string
 }
 
-type VolumeMap map[string]volume.Volume
+// VolumeInfo contains information about the volume.
+type VolumeInfo struct {
+	// Builder is the volume's builder
+	Builder volume.Builder
+	// SELinuxLabeled indicates whether this volume has had the
+	// pod's SELinux label applied to it or not
+	SELinuxLabeled bool
+}
+
+type VolumeMap map[string]VolumeInfo
 
 type Pods []*Pod
 

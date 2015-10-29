@@ -185,6 +185,10 @@ func (b *iscsiDiskBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *iscsiDiskBuilder) SupportsSELinux() bool {
+	return true
+}
+
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
 func (c *iscsiDiskCleaner) TearDown() error {

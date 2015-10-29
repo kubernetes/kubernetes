@@ -189,6 +189,10 @@ func (b *glusterfsBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *glusterfsBuilder) SupportsSELinux() bool {
+	return false
+}
+
 func (glusterfsVolume *glusterfs) GetPath() string {
 	name := glusterfsPluginName
 	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
