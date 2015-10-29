@@ -25,6 +25,7 @@ kube::golang::setup_env
 
 # Find binary
 gendocs=$(kube::util::find-binary "gendocs")
+genkubedocs=$(kube::util::find-binary "genkubedocs")
 genman=$(kube::util::find-binary "genman")
 genbashcomp=$(kube::util::find-binary "genbashcomp")
 mungedocs=$(kube::util::find-binary "mungedocs")
