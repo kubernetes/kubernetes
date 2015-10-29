@@ -63,7 +63,7 @@ func fixURL(filename string, u *url.URL) bool {
 		}
 
 		if fileExistsInBranch(rel) {
-			u.Path = filepath.Join("HEAD", rel)
+			u.Path = filepath.Join(*branch, rel)
 			u.Host = "releases.k8s.io"
 			u.Scheme = "https"
 			return true
@@ -87,7 +87,7 @@ func fixURL(filename string, u *url.URL) bool {
 			if err != nil {
 				return false
 			}
-			u.Path = filepath.Join("HEAD", rel)
+			u.Path = filepath.Join(*branch, rel)
 			u.Host = "releases.k8s.io"
 			u.Scheme = "https"
 			return true
