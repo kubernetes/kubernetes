@@ -159,12 +159,12 @@ func (e *Etcd) NewList() runtime.Object {
 }
 
 // List returns a list of items matching labels and field
-func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return e.ListPredicate(ctx, e.PredicateFunc(label, field))
+func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (runtime.Object, error) {
+	return e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
+func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
 	trace := util.NewTrace("List " + reflect.TypeOf(list).String())
 	filterFunc := e.filterAndDecorateFunction(m)
@@ -183,7 +183,14 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 	}
 
 	trace.Step("About to list directory")
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), filterFunc, list)
+	if options == nil {
+		options = &api.ListOptions{ResourceVersion: "0"}
+	}
+	version, err := storage.ParseWatchResourceVersion(options.ResourceVersion, e.EndpointName)
+	if err != nil {
+		return nil, err
+	}
+	err = e.Storage.List(ctx, e.KeyRootFunc(ctx), version, filterFunc, list)
 	trace.Step("List extracted")
 	if err != nil {
 		return nil, err

@@ -30,7 +30,7 @@ import (
 // Registry is an interface for things that know how to store Jobs.
 type Registry interface {
 	// ListJobs obtains a list of Jobs having labels and fields which match selector.
-	ListJobs(ctx api.Context, label labels.Selector, field fields.Selector) (*extensions.JobList, error)
+	ListJobs(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*extensions.JobList, error)
 	// WatchJobs watch for new/changed/deleted Jobs.
 	WatchJobs(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	// GetJobs gets a specific Job.
@@ -54,11 +54,11 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListJobs(ctx api.Context, label labels.Selector, field fields.Selector) (*extensions.JobList, error) {
+func (s *storage) ListJobs(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*extensions.JobList, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
-	obj, err := s.List(ctx, label, field)
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

@@ -935,7 +935,7 @@ func (m *Master) RemoveThirdPartyResource(path string) error {
 
 func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
 	ctx := api.NewDefaultContext()
-	existingData, err := registry.List(ctx, labels.Everything(), fields.Everything())
+	existingData, err := registry.List(ctx, labels.Everything(), fields.Everything(), nil)
 	if err != nil {
 		return err
 	}
@@ -1138,7 +1138,7 @@ func findExternalAddress(node *api.Node) (string, error) {
 }
 
 func (m *Master) getNodeAddresses() ([]string, error) {
-	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), labels.Everything(), fields.Everything())
+	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), labels.Everything(), fields.Everything(), nil)
 	if err != nil {
 		return nil, err
 	}
