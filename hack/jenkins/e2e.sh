@@ -1436,7 +1436,7 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   NUM_MINIONS=${KUBEMARK_NUM_MINIONS:-$NUM_MINIONS}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   ./test/kubemark/start-kubemark.sh
-  ./test/kubemark/run-e2e-tests.sh && exitcode=0 || exitcode=$?
+  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="should\sallow\sstarting\s30\spods\sper\snode" --delete-namespace="false"
   ./test/kubemark/stop-kubemark.sh
   NUM_MINIONS=${NUM_MINIONS_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
