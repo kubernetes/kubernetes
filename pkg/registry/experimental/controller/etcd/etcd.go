@@ -37,9 +37,9 @@ type ContainerStorage struct {
 	Scale                 *ScaleREST
 }
 
-func NewStorage(s storage.Interface) ContainerStorage {
+func NewStorage(s storage.Interface, storageFactory storage.StorageFactory) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := etcd.NewREST(s)
+	controllerREST, _ := etcd.NewREST(s, storageFactory)
 	rcRegistry := controller.NewRegistry(controllerREST)
 
 	return ContainerStorage{

@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 )
 
@@ -30,7 +31,7 @@ var testTTL uint64 = 60
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
 	fakeClient.HideExpires = true
-	return NewREST(etcdStorage, testTTL), fakeClient
+	return NewREST(etcdStorage, storage.NoDecoration, testTTL), fakeClient
 }
 
 func validNewEvent(namespace string) *api.Event {
