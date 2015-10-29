@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Nginx https service\""
+---
+---
+layout: docwithnav
+title: "Nginx https service"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -14,7 +18,7 @@ It uses an [nginx server block](http://wiki.nginx.org/ServerBlockExample) to ser
 
 ### Generate certificates
 
-First generate a self signed rsa key and certificate that the server can use for TLS. This step invokes the make_secret.go script in the same directory, which uses the kubernetes api to generate a secret json config in /tmp/secret.json.
+First generate a self signed rsa key and certificate that the server can use for TLS.
 
 {% highlight sh %}
 {% raw %}
@@ -27,6 +31,7 @@ $ make keys secret KEY=/tmp/nginx.key CERT=/tmp/nginx.crt SECRET=/tmp/secret.jso
 You need a [running kubernetes cluster](../../docs/getting-started-guides/) for this to work.
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl create -f /tmp/secret.json
 secrets/nginxsecret
@@ -69,12 +74,21 @@ $ curl https://nodeip:30744 -k
 <title>Welcome to nginx!</title>
 ...
 {% endraw %}
+{% endraw %}
 ```
 
 For more information on how to run this in a kubernetes cluster, please see the [user-guide](../../docs/user-guide/connecting-applications.html).
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/https-nginx/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

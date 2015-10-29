@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Example of NFS volume\""
+---
+---
+layout: docwithnav
+title: "Example of NFS volume"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -14,7 +18,7 @@ in a pod.
 
 ## Complete setup
 
-The example below shows how to export a NFS share from a pod and imports it
+The example below shows how to export a NFS share from a pod and import it
 into another one.
 
 ### Prerequisites
@@ -23,7 +27,7 @@ The nfs server pod creates a privileged container, so if you are using a Salt ba
 
 {% highlight sh %}
 {% raw %}
-# At the root of Kubernetes source code
+#At the root of Kubernetes source code
 $ vi cluster/saltbase/pillar/privilege.sls
 
 # If true, allow privileged containers to be created by API
@@ -64,7 +68,15 @@ Now the pod serves `index.html` from the NFS server:
     Hello World!
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

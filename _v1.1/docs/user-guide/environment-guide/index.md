@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Environment Guide Example\""
+---
+---
+layout: docwithnav
+title: "Environment Guide Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -54,6 +58,7 @@ something like this back:
 
 ```
 {% raw %}
+{% raw %}
 Pod Name: show-rc-xxu6i
 Pod Namespace: default
 USER_VAR: important information
@@ -73,6 +78,7 @@ Response from backend
 Backend Container
 Backend Pod Name: backend-rc-6qiya
 Backend Namespace: default
+{% endraw %}
 {% endraw %}
 ```
 
@@ -99,7 +105,15 @@ Cleanup
     kubectl delete rc,service -l type=backend-type
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/environment-guide/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

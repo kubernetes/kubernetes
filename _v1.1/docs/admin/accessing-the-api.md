@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Configuring APIserver ports"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -62,7 +62,9 @@ variety of uses cases:
    2. Processes running in Containers on Kubernetes that need to read from
       the apiserver.  Currently, these can use a [service account](../user-guide/service-accounts.html).
    3. Scheduler and Controller-manager processes, which need to do read-write
-      API operations, using service accounts to avoid the need to be co-located.
+      API operations. Currently, these have to run on the same host as the
+      apiserver and use the Localhost Port.  In the future, these will be
+      switched to using service accounts to avoid the need to be co-located.
    4. Kubelets, which need to do read-write API operations and are necessarily
       on different machines than the apiserver.  Kubelet uses the Secure Port
       to get their pods, to find the services that a pod can see, and to
@@ -73,6 +75,15 @@ variety of uses cases:
 ## Expected changes
 
    - Policy will limit the actions kubelets can do via the authed port.
+   - Scheduler and Controller-manager will use the Secure Port too.  They
+     will then be able to run on different machines than the apiserver.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/accessing-the-api.md?pixel)]()

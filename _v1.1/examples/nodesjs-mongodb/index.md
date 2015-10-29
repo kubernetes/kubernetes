@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Node.js and MongoDB on Kubernetes\""
+---
+---
+layout: docwithnav
+title: "Node.js and MongoDB on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -318,7 +322,15 @@ gcloud compute forwarding-rules list
 {% endraw %}
 {% endhighlight %}
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nodesjs-mongodb/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

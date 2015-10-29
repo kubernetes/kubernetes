@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Example: Distributed task queues with Celery, RabbitMQ and Flower"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -48,7 +48,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    component: rabbitmq
+    name: rabbitmq
   name: rabbitmq-service
 spec:
   ports:
@@ -85,10 +85,12 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    component: rabbitmq
+    name: rabbitmq
   name: rabbitmq-controller
 spec:
   replicas: 1
+  selector:
+    component: rabbitmq
   template:
     metadata:
       labels:
@@ -126,10 +128,12 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    component: celery
+    name: celery
   name: celery-controller
 spec:
   replicas: 1
+  selector:
+    component: celery
   template:
     metadata:
       labels:
@@ -212,7 +216,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    component: flower
+    name: flower
   name: flower-service
 spec:
   ports:
@@ -248,10 +252,12 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    component: flower
+    name: flower
   name: flower-controller
 spec:
   replicas: 1
+  selector:
+    component: flower
   template:
     metadata:
       labels:
@@ -295,14 +301,21 @@ rabbitmq-controller-5eb2l                      1/1       Running      0         
 
 ```
 {% raw %}
-NAME             LABELS             SELECTOR                         IP(S)            PORT(S)
-flower-service   component=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
+NAME             LABELS        SELECTOR                         IP(S)            PORT(S)
+flower-service   name=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
                                                                 162.222.181.180
 {% endraw %}
 ```
 
 Point your internet browser to the appropriate flower-service address, port 5555 (in our case http://162.222.181.180:5555).
 If you click on the tab called "Tasks", you should see an ever-growing list of tasks called "celery_conf.add" which the run\_tasks.py script is dispatching.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

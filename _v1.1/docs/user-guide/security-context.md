@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Security Contexts"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -10,6 +10,13 @@ title: "</strong>"
 # Security Contexts
 
 A security context defines the operating system security settings (uid, gid, capabilities, SELinux role, etc..) applied to a container. See [security context design](../design/security_context.html) for more details.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

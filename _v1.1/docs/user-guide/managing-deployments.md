@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications: Managing deployments"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -485,6 +485,13 @@ replicationcontrollers/my-nginx-v4
 
 - [Learn about how to use `kubectl` for application introspection and debugging.](introspection-and-debugging.html)
 - [Tips and tricks when working with config](config-best-practices.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

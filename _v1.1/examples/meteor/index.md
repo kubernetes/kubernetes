@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Meteor on Kuberenetes\""
+---
+---
+layout: docwithnav
+title: "Meteor on Kuberenetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -65,8 +69,10 @@ files to your existing Meteor project `Dockerfile` and
 
 ```
 {% raw %}
+{% raw %}
 FROM chees/meteor-kubernetes
 ENV ROOT_URL http://myawesomeapp.com
+{% endraw %}
 {% endraw %}
 ```
 
@@ -76,8 +82,10 @@ your container.
 
 ```
 {% raw %}
+{% raw %}
 .meteor/local
 packages/*/.build*
+{% endraw %}
 {% endraw %}
 ```
 
@@ -93,7 +101,9 @@ your Meteor project directory:
 
 ```
 {% raw %}
+{% raw %}
 docker build -t my-meteor .
+{% endraw %}
 {% endraw %}
 ```
 
@@ -106,8 +116,10 @@ your username and push to the Hub with the below commands. Replace
 
 ```
 {% raw %}
+{% raw %}
 docker tag my-meteor <username>/my-meteor
 docker push <username>/my-meteor
+{% endraw %}
 {% endraw %}
 ```
 
@@ -118,8 +130,10 @@ your app image with your project ID, and push to GCR. Replace
 
 ```
 {% raw %}
+{% raw %}
 docker tag my-meteor gcr.io/<project>/my-meteor
 gcloud docker push gcr.io/<project>/my-meteor
+{% endraw %}
 {% endraw %}
 ```
 
@@ -138,7 +152,9 @@ disks. Create the MongoDB disk by running:
 
 ```
 {% raw %}
+{% raw %}
 gcloud compute disks create --size=200GB mongo-disk
+{% endraw %}
 {% endraw %}
 ```
 
@@ -146,8 +162,10 @@ Now you can start Mongo using that disk:
 
 ```
 {% raw %}
+{% raw %}
 kubectl create -f examples/meteor/mongo-pod.json
 kubectl create -f examples/meteor/mongo-service.json
+{% endraw %}
 {% endraw %}
 ```
 
@@ -155,8 +173,10 @@ Wait until Mongo is started completely and then start up your Meteor app:
 
 ```
 {% raw %}
+{% raw %}
 kubectl create -f examples/meteor/meteor-service.json
 kubectl create -f examples/meteor/meteor-controller.json
+{% endraw %}
 {% endraw %}
 ```
 
@@ -169,7 +189,9 @@ by running:
 
 ```
 {% raw %}
+{% raw %}
 kubectl get service meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+{% endraw %}
 {% endraw %}
 ```
 
@@ -178,7 +200,9 @@ environment. On Google Compute Engine, you may run the below command.
 
 ```
 {% raw %}
+{% raw %}
 gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-minion
+{% endraw %}
 {% endraw %}
 ```
 
@@ -248,7 +272,15 @@ container section:
 {% endhighlight %}
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/meteor/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

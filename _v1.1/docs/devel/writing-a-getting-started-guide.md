@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Writing a Getting Started Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -103,6 +103,13 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    if you use another Configuration Management tool -- you just have to do some manual steps
    during testing and deployment.
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

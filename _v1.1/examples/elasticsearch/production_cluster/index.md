@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Elasticsearch for Kubernetes\""
+---
+---
+layout: docwithnav
+title: "Elasticsearch for Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -29,10 +33,12 @@ This example uses [this pre-built image](https://github.com/pires/docker-elastic
 
 ```
 {% raw %}
+{% raw %}
 kubectl create -f examples/elasticsearch/production_cluster/service-account.yaml
 kubectl create -f examples/elasticsearch/production_cluster/es-discovery-svc.yaml
 kubectl create -f examples/elasticsearch/production_cluster/es-svc.yaml
 kubectl create -f examples/elasticsearch/production_cluster/es-master-rc.yaml
+{% endraw %}
 {% endraw %}
 ```
 
@@ -40,7 +46,9 @@ Wait until `es-master` is provisioned, and
 
 ```
 {% raw %}
+{% raw %}
 kubectl create -f examples/elasticsearch/production_cluster/es-client-rc.yaml
+{% endraw %}
 {% endraw %}
 ```
 
@@ -48,7 +56,9 @@ Wait until `es-client` is provisioned, and
 
 ```
 {% raw %}
+{% raw %}
 kubectl create -f examples/elasticsearch/production_cluster/es-data-rc.yaml
+{% endraw %}
 {% endraw %}
 ```
 
@@ -58,15 +68,18 @@ Now, I leave up to you how to validate the cluster, but a first step is to wait 
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl get pods
 NAME              READY     STATUS    RESTARTS   AGE
 es-client-2ep9o   1/1       Running   0          2m
 es-data-r9tgv     1/1       Running   0          1m
 es-master-vxl6c   1/1       Running   0          6m
 {% endraw %}
+{% endraw %}
 ```
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl logs es-master-vxl6c
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
@@ -86,6 +99,7 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 [2015-08-21 11:02:28,797][INFO ][cluster.service          ] [Arc] added {[Gideon][4EfhWSqaTqikbK4tI7bODA][es-data-r9tgv][inet[/10.244.59.4:9300]]{master=false},}, reason: zen-disco-receive(join from node[[Gideon][4EfhWSqaTqikbK4tI7bODA][es-data-r9tgv][inet[/10.244.59.4:9300]]{master=false}])
 [2015-08-21 11:03:16,822][INFO ][cluster.service          ] [Arc] added {[Venomm][tFYxwgqGSpOejHLG4umRqg][es-client-2ep9o][inet[/10.244.53.2:9300]]{data=false, master=false},}, reason: zen-disco-receive(join from node[[Venomm][tFYxwgqGSpOejHLG4umRqg][es-client-2ep9o][inet[/10.244.53.2:9300]]{data=false, master=false}])
 {% endraw %}
+{% endraw %}
 ```
 
 As you can assert, the cluster is up and running. Easy, wasn't it?
@@ -96,15 +110,18 @@ Scaling each type of node to handle your cluster is as easy as:
 
 ```
 {% raw %}
+{% raw %}
 kubectl scale --replicas=3 rc es-master
 kubectl scale --replicas=2 rc es-client
 kubectl scale --replicas=2 rc es-data
+{% endraw %}
 {% endraw %}
 ```
 
 Did it work?
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl get pods
 NAME              READY     STATUS    RESTARTS   AGE
@@ -116,11 +133,13 @@ es-master-57h7k   1/1       Running   0          52s
 es-master-kuwse   1/1       Running   0          52s
 es-master-vxl6c   1/1       Running   0          8m
 {% endraw %}
+{% endraw %}
 ```
 
 Let's take another look of the Elasticsearch master logs:
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl logs es-master-vxl6c
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
@@ -144,6 +163,7 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 [2015-08-21 11:04:53,966][INFO ][cluster.service          ] [Arc] added {[Cagliostro][Wpfx5fkBRiG2qCEWd8laaQ][es-client-ye5s1][inet[/10.244.15.3:9300]]{data=false, master=false},}, reason: zen-disco-receive(join from node[[Cagliostro][Wpfx5fkBRiG2qCEWd8laaQ][es-client-ye5s1][inet[/10.244.15.3:9300]]{data=false, master=false}])
 [2015-08-21 11:04:56,803][INFO ][cluster.service          ] [Arc] added {[Thog][vkdEtX3ESfWmhXXf-Wi0_Q][es-data-8az22][inet[/10.244.15.4:9300]]{master=false},}, reason: zen-disco-receive(join from node[[Thog][vkdEtX3ESfWmhXXf-Wi0_Q][es-data-8az22][inet[/10.244.15.4:9300]]{master=false}])
 {% endraw %}
+{% endraw %}
 ```
 
 ## Access the service
@@ -152,9 +172,11 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl get service elasticsearch
 NAME            LABELS                                SELECTOR                              IP(S)          PORT(S)
 elasticsearch   component=elasticsearch,role=client   component=elasticsearch,role=client   10.100.134.2   9200/TCP
+{% endraw %}
 {% endraw %}
 ```
 
@@ -162,7 +184,9 @@ From any host on your cluster (that's running `kube-proxy`), run:
 
 ```
 {% raw %}
+{% raw %}
 curl http://10.100.134.2:9200
+{% endraw %}
 {% endraw %}
 ```
 
@@ -192,7 +216,9 @@ Or if you want to check cluster information:
 
 ```
 {% raw %}
+{% raw %}
 curl http://10.100.134.2:9200/_cluster/health?pretty
+{% endraw %}
 {% endraw %}
 ```
 
@@ -219,7 +245,15 @@ You should see something similar to the following:
 {% endhighlight %}
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/elasticsearch/production_cluster/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

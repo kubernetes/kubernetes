@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Java EE Application using WildFly and MySQL"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -156,6 +156,13 @@ kubectl delete -f examples/javaee/mysql-service.yaml
 kubectl delete -f examples/javaee/wildfly-rc.yaml
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

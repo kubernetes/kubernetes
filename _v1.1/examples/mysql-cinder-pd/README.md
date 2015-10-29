@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Mysql installation with cinder volume plugin"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -57,6 +57,13 @@ This should now
 2. Format the volume if required (only if the volume specified is not already formatted to the fstype specified)
 3. Mount it on the kubelet's host machine
 4. Spin up a container with this volume mounted to the path specified in the pod definition
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

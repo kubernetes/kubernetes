@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Glusterfs\""
+---
+---
+layout: docwithnav
+title: "Glusterfs"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -23,6 +27,7 @@ Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
 
 ```
 {% raw %}
+{% raw %}
       "addresses": [
         {
           "IP": "10.240.106.152"
@@ -34,6 +39,7 @@ Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
         }
       ]
 
+{% endraw %}
 {% endraw %}
 ```
 
@@ -124,7 +130,15 @@ $ mount | grep kube_vol
 You may also run `docker ps` on the host to see the actual container.
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/glusterfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	expValidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -105,17 +105,22 @@ func validateObject(obj runtime.Object) (errors []error) {
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expvalidation.ValidateDeployment(t)
+		errors = expValidation.ValidateDeployment(t)
 	case *extensions.Job:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expvalidation.ValidateJob(t)
+		errors = expValidation.ValidateJob(t)
+	case *extensions.Ingress:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expValidation.ValidateIngress(t)
 	case *extensions.DaemonSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expvalidation.ValidateDaemonSet(t)
+		errors = expValidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -218,10 +223,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"http-liveness": &api.Pod{},
 		},
 		"../docs/user-guide": {
-			"multi-pod":   nil,
-			"pod":         &api.Pod{},
-			"replication": &api.ReplicationController{},
-			"job":         &extensions.Job{},
+			"multi-pod":            nil,
+			"pod":                  &api.Pod{},
+			"replication":          &api.ReplicationController{},
+			"job":                  &extensions.Job{},
+			"ingress":              &extensions.Ingress{},
+			"nginx-deployment":     &extensions.Deployment{},
+			"new-nginx-deployment": &extensions.Deployment{},
 		},
 		"../docs/admin": {
 			"daemon": &extensions.DaemonSet{},
@@ -318,8 +326,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret":                     nil,
 		},
 		"../examples/phabricator": {
-			"phabricator-controller": &api.ReplicationController{},
-			"phabricator-service":    &api.Service{},
+			"authenticator-controller": &api.ReplicationController{},
+			"phabricator-controller":   &api.ReplicationController{},
+			"phabricator-service":      &api.Service{},
 		},
 		"../examples/redis": {
 			"redis-controller":          &api.ReplicationController{},
@@ -365,10 +374,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../examples/extensions": {
 			"deployment": &extensions.Deployment{},
-		},
-		"../examples/javaweb-tomcat-sidecar": {
-			"javaweb":   &api.Pod{},
-			"javaweb-2": &api.Pod{},
 		},
 	}
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Deploy DNS"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -56,10 +56,17 @@ $ kubectl -s "$KUBE_SERVER:8080" --namespace=kube-system create -f ./skydns-svc.
 
 ### Test if DNS works
 
-Follow [this link](https://releases.k8s.io/v1.1.0/cluster/addons/dns#how-do-i-test-if-it-is-working) to check it out.
+Follow [this link](https://releases.k8s.io/HEAD/cluster/addons/dns#how-do-i-test-if-it-is-working) to check it out.
 
 
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

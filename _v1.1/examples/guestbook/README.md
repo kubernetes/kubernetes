@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Guestbook Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -680,6 +680,13 @@ $ <kubernetes>/cluster/kube-down.sh
 If you are having trouble bringing up your guestbook app, double check that your external IP is properly defined for your frontend service, and that the firewall for your cluster nodes is open to port 80.
 
 Then, see the [troubleshooting documentation](../../docs/troubleshooting.html) for a further list of common issues and how you can diagnose them.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

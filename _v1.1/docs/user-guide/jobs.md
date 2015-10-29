@@ -4,6 +4,34 @@ title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/user-guide/jobs.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -47,13 +75,14 @@ It takes around 10s to complete.
 
 {% highlight yaml %}
 {% raw %}
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: Job
 metadata:
   name: pi
 spec:
   selector:
-    app: pi
+    matchLabels:
+      app: pi
   template:
     metadata:
       name: pi
@@ -148,11 +177,16 @@ Only a [`RestartPolicy`](pod-states.html) equal to `Never` or `OnFailure` are al
 
 ### Pod Selector
 
-The `.spec.selector` field is a pod selector.  It works the same as the `.spec.selector` of
-a [ReplicationController](replication-controller.html).
+The `.spec.selector` field is a label query over a set of pods.
 
-If specified, the `.spec.template.metadata.labels` must be equal to the `.spec.selector`, or it will
-be rejected by the API.  If `.spec.selector` is unspecified, it will be defaulted to
+The `spec.selector` is an object consisting of two fields:
+* `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](replication-controller.html)
+* `matchExpressions` - allows to build more sophisticated selectors by specyfing key,
+  list of values and an operator that relates the key and values.
+
+When the two are specified the result is ANDed.
+
+If `.spec.selector` is unspecified, `.spec.selector.matchLabels` will be defaulted to
 `.spec.template.metadata.labels`.
 
 Also you should not normally create any pods whose labels match this selector, either directly,
@@ -227,7 +261,8 @@ value is `Always`.)
 
 ## Caveats
 
-Job objects are in the [`extensions` API Group](../api.html#api-groups).
+Job objects are in the [`extensions` API Group](../api.html#api-groups).  This API group may or
+may not be enabled on your cluster.
 
 Job objects have [API version `v1beta1`](../api.html#api-versioning).  Beta objects may
 undergo changes to their schema and/or semantics in future software releases, but

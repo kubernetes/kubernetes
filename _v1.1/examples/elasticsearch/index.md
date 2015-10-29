@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Elasticsearch for Kubernetes\""
+---
+---
+layout: docwithnav
+title: "Elasticsearch for Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -26,9 +30,11 @@ Let's kickstart our cluster with 1 instance of Elasticsearch.
 
 ```
 {% raw %}
+{% raw %}
 kubectl create -f examples/elasticsearch/service-account.yaml
 kubectl create -f examples/elasticsearch/es-svc.yaml
 kubectl create -f examples/elasticsearch/es-rc.yaml
+{% endraw %}
 {% endraw %}
 ```
 
@@ -36,14 +42,17 @@ Let's see if it worked:
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl get pods
 NAME             READY     STATUS    RESTARTS   AGE
 es-kfymw         1/1       Running   0          7m
 kube-dns-p3v1u   3/3       Running   0          19m
 {% endraw %}
+{% endraw %}
 ```
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl logs es-kfymw
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
@@ -62,6 +71,7 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 [2015-08-30 10:01:44,011][INFO ][node                     ] [Hammerhead] started
 [2015-08-30 10:01:44,042][INFO ][gateway                  ] [Hammerhead] recovered [0] indices into cluster_state
 {% endraw %}
+{% endraw %}
 ```
 
 So we have a 1-node Elasticsearch cluster ready to handle some work.
@@ -72,13 +82,16 @@ Scaling is as easy as:
 
 ```
 {% raw %}
+{% raw %}
 kubectl scale --replicas=3 rc es
+{% endraw %}
 {% endraw %}
 ```
 
 Did it work?
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl get pods
 NAME             READY     STATUS    RESTARTS   AGE
@@ -87,11 +100,13 @@ es-kfymw         1/1       Running   0          17m
 es-rjmer         1/1       Running   0          8m
 kube-dns-p3v1u   3/3       Running   0          30m
 {% endraw %}
+{% endraw %}
 ```
 
 Let's take a look at logs:
 
 ```
+{% raw %}
 {% raw %}
 $ kubectl logs es-kfymw
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
@@ -112,6 +127,7 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 [2015-08-30 10:08:02,517][INFO ][cluster.service          ] [Hammerhead] added {[Tenpin][2gv5MiwhRiOSsrTOF3DhuA][es-78e0s][inet[/10.244.54.4:9300]]{master=true},}, reason: zen-disco-receive(join from node[[Tenpin][2gv5MiwhRiOSsrTOF3DhuA][es-78e0s][inet[/10.244.54.4:9300]]{master=true}])
 [2015-08-30 10:10:10,645][INFO ][cluster.service          ] [Hammerhead] added {[Evilhawk][ziTq2PzYRJys43rNL2tbyg][es-rjmer][inet[/10.244.33.3:9300]]{master=true},}, reason: zen-disco-receive(join from node[[Evilhawk][ziTq2PzYRJys43rNL2tbyg][es-rjmer][inet[/10.244.33.3:9300]]{master=true}])
 {% endraw %}
+{% endraw %}
 ```
 
 So we have a 3-node Elasticsearch cluster ready to handle more work.
@@ -122,10 +138,12 @@ So we have a 3-node Elasticsearch cluster ready to handle more work.
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl get service elasticsearch
 NAME            LABELS                    SELECTOR                  IP(S)           PORT(S)
 elasticsearch   component=elasticsearch   component=elasticsearch   10.100.108.94   9200/TCP
                                                                                     9300/TCP
+{% endraw %}
 {% endraw %}
 ```
 
@@ -133,7 +151,9 @@ From any host on your cluster (that's running `kube-proxy`), run:
 
 ```
 {% raw %}
+{% raw %}
 $ curl 10.100.108.94:9200
+{% endraw %}
 {% endraw %}
 ```
 
@@ -163,7 +183,9 @@ Or if you want to check cluster information:
 
 ```
 {% raw %}
+{% raw %}
 curl 10.100.108.94:9200/_cluster/health?pretty
+{% endraw %}
 {% endraw %}
 ```
 
@@ -189,7 +211,15 @@ You should see something similar to the following:
 {% endraw %}
 {% endhighlight %}
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/elasticsearch/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

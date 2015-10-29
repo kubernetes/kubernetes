@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Building and releasing Guestbook Image\""
+---
+---
+layout: docwithnav
+title: "Building and releasing Guestbook Image"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -43,7 +47,15 @@ Accepts an optional tag (defaults to "latest")
     ./script/clean.sh
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook-go/_src/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

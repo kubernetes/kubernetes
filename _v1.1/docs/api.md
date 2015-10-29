@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "The Kubernetes API"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -83,12 +83,11 @@ In the future we expect that there will be more API groups, all at REST path `/a
 using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for (third parties to
 create their own API groups](design/extending-api.md), and to avoid naming collisions.
 
-## Enabling resources in the extensions group
+## Enabling the extensions group
 
-Jobs, Ingress and HorizontalPodAutoscalers are enabled by default.
-Other extensions resources can be enabled by setting runtime-config on
-apiserver. runtime-config accepts comma separated values. For ex: to enable deployments and disable jobs, set
-`--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/jobs=false`
+Enable `extensions/v1beta1` objects by adding the following flags to your API server:
+
+  - `--runtime-config=extensions/v1beta1=true`
 
 ## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 
@@ -132,6 +131,13 @@ Some important differences between v1beta1/2 and v1beta3:
 * Pull policies changed from `PullAlways`, `PullNever`, and `PullIfNotPresent` to `Always`, `Never`, and `IfNotPresent`.
 * The volume `source` is inlined into `volume` rather than nested.
 * Host volumes have been changed from `hostDir` to `hostPath` to better reflect that they can be files or directories.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Limit Range"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -221,6 +221,13 @@ the Kubernetes system is able to apply default resource *limits* and *requests* 
 constrain the amount of resource a pod consumes on a node.
 
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

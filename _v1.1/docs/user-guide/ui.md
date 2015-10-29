@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Interface"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -58,6 +58,13 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 ## More Information
 
 For more information, see the [Kubernetes UI development document](http://releases.k8s.io/v1.1.0/www/README.md) in the www directory.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

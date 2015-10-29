@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Cloud Native Deployments of Hazelcast using Kubernetes\""
+---
+---
+layout: docwithnav
+title: "Cloud Native Deployments of Hazelcast using Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -276,7 +280,15 @@ kubectl scale rc hazelcast --replicas=4
 See [here](https://github.com/pires/hazelcast-kubernetes-bootstrapper/blob/master/src/main/java/com/github/pires/hazelcast/HazelcastDiscoveryController.java)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/hazelcast/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
