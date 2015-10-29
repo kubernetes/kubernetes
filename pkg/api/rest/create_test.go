@@ -14,28 +14,49 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rest
+package rest_test
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
+
+type fakeStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+var strategy = fakeStrategy{api.Scheme, api.SimpleNameGenerator}
+
+func (fakeStrategy) NamespaceScoped() bool {
+	return true
+}
+
+func (fakeStrategy) PrepareForCreate(obj runtime.Object) {
+}
+
+func (fakeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+	return nil
+}
 
 func TestCheckGeneratedNameError(t *testing.T) {
 	expect := errors.NewNotFound("foo", "bar")
-	if err := CheckGeneratedNameError(Services, expect, &api.Pod{}); err != expect {
+	if err := rest.CheckGeneratedNameError(strategy, expect, &api.Pod{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists("foo", "bar")
-	if err := CheckGeneratedNameError(Services, expect, &api.Pod{}); err != expect {
+	if err := rest.CheckGeneratedNameError(strategy, expect, &api.Pod{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists("foo", "bar")
-	if err := CheckGeneratedNameError(Services, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+	if err := rest.CheckGeneratedNameError(strategy, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }
