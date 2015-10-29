@@ -176,6 +176,10 @@ func (sv *secretVolume) IsReadOnly() bool {
 	return false
 }
 
+func (sv *secretVolume) SupportsSELinux() bool {
+	return true
+}
+
 func totalSecretBytes(secret *api.Secret) int {
 	totalSize := 0
 	for _, bytes := range secret.Data {

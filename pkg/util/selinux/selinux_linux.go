@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,20 +16,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package selinux
 
 import (
 	"github.com/docker/libcontainer/selinux"
 )
 
-// getRootDirContext gets the SELinux context of the kubelet rootDir
-// or returns an error.
-func (kl *Kubelet) getRootDirContext() (string, error) {
+type realChconRunner struct{}
+
+func (_ *realChconRunner) SetContext(dir, context string) error {
 	// If SELinux is not enabled, return an empty string
 	if !selinux.SelinuxEnabled() {
-		return "", nil
+		return nil
 	}
 
-	// Get the SELinux context of the rootDir.
-	return selinux.Getfilecon(kl.getRootDir())
+	return selinux.Setfilecon(dir, context)
 }
