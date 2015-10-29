@@ -921,6 +921,23 @@ func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice string)
 	delete(self.deviceMappings, mountDevice)
 }
 
+func (self *awsInstance) releaseMountDeviceByVolume(volumeID string) {
+	self.mutex.Lock()
+	defer self.mutex.Unlock()
+
+	// Sequentially find 'device', whose self.deviceMappings[device] == volumeID
+	// AWS supports only 40 attached EBS volumes, we probably do not need to
+	// over-optimize with maps and such.
+	for device, existingVolumeID := range self.deviceMappings {
+		if existingVolumeID == volumeID {
+			glog.V(2).Infof("Releasing mount device mapping: %s -> volume %s", device, volumeID)
+			delete(self.deviceMappings, device)
+			return
+		}
+	}
+	glog.Errorf("releaseMountDeviceByVolume on non-allocated volume %s", volumeID)
+}
+
 type awsDisk struct {
 	ec2 EC2
 
@@ -1193,6 +1210,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 		return err
 	}
 
+	awsInstance.releaseMountDeviceByVolume(disk.awsID)
 	return err
 }
 
