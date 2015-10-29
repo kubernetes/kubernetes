@@ -88,7 +88,7 @@ ln -s ${KUBE_BUILD_DIR}/_output/release-tars/kubernetes.tar.gz ${KUBE_BUILD_DIR}
 MD5=$(md5 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 SHA1=$(sha1 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 
-echo <<- EOM
+cat <<- EOM
 
 Success! You must now do the following: (you may want to cut
   and paste these instructions elsewhere, step 1 can be spammy)
