@@ -16,16 +16,17 @@
 # unit and integration tests
 
 FROM golang:1.4
-MAINTAINER  jeff lowdermilk <jeffml@google.com>
+MAINTAINER  Jeff Lowdermilk <jeffml@google.com>
 
 ENV KUBE_TEST_API_VERSIONS  v1,extensions/v1beta1
 ENV KUBE_TEST_ETCD_PREFIXES registry
 ENV WORKSPACE               /workspace
+ENV TERM                    xterm
 
 WORKDIR /workspace
-ADD run.sh ./
 
 RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
+RUN apt-get install -y file
 RUN mkdir -p /go/src/k8s.io/kubernetes
 RUN ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
 
