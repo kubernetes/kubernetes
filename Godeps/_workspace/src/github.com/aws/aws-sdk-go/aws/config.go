@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 )
 
-// The default number of retries for a service. The value of -1 indicates that
-// the service specific retry default will be used.
+// DefaultRetries is the default number of retries for a service. The value of
+// -1 indicates that the service specific retry default will be used.
 const DefaultRetries = -1
 
 // A Config provides service configuration for service clients. By default,

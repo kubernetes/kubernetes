@@ -2,7 +2,9 @@ package ec2metadata
 
 import (
 	"io/ioutil"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -88,7 +90,19 @@ func copyConfig(config *Config) *aws.Config {
 	}
 
 	if c.HTTPClient == nil {
-		c.HTTPClient = http.DefaultClient
+		c.HTTPClient = &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				Dial: (&net.Dialer{
+					// use a shorter timeout than default because the metadata
+					// service is local if it is running, and to fail faster
+					// if not running on an ec2 instance.
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+		}
 	}
 	if c.Logger == nil {
 		c.Logger = aws.NewDefaultLogger()

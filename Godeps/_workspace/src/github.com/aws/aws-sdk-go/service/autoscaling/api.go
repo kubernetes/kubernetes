@@ -1567,7 +1567,7 @@ func (c *AutoScaling) TerminateInstanceInAutoScalingGroupRequest(input *Terminat
 // Terminates the specified instance and optionally adjusts the desired group
 // size.
 //
-// This call simply makes a termination request. The instances is not terminated
+// This call simply makes a termination request. The instance is not terminated
 // immediately.
 func (c *AutoScaling) TerminateInstanceInAutoScalingGroup(input *TerminateInstanceInAutoScalingGroupInput) (*TerminateInstanceInAutoScalingGroupOutput, error) {
 	req, out := c.TerminateInstanceInAutoScalingGroupRequest(input)
@@ -1826,7 +1826,7 @@ type BlockDeviceMapping struct {
 	// fails the health check.
 	NoDevice *bool `type:"boolean"`
 
-	// The name of the virtual device, ephemeral0 to ephemeral3.
+	// The name of the virtual device (for example, ephemeral0).
 	VirtualName *string `min:"1" type:"string"`
 
 	metadataBlockDeviceMapping `json:"-" xml:"-"`
@@ -1909,8 +1909,8 @@ type CreateAutoScalingGroupInput struct {
 	// The amount of time, in seconds, after a scaling activity completes before
 	// another scaling activity can start.
 	//
-	// If this parameter is not specified, the default value is 300. For more information,
-	// see Understanding Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
+	// The default is 300. For more information, see Understanding Auto Scaling
+	// Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
 	// in the Auto Scaling Developer Guide.
 	DefaultCooldown *int64 `type:"integer"`
 
@@ -1936,7 +1936,8 @@ type CreateAutoScalingGroupInput struct {
 	// The service to use for the health checks. The valid values are EC2 and ELB.
 	//
 	// By default, health checks use Amazon EC2 instance status checks to determine
-	// the health of an instance. For more information, see Health Checks (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html).
+	// the health of an instance. For more information, see Health Checks (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html)
+	// in the Auto Scaling Developer Guide.
 	HealthCheckType *string `min:"1" type:"string"`
 
 	// The ID of the EC2 instance used to create a launch configuration for the
@@ -2118,7 +2119,7 @@ type CreateLaunchConfigurationInput struct {
 
 	// The instance type of the EC2 instance. For information about available instance
 	// types, see  Available Instance Types (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html#AvailableInstanceTypes)
-	// in the Amazon Elastic Cloud Compute User Guide.
+	// in the Amazon Elastic Compute Cloud User Guide.
 	InstanceType *string `min:"1" type:"string"`
 
 	// The ID of the kernel associated with the AMI.
@@ -3496,7 +3497,8 @@ type DisableMetricsCollectionInput struct {
 	// The name or Amazon Resource Name (ARN) of the group.
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
 
-	// One or more metrics. If you omit this parameter, all metrics are disabled.
+	// One or more of the following metrics. If you omit this parameter, all metrics
+	// are disabled.
 	//
 	//  GroupMinSize
 	//
@@ -3557,10 +3559,17 @@ type Ebs struct {
 	// Default: true
 	DeleteOnTermination *bool `type:"boolean"`
 
+	// Indicates whether the volume should be encrypted. Encrypted EBS volumes must
+	// be attached to instances that support Amazon EBS encryption. Volumes that
+	// are created from encrypted snapshots are automatically encrypted. There is
+	// no way to create an encrypted volume from an unencrypted snapshot or an unencrypted
+	// volume from an encrypted snapshot. For more information, see Amazon EBS Encryption
+	// (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html) in
+	// the Amazon Elastic Compute Cloud User Guide.
+	Encrypted *bool `type:"boolean"`
+
 	// For Provisioned IOPS (SSD) volumes only. The number of I/O operations per
 	// second (IOPS) to provision for the volume.
-	//
-	// Valid values: Range is 100 to 4000.
 	//
 	// Default: None
 	Iops *int64 `min:"100" type:"integer"`
@@ -3612,7 +3621,8 @@ type EnableMetricsCollectionInput struct {
 	// value is 1Minute.
 	Granularity *string `min:"1" type:"string" required:"true"`
 
-	// One or more metrics. If you omit this parameter, all metrics are enabled.
+	// One or more of the following metrics. If you omit this parameter, all metrics
+	// are enabled.
 	//
 	//  GroupMinSize
 	//
@@ -3674,7 +3684,7 @@ type EnabledMetric struct {
 	// The granularity of the metric. The only valid value is 1Minute.
 	Granularity *string `min:"1" type:"string"`
 
-	// The name of the metric.
+	// One of the following metrics:
 	//
 	//  GroupMinSize
 	//
@@ -3952,7 +3962,8 @@ type Group struct {
 	MinSize *int64 `type:"integer" required:"true"`
 
 	// The name of the placement group into which you'll launch your instances,
-	// if any. For more information, see Placement Groups (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html).
+	// if any. For more information, see Placement Groups (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html)
+	// in the Amazon Elastic Compute Cloud User Guide.
 	PlacementGroup *string `min:"1" type:"string"`
 
 	// The current state of the group when DeleteAutoScalingGroup is in progress.
@@ -4090,8 +4101,7 @@ func (s InstanceMonitoring) GoString() string {
 
 // Describes a launch configuration.
 type LaunchConfiguration struct {
-	// Specifies whether the instances are associated with a public IP address (true)
-	// or not (false).
+	// [EC2-VPC] Indicates whether to assign a public IP address to each instance.
 	AssociatePublicIpAddress *bool `type:"boolean"`
 
 	// A block device mapping, which specifies the block devices for the instance.
@@ -4192,14 +4202,14 @@ type LifecycleHook struct {
 	// are CONTINUE and ABANDON. The default value is CONTINUE.
 	DefaultResult *string `type:"string"`
 
-	// The maximum length of time an instance can remain in a Pending:Wait or Terminating:Wait
-	// state. Currently, the maximum is set to 48 hours.
+	// The maximum time, in seconds, that an instance can remain in a Pending:Wait
+	// or Terminating:Wait state. The default is 172800 seconds (48 hours).
 	GlobalTimeout *int64 `type:"integer"`
 
-	// The amount of time that can elapse before the lifecycle hook times out. When
-	// the lifecycle hook times out, Auto Scaling performs the action defined in
-	// the DefaultResult parameter. You can prevent the lifecycle hook from timing
-	// out by calling RecordLifecycleActionHeartbeat.
+	// The maximum time, in seconds, that can elapse before the lifecycle hook times
+	// out. The default is 3600 seconds (1 hour). When the lifecycle hook times
+	// out, Auto Scaling performs the action defined in the DefaultResult parameter.
+	// You can prevent the lifecycle hook from timing out by calling RecordLifecycleActionHeartbeat.
 	HeartbeatTimeout *int64 `type:"integer"`
 
 	// The name of the lifecycle hook.
@@ -4248,7 +4258,7 @@ type LoadBalancerState struct {
 	// The name of the load balancer.
 	LoadBalancerName *string `min:"1" type:"string"`
 
-	// The state of the load balancer.
+	// One of the following load balancer states:
 	//
 	//  Adding - The instances in the group are being registered with the load
 	// balancer.
@@ -4281,7 +4291,7 @@ func (s LoadBalancerState) GoString() string {
 
 // Describes a metric.
 type MetricCollectionType struct {
-	// The metric.
+	// One of the following metrics:
 	//
 	//  GroupMinSize
 	//
@@ -4344,7 +4354,7 @@ type NotificationConfiguration struct {
 	// The name of the group.
 	AutoScalingGroupName *string `min:"1" type:"string"`
 
-	// The types of events for an action to start.
+	// One of the following event notification types:
 	//
 	//  autoscaling:EC2_INSTANCE_LAUNCH
 	//
@@ -4383,7 +4393,7 @@ func (s NotificationConfiguration) GoString() string {
 // For more information, see Auto Scaling Processes (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SuspendResume.html#process-types)
 // in the Auto Scaling Developer Guide.
 type ProcessType struct {
-	// The name of the process.
+	// One of the following processes:
 	//
 	//  Launch
 	//
@@ -4430,11 +4440,11 @@ type PutLifecycleHookInput struct {
 	// is ABANDON.
 	DefaultResult *string `type:"string"`
 
-	// Defines the amount of time, in seconds, that can elapse before the lifecycle
-	// hook times out. When the lifecycle hook times out, Auto Scaling performs
-	// the action defined in the DefaultResult parameter. You can prevent the lifecycle
-	// hook from timing out by calling RecordLifecycleActionHeartbeat. The default
-	// value for this parameter is 3600 seconds (1 hour).
+	// The amount of time, in seconds, that can elapse before the lifecycle hook
+	// times out. When the lifecycle hook times out, Auto Scaling performs the action
+	// defined in the DefaultResult parameter. You can prevent the lifecycle hook
+	// from timing out by calling RecordLifecycleActionHeartbeat. The default is
+	// 3600 seconds (1 hour).
 	HeartbeatTimeout *int64 `type:"integer"`
 
 	// The name of the lifecycle hook.
@@ -5257,7 +5267,7 @@ type TerminateInstanceInAutoScalingGroupInput struct {
 	// The ID of the EC2 instance.
 	InstanceId *string `min:"1" type:"string" required:"true"`
 
-	// If true, terminating this instance also decrements the size of the Auto Scaling
+	// If true, terminating the instance also decrements the size of the Auto Scaling
 	// group.
 	ShouldDecrementDesiredCapacity *bool `type:"boolean" required:"true"`
 
@@ -5308,7 +5318,8 @@ type UpdateAutoScalingGroupInput struct {
 
 	// The amount of time, in seconds, after a scaling activity completes before
 	// another scaling activity can start. For more information, see Understanding
-	// Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html).
+	// Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
+	// in the Auto Scaling Developer Guide.
 	DefaultCooldown *int64 `type:"integer"`
 
 	// The number of EC2 instances that should be running in the Auto Scaling group.
@@ -5319,7 +5330,8 @@ type UpdateAutoScalingGroupInput struct {
 	// The amount of time, in seconds, that Auto Scaling waits before checking the
 	// health status of an instance. The grace period begins when the instance passes
 	// the system status and instance status checks from Amazon EC2. For more information,
-	// see .
+	// see Health Checks (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html)
+	// in the Auto Scaling Developer Guide.
 	HealthCheckGracePeriod *int64 `type:"integer"`
 
 	// The type of health check for the instances in the Auto Scaling group. The
@@ -5337,7 +5349,8 @@ type UpdateAutoScalingGroupInput struct {
 	MinSize *int64 `type:"integer"`
 
 	// The name of the placement group into which you'll launch your instances,
-	// if any. For more information, see Placement Groups (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html).
+	// if any. For more information, see Placement Groups (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html)
+	// in the Amazon Elastic Compute Cloud User Guide.
 	PlacementGroup *string `min:"1" type:"string"`
 
 	// A standalone termination policy or a list of termination policies used to
