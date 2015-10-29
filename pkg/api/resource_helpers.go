@@ -87,3 +87,13 @@ func GetPodReadyCondition(status PodStatus) *PodCondition {
 	}
 	return nil
 }
+
+// IsNodeReady returns true if a node is ready; false otherwise.
+func IsNodeReady(node *Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == NodeReady {
+			return c.Status == ConditionTrue
+		}
+	}
+	return false
+}
