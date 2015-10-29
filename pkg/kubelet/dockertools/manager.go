@@ -1672,6 +1672,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 type empty struct{}
 type PodContainerChangesSpec struct {
 	StartInfraContainer bool
+	InfraChanged        bool
 	InfraContainerId    kubetypes.DockerID
 	ContainersToStart   map[int]empty
 	ContainersToKeep    map[kubetypes.DockerID]int
@@ -1777,6 +1778,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 
 	return PodContainerChangesSpec{
 		StartInfraContainer: createPodInfraContainer,
+		InfraChanged:        changed,
 		InfraContainerId:    podInfraContainerID,
 		ContainersToStart:   containersToStart,
 		ContainersToKeep:    containersToKeep,
@@ -1811,10 +1813,18 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 
+	if containerChanges.InfraChanged {
+		ref, err := api.GetReference(pod)
+		if err != nil {
+			glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+		}
+		dm.recorder.Eventf(ref, "InfraChanged", "Pod infrastructure changed, it will be killed and re-created.")
+	}
 	if containerChanges.StartInfraContainer || (len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0) {
 		if len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0 {
 			glog.V(4).Infof("Killing Infra Container for %q because all other containers are dead.", podFullName)
 		} else {
+
 			glog.V(4).Infof("Killing Infra Container for %q, will start new one", podFullName)
 		}
 
