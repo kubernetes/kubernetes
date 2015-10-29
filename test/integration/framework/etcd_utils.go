@@ -17,8 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -29,15 +31,18 @@ import (
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-// If you need to start an etcd instance by hand, you also need to insert a key
-// for this check to pass (*any* key will do, eg:
-//curl -L http://127.0.0.1:4001/v2/keys/message -XPUT -d value="Hello world").
+var etcdServers string
+
 func init() {
+	flag.StringVar(&etcdServers, "etcd-servers", "", "comma-separated list of etcd servers in scheme://host:port format.")
+	flag.Parse()
 	RequireEtcd()
 }
 
+// NewEtcdClient creates a new etcd client, defaulting to server http://127.0.0.1:4001 (as specified in the etcd client library).
+// The flag --etcd-servers can be used to override this default.
 func NewEtcdClient() *etcd.Client {
-	return etcd.NewClient([]string{})
+	return etcd.NewClient(strings.Split(etcdServers, ","))
 }
 
 func NewEtcdStorage() (storage.Interface, error) {
@@ -51,6 +56,9 @@ func NewExtensionsEtcdStorage(client *etcd.Client) (storage.Interface, error) {
 	return master.NewEtcdStorage(client, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
 }
 
+// If you need to start an etcd instance by hand, you also need to insert a key
+// for this check to pass (*any* key will do, eg:
+//curl -L http://127.0.0.1:4001/v2/keys/message -XPUT -d value="Hello world").
 func RequireEtcd() {
 	if _, err := NewEtcdClient().Get("/", false, false); err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)

@@ -35,14 +35,14 @@ import (
 )
 
 func init() {
-	requireEtcd()
+	framework.RequireEtcd()
 }
 
 func TestPersistentVolumeRecycler(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	binderClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 	testClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
@@ -95,7 +95,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	// Deleter test begins now.
 	// tests are serial because running masters concurrently that delete keys may cause similar tests to time out
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// change the reclamation policy of the PV for the next test
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimDelete

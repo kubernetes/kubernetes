@@ -53,11 +53,13 @@ runTests() {
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
     KUBE_API_VERSIONS="v1,extensions/v1beta1" \
+    KUBE_TEST_ARGS="--etcd-servers=http://${ETCD_HOST}:${ETCD_PORT}" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
   kube::log::status "Running integration test scenario"
 
   KUBE_API_VERSIONS="v1,extensions/v1beta1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+    --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
