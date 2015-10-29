@@ -71,6 +71,10 @@ func init() {
 
 	// Register Unversioned types
 	Scheme.AddKnownTypes("", &unversioned.Status{})
+	Scheme.AddKnownTypes("", &unversioned.APIVersions{})
+	Scheme.AddKnownTypes("", &unversioned.APIGroupList{})
+	Scheme.AddKnownTypes("", &unversioned.APIGroup{})
+	Scheme.AddKnownTypes("", &unversioned.APIResourceList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
