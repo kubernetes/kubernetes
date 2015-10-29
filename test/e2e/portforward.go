@@ -115,6 +115,7 @@ func runPortForward(ns, podName string, port int) (*exec.Cmd, int) {
 func runKubectlWithTimeout(timeout time.Duration, args ...string) string {
 	logOutput := make(chan string)
 	go func() {
+		defer GinkgoRecover()
 		logOutput <- runKubectl(args...)
 	}()
 	select {
