@@ -121,6 +121,7 @@ Kubernetes supports several types of Volumes:
    * `gitRepo`
    * `secret`
    * `persistentVolumeClaim`
+   * `downwardAPI`
 
 We welcome additional contributions.
 
