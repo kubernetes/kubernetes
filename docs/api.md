@@ -64,7 +64,7 @@ in more detail in the [API Changes documentation](devel/api_changes.md#alpha-bet
 ## API groups
 
 To make it easier to extend the Kubernetes API, we are in the process of implementing [*API
-groups*](proposals/api-groups.md).  These are simply different interfaces to read and/or modify the
+groups*](proposals/api-group.md).  These are simply different interfaces to read and/or modify the
 same underlying resources.  The API group is specified in a REST path and in the `apiVersion` field
 of a serialized object.
 
