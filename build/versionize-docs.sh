@@ -45,7 +45,7 @@ if ! ($SED --version 2>&1 | grep -q GNU); then
   exit 1
 fi
 
-echo "+++ Versioning documentation and examples at ${NEW_VERSION}"
+echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
 HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/kubernetes/kubernetes"
