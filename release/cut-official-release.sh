@@ -187,12 +187,12 @@ function alpha-release() {
 - Finish the ${alpha_version} release build:
   - From this directory (clone of upstream/master),
       ./release/build-official-release.sh ${alpha_version}
-  - Figure out what the PR numbers for this release and last release are, and
-    get an api-token from GitHub (https://github.com/settings/tokens).  From a
-    clone of kubernetes/contrib at upstream/master,
-      go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token>
-    Feel free to prune, but typically for patch releases we tend to include
-    everything in the release notes.
+  - Prep release notes:
+    - Figure out what the PR numbers for this release and last release are, and
+      get an api-token from GitHub (https://github.com/settings/tokens).  From a
+      clone of kubernetes/contrib at upstream/master,
+        go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token>
+      Feel free to prune.
 EOM
 }
 
@@ -226,12 +226,12 @@ function official-release() {
   git-push "${official_version}"
 
   cat >> "${INSTRUCTIONS}" <<- EOM
-- Finish the ${version} release build:
+- Finish the ${official_version} release build:
   - From this directory (clone of upstream/master),
-      ./release/build-official-release.sh ${version}
+      ./release/build-official-release.sh ${official_version}
   - Prep release notes:
     - From this directory (clone of upstream/master), run
-        ./hack/cherry_pick_list.sh ${version}
+        ./hack/cherry_pick_list.sh ${official_version}
       to get the release notes for the patch release you just created. Feel
       free to prune anything internal, but typically for patch releases we tend
       to include everything in the release notes.
@@ -245,7 +245,7 @@ function verify-at-git-commit() {
   local -r git_commit="${1}"
   echo "Verifying we are at ${git_commit}."
   if [[ $(current-git-commit) != ${git_commit} ]]; then
-    echo <<- EOM
+    cat <<- EOM
 !!! We are not at commit ${git_commit}! (If you're cutting an official release,
 that probably means your release branch isn't frozen, so the commit you want to
 release isn't at HEAD of the release branch.)"
