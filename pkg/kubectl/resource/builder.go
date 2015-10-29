@@ -32,7 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-var FileExtensions = []string{".json", ".stdin", ".yaml", ".yml"}
+var FileExtensions = []string{".json", ".yaml", ".yml"}
+var InputExtensions = append(FileExtensions, "stdin")
 
 // Builder provides convenience functions for taking arguments and parameters
 // from the command line and converting them to a list of resources to iterate
@@ -648,7 +649,7 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{singular: singular, visitor: visitors, sources: b.paths}
 	}
 
-	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename (%s)", strings.Join(FileExtensions, "|"))}
+	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename (%s)", strings.Join(InputExtensions, "|"))}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.
