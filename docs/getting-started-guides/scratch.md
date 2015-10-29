@@ -77,9 +77,7 @@ steps that existing cluster setup scripts are making.
       - [Scheduler pod template](#scheduler-pod-template)
       - [Controller Manager Template](#controller-manager-template)
       - [Starting and Verifying Apiserver, Scheduler, and Controller Manager](#starting-and-verifying-apiserver-scheduler-and-controller-manager)
-    - [Logging](#logging)
-    - [Monitoring](#monitoring)
-    - [DNS](#dns)
+    - [Starting Cluster Services](#starting-cluster-services)
   - [Troubleshooting](#troubleshooting)
     - [Running validate-cluster](#running-validate-cluster)
     - [Inspect pods and services](#inspect-pods-and-services)
@@ -433,7 +431,7 @@ Arguments to consider:
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
   - `--config=/etc/kubernetes/manifests`
-  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](#starting-addons).)
+  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Cluster Services](#starting-cluster-services).)
   - `--cluster-domain=` to the dns domain prefix to use for cluster DNS addresses.
   - `--docker-root=`
   - `--root-dir=`
@@ -836,17 +834,30 @@ If you have selected the `--register-node=true` option for kubelets, they will n
 You should soon be able to see all your nodes by running the `kubectl get nodes` command.
 Otherwise, you will need to manually create node objects.
 
-### Logging
+### Starting Cluster Services
 
-**TODO** talk about starting Logging.
+You will want to complete your Kubernetes clusters by adding cluster-wide
+services.  These are sometimes called *addons*, and [an overview
+of their purpose is in the admin guide](
+../../docs/admin/cluster-components.md#addons).
 
-### Monitoring
+Notes for setting up each cluster service are given below:
 
-**TODO** talk about starting Monitoring.
-
-### DNS
-
-**TODO** talk about starting DNS.
+* Cluster DNS:
+  * required for many kubernetes examples
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/dns/)
+  * [Admin Guide](../admin/dns.md)
+* Cluster-level Logging
+  * Multiple implementations with different storage backends and UIs.
+  * [Elasticsearch Backend Setup Instructions](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/)
+  * [Google Cloud Logging Backend Setup Instructions](http://releases.k8s.io/HEAD/cluster/addons/fluentd-gcp/).
+  * Both require running fluentd on each node.
+  * [User Guide](../user-guide/logging.md)
+* Container Resource Monitoring
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/)
+* GUI
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/kube-ui/)
+  cluster.
 
 ## Troubleshooting
 

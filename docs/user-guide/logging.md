@@ -33,6 +33,20 @@ Documentation for other releases can be found at
 
 # Logging
 
+**Table of Contents**
+
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Logging](#logging)
+  - [Logging by Kubernetes Components](#logging-by-kubernetes-components)
+  - [Examining the logs of running containers](#examining-the-logs-of-running-containers)
+  - [Cluster level logging to Google Cloud Logging](#cluster-level-logging-to-google-cloud-logging)
+  - [Cluster level logging with Elasticsearch and Kibana](#cluster-level-logging-with-elasticsearch-and-kibana)
+  - [Ingesting Application Log Files](#ingesting-application-log-files)
+  - [Known issues](#known-issues)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Logging by Kubernetes Components
 
 Kubernetes components, such as kubelet and apiserver, use the [glog](https://godoc.org/github.com/golang/glog) logging library.  Developer conventions for logging severity are described in [docs/devel/logging.md](../devel/logging.md).
