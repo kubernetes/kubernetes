@@ -25,30 +25,30 @@ divided by the node's capacity).
 Finally, the node with the highest priority is chosen
 (or, if there are multiple such nodes, then one of them is chosen at random). The code
 for this main scheduling loop is in the function `Schedule()` in
-[plugin/pkg/scheduler/generic_scheduler.go](http://releases.k8s.io/v1.1.0/plugin/pkg/scheduler/generic_scheduler.go)
+[plugin/pkg/scheduler/generic_scheduler.go](http://releases.k8s.io/release-1.1/plugin/pkg/scheduler/generic_scheduler.go)
 
 ## Scheduler extensibility
 
 The scheduler is extensible: the cluster administrator can choose which of the pre-defined
 scheduling policies to apply, and can add new ones. The built-in predicates and priorities are
-defined in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/v1.1.0/plugin/pkg/scheduler/algorithm/predicates/predicates.go) and
-[plugin/pkg/scheduler/algorithm/priorities/priorities.go](http://releases.k8s.io/v1.1.0/plugin/pkg/scheduler/algorithm/priorities/priorities.go), respectively.
+defined in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/release-1.1/plugin/pkg/scheduler/algorithm/predicates/predicates.go) and
+[plugin/pkg/scheduler/algorithm/priorities/priorities.go](http://releases.k8s.io/release-1.1/plugin/pkg/scheduler/algorithm/priorities/priorities.go), respectively.
 The policies that are applied when scheduling can be chosen in one of two ways. Normally,
 the policies used are selected by the functions `defaultPredicates()` and `defaultPriorities()` in
-[plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](http://releases.k8s.io/v1.1.0/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).
+[plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](http://releases.k8s.io/release-1.1/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).
 However, the choice of policies
 can be overridden by passing the command-line flag `--policy-config-file` to the scheduler, pointing to a JSON
 file specifying which scheduling policies to use. See
 [examples/scheduler-policy-config.json](../../examples/scheduler-policy-config.json) for an example
 config file. (Note that the config file format is versioned; the API is defined in
-[plugin/pkg/scheduler/api](http://releases.k8s.io/v1.1.0/plugin/pkg/scheduler/api/)).
+[plugin/pkg/scheduler/api](http://releases.k8s.io/release-1.1/plugin/pkg/scheduler/api/)).
 Thus to add a new scheduling policy, you should modify predicates.go or priorities.go,
 and either register the policy in `defaultPredicates()` or `defaultPriorities()`, or use a policy config file.
 
 ## Exploring the code
 
 If you want to get a global picture of how the scheduler works, you can start in
-[plugin/cmd/kube-scheduler/app/server.go](http://releases.k8s.io/v1.1.0/plugin/cmd/kube-scheduler/app/server.go)
+[plugin/cmd/kube-scheduler/app/server.go](http://releases.k8s.io/release-1.1/plugin/cmd/kube-scheduler/app/server.go)
 
 
 

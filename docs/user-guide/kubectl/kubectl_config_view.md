@@ -35,7 +35,7 @@ $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2
       --merge=true: merge together the full hierarchy of kubeconfig files
       --minify[=false]: remove all information not used by current-context from the output
       --no-headers[=false]: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/v1.1.0/docs/user-guide/jsonpath.md].
+  -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/release-1.1/docs/user-guide/jsonpath.md].
       --output-version="": Output the formatted object with the given version (default api-version).
       --raw[=false]: display raw byte data
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)

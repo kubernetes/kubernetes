@@ -126,7 +126,7 @@ To determine if a container cannot be scheduled or is being killed due to resour
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](http://releases.k8s.io/v1.1.0/cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
+If [optional monitoring](http://releases.k8s.io/release-1.1/cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting

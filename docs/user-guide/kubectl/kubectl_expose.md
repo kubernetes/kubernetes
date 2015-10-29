@@ -51,7 +51,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --load-balancer-ip="": IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud-provider specific).
       --name="": The name for the newly created object.
       --no-headers[=false]: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/v1.1.0/docs/user-guide/jsonpath.md].
+  -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/release-1.1/docs/user-guide/jsonpath.md].
       --output-version="": Output the formatted object with the given version (default api-version).
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that the service should serve on. Copied from the resource being exposed, if unspecified

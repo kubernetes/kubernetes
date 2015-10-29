@@ -79,7 +79,7 @@ choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 
 If you are extending from a standard Kubernetes installation, the `kubelet` binary should already be present on your system.  You can run
 `which kubelet` to determine if the binary is in fact installed.  If it is not installed,
 you should install the [kubelet binary](https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet), the
-[kubelet init file](http://releases.k8s.io/v1.1.0/cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
+[kubelet init file](http://releases.k8s.io/release-1.1/cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
 scripts.
 
 If you are using monit, you should also install the monit daemon (`apt-get install monit`) and the [high-availability/monit-kubelet](high-availability/monit-kubelet) and

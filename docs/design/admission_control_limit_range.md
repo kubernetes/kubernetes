@@ -61,11 +61,11 @@ type LimitRangeSpec struct {
 type LimitRange struct {
   TypeMeta `json:",inline"`
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
   ObjectMeta `json:"metadata,omitempty"`
 
   // Spec defines the limits enforced.
-  // More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+  // More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
   Spec LimitRangeSpec `json:"spec,omitempty"`
 }
 
@@ -73,11 +73,11 @@ type LimitRange struct {
 type LimitRangeList struct {
   TypeMeta `json:",inline"`
   // Standard list metadata.
-  // More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+  // More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
   ListMeta `json:"metadata,omitempty"`
 
   // Items is a list of LimitRange objects.
-  // More info: http://releases.k8s.io/v1.1.0/docs/design/admission_control_limit_range.md
+  // More info: http://releases.k8s.io/release-1.1/docs/design/admission_control_limit_range.md
   Items []LimitRange `json:"items"`
 }
 ```
