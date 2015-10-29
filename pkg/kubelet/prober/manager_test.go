@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/probe"
@@ -268,7 +269,7 @@ func newTestManager() *manager {
 	const probePeriod = 1
 	m := NewManager(
 		probePeriod,
-		status.NewManager(&testclient.Fake{}),
+		status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil)),
 		results.NewManager(),
 		results.NewManager(),
 		nil, // runner
