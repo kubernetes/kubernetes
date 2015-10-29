@@ -18,15 +18,7 @@ spec:
           image: gcr.io/google_containers/spark-master:1.5.1_v1
           ports:
             - containerPort: 7077
-          volumeMounts:
-            - mountPath: /mnt/glusterfs
-              name: glusterfsvol
+            - containerPort: 8080
           resources:
             requests:
               cpu: 100m
-      volumes:
-        - name: glusterfsvol
-          glusterfs:
-            endpoints: glusterfs-cluster
-            path: MyVolume
-            readOnly: false

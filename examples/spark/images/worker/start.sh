@@ -14,15 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [[ ${SPARK_MASTER_SERVICE_HOST} == "" ]]; then
-  echo "Spark Master service must be created before starting any workers"
-  sleep 30 # To postpone pod restart
-  exit 1
-fi
+. /start-common.sh
 
-echo "${SPARK_MASTER_SERVICE_HOST} spark-master" >> /etc/hosts
-export SPARK_LOCAL_HOSTNAME=$(hostname -i)
-
-/opt/spark/sbin/start-slave.sh spark://spark-master:${SPARK_MASTER_SERVICE_PORT}
+/opt/spark/sbin/start-slave.sh spark://spark-master:7077
 
 tail -F /opt/spark/logs/*
