@@ -56,8 +56,7 @@ If load balancers are not supported (e.g.: on Vagrant), we can expose php-apache
 
 ```console
 $ kubectl expose rc php-apache --port=80 --type=ClusterIP
-NAME         LABELS           SELECTOR         IP(S)     PORT(S)
-php-apache   run=php-apache   run=php-apache             80/TCP
+service "php-apache" exposed
 
 $ kubectl cluster-info | grep master
 Kubernetes master is running at https://146.148.6.215

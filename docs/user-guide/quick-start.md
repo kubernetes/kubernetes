@@ -48,8 +48,7 @@ Through integration with some cloud providers (for example Google Compute Engine
 
 ```console
 $ kubectl expose rc my-nginx --port=80 --type=LoadBalancer
-NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
-my-nginx     10.179.240.1     <none>            80/TCP                 run=nginx    8d
+service "my-nginx" exposed
 ```
 
 To find the public IP address assigned to your application, execute:
