@@ -78,9 +78,16 @@ No matter what you're cutting, you're going to want to look at
 (see above,) and look at the critical jobs building from that branch.  First
 glance through builds and look for nice solid rows of green builds, and then
 check temporally with the other critical builds to make sure they're solid
-around then as well. Once you find some greens, you can find the git hash for a
-build by looking at the Full Console Output and searching for `githash=`. You
-should see a line:
+around then as well.
+
+If you're doing an alpha release or cutting a new release series, you can
+choose an arbitrary build.  If you are doing an official release, you have to
+release from HEAD of the branch, (because you have to do some version-rev
+commits,) so choose the latest build on the release branch.  (Remember, that
+branch should be frozen.)
+
+Once you find some greens, you can find the git hash for a build by looking at
+the Full Console Output and searching for `githash=`. You should see a line:
 
 ```console
 githash=v1.2.0-alpha.2.164+b44c7d79d6c9bb
@@ -115,9 +122,11 @@ will become your release point.
 You'll need the latest version of the releasing tools:
 
 ```console
-git clone git@github.com:kubernetes/contrib.git
-cd contrib/release
+git clone git@github.com:kubernetes/kubernetes.git
+cd kubernetes
 ```
+
+or `git checkout upstream/master` from an existing repo.
 
 #### Cutting an alpha release (`vX.Y.0-alpha.W`)
 
@@ -127,10 +136,10 @@ Figure out what version you're cutting, and
 export VER="vX.Y.0-alpha.W"
 ```
 
-then, from `contrib/release`, run
+then, run
 
 ```console
-cut.sh "${VER}" "${GITHASH}"
+build/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
@@ -147,10 +156,10 @@ Figure out what version you're cutting, and
 export VER="vX.Y.Z"
 ```
 
-then, from `contrib/release`, run
+then, run
 
 ```console
-cut.sh "${VER}" "${GITHASH}"
+build/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
@@ -161,7 +170,7 @@ This will:
 1. do a series of commits on the branch for `vX.Y.(Z+1)-beta` on top of the
    previous commits, including versionizing the documentation and doing the
    beta version commit;
-1. mark the `vX.Y.(Z+1)-beta` tag at the release version commit;
+1. mark the `vX.Y.(Z+1)-beta` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
@@ -177,10 +186,10 @@ Figure out what series you're cutting, and
 export VER="vX.Y"
 ```
 
-then, from `contrib/release`, run
+then, run
 
 ```console
-cut.sh "${VER}" "${GITHASH}"
+build/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
@@ -189,18 +198,19 @@ This will:
 1. fork a new branch `release-X.Y` off of `master` at the given git hash;
 1. do a series of commits on the branch for `vX.Y.0-beta`, including versionizing
    the documentation and doing the release version commit;
-1. mark the `vX.Y.(Z+1)-beta` tag at the beta version commit;
+1. mark the `vX.Y.0-beta` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
 ### Publishing binaries and release notes
 
-Whichever script you ran above will prompt you to take any remaining steps,
-including publishing binaries and release notes.
+The script you ran above will prompt you to take any remaining steps, including
+publishing binaries and release notes.
 
-## Origin of the Sources
+## Injecting Version into Binaries
 
-TODO(ihmccreery) update this
+*Please note that this information may be out of date.  The scripts are the
+authoritative source on how version injection works.*
 
 Kubernetes may be built from either a git tree (using `hack/build-go.sh`) or
 from a tarball (using either `hack/build-go.sh` or `go install`) or directly by
@@ -215,36 +225,6 @@ When building from a tarball or using the Go build system, we will not have
 access to the information about the git tree, but we still want to be able to
 tell whether this build corresponds to an exact release (e.g. v0.3) or is
 between releases (e.g. at some point in development between v0.3 and v0.4).
-
-## Version Number Format
-
-TODO(ihmccreery) update everything below here
-
-In order to account for these use cases, there are some specific formats that
-may end up representing the Kubernetes version. Here are a few examples:
-
-- **v0.5**: This is official version 0.5 and this version will only be used
-  when building from a clean git tree at the v0.5 git tag, or from a tree
-  extracted from the tarball corresponding to that specific release.
-- **v0.5-15-g0123abcd4567**: This is the `git describe` output and it indicates
-  that we are 15 commits past the v0.5 release and that the SHA1 of the commit
-  where the binaries were built was `0123abcd4567`. It is only possible to have
-  this level of detail in the version information when building from git, not
-  when building from a tarball.
-- **v0.5-15-g0123abcd4567-dirty** or **v0.5-dirty**: The extra `-dirty` prefix
-  means that the tree had local modifications or untracked files at the time of
-  the build, so there's no guarantee that the source code matches exactly the
-  state of the tree at the `0123abcd4567` commit or at the `v0.5` git tag
-  (resp.)
-- **v0.5-dev**: This means we are building from a tarball or using `go get` or,
-  if we have a git tree, we are using `go install` directly, so it is not
-  possible to inject the git version into the build information. Additionally,
-  this is not an official release, so the `-dev` prefix indicates that the
-  version we are building is after `v0.5` but before `v0.6`. (There is actually
-  an exception where a commit with `v0.5-dev` is not present on `v0.6`, see
-  later for details.)
-
-## Injecting Version into Binaries
 
 In order to cover the different build cases, we start by providing information
 that can be used when using only Go build tools or when we do not have the git
@@ -275,22 +255,6 @@ tell the Go linker to override the contents of those variables at build time. It
 can, for instance, tell it to override `gitVersion` and set it to
 `v0.4-13-g4567bcdef6789-dirty` and set `gitCommit` to `4567bcdef6789...` which
 is the complete SHA1 of the (dirty) tree used at build time.
-
-## Release Notes
-
-TODO(ihmccreery) update this
-
-No official release should be made final without properly matching release notes.
-
-There should be made available, per release, a small summary, preamble, of the
-major changes, both in terms of feature improvements/bug fixes and notes about
-functional feature changes (if any) regarding the previous released version so
-that the BOM regarding updating to it gets as obvious and trouble free as possible.
-
-After this summary, preamble, all the relevant PRs/issues that got in that
-version should be listed and linked together with a small summary understandable
-by plain mortals (in a perfect world PR/issue's title would be enough but often
-it is just too cryptic/geeky/domain-specific that it isn't).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

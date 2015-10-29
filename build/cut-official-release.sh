@@ -113,18 +113,20 @@ EOM
   pushd "${DIR}"
 
   if [[ "${release_type}" == 'alpha' ]]; then
+    local -r ancestor="v${version_major}.${version_minor}.0-alpha.$((${version_alpha_rev}-1))"
     git checkout "${git_commit}"
     verify-at-git-commit "${git_commit}"
-    verify-ancestor "v${version_major}.${version_minor}.0-alpha.$((${version_alpha_rev}-1))"
+    verify-ancestor "${ancestor}"
 
     alpha-release "${new_version}"
   elif [[ "${release_type}" == 'official' ]]; then
     local -r release_branch="release-${version_major}.${version_minor}"
     local -r beta_version="v${version_major}.${version_minor}.$((${version_patch}+1))-beta"
+    local -r ancestor="${new_version}-beta"
 
     git checkout "${release_branch}"
     verify-at-git-commit "${git_commit}"
-    verify-ancestor "${new_version}-beta"
+    verify-ancestor "${ancestor}"
 
     official-release "${new_version}"
     beta-release "${beta_version}"
@@ -132,14 +134,15 @@ EOM
     local -r release_branch="release-${version_major}.${version_minor}"
     local -r alpha_version="v${version_major}.$((${version_minor}+1)).0-alpha.0"
     local -r beta_version="v${version_major}.${version_minor}.0-beta"
-
-    git checkout "${git_commit}"
-    verify-at-git-commit "${git_commit}"
     # NOTE: We check the second alpha version, ...-alpha.1, because ...-alpha.0
     # is the branch point for the previous release cycle, so could provide a
     # false positive if we accidentally try to release off of the old release
     # branch.
-    verify-ancestor "v${version_major}.${version_minor}.0-alpha.1"
+    local -r ancestor="v${version_major}.${version_minor}.0-alpha.1"
+
+    git checkout "${git_commit}"
+    verify-at-git-commit "${git_commit}"
+    verify-ancestor "${ancestor}"
 
     alpha-release "${alpha_version}"
 
@@ -179,7 +182,18 @@ function alpha-release() {
   echo "Tagging ${alpha_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes pre-release ${alpha_version}" "${alpha_version}"
   git-push "${alpha_version}"
-  finish-release-instructions "${alpha_version}"
+
+  cat >> "${INSTRUCTIONS}" <<- EOM
+- Finish the ${alpha_version} release build:
+  - From this directory (clone of upstream/master),
+      ./release/build-official-release.sh ${alpha_version}
+  - Figure out what the PR numbers for this release and last release are, and
+    get an api-token from GitHub (https://github.com/settings/tokens).  From a
+    clone of kubernetes/contrib at upstream/master,
+      go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token>
+    Feel free to prune, but typically for patch releases we tend to include
+    everything in the release notes.
+EOM
 }
 
 function beta-release() {
@@ -193,7 +207,10 @@ function beta-release() {
   echo "Tagging ${beta_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes pre-release ${beta_version}" "${beta_version}"
   git-push "${beta_version}"
-  finish-release-instructions "${beta_version}"
+
+  # NOTE: We currently don't build/release beta versions, since they're almost
+  # identical to the prior version, so we don't prompt for build or release
+  # here.
 }
 
 function official-release() {
@@ -207,7 +224,21 @@ function official-release() {
   echo "Tagging ${official_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes release ${official_version}" "${official_version}"
   git-push "${official_version}"
-  finish-release-instructions "${official_version}"
+
+  cat >> "${INSTRUCTIONS}" <<- EOM
+- Finish the ${version} release build:
+  - From this directory (clone of upstream/master),
+      ./release/build-official-release.sh ${version}
+  - Prep release notes:
+    - From this directory (clone of upstream/master), run
+        ./hack/cherry_pick_list.sh ${version}
+      to get the release notes for the patch release you just created. Feel
+      free to prune anything internal, but typically for patch releases we tend
+      to include everything in the release notes.
+    - If this is a first official release (vX.Y.0), scan through the release
+      notes for all of the alpha releases since the last cycle, and include
+      anything important in release notes.
+EOM
 }
 
 function verify-at-git-commit() {
@@ -282,15 +313,6 @@ function git-push() {
     echo "NOT A DRY RUN: you don't really want to git push ${object}, do you?"
     # git push "${object}"
   fi
-}
-
-function finish-release-instructions() {
-  local -r version="${1}"
-
-  cat >> "${INSTRUCTIONS}" <<- EOM
-- Finish the ${version} release build:
-    ./build/build-official-release.sh ${version}
-EOM
 }
 
 main "$@"

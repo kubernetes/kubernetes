@@ -53,7 +53,7 @@ There is no mandated timeline for major versions. They only occur when we need t
 
 ### CI version scheme
 
-* Continuous integration versions also exist, and are versioned off of alpha and beta releases.  X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an additional +aaaa build suffix added; X.Y.Z-beta.C+bbbb is C commits after X.Y.Z-beta, with an additional +bbbb build suffix added.
+* Continuous integration versions also exist, and are versioned off of alpha and beta releases.  X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an additional +aaaa build suffix added; X.Y.Z-beta.C+bbbb is C commits after X.Y.Z-beta, with an additional +bbbb build suffix added.  Furthermore, builds that are built off of a dirty build tree, (with things in the tree that are not checked it,) it will be appended with -dirty.
 
 ## Release versions as related to API versions
 

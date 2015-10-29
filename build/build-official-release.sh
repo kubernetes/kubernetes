@@ -88,29 +88,31 @@ ln -s ${KUBE_BUILD_DIR}/_output/release-tars/kubernetes.tar.gz ${KUBE_BUILD_DIR}
 MD5=$(md5 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 SHA1=$(sha1 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 
-echo ""
-echo "Success! You must now do the following: (you may want to cut"
-echo "  and paste these instructions elsewhere, step 1 can be spammy)"
-echo ""
-echo "  1) (cd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION})"
-echo "  2) Go to https://github.com/GoogleCloudPlatform/kubernetes/releases"
-echo "     and create a new 'Release ${KUBE_RELEASE_VERSION} Candidate' release"
-echo "     with the ${KUBE_RELEASE_VERSION} tag. Mark it as a pre-release."
-echo "  3) Upload the ${KUBE_BUILD_DIR}/kubernetes.tar.gz to GitHub"
-echo "  4) Use this template for the release:"
-echo ""
-echo "## [Documentation](http://releases.k8s.io/${KUBE_RELEASE_VERSION}/docs/README.md)"
-echo "## [Examples](http://releases.k8s.io/${KUBE_RELEASE_VERSION}/examples)"
-echo "## Changes since <last release> (last PR <last PR>)"
-echo ""
-echo "<release notes>"
-echo ""
-echo "binary | hash alg | hash"
-echo "------ | -------- | ----"
-echo "\`kubernetes.tar.gz\` | md5 | \`${MD5}\`"
-echo "\`kubernetes.tar.gz\` | sha1 | \`${SHA1}\`"
-echo ""
-echo "     We'll fill in the release notes in the next stage."
-echo "  5) Ensure all the binaries are in place on GitHub and GCS before cleaning."
-echo "  6) (cd ${KUBE_BUILD_DIR}; make clean; cd -; rm -rf ${KUBE_BUILD_DIR})"
-echo ""
+echo <<- EOM
+
+Success! You must now do the following: (you may want to cut
+  and paste these instructions elsewhere, step 1 can be spammy)
+
+  1) (cd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION})
+  2) Go to https://github.com/GoogleCloudPlatform/kubernetes/releases
+     and create a new 'Release ${KUBE_RELEASE_VERSION} Candidate' release
+     with the ${KUBE_RELEASE_VERSION} tag. Mark it as a pre-release.
+  3) Upload the ${KUBE_BUILD_DIR}/kubernetes.tar.gz to GitHub
+  4) Use this template for the release:
+
+## [Documentation](http://releases.k8s.io/${KUBE_RELEASE_VERSION}/docs/README.md)
+## [Examples](http://releases.k8s.io/${KUBE_RELEASE_VERSION}/examples)
+## Changes since <last release> (last PR <last PR>)
+
+<release notes>
+
+binary | hash alg | hash
+------ | -------- | ----
+\`kubernetes.tar.gz\` | md5 | \`${MD5}\`
+\`kubernetes.tar.gz\` | sha1 | \`${SHA1}\`
+
+     We'll fill in the release notes in the next stage.
+  5) Ensure all the binaries are in place on GitHub and GCS before cleaning.
+  6) (cd ${KUBE_BUILD_DIR}; make clean; cd -; rm -rf ${KUBE_BUILD_DIR})
+
+EOM
