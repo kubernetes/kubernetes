@@ -139,7 +139,7 @@ export VER="vX.Y.0-alpha.W"
 then, run
 
 ```console
-build/cut-official-release.sh "${VER}" "${GITHASH}"
+release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
@@ -159,7 +159,7 @@ export VER="vX.Y.Z"
 then, run
 
 ```console
-build/cut-official-release.sh "${VER}" "${GITHASH}"
+release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
@@ -189,7 +189,7 @@ export VER="vX.Y"
 then, run
 
 ```console
-build/cut-official-release.sh "${VER}" "${GITHASH}"
+release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will:
