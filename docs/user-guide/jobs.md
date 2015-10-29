@@ -219,8 +219,7 @@ value is `Always`.)
 
 ## Caveats
 
-Job objects are in the [`extensions` API Group](../api.md#api-groups).  This API group may or
-may not be enabled on your cluster.
+Job objects are in the [`extensions` API Group](../api.md#api-groups).
 
 Job objects have [API version `v1beta1`](../api.md#api-versioning).  Beta objects may
 undergo changes to their schema and/or semantics in future software releases, but
