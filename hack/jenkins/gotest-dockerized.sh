@@ -42,5 +42,5 @@ docker run --rm=true \
   -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
   -v "${KUBE_JUNIT_REPORT_DIR}":/workspace/artifacts \
   --env REPO_DIR="${REPO_DIR}" \
-  -it gcr.io/google_containers/kubekins-test:0.1 \
+  -i gcr.io/google_containers/kubekins-test:0.1 \
   bash -c "cd kubernetes && ./hack/jenkins/test-dockerized.sh"
