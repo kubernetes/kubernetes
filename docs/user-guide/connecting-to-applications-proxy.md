@@ -33,6 +33,14 @@ Documentation for other releases can be found at
 
 # Connecting to applications: kubectl proxy and apiserver proxy
 
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Connecting to applications: kubectl proxy and apiserver proxy](#connecting-to-applications-kubectl-proxy-and-apiserver-proxy)
+  - [Getting the apiserver proxy URL of kube-ui](#getting-the-apiserver-proxy-url-of-kube-ui)
+  - [Connecting to the kube-ui service from your local workstation](#connecting-to-the-kube-ui-service-from-your-local-workstation)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 You have seen the [basics](accessing-the-cluster.md) about `kubectl proxy` and `apiserver proxy`. This guide shows how to use them together to access a service([kube-ui](ui.md)) running on the Kubernetes cluster from your workstation.
 
 
