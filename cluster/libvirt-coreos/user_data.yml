@@ -46,7 +46,7 @@ coreos:
         Name=cbr0
 
         [Network]
-        Address=${MINION_CONTAINER_SUBNETS[$i]}
+        Address=${NODE_CONTAINER_SUBNETS[$i]}
 
         [Route]
         Destination=${CONTAINER_SUBNET}
@@ -113,4 +113,4 @@ coreos:
     reboot-strategy: off
 
 $( [[ ${type} =~ "master" ]] && render-template "$ROOT/user_data_master.yml" )
-$( [[ ${type} =~ "minion" ]] && render-template "$ROOT/user_data_minion.yml" )
+$( [[ ${type} =~ "node" ]] && render-template "$ROOT/user_data_minion.yml" )
