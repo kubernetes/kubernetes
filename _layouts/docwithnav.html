@@ -77,7 +77,7 @@
 		    $(window).bind('popstate', function (event) {
 				var returnlocation = history.location || document.location;
 				returnlochref = returnlocation.href;
-				if (!displaycodesample(returnlochref)) {//open code samples (.yaml or .json files) in <code> blocks
+				if (!displaycodesample(returnlochref)) {//open code samples (.yaml or .yaml.in or .json files) in <code> blocks
 					loadandscrollpage(returnlochref); //otherwise, load page contents
 				}
 				syncmenutourl();
@@ -163,7 +163,7 @@
 							offset = $(href).offset().top - 155;
 						}
 						$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
-					} else if (displaycodesample(href)) {//open code samples (.yaml or .json files) in <code> blocks
+					} else if (displaycodesample(href)) {//open code samples (.yaml or .yaml.in or .json files) in <code> blocks
 						isCode = true;
 					} else { //if its a link to another topic, only load content into the page (avoid refreshing whole page)
 						loadandscrollpage(href);
@@ -207,7 +207,7 @@
 		/* Load the code samples in a syntax formatted code block */
 		function displaycodesample(targethref) {
 			var isCodeSample = false;
-			if ((targethref.indexOf('.yaml') > -1 && targethref.indexOf('.yaml') + 5 == targethref.length) || (targethref.indexOf('.json') > -1 && targethref.indexOf('.json') + 5 ==  targethref.length)) {
+			if ((targethref.indexOf('.yaml') > -1 && targethref.indexOf('.yaml') + 5 == targethref.length) || (targethref.indexOf('.json') > -1 && targethref.indexOf('.json') + 5 ==  targethref.length || (targethref.indexOf('.yaml.in') > -1 && targethref.indexOf('.yaml.in') + 8 ==  targethref.length)) {
 				$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {// load the code sample template
 					$('#codeblock').load(targethref, function() { //load the code sample file into the 'code' tags of the template
 						$('#codetitle').html(location.pathname); //set the page title
