@@ -20,7 +20,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestConfigMapStrategy(t *testing.T) {
@@ -66,4 +69,13 @@ func TestConfigMapStrategy(t *testing.T) {
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}
+}
+
+func TestSelectableFieldLabelConversions(t *testing.T) {
+	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
+		testapi.Extensions.GroupVersion().String(),
+		"ConfigMap",
+		labels.Set(ConfigMapToSelectableFields(&extensions.ConfigMap{})),
+		nil,
+	)
 }

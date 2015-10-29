@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -39,6 +40,37 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 	)
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+
+	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
+	for _, kind := range []string{"ConfigMap", "DaemonSet", "Deployment", "Ingress"} {
+		err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name", "metadata.namespace":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			})
+		if err != nil {
+			// If one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	}
+
+	err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "metadata.namespace", "status.successful":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)

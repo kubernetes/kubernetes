@@ -107,7 +107,9 @@ func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 
 // SelectableFields returns a label set that can be used for filter selection
 func SelectableFields(obj *api.Secret) labels.Set {
-	return labels.Set{
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(obj.ObjectMeta, true)
+	secretSpecificFieldsSet := fields.Set{
 		"type": string(obj.Type),
 	}
+	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, secretSpecificFieldsSet))
 }
