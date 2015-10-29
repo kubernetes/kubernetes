@@ -68,9 +68,9 @@ spec:
   - name: db
     image: mysql
     resources:
-	  requests:
-	    memory: "64Mi"
-		cpu: "250m"
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
       limits:
         memory: "128Mi"
         cpu: "500m"
@@ -78,9 +78,9 @@ spec:
     image: wordpress
     resources:
       requests:
-	    memory: "64Mi"
-		cpu: "250m"
-	  limits:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
         memory: "128Mi"
         cpu: "500m"
 ```
