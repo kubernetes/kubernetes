@@ -114,6 +114,7 @@ func processFile(prefix, filename string) error {
 	output := rewriteLinks(filename, fileBytes)
 	output = rewriteCodeBlocks(output)
 	output = rewriteHTMLPreviewLinks(output)
+	output = rewriteDownloadLinks(output)
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -241,6 +242,24 @@ var (
 // http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html#_v1_pod
 func rewriteHTMLPreviewLinks(fileBytes []byte) []byte {
 	return htmlPreviewRE.ReplaceAll(fileBytes, []byte(fmt.Sprintf("http://kubernetes.io/%s", *version)))
+}
+
+var (
+	downloadLinkRE = regexp.MustCompile("\\[Download example\\]\\((.*\\.)(yaml|json)\\?raw=true\\)")
+)
+
+// Drops "?raw=true" from download example links. For example this rewrites
+// "[Download example](pod.yaml?raw=true)"
+// to
+// "[Download example](pod.yaml)"
+func rewriteDownloadLinks(fileBytes []byte) []byte {
+	return downloadLinkRE.ReplaceAllFunc(fileBytes, func([]byte) []byte {
+		matches := downloadLinkRE.FindSubmatch(fileBytes)
+		fileName := string(matches[1])
+		extension := string(matches[2])
+		newLink := "[Download example](" + fileName + extension + ")"
+		return []byte(newLink)
+	})
 }
 
 var (
