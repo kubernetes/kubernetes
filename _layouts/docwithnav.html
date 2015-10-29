@@ -207,7 +207,7 @@
 		/* Load the code samples in a syntax formatted code block */
 		function displaycodesample(targethref) {
 			var isCodeSample = false;
-			if ((targethref.indexOf('.yaml') > -1 && targethref.indexOf('.yaml') + 5 == targethref.length) || (targethref.indexOf('.json') > -1 && targethref.indexOf('.json') + 5 ==  targethref.length || (targethref.indexOf('.yaml.in') > -1 && targethref.indexOf('.yaml.in') + 8 ==  targethref.length)) {
+			if ((targethref.indexOf('.yaml') > -1 && targethref.indexOf('.yaml') + 5 == targethref.length) || (targethref.indexOf('.json') > -1 && targethref.indexOf('.json') + 5 ==  targethref.length) || (targethref.indexOf('.yaml.in') > -1 && targethref.indexOf('.yaml.in') + 8 ==  targethref.length)) {
 				$('#doccontent').load(location.origin + "/codeblockdisplay.html", function() {// load the code sample template
 					$('#codeblock').load(targethref, function() { //load the code sample file into the 'code' tags of the template
 						$('#codetitle').html(location.pathname); //set the page title
