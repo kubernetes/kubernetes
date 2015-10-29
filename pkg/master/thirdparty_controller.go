@@ -76,7 +76,7 @@ func (t *ThirdPartyController) SyncOneResource(rsrc *expapi.ThirdPartyResource) 
 
 // Synchronize all resources with RESTful resources on the master
 func (t *ThirdPartyController) SyncResources() error {
-	list, err := t.thirdPartyResourceRegistry.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
+	list, err := t.thirdPartyResourceRegistry.List(api.NewDefaultContext(), labels.Everything(), fields.Everything(), nil)
 	if err != nil {
 		return err
 	}

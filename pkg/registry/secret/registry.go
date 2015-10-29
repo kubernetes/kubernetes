@@ -27,7 +27,7 @@ import (
 // Registry is an interface implemented by things that know how to store Secret objects.
 type Registry interface {
 	// ListSecrets obtains a list of Secrets having labels which match selector.
-	ListSecrets(ctx api.Context, selector labels.Selector) (*api.SecretList, error)
+	ListSecrets(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.SecretList, error)
 	// Watch for new/changed/deleted secrets
 	WatchSecrets(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	// Get a specific Secret
@@ -51,8 +51,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListSecrets(ctx api.Context, label labels.Selector) (*api.SecretList, error) {
-	obj, err := s.List(ctx, label, fields.Everything())
+func (s *storage) ListSecrets(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.SecretList, error) {
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

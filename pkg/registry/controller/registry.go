@@ -28,7 +28,7 @@ import (
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error)
+	ListControllers(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.ReplicationControllerList, error)
 	WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
 	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
@@ -48,11 +48,11 @@ func NewRegistry(s rest.StandardStorage) Registry {
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (s *storage) ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
+func (s *storage) ListControllers(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.ReplicationControllerList, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
-	obj, err := s.List(ctx, label, field)
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}

@@ -27,7 +27,7 @@ import (
 // Registry is an interface implemented by things that know how to store Namespace objects.
 type Registry interface {
 	// ListNamespaces obtains a list of namespaces having labels which match selector.
-	ListNamespaces(ctx api.Context, selector labels.Selector) (*api.NamespaceList, error)
+	ListNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.NamespaceList, error)
 	// Watch for new/changed/deleted namespaces
 	WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	// Get a specific namespace
@@ -51,8 +51,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNamespaces(ctx api.Context, label labels.Selector) (*api.NamespaceList, error) {
-	obj, err := s.List(ctx, label, fields.Everything())
+func (s *storage) ListNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (*api.NamespaceList, error) {
+	obj, err := s.List(ctx, label, field, options)
 	if err != nil {
 		return nil, err
 	}
