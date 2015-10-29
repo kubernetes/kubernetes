@@ -48,23 +48,12 @@ except:
 	print 'err'`
 
 var _ = Describe("Examples e2e", func() {
+	framework := NewFramework("examples")
 	var c *client.Client
 	var ns string
-	var testingNs *api.Namespace
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		testingNs, err = createTestingNS("examples", c)
-		ns = testingNs.Name
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
 	Describe("[Skipped][Example]Redis", func() {
@@ -476,10 +465,14 @@ var _ = Describe("Examples e2e", func() {
 			for i := range namespaces {
 				var err error
 				namespaces[i], err = createTestingNS(fmt.Sprintf("dnsexample%d", i), c)
-				if namespaces[i] != nil {
-					defer deleteNS(c, namespaces[i].Name, 5*time.Minute /* namespace deletion timeout */)
+				if testContext.DeleteNamespace {
+					if namespaces[i] != nil {
+						defer deleteNS(c, namespaces[i].Name, 5*time.Minute /* namespace deletion timeout */)
+					}
+					Expect(err).NotTo(HaveOccurred())
+				} else {
+					Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 				}
-				Expect(err).NotTo(HaveOccurred())
 			}
 
 			for _, ns := range namespaces {

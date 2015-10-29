@@ -120,6 +120,7 @@ type TestContextType struct {
 	UpgradeTarget         string
 	PrometheusPushGateway string
 	VerifyServiceAccount  bool
+	DeleteNamespace       bool
 }
 
 var testContext TestContextType

@@ -59,6 +59,7 @@ cpu-percent
 default-container-cpu-limit
 default-container-mem-limit
 delay-shutdown
+delete-namespace
 deleting-pods-burst
 deleting-pods-qps
 deployment-label-key

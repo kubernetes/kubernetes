@@ -54,13 +54,17 @@ var _ = Describe("Services", func() {
 	})
 
 	AfterEach(func() {
-		for _, ns := range extraNamespaces {
-			By(fmt.Sprintf("Destroying namespace %v", ns))
-			if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-				Failf("Couldn't delete namespace %s: %s", ns, err)
+		if testContext.DeleteNamespace {
+			for _, ns := range extraNamespaces {
+				By(fmt.Sprintf("Destroying namespace %v", ns))
+				if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
+					Failf("Couldn't delete namespace %s: %s", ns, err)
+				}
 			}
+			extraNamespaces = nil
+		} else {
+			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 		}
-		extraNamespaces = nil
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
