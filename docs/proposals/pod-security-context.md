@@ -250,7 +250,7 @@ defined as:
 > 3.  It must be possible to round-trip your change (convert to different API versions and back) with
 >     no loss of information.
 
-Previous versions of this proposal attempted to deal with backward compatiblity by defining
+Previous versions of this proposal attempted to deal with backward compatibility by defining
 the affect of setting the pod-level fields on the container-level fields.  While trying to find
 consensus on this design, it became apparent that this approach was going to be extremely complex
 to implement, explain, and support.  Instead, we will approach backward compatibility as follows:

@@ -188,7 +188,7 @@ For each pending deployment, it will:
    and the old RCs have been ramped down to 0.
 6. Cleanup.
 
-DeploymentController is stateless so that it can recover incase it crashes during a deployment.
+DeploymentController is stateless so that it can recover in case it crashes during a deployment.
 
 ### MinReadySeconds
 

@@ -161,7 +161,7 @@ the same schema as a [pod](pods.md), except it is nested and does not have an `a
 `kind`.
 
 In addition to required fields for a Pod, a pod template in a job must specify appropriate
-lables (see [pod selector](#pod-selector) and an appropriate restart policy.
+labels (see [pod selector](#pod-selector) and an appropriate restart policy.
 
 Only a [`RestartPolicy`](pod-states.md) equal to `Never` or `OnFailure` are allowed.
 
@@ -171,7 +171,7 @@ The `.spec.selector` field is a label query over a set of pods.
 
 The `spec.selector` is an object consisting of two fields:
 * `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](replication-controller.md)
-* `matchExpressions` - allows to build more sophisticated selectors by specyfing key,
+* `matchExpressions` - allows to build more sophisticated selectors by specifying key,
   list of values and an operator that relates the key and values.
 
 When the two are specified the result is ANDed.
@@ -215,7 +215,7 @@ restarted locally, or else specify `.spec.template.containers[].restartPolicy = 
 See [pods-states](pod-states.md) for more information on `restartPolicy`.
 
 An entire Pod can also fail, for a number of reasons, such as when the pod is kicked off the node
-(node is upgraded, rebooted, delelted, etc.), or if a container of the Pod fails and the
+(node is upgraded, rebooted, deleted, etc.), or if a container of the Pod fails and the
 `.spec.template.containers[].restartPolicy = "Never"`.  When a Pod fails, then the Job controller
 starts a new Pod.  Therefore, your program needs to handle the case when it is restarted in a new
 pod.  In particular, it needs to handle temporary files, locks, incomplete output and the like

@@ -179,7 +179,7 @@ exports.queue_storage_if_needed = function() {
     ]);
     process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
   } else {
-    // Preserve it for resizing, so we don't create a new one by accedent,
+    // Preserve it for resizing, so we don't create a new one by accident,
     // when the environment variable is unset
     conf.resources['storage_account'] = process.env['AZURE_STORAGE_ACCOUNT'];
   }
