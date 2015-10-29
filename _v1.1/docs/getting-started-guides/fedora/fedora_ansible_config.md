@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Configuring Kubernetes on Fedora via Ansible"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -278,6 +278,13 @@ curl http://localhost
 {% endhighlight %}
 
 That's it !
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

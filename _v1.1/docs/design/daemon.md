@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "DaemonSet in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -75,7 +75,7 @@ The DaemonSet supports standard API features:
     - get (e.g. kubectl get daemonsets)
     - describe
   - Modifiers
-    - delete (if --cascade=true, then first the client turns down all the pods controlled by the DaemonSet (by setting the nodeSelector to a uuid pair that is unlikely to be set on any node); then it deletes the DaemonSet; then it deletes the pods)
+    - delete (if --cascade=true, then first the client turns down all the pods controlled by the DaemonSet (by setting the nodeName to a non-existant name); then it deletes the DaemonSet; then it deletes the pods)
     - label
 	- annotate
     - update operations like patch and replace (only allowed to selector and to nodeSelector and nodeName of pod template)
@@ -130,6 +130,13 @@ A third alternative is to generalize the Replication Controller. We would do som
 ## Open Issues
 
 - Should work similarly to [Deployment](http://issues.k8s.io/1743).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

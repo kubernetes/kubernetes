@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "explorer/README"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -18,13 +18,13 @@ Currently, you can look at:
  * The filesystem to make sure the mounted volumes and files are also what you expect.
  * Perform DNS lookups, to see how DNS works.
 
-`pod.yaml` is supplied as an example. You can control the port it serves on with the -port flag.
+`pod.json` is supplied as an example. You can control the port it serves on with the -port flag.
 
 Example from command line (the DNS lookup looks better from a web browser):
 
 {% highlight console %}
 {% raw %}
-$ kubectl create -f examples/explorer/pod.yaml
+$ kubectl create -f examples/explorer/pod.json
 $ kubectl proxy &
 Starting to serve on localhost:8001
 
@@ -137,6 +137,13 @@ Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 </body></html>
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

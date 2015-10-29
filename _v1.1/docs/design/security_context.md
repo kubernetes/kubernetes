@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Security Contexts"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -173,6 +173,13 @@ time of writing, the admission control plugin for security contexts will only al
 has defined capabilities or privileged.  Contexts that attempt to define a UID or SELinux options
 will be denied by default.  In the future the admission plugin will base this decision upon
 configurable policies that reside within the [service account](http://pr.k8s.io/2297).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

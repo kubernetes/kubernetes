@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Running your first containers in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -41,11 +41,11 @@ kubectl get rc
 {% endraw %}
 {% endhighlight %}
 
-To delete the two replicated containers, delete the replication controller:
+To stop the two replicated containers, stop the replication controller:
 
 {% highlight bash %}
 {% raw %}
-kubectl delete rc my-nginx
+kubectl stop rc my-nginx
 {% endraw %}
 {% endhighlight %}
 
@@ -74,6 +74,13 @@ In order to access your nginx landing page, you also have to make sure that traf
 
 Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](../docs/user-guide/simple-yaml.html)
 is given in a different document.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications: Connecting applications"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -112,7 +112,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-This specification will create a Service which targets TCP port 80 on any Pod with the `app=nginx` label, and expose it on an abstracted Service port (`targetPort`: is the port the container accepts traffic on, `port`: is the abstracted Service port, which can be any port other pods use to access the Service). View [service API object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html#_v1_service) to see the list of supported fields in service definition.
+This specification will create a Service which targets TCP port 80 on any Pod with the `app=nginx` label, and expose it on an abstracted Service port (`targetPort`: is the port the container accepts traffic on, `port`: is the abstracted Service port, which can be any port other pods use to access the Service). View [service API object](http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html#_v1_service) to see the list of supported fields in service definition.
 Check your Service:
 
 {% highlight console %}
@@ -439,6 +439,13 @@ cluster/private cloud network.
 ## What's next?
 
 [Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

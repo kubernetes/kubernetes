@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "GitHub Issues for the Kubernetes Project"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -25,6 +25,13 @@ Definitions
 * design - priority/design is for issues that are used to track design discussions
 * support - priority/support is used for issues tracking user support requests
 * untriaged - anything without a priority/X label will be considered untriaged
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

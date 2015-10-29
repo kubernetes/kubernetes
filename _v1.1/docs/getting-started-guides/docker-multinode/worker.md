@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Adding a Kubernetes worker node via Docker."
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -73,7 +73,7 @@ Now run flanneld itself, this call is slightly different from the above, since w
 
 {% highlight sh %}
 {% raw %}
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001
 {% endraw %}
 {% endhighlight %}
 
@@ -169,6 +169,13 @@ sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1
 ### Next steps
 
 Move on to [testing your cluster](testing.html) or [add another node](#adding-a-kubernetes-worker-node-via-docker)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

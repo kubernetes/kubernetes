@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Event Compression"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -36,7 +36,7 @@ Instead of a single Timestamp, each event object [contains](http://releases.k8s.
 
 Each binary that generates events:
  * Maintains a historical record of previously generated events:
-   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/record/events_cache.go`](https://releases.k8s.io/v1.1.0/pkg/client/record/events_cache.go).
+   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/record/events_cache.go`](https://releases.k8s.io/HEAD/pkg/client/record/events_cache.go).
    * The key in the cache is generated from the event object minus timestamps/count/transient fields, specifically the following events fields are used to construct a unique key for an event:
      * `event.Source.Component`
      * `event.Source.Host`
@@ -92,6 +92,13 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
  * PR [#4206](http://issue.k8s.io/4206): Modify Event struct to allow compressing multiple recurring events in to a single event
  * PR [#4306](http://issue.k8s.io/4306): Compress recurring events in to a single event to optimize etcd storage
  * PR [#4444](http://pr.k8s.io/4444): Switch events history to use LRU cache instead of map
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

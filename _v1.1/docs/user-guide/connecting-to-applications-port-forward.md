@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Connecting to applications: kubectl port-forward"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -64,6 +64,13 @@ PONG
 {% endhighlight %}
 
 Now one can debug the database from the local workstation.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

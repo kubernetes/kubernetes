@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications: Quick start"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -57,8 +57,7 @@ Through integration with some cloud providers (for example Google Compute Engine
 {% highlight console %}
 {% raw %}
 $ kubectl expose rc my-nginx --port=80 --type=LoadBalancer
-NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
-my-nginx     10.179.240.1     <none>            80/TCP                 run=nginx    8d
+service "my-nginx" exposed
 {% endraw %}
 {% endhighlight %}
 
@@ -92,6 +91,13 @@ services/my-nginx
 ## What's next?
 
 [Learn about how to configure common container parameters, such as commands and environment variables.](configuring-containers.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

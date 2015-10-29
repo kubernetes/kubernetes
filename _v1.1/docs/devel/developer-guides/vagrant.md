@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started with Vagrant"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -415,6 +415,13 @@ export KUBERNETES_MINION_MEMORY=2048
 #### I ran vagrant suspend and nothing works!
 
 `vagrant suspend` seems to mess up the network.  It's not supported at this time.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications: Prerequisites"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -70,6 +70,13 @@ If you see a url response, you are ready to go.
 ## What's next?
 
 [Learn how to launch and expose your application.](quick-start.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

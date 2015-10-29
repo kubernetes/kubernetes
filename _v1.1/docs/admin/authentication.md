@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Authentication Plugins"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -22,14 +22,7 @@ to apiserver.  Currently, tokens last indefinitely, and the token list cannot
 be changed without restarting apiserver.
 
 The token file format is implemented in `plugin/pkg/auth/authenticator/token/tokenfile/...`
-and is a csv file with a minimum of 3 columns: token, user name, user uid, followed by
-optional group names. Note, if you have more than one group the column must be double quoted e.g.
-
-```
-{% raw %}
-token,user,uid,"group1,group2,group3"
-{% endraw %}
-```
+and is a csv file with 3 columns: token, user name, user uid.
 
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.
@@ -139,6 +132,13 @@ into apiserver start parameters.
 1.  View the certificate.
     `openssl x509  -noout -text -in ./server.crt`
     Finally, do not forget fill the same parameters and add parameters into apiserver start parameters.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/authentication.md?pixel)]()

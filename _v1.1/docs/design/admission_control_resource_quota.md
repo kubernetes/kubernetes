@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Admission control plugin: ResourceQuota"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -205,6 +205,13 @@ services                 0         5
 ## More information
 
 See [resource quota document](../admin/resource-quota.html) and the [example of Resource Quota](../admin/resourcequota/) for more information.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()

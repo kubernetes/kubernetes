@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "The Kubernetes Scheduler"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -53,6 +53,13 @@ and either register the policy in `defaultPredicates()` or `defaultPriorities()`
 
 If you want to get a global picture of how the scheduler works, you can start in
 [plugin/cmd/kube-scheduler/app/server.go](http://releases.k8s.io/v1.1.0/plugin/cmd/kube-scheduler/app/server.go)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

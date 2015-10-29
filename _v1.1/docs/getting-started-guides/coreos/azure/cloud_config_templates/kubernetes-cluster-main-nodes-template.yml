@@ -25,6 +25,13 @@ coreos:
             ExecStart=/bin/sh -x -c \
               'until curl --silent --fail https://status.github.com/api/status.json | grep -q \"good\"; do sleep 2; done'
 
+    - name: docker.service
+      drop-ins:
+        - name: 50-weave-kubernetes.conf
+          content: |
+            [Service]
+            Environment=DOCKER_OPTS='--bridge="weave" -r="false"'
+
     - name: weave-network.target
       enable: true
       content: |
@@ -85,46 +92,46 @@ coreos:
       content: |
         [Unit]
         After=network-online.target
-        After=docker.service
         Before=weave.service
+        Before=weave-helper.service
+        Before=docker.service
         Description=Install Weave
         Documentation=http://docs.weave.works/
         Requires=network-online.target
         [Service]
-        EnvironmentFile=-/etc/weave.%H.env
-        EnvironmentFile=-/etc/weave.env
         Type=oneshot
         RemainAfterExit=yes
-        TimeoutStartSec=0
         ExecStartPre=/bin/mkdir -p /opt/bin/
         ExecStartPre=/opt/bin/curl-retry.sh \
           --silent \
           --location \
-          git.io/weave \
+          https://github.com/weaveworks/weave/releases/download/latest_release/weave \
           --output /opt/bin/weave
+        ExecStartPre=/opt/bin/curl-retry.sh \
+          --silent \
+          --location \
+          https://raw.github.com/errordeveloper/weave-demos/master/poseidon/weave-helper \
+          --output /opt/bin/weave-helper
         ExecStartPre=/usr/bin/chmod +x /opt/bin/weave
-        ExecStart=/opt/bin/weave setup
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/weave-helper
+        ExecStart=/bin/echo Weave Installed
         [Install]
         WantedBy=weave-network.target
         WantedBy=weave.service
 
-    - name: weaveproxy.service
+    - name: weave-helper.service
       enable: true
       content: |
         [Unit]
         After=install-weave.service
         After=docker.service
-        Description=Weave proxy for Docker API
+        Description=Weave Network Router
         Documentation=http://docs.weave.works/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
-        EnvironmentFile=-/etc/weave.%H.env
-        EnvironmentFile=-/etc/weave.env
-        ExecStartPre=/opt/bin/weave launch-proxy --rewrite-inspect --without-dns
-        ExecStart=/usr/bin/docker attach weaveproxy
-        Restart=on-failure
-        ExecStop=/opt/bin/weave stop-proxy
+        ExecStart=/opt/bin/weave-helper
+        Restart=always
         [Install]
         WantedBy=weave-network.target
 
@@ -140,35 +147,35 @@ coreos:
         Requires=install-weave.service
         [Service]
         TimeoutStartSec=0
-        EnvironmentFile=-/etc/weave.%H.env
-        EnvironmentFile=-/etc/weave.env
-        ExecStartPre=/opt/bin/weave launch-router $WEAVE_PEERS
+        EnvironmentFile=/etc/weave.%H.env
+        ExecStartPre=/opt/bin/weave setup
+        ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
         ExecStart=/usr/bin/docker attach weave
         Restart=on-failure
-        ExecStop=/opt/bin/weave stop-router
+        Restart=always
+        ExecStop=/opt/bin/weave stop
         [Install]
         WantedBy=weave-network.target
 
-    - name: weave-expose.service
+    - name: weave-create-bridge.service
       enable: true
       content: |
         [Unit]
+        After=network.target
         After=install-weave.service
-        After=weave.service
-        After=docker.service
-        Documentation=http://docs.weave.works/
-        Requires=docker.service
+        Before=weave.service
+        Before=docker.service
+        Requires=network.target
         Requires=install-weave.service
-        Requires=weave.service
         [Service]
         Type=oneshot
-        RemainAfterExit=yes
-        TimeoutStartSec=0
-        EnvironmentFile=-/etc/weave.%H.env
-        EnvironmentFile=-/etc/weave.env
-        ExecStart=/opt/bin/weave expose
-        ExecStop=/opt/bin/weave hide
+        EnvironmentFile=/etc/weave.%H.env
+        ExecStart=/opt/bin/weave --local create-bridge
+        ExecStart=/usr/bin/ip addr add dev weave $BRIDGE_ADDRESS_CIDR
+        ExecStart=/usr/bin/ip route add $BREAKOUT_ROUTE dev weave scope link
+        ExecStart=/usr/bin/ip route add 224.0.0.0/4 dev weave
         [Install]
+        WantedBy=multi-user.target
         WantedBy=weave-network.target
 
     - name: install-kubernetes.service
@@ -184,7 +191,7 @@ coreos:
         Documentation=http://kubernetes.io/
         Requires=network-online.target
         [Service]
-        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v1.0.6/kubernetes.tar.gz
+        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v1.0.1/kubernetes.tar.gz
         ExecStartPre=/bin/mkdir -p /opt/
         ExecStart=/opt/bin/curl-retry.sh --silent --location $KUBE_RELEASE_TARBALL --output /tmp/kubernetes.tgz
         ExecStart=/bin/tar xzvf /tmp/kubernetes.tgz -C /tmp/
@@ -215,13 +222,11 @@ coreos:
         ConditionHost=kube-00
         [Service]
         ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
-            --insecure-bind-address=0.0.0.0 \
-            --advertise-address=$public_ipv4 \
+            --address=0.0.0.0 \
             --port=8080 \
             $ETCD_SERVERS \
-            --service-cluster-ip-range=10.16.0.0/12 \
-            --cloud-provider=vagrant \
-            --logtostderr=true
+            --service-cluster-ip-range=10.1.0.0/16 \
+            --logtostderr=true --v=3
         Restart=always
         RestartSec=10
         [Install]
@@ -281,13 +286,12 @@ coreos:
         [Service]
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests/
         ExecStart=/opt/kubernetes/server/bin/kubelet \
-            --docker-endpoint=unix:/var/run/weave.sock \
             --address=0.0.0.0 \
             --port=10250 \
             --hostname-override=%H \
             --api-servers=http://kube-00:8080 \
             --logtostderr=true \
-            --cluster-dns=10.16.0.3 \
+            --cluster-dns=10.1.0.3 \
             --cluster-domain=kube.local \
             --config=/etc/kubernetes/manifests/
         Restart=always
@@ -329,7 +333,7 @@ coreos:
         [Service]
         Type=oneshot
         RemainAfterExit=no
-        ExecStart=/bin/bash -c 'until /opt/kubernetes/server/bin/kubectl create -f /etc/kubernetes/addons/; do sleep 2; done'
+        ExecStart=/opt/kubernetes/server/bin/kubectl create -f /etc/kubernetes/addons/
         SuccessExitStatus=1
         [Install]
         WantedBy=kubernetes-master.target

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Using Salt to configure Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -63,7 +63,7 @@ An example file is presented below using the Vagrant based environment.
 [root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
   etcd_servers: $MASTER_IP
-  cloud: vagrant
+  cloud_provider: vagrant
   roles:
     - kubernetes-master
 {% endraw %}
@@ -114,6 +114,13 @@ We should define a grains.conf key that captures more specifically what network 
 ## Further reading
 
 The [cluster/saltbase](http://releases.k8s.io/v1.1.0/cluster/saltbase/) tree has more details on the current SaltStack configuration.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

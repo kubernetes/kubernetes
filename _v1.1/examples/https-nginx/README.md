@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Nginx https service"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -14,7 +14,7 @@ It uses an [nginx server block](http://wiki.nginx.org/ServerBlockExample) to ser
 
 ### Generate certificates
 
-First generate a self signed rsa key and certificate that the server can use for TLS. This step invokes the make_secret.go script in the same directory, which uses the kubernetes api to generate a secret json config in /tmp/secret.json.
+First generate a self signed rsa key and certificate that the server can use for TLS.
 
 {% highlight sh %}
 {% raw %}
@@ -72,6 +72,13 @@ $ curl https://nodeip:30744 -k
 ```
 
 For more information on how to run this in a kubernetes cluster, please see the [user-guide](../../docs/user-guide/connecting-applications.html).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

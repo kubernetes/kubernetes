@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting into containers: kubectl exec"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -92,6 +92,13 @@ root@storage:/data#
 {% endhighlight %}
 
 This gets you a terminal.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

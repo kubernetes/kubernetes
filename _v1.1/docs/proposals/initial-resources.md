@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Abstract"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -22,7 +22,7 @@ which will set initial Resources to a reasonable value.
 
 ## Design
 
-InitialResources component will be implemented as an [admission plugin](https://releases.k8s.io/v1.1.0/plugin/pkg/admission) and invoked right before
+InitialResources component will be implemented as an [admission plugin](https://releases.k8s.io/HEAD/plugin/pkg/admission) and invoked right before
 [LimitRanger](https://github.com/kubernetes/kubernetes/blob/7c9bbef96ed7f2a192a1318aa312919b861aee00/cluster/gce/config-default.sh#L91).
 For every container without Resources specified it will try to predict amount of resources that should be sufficient for it.
 So that a pod without specified resources will be treated as
@@ -81,6 +81,13 @@ and should be introduced shortly after the first version is done:
 * dry mode, which allows to ask system for resource recommendation for a container without running it
 * add estimation as annotations for those containers that already has resources set
 * support for other data sources like [Hawkular](http://www.hawkular.org/)
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/initial-resources.md?pixel)]()

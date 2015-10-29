@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Persistent Storage"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -225,6 +225,13 @@ $ kubectl delete pvc myclaim-1
 The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.
 
 Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

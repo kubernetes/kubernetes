@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Rolling update example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -148,6 +148,13 @@ Note that the images included here are public domain.
 
 * [kitten](http://commons.wikimedia.org/wiki/File:Kitten-stare.jpg)
 * [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

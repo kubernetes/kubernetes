@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Running Kubernetes locally via Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -81,14 +81,14 @@ docker run \
     --volume=/:/rootfs:ro \
     --volume=/sys:/sys:ro \
     --volume=/dev:/dev \
-    --volume=/var/lib/docker/:/var/lib/docker:rw \
+    --volume=/var/lib/docker/:/var/lib/docker:ro \
     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
     --volume=/var/run:/var/run:rw \
     --net=host \
     --pid=host \ 
     --privileged=true \
     -d \
-    gcr.io/google_containers/hyperkube:v1.0.6 \
+    gcr.io/google_containers/hyperkube:v1.0.1 \
     /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
 {% endraw %}
 {% endhighlight %}
@@ -99,7 +99,7 @@ This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.ht
 
 {% highlight sh %}
 {% raw %}
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.6 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 {% endraw %}
 {% endhighlight %}
 
@@ -110,38 +110,14 @@ binary
 ([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
 ([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
 
-<hr>
-
-**Note for OS/X users:**
-You will need to set up port forwarding via ssh. For users still using boot2docker directly, it is enough to run the command:
+*Note:*
+On OS/X you will need to set up port forwarding via ssh:
 
 {% highlight sh %}
 {% raw %}
 boot2docker ssh -L8080:localhost:8080
 {% endraw %}
 {% endhighlight %}
-
-Since the recent deprecation of boot2docker/osx-installer, the correct way to solve the problem is to issue
-
-{% highlight sh %}
-{% raw %}
-docker-machine ssh default -L 8080:localhost:8080
-{% endraw %}
-{% endhighlight %}
-
-However, this solution works only from docker-machine version 0.5. For older versions of docker-machine, a workaround is the
-following:
-
-{% highlight sh %}
-{% raw %}
-docker-machine env default
-ssh -f -T -N -L8080:localhost:8080 -l docker $(echo $DOCKER_HOST | cut -d ':' -f 2 | tr -d '/')
-{% endraw %}
-{% endhighlight %}
-
-Type `tcuser` as the password.
-
-<hr>
 
 List the nodes in your cluster by running:
 
@@ -155,8 +131,8 @@ This should print:
 
 {% highlight console %}
 {% raw %}
-NAME        LABELS                             STATUS
-127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
+NAME        LABELS    STATUS
+127.0.0.1   <none>    Ready
 {% endraw %}
 {% endhighlight %}
 
@@ -180,16 +156,7 @@ kubectl expose rc nginx --port=80
 {% endraw %}
 {% endhighlight %}
 
-This should print:
-
-{% highlight console %}
-{% raw %}
-NAME      LABELS      SELECTOR    IP(S)     PORT(S)
-nginx     run=nginx   run=nginx             80/TCP
-{% endraw %}
-{% endhighlight %}
-
-If `IP(S)` is blank run the following command to obtain it. Know issue [#10836](https://github.com/kubernetes/kubernetes/issues/10836)
+Run the following command to obtain the IP of this service we just created. There are two IPs, the first one is internal (CLUSTER_IP), and the second one is the external load-balanced IP.
 
 {% highlight sh %}
 {% raw %}
@@ -197,11 +164,19 @@ kubectl get svc nginx
 {% endraw %}
 {% endhighlight %}
 
-Hit the webserver:
+Alternatively, you can obtain only the first IP (CLUSTER_IP) by running:
 
 {% highlight sh %}
 {% raw %}
-curl <insert-ip-from-above-here>
+kubectl get svc nginx --template={{.spec.clusterIP}}
+{% endraw %}
+{% endhighlight %}
+
+Hit the webserver with the first IP (CLUSTER_IP):
+
+{% highlight sh %}
+{% raw %}
+curl <insert-cluster-ip-here>
 {% endraw %}
 {% endhighlight %}
 
@@ -213,6 +188,13 @@ Many of these containers run under the management of the `kubelet` binary, which
 the cluster, you need to first kill the kubelet container, and then any other containers.
 
 You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()

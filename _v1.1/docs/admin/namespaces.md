@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Namespaces"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -165,6 +165,13 @@ across namespaces, you need to use the fully qualified domain name (FQDN).
 
 Details of the design of namespaces in Kubernetes, including a [detailed example](../design/namespaces.html#example-openshift-origin-managing-a-kubernetes-namespace)
 can be found in the [namespaces design doc](../design/namespaces.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

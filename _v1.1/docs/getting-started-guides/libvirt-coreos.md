@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started with libvirt CoreOS"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -351,6 +351,13 @@ usermod -a -G libvirtd $USER
 #### error: Out of memory initializing network (virsh net-create...)
 
 Ensure libvirtd has been restarted since ebtables was installed.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started locally"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -145,7 +145,14 @@ One or more of the KUbernetes daemons might've crashed. Tail the logs of each in
 
 #### The pods fail to connect to the services by host names
 
-The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](http://issue.k8s.io/6667). You can start a manually. Related documents can be found [here](https://releases.k8s.io/v1.1.0/cluster/addons/dns#how-do-i-configure-it)
+The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](http://issue.k8s.io/6667). You can start a manually. Related documents can be found [here](https://releases.k8s.io/HEAD/cluster/addons/dns#how-do-i-configure-it)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "How to Use it?"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -11,7 +11,7 @@ title: "</strong>"
 
 Install Ceph on the Kubernetes host. For example, on Fedora 21
 
-    # yum -y install ceph-common
+    # yum -y install ceph
 
 If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/rootfs/docker-ceph)
 
@@ -30,16 +30,7 @@ Once you have installed Ceph and new Kubernetes, you can create a pod based on m
 
 # Use Ceph Authentication Secret
 
-If Ceph authentication secret is provided, the secret should be first be *base64 encoded*, then encoded string is placed in a secret yaml. For example, getting Ceph user `kube`'s base64 encoded secret can use the following command:
-
-{% highlight console %}
-{% raw %}
-  # grep key /etc/ceph/ceph.client.kube.keyring |awk '{printf "%s", $NF}'|base64
-QVFBTWdYaFZ3QkNlRGhBQTlubFBhRnlmVVNhdEdENGRyRldEdlE9PQ==
-{% endraw %}
-{% endhighlight %}
-
-An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
+If Ceph authentication secret is provided, the secret should be first be base64 encoded, then encoded string is placed in a secret yaml. An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
 
 {% highlight console %}
 {% raw %}
@@ -69,6 +60,13 @@ On the Kubernetes host, I got these in mount output
 {% endhighlight %}
 
  If you ssh to that machine, you can run `docker ps` to see the actual pod and `docker inspect` to see the volumes used by the container.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "NFS-exporter container with a file"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -14,6 +14,13 @@ This container exports /mnt/data with index.html in it via NFSv4. Based on
 
 Available in dockerhub as
 [jsafrane/nfs-data](https://registry.hub.docker.com/u/jsafrane/nfs-data/).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

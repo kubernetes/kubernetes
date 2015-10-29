@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Cluster Admin Guide: Cluster Components"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -121,6 +121,13 @@ network rules on the host and performing connection forwarding.
 
 `monit` is a lightweight process babysitting system for keeping kubelet and docker
 running.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

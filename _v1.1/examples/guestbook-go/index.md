@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Guestbook Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -307,6 +307,13 @@ redis-slave
 
 Tip: To turn down your Kubernetes cluster, follow the corresponding instructions in the version of the
 [Getting Started Guides](../../docs/getting-started-guides/) that you previously used to create your cluster.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

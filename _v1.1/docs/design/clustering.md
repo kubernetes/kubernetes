@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Clustering in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -68,6 +68,13 @@ This diagram dynamic clustering using the bootstrap API endpoint.  That API endp
 This flow has the admin manually approving the kubelet signing requests.  This is the `queue` policy defined above.This manual intervention could be replaced by code that can verify the signing requests via other means.
 
 ![Dynamic Sequence Diagram](clustering/dynamic.png)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

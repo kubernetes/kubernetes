@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "etcd"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -54,6 +54,13 @@ you can talk to your cluster's etcd), try:
 curl -fs -X PUT "http://${host}:${port}/v2/keys/_test"
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Building the meteor-kubernetes base image"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -15,6 +15,13 @@ To build and push the base meteor-kubernetes image:
 
     docker build -t chees/meteor-kubernetes .
     docker push chees/meteor-kubernetes
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

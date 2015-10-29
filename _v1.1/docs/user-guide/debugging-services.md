@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "My Service is not working - how to debug"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -210,8 +210,7 @@ walk-through - you can use your own `Service`'s details here.
 {% highlight console %}
 {% raw %}
 $ kubectl expose rc hostnames --port=80 --target-port=9376
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
-hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
+service "hostnames" exposed
 {% endraw %}
 {% endhighlight %}
 
@@ -591,6 +590,13 @@ Contact us on
 ## More information
 
 Visit [troubleshooting document](../troubleshooting.html) for more information.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

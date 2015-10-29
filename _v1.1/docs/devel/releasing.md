@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Releasing Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -320,6 +320,13 @@ After this summary, preamble, all the relevant PRs/issues that got in that
 version should be listed and linked together with a small summary understandable
 by plain mortals (in a perfect world PR/issue's title would be enough but often
 it is just too cryptic/geeky/domain-specific that it isn't).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

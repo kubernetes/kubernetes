@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Running Multi-Node Kubernetes Using Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -104,6 +104,13 @@ See [here](docker-multinode/deployDNS.html) for instructions.
 Once your cluster has been created you can [test it out](docker-multinode/testing.html)
 
 For more complete applications, please look in the [examples directory](../../examples/)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

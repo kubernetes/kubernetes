@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Namespaces"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -78,7 +78,7 @@ Use the file [`namespace-dev.json`](namespace-dev.json) which describes a develo
 {% endraw %}
 {% endhighlight %}
 
-[Download example](namespace-dev.json?raw=true)
+[Download example](namespace-dev.json)
 <!-- END MUNGE: EXAMPLE namespace-dev.json -->
 
 Create the development namespace using kubectl.
@@ -287,6 +287,13 @@ At this point, it should be clear that the resources users create in one namespa
 
 As the policy support in Kubernetes evolves, we will extend this scenario to show how you can provide different
 authorization rules for each namespace.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

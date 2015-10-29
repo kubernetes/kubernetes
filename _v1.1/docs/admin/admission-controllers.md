@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Admission Controllers"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -25,7 +25,6 @@ title: "</strong>"
     - [SecurityContextDeny](#securitycontextdeny)
     - [ResourceQuota](#resourcequota)
     - [LimitRanger](#limitranger)
-    - [InitialResources (experimental)](#initialresources-experimental)
     - [NamespaceExists (deprecated)](#namespaceexists-deprecated)
     - [NamespaceAutoProvision (deprecated)](#namespaceautoprovision-deprecated)
     - [NamespaceLifecycle](#namespacelifecycle)
@@ -119,15 +118,6 @@ applies a 0.1 CPU requirement to all Pods in the `default` namespace.
 
 See the [limitRange design doc](../design/admission_control_limit_range.html) and the [example of Limit Range](limitrange/) for more details.
 
-### InitialResources (experimental)
-
-This plug-in observes pod creation requests. If a container omits compute resource requests and limits,
-then the plug-in auto-populates a compute resource request based on historical usage of containers running the same image.
-If there is not enough data to make a decision the Request is left unchanged.
-When the plug-in sets a compute resource request, it annotates the pod with information on what compute resources it auto-populated.
-
-See the [InitialResouces proposal](../proposals/initial-resources.html) for more details.
-
 ### NamespaceExists (deprecated)
 
 This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes `Namespace`
@@ -162,6 +152,13 @@ For Kubernetes 1.0, we strongly recommend running the following set of admission
 --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 {% endraw %}
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

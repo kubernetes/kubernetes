@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started with Juju"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -220,8 +220,8 @@ The Kubernetes charms and bundles can be found in the `kubernetes` project on
 github.com:
 
  - [Bundle Repository](http://releases.k8s.io/v1.1.0/cluster/juju/bundles)
-   * [Kubernetes master charm](https://releases.k8s.io/v1.1.0/cluster/juju/charms/trusty/kubernetes-master)
-   * [Kubernetes node charm](https://releases.k8s.io/v1.1.0/cluster/juju/charms/trusty/kubernetes)
+   * [Kubernetes master charm](https://releases.k8s.io/HEAD/cluster/juju/charms/trusty/kubernetes-master)
+   * [Kubernetes node charm](https://releases.k8s.io/HEAD/cluster/juju/charms/trusty/kubernetes)
  - [More about Juju](https://jujucharms.com)
 
 
@@ -244,6 +244,13 @@ configured for [manual provisioning](https://jujucharms.com/docs/stable/config-m
 
 The Kubernetes bundle has been tested on GCE and AWS and found to work with
 version 1.0.0.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

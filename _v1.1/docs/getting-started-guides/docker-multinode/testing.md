@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Testing your Kubernetes cluster."
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -47,20 +47,27 @@ kubectl expose rc nginx --port=80
 {% endraw %}
 {% endhighlight %}
 
-This should print:
-
-{% highlight console %}
-{% raw %}
-NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
-nginx        10.179.240.1     <none>            80/TCP                 run=nginx    8d
-{% endraw %}
-{% endhighlight %}
-
-Hit the webserver:
+Run the following command to obtain the IP of this service we just created. There are two IPs, the first one is internal (CLUSTER_IP), and the second one is the external load-balanced IP.
 
 {% highlight sh %}
 {% raw %}
-curl <insert-ip-from-above-here>
+kubectl get svc nginx
+{% endraw %}
+{% endhighlight %}
+
+Alternatively, you can obtain only the first IP (CLUSTER_IP) by running:
+
+{% highlight sh %}
+{% raw %}
+kubectl get svc nginx --template={{.spec.clusterIP}}
+{% endraw %}
+{% endhighlight %}
+
+Hit the webserver with the first IP (CLUSTER_IP):
+
+{% highlight sh %}
+{% raw %}
+curl <insert-cluster-ip-here>
 {% endraw %}
 {% endhighlight %}
 
@@ -85,6 +92,13 @@ kubectl get pods
 {% endhighlight %}
 
 You should see pods landing on the newly added machine.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Tips and tricks when working with config"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -28,6 +28,13 @@ This document is meant to highlight and consolidate in one place configuration b
 1. If there is a viable alternative to naked pods (i.e. pods not bound to a controller), go with the alternative. Controllers are almost always preferable to creating pods (except for some `restartPolicy: Never` scenarios). A minimal Job is coming. See [#1624](http://issue.k8s.io/1624). Naked pods will not be rescheduled in the event of node failure.
 1. Put a version number or hash as a suffix to the name and in a label on a replication controller to facilitate rolling update, as we do for [--image](kubectl/kubectl_rolling-update.html). This is necessary because rolling-update actually creates a new controller as opposed to modifying the existing controller. This does not play well with version agnostic controller names.
 1. Put an object description in an annotation to allow better introspection.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting Kubernetes Builds"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -11,33 +11,19 @@ title: "</strong>"
 
 You can use [hack/get-build.sh](http://releases.k8s.io/v1.1.0/hack/get-build.sh) to or use as a reference on how to get the most recent builds with curl. With `get-build.sh` you can grab the most recent stable build, the most recent release candidate, or the most recent build to pass our ci and gce e2e tests (essentially a nightly build).
 
-Run `./hack/get-build.sh -h` for its usage.
-
-For example, to get a build at a specific version (v1.0.2):
-
 {% highlight console %}
 {% raw %}
-./hack/get-build.sh v1.0.2
+usage:
+  ./hack/get-build.sh [stable|release|latest|latest-green]
+
+        stable:        latest stable version
+        release:       latest release candidate
+        latest:        latest ci build
+        latest-green:  latest ci build to pass gce e2e
 {% endraw %}
 {% endhighlight %}
 
-Alternatively, to get the latest stable release:
-
-{% highlight console %}
-{% raw %}
-./hack/get-build.sh release/stable
-{% endraw %}
-{% endhighlight %}
-
-Finally, you can just print the latest or stable version:
-
-{% highlight console %}
-{% raw %}
-./hack/get-build.sh -v ci/latest
-{% endraw %}
-{% endhighlight %}
-
-You can also use the gsutil tool to explore the Google Cloud Storage release buckets. Here are some examples:
+You can also use the gsutil tool to explore the Google Cloud Storage release bucket. Here are some examples:
 
 {% highlight sh %}
 {% raw %}
@@ -47,6 +33,13 @@ gsutil ls gs://kubernetes-release/ci/v0.20.0-29-g29a55cc/ # list the contents of
 gsutil ls gs://kubernetes-release/release                 # list all official releases and rcs
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

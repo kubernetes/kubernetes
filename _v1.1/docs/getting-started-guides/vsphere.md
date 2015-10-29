@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started with vSphere"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -106,6 +106,13 @@ The output of `kube-up.sh` displays the IP addresses of the VMs it deploys. You
 can log into any VM as the `kube` user to poke around and figure out what is
 going on (find yourself authorized with your SSH key, or use the password
 `kube` otherwise).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

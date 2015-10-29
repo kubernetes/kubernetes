@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Adding custom resources to the Kubernetes API server"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -49,11 +49,11 @@ Kubernetes API server to provide the following features:
 The `Kind` for an instance of a third-party object (e.g. CronTab) below is expected to be
 programmatically convertible to the name of the resource using
 the following conversion.  Kinds are expected to be of the form `<CamelCaseKind>`, the
-`APIVersion` for the object is expected to be `<api-group>/<api-version>`. To
-prevent collisions, it's expected that you'll use a fulling qualified domain
-name for the API group, e.g. `example.com`.
+`APIVersion` for the object is expected to be `<domain-name>/<api-group>/<api-version>`.
 
-For example `stable.example.com/v1`
+For example `example.com/stable/v1`
+
+`domain-name` is expected to be a fully qualified domain name.
 
 'CamelCaseKind' is the specific type name.
 
@@ -92,18 +92,19 @@ For example, if a user creates:
 {% highlight yaml %}
 {% raw %}
 metadata:
-  name: cron-tab.stable.example.com
+  name: cron-tab.example.com
 apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
 description: "A specification of a Pod to run on a cron style schedule"
 versions:
-- name: v1
-- name: v2
+  - name: stable/v1
+  - name: experimental/v2
 {% endraw %}
 {% endhighlight %}
 
-Then the API server will program in the new RESTful resource path:
-   * `/apis/stable.example.com/v1/namespaces/<namespace>/crontabs/...`
+Then the API server will program in two new RESTful resource paths:
+   * `/thirdparty/example.com/stable/v1/namespaces/<namespace>/crontabs/...`
+   * `/thirdparty/example.com/experimental/v2/namespaces/<namespace>/crontabs/...`
 
 
 Now that this schema has been created, a user can `POST`:
@@ -114,7 +115,7 @@ Now that this schema has been created, a user can `POST`:
    "metadata": {
      "name": "my-new-cron-object"
    },
-   "apiVersion": "stable.example.com/v1",
+   "apiVersion": "example.com/stable/v1",
    "kind": "CronTab",
    "cronSpec": "* * * * /5",
    "image":     "my-awesome-chron-image"
@@ -122,13 +123,13 @@ Now that this schema has been created, a user can `POST`:
 {% endraw %}
 {% endhighlight %}
 
-to: `/apis/stable.example.com/v1/namespaces/default/crontabs`
+to: `/third-party/example.com/stable/v1/namespaces/default/crontabs/my-new-cron-object`
 
 and the corresponding data will be stored into etcd by the APIServer, so that when the user issues:
 
 ```
 {% raw %}
-GET /apis/stable.example.com/v1/namespaces/default/crontabs/my-new-cron-object`
+GET /third-party/example.com/stable/v1/namespaces/default/crontabs/my-new-cron-object`
 {% endraw %}
 ```
 
@@ -139,7 +140,7 @@ Likewise, to list all resources, a user can issue:
 
 ```
 {% raw %}
-GET /apis/stable.example.com/v1/namespaces/default/crontabs
+GET /third-party/example.com/stable/v1/namespaces/default/crontabs
 {% endraw %}
 ```
 
@@ -148,14 +149,14 @@ and get back:
 {% highlight json %}
 {% raw %}
 {
-   "apiVersion": "stable.example.com/v1",
+   "apiVersion": "example.com/stable/v1",
    "kind": "CronTabList",
    "items": [
      {
        "metadata": {
          "name": "my-new-cron-object"
        },
-       "apiVersion": "stable.example.com/v1",
+       "apiVersion": "example.com/stable/v1",
        "kind": "CronTab",
        "cronSpec": "* * * * /5",
        "image":     "my-awesome-chron-image"
@@ -206,6 +207,13 @@ Thus, listing a third-party resource can be achieved by listing the directory:
 ${standard-k8s-prefix}/third-party-resources/${third-party-resource-namespace}/${third-party-resource-name}/${resource-namespace}/
 {% endraw %}
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

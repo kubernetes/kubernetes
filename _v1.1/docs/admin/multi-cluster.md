@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Considerations for running multiple Kubernetes clusters"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -56,9 +56,8 @@ Second, decide how many clusters should be able to be unavailable at the same ti
 the number that can be unavailable `U`.  If you are not sure, then 1 is a fine choice.
 
 If it is allowable for load-balancing to direct traffic to any region in the event of a cluster failure, then
-you need at least the larger of `R` or `U + 1` clusters.  If it is not (e.g you want to ensure low latency for all
-users in the event of a cluster failure), then you need to have `R * (U + 1)` clusters
-(`U + 1` in each of `R` regions).  In any case, try to put each cluster in a different zone.
+you need `R + U` clusters.  If it is not (e.g you want to ensure low latency for all users in the event of a
+cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
 Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
 you may need even more clusters.  Kubernetes v1.0 currently supports clusters up to 100 nodes in size, but we are targeting
@@ -69,6 +68,13 @@ you may need even more clusters.  Kubernetes v1.0 currently supports clusters up
 When you have multiple clusters, you would typically create services with the same config in each cluster and put each of those
 service instances behind a load balancer (AWS Elastic Load Balancer, GCE Forwarding Rule or HTTP Load Balancer) spanning all of them, so that
 failures of a single cluster are not visible to end users.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

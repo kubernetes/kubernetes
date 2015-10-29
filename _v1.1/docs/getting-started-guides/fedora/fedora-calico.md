@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Running Kubernetes with Calico Networking on a Digital Ocean Fedora Host"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -371,6 +371,13 @@ NAME          LABELS                               STATUS
 kube-node-1   kubernetes.io/hostname=kube-node-1   Ready
 {% endraw %}
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

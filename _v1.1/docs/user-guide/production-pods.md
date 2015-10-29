@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications: Working with pods and containers in production"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -386,6 +386,13 @@ $ kubectl get pods/pod-w-message -o go-template="{{range .status.containerStatus
 ## What's next?
 
 [Learn more about managing deployments.](managing-deployments.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

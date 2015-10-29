@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Resource Quota"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -10,6 +10,13 @@ title: "</strong>"
 Resource Quota
 ========================================
 This page has been moved to [here](../../admin/resourcequota/README.html)
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/resourcequota/README.md?pixel)]()

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications: Application Introspection and Debugging"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -348,6 +348,13 @@ Learn about additional debugging tools, including:
 * [Getting into containers via `exec`](getting-into-containers.html)
 * [Connecting to containers via proxies](connecting-to-applications-proxy.html)
 * [Connecting to containers via port forwarding](connecting-to-applications-port-forward.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

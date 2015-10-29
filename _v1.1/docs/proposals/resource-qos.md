@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Resource Quality of Service in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -70,6 +70,7 @@ An alternative is to have user-specified numerical priorities that guide Kubelet
 1. Achieved behavior would be emergent based on how users assigned priorities to their containers. No particular SLO could be delivered by the system, and usage would be subject to gaming if not restricted administratively
 2. Changes to desired priority bands would require changes to all user container configurations.
 
+
 ## Under Development
 
 This feature is still under development.
@@ -110,6 +111,13 @@ Maintaining CPU performance:
 
 Documentation:
 - **Documentation**: TODO: add user docs for resource QoS
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/resource-qos.md?pixel)]()

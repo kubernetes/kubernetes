@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "How to generate the bps-data-generator container #"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -22,6 +22,13 @@ and checkout the last exact version (will be updated periodically).
 then, cd to bigtop-bigpetstore/bigpetstore-transaction-queue, and run the docker file, i.e.
 
 `Docker build -t -i jayunit100/bps-transaction-queue`.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

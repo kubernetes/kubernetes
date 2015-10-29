@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Working with Resources"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -59,7 +59,14 @@ The API will generally not modify fields that you have set; it just sets ones wh
 
 ## <a name="finding_schema_docs"></a>Finding Documentation on Resource Fields
 
-You can browse auto-generated API documentation at the [project website](http://kubernetes.io/v1.0/api-ref.html) or on [github](https://releases.k8s.io/v1.1.0/docs/api-reference).
+You can browse auto-generated API documentation at the [project website](http://kubernetes.io/v1.1/api-ref.html) or on [github](https://releases.k8s.io/HEAD/docs/api-reference).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Jobs"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -47,13 +47,14 @@ It takes around 10s to complete.
 
 {% highlight yaml %}
 {% raw %}
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: Job
 metadata:
   name: pi
 spec:
   selector:
-    app: pi
+    matchLabels:
+      app: pi
   template:
     metadata:
       name: pi
@@ -68,7 +69,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](job.yaml?raw=true)
+[Download example](job.yaml)
 <!-- END MUNGE: EXAMPLE job.yaml -->
 
 Run the example job by downloading the example file and then running this command:
@@ -148,11 +149,16 @@ Only a [`RestartPolicy`](pod-states.html) equal to `Never` or `OnFailure` are al
 
 ### Pod Selector
 
-The `.spec.selector` field is a pod selector.  It works the same as the `.spec.selector` of
-a [ReplicationController](replication-controller.html).
+The `.spec.selector` field is a label query over a set of pods.
 
-If specified, the `.spec.template.metadata.labels` must be equal to the `.spec.selector`, or it will
-be rejected by the API.  If `.spec.selector` is unspecified, it will be defaulted to
+The `spec.selector` is an object consisting of two fields:
+* `matchLabels` - works the same as the `.spec.selector` of a [ReplicationController](replication-controller.html)
+* `matchExpressions` - allows to build more sophisticated selectors by specyfing key,
+  list of values and an operator that relates the key and values.
+
+When the two are specified the result is ANDed.
+
+If `.spec.selector` is unspecified, `.spec.selector.matchLabels` will be defaulted to
 `.spec.template.metadata.labels`.
 
 Also you should not normally create any pods whose labels match this selector, either directly,
@@ -237,6 +243,13 @@ similar functionality will be supported.
 
 Support for creating Jobs at specified times/dates (i.e. cron) is expected in the next minor
 release.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/jobs.md?pixel)]()

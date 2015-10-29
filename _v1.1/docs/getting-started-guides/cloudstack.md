@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started on CloudStack"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -90,6 +90,13 @@ SSH to it using the key that was created and using the _core_ user and you can l
     a017c422...	<node #1 IP>   role=node
     ad13bf84...	<master IP>	   role=master
     e9af8293...	<node #2 IP>   role=node
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

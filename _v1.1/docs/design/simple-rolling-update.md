@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Simple rolling update"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -108,6 +108,13 @@ then `foo-next` is synthesized using the pattern `<controller-name>-<hash-of-nex
    * Otherwise, `foo-next` and `foo` both exist
       * Set `desired-replicas` annotation on `foo` to match the annotation on `foo-next`
       * Goto Rollout with `foo` and `foo-next` trading places.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

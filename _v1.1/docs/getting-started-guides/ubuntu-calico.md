@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Deployment On Bare-metal Ubuntu Nodes with Calico Networking"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -274,7 +274,7 @@ sudo systemctl start kube-kubelet.service
 
 ## Install the DNS Addon
 
-Most Kubernetes deployments will require the DNS addon for service discovery.  For more on DNS service discovery, check [here](https://releases.k8s.io/v1.1.0/cluster/addons/dns).
+Most Kubernetes deployments will require the DNS addon for service discovery.  For more on DNS service discovery, check [here](https://releases.k8s.io/HEAD/cluster/addons/dns).
 
 The config repository for this guide comes with manifest files to start the DNS addon.  To install DNS, do the following on your Master node.
 
@@ -312,6 +312,13 @@ This chain should be applied on the master and all nodes. In production, these r
 ### NAT at the border router
 
 In a datacenter environment, it is recommended to configure Calico to peer with the border routers over BGP. This means that the container IPs will be routable anywhere in the datacenter, and so NAT is not needed on the nodes (though it may be enabled at the datacenter edge to allow outbound-only internet connectivity).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
