@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -188,6 +189,72 @@ func TestAttach(t *testing.T) {
 		}
 		if ex.url.Query().Get("container") != "bar" {
 			t.Errorf("%s: Did not have query parameters: %s", test.name, ex.url.Query())
+		}
+	}
+}
+
+func TestAttachWarnings(t *testing.T) {
+	version := testapi.Default.Version()
+	tests := []struct {
+		name, container, version, podPath, expectedErr, expectedOut string
+		pod                                                         *api.Pod
+		stdin, tty                                                  bool
+	}{
+		{
+			name:        "fallback tty if not supported",
+			version:     version,
+			podPath:     "/api/" + version + "/namespaces/test/pods/foo",
+			pod:         attachPod(),
+			stdin:       true,
+			tty:         true,
+			expectedErr: "Unable to use a TTY - container bar doesn't allocate one",
+		},
+	}
+	for _, test := range tests {
+		f, tf, codec := NewAPIFactory()
+		tf.Client = &fake.RESTClient{
+			Codec: codec,
+			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == test.podPath && m == "GET":
+					body := objBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Body: body}, nil
+				default:
+					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
+					return nil, fmt.Errorf("unexpected request")
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = &client.Config{Version: test.version}
+		bufOut := bytes.NewBuffer([]byte{})
+		bufErr := bytes.NewBuffer([]byte{})
+		bufIn := bytes.NewBuffer([]byte{})
+		ex := &fakeRemoteAttach{}
+		params := &AttachOptions{
+			ContainerName: test.container,
+			In:            bufIn,
+			Out:           bufOut,
+			Err:           bufErr,
+			Stdin:         test.stdin,
+			TTY:           test.tty,
+			Attach:        ex,
+		}
+		cmd := &cobra.Command{}
+		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := params.Run(); err != nil {
+			t.Fatal(err)
+		}
+
+		if test.stdin && test.tty {
+			if !test.pod.Spec.Containers[0].TTY {
+				if !strings.Contains(bufErr.String(), test.expectedErr) {
+					t.Errorf("%s: Expected TTY fallback warning for attach request: %s", test.name, bufErr.String())
+					continue
+				}
+			}
 		}
 	}
 }
