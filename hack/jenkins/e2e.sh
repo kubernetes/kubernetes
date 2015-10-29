@@ -570,6 +570,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade"}
     : ${E2E_NETWORK:="gke-upgrade"}
     : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
@@ -682,6 +683,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
     : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
     : ${JENKINS_PUBLISHED_VERSION:="release/stable"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
@@ -783,11 +785,11 @@ case ${JOB_NAME} in
   #
   # This suite:
   #
-  # 1. launches a cluster at release/latest-1.0,
+  # 1. launches a cluster at ci/latest-1.0,
   # 2. upgrades the master to ci/latest-1.1
-  # 3. runs release/latest-1.0 e2es,
+  # 3. runs ci/latest-1.0 e2es,
   # 4. upgrades the rest of the cluster,
-  # 5. runs release/latest-1.0 e2es again, then
+  # 5. runs ci/latest-1.0 e2es again, then
   # 6. runs ci/latest-1.1 e2es and tears down the cluster.
 
   kubernetes-upgrade-1.0-1.1-gke-step1-deploy)
@@ -795,7 +797,8 @@ case ${JOB_NAME} in
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest-1.0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
@@ -826,7 +829,7 @@ case ${JOB_NAME} in
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest-1.0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -862,7 +865,7 @@ case ${JOB_NAME} in
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest-1.0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -1011,17 +1014,17 @@ case ${JOB_NAME} in
   #
   # This suite:
   #
-  # 1. launches a cluster at release/latest-1.0,
+  # 1. launches a cluster at ci/latest-1.0,
   # 2. upgrades the master to ci/latest-1.1
-  # 3. runs release/latest-1.0 e2es,
+  # 3. runs ci/latest-1.0 e2es,
   # 4. upgrades the rest of the cluster,
-  # 5. runs release/latest-1.0 e2es again, then
+  # 5. runs ci/latest-1.0 e2es again, then
   # 6. runs ci/latest-1.1 e2es and tears down the cluster.
 
     kubernetes-upgrade-1.0-1.1-gce-step1-deploy)
     : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
     : ${E2E_NETWORK:="gce-upgrade-1-0"}
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest-1.0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
@@ -1054,7 +1057,7 @@ case ${JOB_NAME} in
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest-1.0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
@@ -1091,7 +1094,7 @@ case ${JOB_NAME} in
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest-1.0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
