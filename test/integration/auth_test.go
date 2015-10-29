@@ -164,15 +164,17 @@ var aNode string = `
   }
 }
 `
+
 var aEvent string = `
 {
   "kind": "Event",
   "apiVersion": "` + testapi.Default.Version() + `",
   "metadata": {
-    "name": "a"%s
+    "name": "a"%s,
+    "namespace": "default"
   },
   "involvedObject": {
-    "kind": "Node",
+    "kind": "Pod",
     "namespace": "default",
     "name": "a",
     "apiVersion": "v1"
@@ -338,7 +340,6 @@ func getTestRequests() []struct {
 		{"DELETE", timeoutPath("nodes", "", "a"), "", code200},
 
 		// Normal methods on events
-		{"GET", path("events", "", ""), "", code200},
 		{"GET", path("events", api.NamespaceDefault, ""), "", code200},
 		{"POST", timeoutPath("events", api.NamespaceDefault, ""), aEvent, code201},
 		{"PUT", timeoutPath("events", api.NamespaceDefault, "a"), aEvent, code200},

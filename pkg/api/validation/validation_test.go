@@ -61,7 +61,7 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 
 // Ensure namespace names follow dns label format
 func TestValidateObjectMetaNamespaces(t *testing.T) {
-	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", Namespace: "foo.bar"}, false, func(s string, prefix bool) (bool, string) {
+	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", Namespace: "foo.bar"}, true, func(s string, prefix bool) (bool, string) {
 		return true, ""
 	})
 	if len(errs) != 1 {
@@ -76,7 +76,7 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
-	errs = ValidateObjectMeta(&api.ObjectMeta{Name: "test", Namespace: string(b)}, false, func(s string, prefix bool) (bool, string) {
+	errs = ValidateObjectMeta(&api.ObjectMeta{Name: "test", Namespace: string(b)}, true, func(s string, prefix bool) (bool, string) {
 		return true, ""
 	})
 	if len(errs) != 1 {
@@ -4057,6 +4057,87 @@ func TestValidPodLogOptions(t *testing.T) {
 		errs := ValidatePodLogOptions(&test.opt)
 		if test.errs != len(errs) {
 			t.Errorf("%d: Unexpected errors: %v", i, errs)
+		}
+	}
+}
+
+func TestValidateEvent(t *testing.T) {
+	table := []struct {
+		*api.Event
+		valid bool
+	}{
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1/../test2",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					Namespace: "foo",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1",
+					Namespace: "foo.bar",
+				},
+				InvolvedObject: api.ObjectReference{
+					Namespace: "foo.bar",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					Namespace: "foo",
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1",
+					Namespace: "",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind: "Node",
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					Namespace: "bar",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1",
+					Namespace: "aoeu-_-aoeu",
+				},
+				InvolvedObject: api.ObjectReference{
+					Namespace: "aoeu-_-aoeu",
+				},
+			},
+			false,
+		},
+	}
+
+	for _, item := range table {
+		if e, a := item.valid, len(ValidateEvent(item.Event)) == 0; e != a {
+			t.Errorf("%v: expected %v, got %v", item.Event.Name, e, a)
 		}
 	}
 }

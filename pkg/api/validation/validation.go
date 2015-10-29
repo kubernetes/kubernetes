@@ -184,6 +184,13 @@ func ValidateEndpointsName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateEventName can be used to check whether the given event name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateEventName(name string, prefix bool) (bool, string) {
+	return NameIsDNSSubdomain(name, prefix)
+}
+
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -276,7 +283,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 		}
 	} else {
 		if len(meta.Namespace) != 0 {
-			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, "namespace is not allowed on this type"))
+			allErrs = append(allErrs, errs.NewFieldForbidden("namespace", "not allowed on this object"))
 		}
 	}
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
@@ -2048,5 +2055,24 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus) errs.ValidationE
 			}
 		}
 	}
+	return allErrs
+}
+
+// ValidateEvent makes sure that the event makes sense.
+func ValidateEvent(event *api.Event) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	requiresNamespace := true
+	// TODO: this is wrong - it should check for all non-namespaced objects.
+	if event.InvolvedObject.Kind == "Node" {
+		// TODO: There is no namespace required for node.
+		requiresNamespace = false
+	}
+	allErrs = append(allErrs, ValidateObjectMeta(&event.ObjectMeta, requiresNamespace, ValidateEventName).Prefix("metadata")...)
+
+	if requiresNamespace && event.Namespace != event.InvolvedObject.Namespace {
+		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
+	}
+
 	return allErrs
 }
