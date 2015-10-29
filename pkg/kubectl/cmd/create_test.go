@@ -19,11 +19,14 @@ package cmd
 import (
 	"bytes"
 	"net/http"
+	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 func TestExtraArgsFail(t *testing.T) {
@@ -99,6 +102,37 @@ func TestCreateMultipleObject(t *testing.T) {
 	// Names should come from the REST response, NOT the files
 	if buf.String() != "replicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestCreateDryRun(t *testing.T) {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{}
+
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdCreate(f, buf)
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("dry-run", "true")
+	cmd.Run(cmd, []string{})
+
+	fd, err := os.Open("../../../examples/guestbook/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	rc := api.ReplicationController{}
+	if err := yaml.NewYAMLToJSONDecoder(fd).Decode(&rc); err != nil {
+		t.Errorf("unexpected error parsing YAML: %v", err)
 	}
 }
 

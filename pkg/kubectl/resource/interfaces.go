@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"io"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -43,4 +45,14 @@ type ClientMapperFunc func(mapping *meta.RESTMapping) (RESTClient, error)
 // ClientForMapping implements ClientMapper
 func (f ClientMapperFunc) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
 	return f(mapping)
+}
+
+// StreamTransform is a function that takes a reader, and returns a reader that transforms the input
+// in some way.  For example, transforming a simplified YAML file into a complete API object.
+type StreamTransform func(io.Reader) (io.Reader, error)
+
+// StreamTransformer is an interface for things that know how to accept StreamTransforms to transform
+// their input.
+type StreamTransformer interface {
+	SetStreamTransform(fn StreamTransform)
 }
