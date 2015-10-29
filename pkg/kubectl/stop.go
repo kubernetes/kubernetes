@@ -23,9 +23,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -220,6 +223,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	jobs := reaper.Extensions().Jobs(namespace)
+	pods := reaper.Pods(namespace)
 	scaler, err := ScalerFor("Job", *reaper)
 	if err != nil {
 		return "", err
@@ -240,6 +244,22 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil {
 		return "", err
 	}
+	// at this point only dead pods are left, that should be removed
+	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
+	podList, err := pods.List(selector, fields.Everything())
+	if err != nil {
+		return "", err
+	}
+	errList := []error{}
+	for _, pod := range podList.Items {
+		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
+			errList = append(errList, err)
+		}
+	}
+	if len(errList) > 0 {
+		return "", utilerrors.NewAggregate(errList)
+	}
+	// once we have all the pods removed we can safely remove the job itself
 	if err := jobs.Delete(name, gracePeriod); err != nil {
 		return "", err
 	}
