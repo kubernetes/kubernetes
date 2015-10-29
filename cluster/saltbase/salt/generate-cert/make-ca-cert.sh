@@ -36,11 +36,6 @@ if [ "$cert_ip" == "_use_aws_external_ip_" ]; then
   cert_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 fi
 
-if [ "$cert_ip" == "_use_azure_dns_name_" ]; then
-  cert_ip=$(uname -n | awk -F. '{ print $2 }').cloudapp.net
-  use_cn=true
-fi
-
 sans="IP:${cert_ip}"
 if [[ -n "${extra_sans}" ]]; then
   sans="${sans},${extra_sans}"

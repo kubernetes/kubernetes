@@ -10,9 +10,6 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn-client
-{% endif %}
     - helpers
     - cadvisor
     - kube-client-tools
@@ -65,9 +62,6 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn
-{% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
     - docker
     - kubelet
