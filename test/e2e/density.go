@@ -63,9 +63,10 @@ func (a latencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a latencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
 func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
-	perc50 := latencies[len(latencies)/2].Latency
-	perc90 := latencies[(len(latencies)*9)/10].Latency
-	perc99 := latencies[(len(latencies)*99)/100].Latency
+	length := len(latencies)
+	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
+	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
+	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
 	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
 }
 
