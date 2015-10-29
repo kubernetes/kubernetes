@@ -1,0 +1,203 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl proxy \- Run a proxy to the Kubernetes API server
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl proxy\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+To proxy all of the kubernetes api and nothing else, use:
+
+.PP
+kubectl proxy \-\-api\-prefix=/
+
+.PP
+To proxy only part of the kubernetes api and also some static files:
+
+.PP
+kubectl proxy \-\-www=/my/files \-\-www\-prefix=/static/ \-\-api\-prefix=/api/
+
+.PP
+The above lets you 'curl localhost:8001/api/v1/pods'.
+
+.PP
+To proxy the entire kubernetes api at a different root, use:
+
+.PP
+kubectl proxy \-\-api\-prefix=/custom/
+
+.PP
+The above lets you 'curl localhost:8001/custom/api/v1/pods'
+
+
+.SH OPTIONS
+.PP
+\fB\-\-accept\-hosts\fP="^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
+    Regular expression for hosts that the proxy should accept.
+
+.PP
+\fB\-\-accept\-paths\fP="^/.*"
+    Regular expression for paths that the proxy should accept.
+
+.PP
+\fB\-\-api\-prefix\fP="/"
+    Prefix to serve the proxied API under.
+
+.PP
+\fB\-\-disable\-filter\fP=false
+    If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.
+
+.PP
+\fB\-p\fP, \fB\-\-port\fP=8001
+    The port on which to run the proxy. Set to 0 to pick a random port.
+
+.PP
+\fB\-\-reject\-methods\fP="POST,PUT,PATCH"
+    Regular expression for HTTP methods that the proxy should reject.
+
+.PP
+\fB\-\-reject\-paths\fP="^/api/.\fI/exec,^/api/.\fP/run"
+    Regular expression for paths that the proxy should reject.
+
+.PP
+\fB\-u\fP, \fB\-\-unix\-socket\fP=""
+    Unix socket on which to run the proxy.
+
+.PP
+\fB\-w\fP, \fB\-\-www\fP=""
+    Also serve static files from the given directory under the specified prefix.
+
+.PP
+\fB\-P\fP, \fB\-\-www\-prefix\fP="/static/"
+    Prefix to serve static files under, if static file directory is specified.
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    The API version to use when talking to the server
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+$ kubectl proxy \-\-port=8011 \-\-www=./local/www/
+
+# Run a proxy to kubernetes apiserver on an arbitrary local port.
+# The chosen port for the server will be output to stdout.
+$ kubectl proxy \-\-port=0
+
+# Run a proxy to kubernetes apiserver, changing the api prefix to k8s\-api
+# This makes e.g. the pods api available at localhost:8011/k8s\-api/v1/pods/
+$ kubectl proxy \-\-api\-prefix=/k8s\-api
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

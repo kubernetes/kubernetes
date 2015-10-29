@@ -1,0 +1,19 @@
+{
+  "name": "coreos-azure-weave",
+  "version": "1.0.0",
+  "description": "Small utility to bring up a woven CoreOS cluster",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ilya Dmitrichenko <errordeveloper@gmail.com>",
+  "license": "Apache 2.0",
+  "dependencies": {
+    "azure-cli": "^0.9.5",
+    "colors": "^1.0.3",
+    "js-yaml": "^3.2.5",
+    "openssl-wrapper": "^0.2.1",
+    "underscore": "^1.7.0",
+    "underscore.string": "^3.0.2"
+  }
+}
