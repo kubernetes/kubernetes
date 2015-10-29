@@ -1443,15 +1443,29 @@ func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	return waitForRCPodsRunning(c, ns, name)
 }
 
-// Wait up to 10 minutes for pods to become Running.
+// Wait up to 10 minutes for pods to become Running. Assume that the pods of the
+// rc are labels with {"name":rcName}.
 func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	err := waitForPodsWithLabelRunning(c, ns, selector)
+	if err != nil {
+		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", rcName, err)
+	}
+	return nil
+}
+
+// Wait up to 10 minutes for all matching pods to become Running and at least one
+// matching pod exists.
+func waitForPodsWithLabelRunning(c *client.Client, ns string, label labels.Selector) error {
 	running := false
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	podStore := newPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
 waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := podStore.List()
+		if len(pods) == 0 {
+			continue waitLoop
+		}
 		for _, p := range pods {
 			if p.Status.Phase != api.PodRunning {
 				continue waitLoop
@@ -1461,7 +1475,7 @@ waitLoop:
 		break
 	}
 	if !running {
-		return fmt.Errorf("Timeout while waiting for replication controller %s pods to be running", rcName)
+		return fmt.Errorf("Timeout while waiting for pods with labels %q to be running", label.String())
 	}
 	return nil
 }
