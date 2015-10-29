@@ -39,8 +39,8 @@ type DeploymentStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(s storage.Interface) DeploymentStorage {
-	deploymentRest, deploymentStatusRest := NewREST(s)
+func NewStorage(s storage.Interface, storageFactory storage.StorageFactory) DeploymentStorage {
+	deploymentRest, deploymentStatusRest := NewREST(s, storageFactory)
 	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
@@ -55,12 +55,17 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
 	prefix := "/deployments"
+
+	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &extensions.Deployment{}, prefix, false, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Deployment{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &extensions.DeploymentList{} },
+		NewListFunc: newListFunc,
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix.
 		KeyRootFunc: func(ctx api.Context) string {
@@ -87,7 +92,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		// Used to validate deployment updates.
 		UpdateStrategy: deployment.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy

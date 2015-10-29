@@ -32,12 +32,16 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against secrets.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
 	prefix := "/secrets"
+
+	newListFunc := func() runtime.Object { return &api.SecretList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.Secret{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Secret{} },
-		NewListFunc: func() runtime.Object { return &api.SecretList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
@@ -55,7 +59,7 @@ func NewREST(s storage.Interface) *REST {
 		CreateStrategy: secret.Strategy,
 		UpdateStrategy: secret.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	return &REST{store}
 }

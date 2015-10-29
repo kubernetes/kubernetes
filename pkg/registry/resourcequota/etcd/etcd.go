@@ -32,11 +32,16 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against resource quotas.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
 	prefix := "/resourcequotas"
+
+	newListFunc := func() runtime.Object { return &api.ResourceQuotaList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.ResourceQuota{}, prefix, true, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
-		NewListFunc: func() runtime.Object { return &api.ResourceQuotaList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
@@ -55,7 +60,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		UpdateStrategy:      resourcequota.Strategy,
 		ReturnDeletedObject: true,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	statusStore := *store

@@ -26,14 +26,15 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	storage, _, _ := NewREST(etcdStorage)
-	return storage, fakeClient
+	namespaceStorage, _, _ := NewREST(etcdStorage, storage.NoDecoration)
+	return namespaceStorage, fakeClient
 }
 
 func validNewNamespace() *api.Namespace {

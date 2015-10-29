@@ -33,25 +33,28 @@ type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// daemonPrefix is the location for daemons in etcd
-var daemonPrefix = "/daemonsets"
-
 // NewREST returns a RESTStorage object that will work against DaemonSets.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+	prefix := "/daemonsets"
+
+	newListFunc := func() runtime.Object { return &extensions.DaemonSetList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &extensions.DaemonSet{}, prefix, false, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.DaemonSet{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &extensions.DaemonSetList{} },
+		NewListFunc: newListFunc,
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, daemonPrefix)
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		// Produces a path that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, daemonPrefix, name)
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		// Retrieve the name field of a daemon set
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -69,7 +72,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		// Used to validate daemon set updates
 		UpdateStrategy: daemonset.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -33,8 +34,8 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	storage, statusStorage := NewREST(etcdStorage)
-	return storage, statusStorage, fakeClient
+	persistentVolumeStorage, statusStorage := NewREST(etcdStorage, storage.NoDecoration)
+	return persistentVolumeStorage, statusStorage, fakeClient
 }
 
 func validNewPersistentVolume(name string) *api.PersistentVolume {

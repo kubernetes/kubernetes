@@ -33,26 +33,28 @@ type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// jobPrefix is the location for jobs in etcd, only exposed
-// for testing
-var jobPrefix = "/jobs"
-
 // NewREST returns a RESTStorage object that will work against Jobs.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+	prefix := "/jobs"
+
+	newListFunc := func() runtime.Object { return &extensions.JobList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &extensions.Job{}, prefix, false, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Job{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &extensions.JobList{} },
+		NewListFunc: newListFunc,
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, jobPrefix)
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		// Produces a path that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, jobPrefix, name)
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		// Retrieve the name field of a job
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -70,7 +72,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		// Used to validate job updates
 		UpdateStrategy: job.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	statusStore := *store
