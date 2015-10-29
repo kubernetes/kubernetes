@@ -374,7 +374,7 @@ case ${JOB_NAME} in
     MINION_DISK_SIZE="50GB"
     NUM_MINIONS="100"
     # Reduce logs verbosity
-    TEST_CLUSTER_LOG_LEVEL="--v=1"
+    TEST_CLUSTER_LOG_LEVEL="--v=2"
     # Increase resync period to simulate production
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
