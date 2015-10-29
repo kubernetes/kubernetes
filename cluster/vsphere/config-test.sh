@@ -32,3 +32,6 @@ MINION_MEMORY_MB=1024
 MINION_CPU=1
 
 SERVICE_CLUSTER_IP_RANGE="10.244.240.0/20"  # formerly PORTAL_NET
+
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
