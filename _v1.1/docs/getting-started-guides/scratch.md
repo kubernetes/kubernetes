@@ -825,7 +825,7 @@ $ curl -s http://localhost:8080/api
 {% endhighlight %}
 
 If you have selected the `--register-node=true` option for kubelets, they will now begin self-registering with the apiserver.
-You should soon be able to see all your nodes by running the `kubect get nodes` command.
+You should soon be able to see all your nodes by running the `kubectl get nodes` command.
 Otherwise, you will need to manually create node objects.
 
 ### Logging
@@ -834,7 +834,7 @@ Otherwise, you will need to manually create node objects.
 
 ### Monitoring
 
-**TODO** talk about starting Logging.
+**TODO** talk about starting Monitoring.
 
 ### DNS
 

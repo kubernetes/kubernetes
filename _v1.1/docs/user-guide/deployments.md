@@ -176,7 +176,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](nginx-deployment.yaml)
+[Download example](new-nginx-deployment.yaml)
 <!-- END MUNGE: EXAMPLE new-nginx-deployment.yaml -->
 
 

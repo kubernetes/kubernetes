@@ -115,7 +115,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](cassandra-controller.yaml)
+[Download example](cassandra-service.yaml)
 <!-- END MUNGE: EXAMPLE cassandra-service.yaml -->
 
 The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.

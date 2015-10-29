@@ -180,7 +180,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](mysql.yaml)
+[Download example](mysql-service.yaml)
 <!-- END MUNGE: EXAMPLE mysql-service.yaml -->
 
 Start the service like this:
@@ -241,7 +241,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](mysql.yaml)
+[Download example](wordpress.yaml)
 <!-- END MUNGE: EXAMPLE wordpress.yaml -->
 
 Create the pod:
@@ -288,7 +288,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](mysql.yaml)
+[Download example](wordpress-service.yaml)
 <!-- END MUNGE: EXAMPLE wordpress-service.yaml -->
 
 Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.

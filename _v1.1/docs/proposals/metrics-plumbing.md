@@ -1,5 +1,9 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
 title: "title: \"</strong>\""
 ---
 ---
@@ -112,5 +116,6 @@ We are tracking heapster work items using [milestones](https://github.com/kubern
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/metrics-plumbing.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
 

@@ -104,7 +104,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](pod.yaml)
+[Download example](replication.yaml)
 <!-- END MUNGE: EXAMPLE replication.yaml -->
 
 To delete the replication controller (and the pods it created):

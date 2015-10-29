@@ -1,5 +1,9 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"title: \"</strong>\"\"\""
+---
+---
+layout: docwithnav
 title: "title: \"title: \"</strong>\"\""
 ---
 ---
@@ -60,6 +64,7 @@ Shown below are examples of Using ```kubectl``` from within the ```./examples/my
 {% raw %}
 {% raw %}
 {% raw %}
+{% raw %}
 $ kubectl create -f examples/mysql-galera/pxc-cluster-service.yaml 
 services/pxc-cluster
 
@@ -78,6 +83,7 @@ replicationcontrollers/pxc-node3
 {% endraw %}
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 ### Confirm a running cluster
@@ -85,6 +91,7 @@ replicationcontrollers/pxc-node3
 Verify everything is running:
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
 {% raw %}
@@ -115,6 +122,7 @@ pxc-node3     <none>    name=pxc-node3     10.100.200.14    3306/TCP
 {% endraw %}
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 The cluster should be ready for use!
@@ -124,6 +132,7 @@ The cluster should be ready for use!
 Using the name of ```pxc-cluster``` service running interactively using ```kubernetes exec```, it is possible to connect to any of the pods using the mysql client on the pod's container to verify the cluster size, which should be ```3```. In this example below, pxc-node3 replication controller is chosen, and to find out the pod name, ```kubectl get pods``` and ```awk``` are employed:
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
 {% raw %}
@@ -157,6 +166,7 @@ mysql> show status like 'wsrep_cluster_size';
 {% endraw %}
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 At this point, there is a working cluster that can begin being used via the pxc-cluster service IP address!
@@ -170,6 +180,7 @@ This setup certainly can become more fluid and dynamic. One idea is to perhaps u
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/mysql-galera/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
 
 

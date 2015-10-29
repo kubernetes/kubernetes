@@ -189,7 +189,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](../../examples/blog-logging/counter-pod.yaml)
+[Download example](https://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 <!-- END MUNGE: EXAMPLE ../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml -->
 
 This pod specification maps the directory on the host containing the Docker log files, `/var/lib/docker/containers`, to a directory inside the container which has the same path. The pod runs one image, `gcr.io/google_containers/fluentd-gcp:1.6`, which is configured to collect the Docker log files from the logs directory and ingest them into Google Cloud Logging. One instance of this pod runs on each node of the cluster. Kubernetes will notice if this pod fails and automatically restart it.

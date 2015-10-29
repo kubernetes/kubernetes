@@ -160,7 +160,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](downward-api/dapi-pod.yaml)
+[Download example](downward-api/volume/dapi-volume.yaml)
 <!-- END MUNGE: EXAMPLE downward-api/volume/dapi-volume.yaml -->
 
 Some more thorough examples:

@@ -1,5 +1,9 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
 title: "title: \"</strong>\""
 ---
 ---
@@ -32,7 +36,9 @@ to change to output destination.
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 kubectl convert -f FILENAME
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -40,6 +46,7 @@ kubectl convert -f FILENAME
 ### Examples
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
 # Convert 'pod.yaml' to latest version and print to stdout.
@@ -54,11 +61,13 @@ $ kubectl convert -f . | kubectl create -f -
 
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
   -f, --filename=[]: Filename, directory, or URL to file to need to get converted.
@@ -73,11 +82,13 @@ $ kubectl convert -f . | kubectl create -f -
       --validate[=true]: If true, use a schema to validate the input before sending it
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
       --alsologtostderr[=false]: log to standard error as well as files
@@ -105,6 +116,7 @@ $ kubectl convert -f . | kubectl create -f -
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 ### SEE ALSO
@@ -116,5 +128,6 @@ $ kubectl convert -f . | kubectl create -f -
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_convert.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
 

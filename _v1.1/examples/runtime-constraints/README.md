@@ -1,5 +1,9 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
 title: "title: \"</strong>\""
 ---
 ---
@@ -24,12 +28,14 @@ of compute resources easier to follow by starting with an empty cluster.
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ export KUBERNETES_PROVIDER=vagrant
 $ export NUM_MINIONS=1
 $ export KUBE_ENABLE_CLUSTER_MONITORING=none
 $ export KUBE_ENABLE_CLUSTER_DNS=false
 $ export KUBE_ENABLE_CLUSTER_UI=false
 $ cluster/kube-up.sh
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -39,10 +45,12 @@ We should now have a single node cluster running 0 pods.
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh get nodes
 NAME         LABELS                              STATUS    AGE
 10.245.1.3   kubernetes.io/hostname=10.245.1.3   Ready     17m
 $ cluster/kubectl.sh get pods --all-namespaces
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -62,10 +70,12 @@ Let's demonstrate this concept using a simple container that will consume as muc
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh run cpuhog \
     --image=busybox \
     --requests=cpu=100m \
     -- md5sum /dev/urandom
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -78,11 +88,13 @@ To demonstrate this, if you SSH into your machine, you will see it is consuming 
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ vagrant ssh minion-1
 $ sudo docker stats $(sudo docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
 6b593b1a9658        0.00%               1.425 MB/1.042 GB   0.14%               1.038 kB/738 B
 ae8ae4ffcfe4        150.06%             831.5 kB/1.042 GB   0.08%               0 B/0 B
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -94,7 +106,9 @@ If we scale our replication controller to 20 pods, we should see that each conta
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh scale rc/cpuhog --replicas=20
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -104,11 +118,13 @@ Once all the pods are running, you will see on your node that each container is 
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ sudo docker stats $(sudo docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
 089e2d061dee        9.24%               786.4 kB/1.042 GB   0.08%               0 B/0 B
 0be33d6e8ddb        10.48%              823.3 kB/1.042 GB   0.08%               0 B/0 B
 0f4e3c4a93e0        10.43%              786.4 kB/1.042 GB   0.08%               0 B/0 B
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -124,9 +140,11 @@ Let's delete all existing resources in preparation for the next scenario.  Verif
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh delete rc --all
 $ cluster/kubectl.sh get pods
 NAME      READY     STATUS    RESTARTS   AGE
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -143,7 +161,9 @@ have support for CFS quota enabled.  Finally, your the Kubelet must be started w
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 kubelet --cpu-cfs-quota=true
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -153,11 +173,13 @@ To demonstrate, let's create the same pod again, but this time set an upper limi
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh run cpuhog \
     --image=busybox \
     --requests=cpu=100m \
     --limits=cpu=500m \
     -- md5sum /dev/urandom
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -167,12 +189,14 @@ Let's SSH into the node, and look at usage stats.
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ vagrant ssh minion-1
 $ sudo su
 $ docker stats $(docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
 2a196edf7de2        47.38%              835.6 kB/1.042 GB   0.08%               0 B/0 B
 ...
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -185,9 +209,11 @@ Let's delete all existing resources in preparation for the next scenario.  Verif
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh delete rc --all
 $ cluster/kubectl.sh get pods
 NAME      READY     STATUS    RESTARTS   AGE
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -204,11 +230,13 @@ allocate and write to 200MB of memory every 2 seconds.
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh run memhog \
    --image=derekwaynecarr/memhog \
    --requests=memory=100Mi \
    --command \
    -- /bin/sh -c "while true; do memhog -r100 200m; sleep 1; done"
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -218,11 +246,13 @@ If you look at output of docker stats on the node:
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ docker stats $(docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
 2badf74ae782        0.00%               1.425 MB/1.042 GB   0.14%               816 B/348 B
 a320182967fa        105.81%             214.2 MB/1.042 GB   20.56%              0 B/0 B
 
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -238,9 +268,11 @@ Let's delete all existing resources in preparation for the next scenario.  Verif
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh delete rc --all
 $ cluster/kubectl.sh get pods
 NAME      READY     STATUS    RESTARTS   AGE
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -254,10 +286,12 @@ For example, let's limit our container to 200Mi of memory, and just consume 100M
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh run memhog \
    --image=derekwaynecarr/memhog \
    --limits=memory=200Mi \
    --command -- /bin/sh -c "while true; do memhog -r100 100m; sleep 1; done"
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -267,10 +301,12 @@ If you look at output of docker stats on the node:
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ docker stats $(docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
 5a7c22ae1837        125.23%             109.4 MB/209.7 MB   52.14%              0 B/0 B
 c1d7579c9291        0.00%               1.421 MB/1.042 GB   0.14%               1.038 kB/816 B
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -283,7 +319,9 @@ whose pod will keep being OOM killed because it attempts to allocate 300MB of me
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh run memhog-oom    --image=derekwaynecarr/memhog    --limits=memory=200Mi    --command -- memhog -r100 300m
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -293,6 +331,7 @@ If we describe the created pod, you will see that it keeps restarting until it u
 The reason it is killed and restarts is because it is OOMKilled as it attempts to exceed its memory limit.
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
 $ cluster/kubectl.sh get pods
@@ -308,6 +347,7 @@ $ cluster/kubectl.sh describe pods/memhog-oom-gj9hw | grep -C 3 "Terminated"
       Started:          Wed, 23 Sep 2015 15:23:58 -0400
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 Let's clean-up before proceeding further.
@@ -315,7 +355,9 @@ Let's clean-up before proceeding further.
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh delete rc --all
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -341,9 +383,11 @@ To demonstrate this, let's spin up a set of different replication controllers th
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh run mem-guaranteed --image=derekwaynecarr/memhog --replicas=2 --requests=cpu=10m --limits=memory=600Mi --command -- memhog -r100000 500m
 $ cluster/kubectl.sh run mem-burstable --image=derekwaynecarr/memhog --replicas=2 --requests=cpu=10m,memory=600Mi --command -- memhog -r100000 100m
 $ cluster/kubectl.sh run mem-besteffort --replicas=10 --image=derekwaynecarr/memhog --requests=cpu=10m --command -- memhog -r10000 500m
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -353,8 +397,10 @@ This will induce a SystemOOM
 ```
 {% raw %}
 {% raw %}
+{% raw %}
 $ cluster/kubectl.sh get events | grep OOM
 43m       8m        178       10.245.1.3             Node                                                        SystemOOM          {kubelet 10.245.1.3}        System OOM encountered
+{% endraw %}
 {% endraw %}
 {% endraw %}
 ```
@@ -362,6 +408,7 @@ $ cluster/kubectl.sh get events | grep OOM
 If you look at the pods:
 
 ```
+{% raw %}
 {% raw %}
 {% raw %}
 $ cluster/kubectl.sh get pods
@@ -374,6 +421,7 @@ mem-guaranteed-fqsw8   1/1       Running            0          4m
 mem-guaranteed-rkqso   1/1       Running            0          4m
 {% endraw %}
 {% endraw %}
+{% endraw %}
 ```
 
 You see that our BestEffort pod goes in a restart cycle, but the pods with greater levels of quality of service continue to function.
@@ -384,5 +432,6 @@ system was configured, and which process the Kernel ultimately decides to kill o
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/runtime-constraints/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
 

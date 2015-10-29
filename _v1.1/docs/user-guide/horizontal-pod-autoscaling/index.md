@@ -1,5 +1,9 @@
 ---
 layout: docwithnav
+title: "title: \"Horizontal Pod Autoscaler\""
+---
+---
+layout: docwithnav
 title: "Horizontal Pod Autoscaler"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -124,8 +128,10 @@ The following command will create the equivalent autoscaler as defined in the [h
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl autoscale rc php-apache --cpu-percent=50 --min=1 --max=10
 replicationcontroller "php-apache" autoscaled
+{% endraw %}
 {% endraw %}
 ```
 
@@ -227,4 +233,5 @@ As we see, in the presented case CPU utilization dropped to 0, and the number of
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/horizontal-pod-autoscaling/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 
