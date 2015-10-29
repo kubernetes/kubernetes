@@ -21,8 +21,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# TODO Audit echos to make sure they're all consistent.
-
 # Sets DIR, INSTRUCTIONS
 function main() {
   # Parse arguments
@@ -38,7 +36,7 @@ function main() {
     echo "!!! This NOT is a dry run."
     DRY_RUN=false
   else
-    echo "(This is a dry run.)"
+    echo "This is a dry run."
   fi
 
   check-prereqs
@@ -90,10 +88,17 @@ function main() {
 
   # Start a tmp file that will hold instructions for the user.
   declare -r INSTRUCTIONS="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)-instructions"
-  cat > "${INSTRUCTIONS}" <<- EOM
-Success!  You must now:
+  if $DRY_RUN; then
+    cat > "${INSTRUCTIONS}" <<- EOM
+Success!  You would now do the following, if not a dry run:
 
 EOM
+  else
+    cat > "${INSTRUCTIONS}" <<- EOM
+Success!  You must now do the following:
+
+EOM
+  fi
 
   local -r github="https://github.com/kubernetes/kubernetes.git"
   declare -r DIR="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)"
@@ -187,7 +192,6 @@ function beta-release() {
 
   echo "Tagging ${beta_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes pre-release ${beta_version}" "${beta_version}"
-  # TODO what about a PR?
   git-push "${beta_version}"
   finish-release-instructions "${beta_version}"
 }
@@ -202,7 +206,6 @@ function official-release() {
 
   echo "Tagging ${official_version} at $(current-git-commit)."
   git tag -a -m "Kubernetes release ${official_version}" "${official_version}"
-  # TODO what about a PR?
   git-push "${official_version}"
   finish-release-instructions "${official_version}"
 }
