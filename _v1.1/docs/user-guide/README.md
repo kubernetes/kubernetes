@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes User Guide: Managing Applications"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -104,6 +104,13 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
   * [Tips and tricks when working with config](config-best-practices.html)
   * [Assign pods to selected nodes](node-selection/)
   * [Perform a rolling update on a running group of pods](update-demo/)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes DNS example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -13,7 +13,7 @@ This is a toy example demonstrating how to use kubernetes DNS.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](https://releases.k8s.io/v1.1.0/cluster/addons/dns).
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](https://releases.k8s.io/HEAD/cluster/addons/dns).
 
 {% highlight sh %}
 {% raw %}
@@ -214,6 +214,13 @@ kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
 kubectl logs dns-frontend
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

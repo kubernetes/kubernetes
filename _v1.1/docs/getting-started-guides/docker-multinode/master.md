@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Installing a Kubernetes Master Node via Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -94,7 +94,7 @@ Now run flanneld itself:
 
 {% highlight sh %}
 {% raw %}
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0
 {% endraw %}
 {% endhighlight %}
 
@@ -216,6 +216,13 @@ If all else fails, ask questions on [Slack](../../troubleshooting.html#slack).
 ### Next steps
 
 Move on to [adding one or more workers](worker.html) or [deploy a dns](deployDNS.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

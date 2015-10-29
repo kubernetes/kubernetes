@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Variable expansion in pod command, args, and env"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -405,6 +405,13 @@ spec:
   restartPolicy: Never
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

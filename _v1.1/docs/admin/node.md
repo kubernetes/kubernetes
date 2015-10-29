@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Node"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -192,7 +192,7 @@ unschedulable, run this command:
 
 {% highlight sh %}
 {% raw %}
-kubectl patch nodes $NODENAME -p '{"spec": {"unschedulable": true}}'
+kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 {% endraw %}
 {% endhighlight %}
 
@@ -241,7 +241,14 @@ on each kubelet where you want to reserve resources.
 
 Node is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Node API
-object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html#_v1_node).
+object](http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html#_v1_node).
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

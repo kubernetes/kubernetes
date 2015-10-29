@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Diagrams for Cloud Logging Blog Article"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -8,6 +8,13 @@ title: "</strong>"
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 # Diagrams for Cloud Logging Blog Article
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

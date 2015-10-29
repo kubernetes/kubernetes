@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Troubleshooting"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -56,6 +56,13 @@ If filing a bug, please include detailed information about how to reproduce the 
 * Kubernetes version: `kubectl version`
 * Cloud provider, OS distro, network configuration, and Docker version
 * Steps to reproduce the problem
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/troubleshooting.md?pixel)]()

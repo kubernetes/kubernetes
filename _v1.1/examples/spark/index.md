@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Spark example\""
+---
+---
+layout: docwithnav
+title: "Spark example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -163,6 +167,7 @@ Use the kubectl exec to connect to Spark driver
 
 ```
 {% raw %}
+{% raw %}
 $ kubectl exec spark-driver -it bash
 root@spark-driver:/#
 root@spark-driver:/# pyspark
@@ -181,6 +186,7 @@ SparkContext available as sc, HiveContext available as sqlContext.
 >>> import socket
 >>> sc.parallelize(range(1000)).map(lambda x:socket.gethostname()).distinct().collect()
 ['spark-worker-controller-u40r2', 'spark-worker-controller-hifwi', 'spark-worker-controller-vpgyg']
+{% endraw %}
 {% endraw %}
 ```
 
@@ -204,7 +210,15 @@ Make sure the Master Pod is running (use: ```kubectl get pods```).
 ```kubectl create -f spark-driver.json```
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

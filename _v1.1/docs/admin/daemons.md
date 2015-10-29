@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Daemon Sets"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -185,14 +185,20 @@ all or certain hosts, and when it needs to start before other pods.
 
 ## Caveats
 
-DaemonSet objects are in the [`extensions` API Group](../api.html#api-groups).
-DaemonSet is not enabled by default. Enable it by setting
-`--runtime-config=extensions/v1beta1/daemonset` on the api server.
+DaemonSet objects are in the [`extensions` API Group](../api.html#api-groups).  This API group may or
+may not be enabled on your cluster.
 
 DaemonSet objects effectively have [API version `v1alpha1`](../api.html#api-versioning).
  Alpha objects may change or even be discontinued in future software releases.
 However, due to to a known issue, they may appear as API version `v1beta1` if enabled.
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

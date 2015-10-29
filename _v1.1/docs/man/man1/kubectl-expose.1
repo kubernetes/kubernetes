@@ -66,7 +66,7 @@ re\-use the labels from the resource it exposes.
 \fB\-o\fP, \fB\-\-output\fP=""
     Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
-\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
+\[la]http://releases.k8s.io/v1.1.0/docs/user-guide/jsonpath.md\[ra]].
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -77,7 +77,7 @@ re\-use the labels from the resource it exposes.
     An inline JSON override for the generated object. If this is non\-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
 
 .PP
-\fB\-\-port\fP=""
+\fB\-\-port\fP=\-1
     The port that the service should serve on. Copied from the resource being exposed, if unspecified
 
 .PP
@@ -105,7 +105,7 @@ re\-use the labels from the resource it exposes.
     Name or number for the port on the container that the service should direct traffic to. Optional.
 
 .PP
-\fB\-\-template\fP=""
+\fB\-t\fP, \fB\-\-template\fP=""
     Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 

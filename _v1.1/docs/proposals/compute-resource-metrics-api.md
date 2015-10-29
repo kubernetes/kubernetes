@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes compute resource metrics API"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -150,6 +150,13 @@ type DerivedMetrics struct {
 type ResourceUsage map[resource.Type]resource.Quantity
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

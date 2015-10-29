@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Kubernetes Cluster Admin Guide\""
+---
+---
+layout: docwithnav
+title: "Kubernetes Cluster Admin Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -45,7 +49,15 @@ It assumes some familiarity with concepts in the [User Guide](../user-guide/READ
   1. [Troubleshooting](cluster-troubleshooting.html)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Application Troubleshooting"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -229,6 +229,13 @@ check:
 If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.html) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving.
 
 You may also visit [troubleshooting document](../troubleshooting.html) for more information.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

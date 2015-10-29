@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Downward API example\""
+---
+---
+layout: docwithnav
+title: "Downward API example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -47,7 +51,15 @@ $ kubectl logs dapi-test-pod | grep POD_
 {% endhighlight %}
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

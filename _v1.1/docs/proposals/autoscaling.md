@@ -1,11 +1,19 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "WARNING:"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
+---
+
+# WARNING:
+
+## This document is outdated. It is superseded by [the horizontal pod autoscaler design doc](../design/horizontal-pod-autoscaler.html).
+
+---
 
 ## Abstract
 
@@ -265,6 +273,13 @@ process and auto-scaler are fighting to increase and decrease the count of the t
 to prevent this, deployment orchestration should notify the auto-scaler that a deployment is occurring.  This will
 temporarily disable negative decrement thresholds until the deployment process is completed.  It is more important for
 an auto-scaler to be able to grow capacity during a deployment than to shrink the number of instances precisely.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

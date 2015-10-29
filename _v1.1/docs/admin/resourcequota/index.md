@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Resource Quota\""
+---
+---
+layout: docwithnav
+title: "Resource Quota"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -184,7 +188,15 @@ Any action that consumes those resources can be tweaked, or can pick up namespac
 meet your end goal.
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/resourcequota/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

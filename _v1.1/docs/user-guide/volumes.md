@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Volumes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -165,7 +165,7 @@ A feature of PD is that they can be mounted as read-only by multiple consumers
 simultaneously.  This means that you can pre-populate a PD with your dataset
 and then serve it in parallel from as many pods as you need.  Unfortunately,
 PDs can only be mounted by a single consumer in read-write mode - no
-simultaneous writers allowed.
+simultaneous readers allowed.
 
 Using a PD on a pod controlled by a ReplicationController will fail unless
 the PD is read-only or the replica count is 0 or 1.
@@ -279,7 +279,7 @@ For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how t
 specify the usage of an NFS volume within a pod.
 
 In this example one can see that a `volumeMount` called `nfs` is being mounted
-onto `/usr/share/nginx/html` in the container `web`.  The volume "nfs" is defined as
+onto `/var/www/html` in the container `web`.  The volume "nfs" is defined as
 type `nfs`, with the NFS server serving from `nfs-server.default.kube.local`
 and exporting directory `/` as the share.  The mount being created in this
 example is writeable.
@@ -299,7 +299,7 @@ A feature of iSCSI is that it can be mounted as read-only by multiple consumers
 simultaneously.  This means that you can pre-populate a volume with your dataset
 and then serve it in parallel from as many pods as you need.  Unfortunately,
 iSCSI volumes can only be mounted by a single consumer in read-write mode - no
-simultaneous writers allowed.
+simultaneous readers allowed.
 
 See the [iSCSI example](../../examples/iscsi/) for more details.
 
@@ -425,6 +425,13 @@ In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
 request a certain amount of space using a [resource](compute-resources.html)
 specification, and to select the type of media to use, for clusters that have
 several media types.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

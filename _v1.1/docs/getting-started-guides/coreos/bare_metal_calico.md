@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Bare Metal CoreOS with Kubernetes and Project Calico"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -137,6 +137,13 @@ Once complete, restart the server.  When it comes back up, you should have SSH a
 You should now have a functional bare-metal Kubernetes cluster with one master and two compute hosts.
 Try running the [guestbook demo](../../../examples/guestbook/) to test out your new cluster!
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
