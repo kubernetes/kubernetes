@@ -244,9 +244,9 @@ func (s *StoreToDaemonSetLister) Exists(ds *extensions.DaemonSet) (bool, error) 
 
 // List lists all daemon sets in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToDaemonSetLister) List() (dss []extensions.DaemonSet, err error) {
+func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error) {
 	for _, c := range s.Store.List() {
-		dss = append(dss, *(c.(*extensions.DaemonSet)))
+		dss.Items = append(dss.Items, *(c.(*extensions.DaemonSet)))
 	}
 	return dss, nil
 }
