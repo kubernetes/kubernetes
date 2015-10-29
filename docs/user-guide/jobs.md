@@ -57,8 +57,7 @@ Documentation for other releases can be found at
 
 A _job_ creates one or more pods and ensures that a specified number of them successfully terminate.
 As pods successfully complete, the _job_ tracks the successful completions.  When a specified number
-of successful completions is reached, the job itself is complete.  Deleting a Job will cleanup the
-pods it created.
+of successful completions is reached, the job itself is complete.
 
 A simple case is to create 1 Job object in order to reliably run one Pod to completion.
 A Job can also be used to run multiple pods in parallel.
