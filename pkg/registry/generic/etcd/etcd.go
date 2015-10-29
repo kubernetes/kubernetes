@@ -54,6 +54,8 @@ import (
 // logic specific to the API.
 //
 // TODO: make the default exposed methods exactly match a generic RESTStorage
+// TODO: because all aspects of etcd have been removed it should really
+//       just be called a registry implementation.
 type Etcd struct {
 	// Called to make a new object, should return e.g., &api.Pod{}
 	NewFunc func() runtime.Object
