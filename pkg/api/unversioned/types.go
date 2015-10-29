@@ -270,11 +270,16 @@ const (
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
 
-func (*Status) IsAnAPIObject() {}
+func (*Status) IsAnAPIObject()          {}
+func (*APIVersions) IsAnAPIObject()     {}
+func (*APIGroupList) IsAnAPIObject()    {}
+func (*APIGroup) IsAnAPIObject()        {}
+func (*APIResourceList) IsAnAPIObject() {}
 
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.
 type APIVersions struct {
+	TypeMeta `json:",inline"`
 	// versions are the api versions that are available.
 	Versions []string `json:"versions"`
 }
@@ -282,6 +287,7 @@ type APIVersions struct {
 // APIGroupList is a list of APIGroup, to allow clients to discover the API at
 // /apis.
 type APIGroupList struct {
+	TypeMeta `json:",inline"`
 	// groups is a list of APIGroup.
 	Groups []APIGroup `json:"groups"`
 }
@@ -289,6 +295,7 @@ type APIGroupList struct {
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
 type APIGroup struct {
+	TypeMeta `json:",inline"`
 	// name is the name of the group.
 	Name string `json:"name"`
 	// versions are the versions supported in this group.
@@ -320,6 +327,7 @@ type APIResource struct {
 // resources supported in a specific group and version, and if the resource
 // is namespaced.
 type APIResourceList struct {
+	TypeMeta `json:",inline"`
 	// groupVersion is the group and version this APIResourceList is for.
 	GroupVersion string `json:"groupVersion"`
 	// resources contains the name of the resources and if they are namespaced.

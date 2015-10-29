@@ -225,5 +225,9 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 			return group.Codec(), nil
 		}
 	}
+	// Codec used for unversioned types
+	if api.Scheme.Recognizes("", kind) {
+		return api.Codec, nil
+	}
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
