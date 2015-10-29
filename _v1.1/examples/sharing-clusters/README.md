@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Sharing Clusters"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -211,6 +211,13 @@ eu-minion-loh2   kubernetes.io/hostname=eu-minion-loh2   Ready
 {% endhighlight %}
 
 For a more advanced example of sharing clusters, see the [service-loadbalancer](https://github.com/kubernetes/contrib/tree/master/service-loadbalancer/README.md)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

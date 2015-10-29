@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Guestbook Example\""
+---
+---
+layout: docwithnav
+title: "Guestbook Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -78,7 +82,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](redis-master-controller.yaml?raw=true)
+[Download example](redis-master-controller.yaml)
 <!-- END MUNGE: EXAMPLE redis-master-controller.yaml -->
 
 Change to the `<kubernetes>/examples/guestbook` directory if you're not already there. Create the redis master pod in your Kubernetes cluster by running:
@@ -126,7 +130,9 @@ redis-master-dz33o                             1/1       Running   0          2h
 
 ```
 {% raw %}
+{% raw %}
 kubectl get pods -o wide --all-namespaces=true
+{% endraw %}
 {% endraw %}
 ```
 
@@ -227,7 +233,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](redis-master-service.yaml?raw=true)
+[Download example](redis-master-service.yaml)
 <!-- END MUNGE: EXAMPLE redis-master-service.yaml -->
 
 Create the service by running:
@@ -322,7 +328,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](redis-slave-controller.yaml?raw=true)
+[Download example](redis-slave-controller.yaml)
 <!-- END MUNGE: EXAMPLE redis-slave-controller.yaml -->
 
 and create the replication controller by running:
@@ -379,7 +385,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](redis-slave-service.yaml?raw=true)
+[Download example](redis-slave-service.yaml)
 <!-- END MUNGE: EXAMPLE redis-slave-service.yaml -->
 
 This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
@@ -442,7 +448,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](frontend-controller.yaml?raw=true)
+[Download example](frontend-controller.yaml)
 <!-- END MUNGE: EXAMPLE frontend-controller.yaml -->
 
 Using this file, you can turn up your frontend with:
@@ -565,7 +571,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](frontend-service.yaml?raw=true)
+[Download example](frontend-service.yaml)
 <!-- END MUNGE: EXAMPLE frontend-service.yaml -->
 
 #### Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)
@@ -682,7 +688,15 @@ If you are having trouble bringing up your guestbook app, double check that your
 Then, see the [troubleshooting documentation](../../docs/troubleshooting.html) for a further list of common issues and how you can diagnose them.
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

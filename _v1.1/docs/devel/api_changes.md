@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "So you want to change the API?"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -138,7 +138,7 @@ type Frobber struct {
 	Height int           `json:"height"`
 	Width  int           `json:"width"`
 	Param  string        `json:"param"`  // the first param
-	ExtraParams []string `json:"extraParams"` // additional params
+	ExtraParams []string `json:"params"` // additional params
 }
 {% endraw %}
 {% endhighlight %}
@@ -344,7 +344,7 @@ have to do more later.  The files you want are
 
 Note that the conversion machinery doesn't generically handle conversion of values,
 such as various kinds of field references and API constants. [The client
-library](https://releases.k8s.io/v1.1.0/pkg/client/unversioned/request.go) has custom conversion code for
+library](https://releases.k8s.io/HEAD/pkg/client/unversioned/request.go) has custom conversion code for
 field references. You also need to add a call to api.Scheme.AddFieldLabelConversionFunc
 with a mapping function that understands supported translations.
 
@@ -614,6 +614,13 @@ New feature development proceeds through a series of stages of increasing maturi
   - Cluster Reliability: high
   - Support: API version will continue to be present for many subsequent software releases;
   - Recommended Use Cases: any
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()

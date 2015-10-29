@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Kubernetes Cluster Admin Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -81,6 +81,13 @@ project](salt.html).
 * **Authorization** [authorization](authorization.html)
 
 * **Admission Controllers** [admission_controllers](admission-controllers.html)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

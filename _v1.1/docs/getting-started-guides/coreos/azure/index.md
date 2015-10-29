@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Kubernetes on Azure with CoreOS and Weave\""
+---
+---
+layout: docwithnav
+title: "Kubernetes on Azure with CoreOS and Weave"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -235,6 +239,7 @@ There is no native Azure load-balancer support in Kubernetes 1.0, however here i
 
 ```
 {% raw %}
+{% raw %}
 ./expose_guestbook_app_port.sh ./output/kube_1c1496016083b4_ssh_conf
 Guestbook app is on port 31605, will map it to port 80 on kube-00
 info:    Executing command vm endpoint create
@@ -250,6 +255,7 @@ data:      Protcol                       : tcp
 data:      Virtual IP Address            : 137.117.156.164
 data:      Direct server return          : Disabled
 info:    vm endpoint show command OK
+{% endraw %}
 {% endraw %}
 ```
 
@@ -276,7 +282,15 @@ If you don't wish care about the Azure bill, you can tear down the cluster. It's
 By the way, with the scripts shown, you can deploy multiple clusters, if you like :)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/azure/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

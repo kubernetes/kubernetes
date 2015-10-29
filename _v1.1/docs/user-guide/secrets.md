@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Secrets"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -145,7 +145,7 @@ Use of imagePullSecrets is described in the [images documentation](images.html#s
 
 You can manually create an imagePullSecret, and reference it from
 a serviceAccount.  Any pods created with that serviceAccount
-or that default to use that serviceAccount, will get their imagePullSecret
+or that default to use that serviceAccount, will get have the imagePullSecret of the
 field set to that of the service account.
 See [here](service-accounts.html#adding-imagepullsecrets-to-a-service-account)
  for a detailed explanation of that process.
@@ -535,6 +535,13 @@ Pod level](#use-case-two-containers).
    by impersonating the kubelet.  It is a planned feature to only send secrets to
    nodes that actually require them, to restrict the impact of a root exploit on a
    single node.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Creating a Kubernetes Cluster\""
+---
+---
+layout: docwithnav
+title: "Creating a Kubernetes Cluster"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -135,6 +139,7 @@ AWS                  | Juju         | Ubuntu | flannel     | [docs](juju.html)  
 OpenStack/HPCloud    | Juju         | Ubuntu | flannel     | [docs](juju.html)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
 Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.html)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.html)                                    |          | Community ([@justinsb](https://github.com/justinsb))
+Azure                | Saltstack    | Ubuntu | OpenVPN     | [docs](azure.html)                                  |          | Community
 Bare-metal           | custom       | Ubuntu | Calico      | [docs](ubuntu-calico.html)                          |          | Community ([@djosborne](https://github.com/djosborne))
 Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.html)                                 |          | Community ([@resouer](https://github.com/resouer), [@WIZARD-CXY](https://github.com/WIZARD-CXY))
 Local                |              |        | _none_      | [docs](locally.html)                                |          | Community ([@preillyme](https://github.com/preillyme))
@@ -172,7 +177,15 @@ Definition of columns:
 [3]: https://gist.github.com/erictune/2f39b22f72565365e59b
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

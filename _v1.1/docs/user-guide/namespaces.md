@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Namespaces"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -102,6 +102,13 @@ in a some namespace.  However namespace resources are not themselves in a namesp
 And, low-level resources, such as [nodes](../../docs/admin/node.html) and
 persistentVolumes, are not in any namespace. Events are an exception: they may or may not
 have a namespace, depending on the object the event is about.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

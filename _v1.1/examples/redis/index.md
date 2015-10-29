@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Reliable, Scalable Redis on Kubernetes\""
+---
+---
+layout: docwithnav
+title: "Reliable, Scalable Redis on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -128,6 +132,7 @@ For those of you who are impatient, here is the summary of commands we ran in th
 
 ```
 {% raw %}
+{% raw %}
 # Create a bootstrap master
 kubectl create -f examples/redis/redis-master.yaml
 
@@ -147,10 +152,19 @@ kubectl scale rc redis-sentinel --replicas=3
 # Delete the original master pod
 kubectl delete pods redis-master
 {% endraw %}
+{% endraw %}
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/redis/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

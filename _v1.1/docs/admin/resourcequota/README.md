@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Resource Quota"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -182,6 +182,13 @@ by the namespace quota. The resource consumption is measured by resource *reques
 
 Any action that consumes those resources can be tweaked, or can pick up namespace level defaults to
 meet your end goal.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

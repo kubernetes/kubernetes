@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Images"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -262,6 +262,13 @@ common use cases and suggested solutions.
      - DO NOT use imagePullSecrets for this use case yet.
   1. A multi-tenant cluster where each tenant needs own private registry
      - NOT supported yet.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

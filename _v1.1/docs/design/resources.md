@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "The Kubernetes resource model"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -246,6 +246,13 @@ This is the amount of time a container spends accessing disk, including actuator
   * Name: "storage-iops" (or `kubernetes.io/storage-iops`)
   * Units: operations per second
   * Compressible? yes
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

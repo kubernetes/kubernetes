@@ -1,5 +1,13 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
+title: "title: \"</strong>\""
+---
+---
+layout: docwithnav
 title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -23,7 +31,11 @@ resourcequotas (quota), namespaces (ns) or endpoints (ep).
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 kubectl explain RESOURCE
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -31,11 +43,15 @@ kubectl explain RESOURCE
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 # Get the documentation of the resource and its fields
 $ kubectl explain pods
 
 # Get the documentation of a specific field of a resource
 $ kubectl explain pods.spec.containers
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -43,13 +59,19 @@ $ kubectl explain pods.spec.containers
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
       --recursive[=false]: Print the fields of fields (Currently only 1 level deep)
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
       --alsologtostderr[=false]: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
@@ -75,6 +97,8 @@ $ kubectl explain pods.spec.containers
       --v=0: log level for V logs
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 ### SEE ALSO
@@ -86,4 +110,6 @@ $ kubectl explain pods.spec.containers
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_explain.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
+
 

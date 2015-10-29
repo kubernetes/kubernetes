@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Example: Distributed task queues with Celery, RabbitMQ and Flower\""
+---
+---
+layout: docwithnav
+title: "Example: Distributed task queues with Celery, RabbitMQ and Flower"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -48,7 +52,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    component: rabbitmq
+    name: rabbitmq
   name: rabbitmq-service
 spec:
   ports:
@@ -59,7 +63,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](rabbitmq-service.yaml?raw=true)
+[Download example](rabbitmq-service.yaml)
 <!-- END MUNGE: EXAMPLE rabbitmq-service.yaml -->
 
 To start the service, run:
@@ -85,10 +89,12 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    component: rabbitmq
+    name: rabbitmq
   name: rabbitmq-controller
 spec:
   replicas: 1
+  selector:
+    component: rabbitmq
   template:
     metadata:
       labels:
@@ -106,7 +112,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](rabbitmq-controller.yaml?raw=true)
+[Download example](rabbitmq-controller.yaml)
 <!-- END MUNGE: EXAMPLE rabbitmq-controller.yaml -->
 
 Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
@@ -126,10 +132,12 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    component: celery
+    name: celery
   name: celery-controller
 spec:
   replicas: 1
+  selector:
+    component: celery
   template:
     metadata:
       labels:
@@ -147,7 +155,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](celery-controller.yaml?raw=true)
+[Download example](celery-controller.yaml)
 <!-- END MUNGE: EXAMPLE celery-controller.yaml -->
 
 There are several things to point out here...
@@ -155,6 +163,7 @@ There are several things to point out here...
 Like the RabbitMQ controller, this controller ensures that there is always a pod is running a Celery worker instance. The celery-app-add Docker image is an extension of the standard Celery image. This is the Dockerfile:
 
 ```
+{% raw %}
 {% raw %}
 FROM library/celery
 
@@ -165,6 +174,7 @@ ADD run.sh /usr/local/bin/run.sh
 ENV C_FORCE_ROOT 1
 
 CMD ["/bin/bash", "/usr/local/bin/run.sh"]
+{% endraw %}
 {% endraw %}
 ```
 
@@ -212,7 +222,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    component: flower
+    name: flower
   name: flower-service
 spec:
   ports:
@@ -224,7 +234,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](flower-service.yaml?raw=true)
+[Download example](flower-service.yaml)
 <!-- END MUNGE: EXAMPLE flower-service.yaml -->
 
 It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
@@ -232,7 +242,9 @@ On GCE this can be done with:
 
 ```
 {% raw %}
+{% raw %}
  $ gcloud compute firewall-rules create --allow=tcp:5555 --target-tags=kubernetes-minion kubernetes-minion-5555
+{% endraw %}
 {% endraw %}
 ```
 
@@ -248,10 +260,12 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    component: flower
+    name: flower
   name: flower-controller
 spec:
   replicas: 1
+  selector:
+    component: flower
   template:
     metadata:
       labels:
@@ -267,7 +281,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](flower-controller.yaml?raw=true)
+[Download example](flower-controller.yaml)
 <!-- END MUNGE: EXAMPLE flower-controller.yaml -->
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:
@@ -284,10 +298,12 @@ Once all pods are up and running, running `kubectl get pods` will display someth
 
 ```
 {% raw %}
+{% raw %}
 NAME                                           READY     REASON       RESTARTS   AGE
 celery-controller-wqkz1                        1/1       Running      0          8m
 flower-controller-7bglc                        1/1       Running      0          7m
 rabbitmq-controller-5eb2l                      1/1       Running      0          13m
+{% endraw %}
 {% endraw %}
 ```
 
@@ -295,9 +311,11 @@ rabbitmq-controller-5eb2l                      1/1       Running      0         
 
 ```
 {% raw %}
-NAME             LABELS             SELECTOR                         IP(S)            PORT(S)
-flower-service   component=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
+{% raw %}
+NAME             LABELS        SELECTOR                         IP(S)            PORT(S)
+flower-service   name=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
                                                                 162.222.181.180
+{% endraw %}
 {% endraw %}
 ```
 
@@ -305,7 +323,15 @@ Point your internet browser to the appropriate flower-service address, port 5555
 If you click on the tab called "Tasks", you should see an ever-growing list of tasks called "celery_conf.add" which the run\_tasks.py script is dispatching.
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/celery-rabbitmq/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

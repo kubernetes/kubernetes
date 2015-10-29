@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Building"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -26,6 +26,13 @@ Change Pod Definitions
 ----------------------
 Edit both `show-rc.yaml` and `backend-rc.yaml` and replace the
 specified `image:` with the one that you built.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

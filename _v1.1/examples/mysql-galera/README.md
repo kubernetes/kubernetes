@@ -1,5 +1,13 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
+title: "title: \"</strong>\""
+---
+---
+layout: docwithnav
 title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -50,6 +58,8 @@ Shown below are examples of Using ```kubectl``` from within the ```./examples/my
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 $ kubectl create -f examples/mysql-galera/pxc-cluster-service.yaml 
 services/pxc-cluster
 
@@ -66,6 +76,8 @@ services/pxc-node3
 replicationcontrollers/pxc-node3
 
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 ### Confirm a running cluster
@@ -73,6 +85,8 @@ replicationcontrollers/pxc-node3
 Verify everything is running:
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
 $ kubectl get rc,pods,services
 CONTROLLER   CONTAINER(S)   IMAGE(S)                                    SELECTOR           REPLICAS
@@ -99,6 +113,8 @@ pxc-node3     <none>    name=pxc-node3     10.100.200.14    3306/TCP
                                                             4568/TCP
 
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 The cluster should be ready for use!
@@ -108,6 +124,8 @@ The cluster should be ready for use!
 Using the name of ```pxc-cluster``` service running interactively using ```kubernetes exec```, it is possible to connect to any of the pods using the mysql client on the pod's container to verify the cluster size, which should be ```3```. In this example below, pxc-node3 replication controller is chosen, and to find out the pod name, ```kubectl get pods``` and ```awk``` are employed:
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
 $ kubectl get pods|grep pxc-node3|awk '{ print $1 }'
 pxc-node3-0b5mc
@@ -137,6 +155,8 @@ mysql> show status like 'wsrep_cluster_size';
 1 row in set (0.06 sec)
 
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 At this point, there is a working cluster that can begin being used via the pxc-cluster service IP address!
@@ -150,4 +170,6 @@ This setup certainly can become more fluid and dynamic. One idea is to perhaps u
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/mysql-galera/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
+
 

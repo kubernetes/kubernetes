@@ -47,7 +47,7 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 \fB\-o\fP, \fB\-\-output\fP=""
     Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
-\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
+\[la]http://releases.k8s.io/v1.1.0/docs/user-guide/jsonpath.md\[ra]].
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -66,7 +66,7 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
     If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
 .PP
-\fB\-\-template\fP=""
+\fB\-t\fP, \fB\-\-template\fP=""
     Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 

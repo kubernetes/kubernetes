@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Known Issues"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -28,6 +28,13 @@ Please consult this document before filing new bugs.
    * GCE PDs may sometimes fail to attach (#11302)
    * If multiple Pods use the same RBD volume in read-write mode, it is possible data on the RBD volume could get corrupted. This problem has been found in environments where both apiserver and etcd rebooted and Pods were redistributed.
       * A workaround is to ensure there is no other Ceph client using the RBD volume before mapping RBD image in read-write mode. For example, `rados -p poolname listwatchers image_name.rbd` can list RBD clients that are mapping the image.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

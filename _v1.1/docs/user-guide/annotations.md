@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Annotations"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -35,6 +35,13 @@ Possible information that could be recorded in annotations:
 * phone/pager number(s) of person(s) responsible, or directory entry where that info could be found, such as a team website
 
 Yes, this information could be stored in an external database or directory, but that would make it much harder to produce shared client libraries and tools for deployment, management, introspection, etc.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

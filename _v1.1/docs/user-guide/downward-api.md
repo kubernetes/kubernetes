@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Downward API"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -86,7 +86,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](downward-api/dapi-pod.yaml?raw=true)
+[Download example](downward-api/dapi-pod.yaml)
 <!-- END MUNGE: EXAMPLE downward-api/dapi-pod.yaml -->
 
 
@@ -160,12 +160,19 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](downward-api/volume/dapi-volume.yaml?raw=true)
+[Download example](downward-api/volume/dapi-volume.yaml)
 <!-- END MUNGE: EXAMPLE downward-api/volume/dapi-volume.yaml -->
 
 Some more thorough examples:
    * [environment variables](environment-guide/)
    * [downward API](downward-api/)
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

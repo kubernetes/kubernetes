@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Persistent Installation of MySQL and WordPress on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -50,7 +50,7 @@ Please see the [GCE getting started guide](../../docs/getting-started-guides/gce
 
 For this WordPress installation, we're going to configure our Kubernetes [pods](../../docs/user-guide/pods.html) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
 
-You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The default setup script will create the cluster in the `us-central1-b` zone, as seen in the [config-default.sh](https://releases.k8s.io/v1.1.0/cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
+You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The default setup script will create the cluster in the `us-central1-b` zone, as seen in the [config-default.sh](https://releases.k8s.io/HEAD/cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
 
 We will create two disks: one for the mysql pod, and one for the wordpress pod. In this example, we create 20GB disks, which will be sufficient for this demo. Feel free to change the size to align with your needs, as wordpress requirements can vary. Also, keep in mind that [disk performance scales with size](https://cloud.google.com/compute/docs/disks/#comparison_of_disk_types).
 
@@ -117,7 +117,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](mysql.yaml?raw=true)
+[Download example](mysql.yaml)
 <!-- END MUNGE: EXAMPLE mysql.yaml -->
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
@@ -180,7 +180,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](mysql-service.yaml?raw=true)
+[Download example](mysql-service.yaml)
 <!-- END MUNGE: EXAMPLE mysql-service.yaml -->
 
 Start the service like this:
@@ -241,7 +241,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](wordpress.yaml?raw=true)
+[Download example](wordpress.yaml)
 <!-- END MUNGE: EXAMPLE wordpress.yaml -->
 
 Create the pod:
@@ -288,7 +288,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](wordpress-service.yaml?raw=true)
+[Download example](wordpress-service.yaml)
 <!-- END MUNGE: EXAMPLE wordpress-service.yaml -->
 
 Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.
@@ -377,6 +377,13 @@ If you are ready to turn down your Kubernetes cluster altogether, run:
 $ cluster/kube-down.sh
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

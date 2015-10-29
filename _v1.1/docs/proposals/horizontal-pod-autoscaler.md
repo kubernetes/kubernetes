@@ -1,5 +1,13 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
+title: "title: \"</strong>\""
+---
+---
+layout: docwithnav
 title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -89,7 +97,11 @@ We will introduce HorizontalPodAutoscaler object, it will be accessible under:
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 api/vX/horizontalpodautoscalers/myautoscaler
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -184,7 +196,11 @@ The target number of pods will be calculated from the following formula:
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 TargetNumOfPods =ceil(sum(CurrentPodsConsumption) / Target)
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -196,7 +212,11 @@ Scale-down will wait for 10 minutes from the last rescaling. Moreover any scalin
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 avg(CurrentPodsConsumption) / Target
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -266,4 +286,6 @@ Our design is in general compatible with them.
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/horizontal-pod-autoscaler.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
+
 

@@ -1,5 +1,13 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
+title: "title: \"</strong>\""
+---
+---
+layout: docwithnav
 title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -55,6 +63,8 @@ NOTE: you should define `war` container **first** as it is the "provider".
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -79,6 +89,8 @@ spec:
   - name: app-volume
     emptyDir: {}
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 <!-- END MUNGE: EXAMPLE -->
@@ -87,9 +99,13 @@ The only magic here is the `resouer/sample:v1` image:
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 FROM busybox:latest
 ADD sample.war sample.war
 CMD "sh" "mv.sh"
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -115,6 +131,8 @@ What's more, if you don't want to enclose a build-in `mv.sh` script in the `war`
 <!-- BEGIN MUNGE: javaweb-2.yaml -->
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
 apiVersion: v1
 kind: Pod
@@ -147,6 +165,8 @@ spec:
   - name: app-volume
     emptyDir: {}
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 <!-- END MUNGE: EXAMPLE -->
@@ -155,9 +175,13 @@ And the `resouer/sample:v2` Dockerfile is quite simple:
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 FROM busybox:latest
 ADD sample.war sample.war
 CMD "tail" "-f" "/dev/null"
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
@@ -210,4 +234,6 @@ $ kubectl delete -f examples/javaweb-tomcat-sidecar/javaweb-2.yaml
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/javaweb-tomcat-sidecar/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
+
 

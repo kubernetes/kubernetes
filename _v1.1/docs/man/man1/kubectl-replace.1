@@ -22,7 +22,7 @@ $ kubectl get TYPE NAME \-o yaml
 
 .PP
 Please refer to the models in 
-\[la]https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html\[ra] to find if a field is mutable.
+\[la]https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/v1.1.0/docs/api-reference/definitions.html\[ra] to find if a field is mutable.
 
 
 .SH OPTIONS
@@ -47,8 +47,8 @@ Please refer to the models in
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
-\fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
-    If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
+\fB\-\-schema\-cache\-dir\fP="/tmp/kubectl.schema"
+    If non\-empty, load/store cached API schemas in this directory, default is '/tmp/kubectl.schema'
 
 .PP
 \fB\-\-timeout\fP=0

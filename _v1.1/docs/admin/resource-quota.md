@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Resource Quotas"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -159,6 +159,13 @@ See a [detailed example for how to use resource quota](resourcequota/)..
 ## Read More
 
 See [ResourceQuota design doc](../design/admission_control_resource_quota.html) for more information.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

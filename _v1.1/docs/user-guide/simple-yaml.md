@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Getting started with config files."
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -104,7 +104,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](replication.yaml?raw=true)
+[Download example](replication.yaml)
 <!-- END MUNGE: EXAMPLE replication.yaml -->
 
 To delete the replication controller (and the pods it created):
@@ -114,6 +114,13 @@ To delete the replication controller (and the pods it created):
 $ kubectl delete rc nginx
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

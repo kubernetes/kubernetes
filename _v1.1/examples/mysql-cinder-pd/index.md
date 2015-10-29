@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Mysql installation with cinder volume plugin\""
+---
+---
+layout: docwithnav
+title: "Mysql installation with cinder volume plugin"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -18,12 +22,14 @@ Sample cloud_config:
 
 ```
 {% raw %}
+{% raw %}
 [Global]
 auth-url=https://os-identity.vip.foo.bar.com:5443/v2.0
 username=user
 password=pass
 region=region1
 tenant-id=0c331a1df18571594d49fe68asa4e
+{% endraw %}
 {% endraw %}
 ```
 
@@ -32,9 +38,11 @@ Make sure that kubelet host machine has the following executables
 
 ```
 {% raw %}
+{% raw %}
 /bin/lsblk -- To Find out the fstype of the volume
 /sbin/mkfs.ext3 and /sbin/mkfs.ext4 -- To format the volume if required
 /usr/bin/udevadm -- To probe the volume attached so that a symlink is created under /dev/disk/by-id/ with a virtio- prefix
+{% endraw %}
 {% endraw %}
 ```
 
@@ -59,7 +67,15 @@ This should now
 4. Spin up a container with this volume mounted to the path specified in the pod definition
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/mysql-cinder-pd/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

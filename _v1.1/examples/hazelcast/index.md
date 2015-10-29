@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Cloud Native Deployments of Hazelcast using Kubernetes\""
+---
+---
+layout: docwithnav
+title: "Cloud Native Deployments of Hazelcast using Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -61,7 +65,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](hazelcast-service.yaml?raw=true)
+[Download example](hazelcast-service.yaml)
 <!-- END MUNGE: EXAMPLE hazelcast-service.yaml -->
 
 The important thing to note here is the `selector`. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is `name: hazelcast`.  If you look at the Replication Controller specification below, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
@@ -120,7 +124,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-[Download example](hazelcast-controller.yaml?raw=true)
+[Download example](hazelcast-controller.yaml)
 <!-- END MUNGE: EXAMPLE hazelcast-controller.yaml -->
 
 There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingly.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
@@ -276,7 +280,15 @@ kubectl scale rc hazelcast --replicas=4
 See [here](https://github.com/pires/hazelcast-kubernetes-bootstrapper/blob/master/src/main/java/com/github/pires/hazelcast/HazelcastDiscoveryController.java)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/hazelcast/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

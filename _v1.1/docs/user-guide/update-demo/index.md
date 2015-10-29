@@ -1,6 +1,10 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "title: \"Rolling update example\""
+---
+---
+layout: docwithnav
+title: "Rolling update example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -150,7 +154,15 @@ Note that the images included here are public domain.
 * [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)
 
 
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/update-demo/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
 

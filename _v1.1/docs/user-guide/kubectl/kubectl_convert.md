@@ -1,5 +1,13 @@
 ---
 layout: docwithnav
+title: "title: \"title: \"</strong>\"\""
+---
+---
+layout: docwithnav
+title: "title: \"</strong>\""
+---
+---
+layout: docwithnav
 title: "</strong>"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
@@ -27,13 +35,19 @@ to change to output destination.
 
 ```
 {% raw %}
+{% raw %}
+{% raw %}
 kubectl convert -f FILENAME
+{% endraw %}
+{% endraw %}
 {% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
 # Convert 'pod.yaml' to latest version and print to stdout.
 $ kubectl convert -f pod.yaml
@@ -46,11 +60,15 @@ $ kubectl convert -f pod.yaml --local -o json
 $ kubectl convert -f . | kubectl create -f -
 
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
   -f, --filename=[]: Filename, directory, or URL to file to need to get converted.
       --local[=true]: If true, convert will NOT try to contact api-server but run locally.
@@ -63,11 +81,15 @@ $ kubectl convert -f . | kubectl create -f -
       --template="": Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
       --validate[=true]: If true, use a schema to validate the input before sending it
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
+{% raw %}
 {% raw %}
       --alsologtostderr[=false]: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
@@ -93,6 +115,8 @@ $ kubectl convert -f . | kubectl create -f -
       --v=0: log level for V logs
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 {% endraw %}
+{% endraw %}
+{% endraw %}
 ```
 
 ### SEE ALSO
@@ -104,4 +128,6 @@ $ kubectl convert -f . | kubectl create -f -
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_convert.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
+
 

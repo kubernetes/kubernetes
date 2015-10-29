@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Containers with Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -96,6 +96,13 @@ The relationship between Docker's capabilities and [Linux capabilities](http://m
 | SETFCAP |  CAP_SETFCAP |
 | WAKE_ALARM |  CAP_WAKE_ALARM |
 | BLOCK_SUSPEND |  CAP_BLOCK_SUSPEND |
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

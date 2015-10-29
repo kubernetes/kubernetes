@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Cluster Admin Guide to Service Accounts"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -22,7 +22,7 @@ for a number of reasons:
   - User accounts are for humans.  Service accounts are for processes, which
     run in pods.
   - User accounts are intended to be global. Names must be unique across all
-    namespaces of a cluster, future user resource will not be namespaced.
+    namespaces of a cluster, future user resource will not be namespaced).
     Service accounts are namespaced.
   - Typically, a cluster's User accounts might be synced from a corporate
     database, where new user account creation requires special privileges and
@@ -105,6 +105,13 @@ kubectl delete secret mysecretname
 
 Service Account Controller manages ServiceAccount inside namespaces, and ensures
 a ServiceAccount named "default" exists in every active namespace.
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

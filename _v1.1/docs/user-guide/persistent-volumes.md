@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: "</strong>"
+title: "Persistent Volumes and Claims"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -205,6 +205,13 @@ spec:
         claimName: myclaim
 {% endraw %}
 {% endhighlight %}
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
