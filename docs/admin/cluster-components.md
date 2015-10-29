@@ -69,17 +69,17 @@ selects a node for them to run on.
 Addons are pods and services that implement cluster features. They don't run on
 the master VM, but currently the default setup scripts that make the API calls
 to create these pods and services does run on the master VM. See:
-[kube-master-addons](http://releases.k8s.io/v1.1.0/cluster/saltbase/salt/kube-master-addons/kube-master-addons.sh)
+[kube-master-addons](http://releases.k8s.io/release-1.1/cluster/saltbase/salt/kube-master-addons/kube-master-addons.sh)
 
 Addon objects are created in the "kube-system" namespace.
 
 Example addons are:
-* [DNS](http://releases.k8s.io/v1.1.0/cluster/addons/dns/) provides cluster local DNS.
-* [kube-ui](http://releases.k8s.io/v1.1.0/cluster/addons/kube-ui/) provides a graphical UI for the
+* [DNS](http://releases.k8s.io/release-1.1/cluster/addons/dns/) provides cluster local DNS.
+* [kube-ui](http://releases.k8s.io/release-1.1/cluster/addons/kube-ui/) provides a graphical UI for the
   cluster.
-* [fluentd-elasticsearch](http://releases.k8s.io/v1.1.0/cluster/addons/fluentd-elasticsearch/) provides
-  log storage. Also see the [gcp version](http://releases.k8s.io/v1.1.0/cluster/addons/fluentd-gcp/).
-* [cluster-monitoring](http://releases.k8s.io/v1.1.0/cluster/addons/cluster-monitoring/) provides
+* [fluentd-elasticsearch](http://releases.k8s.io/release-1.1/cluster/addons/fluentd-elasticsearch/) provides
+  log storage. Also see the [gcp version](http://releases.k8s.io/release-1.1/cluster/addons/fluentd-gcp/).
+* [cluster-monitoring](http://releases.k8s.io/release-1.1/cluster/addons/cluster-monitoring/) provides
   monitoring for the cluster.
 
 ## Node components

@@ -62,7 +62,7 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7
   -f, --filename=[]: Filename, directory, or URL to a file identifying the resource to get from a server.
   -L, --label-columns=[]: Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag statements like -L label1 -L label2...
       --no-headers[=false]: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/v1.1.0/docs/user-guide/jsonpath.md].
+  -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/release-1.1/docs/user-guide/jsonpath.md].
       --output-version="": Output the formatted object with the given version (default api-version).
   -l, --selector="": Selector (label query) to filter on
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)

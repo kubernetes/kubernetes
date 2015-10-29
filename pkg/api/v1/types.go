@@ -71,7 +71,7 @@ type ObjectMeta struct {
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names
 	Name string `json:"name,omitempty"`
 
 	// GenerateName is an optional prefix, used by the server, to generate a unique
@@ -88,7 +88,7 @@ type ObjectMeta struct {
 	// should retry (optionally after the time indicated in the Retry-After header).
 	//
 	// Applied only if Name is not specified.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#idempotency
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#idempotency
 	GenerateName string `json:"generateName,omitempty"`
 
 	// Namespace defines the space within each name must be unique. An empty namespace is
@@ -98,7 +98,7 @@ type ObjectMeta struct {
 	//
 	// Must be a DNS_LABEL.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/namespaces.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md
 	Namespace string `json:"namespace,omitempty"`
 
 	// SelfLink is a URL representing this object.
@@ -112,7 +112,7 @@ type ObjectMeta struct {
 	//
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#uids
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#uids
 	UID types.UID `json:"uid,omitempty"`
 
 	// An opaque value that represents the internal version of this object that can
@@ -124,7 +124,7 @@ type ObjectMeta struct {
 	// Populated by the system.
 	// Read-only.
 	// Value must be treated as opaque by clients and .
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#concurrency-control-and-consistency
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#concurrency-control-and-consistency
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
 	// A sequence number representing a specific generation of the desired state.
@@ -140,7 +140,7 @@ type ObjectMeta struct {
 	// Populated by the system.
 	// Read-only.
 	// Null for lists.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	CreationTimestamp unversioned.Time `json:"creationTimestamp,omitempty"`
 
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
@@ -156,7 +156,7 @@ type ObjectMeta struct {
 	//
 	// Populated by the system when a graceful deletion is requested.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	DeletionTimestamp *unversioned.Time `json:"deletionTimestamp,omitempty"`
 
 	// Number of seconds allowed for this object to gracefully terminate before
@@ -168,14 +168,14 @@ type ObjectMeta struct {
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md
 	// TODO: replace map[string]string with labels.LabelSet type
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
 	// set by external tools to store and retrieve arbitrary metadata. They are not
 	// queryable and should be preserved when modifying objects.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/annotations.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/annotations.md
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
@@ -190,7 +190,7 @@ const (
 type Volume struct {
 	// Volume's name.
 	// Must be a DNS_LABEL and unique within the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names
 	Name string `json:"name"`
 	// VolumeSource represents the location and type of the mounted volume.
 	// If not specified, the Volume is implied to be an EmptyDir.
@@ -205,46 +205,46 @@ type VolumeSource struct {
 	// machine that is directly exposed to the container. This is generally
 	// used for system agents or other privileged things that are allowed
 	// to see the host machine. Most containers will NOT need this.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#hostpath
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#hostpath
 	// ---
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
 	// mount host directories as read/write.
 	HostPath *HostPathVolumeSource `json:"hostPath,omitempty"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#emptydir
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#emptydir
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir,omitempty"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk,omitempty"`
 	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo,omitempty"`
 	// Secret represents a secret that should populate this volume.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#secrets
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#secrets
 	Secret *SecretVolumeSource `json:"secret,omitempty"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs
 	NFS *NFSVolumeSource `json:"nfs,omitempty"`
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/v1.1.0/examples/iscsi/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/iscsi/README.md
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
 	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
-	// More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty"`
 	// PersistentVolumeClaimVolumeSource represents a reference to a
 	// PersistentVolumeClaim in the same namespace.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
-	// More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
@@ -265,7 +265,7 @@ type VolumeSource struct {
 // type of volume that is owned by someone else (the system).
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	ClaimName string `json:"claimName"`
 	// Will force the ReadOnly setting in VolumeMounts.
 	// Default false.
@@ -277,33 +277,33 @@ type PersistentVolumeClaimVolumeSource struct {
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk,omitempty"`
 	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty"`
 	// HostPath represents a directory on the host.
 	// Provisioned by a developer or tester.
 	// This is useful for single-node development and testing only!
 	// On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#hostpath
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#hostpath
 	HostPath *HostPathVolumeSource `json:"hostPath,omitempty"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and
 	// exposed to the pod. Provisioned by an admin.
-	// More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty"`
 	// NFS represents an NFS mount on the host. Provisioned by an admin.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs
 	NFS *NFSVolumeSource `json:"nfs,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
-	// More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
@@ -315,44 +315,44 @@ type PersistentVolumeSource struct {
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
-// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md
+// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md
 type PersistentVolume struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines a specification of a persistent volume owned by the cluster.
 	// Provisioned by an administrator.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistent-volumes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistent-volumes
 	Spec PersistentVolumeSpec `json:"spec,omitempty"`
 
 	// Status represents the current information/status for the persistent volume.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistent-volumes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistent-volumes
 	Status PersistentVolumeStatus `json:"status,omitempty"`
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
 type PersistentVolumeSpec struct {
 	// A description of the persistent volume's resources and capacity.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#capacity
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#capacity
 	Capacity ResourceList `json:"capacity,omitempty"`
 	// The actual volume backing the persistent volume.
 	PersistentVolumeSource `json:",inline"`
 	// AccessModes contains all ways the volume can be mounted.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#access-modes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#access-modes
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// Expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#binding
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#binding
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 	// What happens to a persistent volume when released from its claim.
 	// Valid options are Retain (default) and Recycle.
 	// Recyling must be supported by the volume plugin underlying this persistent volume.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#recycling-policy
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#recycling-policy
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
 }
 
@@ -374,7 +374,7 @@ const (
 // PersistentVolumeStatus is the current status of a persistent volume.
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#phase
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#phase
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
 	// A human-readable message indicating details about why the volume is in this state.
 	Message string `json:"message,omitempty"`
@@ -387,10 +387,10 @@ type PersistentVolumeStatus struct {
 type PersistentVolumeList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 	// List of persistent volumes.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md
 	Items []PersistentVolume `json:"items"`
 }
 
@@ -398,16 +398,16 @@ type PersistentVolumeList struct {
 type PersistentVolumeClaim struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired characteristics of a volume requested by a pod author.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
 
 	// Status represents the current information/status of a persistent volume claim.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	Status PersistentVolumeClaimStatus `json:"status,omitempty"`
 }
 
@@ -415,10 +415,10 @@ type PersistentVolumeClaim struct {
 type PersistentVolumeClaimList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 	// A list of persistent volume claims.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	Items []PersistentVolumeClaim `json:"items"`
 }
 
@@ -426,10 +426,10 @@ type PersistentVolumeClaimList struct {
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// AccessModes contains the desired access modes the volume should have.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#access-modes-1
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Resources represents the minimum resources the volume should have.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#resources
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#resources
 	Resources ResourceRequirements `json:"resources,omitempty"`
 	// VolumeName is the binding reference to the PersistentVolume backing this claim.
 	VolumeName string `json:"volumeName,omitempty"`
@@ -440,7 +440,7 @@ type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim.
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
 	// AccessModes contains the actual access modes the volume backing the PVC has.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#access-modes-1
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume.
 	Capacity ResourceList `json:"capacity,omitempty"`
@@ -487,7 +487,7 @@ const (
 // HostPathVolumeSource represents bare host directory volume.
 type HostPathVolumeSource struct {
 	// Path of the directory on the host.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#hostpath
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#hostpath
 	Path string `json:"path"`
 }
 
@@ -496,23 +496,23 @@ type EmptyDirVolumeSource struct {
 	// What type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
 	// Must be an empty string (default) or Memory.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#emptydir
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#emptydir
 	Medium StorageMedium `json:"medium,omitempty"`
 }
 
 // GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod.
 type GlusterfsVolumeSource struct {
 	// EndpointsName is the endpoint name that details Glusterfs topology.
-	// More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md#create-a-pod
+	// More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md#create-a-pod
 	EndpointsName string `json:"endpoints"`
 
 	// Path is the Glusterfs volume path.
-	// More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md#create-a-pod
+	// More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md#create-a-pod
 	Path string `json:"path"`
 
 	// ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
 	// Defaults to false.
-	// More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md#create-a-pod
+	// More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md#create-a-pod
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -522,37 +522,37 @@ type StorageMedium string
 // RBDVolumeSource represents a Rados Block Device Mount that lasts the lifetime of a pod
 type RBDVolumeSource struct {
 	// A collection of Ceph monitors.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it
 	CephMonitors []string `json:"monitors"`
 	// The rados image name.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it
 	RBDImage string `json:"image"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs".
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#rbd
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#rbd
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// The rados pool name.
 	// Default is rbd.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it.
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it.
 	RBDPool string `json:"pool"`
 	// The rados user name.
 	// Default is admin.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it
 	RadosUser string `json:"user"`
 	// Keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it
 	Keyring string `json:"keyring"`
 	// SecretRef is name of the authentication secret for RBDUser. If provided
 	// overrides keyring.
 	// Default is empty.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it
 	SecretRef *LocalObjectReference `json:"secretRef"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
-	// More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -561,36 +561,36 @@ type RBDVolumeSource struct {
 // The volume must also be in the same region as the kubelet.
 type CinderVolumeSource struct {
 	// volume id used to identify the volume in cinder
-	// More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md
 	VolumeID string `json:"volumeID"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Only ext3 and ext4 are allowed
-	// More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
-	// More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md
+	// More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod
 type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
-	// More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it
 	Monitors []string `json:"monitors"`
 	// Optional: User is the rados user name, default is admin
-	// More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it
 	User string `json:"user,omitempty"`
 	// Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
-	// More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it
 	SecretFile string `json:"secretFile,omitempty"`
 	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
-	// More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
-	// More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it
+	// More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -622,23 +622,23 @@ const (
 // A GCE PD can only be mounted as read/write once.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource in GCE. Used to identify the disk in GCE.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk
 	PDName string `json:"pdName"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs".
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType"`
 	// The partition in the volume that you want to mount.
 	// If omitted, the default is to mount by volume name.
 	// Examples: For volume /dev/sda1, you specify the partition as "1".
 	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk
 	Partition int `json:"partition,omitempty"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -649,12 +649,12 @@ type GCEPersistentDiskVolumeSource struct {
 // Note: Amazon EBS volumes can be mounted to only one instance at a time.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore
 	VolumeID string `json:"volumeID"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs".
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType"`
 	// The partition in the volume that you want to mount.
@@ -664,7 +664,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 	Partition int `json:"partition,omitempty"`
 	// Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
 	// If omitted, the default is "false".
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -677,27 +677,27 @@ type GitRepoVolumeSource struct {
 }
 
 // SecretVolumeSource adapts a Secret into a VolumeSource.
-// More info: http://releases.k8s.io/v1.1.0/docs/design/secrets.md
+// More info: http://releases.k8s.io/release-1.1/docs/design/secrets.md
 type SecretVolumeSource struct {
 	// SecretName is the name of a secret in the pod's namespace.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#secrets
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#secrets
 	SecretName string `json:"secretName"`
 }
 
 // NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod
 type NFSVolumeSource struct {
 	// Server is the hostname or IP address of the NFS server.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs
 	Server string `json:"server"`
 
 	// Path that is exported by the NFS server.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs
 	Path string `json:"path"`
 
 	// ReadOnly here will force
 	// the NFS export to be mounted with read-only permissions.
 	// Defaults to false.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
@@ -713,7 +713,7 @@ type ISCSIVolumeSource struct {
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs".
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#iscsi
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#iscsi
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
@@ -851,11 +851,11 @@ type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
 	// Number of seconds after the container has started before liveness probes are initiated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
 	// Number of seconds after which liveness probes timeout.
 	// Defaults to 1 second.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes
 	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
 }
 
@@ -885,12 +885,12 @@ type Capabilities struct {
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/resources.md#resource-specifications
+	// More info: http://releases.k8s.io/release-1.1/docs/design/resources.md#resource-specifications
 	Limits ResourceList `json:"limits,omitempty"`
 	// Requests describes the minimum amount of compute resources required.
 	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
 	// otherwise to an implementation-defined value.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/resources.md#resource-specifications
+	// More info: http://releases.k8s.io/release-1.1/docs/design/resources.md#resource-specifications
 	Requests ResourceList `json:"requests,omitempty"`
 }
 
@@ -906,7 +906,7 @@ type Container struct {
 	// Cannot be updated.
 	Name string `json:"name"`
 	// Docker image name.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md
 	Image string `json:"image,omitempty"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's entrypoint is used if this is not provided.
@@ -915,7 +915,7 @@ type Container struct {
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
 	// regardless of whether the variable exists or not.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/containers.md#containers-and-commands
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands
 	Command []string `json:"command,omitempty"`
 	// Arguments to the entrypoint.
 	// The docker image's cmd is used if this is not provided.
@@ -924,7 +924,7 @@ type Container struct {
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
 	// regardless of whether the variable exists or not.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/containers.md#containers-and-commands
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands
 	Args []string `json:"args,omitempty"`
 	// Container's working directory.
 	// Defaults to Docker's default. D
@@ -939,7 +939,7 @@ type Container struct {
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#resources
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#resources
 	Resources ResourceRequirements `json:"resources,omitempty"`
 	// Pod volumes to mount into the container's filesyste.
 	// Cannot be updated.
@@ -947,12 +947,12 @@ type Container struct {
 	// Periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes
 	LivenessProbe *Probe `json:"livenessProbe,omitempty"`
 	// Periodic probe of container service readiness.
 	// Container will be removed from service endpoints if the probe fails.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty"`
 	// Actions that the management system should take in response to container lifecycle events.
 	// Cannot be updated.
@@ -967,10 +967,10 @@ type Container struct {
 	// One of Always, Never, IfNotPresent.
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md#updating-images
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md#updating-images
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty"`
 	// Security options the pod should run with.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md
+	// More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md
 	SecurityContext *SecurityContext `json:"securityContext,omitempty"`
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
@@ -1014,14 +1014,14 @@ type Lifecycle struct {
 	// PostStart is called immediately after a container is created. If the handler fails,
 	// the container is terminated and restarted according to its restart policy.
 	// Other management of the container blocks until the hook completes.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/container-environment.md#hook-details
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/container-environment.md#hook-details
 	PostStart *Handler `json:"postStart,omitempty"`
 	// PreStop is called immediately before a container is terminated.
 	// The container is terminated after the handler completes.
 	// The reason for termination is passed to the handler.
 	// Regardless of the outcome of the handler, the container is eventually terminated.
 	// Other management of the container blocks until the hook completes.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/container-environment.md#hook-details
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/container-environment.md#hook-details
 	PreStop *Handler `json:"preStop,omitempty"`
 }
 
@@ -1098,13 +1098,13 @@ type ContainerStatus struct {
 	// garbage collection. This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount"`
 	// The image the container is running.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md
 	// TODO(dchen1107): Which image the container is running with?
 	Image string `json:"image"`
 	// ImageID of the container's image.
 	ImageID string `json:"imageID"`
 	// Container's ID in the format 'docker://<container_id>'.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/container-environment.md#container-information
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/container-environment.md#container-information
 	ContainerID string `json:"containerID,omitempty"`
 }
 
@@ -1145,11 +1145,11 @@ const (
 type PodCondition struct {
 	// Type is the type of the condition.
 	// Currently only Ready.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#pod-conditions
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#pod-conditions
 	Type PodConditionType `json:"type"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#pod-conditions
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#pod-conditions
 	Status ConditionStatus `json:"status"`
 	// Last time we probed the condition.
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
@@ -1192,18 +1192,18 @@ const (
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md
 	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
 	// There must be at least one container in a Pod.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/containers.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/containers.md
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
 	// Restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never.
 	// Default to Always.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#restartpolicy
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#restartpolicy
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates delete immediately.
@@ -1223,11 +1223,11 @@ type PodSpec struct {
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/node-selection/README.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/node-selection/README.md
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/service_accounts.md
+	// More info: http://releases.k8s.io/release-1.1/docs/design/service_accounts.md
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 	// DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
 	// Deprecated: Use serviceAccountName instead.
@@ -1250,7 +1250,7 @@ type PodSpec struct {
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use. For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
@@ -1258,10 +1258,10 @@ type PodSpec struct {
 // state of a system.
 type PodStatus struct {
 	// Current condition of the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#pod-phase
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#pod-phase
 	Phase PodPhase `json:"phase,omitempty"`
 	// Current service state of pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#pod-conditions
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#pod-conditions
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// A human readable message indicating details about why the pod is in this condition.
 	Message string `json:"message,omitempty"`
@@ -1281,7 +1281,7 @@ type PodStatus struct {
 
 	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-statuses
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-statuses
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
 }
 
@@ -1289,13 +1289,13 @@ type PodStatus struct {
 type PodStatusResult struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 	// Most recently observed status of the pod.
 	// This data may not be up to date.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status PodStatus `json:"status,omitempty"`
 }
 
@@ -1304,18 +1304,18 @@ type PodStatusResult struct {
 type Pod struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec PodSpec `json:"spec,omitempty"`
 
 	// Most recently observed status of the pod.
 	// This data may not be up to date.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status PodStatus `json:"status,omitempty"`
 }
 
@@ -1323,22 +1323,22 @@ type Pod struct {
 type PodList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of pods.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pods.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/pods.md
 	Items []Pod `json:"items"`
 }
 
 // PodTemplateSpec describes the data a pod should have when created from a template
 type PodTemplateSpec struct {
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the pod.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec PodSpec `json:"spec,omitempty"`
 }
 
@@ -1346,11 +1346,11 @@ type PodTemplateSpec struct {
 type PodTemplate struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Template defines the pods that will be created from this pod template.
-	// http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Template PodTemplateSpec `json:"template,omitempty"`
 }
 
@@ -1358,7 +1358,7 @@ type PodTemplate struct {
 type PodTemplateList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of pod templates
@@ -1370,14 +1370,14 @@ type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas *int `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
 	// Label keys and values that must match in order to be controlled by this replication
 	// controller, if empty defaulted to labels on Pod template.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md#label-selectors
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
@@ -1387,7 +1387,7 @@ type ReplicationControllerSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. This takes precedence over a TemplateRef.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/replication-controller.md#pod-template
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/replication-controller.md#pod-template
 	Template *PodTemplateSpec `json:"template,omitempty"`
 }
 
@@ -1395,7 +1395,7 @@ type ReplicationControllerSpec struct {
 // controller.
 type ReplicationControllerStatus struct {
 	// Replicas is the most recently oberved number of replicas.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas int `json:"replicas"`
 
 	// ObservedGeneration reflects the generation of the most recently observed replication controller.
@@ -1408,18 +1408,18 @@ type ReplicationController struct {
 
 	// If the Labels of a ReplicationController are empty, they are defaulted to
 	// be the same as the Pod(s) that the replication controller manages.
-	// Standard object's metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// Standard object's metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the specification of the desired behavior of the replication controller.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec ReplicationControllerSpec `json:"spec,omitempty"`
 
 	// Status is the most recently observed status of the replication controller.
 	// This data may be out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status ReplicationControllerStatus `json:"status,omitempty"`
 }
 
@@ -1427,11 +1427,11 @@ type ReplicationController struct {
 type ReplicationControllerList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of replication controllers.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/replication-controller.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/replication-controller.md
 	Items []ReplicationController `json:"items"`
 }
 
@@ -1493,13 +1493,13 @@ type LoadBalancerIngress struct {
 // ServiceSpec describes the attributes that a user creates on a service.
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	Ports []ServicePort `json:"ports"`
 
 	// This service will route traffic to pods having labels matching this selector.
 	// Label keys and values that must match in order to receive traffic for this service.
 	// If empty, all pods are selected, if not specified, endpoints must be manually specified.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#overview
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#overview
 	Selector map[string]string `json:"selector,omitempty"`
 
 	// ClusterIP is usually assigned by the master and is the IP address of the service.
@@ -1508,12 +1508,12 @@ type ServiceSpec struct {
 	// Valid values are None, empty string (""), or a valid IP address.
 	// 'None' can be specified for a headless service when proxying is not required.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
 
 	// Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer.
 	// Defaults to ClusterIP.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#external-services
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#external-services
 	Type ServiceType `json:"type,omitempty"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
@@ -1536,7 +1536,7 @@ type ServiceSpec struct {
 	// Enable client IP based session affinity.
 	// Must be ClientIP or None.
 	// Defaults to None.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
 
 	// Only applies to Service Type: LoadBalancer
@@ -1568,14 +1568,14 @@ type ServicePort struct {
 	// target Pod's container ports. If this is not specified, the value
 	// of Port is used (an identity map).
 	// Defaults to the service port.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#defining-a-service
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#defining-a-service
 	TargetPort util.IntOrString `json:"targetPort,omitempty"`
 
 	// The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
 	// Usually assigned by the system. If specified, it will be allocated to the service
 	// if unused or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/services.md#type--nodeport
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/services.md#type--nodeport
 	NodePort int `json:"nodePort,omitempty"`
 }
 
@@ -1585,17 +1585,17 @@ type ServicePort struct {
 type Service struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a service.
-	// http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec ServiceSpec `json:"spec,omitempty"`
 
 	// Most recently observed status of the service.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status ServiceStatus `json:"status,omitempty"`
 }
 
@@ -1609,7 +1609,7 @@ const (
 type ServiceList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of services
@@ -1623,17 +1623,17 @@ type ServiceList struct {
 type ServiceAccount struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/secrets.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/secrets.md
 	Secrets []ObjectReference `json:"secrets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
 	// in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/secrets.md#manually-specifying-an-imagepullsecret
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/secrets.md#manually-specifying-an-imagepullsecret
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
@@ -1641,11 +1641,11 @@ type ServiceAccount struct {
 type ServiceAccountList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of ServiceAccounts.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/service_accounts.md#service-accounts
+	// More info: http://releases.k8s.io/release-1.1/docs/design/service_accounts.md#service-accounts
 	Items []ServiceAccount `json:"items"`
 }
 
@@ -1664,7 +1664,7 @@ type ServiceAccountList struct {
 type Endpoints struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// The set of all endpoints is the union of all subsets. Addresses are placed into
@@ -1731,7 +1731,7 @@ type EndpointPort struct {
 type EndpointsList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of endpoints.
@@ -1748,7 +1748,7 @@ type NodeSpec struct {
 	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	ProviderID string `json:"providerID,omitempty"`
 	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
-	// More info: http://releases.k8s.io/v1.1.0/docs/admin/node.md#manual-node-administration"`
+	// More info: http://releases.k8s.io/release-1.1/docs/admin/node.md#manual-node-administration"`
 	Unschedulable bool `json:"unschedulable,omitempty"`
 }
 
@@ -1787,22 +1787,22 @@ type NodeSystemInfo struct {
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the available resources of a node.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#capacity for more details.
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#capacity for more details.
 	Capacity ResourceList `json:"capacity,omitempty"`
 	// NodePhase is the recently observed lifecycle phase of the node.
-	// More info: http://releases.k8s.io/v1.1.0/docs/admin/node.md#node-phase
+	// More info: http://releases.k8s.io/release-1.1/docs/admin/node.md#node-phase
 	Phase NodePhase `json:"phase,omitempty"`
 	// Conditions is an array of current observed node conditions.
-	// More info: http://releases.k8s.io/v1.1.0/docs/admin/node.md#node-condition
+	// More info: http://releases.k8s.io/release-1.1/docs/admin/node.md#node-condition
 	Conditions []NodeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// List of addresses reachable to the node.
 	// Queried from cloud provider, if available.
-	// More info: http://releases.k8s.io/v1.1.0/docs/admin/node.md#node-addresses
+	// More info: http://releases.k8s.io/release-1.1/docs/admin/node.md#node-addresses
 	Addresses []NodeAddress `json:"addresses,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 	// Endpoints of daemons running on the Node.
 	DaemonEndpoints NodeDaemonEndpoints `json:"daemonEndpoints,omitempty"`
 	// Set of ids/uuids to uniquely identify the node.
-	// More info: http://releases.k8s.io/v1.1.0/docs/admin/node.md#node-info
+	// More info: http://releases.k8s.io/release-1.1/docs/admin/node.md#node-info
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }
 
@@ -1884,17 +1884,17 @@ type ResourceList map[ResourceName]resource.Quantity
 type Node struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a node.
-	// http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec NodeSpec `json:"spec,omitempty"`
 
 	// Most recently observed status of the node.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status NodeStatus `json:"status,omitempty"`
 }
 
@@ -1902,7 +1902,7 @@ type Node struct {
 type NodeList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of nodes
@@ -1919,14 +1919,14 @@ const (
 // NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/namespaces.md#finalizers
+	// More info: http://releases.k8s.io/release-1.1/docs/design/namespaces.md#finalizers
 	Finalizers []FinalizerName `json:"finalizers,omitempty"`
 }
 
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/namespaces.md#phases
+	// More info: http://releases.k8s.io/release-1.1/docs/design/namespaces.md#phases
 	Phase NamespacePhase `json:"phase,omitempty"`
 }
 
@@ -1945,15 +1945,15 @@ const (
 type Namespace struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Namespace.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec NamespaceSpec `json:"spec,omitempty"`
 
 	// Status describes the current status of a Namespace.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status NamespaceStatus `json:"status,omitempty"`
 }
 
@@ -1961,11 +1961,11 @@ type Namespace struct {
 type NamespaceList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Namespace objects in the list.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/namespaces.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md
 	Items []Namespace `json:"items"`
 }
 
@@ -1974,7 +1974,7 @@ type NamespaceList struct {
 type Binding struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// The target object that you want to bind to the standard object.
@@ -2114,21 +2114,21 @@ type PodProxyOptions struct {
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	// Kind of the referent.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	Kind string `json:"kind,omitempty"`
 	// Namespace of the referent.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/namespaces.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md
 	Namespace string `json:"namespace,omitempty"`
 	// Name of the referent.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names
 	Name string `json:"name,omitempty"`
 	// UID of the referent.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#uids
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#uids
 	UID types.UID `json:"uid,omitempty"`
 	// API version of the referent.
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Specific resourceVersion to which this reference is made, if any.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#concurrency-control-and-consistency
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#concurrency-control-and-consistency
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
 	// If referring to a piece of an object instead of an entire object, this string
@@ -2146,7 +2146,7 @@ type ObjectReference struct {
 // referenced object inside the same namespace.
 type LocalObjectReference struct {
 	// Name of the referent.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names
 	// TODO: Add other useful fields. apiVersion, kind, uid?
 	Name string `json:"name,omitempty"`
 }
@@ -2171,7 +2171,7 @@ type EventSource struct {
 type Event struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata"`
 
 	// The object that this event is about.
@@ -2203,7 +2203,7 @@ type Event struct {
 type EventList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of events
@@ -2214,7 +2214,7 @@ type EventList struct {
 type List struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of objects
@@ -2257,11 +2257,11 @@ type LimitRangeSpec struct {
 type LimitRange struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the limits enforced.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec LimitRangeSpec `json:"spec,omitempty"`
 }
 
@@ -2269,11 +2269,11 @@ type LimitRange struct {
 type LimitRangeList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of LimitRange objects.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/admission_control_limit_range.md
+	// More info: http://releases.k8s.io/release-1.1/docs/design/admission_control_limit_range.md
 	Items []LimitRange `json:"items"`
 }
 
@@ -2296,14 +2296,14 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
+	// More info: http://releases.k8s.io/release-1.1/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
 	Hard ResourceList `json:"hard,omitempty"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
+	// More info: http://releases.k8s.io/release-1.1/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
 	Hard ResourceList `json:"hard,omitempty"`
 	// Used is the current observed total usage of the resource in the namespace.
 	Used ResourceList `json:"used,omitempty"`
@@ -2313,15 +2313,15 @@ type ResourceQuotaStatus struct {
 type ResourceQuota struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired quota.
-	// http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Spec ResourceQuotaSpec `json:"spec,omitempty"`
 
 	// Status defines the actual enforced quota and its current usage.
-	// http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status
+	// http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status
 	Status ResourceQuotaStatus `json:"status,omitempty"`
 }
 
@@ -2329,11 +2329,11 @@ type ResourceQuota struct {
 type ResourceQuotaList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of ResourceQuota objects.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
+	// More info: http://releases.k8s.io/release-1.1/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
 	Items []ResourceQuota `json:"items"`
 }
 
@@ -2342,7 +2342,7 @@ type ResourceQuotaList struct {
 type Secret struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN
@@ -2397,11 +2397,11 @@ const (
 type SecretList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of secret objects.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/secrets.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/secrets.md
 	Items []Secret `json:"items"`
 }
 
@@ -2433,7 +2433,7 @@ type ComponentCondition struct {
 type ComponentStatus struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// List of component conditions observed
@@ -2444,7 +2444,7 @@ type ComponentStatus struct {
 type ComponentStatusList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of ComponentStatus objects.
@@ -2469,23 +2469,23 @@ type DownwardAPIVolumeFile struct {
 type SecurityContext struct {
 	// The linux kernel capabilites that should be added or removed.
 	// Default to Container.Capabilities if left unset.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context
+	// More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context
 	Capabilities *Capabilities `json:"capabilities,omitempty"`
 
 	// Run the container in privileged mode.
 	// Default to Container.Privileged if left unset.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context
+	// More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context
 	Privileged *bool `json:"privileged,omitempty"`
 
 	// SELinuxOptions are the labels to be applied to the container
 	// and volumes.
 	// Options that control the SELinux labels applied.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context
+	// More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
 
 	// RunAsUser is the UID to run the entrypoint of the container process.
 	// The user id that runs the first process in the container.
-	// More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context
+	// More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context
 	RunAsUser *int64 `json:"runAsUser,omitempty"`
 
 	// RunAsNonRoot indicates that the container should be run as a non-root user. If the RunAsUser
@@ -2497,19 +2497,19 @@ type SecurityContext struct {
 // SELinuxOptions are the labels to be applied to the container
 type SELinuxOptions struct {
 	// User is a SELinux user label that applies to the container.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md
 	User string `json:"user,omitempty"`
 
 	// Role is a SELinux role label that applies to the container.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md
 	Role string `json:"role,omitempty"`
 
 	// Type is a SELinux type label that applies to the container.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md
 	Type string `json:"type,omitempty"`
 
 	// Level is SELinux level label that applies to the container.
-	// More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md
+	// More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md
 	Level string `json:"level,omitempty"`
 }
 
@@ -2517,7 +2517,7 @@ type SELinuxOptions struct {
 type RangeAllocation struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata
+	// More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Range is string that identifies the range represented by 'data'.

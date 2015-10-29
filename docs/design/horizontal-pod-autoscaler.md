@@ -12,7 +12,7 @@ The autoscaler (implemented as a Kubernetes API resource and controller) is resp
 the number of replicas of some collection (e.g. the pods of a ReplicationController) to meet some objective(s),
 for example a target per-pod CPU utilization.
 
-This design supersedes [autoscaling.md](http://releases.k8s.io/v1.1.0/docs/proposals/autoscaling.md).
+This design supersedes [autoscaling.md](http://releases.k8s.io/release-1.1/docs/proposals/autoscaling.md).
 
 ## Overview
 

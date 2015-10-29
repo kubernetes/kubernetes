@@ -2242,11 +2242,11 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
@@ -2271,7 +2271,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      }
     }
    },
@@ -2281,19 +2281,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta1.HorizontalPodAutoscalerSpec",
-      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status."
+      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status."
      },
      "status": {
       "$ref": "v1beta1.HorizontalPodAutoscalerStatus",
@@ -2307,15 +2307,15 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names"
+      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names"
      },
      "generateName": {
       "type": "string",
-      "description": "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#idempotency"
+      "description": "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#idempotency"
      },
      "namespace": {
       "type": "string",
-      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/namespaces.md"
+      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md"
      },
      "selfLink": {
       "type": "string",
@@ -2323,11 +2323,11 @@
      },
      "uid": {
       "type": "string",
-      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#uids"
+      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#uids"
      },
      "resourceVersion": {
       "type": "string",
-      "description": "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+      "description": "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      },
      "generation": {
       "type": "integer",
@@ -2336,11 +2336,11 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "deletionTimestamp": {
       "type": "string",
-      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "deletionGracePeriodSeconds": {
       "type": "integer",
@@ -2349,11 +2349,11 @@
      },
      "labels": {
       "type": "any",
-      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md"
+      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md"
      },
      "annotations": {
       "type": "any",
-      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/annotations.md"
+      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://releases.k8s.io/release-1.1/docs/user-guide/annotations.md"
      }
     }
    },
@@ -2391,15 +2391,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind of the referent; More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds\""
+      "description": "Kind of the referent; More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds\""
      },
      "namespace": {
       "type": "string",
-      "description": "Namespace of the referent; More info: http://releases.k8s.io/v1.1.0/docs/user-guide/namespaces.md"
+      "description": "Namespace of the referent; More info: http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md"
      },
      "name": {
       "type": "string",
-      "description": "Name of the referent; More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent; More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names"
      },
      "apiVersion": {
       "type": "string",
@@ -2482,19 +2482,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Standard list metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "status": {
       "type": "string",
-      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status"
      },
      "message": {
       "type": "string",
@@ -2525,7 +2525,7 @@
      },
      "kind": {
       "type": "string",
-      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "causes": {
       "type": "array",
@@ -2568,11 +2568,11 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "gracePeriodSeconds": {
       "type": "integer",
@@ -2590,15 +2590,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -2615,23 +2615,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta1.IngressSpec",
-      "description": "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta1.IngressStatus",
-      "description": "Status is the current state of the Ingress. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Status is the current state of the Ingress. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -2769,15 +2769,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "Standard list metadata More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -2794,23 +2794,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta1.JobSpec",
-      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta1.JobStatus",
-      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -2824,20 +2824,20 @@
      "parallelism": {
       "type": "integer",
       "format": "int32",
-      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/jobs.md"
+      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://releases.k8s.io/release-1.1/docs/user-guide/jobs.md"
      },
      "completions": {
       "type": "integer",
       "format": "int32",
-      "description": "Completions specifies the desired number of successfully finished pods the job should be run with. Defaults to 1. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/jobs.md"
+      "description": "Completions specifies the desired number of successfully finished pods the job should be run with. Defaults to 1. More info: http://releases.k8s.io/release-1.1/docs/user-guide/jobs.md"
      },
      "selector": {
       "$ref": "v1beta1.PodSelector",
-      "description": "Selector is a label query over pods that should match the pod count. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md#label-selectors"
+      "description": "Selector is a label query over pods that should match the pod count. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/jobs.md"
+      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://releases.k8s.io/release-1.1/docs/user-guide/jobs.md"
      }
     }
    },
@@ -2889,11 +2889,11 @@
     "properties": {
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.PodSpec",
-      "description": "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -2909,18 +2909,18 @@
       "items": {
        "$ref": "v1.Volume"
       },
-      "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md"
+      "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md"
      },
      "containers": {
       "type": "array",
       "items": {
        "$ref": "v1.Container"
       },
-      "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/containers.md"
+      "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/containers.md"
      },
      "restartPolicy": {
       "type": "string",
-      "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#restartpolicy"
+      "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#restartpolicy"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
@@ -2938,11 +2938,11 @@
      },
      "nodeSelector": {
       "type": "any",
-      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/node-selection/README.md"
+      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/release-1.1/docs/user-guide/node-selection/README.md"
      },
      "serviceAccountName": {
       "type": "string",
-      "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/v1.1.0/docs/design/service_accounts.md"
+      "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/release-1.1/docs/design/service_accounts.md"
      },
      "serviceAccount": {
       "type": "string",
@@ -2969,7 +2969,7 @@
       "items": {
        "$ref": "v1.LocalObjectReference"
       },
-      "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod"
+      "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod"
      }
     }
    },
@@ -2982,23 +2982,23 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names"
+      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names"
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#hostpath"
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#hostpath"
      },
      "emptyDir": {
       "$ref": "v1.EmptyDirVolumeSource",
-      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#emptydir"
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#emptydir"
      },
      "gcePersistentDisk": {
       "$ref": "v1.GCEPersistentDiskVolumeSource",
-      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "awsElasticBlockStore": {
       "$ref": "v1.AWSElasticBlockStoreVolumeSource",
-      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
@@ -3006,31 +3006,31 @@
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
-      "description": "Secret represents a secret that should populate this volume. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#secrets"
+      "description": "Secret represents a secret that should populate this volume. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#secrets"
      },
      "nfs": {
       "$ref": "v1.NFSVolumeSource",
-      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs"
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs"
      },
      "iscsi": {
       "$ref": "v1.ISCSIVolumeSource",
-      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/v1.1.0/examples/iscsi/README.md"
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/release-1.1/examples/iscsi/README.md"
      },
      "glusterfs": {
       "$ref": "v1.GlusterfsVolumeSource",
-      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md"
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md"
      },
      "persistentVolumeClaim": {
       "$ref": "v1.PersistentVolumeClaimVolumeSource",
-      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      },
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
-      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md"
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md"
      },
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
-      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md"
+      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md"
      },
      "cephfs": {
       "$ref": "v1.CephFSVolumeSource",
@@ -3059,7 +3059,7 @@
     "properties": {
      "path": {
       "type": "string",
-      "description": "Path of the directory on the host. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#hostpath"
+      "description": "Path of the directory on the host. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#hostpath"
      }
     }
    },
@@ -3069,7 +3069,7 @@
     "properties": {
      "medium": {
       "type": "string",
-      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#emptydir"
+      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#emptydir"
      }
     }
    },
@@ -3083,20 +3083,20 @@
     "properties": {
      "pdName": {
       "type": "string",
-      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#gcepersistentdisk"
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#gcepersistentdisk"
      }
     }
    },
@@ -3110,11 +3110,11 @@
     "properties": {
      "volumeID": {
       "type": "string",
-      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "partition": {
       "type": "integer",
@@ -3123,7 +3123,7 @@
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#awselasticblockstore"
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#awselasticblockstore"
      }
     }
    },
@@ -3147,14 +3147,14 @@
    },
    "v1.SecretVolumeSource": {
     "id": "v1.SecretVolumeSource",
-    "description": "SecretVolumeSource adapts a Secret into a VolumeSource. More info: http://releases.k8s.io/v1.1.0/docs/design/secrets.md",
+    "description": "SecretVolumeSource adapts a Secret into a VolumeSource. More info: http://releases.k8s.io/release-1.1/docs/design/secrets.md",
     "required": [
      "secretName"
     ],
     "properties": {
      "secretName": {
       "type": "string",
-      "description": "SecretName is the name of a secret in the pod's namespace. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#secrets"
+      "description": "SecretName is the name of a secret in the pod's namespace. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#secrets"
      }
     }
    },
@@ -3168,15 +3168,15 @@
     "properties": {
      "server": {
       "type": "string",
-      "description": "Server is the hostname or IP address of the NFS server. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs"
+      "description": "Server is the hostname or IP address of the NFS server. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs"
      },
      "path": {
       "type": "string",
-      "description": "Path that is exported by the NFS server. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs"
+      "description": "Path that is exported by the NFS server. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#nfs"
+      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#nfs"
      }
     }
    },
@@ -3205,7 +3205,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#iscsi"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#iscsi"
      },
      "readOnly": {
       "type": "boolean",
@@ -3223,15 +3223,15 @@
     "properties": {
      "endpoints": {
       "type": "string",
-      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md#create-a-pod"
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md#create-a-pod"
      },
      "path": {
       "type": "string",
-      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md#create-a-pod"
+      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md#create-a-pod"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/v1.1.0/examples/glusterfs/README.md#create-a-pod"
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/release-1.1/examples/glusterfs/README.md#create-a-pod"
      }
     }
    },
@@ -3244,7 +3244,7 @@
     "properties": {
      "claimName": {
       "type": "string",
-      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
+      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      },
      "readOnly": {
       "type": "boolean",
@@ -3269,35 +3269,35 @@
       "items": {
        "type": "string"
       },
-      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it"
+      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it"
      },
      "image": {
       "type": "string",
-      "description": "The rados image name. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it"
+      "description": "The rados image name. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it"
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/v1.1.0/docs/user-guide/volumes.md#rbd"
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md#rbd"
      },
      "pool": {
       "type": "string",
-      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it."
+      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it."
      },
      "user": {
       "type": "string",
-      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it"
+      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it"
      },
      "keyring": {
       "type": "string",
-      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it"
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it"
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
-      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it"
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/v1.1.0/examples/rbd/README.md#how-to-use-it"
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/release-1.1/examples/rbd/README.md#how-to-use-it"
      }
     }
    },
@@ -3307,7 +3307,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/identifiers.md#names"
+      "description": "Name of the referent. More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names"
      }
     }
    },
@@ -3320,15 +3320,15 @@
     "properties": {
      "volumeID": {
       "type": "string",
-      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md"
+      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md"
      },
      "fsType": {
       "type": "string",
-      "description": "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Only ext3 and ext4 are allowed More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md"
+      "description": "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Only ext3 and ext4 are allowed More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/v1.1.0/examples/mysql-cinder-pd/README.md"
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/release-1.1/examples/mysql-cinder-pd/README.md"
      }
     }
    },
@@ -3344,23 +3344,23 @@
       "items": {
        "type": "string"
       },
-      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it"
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it"
      },
      "user": {
       "type": "string",
-      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it"
      },
      "secretFile": {
       "type": "string",
-      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it"
      },
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
-      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/v1.1.0/examples/cephfs/README.md#how-to-use-it"
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/release-1.1/examples/cephfs/README.md#how-to-use-it"
      }
     }
    },
@@ -3469,21 +3469,21 @@
      },
      "image": {
       "type": "string",
-      "description": "Docker image name. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md"
+      "description": "Docker image name. More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md"
      },
      "command": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Entrypoint array. Not executed within a shell. The docker image's entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/containers.md#containers-and-commands"
+      "description": "Entrypoint array. Not executed within a shell. The docker image's entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands"
      },
      "args": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Arguments to the entrypoint. The docker image's cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/containers.md#containers-and-commands"
+      "description": "Arguments to the entrypoint. The docker image's cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands"
      },
      "workingDir": {
       "type": "string",
@@ -3505,7 +3505,7 @@
      },
      "resources": {
       "$ref": "v1.ResourceRequirements",
-      "description": "Compute Resources required by this container. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/persistent-volumes.md#resources"
+      "description": "Compute Resources required by this container. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/persistent-volumes.md#resources"
      },
      "volumeMounts": {
       "type": "array",
@@ -3516,11 +3516,11 @@
      },
      "livenessProbe": {
       "$ref": "v1.Probe",
-      "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes"
+      "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes"
      },
      "readinessProbe": {
       "$ref": "v1.Probe",
-      "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes"
+      "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes"
      },
      "lifecycle": {
       "$ref": "v1.Lifecycle",
@@ -3532,11 +3532,11 @@
      },
      "imagePullPolicy": {
       "type": "string",
-      "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/images.md#updating-images"
+      "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/images.md#updating-images"
      },
      "securityContext": {
       "$ref": "v1.SecurityContext",
-      "description": "Security options the pod should run with. More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md"
+      "description": "Security options the pod should run with. More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md"
      },
      "stdin": {
       "type": "boolean",
@@ -3623,11 +3623,11 @@
     "properties": {
      "limits": {
       "type": "any",
-      "description": "Limits describes the maximum amount of compute resources allowed. More info: http://releases.k8s.io/v1.1.0/docs/design/resources.md#resource-specifications"
+      "description": "Limits describes the maximum amount of compute resources allowed. More info: http://releases.k8s.io/release-1.1/docs/design/resources.md#resource-specifications"
      },
      "requests": {
       "type": "any",
-      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://releases.k8s.io/v1.1.0/docs/design/resources.md#resource-specifications"
+      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://releases.k8s.io/release-1.1/docs/design/resources.md#resource-specifications"
      }
     }
    },
@@ -3672,12 +3672,12 @@
      "initialDelaySeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/release-1.1/docs/user-guide/pod-states.md#container-probes"
      }
     }
    },
@@ -3738,11 +3738,11 @@
     "properties": {
      "postStart": {
       "$ref": "v1.Handler",
-      "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/container-environment.md#hook-details"
+      "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/release-1.1/docs/user-guide/container-environment.md#hook-details"
      },
      "preStop": {
       "$ref": "v1.Handler",
-      "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/container-environment.md#hook-details"
+      "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/release-1.1/docs/user-guide/container-environment.md#hook-details"
      }
     }
    },
@@ -3770,20 +3770,20 @@
     "properties": {
      "capabilities": {
       "$ref": "v1.Capabilities",
-      "description": "The linux kernel capabilites that should be added or removed. Default to Container.Capabilities if left unset. More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context"
+      "description": "The linux kernel capabilites that should be added or removed. Default to Container.Capabilities if left unset. More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context"
      },
      "privileged": {
       "type": "boolean",
-      "description": "Run the container in privileged mode. Default to Container.Privileged if left unset. More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context"
+      "description": "Run the container in privileged mode. Default to Container.Privileged if left unset. More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context"
      },
      "seLinuxOptions": {
       "$ref": "v1.SELinuxOptions",
-      "description": "SELinuxOptions are the labels to be applied to the container and volumes. Options that control the SELinux labels applied. More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context"
+      "description": "SELinuxOptions are the labels to be applied to the container and volumes. Options that control the SELinux labels applied. More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context"
      },
      "runAsUser": {
       "type": "integer",
       "format": "int64",
-      "description": "RunAsUser is the UID to run the entrypoint of the container process. The user id that runs the first process in the container. More info: http://releases.k8s.io/v1.1.0/docs/design/security_context.md#security-context"
+      "description": "RunAsUser is the UID to run the entrypoint of the container process. The user id that runs the first process in the container. More info: http://releases.k8s.io/release-1.1/docs/design/security_context.md#security-context"
      },
      "runAsNonRoot": {
       "type": "boolean",
@@ -3821,19 +3821,19 @@
     "properties": {
      "user": {
       "type": "string",
-      "description": "User is a SELinux user label that applies to the container. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md"
+      "description": "User is a SELinux user label that applies to the container. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md"
      },
      "role": {
       "type": "string",
-      "description": "Role is a SELinux role label that applies to the container. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md"
+      "description": "Role is a SELinux role label that applies to the container. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md"
      },
      "type": {
       "type": "string",
-      "description": "Type is a SELinux type label that applies to the container. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md"
+      "description": "Type is a SELinux type label that applies to the container. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md"
      },
      "level": {
       "type": "string",
-      "description": "Level is SELinux level label that applies to the container. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md"
+      "description": "Level is SELinux level label that applies to the container. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md"
      }
     }
    },
@@ -3846,7 +3846,7 @@
       "items": {
        "$ref": "v1beta1.JobCondition"
       },
-      "description": "Conditions represent the latest available observations of an object's current state. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/jobs.md"
+      "description": "Conditions represent the latest available observations of an object's current state. More info: http://releases.k8s.io/release-1.1/docs/user-guide/jobs.md"
      },
      "startTime": {
       "type": "string",
@@ -3913,23 +3913,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object metadata; More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#metadata."
+      "description": "Standard object metadata; More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#metadata."
      },
      "spec": {
       "$ref": "v1beta1.ScaleSpec",
-      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status."
+      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status."
      },
      "status": {
       "$ref": "v1beta1.ScaleStatus",
-      "description": "current status of the scale. More info: http://releases.k8s.io/v1.1.0/docs/devel/api-conventions.md#spec-and-status. Read-only."
+      "description": "current status of the scale. More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#spec-and-status. Read-only."
      }
     }
    },
@@ -3958,7 +3958,7 @@
      },
      "selector": {
       "type": "any",
-      "description": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/v1.1.0/docs/user-guide/labels.md#label-selectors"
+      "description": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.1/docs/user-guide/labels.md#label-selectors"
      }
     }
    }

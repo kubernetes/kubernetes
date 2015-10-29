@@ -7,7 +7,7 @@
 
 ### Supported
 
-   * [Go](http://releases.k8s.io/v1.1.0/pkg/client/)
+   * [Go](http://releases.k8s.io/release-1.1/pkg/client/)
 
 ### User Contributed
 

@@ -5,7 +5,7 @@
 
 # Getting Kubernetes Builds
 
-You can use [hack/get-build.sh](http://releases.k8s.io/v1.1.0/hack/get-build.sh) to or use as a reference on how to get the most recent builds with curl. With `get-build.sh` you can grab the most recent stable build, the most recent release candidate, or the most recent build to pass our ci and gce e2e tests (essentially a nightly build).
+You can use [hack/get-build.sh](http://releases.k8s.io/release-1.1/hack/get-build.sh) to or use as a reference on how to get the most recent builds with curl. With `get-build.sh` you can grab the most recent stable build, the most recent release candidate, or the most recent build to pass our ci and gce e2e tests (essentially a nightly build).
 
 ```console
 usage:
