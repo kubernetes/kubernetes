@@ -20,6 +20,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [ "$#" -ne 1 ]; then
+  echo "Usage: ${0} <version>"
+  exit 1
+fi
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
@@ -105,22 +110,31 @@ gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
 git add "${VERSION_FILE}"
-git commit -m "Kubernetes version $NEW_VERSION"
+git commit -m "Kubernetes version ${NEW_VERSION}"
 
 echo "+++ Tagging version"
-git tag -a -m "Kubernetes version $NEW_VERSION" "${NEW_VERSION}"
+git tag -a -m "Kubernetes version ${NEW_VERSION}" "${NEW_VERSION}"
+# We have to sleep for a bit so that the timestamp of the beta tag is after the
+# timestamp of the release version, so that future commits are described as
+# beta, and not release versions.
+echo "+++ Waiting for 5 seconds to ensure timestamps are different before continuing"
+sleep 5
+echo "+++ Tagging beta tag"
+declare -r beta_ver="v${VERSION_MAJOR}.${VERSION_MINOR}.$((${VERSION_PATCH}+1))-beta"
+git tag -a -m "Kubernetes version ${beta_ver}" "${beta_ver}"
 newtag=$(git rev-parse --short HEAD)
 
 if [[ "${VERSION_PATCH}" == "0" ]]; then
   declare -r alpha_ver="v${VERSION_MAJOR}.$((${VERSION_MINOR}+1)).0-alpha.0"
-  git tag -a -m "Kubernetes pre-release branch ${alpha-ver}" "${alpha_ver}" "${head_commit}"
+  git tag -a -m "Kubernetes pre-release branch ${alpha_ver}" "${alpha_ver}" "${head_commit}"
 fi
 
 echo ""
 echo "Success you must now:"
 echo ""
-echo "- Push the tag:"
-echo "   git push ${push_url} v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+echo "- Push the tags:"
+echo "   git push ${push_url} ${NEW_VERSION}"
+echo "   git push ${push_url} ${beta_ver}"
 
 if [[ "${VERSION_PATCH}" == "0" ]]; then
   echo "- Push the alpha tag:"
