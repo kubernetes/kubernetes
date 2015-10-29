@@ -356,10 +356,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret":     &api.Secret{},
 		},
 		"../examples/spark": {
+			"spark-driver-controller": &api.ReplicationController{},
+			"spark-master-controller": &api.ReplicationController{},
 			"spark-master-service":    &api.Service{},
-			"spark-master":            &api.Pod{},
+			"spark-webui":             &api.Service{},
 			"spark-worker-controller": &api.ReplicationController{},
-			"spark-driver":            &api.Pod{},
 		},
 		"../examples/spark/spark-gluster": {
 			"spark-master-service":    &api.Service{},

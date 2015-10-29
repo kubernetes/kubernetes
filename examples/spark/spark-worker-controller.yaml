@@ -1,11 +1,11 @@
 kind: ReplicationController
 apiVersion: v1
 metadata:
-  name: spark-gluster-worker-controller
+  name: spark-worker-controller
   labels:
     component: spark-worker
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     component: spark-worker
   template:
@@ -19,15 +19,6 @@ spec:
           image: gcr.io/google_containers/spark-worker:1.5.1_v1
           ports:
             - containerPort: 8888
-          volumeMounts:
-            - mountPath: /mnt/glusterfs
-              name: glusterfsvol
           resources:
             requests:
               cpu: 100m
-      volumes:
-        - name: glusterfsvol
-          glusterfs:
-            endpoints: glusterfs-cluster
-            path: MyVolume
-            readOnly: false
