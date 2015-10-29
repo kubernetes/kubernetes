@@ -92,7 +92,7 @@ func testPreStop(c *client.Client, ns string) {
 		},
 	}
 
-	By(fmt.Sprintf("Creating tester pod %s in namespace %s", podDescr.Name, ns))
+	By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
 	_, err = c.Pods(ns).Create(preStopDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
