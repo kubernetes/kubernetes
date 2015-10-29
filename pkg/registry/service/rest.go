@@ -65,7 +65,7 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
-	if err := rest.BeforeCreate(rest.Services, ctx, obj); err != nil {
+	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +120,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
-		err = rest.CheckGeneratedNameError(rest.Services, err, service)
+		err = rest.CheckGeneratedNameError(Strategy, err, service)
 	}
 
 	if err == nil {

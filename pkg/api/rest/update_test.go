@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rest
+package rest_test
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -99,7 +101,7 @@ func TestBeforeUpdate(t *testing.T) {
 		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
 		ctx := api.NewDefaultContext()
-		err := BeforeUpdate(Services, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
+		err := rest.BeforeUpdate(service.Strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
 		if tc.expectErr && err == nil {
 			t.Errorf("unexpected non-error for %q", tc.name)
 		}

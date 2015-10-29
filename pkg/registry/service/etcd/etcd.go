@@ -17,14 +17,12 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -49,29 +47,14 @@ func NewREST(s storage.Interface) *REST {
 			return obj.(*api.Service).Name, nil
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return MatchServices(label, field)
+			return service.MatchService(label, field)
 		},
 		EndpointName: "services",
 
-		CreateStrategy: rest.Services,
-		UpdateStrategy: rest.Services,
+		CreateStrategy: service.Strategy,
+		UpdateStrategy: service.Strategy,
 
 		Storage: s,
 	}
 	return &REST{store}
-}
-
-// FIXME: Move it.
-func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: ServiceAttributes}
-}
-
-func ServiceAttributes(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	service, ok := obj.(*api.Service)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
-	}
-	return service.Labels, fields.Set{
-		"metadata.name": service.Name,
-	}, nil
 }
