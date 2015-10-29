@@ -96,8 +96,9 @@ if ! ($SED --version 2>&1 | grep -q GNU); then
 fi
 
 echo "+++ Running ./versionize-docs"
-${KUBE_ROOT}/build/versionize-docs.sh ${NEW_VERSION}
-git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+# Links in docs should always point to the release branch. 
+${KUBE_ROOT}/build/versionize-docs.sh ${release_branch}
+git commit -am "Versioning docs and examples to ${release_branch}"
 
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
 
