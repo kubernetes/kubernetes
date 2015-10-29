@@ -4677,7 +4677,14 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">stdin</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Whether this container should allocate a buffer for stdin in the container runtime. Default is false.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">stdinOnce</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -6784,7 +6791,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-10-27 00:35:19 UTC
+Last updated 2015-10-29 00:05:16 UTC
 </div>
 </div>
 </body>
