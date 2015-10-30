@@ -81,12 +81,7 @@ $ kubectl create -f examples/spark/spark-master-service.yaml
 services/spark-master
 ```
 
-Optionally, you can create a service for the Spark Master WebUI at this point as
-well. If you are running on a cloud provider that supports it, this will create
-an external load balancer and open a firewall to the Spark Master WebUI on the
-cluster. **Note:** With the existing configuration, there is **ABSOLUTELY NO**
-authentication on this WebUI. With slightly more work, it would be
-straightforward to put an `nginx` proxy in front to password protect it.
+You can then create a service for the Spark Master WebUI:
 
 ```console
 $ kubectl create -f examples/spark/spark-webui.yaml
@@ -125,29 +120,16 @@ Spark Command: /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java -cp /opt/spark-1.5
 15/10/27 21:25:07 INFO Master: I have been elected leader! New state: ALIVE
 ```
 
-If you created the Spark WebUI and waited sufficient time for the load balancer
-to be create, the `spark-webui` service should look something like this:
+After you know the master is running, you can use the (cluster
+proxy)[../../docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy] to
+connect to the Spark WebUI:
 
 ```console
-$ kubectl describe services/spark-webui
-Name:                   spark-webui
-Namespace:              default
-Labels:                 <none>
-Selector:               component=spark-master
-Type:                   LoadBalancer
-IP:                     10.0.152.249
-LoadBalancer Ingress:   104.197.147.190
-Port:                   <unnamed>       8080/TCP
-NodePort:               <unnamed>       31141/TCP
-Endpoints:              10.244.1.12:8080
-Session Affinity:       None
-Events: [...]
+kubectl proxy --port=8001
 ```
 
-You should now be able to visit `http://104.197.147.190:8080` and see the Spark
-Master UI. *Note:* After workers connect, this UI has links to worker Web
-UIs. The worker UI links do not work (the links attempt to connect to cluster
-IPs).
+At which point the UI will be available at
+http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/
 
 ## Step Two: Start your Spark workers
 
@@ -184,6 +166,11 @@ $ kubectl logs spark-master-controller-5u0q5
 15/10/26 18:20:14 INFO Master: Registering worker 10.244.2.7:46195 with 2 cores, 6.3 GB RAM
 15/10/26 18:20:14 INFO Master: Registering worker 10.244.3.8:39926 with 2 cores, 6.3 GB RAM
 ```
+
+Assuming you still have the `kubectl proxy` running from the previous section,
+you should now see the workers in the UI as well. *Note:* The UI will have links
+to worker Web UIs. The worker UI links do not work (the links will attempt to
+connect to cluster IPs, which Kubernetes won't proxy automatically).
 
 ## Step Three: Start your Spark driver to launch jobs on your Spark cluster
 
@@ -241,18 +228,14 @@ information.
 ## tl;dr
 
 ```console
-kubectl create -f examples/spark/spark-master-controller.yaml
-kubectl create -f examples/spark/spark-master-service.yaml
-kubectl create -f examples/spark/spark-webui.yaml
-kubectl create -f examples/spark/spark-worker-controller.yaml
-kubectl create -f examples/spark/spark-driver-controller.yaml
+kubectl create -f examples/spark
 ```
 
 After it's setup:
 
 ```console
 kubectl get pods # Make sure everything is running
-kubectl get services spark-webui # Get the IP of the Spark WebUI
+kubectl proxy --port=8001 # Start an application proxy, if you want to see the Spark WebUI
 kubectl get pods -lcomponent=spark-driver # Get the driver pod to interact with.
 ```
 

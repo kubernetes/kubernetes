@@ -2,8 +2,6 @@ kind: ReplicationController
 apiVersion: v1
 metadata:
   name: spark-master-controller
-  labels:
-    component: spark-master
 spec:
   replicas: 1
   selector:
@@ -19,6 +17,15 @@ spec:
           ports:
             - containerPort: 7077
             - containerPort: 8080
+          livenessProbe:
+            exec:
+              command:
+              - /opt/spark/sbin/spark-daemon.sh
+              - status
+              - org.apache.spark.deploy.master.Master
+              - '1'
+            initialDelaySeconds: 30
+            timeoutSeconds: 1
           resources:
             requests:
               cpu: 100m
