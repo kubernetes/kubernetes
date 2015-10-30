@@ -83,6 +83,12 @@ Configure a single master, multi-worker cluster locally, running on your choice 
 
 <hr/>
 
+[**Single-node cluster using a small OS X App**](https://github.com/rimusz/kube-solo-osx/blob/master/README.md)
+
+Guide to running a solo cluster (master + worker) controlled by an OS X menubar application. Uses xhyve + CoreOS under the hood.
+
+<hr/>
+
 [**Multi-node cluster with Vagrant and fleet units using a small OS X App**](https://github.com/rimusz/coreos-osx-gui-kubernetes-cluster/blob/master/README.md)
 
 Guide to running a single master, multi-worker cluster controlled by an OS X menubar application. Uses Vagrant under the hood.
