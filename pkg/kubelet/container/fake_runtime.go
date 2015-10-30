@@ -40,6 +40,7 @@ type FakeRuntime struct {
 	StartedContainers []string
 	KilledContainers  []string
 	VersionInfo       string
+	RuntimeType       string
 	Err               error
 	InspectErr        error
 }
@@ -94,6 +95,7 @@ func (f *FakeRuntime) ClearCalls() {
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
 	f.VersionInfo = ""
+	f.RuntimeType = ""
 	f.Err = nil
 	f.InspectErr = nil
 }
@@ -134,6 +136,10 @@ func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(containers, f.KilledContainers)
+}
+
+func (f *FakeRuntime) Type() string {
+	return f.RuntimeType
 }
 
 func (f *FakeRuntime) Version() (Version, error) {
