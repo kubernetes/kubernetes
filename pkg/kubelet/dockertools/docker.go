@@ -159,6 +159,14 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 
 		err := p.client.PullImage(opts, docker.AuthConfiguration{})
 		if err == nil {
+			// Sometimes PullImage failed with no error returned.
+			exist, ierr := p.IsImagePresent(image)
+			if ierr != nil {
+				glog.Warningf("Failed to inspect image %s: %v", image, ierr)
+			}
+			if !exist {
+				return fmt.Errorf("image pull failed for unknown error")
+			}
 			return nil
 		}
 
