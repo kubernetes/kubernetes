@@ -140,12 +140,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return err
 	}
 
-	// Serialize the object with the annotation applied.
-	data, err := hpa.Mapping.Codec.Encode(object)
-	if err != nil {
-		return err
-	}
-	object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, false, data)
+	object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, false, object)
 	if err != nil {
 		return err
 	}
