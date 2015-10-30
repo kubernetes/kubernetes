@@ -92,7 +92,7 @@ title: "Supporting multiple API groups"
 
 1. clients:
 
-  Currently we have structured (pkg/client/unversioned#ExperimentalClient, pkg/client/unversioned#Client) and unstructured (pkg/kubectl/resource#Helper) clients. The structured clients are not scalable because each of them implements specific interface, e.g., [here](https://releases.k8s.io/HEAD/pkg/client/unversioned/client.go#L32). Only the unstructured clients are scalable. We should either auto-generate the code for structured clients or migrate to use the unstructured clients as much as possible.
+  Currently we have structured (pkg/client/unversioned#ExperimentalClient, pkg/client/unversioned#Client) and unstructured (pkg/kubectl/resource#Helper) clients. The structured clients are not scalable because each of them implements specific interface, e.g., [here](https://releases.k8s.io/release-1.1/pkg/client/unversioned/client.go#L32). Only the unstructured clients are scalable. We should either auto-generate the code for structured clients or migrate to use the unstructured clients as much as possible.
 
   We should also move the unstructured client to pkg/client/.
 
@@ -106,7 +106,7 @@ title: "Supporting multiple API groups"
 
   When kubectl is used with a single resource type, the --api-version and --output-version flag of kubectl should accept values in the form of `group/version`, and they should work as they do today. For multi-resource operations, we will disable these two flags initially.
 
-  Currently, by setting pkg/client/unversioned/clientcmd/api/v1#Config.NamedCluster[x].Cluster.APIVersion ([here](https://releases.k8s.io/HEAD/pkg/client/unversioned/clientcmd/api/v1/types.go#L58)), user can configure the default apiVersion used by kubectl to talk to server. It does not make sense to set a global version used by kubectl when there are multiple groups, so we plan to deprecate this field. We may extend the version negotiation function to negotiate the preferred version of each group. Details will be in another proposal.
+  Currently, by setting pkg/client/unversioned/clientcmd/api/v1#Config.NamedCluster[x].Cluster.APIVersion ([here](https://releases.k8s.io/release-1.1/pkg/client/unversioned/clientcmd/api/v1/types.go#L58)), user can configure the default apiVersion used by kubectl to talk to server. It does not make sense to set a global version used by kubectl when there are multiple groups, so we plan to deprecate this field. We may extend the version negotiation function to negotiate the preferred version of each group. Details will be in another proposal.
 
 ## OpenShift integration
 

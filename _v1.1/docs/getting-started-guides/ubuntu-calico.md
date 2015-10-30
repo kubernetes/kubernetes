@@ -274,7 +274,7 @@ sudo systemctl start kube-kubelet.service
 
 ## Install the DNS Addon
 
-Most Kubernetes deployments will require the DNS addon for service discovery.  For more on DNS service discovery, check [here](https://releases.k8s.io/HEAD/cluster/addons/dns).
+Most Kubernetes deployments will require the DNS addon for service discovery.  For more on DNS service discovery, check [here](https://releases.k8s.io/release-1.1/cluster/addons/dns).
 
 The config repository for this guide comes with manifest files to start the DNS addon.  To install DNS, do the following on your Master node.
 

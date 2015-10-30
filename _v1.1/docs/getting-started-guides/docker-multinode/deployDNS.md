@@ -56,7 +56,7 @@ $ kubectl -s "$KUBE_SERVER:8080" --namespace=kube-system create -f ./skydns-svc.
 
 ### Test if DNS works
 
-Follow [this link](https://releases.k8s.io/HEAD/cluster/addons/dns#how-do-i-test-if-it-is-working) to check it out.
+Follow [this link](https://releases.k8s.io/release-1.1/cluster/addons/dns#how-do-i-test-if-it-is-working) to check it out.
 
 
 

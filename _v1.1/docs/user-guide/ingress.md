@@ -95,7 +95,7 @@ __Lines 8-9__: Each http rule contains the following information: A host (eg: fo
 
 __Lines 10-12__: A backend is a service:port combination as described in the [services doc](services.html). Ingress traffic is typically sent directly to the endpoints matching a backend.
 
-__Global Parameters__: For the sake of simplicity the example Ingress has no global parameters, see the [api-reference](https://releases.k8s.io/HEAD/pkg/apis/extensions/v1beta1/types.go) for a full definition of the resource. One can specify a global default backend in the absence of which requests that don't match a path in the spec are sent to the default backend of the Ingress controller. Though the Ingress resource doesn't support HTTPS yet, security configs would also be global.
+__Global Parameters__: For the sake of simplicity the example Ingress has no global parameters, see the [api-reference](https://releases.k8s.io/release-1.1/pkg/apis/extensions/v1beta1/types.go) for a full definition of the resource. One can specify a global default backend in the absence of which requests that don't match a path in the spec are sent to the default backend of the Ingress controller. Though the Ingress resource doesn't support HTTPS yet, security configs would also be global.
 
 ## Ingress controllers
 

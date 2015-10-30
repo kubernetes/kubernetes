@@ -112,7 +112,7 @@ spec:
 {% endraw %}
 {% endhighlight %}
 
-This specification will create a Service which targets TCP port 80 on any Pod with the `app=nginx` label, and expose it on an abstracted Service port (`targetPort`: is the port the container accepts traffic on, `port`: is the abstracted Service port, which can be any port other pods use to access the Service). View [service API object](http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html#_v1_service) to see the list of supported fields in service definition.
+This specification will create a Service which targets TCP port 80 on any Pod with the `app=nginx` label, and expose it on an abstracted Service port (`targetPort`: is the port the container accepts traffic on, `port`: is the abstracted Service port, which can be any port other pods use to access the Service). View [service API object](http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html#_v1_service) to see the list of supported fields in service definition.
 Check your Service:
 
 {% highlight console %}
@@ -150,7 +150,7 @@ You should now be able to curl the nginx Service on `10.0.116.146:80` from any n
 
 ## Accessing the Service
 
-Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](http://releases.k8s.io/v1.1.0/cluster/addons/dns/README.md).
+Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](http://releases.k8s.io/release-1.1/cluster/addons/dns/README.md).
 
 ### Environment Variables
 
@@ -194,7 +194,7 @@ kube-dns   10.179.240.10   <none>        53/UDP,53/TCP   k8s-app=kube-dns   8d
 {% endraw %}
 {% endhighlight %}
 
-If it isn’t running, you can [enable it](http://releases.k8s.io/v1.1.0/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived IP (nginxsvc), and a dns server that has assigned a name to that IP (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
+If it isn’t running, you can [enable it](http://releases.k8s.io/release-1.1/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived IP (nginxsvc), and a dns server that has assigned a name to that IP (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
 
 {% highlight yaml %}
 {% raw %}

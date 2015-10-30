@@ -18,7 +18,7 @@ Update field(s) of a resource using strategic merge patch
 
 JSON and YAML formats are accepted.
 
-Please refer to the models in http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html to find if a field is mutable.
+Please refer to the models in http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html to find if a field is mutable.
 
 ```
 {% raw %}
