@@ -166,14 +166,7 @@ func TestControllerSyncJob(t *testing.T) {
 		manager := NewJobController(client, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
-		var job *extensions.Job
-		manager.podStoreSynced = func() bool {
-			selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
-			podList, _ := manager.podStore.Pods(job.Namespace).List(selector)
-			active := len(controller.FilterActivePods(podList.Items))
-			succeeded, failed := getStatus(podList.Items)
-			return active == tc.activePods && succeeded == tc.succeededPods && failed == tc.failedPods
-		}
+		manager.podStoreSynced = alwaysReady
 		var actual *extensions.Job
 		manager.updateHandler = func(job *extensions.Job) error {
 			actual = job
@@ -181,7 +174,7 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 
 		// job & pods setup
-		job = newJob(tc.parallelism, tc.completions)
+		job := newJob(tc.parallelism, tc.completions)
 		manager.jobStore.Store.Add(job)
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
 			manager.podStore.Store.Add(&pod)
