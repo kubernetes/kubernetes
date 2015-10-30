@@ -207,7 +207,7 @@ func messageForError(err error) string {
 
 func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s\nsee '%s -h' for help.", msg, cmd.CommandPath())
+	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
 }
 
 func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
