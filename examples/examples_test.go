@@ -308,9 +308,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"wordpress":         &api.Pod{},
 		},
 		"../examples/nfs": {
-			"nfs-server-pod":     &api.Pod{},
+			"nfs-busybox-rc":     &api.ReplicationController{},
+			"nfs-server-rc":      &api.ReplicationController{},
 			"nfs-server-service": &api.Service{},
-			"nfs-web-pod":        &api.Pod{},
+			"nfs-pv":             &api.PersistentVolume{},
+			"nfs-pvc":            &api.PersistentVolumeClaim{},
+			"nfs-web-rc":         &api.ReplicationController{},
+			"nfs-web-service":    &api.Service{},
 		},
 		"../docs/user-guide/node-selection": {
 			"pod": &api.Pod{},
