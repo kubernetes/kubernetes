@@ -69,12 +69,6 @@ const (
 	// SIGTERM for certain process types, which may justify setting this to 0.
 	minimumGracePeriodInSeconds = 2
 
-	kubernetesNameLabel                   = "io.kubernetes.pod.name"
-	kubernetesPodLabel                    = "io.kubernetes.pod.data"
-	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
-	kubernetesContainerLabel              = "io.kubernetes.container.name"
-	kubernetesContainerRestartCountLabel  = "io.kubernetes.container.restartCount"
-
 	DockerNetnsFmt = "/proc/%v/ns/net"
 )
 
@@ -359,18 +353,9 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 
 	glog.V(4).Infof("Container inspect result: %+v", *inspectResult)
 
-	// Get restartCount from docker label, and add into the result.
-	// If there is no restart count label in an container:
-	//	1. It is an infraContainer, it will never use restart count.
-	//	2. It is an old container or an invalid container, we just set restart count to 0 now.
 	var restartCount int
-	if restartCountString, found := inspectResult.Config.Labels[kubernetesContainerRestartCountLabel]; found {
-		restartCount, err = strconv.Atoi(restartCountString)
-		if err != nil {
-			glog.Errorf("Error parsing restart count string %s for container %s: %v,", restartCountString, dockerID, err)
-			// Just set restartCount to 0 to handle this abnormal case
-			restartCount = 0
-		}
+	if restartCount, err = getRestartCountFromLabel(inspectResult.Config.Labels); err != nil {
+		glog.Errorf("Get restart count error for container %v: %v", dockerID, err)
 	}
 
 	result.status = api.ContainerStatus{
@@ -461,6 +446,9 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	}
 	expectedContainers[PodInfraContainerName] = api.Container{}
 
+	// We have added labels like pod name and pod namespace, it seems that we can do filtered list here.
+	// However, there may be some old containers without these labels, so at least now we can't do that.
+	// TODO (random-liu) Add filter when we are sure that all the containers have the labels
 	containers, err := dm.client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
@@ -471,7 +459,6 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	// the statuses. We assume docker returns a list of containers sorted in
 	// reverse by time.
 	for _, value := range containers {
-		// TODO (random-liu) Filter by docker label later
 		if len(value.Names) == 0 {
 			continue
 		}
@@ -672,7 +659,7 @@ func (dm *DockerManager) runContainer(
 	ipcMode string,
 	utsMode string,
 	pidMode string,
-	labels map[string]string) (kubecontainer.ContainerID, error) {
+	restartCount int) (kubecontainer.ContainerID, error) {
 
 	dockerName := KubeletContainerName{
 		PodFullName:   kubecontainer.GetPodFullName(pod),
@@ -693,12 +680,8 @@ func (dm *DockerManager) runContainer(
 	// while the Kubelet is down and there is no information available to recover the pod. This includes
 	// termination information like the termination grace period and the pre stop hooks.
 	// TODO: keep these labels up to date if the pod changes
-	namespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-	// Just in case. If there is no label, just pass nil. An empty map will be created here.
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[kubernetesNameLabel] = namespacedName.String()
+	labels := newLabels(container, pod, restartCount)
+
 	if pod.Spec.TerminationGracePeriodSeconds != nil {
 		labels[kubernetesTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
 	}
@@ -1485,8 +1468,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 
 // Run a single container from a pod. Returns the docker container ID
 // If do not need to pass labels, just pass nil.
-// TODO (random-liu) Just add labels directly now, maybe should make some abstraction.
-func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode string, labels map[string]string) (kubecontainer.ContainerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode string, restartCount int) (kubecontainer.ContainerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1506,7 +1488,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
 		utsMode = "host"
 	}
-	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, labels)
+	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount)
 	if err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
@@ -1643,8 +1625,8 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 		return "", err
 	}
 
-	// There is no meaningful labels for infraContainer now, so just pass nil.
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), nil)
+	// Currently we don't care about restart count of infra container, just set it to 0.
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), 0)
 	if err != nil {
 		return "", err
 	}
@@ -1905,17 +1887,16 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			}
 		}
 
-		labels := map[string]string{}
 		containerStatuses := podStatus.ContainerStatuses
 		// podStatus is generated by GetPodStatus(). In GetPodStatus(), we make sure that ContainerStatuses
 		// contains statuses of all containers in pod.Spec.Containers.
 		// ContainerToStart is a subset of pod.Spec.Containers, we should always find a result here.
 		// For a new container, the RestartCount should be 0
-		labels[kubernetesContainerRestartCountLabel] = "0"
+		restartCount := 0
 		for _, containerStatus := range containerStatuses {
 			// If the container's terminate state is not empty, it exited before. Increment the restart count.
 			if containerStatus.Name == container.Name && (containerStatus.State.Terminated != nil || containerStatus.LastTerminationState.Terminated != nil) {
-				labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(containerStatus.RestartCount + 1)
+				restartCount = containerStatus.RestartCount + 1
 				break
 			}
 		}
@@ -1926,7 +1907,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		// and IPC namespace.  PID mode cannot point to another container right now.
 		// See createPodInfraContainer for infra container setup.
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod), labels)
+		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod), restartCount)
 		dm.updateReasonCache(pod, container, kubecontainer.ErrRunContainer.Error(), err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
