@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/http"
 
+	"k8s.io/kubernetes/pkg/client/transport"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -39,31 +40,20 @@ type HTTPKubeletClient struct {
 }
 
 func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
-	cfg := &Config{TLSClientConfig: config.TLSClientConfig}
-	if config.EnableHttps {
-		hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
-		if !hasCA {
-			cfg.Insecure = true
-		}
-	}
-	tlsConfig, err := TLSConfigFor(cfg)
+	tlsConfig, err := transport.TLSConfigFor(config.transportConfig())
 	if err != nil {
 		return nil, err
 	}
 
-	transport := http.DefaultTransport
+	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		transport = util.SetTransportDefaults(&http.Transport{
+		rt = util.SetTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		})
 	}
 
-	if len(config.BearerToken) > 0 {
-		transport = NewBearerAuthRoundTripper(config.BearerToken, transport)
-	}
-
-	return transport, nil
+	return transport.HTTPWrappersForConfig(config.transportConfig(), rt)
 }
 
 // TODO: this structure is questionable, it should be using client.Config and overriding defaults.
