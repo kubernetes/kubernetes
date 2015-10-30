@@ -1168,6 +1168,17 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 		{Name: "failed"},
 	}
 
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
 	exitedAPIContainers := []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
@@ -1247,17 +1258,7 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 		fakeDocker.ExitedContainerList = exitedAPIContainers
 		fakeDocker.ContainerMap = containerMap
 		fakeDocker.ClearCalls()
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers:    containers,
-				RestartPolicy: tt.policy,
-			},
-		}
+		pod.Spec.RestartPolicy = tt.policy
 		fakeDocker.ContainerList = []docker.APIContainers{
 			{
 				// pod infra container

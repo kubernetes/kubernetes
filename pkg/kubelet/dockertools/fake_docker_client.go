@@ -146,13 +146,14 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	defer f.Unlock()
 	f.called = append(f.called, "list")
 	err := f.popError("list")
+	containerList := append([]docker.APIContainers{}, f.ContainerList...)
 	if options.All {
 		// Althought the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
 		// TODO (random-liu) Is a fully sorted array needed?
-		return append(f.ContainerList, f.ExitedContainerList...), err
+		containerList = append(containerList, f.ExitedContainerList...)
 	}
-	return append([]docker.APIContainers{}, f.ContainerList...), err
+	return containerList, err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
