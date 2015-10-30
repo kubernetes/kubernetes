@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: spark-worker
-          image: gcr.io/google_containers/spark-worker:1.5.1_v1
+          image: gcr.io/google_containers/spark-worker:1.5.1_v2
           ports:
             - containerPort: 8888
           volumeMounts:

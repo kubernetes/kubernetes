@@ -13,19 +13,10 @@ spec:
     spec:
       containers:
         - name: spark-master
-          image: gcr.io/google_containers/spark-master:1.5.1_v1
+          image: gcr.io/google_containers/spark-master:1.5.1_v2
           ports:
             - containerPort: 7077
             - containerPort: 8080
-          livenessProbe:
-            exec:
-              command:
-              - /opt/spark/sbin/spark-daemon.sh
-              - status
-              - org.apache.spark.deploy.master.Master
-              - '1'
-            initialDelaySeconds: 30
-            timeoutSeconds: 1
           resources:
             requests:
               cpu: 100m
