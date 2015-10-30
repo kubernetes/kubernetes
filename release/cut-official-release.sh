@@ -148,6 +148,7 @@ EOM
 
     echo "Branching ${release_branch}."
     git checkout -b "${release_branch}"
+    versionize-docs-and-commit "${release_branch}"
 
     beta-release "${beta_version}"
     git-push ${release_branch}
@@ -201,7 +202,6 @@ function beta-release() {
 
   echo "Doing a beta release of ${beta_version}."
 
-  versionize-docs-and-commit "${beta_version}"
   rev-version-and-commit "${beta_version}"
 
   echo "Tagging ${beta_version} at $(current-git-commit)."
@@ -218,7 +218,6 @@ function official-release() {
 
   echo "Doing an official release of ${official_version}."
 
-  versionize-docs-and-commit "${official_version}"
   rev-version-and-commit "${official_version}"
 
   echo "Tagging ${official_version} at $(current-git-commit)."
@@ -269,11 +268,11 @@ function verify-ancestor() {
 }
 
 function versionize-docs-and-commit() {
-  local -r version="${1}"
-  echo "Versionizing docs for ${version} and committing."
+  local -r release_branch="${1}"
+  echo "Versionizing docs for ${release_branch} and committing."
   # NOTE: This is using versionize-docs.sh at the release point.
-  ./build/versionize-docs.sh ${version}
-  git commit -am "Versioning docs and examples for ${version}."
+  ./build/versionize-docs.sh ${release_branch}
+  git commit -am "Versioning docs and examples for ${release_branch}."
 }
 
 function rev-version-and-commit() {
