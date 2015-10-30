@@ -19,6 +19,7 @@ package kubectl
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -315,9 +316,58 @@ func TestJobStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:       nil,
-			StopMessage:     "foo stopped",
-			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
+			StopError:   nil,
+			StopMessage: "foo stopped",
+			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
+				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
+		},
+		{
+			Name: "JobWithDeadPods",
+			Objs: []runtime.Object{
+				&extensions.Job{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.JobSpec{
+						Parallelism: &zero,
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"k1": "v1"},
+						},
+					},
+				},
+				&extensions.JobList{ // LIST
+					Items: []extensions.Job{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: extensions.JobSpec{
+								Parallelism: &zero,
+								Selector: &extensions.PodSelector{
+									MatchLabels: map[string]string{"k1": "v1"},
+								},
+							},
+						},
+					},
+				},
+				&api.PodList{ // LIST
+					Items: []api.Pod{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "pod1",
+								Namespace: ns,
+								Labels:    map[string]string{"k1": "v1"},
+							},
+						},
+					},
+				},
+			},
+			StopError:   nil,
+			StopMessage: "foo stopped",
+			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
+				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
 		},
 	}
 
@@ -339,12 +389,13 @@ func TestJobStop(t *testing.T) {
 			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
 			continue
 		}
-		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource() != "jobs" {
-				t.Errorf("%s unexpected action: %+v, expected %s-job", test.Name, actions[i], verb)
+		for i, expAction := range test.ExpectedActions {
+			action := strings.Split(expAction, ":")
+			if actions[i].GetVerb() != action[0] {
+				t.Errorf("%s unexpected verb: %+v, expected %s", test.Name, actions[i], expAction)
 			}
-			if actions[i].GetVerb() != verb {
-				t.Errorf("%s unexpected action: %+v, expected %s-job", test.Name, actions[i], verb)
+			if actions[i].GetResource() != action[1] {
+				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
 			}
 		}
 	}
