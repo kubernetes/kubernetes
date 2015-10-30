@@ -39,8 +39,8 @@ func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
 	return obj.(*api.Endpoints), err
 }
 
-func (c *FakeEndpoints) List(label labels.Selector) (*api.EndpointsList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("endpoints", c.Namespace, label, nil), &api.EndpointsList{})
+func (c *FakeEndpoints) List(label labels.Selector, field fields.Selector) (*api.EndpointsList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("endpoints", c.Namespace, label, field), &api.EndpointsList{})
 	if obj == nil {
 		return nil, err
 	}
