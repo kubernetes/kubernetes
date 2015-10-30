@@ -143,7 +143,7 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 	binding := obj.(*api.Binding)
 	// TODO: move me to a binding strategy
 	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
-		return nil, errors.NewInvalid("binding", binding.Name, fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty, 'Node', or 'Minion'")})
+		return nil, errors.NewInvalid("binding", binding.Name, fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty or 'Node'")})
 	}
 	if len(binding.Target.Name) == 0 {
 		return nil, errors.NewInvalid("binding", binding.Name, fielderrors.ValidationErrorList{fielderrors.NewFieldRequired("to.name")})
