@@ -54,7 +54,7 @@ function upload_logs_to_gcs() {
   local -r gcs_acl="public-read"
   for upload_attempt in $(seq 3); do
     echo "Uploading to ${gcs_build_path} (attempt ${upload_attempt})"
-    if [[ -d "${artifacts_path}" ]]; then
+    if [[ -d "${artifacts_path}"  && -n $(ls -A "${artifacts_path}") ]]; then
       gsutil -m -q -o "GSUtil:use_magicfile=True" cp -a "${gcs_acl}" -r -c \
         -z log,txt,xml "${artifacts_path}" "${gcs_build_path}/artifacts" || continue
     fi
