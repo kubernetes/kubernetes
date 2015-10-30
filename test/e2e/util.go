@@ -705,7 +705,7 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 func waitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
-		list, err := c.Endpoints(namespace).List(labels.Everything())
+		list, err := c.Endpoints(namespace).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return false, err
 		}

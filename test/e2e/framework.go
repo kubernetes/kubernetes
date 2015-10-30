@@ -139,7 +139,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything())
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return err
 		}
