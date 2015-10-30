@@ -76,8 +76,8 @@ footer:
         url: https://plus.google.com/u/0/b/116512812300813784482/116512812300813784482
             
     links:
-      - label: Freenode
-        url: http://webchat.freenode.net/?channels=google-containers
+      - label: Slack
+        url: http://slack.k8s.io/
       - label: Mailing List
         url: "https://groups.google.com/forum/#!forum/google-containers" 
 
