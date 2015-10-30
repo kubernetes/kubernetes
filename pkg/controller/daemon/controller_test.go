@@ -88,6 +88,11 @@ func newNode(name string, label map[string]string) *api.Node {
 			Labels:    label,
 			Namespace: api.NamespaceDefault,
 		},
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{Type: api.NodeReady, Status: api.ConditionTrue},
+			},
+		},
 	}
 }
 
@@ -179,6 +184,21 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSets should not place onto NotReady nodes
+func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
+	manager, podControl := newTestController()
+	node := newNode("not-ready", nil)
+	node.Status = api.NodeStatus{
+		Conditions: []api.NodeCondition{
+			{Type: api.NodeReady, Status: api.ConditionFalse},
+		},
+	}
+	manager.nodeStore.Add(node)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
