@@ -1,6 +1,6 @@
 all: push
 
-TAG = 0.1
+TAG = 0.2
 
 container:
 	docker build -t gcr.io/google_containers/kubekins-test .

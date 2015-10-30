@@ -18,8 +18,6 @@
 FROM golang:1.4
 MAINTAINER  Jeff Lowdermilk <jeffml@google.com>
 
-ENV KUBE_TEST_API_VERSIONS  v1,extensions/v1beta1
-ENV KUBE_TEST_ETCD_PREFIXES registry
 ENV WORKSPACE               /workspace
 ENV TERM                    xterm
 
