@@ -77,8 +77,6 @@ func NewSchedulerServer() *SchedulerServer {
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters
 func NewSchedulerCommand() *cobra.Command {
-	s := NewSchedulerServer()
-	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",
 		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,

@@ -151,8 +151,6 @@ func NewProxyServer(
 
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
-	s := NewProxyConfig()
-	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-proxy",
 		Long: `The Kubernetes network proxy runs on each node. This
