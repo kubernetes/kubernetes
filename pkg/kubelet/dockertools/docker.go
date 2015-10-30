@@ -211,6 +211,7 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 	return p.puller.IsImagePresent(name)
 }
 
+// TODO (random-liu) Almost never used, should we remove this?
 // DockerContainers is a map of containers
 type DockerContainers map[kubetypes.DockerID]*docker.APIContainers
 
