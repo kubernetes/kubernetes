@@ -59,7 +59,7 @@ The API will generally not modify fields that you have set; it just sets ones wh
 
 ## <a name="finding_schema_docs"></a>Finding Documentation on Resource Fields
 
-You can browse auto-generated API documentation at the [project website](http://kubernetes.io/v1.1/api-ref.html) or on [github](https://releases.k8s.io/HEAD/docs/api-reference).
+You can browse auto-generated API documentation at the [project website](http://kubernetes.io/v1.1/api-ref.html) or on [github](https://releases.k8s.io/release-1.1/docs/api-reference).
 
 
 

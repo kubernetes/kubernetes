@@ -22,7 +22,7 @@ which will set initial Resources to a reasonable value.
 
 ## Design
 
-InitialResources component will be implemented as an [admission plugin](https://releases.k8s.io/HEAD/plugin/pkg/admission) and invoked right before
+InitialResources component will be implemented as an [admission plugin](https://releases.k8s.io/release-1.1/plugin/pkg/admission) and invoked right before
 [LimitRanger](https://github.com/kubernetes/kubernetes/blob/7c9bbef96ed7f2a192a1318aa312919b861aee00/cluster/gce/config-default.sh#L91).
 For every container without Resources specified it will try to predict amount of resources that should be sufficient for it.
 So that a pod without specified resources will be treated as

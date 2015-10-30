@@ -219,9 +219,9 @@ or destroy your current Juju environment (using the `juju env` command):
 The Kubernetes charms and bundles can be found in the `kubernetes` project on
 github.com:
 
- - [Bundle Repository](http://releases.k8s.io/v1.1.0/cluster/juju/bundles)
-   * [Kubernetes master charm](https://releases.k8s.io/HEAD/cluster/juju/charms/trusty/kubernetes-master)
-   * [Kubernetes node charm](https://releases.k8s.io/HEAD/cluster/juju/charms/trusty/kubernetes)
+ - [Bundle Repository](http://releases.k8s.io/release-1.1/cluster/juju/bundles)
+   * [Kubernetes master charm](https://releases.k8s.io/release-1.1/cluster/juju/charms/trusty/kubernetes-master)
+   * [Kubernetes node charm](https://releases.k8s.io/release-1.1/cluster/juju/charms/trusty/kubernetes)
  - [More about Juju](https://jujucharms.com)
 
 

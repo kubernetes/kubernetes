@@ -241,7 +241,7 @@ on each kubelet where you want to reserve resources.
 
 Node is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Node API
-object](http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html#_v1_node).
+object](http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html#_v1_node).
 
 
 

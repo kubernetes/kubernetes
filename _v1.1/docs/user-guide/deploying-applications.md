@@ -54,7 +54,7 @@ spec:
 
 Some differences compared to specifying just a pod are that the `kind` is `ReplicationController`, the number of `replicas` desired is specified, and the pod specification is under the `template` field. The names of the pods don’t need to be specified explicitly because they are generated from the name of the replication controller.
 View the [replication controller API
-object](http://kubernetes.io/v1.1/v1.1.0/docs/api-reference/definitions.html#_v1_replicationcontroller)
+object](http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html#_v1_replicationcontroller)
 to view the list of supported fields.
 
 This replication controller can be created using `create`, just as with pods:

@@ -27,7 +27,7 @@ We still have [a bunch of work](http://issue.k8s.io/8262) to do to make the expe
 To use rkt as the container runtime, we need to supply `--container-runtime=rkt` and `--rkt-path=$PATH_TO_RKT_BINARY` to kubelet. Additionally we can provide `--rkt-stage1-image` flag
 as well to select which [stage1 image](https://github.com/coreos/rkt/blob/master/Documentation/running-lkvm-stage1.md) we want to use.
 
-If you are using the [hack/local-up-cluster.sh](https://releases.k8s.io/HEAD/hack/local-up-cluster.sh) script to launch the local cluster, then you can edit the environment variable `CONTAINER_RUNTIME`, `RKT_PATH` and `RKT_STAGE1_IMAGE` to
+If you are using the [hack/local-up-cluster.sh](https://releases.k8s.io/release-1.1/hack/local-up-cluster.sh) script to launch the local cluster, then you can edit the environment variable `CONTAINER_RUNTIME`, `RKT_PATH` and `RKT_STAGE1_IMAGE` to
 set these flags:
 
 {% highlight console %}
@@ -131,7 +131,7 @@ Here are severals tips for you when you run into any issues.
 
 By default, the log verbose level is 2. In order to see more logs related to rkt, we can set the verbose level to 4.
 For local cluster, we can set the environment variable: `LOG_LEVEL=4`.
-If the cluster is using salt, we can edit the [logging.sls](https://releases.k8s.io/HEAD/cluster/saltbase/pillar/logging.sls) in the saltbase.
+If the cluster is using salt, we can edit the [logging.sls](https://releases.k8s.io/release-1.1/cluster/saltbase/pillar/logging.sls) in the saltbase.
 
 ##### Check rkt pod status
 
