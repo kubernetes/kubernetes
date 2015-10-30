@@ -18,7 +18,9 @@ package master
 
 import (
 	"fmt"
+	"hash/adler32"
 	"net"
+	"strconv"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -114,7 +116,7 @@ func (c *Controller) UpdateKubernetesService() error {
 	}
 	if c.ServiceIP != nil {
 		servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
-		if err := c.CreateMasterServiceIfNeeded("kubernetes", c.ServiceIP, servicePorts, serviceType); err != nil {
+		if err := c.ReconcileMasterService("kubernetes", c.ServiceIP, servicePorts, serviceType); err != nil {
 			return err
 		}
 		endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
@@ -177,14 +179,9 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 	return endpointPorts
 }
 
-// CreateMasterServiceIfNeeded will create the specified service if it
-// doesn't already exist.
-func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType) error {
-	ctx := api.NewDefaultContext()
-	if _, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
-		// The service already exists.
-		return nil
-	}
+// ReconcileMasterService will create the specified service if it
+// doesn't already exist or update it if it has a different spec than it should.
+func (c *Controller) ReconcileMasterService(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType) error {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      serviceName,
@@ -199,6 +196,19 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            serviceType,
 		},
+	}
+	hash := strconv.FormatUint(hashService(svc), 10)
+	svc.Annotations = map[string]string{"kubernetes.io/config.hash": hash}
+	ctx := api.NewDefaultContext()
+	if curSvc, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
+		if curHash, found := curSvc.Annotations["kubernetes.io/config.hash"]; found && hash == curHash {
+			// The correct service already exists.
+			return nil
+		}
+		// An incorrect service exists
+		if err := c.ServiceRegistry.DeleteService(ctx, serviceName); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 	}
 	if err := rest.BeforeCreate(rest.Services, ctx, svc); err != nil {
 		return err
@@ -305,4 +315,10 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 		}
 	}
 	return true, false
+}
+
+func hashService(svc *api.Service) uint64 {
+	hash := adler32.New()
+	util.DeepHashObject(hash, *svc)
+	return uint64(hash.Sum32())
 }
