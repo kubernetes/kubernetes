@@ -158,6 +158,16 @@ func NewConflict(kind, name string, err error) error {
 	}}
 }
 
+// NewGone returns an error indicating the item no longer available at the server and no forwarding address is known.
+func NewGone(message string) error {
+	return &StatusError{unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    http.StatusGone,
+		Reason:  unversioned.StatusReasonGone,
+		Message: message,
+	}}
+}
+
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
 func NewInvalid(kind, name string, errs fielderrors.ValidationErrorList) error {
 	causes := make([]unversioned.StatusCause, 0, len(errs))

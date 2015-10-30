@@ -266,7 +266,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		return result, nil
 	}
 	if resourceVersion < oldest {
-		return nil, errors.NewInternalError(fmt.Errorf("too old resource version: %d (%d)", resourceVersion, oldest))
+		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest))
 	}
 
 	// Binary seatch the smallest index at which resourceVersion is not smaller than
