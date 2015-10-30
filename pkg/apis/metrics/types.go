@@ -14,12 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package metrics
 
-// These imports are the API groups the client will support.
-import (
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
-)
+import "k8s.io/kubernetes/pkg/api/unversioned"
+
+// Placeholder top-level node resource metrics.
+type RawNode struct {
+	unversioned.TypeMeta `json:",inline"`
+}
+
+// Placeholder top-level pod resource metrics.
+type RawPod struct {
+	unversioned.TypeMeta `json:",inline"`
+}

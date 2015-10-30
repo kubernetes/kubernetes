@@ -14,12 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package metrics
 
-// These imports are the API groups the client will support.
 import (
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+	"k8s.io/kubernetes/pkg/api"
 )
+
+func init() {
+	// Register the API.
+	addKnownTypes()
+}
+
+// Adds the list of known types to api.Scheme.
+func addKnownTypes() {
+	api.Scheme.AddKnownTypes("",
+		&RawNode{},
+		&RawPod{},
+	)
+}
+
+func (*RawNode) IsAnAPIObject() {}
+func (*RawPod) IsAnAPIObject()  {}
