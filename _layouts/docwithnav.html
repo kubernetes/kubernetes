@@ -16,6 +16,7 @@
 	<div class="row">
 		<!-- Navigation menu -->
 		<div class="col-md-3 hidden-sm hidden-xs" id="wrapper">
+			{% include docversionselector.html %}
 			{% case page.collection %}
 				{% when 'v1.1' %}
 					{% include nav_v1.1.html %}
