@@ -43,7 +43,7 @@ cp flannel-${FLANNEL_VERSION}/flanneld binaries/master
 cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
 
 # ectd
-ETCD_VERSION=${ETCD_VERSION:-"2.0.12"}
+ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 ETCD="etcd-v${ETCD_VERSION}-linux-amd64"
 echo "Prepare etcd ${ETCD_VERSION} release ..."
 if [ ! -f etcd.tar.gz ] ; then
