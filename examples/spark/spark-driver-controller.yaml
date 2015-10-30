@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: spark-driver
-          image: gcr.io/google_containers/spark-driver:1.5.1_v1
+          image: gcr.io/google_containers/spark-driver:1.5.1_v2
           resources:
             requests:
               cpu: 100m

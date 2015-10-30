@@ -4,7 +4,7 @@ all: push
 # this tag and reset to v1. You should also double check the native
 # Hadoop libs at that point (we grab the 2.6.1 libs, which are
 # appropriate for 1.5.1-with-2.6).
-TAG = 1.5.1_v1
+TAG = 1.5.1_v2
 
 containers:
 	docker build -t gcr.io/google_containers/spark-base base
