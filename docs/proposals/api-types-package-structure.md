@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/proposals/api-types-package-structure.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # API Types package layout
 
 We have written tooling around api types and will write more. This document
@@ -189,118 +222,206 @@ this api doesn't have a group.
 
 ```
 apis
-└── group
-    ├── install
-    ├── types.go
-    ├── v1
-    │   ├── install
-    │   │   ├── conversion
-    │   │   │   ├── generated_conversion.go
-    │   │   │   └── manual_conversion_overrides.go
-    │   │   ├── defaulting
-    │   │   │   ├── generated_defaulters.go
-    │   │   │   └── generated_default_stubs.go
-    │   │   └── validation
-    │   │       ├── generated_validation.go
-    │   │       └── generated_validation_stubs.go
-    │   └── types.go
-    ├── v1beta1
-    │   ├── install
-    │   │   ├── conversion
-    │   │   │   ├── generated_conversion.go
-    │   │   │   └── manual_conversion_overrides.go
-    │   │   ├── defaulting
-    │   │   │   ├── generated_defaulters.go
-    │   │   │   └── generated_default_stubs.go
-    │   │   └── validation
-    │   │       ├── generated_validation.go
-    │   │       └── generated_validation_stubs.go
-    │   └── types.go
-    └── v2alpha1
-        ├── install
-        │   ├── conversion
-        │   │   ├── generated_conversion.go
-        │   │   └── manual_conversion_overrides.go
-        │   ├── defaulting
-        │   │   ├── generated_defaulters.go
-        │   │   └── generated_default_stubs.go
-        │   └── validation
-        │       ├── generated_validation.go
-        │       └── generated_validation_stubs.go
-        └── types.go
+├── group
+│   ├── install
+│   │   └── install_all_versions.go
+│   ├── resource1
+│   │   └── types.go
+│   ├── resource2
+│   │   └── types.go
+│   ├── v1
+│   │   ├── install
+│   │   │   └── install_all_resources.go
+│   │   ├── resource1
+│   │   │   ├── conversion
+│   │   │   │   ├── generated_conversion.go
+│   │   │   │   └── manual_conversion_overrides.go
+│   │   │   ├── defaulting
+│   │   │   │   ├── generated_defaulters.go
+│   │   │   │   └── generated_default_stubs.go
+│   │   │   ├── types.go
+│   │   │   └── validation
+│   │   │       ├── generated_validation.go
+│   │   │       └── manual_validation_overrides.go
+│   │   └── resource2
+│   │       ├── conversion
+│   │       │   ├── generated_conversion.go
+│   │       │   └── manual_conversion_overrides.go
+│   │       ├── defaulting
+│   │       │   ├── generated_defaulters.go
+│   │       │   └── generated_default_stubs.go
+│   │       ├── types.go
+│   │       └── validation
+│   │           ├── generated_validation.go
+│   │           └── manual_validation_overrides.go
+│   ├── v1beta1
+│   │   ├── install
+│   │   │   └── install_all_resources.go
+│   │   ├── resource1
+│   │   │   ├── conversion
+│   │   │   │   ├── generated_conversion.go
+│   │   │   │   └── manual_conversion_overrides.go
+│   │   │   ├── defaulting
+│   │   │   │   ├── generated_defaulters.go
+│   │   │   │   └── generated_default_stubs.go
+│   │   │   ├── types.go
+│   │   │   └── validation
+│   │   │       ├── generated_validation.go
+│   │   │       └── manual_validation_overrides.go
+│   │   └── resource2
+│   │       ├── conversion
+│   │       │   ├── generated_conversion.go
+│   │       │   └── manual_conversion_overrides.go
+│   │       ├── defaulting
+│   │       │   ├── generated_defaulters.go
+│   │       │   └── generated_default_stubs.go
+│   │       ├── types.go
+│   │       └── validation
+│   │           ├── generated_validation.go
+│   │           └── manual_validation_overrides.go
+│   └── v2alpha1
+│       ├── install
+│       │   └── install_all_resources.go
+│       ├── resource1
+│       │   ├── conversion
+│       │   │   ├── generated_conversion.go
+│       │   │   └── manual_conversion_overrides.go
+│       │   ├── defaulting
+│       │   │   ├── generated_defaulters.go
+│       │   │   └── generated_default_stubs.go
+│       │   ├── types.go
+│       │   └── validation
+│       │       ├── generated_validation.go
+│       │       └── manual_validation_overrides.go
+│       ├── resource2
+│       │   ├── conversion
+│       │   │   ├── generated_conversion.go
+│       │   │   └── manual_conversion_overrides.go
+│       │   ├── defaulting
+│       │   │   ├── generated_defaulters.go
+│       │   │   └── generated_default_stubs.go
+│       │   ├── types.go
+│       │   └── validation
+│       │       ├── generated_validation.go
+│       │       └── manual_validation_overrides.go
+│       └── resource3
+│           ├── conversion
+│           │   ├── generated_conversion.go
+│           │   └── manual_conversion_overrides.go
+│           ├── defaulting
+│           │   ├── generated_defaulters.go
+│           │   └── generated_default_stubs.go
+│           ├── types.go
+│           └── validation
+│               ├── generated_validation.go
+│               └── manual_validation_overrides.go
+└── unversioned
+    ├── meta
+    │   └── meta.go
+    ├── resource
+    │   └── quantity.go
+    ├── time
+    │   └── time.go
+    └── types.go
 ```
 
 ### Package: `apis/`
 
 Multiple groups may live in the same tree. Each group gets its own directory
 under `apis/`. We'll assume an `apis/` directory of this structure in all tools.
+In the above example, we show one group, named 'group'.
 
 TBD: Either test code will live here, or no code.
+
+### Package: `apis/unversioned/`
+
+This package and sub-packages are allowed to be imported and used by any
+group/version/resource. There is no internal/versioned distinction. Types in
+this directory in the main kubernetes repository are reusable by anyone in any
+API; creators of 3rd party APIs should think carefully before creating their own
+unversioned package.
 
 ### Package: `apis/group/`
 
 Multiple versions live in a group. Each version gets its own subdirectory.
 
-Additionally, a types.go file contains an "internal" version of the group's
-objects. This file is used as a destination/source for conversion functions.
+Additionally, a directory for each resource has a types.go file containing an
+"internal" version of the group's objects. These files are used as a
+destination/source for conversion functions.
 
 ### Package: `apis/group/install`
 
-This package installs *all* of the versions of the group.
+This package installs *all* of the versions of the group, meaning it imports
+each nested install/ package.
 
 ### Package: `apis/group/v1`
 
 'v1' is taken to be the current stable version of this api.
 
-`types.go` contains the types for this version of the api group.
+Multiple resource directories (we show 'resource1' and 'resource2') each have a
+`types.go`, containing the type definitions for this group/version/resource.
 
 This package has tightly controlled imports. It's allowed to include the
-Kubernetes unversioned API types (to be moved to `pkg/apis/unversioned`) and
-little else. In particular, it *must not* import its parent `apis/group`.
+Kubernetes unversioned API types (to be moved in/under `pkg/apis/unversioned`)
+and little else. In particular, it *must not* import its parent `apis/group`.
 
 ### Package: `apis/group/v1/install`
 
-This package, if imported, registers the v1 version of this group, its
-conversion, validation, and defaulting functions.
+This package, if imported, registers (via an `init()`) the v1 version of every
+resource in this group, its conversion, validation, and defaulting functions.
 
 We have separate install packages for every version to allow deliberate import
 choices to be made.
 
-### Package: `apis/group/v1/install/conversion`
+### Package: `apis/group/v1/resource1/conversion`
 
-This package contains conversion functions, and if imported, will register them.
+This package contains conversion functions, and exports a Register() function
+which will register them (but does not register them as a side effect of being
+imported).
 
-There are two sorts of conversion functions: those which could be automatically
-generated, and those which have manual additions. All the conversion functions
-convert to & from the types in the parent `apis/groups` and `apis/groups/v1`
-directories.
+There are two sorts of conversion functions: those which have been automatically
+generated, and those which have manual overrides. All the conversion functions
+convert to & from the types in the parent `apis/group/resource1` and
+`apis/group/v1/resource1` directories.
 
-### Package: `apis/group/v1/install/defaulting`
+The allowed imports are constrained; in particular, nothing that would let you
+do RPCs to look up other cluster state is allowed.
 
-This package contains defaulting functions, and if imported, will register them.
+### Package: `apis/group/v1/resource1/defaulting`
 
-The functions apply to only the `group/v1` types, *not* the parent `group/`
-types.
+This package contains defaulting functions, and exports a Register() function
+which will register them (but does not register them as a side effect of being
+imported).
 
-There are two sorts of defaulting functions, those that can be automatically
-written and those that need human attention.
+The functions apply to only the `group/v1/resource1` types, *not* the parent
+`group/resource1` types.
 
-The former will be autogenerated by looking for `// +default=<value>` comments
-preceding the types or their embedded struct members. Similarly, a
-`// +default=custom` marker will force a stub to be generated. Stubs will be
-generated with a `panic("write me!")` marker to ensure that they are populated.
+High-level requirements:
+* Any tags that autogeneration pays attention to (e.g., `// +default: xxxx`)
+  should be readable by humans as well as machines.
+* Things that require a default should not compile until the defaulting function
+  is supplied.
+* Defaults may need to be hirearchical-- e.g., the container resources in a pod
+  temaplate are defaulted differently than the resources in a pod. The simplest
+  way to do this is to set the defaults in the function for the template and
+  separately for the pod, instead of setting them on the container's resources.
 
-### Package: `apis/group/v1/install/validation`
+The allowed imports are constrained; in particular, nothing that would let you
+do RPCs to look up other cluster state is allowed. Defaulting that requires
+information not contained in the object is not allowed; you must change your
+design until it's not needed.
+
+### Package: `apis/group/v1/resource1/validation`
 
 This package contains validation functions, and if imported, will register them.
 
-The functions apply to only the `group/v1` types, *not* the parent `group/`
-types.
+The functions apply to only the `group/v1/resource1` types, *not* the parent
+`group/resource1` types.
 
 The allowed imports are constrained; in particular, nothing that would let you
 do RPCs to look up other cluster state is allowed. Validation functions validate
 *only* the object, not cluster-wide or other constraints, which must be validate
-elsewhere. (TODO: copy-pasta this 2x above)
+elsewhere.
 
 There are two sorts of validation functions, those that can be automatically
 written and those that need human attention.
@@ -308,13 +429,16 @@ written and those that need human attention.
 The former will be autogenerated by looking for directives in the comments
 preceding the types or their embedded struct members. Allowed directives will
 include:
-* `// +validate_min=<numeric value>,validate_max=<numeric value>`
-* `// +validate_regexp=<regexp>`
-* `// +validate_exact=<exact value>`
+* `// +validation=minmax{<numeric value>, <numeric value>}`
+* `// +validation=regexp/<regexp>/`
+* `// +validation=<exact value>`
 
 If no validation directive is in the comments, a stub with a
 `panic("write me!")` marker will be generated. To prevent this, a
-`// +no_validation_required` directive may be added to the comment.
+`// +validation=none` directive may be added to the comment.
+
+(We can hash out the exact form of the tags later; it should be easy for human
+readers to figure out what will happen.)
 
 ### Package: `apis/group/v1beta1`
 
@@ -324,7 +448,12 @@ of the API group, which may lack features.
 ### Package: `apis/group/v2alpha1`
 
 This package layout is the same as `apis/group/v1`, but it is an newer version
-of the API group, which may have extra features.
+of the API group, which may have extra features. It has `resource3`, for
+example.
+
+It is a rule that a client should never have to pay attention to multiple
+versions of a group at the same time, so v2alpha1 copies all types from v1, even
+if there's no changes.
 
 ## Type support package layout
 
@@ -332,7 +461,7 @@ The above is how to arrange the types for a particular API. But we also must
 consider, what Kubernetes packages do you need to import to use the API types?
 
 ```
-pkg
+k8s.io/api_machinery/
 └── typetools
     ├── convert
     ├── deep
@@ -351,15 +480,18 @@ More detailed descriptions belong in another doc when we hash out the
 particulars of the code generation; the important thing here is just to know
 that we'll supply packages with:
 * Minimal import tree
-* Some sort of registration method
-* Some sort of execution method
+* Some sort of registration method. Registration marks a thing as available and
+  it can be enumerated (for producing lists of what could be turned on, for
+  example).
+* Some sort of enabling method, for actually turning a thing on. Registration
+  and enabling are conflated in our codebase at the moment, and this makes it
+  difficult to, for example, construct the default value for --runtime-config.
+* Some sort of execution method, for actually using a thing.
 
 ## Reusable apiserver infrastructure packages
 
-WIP
-
 In the future, it'd be nice if we could generate REST install code based on
-comment annotations in the go types.
+comment annotations in the go types. See #16560 for a problem statement.
 
 ## Desired toolchain
 
@@ -379,3 +511,8 @@ The tool should never fail to run because *its own* output from a previous
 invocation is missing or broken, but it may fail (with helpful error messages)
 if the input files with user types/functions don't compile.
 
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/api-types-package-structure.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
