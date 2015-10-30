@@ -20,60 +20,64 @@ import (
 	"io"
 )
 
-// ObjectScheme represents common conversions between formal external API versions
-// and the internal Go structs. ObjectScheme is typically used with ObjectCodec to
-// transform internal Go structs into serialized versions. There may be many valid
-// ObjectCodecs for each ObjectScheme.
-type ObjectScheme interface {
-	ObjectConvertor
-	ObjectTyper
-	ObjectCreater
-	ObjectCopier
-}
-
-// ObjectCodec represents the common mechanisms for converting to and from a particular
-// binary representation of an object.
-type ObjectCodec interface {
-	ObjectEncoder
-	Decoder
-}
-
-// Decoder defines methods for deserializing API objects into a given type
-type Decoder interface {
-	Decode(data []byte) (Object, error)
-	DecodeToVersion(data []byte, version string) (Object, error)
-	DecodeInto(data []byte, obj Object) error
-	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
-}
-
-// Encoder defines methods for serializing API objects into bytes
-type Encoder interface {
-	Encode(obj Object) (data []byte, err error)
-	EncodeToStream(obj Object, stream io.Writer) error
-}
-
 // Codec defines methods for serializing and deserializing API objects.
 type Codec interface {
 	Decoder
 	Encoder
 }
 
-// ObjectCopier duplicates an object.
-type ObjectCopier interface {
-	// Copy returns an exact copy of the provided Object, or an error if the
-	// copy could not be completed.
-	Copy(Object) (Object, error)
+// Decoder defines methods for deserializing API objects into a given type
+type Decoder interface {
+	Decode(data []byte) (Object, error)
+	// TODO: Remove this method?
+	DecodeToVersion(data []byte, version string) (Object, error)
+	DecodeInto(data []byte, obj Object) error
+	// TODO: Remove this method?
+	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
+
+	// TODO: Add method for processing url parameters.
+	// DecodeParametersInto(parameters url.Values, obj Object) error
 }
 
-// ObjectEncoder turns an object into a byte array. This interface is a
-// general form of the Encoder interface
-type ObjectEncoder interface {
+// Encoder defines methods for serializing API objects into bytes
+type Encoder interface {
+	Encode(obj Object) (data []byte, err error)
+	EncodeToStream(obj Object, stream io.Writer) error
+
+	// TODO: Add method for processing url parameters.
+	// EncodeParameters(obj Object) (url.Values, error)
+}
+
+// ObjectCodec represents the common mechanisms for converting to and from a particular
+// binary representation of an object.
+// TODO: Remove this interface - it is used only in CodecFor() method.
+type ObjectCodec interface {
+	Decoder
+
 	// EncodeToVersion convert and serializes an object in the internal format
 	// to a specified output version. An error is returned if the object
 	// cannot be converted for any reason.
 	EncodeToVersion(obj Object, outVersion string) ([]byte, error)
 	EncodeToVersionStream(obj Object, outVersion string, stream io.Writer) error
 }
+
+// ObjectDecoder is a convenience interface for identifying serialized versions of objects
+// and transforming them into Objects. It intentionally overlaps with ObjectTyper and
+// Decoder for use in decode only paths.
+// TODO: Consider removing this interface?
+type ObjectDecoder interface {
+	Decoder
+	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// if another problem is detected. In many cases this method can be as expensive to
+	// invoke as the Decode method.
+	DataVersionAndKind([]byte) (version, kind string, err error)
+	// Recognizes returns true if the scheme is able to handle the provided version and kind
+	// of an object.
+	Recognizes(version, kind string) bool
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Non-codec interfaces
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
@@ -103,18 +107,11 @@ type ObjectCreater interface {
 	New(version, kind string) (out Object, err error)
 }
 
-// ObjectDecoder is a convenience interface for identifying serialized versions of objects
-// and transforming them into Objects. It intentionally overlaps with ObjectTyper and
-// Decoder for use in decode only paths.
-type ObjectDecoder interface {
-	Decoder
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
-	// if another problem is detected. In many cases this method can be as expensive to
-	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind
-	// of an object.
-	Recognizes(version, kind string) bool
+// ObjectCopier duplicates an object.
+type ObjectCopier interface {
+	// Copy returns an exact copy of the provided Object, or an error if the
+	// copy could not be completed.
+	Copy(Object) (Object, error)
 }
 
 // ResourceVersioner provides methods for setting and retrieving
