@@ -348,13 +348,18 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 		glog.Errorf("Couldn't get list of nodes when syncing daemon set %+v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
-	for i := range nodeList.Items {
+	for i, node := range nodeList.Items {
 		// Check if the node satisfies the daemon set's node selector.
 		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
 		shouldRun := nodeSelector.Matches(labels.Set(nodeList.Items[i].Labels))
 		// If the daemon set specifies a node name, check that it matches with nodeName.
 		nodeName := nodeList.Items[i].Name
 		shouldRun = shouldRun && (ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == nodeName)
+
+		// If the node is not ready, don't run on it.
+		// TODO(mikedanese): remove this once daemonpods forgive nodes
+		shouldRun = shouldRun && api.IsNodeReady(&node)
+
 		daemonPods, isRunning := nodeToDaemonPods[nodeName]
 		if shouldRun && !isRunning {
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
