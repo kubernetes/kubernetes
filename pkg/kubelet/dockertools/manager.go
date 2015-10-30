@@ -290,7 +290,7 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 		RawTerminal:  false,
 	}
 
-	if !logOptions.Follow && logOptions.TailLines != nil {
+	if logOptions.TailLines != nil {
 		opts.Tail = strconv.FormatInt(*logOptions.TailLines, 10)
 	}
 
