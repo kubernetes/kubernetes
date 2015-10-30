@@ -170,7 +170,14 @@ func TestHelperCreate(t *testing.T) {
 		},
 		{
 			Modify: true,
-			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			Object: &api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+				Spec: api.PodSpec{
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+				},
+			},
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
@@ -198,11 +205,7 @@ func TestHelperCreate(t *testing.T) {
 			Versioner:       testapi.Default.MetadataAccessor(),
 			NamespaceScoped: true,
 		}
-		data := []byte{}
-		if test.Object != nil {
-			data = []byte(runtime.EncodeOrDie(testapi.Default.Codec(), test.Object))
-		}
-		_, err := modifier.Create("bar", test.Modify, data)
+		_, err := modifier.Create("bar", test.Modify, test.Object)
 		if (err != nil) != test.Err {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}
@@ -222,7 +225,7 @@ func TestHelperCreate(t *testing.T) {
 			expect = []byte(runtime.EncodeOrDie(testapi.Default.Codec(), test.ExpectObject))
 		}
 		if !reflect.DeepEqual(expect, body) {
-			t.Errorf("%d: unexpected body: %s", i, string(body))
+			t.Errorf("%d: unexpected body: %s (expected %s)", i, string(body), string(expect))
 		}
 
 	}
@@ -418,7 +421,14 @@ func TestHelperReplace(t *testing.T) {
 			Req: expectPut,
 		},
 		{
-			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Object: &api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+				},
+			},
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 				Spec: api.PodSpec{
@@ -458,11 +468,7 @@ func TestHelperReplace(t *testing.T) {
 			Versioner:       testapi.Default.MetadataAccessor(),
 			NamespaceScoped: true,
 		}
-		data := []byte{}
-		if test.Object != nil {
-			data = []byte(runtime.EncodeOrDie(testapi.Default.Codec(), test.Object))
-		}
-		_, err := modifier.Replace("bar", "foo", test.Overwrite, data)
+		_, err := modifier.Replace("bar", "foo", test.Overwrite, test.Object)
 		if (err != nil) != test.Err {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}

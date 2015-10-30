@@ -414,12 +414,7 @@ func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (run
 		return nil, err
 	}
 
-	data, err := helper.Codec.Encode(info.Object)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := helper.Replace(info.Namespace, info.Name, true, data); err != nil {
+	if _, err := helper.Replace(info.Namespace, info.Name, true, info.Object); err != nil {
 		return nil, err
 	}
 
