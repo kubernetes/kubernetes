@@ -49,7 +49,7 @@ function generate_deep_copies() {
   for ver in ${group_versions}; do
     # Ensure that the version being processed is registered by setting
     # KUBE_API_VERSIONS.
-    if [ -z ${ver##*/} ]; then 
+    if [ -z ${ver##*/} ]; then
         apiVersions=""
     fi
     KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
@@ -57,6 +57,6 @@ function generate_deep_copies() {
 }
 
 # v1 is in the group ""
-DEFAULT_VERSIONS="/ v1 extensions/ extensions/v1beta1 componentconfig/ componentconfig/v1alpha1"
+DEFAULT_VERSIONS="/ v1 extensions/ extensions/v1beta1 componentconfig/ componentconfig/v1alpha1 metrics/ metrics/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
 generate_deep_copies "$VERSIONS"

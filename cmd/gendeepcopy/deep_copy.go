@@ -31,6 +31,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	_ "k8s.io/kubernetes/pkg/apis/metrics"
+	_ "k8s.io/kubernetes/pkg/apis/metrics/v1alpha1"
 	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
