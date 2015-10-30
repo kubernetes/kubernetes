@@ -141,7 +141,7 @@ metadata:
 spec:
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.13
+    image: gcr.io/google_containers/fluentd-gcp:1.14
     resources:
       limits:
         cpu: 100m
