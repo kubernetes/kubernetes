@@ -160,9 +160,18 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 
 	podClient := client.Pods(config.namespace)
 
-	// ignore all errors, the pods may not be even created
-	podClient.Delete(config.prefix+"-client", nil)
-	podClient.Delete(config.prefix+"-server", nil)
+	err := podClient.Delete(config.prefix+"-client", nil)
+	if err != nil {
+		// Log the error before failing test: if the test has already failed,
+		// expectNoError() won't print anything to logs!
+		glog.Warningf("Failed to delete client pod: %v", err)
+		expectNoError(err, "Failed to delete client pod: %v", err)
+	}
+	err = podClient.Delete(config.prefix+"-server", nil)
+	if err != nil {
+		glog.Warningf("Failed to delete server pod: %v", err)
+		expectNoError(err, "Failed to delete server pod: %v", err)
+	}
 }
 
 // Start a client pod using given VolumeSource (exported by startVolumeServer())
