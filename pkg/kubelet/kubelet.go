@@ -1028,10 +1028,10 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 	rootDirSELinuxOptions.Level = pod.Spec.SecurityContext.SELinuxOptions.Level
 	volumeContext := fmt.Sprintf("%s:%s:%s:%s", rootDirSELinuxOptions.User, rootDirSELinuxOptions.Role, rootDirSELinuxOptions.Type, rootDirSELinuxOptions.Level)
 
-	for _, volume := range volumes {
-		if volume.Builder.SupportsSELinux() && !volume.Builder.IsReadOnly() {
+	for _, vol := range volumes {
+		if vol.Builder.GetAttributes().Managed && vol.Builder.GetAttributes().SupportsSELinux {
 			// Relabel the volume and its content to match the 'Level' of the pod
-			err := filepath.Walk(volume.Builder.GetPath(), func(path string, info os.FileInfo, err error) error {
+			err := filepath.Walk(vol.Builder.GetPath(), func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
@@ -1040,7 +1040,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 			if err != nil {
 				return err
 			}
-			volume.SELinuxLabeled = true
+			vol.SELinuxLabeled = true
 		}
 	}
 	return nil
@@ -1067,7 +1067,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		// If the volume supports SELinux and it has not been
 		// relabeled already and it is not a read-only volume,
 		// relabel it and mark it as labeled
-		if vol.Builder.SupportsSELinux() && !vol.SELinuxLabeled && !vol.Builder.IsReadOnly() {
+		if vol.Builder.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled && !vol.Builder.GetAttributes().Managed {
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}

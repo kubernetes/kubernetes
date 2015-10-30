@@ -135,8 +135,13 @@ type emptyDir struct {
 	rootContext   string
 }
 
-func (_ *emptyDir) SupportsOwnershipManagement() bool {
-	return true
+func (ed *emptyDir) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    false,
+		Managed:                     true,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
 
 // SetUp creates new directory.
@@ -185,14 +190,6 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	}
 
 	return err
-}
-
-func (ed *emptyDir) IsReadOnly() bool {
-	return false
-}
-
-func (ed *emptyDir) SupportsSELinux() bool {
-	return true
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory with the

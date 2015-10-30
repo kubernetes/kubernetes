@@ -177,8 +177,13 @@ type awsElasticBlockStoreBuilder struct {
 
 var _ volume.Builder = &awsElasticBlockStoreBuilder{}
 
-func (_ *awsElasticBlockStoreBuilder) SupportsOwnershipManagement() bool {
-	return true
+func (b *awsElasticBlockStoreBuilder) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.readOnly,
+		Managed:                     !b.readOnly,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -244,14 +249,6 @@ func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
 	}
 
 	return nil
-}
-
-func (b *awsElasticBlockStoreBuilder) IsReadOnly() bool {
-	return b.readOnly
-}
-
-func (b *awsElasticBlockStoreBuilder) SupportsSELinux() bool {
-	return true
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {
