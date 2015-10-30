@@ -1,8 +1,8 @@
 .PHONY:	clean build push
 
 IMAGE = etcd
-TAG = 2.0.12
-ETCD_VERSION = 2.0.12
+TAG = 2.2.1
+ETCD_VERSION = 2.2.1
 OUTPUT_DIR = $(IMAGE)-v$(ETCD_VERSION)-linux-amd64
 
 clean:
