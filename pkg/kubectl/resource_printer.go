@@ -724,21 +724,46 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printJob(job *extensions.Job, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	name := job.Name
+	namespace := job.Namespace
 	containers := job.Spec.Template.Spec.Containers
 	var firstContainer api.Container
 	if len(containers) > 0 {
-		firstContainer = containers[0]
+		firstContainer, containers = containers[0], containers[1:]
+	}
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
 	}
 
 	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d",
-		job.Name,
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
+		name,
 		firstContainer.Name,
 		firstContainer.Image,
 		selector.String(),
 		job.Status.Succeeded)
 	if err != nil {
 		return err
+	}
+	if _, err := fmt.Fprint(w, appendLabels(job.Labels, columnLabels)); err != nil {
+		return err
+	}
+
+	// Lay out all the other containers on separate lines.
+	extraLinePrefix := "\t"
+	if withNamespace {
+		extraLinePrefix = "\t\t"
+	}
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s%s\t%s\t%s\t%s", extraLinePrefix, container.Name, container.Image, "", "")
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
