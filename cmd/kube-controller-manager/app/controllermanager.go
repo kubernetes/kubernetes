@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -300,7 +301,13 @@ func (s *CMServer) Run(_ []string) error {
 
 	resourcequotacontroller.NewResourceQuotaController(kubeClient).Run(s.ResourceQuotaSyncPeriod)
 
-	versionStrings, err := client.ServerAPIVersions(kubeconfig)
+	// If apiserver is not running we should wait for some time and fail only then. This is particularly
+	// important when we start apiserver and controller manager at the same time.
+	var versionStrings []string
+	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+		versionStrings, err = client.ServerAPIVersions(kubeconfig)
+		return err == nil, err
+	})
 	if err != nil {
 		glog.Fatalf("Failed to get api versions from server: %v", err)
 	}
