@@ -269,6 +269,76 @@ func TestGetServerVersion(t *testing.T) {
 	}
 }
 
+func TestGetServerGroupsWithV1Server(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var obj interface{}
+		switch req.URL.Path {
+		case "/api":
+			obj = &unversioned.APIVersions{
+				Versions: []string{
+					"v1",
+				},
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		output, err := json.Marshal(obj)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client := NewOrDie(&Config{Host: server.URL})
+	// ServerGroups should not return an error even if server returns error at /api and /apis
+	apiGroupList, err := client.Discovery().ServerGroups()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	groupVersions := ExtractGroupVersions(apiGroupList)
+	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
+		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
+	}
+}
+
+func TestGetServerResourcesWithV1Server(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var obj interface{}
+		switch req.URL.Path {
+		case "/api":
+			obj = &unversioned.APIVersions{
+				Versions: []string{
+					"v1",
+				},
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		output, err := json.Marshal(obj)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client := NewOrDie(&Config{Host: server.URL})
+	// ServerResources should not return an error even if server returns error at /api/v1.
+	resourceMap, err := client.Discovery().ServerResources()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if _, found := resourceMap["v1"]; !found {
+		t.Errorf("missing v1 in resource map")
+	}
+
+}
+
 func TestGetServerResources(t *testing.T) {
 	stable := unversioned.APIResourceList{
 		GroupVersion: "v1",
