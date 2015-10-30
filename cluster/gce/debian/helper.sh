@@ -21,6 +21,8 @@ function build-kube-env {
   local master=$1
   local file=$2
 
+  build-runtime-config
+
   rm -f ${file}
   cat >$file <<EOF
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
