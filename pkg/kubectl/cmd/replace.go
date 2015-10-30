@@ -134,12 +134,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		}
 
 		// Serialize the object with the annotation applied.
-		data, err := info.Mapping.Codec.Encode(info.Object)
-		if err != nil {
-			return cmdutil.AddSourceToErr("replacing", info.Source, err)
-		}
-
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, data)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
@@ -226,13 +221,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			return err
 		}
 
-		// Serialize the object with the annotation applied.
-		data, err := info.Mapping.Codec.Encode(info.Object)
-		if err != nil {
-			return err
-		}
-
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return err
 		}
