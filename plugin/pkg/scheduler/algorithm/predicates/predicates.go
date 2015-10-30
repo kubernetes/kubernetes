@@ -144,6 +144,10 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, capacity api.ResourceList)
 	return
 }
 
+func podName(pod *api.Pod) string {
+	return pod.Namespace + "/" + pod.Name
+}
+
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	podRequest := getResourceRequest(pod)
@@ -159,21 +163,21 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	pods = append(existingPods, pod)
 	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, info.Status.Capacity)
 	if int64(len(pods)) > info.Status.Capacity.Pods().Value() {
-		glog.V(4).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
+		glog.V(10).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", podName(pod), node, len(pods)-1, info.Status.Capacity.Pods().Value())
 		FailedResourceType = "PodExceedsMaxPodNumber"
 		return false, nil
 	}
 	if len(exceedingCPU) > 0 {
-		glog.V(4).Infof("Cannot schedule Pod %v, because Node does not have sufficient CPU", pod)
+		glog.V(10).Infof("Cannot schedule Pod %v, because Node %v does not have sufficient CPU", podName(pod), node)
 		FailedResourceType = "PodExceedsFreeCPU"
 		return false, nil
 	}
 	if len(exceedingMemory) > 0 {
-		glog.V(4).Infof("Cannot schedule Pod %v, because Node does not have sufficient Memory", pod)
+		glog.V(10).Infof("Cannot schedule Pod %v, because Node %v does not have sufficient Memory", podName(pod), node)
 		FailedResourceType = "PodExceedsFreeMemory"
 		return false, nil
 	}
-	glog.V(4).Infof("Schedule Pod %v on Node %v is allowed, Node is running only %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
+	glog.V(10).Infof("Schedule Pod %v on Node %v is allowed, Node is running only %v out of %v Pods.", podName(pod), node, len(pods)-1, info.Status.Capacity.Pods().Value())
 	return true, nil
 }
 
