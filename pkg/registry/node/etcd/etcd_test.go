@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 )
 
@@ -38,7 +39,7 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, ht
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	storage, _ := NewREST(etcdStorage, false, fakeConnectionInfoGetter{}, nil)
+	storage, _ := NewREST(etcdStorage, storage.NoDecoration, fakeConnectionInfoGetter{}, nil)
 	return storage, fakeClient
 }
 
