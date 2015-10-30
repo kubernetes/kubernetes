@@ -581,11 +581,38 @@ func stringSlicesEqual(x, y []string) bool {
 }
 
 func hostsFromNodeList(list *api.NodeList) []string {
-	result := make([]string, len(list.Items))
+	result := []string{}
 	for ix := range list.Items {
-		result[ix] = list.Items[ix].Name
+		if list.Items[ix].Spec.Unschedulable {
+			continue
+		}
+		result = append(result, list.Items[ix].Name)
 	}
 	return result
+}
+
+func getNodeConditionPredicate() cache.NodeConditionPredicate {
+	return func(node api.Node) bool {
+		// We add the master to the node list, but its unschedulable.  So we use this to filter
+		// the master.
+		// TODO: Use a node annotation to indicate the master
+		if node.Spec.Unschedulable {
+			return false
+		}
+		// If we have no info, don't accept
+		if len(node.Status.Conditions) == 0 {
+			return false
+		}
+		for _, cond := range node.Status.Conditions {
+			// We consider the node for load balancing only when its NodeReady condition status
+			// is ConditionTrue
+			if cond.Type == api.NodeReady && cond.Status != api.ConditionTrue {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			}
+		}
+		return true
+	}
 }
 
 // nodeSyncLoop handles updating the hosts pointed to by all load
@@ -598,7 +625,7 @@ func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	// something to compile, and gofmt1.4 complains about using `_ = range`.
 	for now := range time.Tick(period) {
 		_ = now
-		nodes, err := s.nodeLister.List()
+		nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
 		if err != nil {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
 			continue
