@@ -107,12 +107,6 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 			return err
 		}
 
-		// Update the annotation used by kubectl apply
-		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
-		}
-
-		// Serialize the object with the annotation applied.
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
