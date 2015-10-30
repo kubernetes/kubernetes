@@ -111,10 +111,63 @@ type Cacher struct {
 	ListFromCache bool
 }
 
+// StorageFactory is a function signature for producing
+// a storage.Interface from given parameters.
+type StorageFactory func(
+	storage Interface,
+	capacity int,
+	versioner Versioner,
+	objectType runtime.Object,
+	resourcePrefix string,
+	namespaceScoped bool,
+	newListFunc func() runtime.Object) Interface
+
+func NoDecoration(
+	storage Interface,
+	capacity int,
+	versioner Versioner,
+	objectType runtime.Object,
+	resourcePrefix string,
+	namespaceScoped bool,
+	newListFunc func() runtime.Object) Interface {
+	return storage
+}
+
 // Create a new Cacher responsible from service WATCH and LIST requests from its
 // internal cache and updating its cache in the background based on the given
 // configuration.
-func NewCacher(config CacherConfig) *Cacher {
+func NewCacher(
+	storage Interface,
+	capacity int,
+	versioner Versioner,
+	objectType runtime.Object,
+	resourcePrefix string,
+	namespaceScoped bool,
+	newListFunc func() runtime.Object) Interface {
+	config := CacherConfig{
+		CacheCapacity:  capacity,
+		Storage:        storage,
+		Versioner:      versioner,
+		Type:           objectType,
+		ResourcePrefix: resourcePrefix,
+		NewListFunc:    newListFunc,
+	}
+	if namespaceScoped {
+		config.KeyFunc = func(obj runtime.Object) (string, error) {
+			return NamespaceKeyFunc(resourcePrefix, obj)
+		}
+	} else {
+		config.KeyFunc = func(obj runtime.Object) (string, error) {
+			return NoNamespaceKeyFunc(resourcePrefix, obj)
+		}
+	}
+	return NewCacherFromConfig(config)
+}
+
+// Create a new Cacher responsible from service WATCH and LIST requests from its
+// internal cache and updating its cache in the background based on the given
+// configuration.
+func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
