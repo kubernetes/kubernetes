@@ -624,6 +624,24 @@ func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	self, err := aws.getSelfAWSInstance()
+	if err != nil {
+		return nil, err
+	}
+	if self.nodeName == name || len(name) == 0 {
+		internalIP, err := aws.metadata.GetMetadata("local-ipv4")
+		if err != nil {
+			return nil, err
+		}
+		externalIP, err := aws.metadata.GetMetadata("public-ipv4")
+		if err != nil {
+			return nil, err
+		}
+		return []api.NodeAddress{
+			{Type: api.NodeInternalIP, Address: internalIP},
+			{Type: api.NodeExternalIP, Address: externalIP},
+		}, nil
+	}
 	instance, err := aws.getInstanceByNodeName(name)
 	if err != nil {
 		return nil, err
