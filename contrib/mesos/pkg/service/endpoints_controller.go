@@ -384,7 +384,7 @@ func (e *endpointController) syncService(key string) {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *endpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything())
+	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err)
 		return

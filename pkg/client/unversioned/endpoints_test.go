@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -42,7 +43,7 @@ func TestListEndpoints(t *testing.T) {
 			},
 		},
 	}
-	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(labels.Everything())
+	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, receivedEndpointsList, err)
 }
 
