@@ -17,6 +17,9 @@ func newTty(context *cli.Context, p *libcontainer.Process, rootuid int) (*tty, e
 		}
 		return &tty{
 			console: console,
+			closers: []io.Closer{
+				console,
+			},
 		}, nil
 	}
 	return &tty{}, nil
@@ -25,11 +28,12 @@ func newTty(context *cli.Context, p *libcontainer.Process, rootuid int) (*tty, e
 type tty struct {
 	console libcontainer.Console
 	state   *term.State
+	closers []io.Closer
 }
 
 func (t *tty) Close() error {
-	if t.console != nil {
-		t.console.Close()
+	for _, c := range t.closers {
+		c.Close()
 	}
 	if t.state != nil {
 		term.RestoreTerminal(os.Stdin.Fd(), t.state)
@@ -49,8 +53,33 @@ func (t *tty) attach(process *libcontainer.Process) error {
 		process.Stderr = nil
 		process.Stdout = nil
 		process.Stdin = nil
+	} else {
+		// setup standard pipes so that the TTY of the calling nsinit process
+		// is not inherited by the container.
+		r, w, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		go io.Copy(w, os.Stdin)
+		t.closers = append(t.closers, w)
+		process.Stdin = r
+		if r, w, err = os.Pipe(); err != nil {
+			return err
+		}
+		go io.Copy(os.Stdout, r)
+		process.Stdout = w
+		t.closers = append(t.closers, r)
+		if r, w, err = os.Pipe(); err != nil {
+			return err
+		}
+		go io.Copy(os.Stderr, r)
+		process.Stderr = w
+		t.closers = append(t.closers, r)
 	}
 	return nil
+}
+
+func (t *tty) setupPipe() {
 }
 
 func (t *tty) resize() error {

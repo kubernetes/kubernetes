@@ -105,13 +105,13 @@ func Relabel(path string, fileLabel string, relabel string) error {
 	if fileLabel == "" {
 		return nil
 	}
+	if !strings.ContainsAny(relabel, "zZ") {
+		return nil
+	}
 	for _, p := range exclude_path {
 		if path == p {
 			return fmt.Errorf("Relabeling of %s is not allowed", path)
 		}
-	}
-	if !strings.ContainsAny(relabel, "zZ") {
-		return nil
 	}
 	if strings.Contains(relabel, "z") && strings.Contains(relabel, "Z") {
 		return fmt.Errorf("Bad SELinux option z and Z can not be used together")

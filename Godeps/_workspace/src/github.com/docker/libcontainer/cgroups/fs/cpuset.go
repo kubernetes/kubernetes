@@ -1,3 +1,5 @@
+// +build linux
+
 package fs
 
 import (
@@ -16,7 +18,7 @@ type CpusetGroup struct {
 
 func (s *CpusetGroup) Apply(d *data) error {
 	dir, err := d.path("cpuset")
-	if err != nil {
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 
@@ -48,6 +50,11 @@ func (s *CpusetGroup) GetStats(path string, stats *cgroups.Stats) error {
 }
 
 func (s *CpusetGroup) ApplyDir(dir string, cgroup *configs.Cgroup, pid int) error {
+	// This might happen if we have no cpuset cgroup mounted.
+	// Just do nothing and don't fail.
+	if dir == "" {
+		return nil
+	}
 	if err := s.ensureParent(dir); err != nil {
 		return err
 	}

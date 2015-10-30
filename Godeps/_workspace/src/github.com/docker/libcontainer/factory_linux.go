@@ -106,6 +106,7 @@ func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 	l := &LinuxFactory{
 		Root:      root,
 		Validator: validate.New(),
+		CriuPath:  "criu",
 	}
 	InitArgs(os.Args[0], "init")(l)
 	Cgroupfs(l)
@@ -128,6 +129,10 @@ type LinuxFactory struct {
 	// InitArgs are arguments for calling the init responsibilities for spawning
 	// a container.
 	InitArgs []string
+
+	// CriuPath is the path to the criu binary used for checkpoint and restore of
+	// containers.
+	CriuPath string
 
 	// Validator provides validation to container configurations.
 	Validator validate.Validator
@@ -161,6 +166,7 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 		config:        config,
 		initPath:      l.InitPath,
 		initArgs:      l.InitArgs,
+		criuPath:      l.CriuPath,
 		cgroupManager: l.NewCgroupsManager(config.Cgroups, nil),
 	}, nil
 }
@@ -174,9 +180,10 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &restoredProcess{
+	r := &nonChildProcess{
 		processPid:       state.InitProcessPid,
 		processStartTime: state.InitProcessStartTime,
+		fds:              state.ExternalDescriptors,
 	}
 	return &linuxContainer{
 		initProcess:   r,
@@ -184,6 +191,7 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		config:        &state.Config,
 		initPath:      l.InitPath,
 		initArgs:      l.InitArgs,
+		criuPath:      l.CriuPath,
 		cgroupManager: l.NewCgroupsManager(state.Config.Cgroups, state.CgroupPaths),
 		root:          containerRoot,
 	}, nil
@@ -252,36 +260,4 @@ func (l *LinuxFactory) validateID(id string) error {
 		return newGenericError(fmt.Errorf("Invalid id format: %v", id), InvalidIdFormat)
 	}
 	return nil
-}
-
-// restoredProcess represents a process where the calling process may or may not be
-// the parent process.  This process is created when a factory loads a container from
-// a persisted state.
-type restoredProcess struct {
-	processPid       int
-	processStartTime string
-}
-
-func (p *restoredProcess) start() error {
-	return newGenericError(fmt.Errorf("restored process cannot be started"), SystemError)
-}
-
-func (p *restoredProcess) pid() int {
-	return p.processPid
-}
-
-func (p *restoredProcess) terminate() error {
-	return newGenericError(fmt.Errorf("restored process cannot be terminated"), SystemError)
-}
-
-func (p *restoredProcess) wait() (*os.ProcessState, error) {
-	return nil, newGenericError(fmt.Errorf("restored process cannot be waited on"), SystemError)
-}
-
-func (p *restoredProcess) startTime() (string, error) {
-	return p.processStartTime, nil
-}
-
-func (p *restoredProcess) signal(s os.Signal) error {
-	return newGenericError(fmt.Errorf("restored process cannot be signaled"), SystemError)
 }
