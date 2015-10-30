@@ -137,6 +137,7 @@ GCE_SLOW_TESTS=(
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
     "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
+    "Garbage\scollector\sshould"                      # 7 min,        file: garbage_collector.go,    slow by design
     )
 
 # Tests which are not able to be run in parallel.
