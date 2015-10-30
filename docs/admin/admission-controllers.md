@@ -21,6 +21,7 @@
     - [SecurityContextDeny](#securitycontextdeny)
     - [ResourceQuota](#resourcequota)
     - [LimitRanger](#limitranger)
+    - [InitialResources (experimental)](#initialresources-experimental)
     - [NamespaceExists (deprecated)](#namespaceexists-deprecated)
     - [NamespaceAutoProvision (deprecated)](#namespaceautoprovision-deprecated)
     - [NamespaceLifecycle](#namespacelifecycle)
@@ -113,6 +114,15 @@ be used to apply default resource requests to Pods that don't specify any; curre
 applies a 0.1 CPU requirement to all Pods in the `default` namespace.
 
 See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](limitrange/) for more details.
+
+### InitialResources (experimental)
+
+This plug-in observes pod creation requests. If a container omits compute resource requests and limits,
+then the plug-in auto-populates a compute resource request based on historical usage of containers running the same image.
+If there is not enough data to make a decision the Request is left unchanged.
+When the plug-in sets a compute resource request, it annotates the pod with information on what compute resources it auto-populated.
+
+See the [InitialResouces proposal](../proposals/initial-resources.md) for more details.
 
 ### NamespaceExists (deprecated)
 
