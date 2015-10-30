@@ -107,7 +107,7 @@ Start etcd and verify that it is running:
 
 ```bash
 sudo docker run -d --hostname $(uname -n) --name etcd \
-  -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12 \
+  -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.2.1 \
   --listen-client-urls http://0.0.0.0:4001 \
   --advertise-client-urls http://${KUBERNETES_MASTER_IP}:4001
 ```
@@ -115,7 +115,7 @@ sudo docker run -d --hostname $(uname -n) --name etcd \
 ```console
 $ sudo docker ps
 CONTAINER ID   IMAGE                        COMMAND   CREATED   STATUS   PORTS                NAMES
-fd7bac9e2301   quay.io/coreos/etcd:v2.0.12  "/etcd"   5s ago    Up 3s    2379/tcp, 2380/...   etcd
+fd7bac9e2301   quay.io/coreos/etcd:v2.2.1   "/etcd"   5s ago    Up 3s    2379/tcp, 2380/...   etcd
 ```
 
 It's also a good idea to ensure your etcd instance is reachable by testing it
