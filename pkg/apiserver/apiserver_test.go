@@ -307,13 +307,19 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &apiservertesting.SimpleList{
 		Items: storage.list,
 	}
-	storage.requestedLabelSelector = label
-	storage.requestedFieldSelector = field
+	storage.requestedLabelSelector = labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		storage.requestedLabelSelector = options.LabelSelector
+	}
+	storage.requestedFieldSelector = fields.Everything()
+	if options != nil && options.FieldSelector != nil {
+		storage.requestedFieldSelector = options.FieldSelector
+	}
 	return result, storage.errors["list"]
 }
 
@@ -410,11 +416,20 @@ func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (r
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	storage.checkContext(ctx)
-	storage.requestedLabelSelector = label
-	storage.requestedFieldSelector = field
-	storage.requestedResourceVersion = resourceVersion
+	storage.requestedLabelSelector = labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		storage.requestedLabelSelector = options.LabelSelector
+	}
+	storage.requestedFieldSelector = fields.Everything()
+	if options != nil && options.FieldSelector != nil {
+		storage.requestedFieldSelector = options.FieldSelector
+	}
+	storage.requestedResourceVersion = ""
+	if options != nil {
+		storage.requestedResourceVersion = options.ResourceVersion
+	}
 	storage.requestedResourceNamespace = api.NamespaceValue(ctx)
 	if err := storage.errors["watch"]; err != nil {
 		return nil, err

@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
@@ -173,14 +171,14 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id)
 }
 
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector, options *api.ListOptions) (runtime.Object, error) {
-	return rs.registry.ListServices(ctx, label, field, options)
+func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
 // It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
+func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return rs.registry.WatchServices(ctx, options)
 }
 
 func (*REST) New() runtime.Object {
