@@ -2,6 +2,7 @@ package kubelet
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -10,9 +11,11 @@ import (
 	flannelIp "github.com/coreos/flannel/pkg/ip"
 	flannelSubnet "github.com/coreos/flannel/subnet"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -196,6 +199,7 @@ func NewNodeToLeaseTranslator(c *client.Client) nodeToLeaseTranslator {
 type LeaseClient struct {
 	nodeToLeaseTranslator
 	kubeClient *client.Client
+	store      cache.Store
 }
 
 // List lists all flannel subnet leases.
@@ -215,7 +219,29 @@ func (l *LeaseClient) List() (LeaseList, error) {
 		}
 		leases = append(leases, lease)
 	}
+	glog.Infof("Relisted nodes at RV %v", nodes.ResourceVersion)
 	return LeaseList{leases, nodes.ResourceVersion}, nil
+}
+
+// nodeEqual compares the given nodes ignoring status.
+func (l *LeaseClient) nodeEqual(node, knownNode api.Node) bool {
+	nodeIP, err := l.getIp(&node)
+	if err != nil {
+		glog.Warningf("error checking node equality %v", err)
+		return false
+	}
+	knownNodeIP, err := l.getIp(&knownNode)
+	if err != nil {
+		glog.Warningf("error checking node equality %v", err)
+		return false
+	}
+	if nodeIP.ToIP().Equal(knownNodeIP.ToIP()) &&
+		reflect.DeepEqual(knownNode.Spec, node.Spec) &&
+		reflect.DeepEqual(knownNode.Annotations, node.Annotations) {
+		return true
+	}
+	glog.Infof(util.ObjectGoPrintSideBySide(node, knownNode))
+	return false
 }
 
 // Watch watches for a *single* update to the virtual lease resource, after the given resource version.
@@ -223,25 +249,43 @@ func (l *LeaseClient) Watch(rv string) (LeaseEvent, error) {
 	var err error
 	leaseEvent := LeaseEvent{}
 
+	glog.Infof("Starting watch at %v", rv)
 	w, err := l.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), api.ListOptions{ResourceVersion: rv})
 	if err != nil {
 		return leaseEvent, err
 	}
 	defer w.Stop()
-
-	// This is a performance bottleneck waiting to happen, but it isn't in the
-	// the critical path, and hanging is just so simple for now. The level of
-	// optimization required here depends on how the flannel client behaves.
-	event, ok := <-w.ResultChan()
-	if !ok {
-		return leaseEvent, fmt.Errorf("Watch error")
+	var node *api.Node
+	var event watch.Event
+	for {
+		// This is a performance bottleneck waiting to happen, but it isn't in the
+		// the critical path, and hanging is just so simple for now. The level of
+		// optimization required here depends on how the flannel client behaves.
+		var ok bool
+		event, ok = <-w.ResultChan()
+		if !ok {
+			glog.Infof("Watch error")
+			return leaseEvent, fmt.Errorf("Watch error")
+		}
+		// Ignore node status updates
+		node = event.Object.(*api.Node)
+		known, exists, err := l.store.Get(event.Object)
+		if err != nil || !exists {
+			glog.Infof("node %v not found in store", node.Name)
+			break
+		}
+		if !l.nodeEqual(*node, *known.(*api.Node)) {
+			glog.Infof("detected node change in %v", node.Name)
+			break
+		}
+		glog.Infof("ignoring unchanged node %v", node.Name)
 	}
-
-	node := event.Object.(*api.Node)
+	l.store.Add(event.Object)
 	lease, err := l.getLease(node)
 	if err != nil {
 		return leaseEvent, err
 	}
+	glog.Infof("retrieved lease for node %v: %+v", node.Name, lease)
 	return LeaseEvent{lease, event.Type}, nil
 }
 
@@ -274,6 +318,7 @@ func (k *KubeFlannelClient) WatchLeases(rv string) (flannelSubnet.LeaseWatchResu
 
 	e, err := k.client.Watch(rv)
 	if err != nil {
+		glog.Infof("error watch leases, listing: %+v", err)
 		return k.ListLeases()
 	}
 
@@ -307,5 +352,7 @@ func NewKubeFlannelClient(c *client.Client) *KubeFlannelClient {
 		LeaseClient{
 			nodeToLeaseTranslator: translator,
 			kubeClient:            c,
+			// TODO: Stop reinventing the wheel
+			store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		}}
 }
