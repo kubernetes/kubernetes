@@ -123,10 +123,10 @@ root       479  0.0  0.0   4348   812 ?        S    00:05   0:00 sleep 1
 root       480  0.0  0.0  15572  2212 ?        R    00:05   0:00 ps aux
 ```
 
-What happens if for any reason the image in this pod is killed off and then restarted by Kubernetes? Will we still see the log lines from the previous invocation of the container followed by the log lines for the started container? Or will we lose the log lines from the original container’s execution and only see the log lines for the new container? Let’s find out. First let’s stop the currently running counter.
+What happens if for any reason the image in this pod is killed off and then restarted by Kubernetes? Will we still see the log lines from the previous invocation of the container followed by the log lines for the started container? Or will we lose the log lines from the original container’s execution and only see the log lines for the new container? Let’s find out. First let’s delete the currently running counter.
 
 ```console
-$ kubectl stop pod counter
+$ kubectl delete pod counter
 pods/counter
 ```
 
