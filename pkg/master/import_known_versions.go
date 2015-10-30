@@ -19,5 +19,6 @@ package master
 // These imports are the API groups the API server will support.
 import (
 	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
