@@ -40,6 +40,8 @@ const (
 	startServiceInterval            = 5 * time.Second
 	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta"
 	rcIsNil                         = "ERROR: replicationController = nil"
+	deploymentIsNil                 = "ERROR: deployment = nil"
+	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
 )
 
 /*
@@ -52,6 +54,7 @@ rc.ConsumeCPU(300)
 */
 type ResourceConsumer struct {
 	name                     string
+	kind                     string
 	framework                *Framework
 	cpu                      chan int
 	mem                      chan int
@@ -63,12 +66,13 @@ type ResourceConsumer struct {
 	requestSizeInMegabytes   int
 }
 
-func NewDynamicResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
-	return newResourceConsumer(name, replicas, initCPUTotal, initMemoryTotal, dynamicConsumptionTimeInSeconds, dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, cpuLimit, memLimit, framework)
+func NewDynamicResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTotal int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	return newResourceConsumer(name, kind, replicas, initCPUTotal, initMemoryTotal, dynamicConsumptionTimeInSeconds, dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, cpuLimit, memLimit, framework)
 }
 
+// TODO this still defaults to replication controller
 func NewStaticResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
-	return newResourceConsumer(name, replicas, initCPUTotal, initMemoryTotal, staticConsumptionTimeInSeconds, initCPUTotal/replicas, initMemoryTotal/replicas, cpuLimit, memLimit, framework)
+	return newResourceConsumer(name, kindRC, replicas, initCPUTotal, initMemoryTotal, staticConsumptionTimeInSeconds, initCPUTotal/replicas, initMemoryTotal/replicas, cpuLimit, memLimit, framework)
 }
 
 /*
@@ -78,10 +82,11 @@ initMemoryTotal argument is in megabytes
 memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
-func newResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal, consumptionTimeInSeconds, requestSizeInMillicores, requestSizeInMegabytes int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
-	runServiceAndRCForResourceConsumer(framework.Client, framework.Namespace.Name, name, replicas, cpuLimit, memLimit)
+func newResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTotal, consumptionTimeInSeconds, requestSizeInMillicores, requestSizeInMegabytes int, cpuLimit, memLimit int64, framework *Framework) *ResourceConsumer {
+	runServiceAndWorkloadForResourceConsumer(framework.Client, framework.Namespace.Name, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
+		kind:                     kind,
 		framework:                framework,
 		cpu:                      make(chan int),
 		mem:                      make(chan int),
@@ -210,22 +215,35 @@ func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec 
 }
 
 func (rc *ResourceConsumer) GetReplicas() int {
-	replicationController, err := rc.framework.Client.ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name)
-	expectNoError(err)
-	if replicationController == nil {
-		Failf(rcIsNil)
+	switch rc.kind {
+	case kindRC:
+		replicationController, err := rc.framework.Client.ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name)
+		expectNoError(err)
+		if replicationController == nil {
+			Failf(rcIsNil)
+		}
+		return replicationController.Status.Replicas
+	case kindDeployment:
+		deployment, err := rc.framework.Client.Deployments(rc.framework.Namespace.Name).Get(rc.name)
+		expectNoError(err)
+		if deployment == nil {
+			Failf(deploymentIsNil)
+		}
+		return deployment.Status.Replicas
+	default:
+		Failf(invalidKind)
 	}
-	return replicationController.Status.Replicas
+	return 0
 }
 
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
 	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		if desiredReplicas == rc.GetReplicas() {
-			Logf("Replication Controller current replicas number is equal to desired replicas number: %d", desiredReplicas)
+			Logf("%s: current replicas number is equal to desired replicas number: %d", rc.kind, desiredReplicas)
 			return
 		} else {
-			Logf("Replication Controller current replicas number %d waiting to be %d", rc.GetReplicas(), desiredReplicas)
+			Logf("%s: current replicas number %d waiting to be %d", rc.kind, rc.GetReplicas(), desiredReplicas)
 		}
 	}
 	Failf("timeout waiting %v for pods size to be %d", timeout, desiredReplicas)
@@ -252,8 +270,8 @@ func (rc *ResourceConsumer) CleanUp() {
 	expectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
 }
 
-func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, replicas int, cpuLimitMillis, memLimitMb int64) {
-	By(fmt.Sprintf("Running consuming RC %s with %v replicas", name, replicas))
+func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
+	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := c.Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -270,7 +288,8 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		},
 	})
 	expectNoError(err)
-	config := RCConfig{
+
+	rcConfig := RCConfig{
 		Client:     c,
 		Image:      resourceConsumerImage,
 		Name:       name,
@@ -282,7 +301,21 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 		MemRequest: memLimitMb * 1024 * 1024, // MemLimit is in bytes
 		MemLimit:   memLimitMb * 1024 * 1024,
 	}
-	expectNoError(RunRC(config))
+
+	switch kind {
+	case kindRC:
+		expectNoError(RunRC(rcConfig))
+		break
+	case kindDeployment:
+		dpConfig := DeploymentConfig{
+			rcConfig,
+		}
+		expectNoError(RunDeployment(dpConfig))
+		break
+	default:
+		Failf(invalidKind)
+	}
+
 	// Make sure endpoints are propagated.
 	// TODO(piosz): replace sleep with endpoints watch.
 	time.Sleep(10 * time.Second)
