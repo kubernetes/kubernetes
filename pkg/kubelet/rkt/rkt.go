@@ -53,6 +53,8 @@ const (
 	rktMinimumVersion     = "0.8.1"
 	systemdMinimumVersion = "219"
 
+	RktType = "rkt"
+
 	systemdServiceDir = "/run/systemd/system"
 	rktDataDir        = "/var/lib/rkt"
 	rktLocalConfigDir = "/etc/rkt"
@@ -513,7 +515,7 @@ func newUnitOption(section, name, value string) *unit.UnitOption {
 // apiPodToruntimePod converts an api.Pod to kubelet/container.Pod.
 // we save the this for later reconstruction of the kubelet/container.Pod
 // such as in GetPods().
-func apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
+func apiPodToRuntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 	p := &kubecontainer.Pod{
 		ID:        pod.UID,
 		Name:      pod.Name,
@@ -587,7 +589,7 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	glog.V(4).Infof("'rkt prepare' returns %q", uuid)
 
 	// Create systemd service file for the rkt pod.
-	runtimePod := apiPodToruntimePod(uuid, pod)
+	runtimePod := apiPodToRuntimePod(uuid, pod)
 	b, err := json.Marshal(runtimePod)
 	if err != nil {
 		return "", nil, err
@@ -844,6 +846,10 @@ func (r *runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
 func (r *runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	serviceName := makePodServiceFileName(pod.UID)
 	return r.getPodStatus(serviceName)
+}
+
+func (r *runtime) Type() string {
+	return RktType
 }
 
 // Version invokes 'rkt version' to get the version information of the rkt

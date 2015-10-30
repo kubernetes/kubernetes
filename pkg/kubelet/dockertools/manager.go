@@ -57,6 +57,10 @@ import (
 )
 
 const (
+	DockerType = "docker"
+
+	MinimumDockerAPIVersion = "1.18"
+
 	maxReasonCacheEntries = 200
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
@@ -1019,6 +1023,10 @@ func (dv dockerVersion) Compare(other string) (int, error) {
 		return 1, nil
 	}
 	return 0, nil
+}
+
+func (dm *DockerManager) Type() string {
+	return DockerType
 }
 
 func (dm *DockerManager) Version() (kubecontainer.Version, error) {

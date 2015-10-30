@@ -2627,6 +2627,143 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 }
 
+func TestDockerRuntimeVersion(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.RuntimeType = "docker"
+	fakeRuntime.VersionInfo = "1.18"
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
+	}}).ReactionChain
+	machineInfo := &cadvisorApi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorApi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock
+	// FsInfo values added to Cadvisor should make the kubelet report that it has sufficient
+	// disk space.
+	dockerimagesFsInfo := cadvisorApiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
+	rootFsInfo := cadvisorApiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
+	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
+	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
+	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	if err != nil {
+		t.Fatalf("can't update disk space manager: %v", err)
+	}
+	diskSpaceManager.Unfreeze()
+	kubelet.diskSpaceManager = diskSpaceManager
+
+	expectedNode := &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+		Spec:       api.NodeSpec{},
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeOutOfDisk,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+			},
+			NodeInfo: api.NodeSystemInfo{
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+				ContainerRuntimeVersion: "docker://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+			},
+			Addresses: []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
+				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+			},
+		},
+	}
+
+	kubelet.updateRuntimeUp()
+	if err := kubelet.updateNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	actions := kubeClient.Actions()
+	if len(actions) != 2 {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
+	if !ok {
+		t.Errorf("unexpected object type")
+	}
+	for i, cond := range updatedNode.Status.Conditions {
+		if cond.LastHeartbeatTime.IsZero() {
+			t.Errorf("unexpected zero last probe timestamp")
+		}
+		if cond.LastTransitionTime.IsZero() {
+			t.Errorf("unexpected zero last transition timestamp")
+		}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+	if !reflect.DeepEqual(expectedNode, updatedNode) {
+		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+	}
+
+	// Downgrade docker version, node should be NotReady
+	fakeRuntime.RuntimeType = "docker"
+	fakeRuntime.VersionInfo = "1.17"
+	kubelet.updateRuntimeUp()
+	if err := kubelet.updateNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	actions = kubeClient.Actions()
+	if len(actions) != 4 {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	updatedNode, ok = actions[3].(testclient.UpdateAction).GetObject().(*api.Node)
+	if !ok {
+		t.Errorf("unexpected object type")
+	}
+	if updatedNode.Status.Conditions[0].Reason != "KubeletNotReady" &&
+		!strings.Contains(updatedNode.Status.Conditions[0].Message, "container runtime version is older than") {
+		t.Errorf("unexpect NodeStatus due to container runtime version")
+	}
+}
+
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet

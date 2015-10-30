@@ -2431,11 +2431,13 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	containerRuntimeUp := kl.containerRuntimeUp()
 	// Check whether network is configured properly
 	networkConfigured := kl.doneNetworkConfigure()
+	// Check whether runtime version meets the minimal requirements
+	containerRuntimeVersionRequirementMet := kl.containerRuntimeVersionRequirementMet()
 
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && networkConfigured {
+	if containerRuntimeUp && networkConfigured && containerRuntimeVersionRequirementMet {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -2451,6 +2453,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		if !networkConfigured {
 			messages = append(reasons, "network not configured correctly")
+		}
+		if !containerRuntimeVersionRequirementMet {
+			messages = append(messages, fmt.Sprintf("container runtime version is older than %s", dockertools.MinimumDockerAPIVersion))
 		}
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
@@ -2561,6 +2566,29 @@ func (kl *Kubelet) doneNetworkConfigure() bool {
 	kl.networkConfigMutex.Lock()
 	defer kl.networkConfigMutex.Unlock()
 	return kl.networkConfigured
+}
+
+func (kl *Kubelet) containerRuntimeVersionRequirementMet() bool {
+	switch kl.GetRuntime().Type() {
+	case "docker":
+		version, err := kl.GetContainerRuntimeVersion()
+		if err != nil {
+			return true
+		}
+		// Verify the docker version.
+		result, err := version.Compare(dockertools.MinimumDockerAPIVersion)
+		if err != nil {
+			glog.Errorf("Cannot compare current docker version %v with minimum support Docker version %q", version, dockertools.MinimumDockerAPIVersion)
+			return false
+		}
+		return (result >= 0)
+	case "rkt":
+		// TODO(dawnchen): Rkt support here
+		return true
+	default:
+		glog.Errorf("unsupported container runtime %s specified", kl.GetRuntime().Type())
+		return true
+	}
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0

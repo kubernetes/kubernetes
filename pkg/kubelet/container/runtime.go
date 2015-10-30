@@ -52,6 +52,8 @@ type ImageSpec struct {
 // by a container runtime.
 // Thread safety is required from implementations of this interface.
 type Runtime interface {
+	// Type returns the type of the container runtime.
+	Type() string
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
 	// GetPods returns a list containers group by pods. The boolean parameter
