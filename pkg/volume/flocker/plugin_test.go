@@ -146,8 +146,8 @@ func TestNewCleaner(t *testing.T) {
 }
 
 func TestIsReadOnly(t *testing.T) {
-	b := flockerBuilder{readOnly: true}
-	assert.True(t, b.IsReadOnly())
+	b := &flockerBuilder{readOnly: true}
+	assert.True(t, b.GetAttributes().ReadOnly)
 }
 
 func TestGetPath(t *testing.T) {

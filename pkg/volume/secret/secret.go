@@ -97,10 +97,14 @@ type secretVolumeBuilder struct {
 
 var _ volume.Builder = &secretVolumeBuilder{}
 
-func (_ *secretVolumeBuilder) SupportsOwnershipManagement() bool {
-	return true
+func (sv *secretVolume) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    true,
+		Managed:                     true,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
-
 func (b *secretVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
@@ -170,14 +174,6 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	volumeutil.SetReady(b.getMetaDir())
 
 	return nil
-}
-
-func (sv *secretVolume) IsReadOnly() bool {
-	return false
-}
-
-func (sv *secretVolume) SupportsSELinux() bool {
-	return true
 }
 
 func totalSecretBytes(secret *api.Secret) int {

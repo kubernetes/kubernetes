@@ -140,10 +140,15 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			return nil, err
 		}
-		if hasFSGroup && builder.SupportsOwnershipManagement() && !builder.IsReadOnly() {
+		if hasFSGroup &&
+			builder.GetAttributes().Managed &&
+			builder.GetAttributes().SupportsOwnershipManagement {
 			err := kl.manageVolumeOwnership(pod, internal, builder, fsGroup)
 			if err != nil {
+				glog.Errorf("Error managing ownership of volume %v for pod %v/%v: %v", internal.Name(), pod.Namespace, pod.Name, err)
 				return nil, err
+			} else {
+				glog.V(3).Infof("Managed ownership of volume %v for pod %v/%v", internal.Name(), pod.Namespace, pod.Name)
 			}
 		}
 		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}

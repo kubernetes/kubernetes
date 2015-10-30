@@ -88,10 +88,6 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 	return builder, nil
 }
 
-func (plugin *persistentClaimPlugin) IsReadOnly() bool {
-	return plugin.readOnly
-}
-
 func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a cleaner.  Kubelet uses that cleaner, not this one, when removing orphaned volumes.")
 }

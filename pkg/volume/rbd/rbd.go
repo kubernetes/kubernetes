@@ -192,8 +192,13 @@ type rbdBuilder struct {
 
 var _ volume.Builder = &rbdBuilder{}
 
-func (_ *rbdBuilder) SupportsOwnershipManagement() bool {
-	return true
+func (b *rbd) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.ReadOnly,
+		Managed:                     !b.ReadOnly,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
 
 func (b *rbdBuilder) SetUp() error {
@@ -214,14 +219,6 @@ type rbdCleaner struct {
 }
 
 var _ volume.Cleaner = &rbdCleaner{}
-
-func (b *rbd) IsReadOnly() bool {
-	return b.ReadOnly
-}
-
-func (b *rbd) SupportsSELinux() bool {
-	return true
-}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
