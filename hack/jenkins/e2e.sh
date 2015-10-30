@@ -117,6 +117,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Daemon\sset"
     "Deployment"
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "ServiceLoadBalancer" # issue: #16602
     "Shell"
     )
 
@@ -1142,7 +1143,6 @@ case ${JOB_NAME} in
     : ${ENABLE_DAEMONSETS:=true}
     ;;
 
-  
   # Run Kubemark test on a fake 100 node cluster to have a comparison
   # to the real results from scalability suite
   kubernetes-kubemark-gce)
