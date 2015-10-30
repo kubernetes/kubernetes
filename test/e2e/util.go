@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -202,6 +203,10 @@ type RCConfig struct {
 	// Maximum allowable container failures. If exceeded, RunRC returns an error.
 	// Defaults to replicas*0.1 if unspecified.
 	MaxContainerFailures *int
+}
+
+type DeploymentConfig struct {
+	RCConfig
 }
 
 func nowStamp() string {
@@ -1251,21 +1256,71 @@ func Diff(oldPods []*api.Pod, curPods []*api.Pod) PodDiff {
 	return podInfoMap
 }
 
+// RunDeployment Launches (and verifies correctness) of a Deployment
+// and will wait for all pods it spawns to become "Running".
+// It's the caller's responsibility to clean up externally (i.e. use the
+// namespace lifecycle for handling cleanup).
+func RunDeployment(config DeploymentConfig) error {
+	err := config.create()
+	if err != nil {
+		return err
+	}
+	return config.start()
+}
+
+func (config *DeploymentConfig) create() error {
+	By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
+	deployment := &extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: config.Replicas,
+			Selector: map[string]string{
+				"name": config.Name,
+			},
+			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": config.Name},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+							Ports:   []api.ContainerPort{{ContainerPort: 80}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	config.applyTo(&deployment.Spec.Template)
+
+	_, err := config.Client.Deployments(config.Namespace).Create(deployment)
+	if err != nil {
+		return fmt.Errorf("Error creating deployment: %v", err)
+	}
+	Logf("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
+	return nil
+}
+
 // RunRC Launches (and verifies correctness) of a Replication Controller
 // and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
 func RunRC(config RCConfig) error {
-	// Don't force tests to fail if they don't care about containers restarting.
-	var maxContainerFailures int
-	if config.MaxContainerFailures == nil {
-		maxContainerFailures = int(math.Max(1.0, float64(config.Replicas)*.01))
-	} else {
-		maxContainerFailures = *config.MaxContainerFailures
+	err := config.create()
+	if err != nil {
+		return err
 	}
+	return config.start()
+}
 
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-
+func (config *RCConfig) create() error {
 	By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
@@ -1293,47 +1348,66 @@ func RunRC(config RCConfig) error {
 			},
 		},
 	}
-	if config.Env != nil {
-		for k, v := range config.Env {
-			c := &rc.Spec.Template.Spec.Containers[0]
-			c.Env = append(c.Env, api.EnvVar{Name: k, Value: v})
-		}
-	}
-	if config.Labels != nil {
-		for k, v := range config.Labels {
-			rc.Spec.Template.ObjectMeta.Labels[k] = v
-		}
-	}
-	if config.Ports != nil {
-		for k, v := range config.Ports {
-			c := &rc.Spec.Template.Spec.Containers[0]
-			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
-		}
-	}
-	if config.CpuLimit > 0 || config.MemLimit > 0 {
-		rc.Spec.Template.Spec.Containers[0].Resources.Limits = api.ResourceList{}
-	}
-	if config.CpuLimit > 0 {
-		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuLimit, resource.DecimalSI)
-	}
-	if config.MemLimit > 0 {
-		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
-	}
-	if config.CpuRequest > 0 || config.MemRequest > 0 {
-		rc.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{}
-	}
-	if config.CpuRequest > 0 {
-		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
-	}
-	if config.MemRequest > 0 {
-		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
-	}
+
+	config.applyTo(rc.Spec.Template)
 
 	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
 	Logf("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
+	return nil
+}
+
+func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
+	if config.Env != nil {
+		for k, v := range config.Env {
+			c := &template.Spec.Containers[0]
+			c.Env = append(c.Env, api.EnvVar{Name: k, Value: v})
+		}
+	}
+	if config.Labels != nil {
+		for k, v := range config.Labels {
+			template.ObjectMeta.Labels[k] = v
+		}
+	}
+	if config.Ports != nil {
+		for k, v := range config.Ports {
+			c := &template.Spec.Containers[0]
+			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
+		}
+	}
+	if config.CpuLimit > 0 || config.MemLimit > 0 {
+		template.Spec.Containers[0].Resources.Limits = api.ResourceList{}
+	}
+	if config.CpuLimit > 0 {
+		template.Spec.Containers[0].Resources.Limits[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuLimit, resource.DecimalSI)
+	}
+	if config.MemLimit > 0 {
+		template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
+	}
+	if config.CpuRequest > 0 || config.MemRequest > 0 {
+		template.Spec.Containers[0].Resources.Requests = api.ResourceList{}
+	}
+	if config.CpuRequest > 0 {
+		template.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
+	}
+	if config.MemRequest > 0 {
+		template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
+	}
+}
+
+func (config *RCConfig) start() error {
+	// Don't force tests to fail if they don't care about containers restarting.
+	var maxContainerFailures int
+	if config.MaxContainerFailures == nil {
+		maxContainerFailures = int(math.Max(1.0, float64(config.Replicas)*.01))
+	} else {
+		maxContainerFailures = *config.MaxContainerFailures
+	}
+
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
+
 	podStore := newPodStore(config.Client, config.Namespace, label, fields.Everything())
 	defer podStore.Stop()
 
@@ -1406,7 +1480,7 @@ func RunRC(config RCConfig) error {
 		}
 
 		Logf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
-			rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown, runningButNotReady)
+			config.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown, runningButNotReady)
 
 		promPushRunningPending(running, pending)
 
