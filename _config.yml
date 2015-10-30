@@ -13,7 +13,7 @@ og: # if title, site_name or description are left blank, we will use the global
     type: website
     image: /img/global/og_img.jpg
 
-url: "http://kubernetes.io" # the base hostname & protocol for your site
+url: "http://janetkuo.github.io/kubernetes/" # the base hostname & protocol for your site
 
 google_analytics: "UA-36037335-10"
 
