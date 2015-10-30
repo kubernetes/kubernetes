@@ -78,19 +78,19 @@ func (fh *realFsHandler) update() error {
 
 func (fh *realFsHandler) trackUsage() {
 	for {
-		start := time.Now()
-		if _, ok := <-fh.stopChan; !ok {
+		select {
+		case <-fh.stopChan:
 			return
+		case <-time.After(fh.period):
+			start := time.Now()
+			if err := fh.update(); err != nil {
+				glog.V(2).Infof("failed to collect filesystem stats - %v", err)
+			}
+			duration := time.Since(start)
+			if duration > longDu {
+				glog.V(3).Infof("`du` on following dirs took %v: %v", duration, fh.storageDirs)
+			}
 		}
-		if err := fh.update(); err != nil {
-			glog.V(2).Infof("failed to collect filesystem stats - %v", err)
-		}
-		duration := time.Since(start)
-		if duration > longDu {
-			glog.V(3).Infof("`du` on following dirs took %v: %v", duration, fh.storageDirs)
-		}
-		next := start.Add(fh.period)
-		time.Sleep(next.Sub(time.Now()))
 	}
 }
 
