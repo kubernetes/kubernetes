@@ -232,6 +232,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 			fakeClient := t.Client.(*fake.RESTClient)
 			c := client.NewOrDie(t.ClientConfig)
 			c.Client = fakeClient.Client
+			c.ExtensionsClient.Client = fakeClient.Client
 			return c, t.Err
 		},
 		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {

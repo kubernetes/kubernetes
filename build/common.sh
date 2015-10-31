@@ -448,6 +448,7 @@ function kube::build::source_targets() {
     test
     third_party
     contrib/completions/bash/kubectl
+    contrib/mesos
     .generated_docs
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
