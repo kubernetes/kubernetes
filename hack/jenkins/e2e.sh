@@ -554,6 +554,23 @@ case ${JOB_NAME} in
           )"}
     ;;
 
+  kubernetes-e2e-gke-1.1)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="gke-release-1-1"}
+    : ${E2E_NETWORK:="gke-release-1-1"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-release-1-1"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    ;;
+
   # kubernetes-upgrade-gke
   #
   # This suite:
