@@ -92,5 +92,14 @@ func defaultPriorities() sets.String {
 				Weight: 1,
 			},
 		),
+		factory.RegisterPriorityConfigFactory(
+			"ServiceAffinityPriority",
+			factory.PriorityConfigFactory{
+				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+					return priorities.NewServiceAffinityPriority(args.ServiceLister, args.ControllerLister)
+				},
+				Weight: 1,
+			},
+		),
 	)
 }
