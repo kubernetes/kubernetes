@@ -89,5 +89,5 @@ func EndpointsAttributes(obj runtime.Object) (objLabels labels.Set, objFields fi
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
 	}
-	return endpoints.Labels, generic.ObjectMetaFieldsSet(endpoints.ObjectMeta), nil
+	return endpoints.Labels, generic.ObjectMetaFieldsSet(endpoints.ObjectMeta, true), nil
 }

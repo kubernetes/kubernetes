@@ -27,7 +27,12 @@ import (
 type AttrFunc func(obj runtime.Object) (label labels.Set, field fields.Set, err error)
 
 // ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
-func ObjectMetaFieldsSet(objectMeta api.ObjectMeta) fields.Set {
+func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
+	if !hasNamespaceField {
+		return fields.Set{
+			"metadata.name": objectMeta.Name,
+		}
+	}
 	return fields.Set{
 		"metadata.name":      objectMeta.Name,
 		"metadata.namespace": objectMeta.Namespace,
