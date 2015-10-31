@@ -86,5 +86,5 @@ func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 
 // SelectableFields returns a label set that represents the object
 func SelectableFields(obj *api.ServiceAccount) labels.Set {
-	return labels.Set(generic.ObjectMetaFieldsSet(obj.ObjectMeta))
+	return labels.Set(generic.ObjectMetaFieldsSet(obj.ObjectMeta, true))
 }

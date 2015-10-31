@@ -95,7 +95,7 @@ func (ingressStrategy) AllowUnconditionalUpdate() bool {
 
 // IngressToSelectableFields returns a field set that represents the object.
 func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
-	return generic.ObjectMetaFieldsSet(ingress.ObjectMeta)
+	return generic.ObjectMetaFieldsSet(ingress.ObjectMeta, true)
 }
 
 // MatchIngress is the filter used by the generic etcd backend to ingress
