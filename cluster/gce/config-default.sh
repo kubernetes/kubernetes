@@ -52,6 +52,10 @@ POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
 
+# Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
+#   glbc           - CE L7 Load Balancer Controller
+ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
+
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none           - No cluster monitoring setup
 #   influxdb       - Heapster, InfluxDB, and Grafana

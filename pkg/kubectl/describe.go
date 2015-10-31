@@ -90,6 +90,7 @@ func expDescriberMap(c *client.Client) map[string]Describer {
 		"DaemonSet":               &DaemonSetDescriber{c},
 		"Job":                     &JobDescriber{c},
 		"Deployment":              &DeploymentDescriber{c},
+		"Ingress":                 &IngressDescriber{c},
 	}
 }
 
@@ -982,6 +983,43 @@ func describeSecret(secret *api.Secret) (string, error) {
 
 		return nil
 	})
+}
+
+type IngressDescriber struct {
+	client.Interface
+}
+
+func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
+	c := i.Extensions().Ingress(namespace)
+	ing, err := c.Get(name)
+	if err != nil {
+		return "", err
+	}
+	events, _ := i.Events(namespace).Search(ing)
+	return describeIngress(ing, events)
+}
+
+func describeIngress(ing *extensions.Ingress, events *api.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		describeIngressAnnotations(out, ing.Annotations)
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+// TODO: Move from annotations into Ingress status.
+func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
+	for k, v := range annotations {
+		if !strings.HasPrefix(k, "ingress") {
+			continue
+		}
+		parts := strings.Split(k, "/")
+		name := parts[len(parts)-1]
+		fmt.Fprintf(out, "%v:\t%s\n", name, v)
+	}
+	return
 }
 
 // ServiceDescriber generates information about a service.

@@ -30,6 +30,17 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_l7_loadbalancing', '').lower() == 'glbc' %}
+/etc/kubernetes/addons/cluster-loadbalancing/glbc:
+  file.recurse:
+    - source: salt://kube-addons/cluster-loadbalancing/glbc
+    - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
 {% if pillar.get('enable_cluster_monitoring', '').lower() == 'google' %}
 /etc/kubernetes/addons/cluster-monitoring/google:
   file.recurse:
