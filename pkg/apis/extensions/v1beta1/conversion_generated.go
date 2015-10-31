@@ -707,6 +707,14 @@ func autoconvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s c
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AffinitySelector != nil {
+		out.AffinitySelector = make(map[string]string)
+		for key, val := range in.AffinitySelector {
+			out.AffinitySelector[key] = val
+		}
+	} else {
+		out.AffinitySelector = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {
@@ -1762,6 +1770,14 @@ func autoconvert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s c
 		}
 	} else {
 		out.NodeSelector = nil
+	}
+	if in.AffinitySelector != nil {
+		out.AffinitySelector = make(map[string]string)
+		for key, val := range in.AffinitySelector {
+			out.AffinitySelector[key] = val
+		}
+	} else {
+		out.AffinitySelector = nil
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	// in.DeprecatedServiceAccount has no peer in out

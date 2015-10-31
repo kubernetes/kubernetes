@@ -172,6 +172,7 @@ func ValidateDaemonSetTemplateUpdate(oldPodTemplate, podTemplate *api.PodTemplat
 	podSpec := podTemplate.Spec
 	// podTemplate.Spec is not a pointer, so we can modify NodeSelector and NodeName directly.
 	podSpec.NodeSelector = oldPodTemplate.Spec.NodeSelector
+	podSpec.AffinitySelector = oldPodTemplate.Spec.AffinitySelector
 	podSpec.NodeName = oldPodTemplate.Spec.NodeName
 	// In particular, we do not allow updates to container images at this point.
 	if !api.Semantic.DeepEqual(oldPodTemplate.Spec, podSpec) {
