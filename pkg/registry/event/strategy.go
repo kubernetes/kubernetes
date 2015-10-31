@@ -80,7 +80,7 @@ func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, e
 		l = labels.Set{}
 	}
 
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(event.ObjectMeta)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(event.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"involvedObject.kind":            event.InvolvedObject.Kind,
 		"involvedObject.namespace":       event.InvolvedObject.Namespace,
