@@ -12992,7 +12992,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 	yyrr1149 = yyl1149
 
 	if yyv1149 == nil {
-		if yyrl1149, yyrt1149 = z.DecInferLen(yyl1149, z.DecBasicHandle().MaxInitLen, 608); yyrt1149 {
+		if yyrl1149, yyrt1149 = z.DecInferLen(yyl1149, z.DecBasicHandle().MaxInitLen, 616); yyrt1149 {
 			yyrr1149 = yyrl1149
 		}
 		yyv1149 = make([]Deployment, yyrl1149)
@@ -13007,7 +13007,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 	} else if yyl1149 > 0 {
 
 		if yyl1149 > cap(yyv1149) {
-			yyrl1149, yyrt1149 = z.DecInferLen(yyl1149, z.DecBasicHandle().MaxInitLen, 608)
+			yyrl1149, yyrt1149 = z.DecInferLen(yyl1149, z.DecBasicHandle().MaxInitLen, 616)
 			yyv1149 = make([]Deployment, yyrl1149)
 			yyc1149 = true
 
@@ -13295,7 +13295,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 	yyrr1167 = yyl1167
 
 	if yyv1167 == nil {
-		if yyrl1167, yyrt1167 = z.DecInferLen(yyl1167, z.DecBasicHandle().MaxInitLen, 632); yyrt1167 {
+		if yyrl1167, yyrt1167 = z.DecInferLen(yyl1167, z.DecBasicHandle().MaxInitLen, 640); yyrt1167 {
 			yyrr1167 = yyrl1167
 		}
 		yyv1167 = make([]Job, yyrl1167)
@@ -13310,7 +13310,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 	} else if yyl1167 > 0 {
 
 		if yyl1167 > cap(yyv1167) {
-			yyrl1167, yyrt1167 = z.DecInferLen(yyl1167, z.DecBasicHandle().MaxInitLen, 632)
+			yyrl1167, yyrt1167 = z.DecInferLen(yyl1167, z.DecBasicHandle().MaxInitLen, 640)
 			yyv1167 = make([]Job, yyrl1167)
 			yyc1167 = true
 
