@@ -55,6 +55,10 @@ type watchCacheElement struct {
 type watchCache struct {
 	sync.RWMutex
 
+	// Condition on which lists are waiting for the fresh enough
+	// resource version.
+	cond *sync.Cond
+
 	// Maximum size of history window.
 	capacity int
 
@@ -84,7 +88,7 @@ type watchCache struct {
 }
 
 func newWatchCache(capacity int) *watchCache {
-	return &watchCache{
+	wc := &watchCache{
 		capacity:        capacity,
 		cache:           make([]watchCacheElement, capacity),
 		startIndex:      0,
@@ -92,6 +96,8 @@ func newWatchCache(capacity int) *watchCache {
 		store:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		resourceVersion: 0,
 	}
+	wc.cond = sync.NewCond(wc.RLocker())
+	return wc
 }
 
 func (w *watchCache) Add(obj interface{}) error {
@@ -169,6 +175,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 	w.updateCache(resourceVersion, watchCacheEvent)
 	w.resourceVersion = resourceVersion
+	w.cond.Broadcast()
 	return updateFunc(event.Object)
 }
 
@@ -188,8 +195,11 @@ func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
 
-func (w *watchCache) ListWithVersion() ([]interface{}, uint64) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64) ([]interface{}, uint64) {
 	w.RLock()
+	for w.resourceVersion < resourceVersion {
+		w.cond.Wait()
+	}
 	defer w.RUnlock()
 	return w.store.List(), w.resourceVersion
 }
@@ -230,6 +240,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	if w.onReplace != nil {
 		w.onReplace()
 	}
+	w.cond.Broadcast()
 	return nil
 }
 
