@@ -32,11 +32,11 @@ function ensure-basic-networking() {
     echo 'Waiting for functional DNS (trying to resolve metadata.google.internal)...'
     sleep 3
   done
-  until getent hosts $(hostname -f) &>/dev/null; do
+  until getent hosts $(hostname -f || echo _error_) &>/dev/null; do
     echo 'Waiting for functional DNS (trying to resolve my own FQDN)...'
     sleep 3
   done
-  until getent hosts $(hostname -i) &>/dev/null; do
+  until getent hosts $(hostname -i || echo _error_) &>/dev/null; do
     echo 'Waiting for functional DNS (trying to resolve my own IP)...'
     sleep 3
   done
