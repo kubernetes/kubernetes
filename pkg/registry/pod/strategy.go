@@ -166,7 +166,7 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 // PodToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
 func PodToSelectableFields(pod *api.Pod) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(pod.ObjectMeta)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(pod.ObjectMeta, true)
 	podSpecificFieldsSet := fields.Set{
 		"spec.nodeName": pod.Spec.NodeName,
 		"status.phase":  string(pod.Status.Phase),

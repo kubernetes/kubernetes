@@ -97,7 +97,7 @@ func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.
 func JobToSelectableFields(job *extensions.Job) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(job.ObjectMeta)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(job.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(job.Status.Succeeded),
 	}
