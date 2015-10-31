@@ -2320,68 +2320,74 @@ func (kl *Kubelet) syncNetworkStatus() {
 	kl.networkConfigured = networkConfigured
 }
 
+func (kl *Kubelet) setUpdatedAddressesFromCloud(node *api.Node) {
+	instances, ok := kl.cloud.Instances()
+	if !ok {
+		glog.Errorf("Failed to get instances from cloud provider, so node addresses will be stale")
+		return
+	}
+	// TODO(roberthbailey): Can we do this without having credentials to talk to the cloud provider?
+	// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
+	nodeAddresses, err := instances.NodeAddresses(kl.nodeName)
+	if err != nil {
+		glog.Errorf("Failed to get addresses from cloud provider, so node addresses will be stale: %v", err)
+		return
+	}
+	node.Status.Addresses = nodeAddresses
+}
+
+func (kl *Kubelet) setUpdatedAddressesFromHostname(node *api.Node) {
+	addr := net.ParseIP(kl.hostname)
+	if addr == nil {
+		addrs, err := net.LookupIP(node.Name)
+
+		if err != nil {
+			glog.Errorf("Can't get ip address of node %s, so node addresses will be stale: %v", node.Name, err)
+			return
+		}
+
+		if len(addrs) == 0 {
+			glog.Errorf("No ip address for node %v, so node addresses will be stale", node.Name)
+			return
+		}
+
+		// check all ip addresses for this node.Name and try to find the first non-loopback IPv4 address.
+		// If no match is found, it uses the IP of the interface with gateway on it.
+		for _, ip := range addrs {
+			if !ip.IsLoopback() && ip.To4() != nil {
+				addr = ip
+				break
+			}
+		}
+
+		if addr == nil {
+			ip, err := util.ChooseHostInterface()
+			if err != nil {
+				glog.Errorf("Failed choosing host interface, so node addresses will be stale: %v", err)
+				return
+			}
+			addr = ip
+		}
+	}
+
+	node.Status.Addresses = []api.NodeAddress{
+		{Type: api.NodeLegacyHostIP, Address: addr.String()},
+		{Type: api.NodeInternalIP, Address: addr.String()},
+	}
+}
+
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condtion code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
-	// Set addresses for the node.
+	// Set addresses for the node. These addresses may be stale if there is an
+	// error retrieving an updated value, such as the cloudprovider API being
+	// unavailable.
 	if kl.cloud != nil {
-		instances, ok := kl.cloud.Instances()
-		if !ok {
-			return fmt.Errorf("failed to get instances from cloud provider")
-		}
-		// TODO(roberthbailey): Can we do this without having credentials to talk
-		// to the cloud provider?
-		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
-		nodeAddresses, err := instances.NodeAddresses(kl.nodeName)
-		if err != nil {
-			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
-		}
-		node.Status.Addresses = nodeAddresses
+		kl.setUpdatedAddressesFromCloud(node)
 	} else {
-		addr := net.ParseIP(kl.hostname)
-		if addr != nil {
-			node.Status.Addresses = []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: addr.String()},
-				{Type: api.NodeInternalIP, Address: addr.String()},
-			}
-		} else {
-			addrs, err := net.LookupIP(node.Name)
-			if err != nil {
-				return fmt.Errorf("can't get ip address of node %s: %v", node.Name, err)
-			} else if len(addrs) == 0 {
-				return fmt.Errorf("no ip address for node %v", node.Name)
-			} else {
-				// check all ip addresses for this node.Name and try to find the first non-loopback IPv4 address.
-				// If no match is found, it uses the IP of the interface with gateway on it.
-				for _, ip := range addrs {
-					if ip.IsLoopback() {
-						continue
-					}
-
-					if ip.To4() != nil {
-						node.Status.Addresses = []api.NodeAddress{
-							{Type: api.NodeLegacyHostIP, Address: ip.String()},
-							{Type: api.NodeInternalIP, Address: ip.String()},
-						}
-						break
-					}
-				}
-
-				if len(node.Status.Addresses) == 0 {
-					ip, err := util.ChooseHostInterface()
-					if err != nil {
-						return err
-					}
-
-					node.Status.Addresses = []api.NodeAddress{
-						{Type: api.NodeLegacyHostIP, Address: ip.String()},
-						{Type: api.NodeInternalIP, Address: ip.String()},
-					}
-				}
-			}
-		}
+		kl.setUpdatedAddressesFromHostname(node)
 	}
 
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
