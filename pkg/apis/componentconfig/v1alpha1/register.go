@@ -14,11 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package v1alpha1
 
-// These imports are the API groups the API server will support.
 import (
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
 )
+
+var Codec = runtime.CodecFor(api.Scheme, "componentconfig/v1alpha1")
+
+func init() {
+	addKnownTypes()
+	addDefaultingFuncs()
+}
+
+func addKnownTypes() {
+	api.Scheme.AddKnownTypes("componentconfig/v1alpha1",
+		&KubeProxyConfiguration{},
+	)
+}
+
+func (_ *KubeProxyConfiguration) IsAnAPIObject() {}

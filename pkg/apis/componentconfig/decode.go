@@ -14,11 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package componentconfig
 
-// These imports are the API groups the API server will support.
 import (
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	"io/ioutil"
+
+	"k8s.io/kubernetes/pkg/runtime"
 )
+
+func DecodeFromPathInto(obj runtime.Object, c runtime.Codec, filename string) error {
+	b, err := ioutil.ReadFile(filename)
+	c = runtime.YAMLDecoder(c)
+
+	if err != nil {
+		return err
+	}
+	return c.DecodeInto(b, obj)
+}
