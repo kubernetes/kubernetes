@@ -137,6 +137,8 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 // JSON or YAML marshalling and unmarshalling, it produces or consumes the
 // inner type.  This allows you to have, for example, a JSON field that can
 // accept a name or number.
+//
+// +genprotoidl=true
 type IntOrString struct {
 	Kind   IntstrKind
 	IntVal int64
