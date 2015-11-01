@@ -17,6 +17,7 @@ limitations under the License.
 package generator
 
 import (
+	"bytes"
 	"io"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
@@ -46,6 +47,21 @@ type Package interface {
 	// A Context is passed in case the list of generators depends on the
 	// input types.
 	Generators(*Context) []Generator
+}
+
+type File struct {
+	Name        string
+	FileType    string
+	PackageName string
+	Header      []byte
+	Imports     map[string]struct{}
+	Vars        bytes.Buffer
+	Consts      bytes.Buffer
+	Body        bytes.Buffer
+}
+
+type FileType interface {
+	AssembleFile(f *File, path string) error
 }
 
 // Packages is a list of packages to generate.
@@ -120,6 +136,10 @@ type Generator interface {
 	// TODO: provide per-file import tracking, removing the requirement
 	// that generators coordinate..
 	Filename() string
+
+	// A registered file type in the context to generate this file with. If
+	// the FileType is not found in the context, execution will stop.
+	FileType() string
 }
 
 // Context is global context for individual generators to consume.
@@ -134,6 +154,10 @@ type Context struct {
 	// The canonical ordering of the types (will be filtered by both the
 	// Package's and Generator's Filter methods).
 	Order []*types.Type
+
+	// A set of types this context can process. If this is empty or nil,
+	// the default "golang" filetype will be provided.
+	FileTypes map[string]FileType
 }
 
 // NewContext generates a context from the given builder, naming systems, and
@@ -147,6 +171,9 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 	c := &Context{
 		Namers:   namer.NameSystems{},
 		Universe: u,
+		FileTypes: map[string]FileType{
+			GolangFileType: golangFileType{},
+		},
 	}
 
 	for name, systemNamer := range nameSystems {
