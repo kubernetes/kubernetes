@@ -2586,8 +2586,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1", Subnet: "127.0.0.1/8"},
+				{Type: api.NodeInternalIP, Address: "127.0.0.1", Subnet: "127.0.0.1/8"},
 			},
 		},
 	}
@@ -2864,8 +2864,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1", Subnet: "127.0.0.1/8"},
+				{Type: api.NodeInternalIP, Address: "127.0.0.1", Subnet: "127.0.0.1/8"},
 			},
 		},
 	}
@@ -2985,8 +2985,8 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
-				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1", Subnet: "127.0.0.1/8"},
+				{Type: api.NodeInternalIP, Address: "127.0.0.1", Subnet: "127.0.0.1/8"},
 			},
 		},
 	}

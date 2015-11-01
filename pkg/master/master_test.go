@@ -154,9 +154,9 @@ func TestFindExternalAddress(t *testing.T) {
 	expectedIP := "172.0.0.1"
 
 	nodes := []*api.Node{new(api.Node), new(api.Node), new(api.Node)}
-	nodes[0].Status.Addresses = []api.NodeAddress{{"ExternalIP", expectedIP}}
-	nodes[1].Status.Addresses = []api.NodeAddress{{"LegacyHostIP", expectedIP}}
-	nodes[2].Status.Addresses = []api.NodeAddress{{"ExternalIP", expectedIP}, {"LegacyHostIP", "172.0.0.2"}}
+	nodes[0].Status.Addresses = []api.NodeAddress{{"ExternalIP", expectedIP, "127.0.0.1/8"}}
+	nodes[1].Status.Addresses = []api.NodeAddress{{"LegacyHostIP", expectedIP, "127.0.0.1/8"}}
+	nodes[2].Status.Addresses = []api.NodeAddress{{"ExternalIP", expectedIP, "127.0.0.1/8"}, {"LegacyHostIP", "172.0.0.2", "172.0.0.2/8"}}
 
 	// Pass Case
 	for _, node := range nodes {
