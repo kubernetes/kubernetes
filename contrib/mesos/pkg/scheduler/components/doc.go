@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package operations implements independent aspects of the scheduler which
-// do not use Framework internals, but rely solely on the Framework
+// Package components implements independent aspects of the scheduler which
+// do not use Framework or Scheduler internals, but rely solely on the Scheduler
 // interface.
-package operations
+package components

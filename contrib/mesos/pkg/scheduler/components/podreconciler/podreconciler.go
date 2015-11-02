@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operations
+package podreconciler
 
 import (
 	"time"
 
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
@@ -34,10 +35,10 @@ type PodReconciler struct {
 	sched   types.Scheduler
 	client  *client.Client
 	qr      *queuer.Queuer
-	deleter *Deleter
+	deleter *deleter.Deleter
 }
 
-func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Queuer, deleter *Deleter) *PodReconciler {
+func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Queuer, deleter *deleter.Deleter) *PodReconciler {
 	return &PodReconciler{
 		sched:   sched,
 		client:  client,
