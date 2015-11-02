@@ -338,6 +338,7 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 	return result
 }
 
+// TODO (random-liu) Remove parameter tPath when old containers are deprecated.
 func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string, pod *api.Pod) *containerStatusResult {
 	result := containerStatusResult{api.ContainerStatus{}, "", nil}
 
@@ -408,8 +409,14 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 			FinishedAt:  finishedAt,
 			ContainerID: DockerPrefix + dockerID,
 		}
-		if tPath != "" {
-			path, found := inspectResult.Volumes[tPath]
+		terminationMessagePath := getTerminationMessagePathFromLabel(inspectResult.Config.Labels)
+		if terminationMessagePath == "" {
+			// Because old containers have no terminationMessagePath Label, we stil have to rely on the information from apiserver here.
+			// TODO (random-liu) Remove this later when old containers with no labels are deprecated.
+			terminationMessagePath = tPath
+		}
+		if terminationMessagePath != "" {
+			path, found := inspectResult.Volumes[terminationMessagePath]
 			if found {
 				data, err := ioutil.ReadFile(path)
 				if err != nil {
