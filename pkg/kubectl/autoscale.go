@@ -36,7 +36,6 @@ func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
 		{"default-name", true},
 		{"name", false},
 		{"scaleRef-kind", false},
-		{"scaleRef-namespace", false},
 		{"scaleRef-name", false},
 		{"scaleRef-apiVersion", false},
 		{"scaleRef-subresource", false},
@@ -94,7 +93,6 @@ func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interfac
 		Spec: extensions.HorizontalPodAutoscalerSpec{
 			ScaleRef: extensions.SubresourceReference{
 				Kind:        params["scaleRef-kind"],
-				Namespace:   params["scaleRef-namespace"],
 				Name:        params["scaleRef-name"],
 				APIVersion:  params["scaleRef-apiVersion"],
 				Subresource: scaleSubResource,

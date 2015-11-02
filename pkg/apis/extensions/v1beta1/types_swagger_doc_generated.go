@@ -408,7 +408,6 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 var map_SubresourceReference = map[string]string{
 	"":            "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
 	"kind":        "Kind of the referent; More info: http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md#types-kinds\"",
-	"namespace":   "Namespace of the referent; More info: http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md",
 	"name":        "Name of the referent; More info: http://releases.k8s.io/release-1.1/docs/user-guide/identifiers.md#names",
 	"apiVersion":  "API version of the referent",
 	"subresource": "Subresource name of the referent",

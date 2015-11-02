@@ -1283,9 +1283,8 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 		fmt.Fprintf(out, "Namespace:\t%s\n", hpa.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(hpa.Labels))
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Reference:\t%s/%s/%s/%s\n",
+		fmt.Fprintf(out, "Reference:\t%s/%s/%s\n",
 			hpa.Spec.ScaleRef.Kind,
-			hpa.Spec.ScaleRef.Namespace,
 			hpa.Spec.ScaleRef.Name,
 			hpa.Spec.ScaleRef.Subresource)
 		if hpa.Spec.CPUUtilization != nil {
@@ -1303,7 +1302,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 		// TODO: switch to scale subresource once the required code is submitted.
 		if strings.ToLower(hpa.Spec.ScaleRef.Kind) == "replicationcontroller" {
 			fmt.Fprintf(out, "ReplicationController pods:\t")
-			rc, err := d.client.ReplicationControllers(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Name)
+			rc, err := d.client.ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleRef.Name)
 			if err == nil {
 				fmt.Fprintf(out, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
 			} else {

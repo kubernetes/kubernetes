@@ -111,7 +111,6 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	params["default-name"] = name
 
 	params["scaleRef-kind"] = mapping.Kind
-	params["scaleRef-namespace"] = namespace
 	params["scaleRef-name"] = name
 	params["scaleRef-apiVersion"] = mapping.APIVersion
 
