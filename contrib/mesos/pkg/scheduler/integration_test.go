@@ -426,11 +426,10 @@ type lifecycleTest struct {
 	apiServer     *TestServer
 	driver        *mmock.JoinableDriver
 	eventObs      *EventObserver
-	loop          operations.SchedulerLoopInterface
-	podReconciler *operations.PodReconciler
 	podsListWatch *MockPodsListWatch
-	scheduler     *MesosScheduler
+	framework     *Framework
 	schedulerProc *ha.SchedulerProcess
+	scheduler     *Scheduler
 	t             *testing.T
 }
 
@@ -450,7 +449,25 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	)
 	ei.Data = []byte{0, 1, 2}
 
-	// create scheduler
+	// create framework
+	client := client.NewOrDie(&client.Config{
+		Host:    apiServer.server.URL,
+		Version: testapi.Default.Version(),
+	})
+	c := *schedcfg.CreateDefaultConfig()
+	framework := New(Config{
+		Executor:        ei,
+		Client:          client,
+		SchedulerConfig: c,
+		LookupNode:      apiServer.LookupNode,
+	})
+
+	// TODO(sttts): re-enable the following tests
+	// assert.NotNil(framework.client, "client is nil")
+	// assert.NotNil(framework.executor, "executor is nil")
+	// assert.NotNil(framework.offers, "offer registry is nil")
+
+	// create pod scheduler
 	strategy := podschedulers.NewAllocationStrategy(
 		podtask.NewDefaultPredicate(
 			mresource.DefaultDefaultContainerCPULimit,
@@ -461,33 +478,15 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 			mresource.DefaultDefaultContainerMemLimit,
 		),
 	)
-
-	client := client.NewOrDie(&client.Config{
-		Host:    apiServer.server.URL,
-		Version: testapi.Default.Version(),
-	})
-	c := *schedcfg.CreateDefaultConfig()
-	mesosScheduler := New(Config{
-		Executor:        ei,
-		Client:          client,
-		PodScheduler:    podschedulers.NewFCFSPodScheduler(strategy, apiServer.LookupNode),
-		SchedulerConfig: c,
-		LookupNode:      apiServer.LookupNode,
-	})
-
-	// TODO(sttts): re-enable the following tests
-	// assert.NotNil(mesosScheduler.client, "client is nil")
-	// assert.NotNil(mesosScheduler.executor, "executor is nil")
-	// assert.NotNil(mesosScheduler.offers, "offer registry is nil")
+	fcfs := podschedulers.NewFCFSPodScheduler(strategy, apiServer.LookupNode)
 
 	// create scheduler process
-	schedulerProc := ha.New(mesosScheduler)
+	schedulerProc := ha.New(framework)
 
-	// create scheduler loop
-	fw := &MesosFramework{MesosScheduler: mesosScheduler}
+	// create scheduler
 	eventObs := NewEventObserver()
-	loop, podReconciler := operations.NewScheduler(&c, fw, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
-	assert.NotNil(loop)
+	scheduler := NewScheduler(&c, framework, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	assert.NotNil(scheduler)
 
 	// create mock mesos scheduler driver
 	driver := &mmock.JoinableDriver{}
@@ -496,23 +495,22 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		apiServer:     apiServer,
 		driver:        driver,
 		eventObs:      eventObs,
-		loop:          loop,
 		podsListWatch: podsListWatch,
-		podReconciler: podReconciler,
-		scheduler:     mesosScheduler,
+		framework:     framework,
 		schedulerProc: schedulerProc,
+		scheduler:     scheduler,
 		t:             t,
 	}
 }
 
 func (lt lifecycleTest) Start() <-chan LaunchedTask {
 	assert := &EventAssertions{*assert.New(lt.t)}
-	lt.loop.Run(lt.schedulerProc.Terminal())
+	lt.scheduler.Run(lt.schedulerProc.Terminal())
 
-	// init scheduler
-	err := lt.scheduler.Init(
+	// init framework
+	err := lt.framework.Init(
+		lt.scheduler,
 		lt.schedulerProc.Master(),
-		lt.podReconciler,
 		http.DefaultServeMux,
 	)
 	assert.NoError(err)
@@ -565,7 +563,7 @@ func (lt lifecycleTest) Start() <-chan LaunchedTask {
 	<-started
 
 	// tell scheduler to be registered
-	lt.scheduler.Registered(
+	lt.framework.Registered(
 		lt.driver,
 		mesosutil.NewFrameworkID("kubernetes-id"),
 		mesosutil.NewMasterInfo("master-id", (192<<24)+(168<<16)+(0<<8)+1, 5050),
@@ -605,25 +603,25 @@ func TestScheduler_LifeCycle(t *testing.T) {
 
 	// add some matching offer
 	offers := []*mesos.Offer{NewTestOffer(fmt.Sprintf("offer%d", i))}
-	lt.scheduler.ResourceOffers(nil, offers)
+	lt.framework.ResourceOffers(nil, offers)
 
 	// first offer is declined because node is not available yet
 	lt.apiServer.WaitForNode("some_hostname")
 
 	// add one more offer
-	lt.scheduler.ResourceOffers(nil, offers)
+	lt.framework.ResourceOffers(nil, offers)
 
 	// and wait for scheduled pod
 	assert.EventWithReason(lt.eventObs, operations.Scheduled)
 	select {
 	case launchedTask := <-launchedTasks:
 		// report back that the task has been staged, and then started by mesos
-		lt.scheduler.StatusUpdate(
+		lt.framework.StatusUpdate(
 			lt.driver,
 			newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_STAGING),
 		)
 
-		lt.scheduler.StatusUpdate(
+		lt.framework.StatusUpdate(
 			lt.driver,
 			newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_RUNNING),
 		)
@@ -634,7 +632,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		// report back that the task has been lost
 		lt.driver.AssertNumberOfCalls(t, "SendFrameworkMessage", 0)
 
-		lt.scheduler.StatusUpdate(
+		lt.framework.StatusUpdate(
 			lt.driver,
 			newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_LOST),
 		)
@@ -654,14 +652,14 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		assert.EventWithReason(lt.eventObs, operations.FailedScheduling, "failedScheduling event not received")
 
 		// supply a matching offer
-		lt.scheduler.ResourceOffers(lt.driver, offers)
+		lt.framework.ResourceOffers(lt.driver, offers)
 		for _, offer := range offers {
 			if _, ok := offeredNodes[offer.GetHostname()]; !ok {
 				offeredNodes[offer.GetHostname()] = struct{}{}
 				lt.apiServer.WaitForNode(offer.GetHostname())
 
 				// reoffer since it must have been declined above
-				lt.scheduler.ResourceOffers(lt.driver, []*mesos.Offer{offer})
+				lt.framework.ResourceOffers(lt.driver, []*mesos.Offer{offer})
 			}
 		}
 
@@ -696,11 +694,11 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		pod, launchedTask, offer := launchPodWithOffers(pod, offers)
 		if pod != nil {
 			// report back status
-			lt.scheduler.StatusUpdate(
+			lt.framework.StatusUpdate(
 				lt.driver,
 				newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_STAGING),
 			)
-			lt.scheduler.StatusUpdate(
+			lt.framework.StatusUpdate(
 				lt.driver,
 				newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_RUNNING),
 			)
@@ -736,7 +734,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	select {
 	case <-killTaskCalled:
 		// report back that the task is finished
-		lt.scheduler.StatusUpdate(
+		lt.framework.StatusUpdate(
 			lt.driver,
 			newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_FINISHED),
 		)
@@ -761,8 +759,8 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	assert.Equal(offers[1].Id.GetValue(), usedOffer.Id.GetValue())
 	assert.Equal(pod.Spec.NodeName, *usedOffer.Hostname)
 
-	lt.scheduler.OfferRescinded(lt.driver, offers[0].Id)
-	lt.scheduler.OfferRescinded(lt.driver, offers[2].Id)
+	lt.framework.OfferRescinded(lt.driver, offers[0].Id)
+	lt.framework.OfferRescinded(lt.driver, offers[2].Id)
 
 	// start pods:
 	// - which are failing while binding,
@@ -774,7 +772,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		status := newTaskStatusForTask(task, mesos.TaskState_TASK_FAILED)
 		message := messages.CreateBindingFailure
 		status.Message = &message
-		lt.scheduler.StatusUpdate(lt.driver, status)
+		lt.framework.StatusUpdate(lt.driver, status)
 
 		// wait until pod is looked up at the apiserver
 		assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
@@ -796,7 +794,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 
 	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
 	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
-		t, _ := lt.scheduler.taskRegistry.ForPod(podKey)
+		t, _ := lt.scheduler.Tasks().ForPod(podKey)
 		return t == nil
 	})
 

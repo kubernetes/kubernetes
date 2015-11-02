@@ -62,7 +62,7 @@ func NewFCFSPodScheduler(as AllocationStrategy, lookupNode node.LookupFunc) PodS
 }
 
 // A first-come-first-serve scheduler: acquires the first offer that can support the task
-func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, unused SlaveIndex, task *podtask.T) (offers.Perishable, error) {
+func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, task *podtask.T) (offers.Perishable, error) {
 	podName := fmt.Sprintf("%s/%s", task.Pod.Namespace, task.Pod.Name)
 	var acceptedOffer offers.Perishable
 	err := r.Walk(func(p offers.Perishable) (bool, error) {

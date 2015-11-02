@@ -20,21 +20,19 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
-// Framework abstracts everything other components of the scheduler need from
-// the actual MesosScheduler implementation.
-type Framework interface {
-	sync.Locker // synchronize scheduler plugin operations
-
-	podschedulers.SlaveIndex
-	PodScheduler() podschedulers.PodScheduler
-	Offers() offers.Registry
+// Scheduler abstracts everything other components of the scheduler need
+// to access from eachother
+type Scheduler interface {
 	Tasks() podtask.Registry
+	sync.Locker // synchronize changes to tasks, i.e. lock, get task, change task, store task, unlock
 
-	// driver calls
-	KillTask(taskId string) error
-	LaunchTask(*podtask.T) error
+	Offers() offers.Registry
+	Reconcile(t *podtask.T)
+	KillTask(id string) error
+	LaunchTask(t *podtask.T) error
+
+	Run(done <-chan struct{})
 }

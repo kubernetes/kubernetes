@@ -59,7 +59,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
@@ -720,10 +719,9 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	fcfs := podschedulers.NewFCFSPodScheduler(as, lookupNode)
-	mesosScheduler := scheduler.New(scheduler.Config{
+	framework := scheduler.New(scheduler.Config{
 		SchedulerConfig:   *sc,
 		Executor:          executor,
-		PodScheduler:      fcfs,
 		Client:            client,
 		FailoverTimeout:   s.failoverTimeout,
 		ReconcileInterval: s.reconcileInterval,
@@ -744,7 +742,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("Misconfigured mesos framework: %v", err)
 	}
 
-	schedulerProcess := ha.New(mesosScheduler)
+	schedulerProcess := ha.New(framework)
 	dconfig := &bindings.DriverConfig{
 		Scheduler:        schedulerProcess,
 		Framework:        info,
@@ -761,18 +759,17 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	// create scheduler loop
-	fw := &scheduler.MesosFramework{MesosScheduler: mesosScheduler}
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
 	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
-	loop, pr := operations.NewScheduler(sc, fw, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
+	scheduler := scheduler.NewScheduler(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
 
-	runtime.On(mesosScheduler.Registration(), func() { loop.Run(schedulerProcess.Terminal()) })
-	runtime.On(mesosScheduler.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
+	runtime.On(framework.Registration(), func() { scheduler.Run(schedulerProcess.Terminal()) })
+	runtime.On(framework.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {
 		log.V(1).Infoln("performing deferred initialization")
-		if err = mesosScheduler.Init(schedulerProcess.Master(), pr, s.mux); err != nil {
+		if err = framework.Init(scheduler, schedulerProcess.Master(), s.mux); err != nil {
 			return nil, fmt.Errorf("failed to initialize pod scheduler: %v", err)
 		}
 		log.V(1).Infoln("deferred init complete")

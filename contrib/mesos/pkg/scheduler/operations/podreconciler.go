@@ -31,15 +31,15 @@ import (
 
 // PodReconciler reconciles a pod with the apiserver
 type PodReconciler struct {
-	fw      types.Framework
+	sched   types.Scheduler
 	client  *client.Client
 	qr      *queuer.Queuer
 	deleter *Deleter
 }
 
-func NewPodReconciler(fw types.Framework, client *client.Client, qr *queuer.Queuer, deleter *Deleter) *PodReconciler {
+func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Queuer, deleter *Deleter) *PodReconciler {
 	return &PodReconciler{
-		fw:      fw,
+		sched:   sched,
 		client:  client,
 		qr:      qr,
 		deleter: deleter,
@@ -88,10 +88,10 @@ func (s *PodReconciler) Reconcile(t *podtask.T) {
 				return
 			}
 
-			s.fw.Lock()
-			defer s.fw.Unlock()
+			s.sched.Lock()
+			defer s.sched.Unlock()
 
-			if _, state := s.fw.Tasks().ForPod(podKey); state != podtask.StateUnknown {
+			if _, state := s.sched.Tasks().ForPod(podKey); state != podtask.StateUnknown {
 				//TODO(jdef) reconcile the task
 				log.Errorf("task already registered for pod %v", pod.Name)
 				return

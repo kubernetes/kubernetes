@@ -18,22 +18,13 @@ package types
 
 import (
 	"sync"
-	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/pkg/api"
+	"time"
 )
-
-// @deprecated this is a placeholder for me to test the mock package
-func TestNoSlavesYet(t *testing.T) {
-	obj := &MockScheduler{}
-	obj.On("SlaveHostNameFor", "foo").Return(nil)
-	obj.SlaveHostNameFor("foo")
-	obj.AssertExpectations(t)
-}
 
 // MockScheduler implements SchedulerApi
 type MockScheduler struct {
@@ -41,31 +32,11 @@ type MockScheduler struct {
 	mock.Mock
 }
 
-func (m *MockScheduler) SlaveHostNameFor(id string) (hostName string) {
-	args := m.Called(id)
-	x := args.Get(0)
-	if x != nil {
-		hostName = x.(string)
-	}
-	return
-}
-
-func (m *MockScheduler) PodScheduler() (f podschedulers.PodScheduler) {
-	args := m.Called()
-	x := args.Get(0)
-	if x != nil {
-		f = x.(podschedulers.PodScheduler)
-	}
-	return
-}
-
-func (m *MockScheduler) CreatePodTask(ctx api.Context, pod *api.Pod) (task *podtask.T, err error) {
-	args := m.Called(ctx, pod)
-	x := args.Get(0)
-	if x != nil {
-		task = x.(*podtask.T)
-	}
-	err = args.Error(1)
+func (m *MockScheduler) Run(done <-chan struct{}) {
+	_ = m.Called()
+	runtime.Until(func() {
+		time.Sleep(time.Second)
+	}, time.Second, done)
 	return
 }
 
@@ -95,4 +66,9 @@ func (m *MockScheduler) KillTask(taskId string) error {
 func (m *MockScheduler) LaunchTask(task *podtask.T) error {
 	args := m.Called(task)
 	return args.Error(0)
+}
+
+func (m *MockScheduler) Reconcile(task *podtask.T) {
+	_ = m.Called()
+	return
 }

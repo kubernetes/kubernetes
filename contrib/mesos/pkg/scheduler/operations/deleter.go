@@ -30,14 +30,14 @@ import (
 )
 
 type Deleter struct {
-	fw types.Framework
-	qr *queuer.Queuer
+	sched types.Scheduler
+	qr    *queuer.Queuer
 }
 
-func NewDeleter(fw types.Framework, qr *queuer.Queuer) *Deleter {
+func NewDeleter(sched types.Scheduler, qr *queuer.Queuer) *Deleter {
 	return &Deleter{
-		fw: fw,
-		qr: qr,
+		sched: sched,
+		qr:    qr,
 	}
 }
 
@@ -72,8 +72,8 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	// removing the pod from the scheduling queue. this makes the concurrent
 	// execution of scheduler-error-handling and delete-handling easier to
 	// reason about.
-	k.fw.Lock()
-	defer k.fw.Unlock()
+	k.sched.Lock()
+	defer k.sched.Unlock()
 
 	// prevent the scheduler from attempting to pop this; it's also possible that
 	// it's concurrently being scheduled (somewhere between pod scheduling and
@@ -81,7 +81,7 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	// will abort Bind()ing
 	k.qr.Dequeue(pod.GetUID())
 
-	switch task, state := k.fw.Tasks().ForPod(podKey); state {
+	switch task, state := k.sched.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		log.V(2).Infof("Could not resolve pod '%s' to task id", podKey)
 		return merrors.NoSuchPodErr
@@ -96,11 +96,11 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 				task.Reset()
 				task.Set(podtask.Deleted)
 				//TODO(jdef) probably want better handling here
-				if err := k.fw.Tasks().Update(task); err != nil {
+				if err := k.sched.Tasks().Update(task); err != nil {
 					return err
 				}
 			}
-			k.fw.Tasks().Unregister(task)
+			k.sched.Tasks().Unregister(task)
 			return nil
 		}
 		fallthrough
@@ -108,10 +108,10 @@ func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
 	case podtask.StateRunning:
 		// signal to watchers that the related pod is going down
 		task.Set(podtask.Deleted)
-		if err := k.fw.Tasks().Update(task); err != nil {
+		if err := k.sched.Tasks().Update(task); err != nil {
 			log.Errorf("failed to update task w/ Deleted status: %v", err)
 		}
-		return k.fw.KillTask(task.ID)
+		return k.sched.KillTask(task.ID)
 
 	default:
 		log.Infof("cannot kill pod '%s': non-terminal task not found %v", podKey, task.ID)

@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // Package operations implements independent aspects of the scheduler which
-// do not use MesosScheduler internals, but rely solely on the Framework
+// do not use Framework internals, but rely solely on the Framework
 // interface.
 package operations
