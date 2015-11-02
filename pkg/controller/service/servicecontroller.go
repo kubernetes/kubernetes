@@ -581,9 +581,12 @@ func stringSlicesEqual(x, y []string) bool {
 }
 
 func hostsFromNodeList(list *api.NodeList) []string {
-	result := make([]string, len(list.Items))
+	result := []string{}
 	for ix := range list.Items {
-		result[ix] = list.Items[ix].Name
+		if list.Items[ix].Spec.Unschedulable {
+			continue
+		}
+		result = append(result, list.Items[ix].Name)
 	}
 	return result
 }
@@ -598,7 +601,7 @@ func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	// something to compile, and gofmt1.4 complains about using `_ = range`.
 	for now := range time.Tick(period) {
 		_ = now
-		nodes, err := s.nodeLister.List()
+		nodes, err := s.nodeLister.NodeCondition(api.NodeReady, api.ConditionTrue).List()
 		if err != nil {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
 			continue

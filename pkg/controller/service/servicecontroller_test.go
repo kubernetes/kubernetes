@@ -228,4 +228,58 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 }
 
+func TestHostsFromNodeList(t *testing.T) {
+	tests := []struct {
+		nodes         *api.NodeList
+		expectedHosts []string
+	}{
+		{
+			nodes:         &api.NodeList{},
+			expectedHosts: []string{},
+		},
+		{
+			nodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "foo"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "bar"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+				},
+			},
+			expectedHosts: []string{"foo", "bar"},
+		},
+		{
+			nodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "foo"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "bar"},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "unschedulable"},
+						Spec:       api.NodeSpec{Unschedulable: true},
+						Status:     api.NodeStatus{Phase: api.NodeRunning},
+					},
+				},
+			},
+			expectedHosts: []string{"foo", "bar"},
+		},
+	}
+
+	for _, test := range tests {
+		hosts := hostsFromNodeList(test.nodes)
+		if !reflect.DeepEqual(hosts, test.expectedHosts) {
+			t.Errorf("expected: %v, saw: %v", test.expectedHosts, hosts)
+		}
+	}
+}
+
 // TODO(a-robinson): Add tests for update/sync/delete.
