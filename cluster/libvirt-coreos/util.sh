@@ -183,7 +183,7 @@ function wait-cluster-readiness {
 function kube-up {
   detect-master
   detect-minions
-  gen-kube-bearertoken
+  load-or-gen-kube-bearertoken
   initialize-pool keep_base_image
   initialize-network
 
