@@ -434,6 +434,18 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
+  # Runs slow tests on GCE 1.1 cluster, sequentially.
+  kubernetes-gce-slow-release-1.1)
+    : ${E2E_CLUSTER_NAME:="gce-slow-release-1.1"}
+    : ${E2E_NETWORK:="gce-slow-1-1"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-slow-1-1"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    ;;
+
   # Runs non-flaky tests on GCE on the release-1.0 branch,
   # sequentially. As a reminder, if you need to change the skip list
   # or flaky test list on the release branch, you'll need to propose a
