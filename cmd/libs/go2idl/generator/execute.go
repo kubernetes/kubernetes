@@ -84,6 +84,7 @@ func (f *file) assemble(w io.Writer) {
 
 	if len(f.imports) > 0 {
 		fmt.Fprint(w, "import (\n")
+		// TODO: sort imports like goimports does.
 		for i := range f.imports {
 			if strings.Contains(i, "\"") {
 				// they included quotes, or are using the
