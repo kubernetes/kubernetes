@@ -16,7 +16,6 @@
 
 # A library of helper functions and constant for debian os distro
 
-
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
 # address for the master. (In the case of upgrade/repair, we re-use
@@ -57,4 +56,29 @@ function create-node-instance-template {
   create-node-template "$template_name" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
+}
+
+# create-opencontrail-gw creates the opencontrail gateway.
+# This gateway provides access to the containers that are
+# network orchestrated by OpenContrail
+function create-network-provider-gw {
+  local address_opt=""
+  [[ -n ${1:-} ]] && address_opt="--address ${1}"
+
+  write-network-provider-gw-env
+
+  gcloud compute instances create "${INSTANCE_PREFIX}-${NETWORK_PROVIDER}-gateway" \
+    ${address_opt} \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --machine-type "${NODE_SIZE}" \
+    --image-project="${NODE_IMAGE_PROJECT}" \
+    --image "${NODE_IMAGE}" \
+    --tags "${2}" \
+    --network "${NETWORK}" \
+    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --metadata-from-file \
+      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/network-provider-gw-env.yaml"
 }

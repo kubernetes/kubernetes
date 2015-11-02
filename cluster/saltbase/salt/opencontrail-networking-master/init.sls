@@ -1,10 +1,11 @@
 opencontrail-networking-master:
   cmd.script:
-    - unless: test -f /var/log/contrail/provision_master.log
+    - unless: test -f /etc/contrail/opencontrail_control_prov_run.ok
     - env:
       - 'OPENCONTRAIL_TAG': '{{ pillar.get('opencontrail_tag') }}'
       - 'OPENCONTRAIL_KUBERNETES_TAG': '{{ pillar.get('opencontrail_kubernetes_tag') }}'
       - 'OPENCONTRAIL_PUBLIC_SUBNET': '{{ pillar.get('opencontrail_public_subnet') }}'
+      - 'OPENCONTRAIL_PRIVATE_SUBNET': '{{ pillar.get('opencontrail_private_subnet') }}'
       - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
     - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/provision_master.sh
     - source_hash: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/manifests.hash
