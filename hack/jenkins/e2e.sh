@@ -937,8 +937,6 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-gce-step2-upgrade-master)
@@ -952,8 +950,8 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
+    : ${KUBE_ENABLE_DEPLOYMENTS:=true}
+    : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-gce-step3-e2e-old)
@@ -974,8 +972,6 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-gce-step4-upgrade-cluster)
@@ -989,8 +985,8 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
+    : ${KUBE_ENABLE_DEPLOYMENTS:=true}
+    : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-gce-step5-e2e-old)
@@ -1009,8 +1005,6 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-gce-step6-e2e-new)
@@ -1030,8 +1024,6 @@ case ${JOB_NAME} in
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   # kubernetes-upgrade-gce-1.0-1.1
@@ -1055,8 +1047,6 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gce-step2-upgrade-master)
@@ -1073,8 +1063,8 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=ci/latest-1.1"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
+    : ${KUBE_ENABLE_DEPLOYMENTS:=true}
+    : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gce-step3-e2e-old)
@@ -1094,8 +1084,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gce-step4-upgrade-cluster)
@@ -1112,8 +1100,8 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=ci/latest-1.1"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
+    : ${KUBE_ENABLE_DEPLOYMENTS:=true}
+    : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gce-step5-e2e-old)
@@ -1133,8 +1121,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-upgrade-1.0-1.1-gce-step6-e2e-new)
@@ -1156,8 +1142,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   # Run Kubemark test on a fake 100 node cluster to have a comparison
