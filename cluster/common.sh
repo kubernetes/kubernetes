@@ -108,9 +108,8 @@ function clear-kubeconfig() {
   "${kubectl}" config unset "users.${CONTEXT}-basic-auth"
   "${kubectl}" config unset "contexts.${CONTEXT}"
 
-  local current
-  current=$("${kubectl}" config view -o jsonpath='{.current-context}')
-  if [[ "${current}" == "${CONTEXT}" ]]; then
+  local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
+  if [[ "${cc}" == "${CONTEXT}" ]]; then
     "${kubectl}" config unset current-context
   fi
 
@@ -140,7 +139,7 @@ function tear_down_alive_resources() {
 function get-kubeconfig-basicauth() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
-  local cc="current-context"
+  local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
