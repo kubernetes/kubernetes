@@ -56,14 +56,20 @@ from, and other prerequisites.
 
 * Alpha releases (`vX.Y.0-alpha.W`) are cut directly from `master`.
   * Alpha releases don't require anything besides green tests, (see below).
-* Official releases (`vX.Y.Z`) are cut from their respective release branch,
+* Beta releases (`vX.Y.Z-beta.W`) are cut from their respective release branch,
   `release-X.Y`.
   * Make sure all necessary cherry picks have been resolved.  You should ensure
     that all outstanding cherry picks have been reviewed and merged and the
     branch validated on Jenkins. See [Cherry Picks](cherry-picks.md) for more
     information on how to manage cherry picks prior to cutting the release.
+  * Beta releases also require green tests, (see below).
+* Official releases (`vX.Y.Z`) are cut from their respective release branch,
+  `release-X.Y`.
+  * Official releases should be similar or identical to their respective beta
+    releases, so have a look at the cherry picks that have been merged since
+    the beta release and question everything you find.
   * Official releases also require green tests, (see below).
-* New release series are also cut direclty from `master`.
+* New release series are also cut directly from `master`.
   * **This is a big deal!**  If you're reading this doc for the first time, you
     probably shouldn't be doing this release, and should talk to someone on the
     release team.

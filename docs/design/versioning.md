@@ -43,9 +43,9 @@ Legend:
 ### Minor version scheme and timeline
 
 * Kube X.Y.0-alpha.W, W > 0: Alpha releases are released roughly every two weeks directly from the master branch. No cherrypick releases. If there is a critical bugfix, a new release from master can be created ahead of schedule.
-* Kube X.Y.Z-beta: When master is feature-complete for Kube X.Y, we will cut the release-X.Y branch 2 weeks prior to the desired X.Y.0 date and cherrypick only PRs essential to X.Y.  This cut will be marked as X.Y.0-beta, and master will be revved to X.Y+1.0-alpha.0.
-* Kube X.Y.0: Final release, cut from the release-X.Y branch cut two weeks prior.  X.Y.1-beta will be tagged at the same commit on the same branch.  X.Y.0 occur 3 to 4 months after X.Y-1.0.
-* Kube X.Y.Z, Z > 0: [Patch releases](#patches) are released as we cherrypick commits into the release-X.Y branch, (which is at X.Y.Z-beta,) as needed.  X.Y.Z is cut straight from the release-X.Y branch, and X.Y.Z+1-beta is tagged on the same commit.
+* Kube X.Y.Z-beta.W: When master is feature-complete for Kube X.Y, we will cut the release-X.Y branch 2 weeks prior to the desired X.Y.0 date and cherrypick only PRs essential to X.Y.  This cut will be marked as X.Y.0-beta.0, and master will be revved to X.Y+1.0-alpha.0.  If we're not satisfied with X.Y.0-beta.0, we'll release other beta releases, (X.Y.0-beta.W | W > 0) as necessary.
+* Kube X.Y.0: Final release, cut from the release-X.Y branch cut two weeks prior.  X.Y.1-beta.0 will be tagged at the same commit on the same branch.  X.Y.0 occur 3 to 4 months after X.Y-1.0.
+* Kube X.Y.Z, Z > 0: [Patch releases](#patches) are released as we cherrypick commits into the release-X.Y branch, (which is at X.Y.Z-beta.W,) as needed.  X.Y.Z is cut straight from the release-X.Y branch, and X.Y.Z+1-beta.0 is tagged on the same commit.
 
 ### Major version timeline
 
@@ -53,7 +53,7 @@ There is no mandated timeline for major versions. They only occur when we need t
 
 ### CI version scheme
 
-* Continuous integration versions also exist, and are versioned off of alpha and beta releases.  X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an additional +aaaa build suffix added; X.Y.Z-beta.C+bbbb is C commits after X.Y.Z-beta, with an additional +bbbb build suffix added.  Furthermore, builds that are built off of a dirty build tree, (with things in the tree that are not checked it,) it will be appended with -dirty.
+* Continuous integration versions also exist, and are versioned off of alpha and beta releases.  X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an additional +aaaa build suffix added; X.Y.Z-beta.W.C+bbbb is C commits after X.Y.Z-beta.W, with an additional +bbbb build suffix added.  Furthermore, builds that are built off of a dirty build tree, (with things in the tree that are not checked it,) it will be appended with -dirty.
 
 ## Release versions as related to API versions
 
