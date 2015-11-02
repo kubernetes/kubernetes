@@ -29,8 +29,6 @@ import (
 
 const datapointAmount = 5
 
-type resourceUsagePerContainer map[string]*containerResourceUsage
-
 var systemContainers = []string{"/docker-daemon", "/kubelet", "/kube-proxy", "/system"}
 
 //TODO tweak those values.
@@ -102,7 +100,13 @@ var _ = Describe("Resource usage of system containers", func() {
 
 		for i := 0; i < datapointAmount; i++ {
 			for _, node := range nodeList.Items {
-				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 5*time.Second)
+				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 5*time.Second, func() []string {
+					if providerIs("gce", "gke") {
+						return systemContainers
+					} else {
+						return []string{}
+					}
+				}, false)
 				expectNoError(err)
 				resourceUsagePerNode[node.Name] = append(resourceUsagePerNode[node.Name], resourceUsage)
 			}
@@ -119,6 +123,9 @@ var _ = Describe("Resource usage of system containers", func() {
 			for container, cUsage := range usage {
 				Logf("%v on %v usage: %#v", container, node, cUsage)
 				if !allowedUsage[container].isStrictlyGreaterThan(cUsage) {
+					if _, ok := violating[node]; !ok {
+						violating[node] = make(resourceUsagePerContainer)
+					}
 					if allowedUsage[container].CPUUsageInCores < cUsage.CPUUsageInCores {
 						Logf("CPU is too high for %s (%v)", container, cUsage.CPUUsageInCores)
 					}
