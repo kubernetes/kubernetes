@@ -83,13 +83,14 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", fakeDocker.ContainerList, dockerContainers)
 	}
 	verifyCalls(t, fakeDocker, []string{"list"})
-	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux_ns", "", "foo")
+
+	dockerContainer, found, _ := findPodContainer(dockerContainers, "qux_ns", "", "foo")
 	if dockerContainer == nil || !found {
 		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
 
 	fakeDocker.ClearCalls()
-	dockerContainer, found, _ = dockerContainers.FindPodContainer("foobar", "", "foo")
+	dockerContainer, found, _ = findPodContainer(dockerContainers, "foobar", "", "foo")
 	verifyCalls(t, fakeDocker, []string{})
 	if dockerContainer != nil || found {
 		t.Errorf("Should not have found container %#v", dockerContainer)
