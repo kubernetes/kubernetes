@@ -37,14 +37,13 @@ type PodScheduler interface {
 	// SchedulePod implements how to schedule pods among slaves.
 	// We can have different implementation for different scheduling policy.
 	//
-	// The function accepts a group of slaves (each contains offers from
-	// that slave) and a single pod, which aligns well with the k8s scheduling
-	// algorithm. It returns an offerId that is acceptable for the pod, otherwise
-	// nil. The caller is responsible for filling in task state w/ relevant offer
-	// details.
+	// The function accepts a set of offers and a single pod, which aligns well
+	// with the k8s scheduling algorithm. It returns an offerId that is acceptable
+	// for the pod, otherwise nil. The caller is responsible for filling in task
+	// state w/ relevant offer details.
 	//
 	// See the FCFSPodScheduler for example.
-	SchedulePod(r offers.Registry, slaves SlaveIndex, task *podtask.T) (offers.Perishable, error)
+	SchedulePod(r offers.Registry, task *podtask.T) (offers.Perishable, error)
 }
 
 // A minimal placeholder

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,14 +32,16 @@ import (
 
 // SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
 type SchedulerAlgorithm struct {
-	fw         types.Framework
-	podUpdates queue.FIFO
+	sched        types.Scheduler
+	podUpdates   queue.FIFO
+	podScheduler podschedulers.PodScheduler
 }
 
-func NewSchedulerAlgorithm(fw types.Framework, podUpdates queue.FIFO) *SchedulerAlgorithm {
+func NewSchedulerAlgorithm(sched types.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) *SchedulerAlgorithm {
 	return &SchedulerAlgorithm{
-		fw:         fw,
-		podUpdates: podUpdates,
+		sched:        sched,
+		podUpdates:   podUpdates,
+		podScheduler: podScheduler,
 	}
 }
 
@@ -54,10 +57,10 @@ func (k *SchedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 		return "", err
 	}
 
-	k.fw.Lock()
-	defer k.fw.Unlock()
+	k.sched.Lock()
+	defer k.sched.Unlock()
 
-	switch task, state := k.fw.Tasks().ForPod(podKey); state {
+	switch task, state := k.sched.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		// There's a bit of a potential race here, a pod could have been yielded() and
 		// then before we get *here* it could be deleted.
@@ -77,7 +80,7 @@ func (k *SchedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 			log.Warningf("aborting Schedule, unable to create podtask object %+v: %v", pod, err)
 			return "", err
 		}
-		return k.doSchedule(k.fw.Tasks().Register(podTask, nil))
+		return k.doSchedule(k.sched.Tasks().Register(podTask, nil))
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
 	//we knew previously, we should probably update the task.Pod state here
@@ -107,19 +110,19 @@ func (k *SchedulerAlgorithm) doSchedule(task *podtask.T, err error) (string, err
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table
 		offerId := task.GetOfferId()
-		if offer, ok := k.fw.Offers().Get(offerId); ok && !offer.HasExpired() {
+		if offer, ok := k.sched.Offers().Get(offerId); ok && !offer.HasExpired() {
 			// skip tasks that have already have assigned offers
 			offer = task.Offer
 		} else {
 			task.Offer.Release()
 			task.Reset()
-			if err = k.fw.Tasks().Update(task); err != nil {
+			if err = k.sched.Tasks().Update(task); err != nil {
 				return "", err
 			}
 		}
 	}
 	if err == nil && offer == nil {
-		offer, err = k.fw.PodScheduler().SchedulePod(k.fw.Offers(), k.fw, task)
+		offer, err = k.podScheduler.SchedulePod(k.sched.Offers(), task)
 	}
 	if err != nil {
 		return "", err
@@ -128,24 +131,16 @@ func (k *SchedulerAlgorithm) doSchedule(task *podtask.T, err error) (string, err
 	if details == nil {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
-	slaveId := details.GetSlaveId().GetValue()
-	if slaveHostName := k.fw.SlaveHostNameFor(slaveId); slaveHostName == "" {
-		// not much sense in Release()ing the offer here since its owner died
-		offer.Release()
-		k.fw.Offers().Invalidate(details.Id.GetValue())
-		return "", fmt.Errorf("Slave disappeared (%v) while scheduling task %v", slaveId, task.ID)
-	} else {
-		if task.Offer != nil && task.Offer != offer {
-			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
-		}
-
-		task.Offer = offer
-		k.fw.PodScheduler().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
-
-		if err := k.fw.Tasks().Update(task); err != nil {
-			offer.Release()
-			return "", err
-		}
-		return slaveHostName, nil
+	if task.Offer != nil && task.Offer != offer {
+		return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 	}
+
+	task.Offer = offer
+	k.podScheduler.Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
+
+	if err := k.sched.Tasks().Update(task); err != nil {
+		offer.Release()
+		return "", err
+	}
+	return details.GetHostname(), nil
 }

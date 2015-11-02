@@ -29,12 +29,12 @@ import (
 )
 
 type Binder struct {
-	fw types.Framework
+	sched types.Scheduler
 }
 
-func NewBinder(fw types.Framework) *Binder {
+func NewBinder(sched types.Scheduler) *Binder {
 	return &Binder{
-		fw: fw,
+		sched: sched,
 	}
 }
 
@@ -49,10 +49,10 @@ func (b *Binder) Bind(binding *api.Binding) error {
 		return err
 	}
 
-	b.fw.Lock()
-	defer b.fw.Unlock()
+	b.sched.Lock()
+	defer b.sched.Unlock()
 
-	switch task, state := b.fw.Tasks().ForPod(podKey); state {
+	switch task, state := b.sched.Tasks().ForPod(podKey); state {
 	case podtask.StatePending:
 		return b.bind(ctx, binding, task)
 	default:
@@ -66,7 +66,7 @@ func (b *Binder) Bind(binding *api.Binding) error {
 func (b *Binder) rollback(task *podtask.T, err error) error {
 	task.Offer.Release()
 	task.Reset()
-	if err2 := b.fw.Tasks().Update(task); err2 != nil {
+	if err2 := b.sched.Tasks().Update(task); err2 != nil {
 		log.Errorf("failed to update pod task: %v", err2)
 	}
 	return err
@@ -88,7 +88,7 @@ func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 
 	// By this time, there is a chance that the slave is disconnected.
 	offerId := task.GetOfferId()
-	if offer, ok := b.fw.Offers().Get(offerId); !ok || offer.HasExpired() {
+	if offer, ok := b.sched.Offers().Get(offerId); !ok || offer.HasExpired() {
 		// already rescinded or timed out or otherwise invalidated
 		return b.rollback(task, fmt.Errorf("failed prior to launchTask due to expired offer for task %v", task.ID))
 	}
@@ -96,10 +96,10 @@ func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
 		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\", cpu %.2f, mem %.2f MB",
 			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.CPU, task.Spec.Memory)
-		if err = b.fw.LaunchTask(task); err == nil {
-			b.fw.Offers().Invalidate(offerId)
+		if err = b.sched.LaunchTask(task); err == nil {
+			b.sched.Offers().Invalidate(offerId)
 			task.Set(podtask.Launched)
-			if err = b.fw.Tasks().Update(task); err != nil {
+			if err = b.sched.Tasks().Update(task); err != nil {
 				// this should only happen if the task has been removed or has changed status,
 				// which SHOULD NOT HAPPEN as long as we're synchronizing correctly
 				log.Errorf("failed to update task w/ Launched status: %v", err)

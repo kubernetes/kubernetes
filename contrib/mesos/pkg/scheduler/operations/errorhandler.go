@@ -31,16 +31,18 @@ import (
 )
 
 type ErrorHandler struct {
-	fw      types.Framework
-	backoff *backoff.Backoff
-	qr      *queuer.Queuer
+	sched        types.Scheduler
+	backoff      *backoff.Backoff
+	qr           *queuer.Queuer
+	podScheduler podschedulers.PodScheduler
 }
 
-func NewErrorHandler(fw types.Framework, backoff *backoff.Backoff, qr *queuer.Queuer) *ErrorHandler {
+func NewErrorHandler(sched types.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) *ErrorHandler {
 	return &ErrorHandler{
-		fw:      fw,
-		backoff: backoff,
-		qr:      qr,
+		sched:        sched,
+		backoff:      backoff,
+		qr:           qr,
+		podScheduler: podScheduler,
 	}
 }
 
@@ -64,10 +66,10 @@ func (k *ErrorHandler) Error(pod *api.Pod, schedulingErr error) {
 	}
 
 	k.backoff.GC()
-	k.fw.Lock()
-	defer k.fw.Unlock()
+	k.sched.Lock()
+	defer k.sched.Unlock()
 
-	switch task, state := k.fw.Tasks().ForPod(podKey); state {
+	switch task, state := k.sched.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		// if we don't have a mapping here any more then someone deleted the pod
 		log.V(2).Infof("Could not resolve pod to task, aborting pod reschdule: %s", podKey)
@@ -81,16 +83,16 @@ func (k *ErrorHandler) Error(pod *api.Pod, schedulingErr error) {
 		breakoutEarly := queue.BreakChan(nil)
 		if schedulingErr == podschedulers.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
-			breakoutEarly = queue.BreakChan(k.fw.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
-				k.fw.Lock()
-				defer k.fw.Unlock()
-				switch task, state := k.fw.Tasks().Get(task.ID); state {
+			breakoutEarly = queue.BreakChan(k.sched.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
+				k.sched.Lock()
+				defer k.sched.Unlock()
+				switch task, state := k.sched.Tasks().Get(task.ID); state {
 				case podtask.StatePending:
 					// Assess fitness of pod with the current offer. The scheduler normally
 					// "backs off" when it can't find an offer that matches up with a pod.
 					// The backoff period for a pod can terminate sooner if an offer becomes
 					// available that matches up.
-					return !task.Has(podtask.Launched) && k.fw.PodScheduler().FitPredicate()(task, offer, nil)
+					return !task.Has(podtask.Launched) && k.podScheduler.FitPredicate()(task, offer, nil)
 				default:
 					// no point in continuing to check for matching offers
 					return true

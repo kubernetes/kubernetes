@@ -475,7 +475,7 @@ func (k *KubernetesMesosExecutor) launchTask(driver bindings.ExecutorDriver, tas
 	// TODO(k8s): use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
 	if pod.Spec.NodeName == "" {
-		//HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/scheduler.go
+		//HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/framework.go
 		binding := &api.Binding{
 			ObjectMeta: api.ObjectMeta{
 				Namespace:   pod.Namespace,
@@ -780,7 +780,7 @@ func (k *KubernetesMesosExecutor) FrameworkMessage(driver bindings.ExecutorDrive
 	}
 
 	log.Infof("Receives message from framework %v\n", message)
-	//TODO(jdef) master reported a lost task, reconcile this! @see scheduler.go:handleTaskLost
+	//TODO(jdef) master reported a lost task, reconcile this! @see framework.go:handleTaskLost
 	if strings.HasPrefix(message, messages.TaskLost+":") {
 		taskId := message[len(messages.TaskLost)+1:]
 		if taskId != "" {
