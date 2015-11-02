@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // Framework abstracts everything other components of the scheduler need from
@@ -38,7 +37,4 @@ type Framework interface {
 	// driver calls
 	KillTask(taskId string) error
 	LaunchTask(*podtask.T) error
-
-	// convenience
-	CreatePodTask(api.Context, *api.Pod) (*podtask.T, error)
 }

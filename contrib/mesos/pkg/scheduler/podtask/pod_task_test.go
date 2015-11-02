@@ -35,12 +35,12 @@ const (
 )
 
 func fakePodTask(id string) (*T, error) {
-	return New(api.NewDefaultContext(), "", api.Pod{
+	return New(api.NewDefaultContext(), "", &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      id,
 			Namespace: api.NamespaceDefault,
 		},
-	}, &mesos.ExecutorInfo{})
+	})
 }
 
 func TestUnlimitedResources(t *testing.T) {

@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 type MesosFramework struct {
@@ -44,10 +43,6 @@ func (fw *MesosFramework) Tasks() podtask.Registry {
 	return fw.MesosScheduler.taskRegistry
 }
 
-func (fw *MesosFramework) CreatePodTask(ctx api.Context, pod *api.Pod) (*podtask.T, error) {
-	return podtask.New(ctx, "", *pod, fw.MesosScheduler.executor)
-}
-
 func (fw *MesosFramework) SlaveHostNameFor(id string) string {
 	return fw.MesosScheduler.slaveHostNames.HostName(id)
 }
@@ -60,7 +55,8 @@ func (fw *MesosFramework) KillTask(taskId string) error {
 
 func (fw *MesosFramework) LaunchTask(task *podtask.T) error {
 	// assume caller is holding scheduler lock
-	taskList := []*mesos.TaskInfo{task.BuildTaskInfo()}
+	ei := fw.MesosScheduler.executor
+	taskList := []*mesos.TaskInfo{task.BuildTaskInfo(ei)}
 	offerIds := []*mesos.OfferID{task.Offer.Details().Id}
 	filters := &mesos.Filters{}
 	_, err := fw.MesosScheduler.driver.LaunchTasks(offerIds, taskList, filters)
