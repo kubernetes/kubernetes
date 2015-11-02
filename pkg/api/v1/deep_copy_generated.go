@@ -619,6 +619,17 @@ func deepCopy_v1_GCEPersistentDiskVolumeSource(in GCEPersistentDiskVolumeSource,
 	return nil
 }
 
+func deepCopy_v1_GenerateSecretRequest(in GenerateSecretRequest, out *GenerateSecretRequest, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Type = in.Type
+	return nil
+}
+
 func deepCopy_v1_GitRepoVolumeSource(in GitRepoVolumeSource, out *GitRepoVolumeSource, c *conversion.Cloner) error {
 	out.Repository = in.Repository
 	out.Revision = in.Revision
@@ -2403,6 +2414,7 @@ func init() {
 		deepCopy_v1_FCVolumeSource,
 		deepCopy_v1_FlockerVolumeSource,
 		deepCopy_v1_GCEPersistentDiskVolumeSource,
+		deepCopy_v1_GenerateSecretRequest,
 		deepCopy_v1_GitRepoVolumeSource,
 		deepCopy_v1_GlusterfsVolumeSource,
 		deepCopy_v1_HTTPGetAction,

@@ -2050,3 +2050,14 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus) errs.ValidationE
 	}
 	return allErrs
 }
+
+// ValidateGenerateSecretRequest validates required fields on a GenerateSecretRequest
+func ValidateGenerateSecretRequest(request *api.GenerateSecretRequest) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(request.Type) == 0 {
+		requiredErr := errs.NewFieldRequired("type")
+		requiredErr.Detail = "type is required"
+		allErrs = append(allErrs, requiredErr)
+	}
+	return allErrs
+}
