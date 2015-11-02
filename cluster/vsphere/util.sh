@@ -250,7 +250,7 @@ function kube-up {
 
   ensure-temp-dir
 
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
   python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
     -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
   local htpasswd

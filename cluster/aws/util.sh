@@ -663,7 +663,7 @@ function kube-up {
 
   ensure-iam-profiles
 
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
 
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
