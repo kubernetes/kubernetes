@@ -93,11 +93,20 @@ function main() {
   local -r release_umask=${release_umask:-022}
   umask "${release_umask}"
 
+  local -r github="https://github.com/kubernetes/kubernetes.git"
+  declare -r DIR="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)"
+
   # Start a tmp file that will hold instructions for the user.
   declare -r INSTRUCTIONS="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)-instructions"
   if $DRY_RUN; then
     cat > "${INSTRUCTIONS}" <<- EOM
-Success!  You would now do the following, if not a dry run:
+Success on dry run!  Do
+
+  pushd ${DIR}
+
+to see what happened.
+
+You would now do the following, if not a dry run:
 
 EOM
   else
@@ -107,8 +116,6 @@ Success!  You must now do the following:
 EOM
   fi
 
-  local -r github="https://github.com/kubernetes/kubernetes.git"
-  declare -r DIR="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)"
   echo "Cloning from '${github}'..."
   git clone "${github}" "${DIR}"
 
