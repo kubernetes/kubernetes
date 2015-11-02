@@ -16,8 +16,17 @@ base:
     - helpers
     - cadvisor
     - kube-client-tools
-    - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-kubelet-plugin
+{% endif %}
+    - kubelet
+{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
+    - supervisor
+{% else %}
+    - monit
+{% endif %}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-vrouter-kernel
     - opencontrail-networking-minion
 {% else %}
     - kube-proxy
@@ -33,24 +42,23 @@ base:
     - kube-registry-proxy
 {% endif %}
     - logrotate
-{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
-    - supervisor
-{% else %}
-    - monit
-{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
     - generate-cert
     - etcd
-    - kube-apiserver
-    - kube-controller-manager
-    - kube-scheduler
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
+    - kubelet
+    - docker
+{% endif %}
 {% if grains['cloud'] is defined and grains.cloud == 'gce' %}
     - supervisor
 {% else %}
     - monit
 {% endif %}
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
 {% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant' ] %}
     - nginx
 {% endif %}
@@ -69,10 +77,6 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
-    - docker
-    - kubelet
-{% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
 {% endif %}
@@ -80,3 +84,10 @@ base:
   'roles:kubernetes-pool-vsphere':
     - match: grain
     - static-routes
+
+  'roles:kubernetes-network-provider-gateway':
+    - match: grain
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-vrouter-kernel
+    - opencontrail-networking-gateway
+{% endif %}

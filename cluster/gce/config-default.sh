@@ -120,9 +120,32 @@ KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 
 # OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
-OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
-OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
-OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
+
+if [[ $NETWORK_PROVIDER == "opencontrail" ]]; then
+    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-backports-debian-7-wheezy-v20150929}
+    MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-backports-debian-7-wheezy-v20150929}
+    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-debian-cloud}
+    MINION_IMAGE_PROJECT=${KUBE_GCE_MINION_PROJECT:-debian-cloud}
+    OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
+    MASTER_SIZE=n1-standard-4
+    MINION_SIZE=n1-standard-4
+    MASTER_DISK_SIZE=200GB
+    MINION_DISK_SIZE=200GB
+    # Assuming braches that have tested code to support kuebernetes
+    OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
+    OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-vrouter-manifest}"
+    # opencontrail recommenedation is to have this flag as false such that
+    # gateway is deployed on a separate host not configured with kubelet
+    NETWORK_PROVIDER_GATEWAY_ON_MINION="${NETWORK_PROVIDER_GATEWAY_ON_MINION:-false}"
+    # openctrail will use the following subnets for plumbing the public
+    # and private addresses to the pod
+    # public subnet is used for accessing the pod network from outside
+    # pod traffic is completely isolated and secured to the private network
+    # Even within the pod network, there is an implicit policy based on the 
+    # "uses" label in the service yaml file defined for the pod
+    OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+    OPENCONTRAIL_PRIVATE_SUBNET="${OPENCONTRAIL_PRIVATE_SUBNET:-10.10.0.0/16}"
+fi
