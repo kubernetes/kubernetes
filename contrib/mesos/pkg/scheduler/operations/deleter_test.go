@@ -19,7 +19,6 @@ package operations
 import (
 	"testing"
 
-	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
@@ -60,7 +59,7 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 			UID:       "foo0",
 			Namespace: api.NamespaceDefault,
 		}}}
-	_, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{}))
+	_, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", pod.Pod))
 	if err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -94,7 +93,7 @@ func TestDeleteOne_Running(t *testing.T) {
 			UID:       "foo0",
 			Namespace: api.NamespaceDefault,
 		}}}
-	task, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{}))
+	task, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", pod.Pod))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

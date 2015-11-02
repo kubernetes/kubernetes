@@ -72,7 +72,12 @@ func (k *SchedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
 			return "", merrors.NoSuchPodErr
 		}
-		return k.doSchedule(k.fw.Tasks().Register(k.fw.CreatePodTask(ctx, pod)))
+		podTask, err := podtask.New(ctx, "", pod)
+		if err != nil {
+			log.Warningf("aborting Schedule, unable to create podtask object %+v: %v", pod, err)
+			return "", err
+		}
+		return k.doSchedule(k.fw.Tasks().Register(podTask, nil))
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
 	//we knew previously, we should probably update the task.Pod state here

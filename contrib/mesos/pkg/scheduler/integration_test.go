@@ -486,7 +486,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	// create scheduler loop
 	fw := &MesosFramework{MesosScheduler: mesosScheduler}
 	eventObs := NewEventObserver()
-	loop, _ := operations.NewScheduler(&c, fw, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	loop, podReconciler := operations.NewScheduler(&c, fw, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(loop)
 
 	// create mock mesos scheduler driver
@@ -498,6 +498,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		eventObs:      eventObs,
 		loop:          loop,
 		podsListWatch: podsListWatch,
+		podReconciler: podReconciler,
 		scheduler:     mesosScheduler,
 		schedulerProc: schedulerProc,
 		t:             t,

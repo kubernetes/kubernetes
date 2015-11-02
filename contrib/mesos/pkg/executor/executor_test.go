@@ -170,11 +170,10 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	}
 
 	pod := NewTestPod(1)
-	podTask, err := podtask.New(api.NewDefaultContext(), "",
-		*pod, &mesosproto.ExecutorInfo{})
+	podTask, err := podtask.New(api.NewDefaultContext(), "", pod)
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
 
-	taskInfo := podTask.BuildTaskInfo()
+	taskInfo := podTask.BuildTaskInfo(&mesosproto.ExecutorInfo{})
 	data, err := testapi.Default.Codec().Encode(pod)
 	assert.Equal(t, nil, err, "must be able to encode a pod's spec data")
 	taskInfo.Data = data
@@ -417,10 +416,8 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 
 	// set up a pod to then lose
 	pod := NewTestPod(1)
-	podTask, _ := podtask.New(api.NewDefaultContext(), "foo",
-		*pod, &mesosproto.ExecutorInfo{})
-
-	taskInfo := podTask.BuildTaskInfo()
+	podTask, _ := podtask.New(api.NewDefaultContext(), "foo", pod)
+	taskInfo := podTask.BuildTaskInfo(&mesosproto.ExecutorInfo{})
 	data, _ := testapi.Default.Codec().Encode(pod)
 	taskInfo.Data = data
 
