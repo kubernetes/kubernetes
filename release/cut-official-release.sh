@@ -43,6 +43,7 @@ function main() {
 
   # Get and verify version info
   local -r alpha_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.0-alpha\\.([1-9][0-9]*)$"
+  local -r beta_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-beta\\.([1-9][0-9]*)$"
   local -r official_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
   local -r series_version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
   if [[ "${new_version}" =~ $alpha_version_regex ]]; then
@@ -50,6 +51,12 @@ function main() {
     local -r version_major="${BASH_REMATCH[1]}"
     local -r version_minor="${BASH_REMATCH[2]}"
     local -r version_alpha_rev="${BASH_REMATCH[3]}"
+  elif [[ "${new_version}" =~ $beta_version_regex ]]; then
+    local -r release_type='beta'
+    local -r version_major="${BASH_REMATCH[1]}"
+    local -r version_minor="${BASH_REMATCH[2]}"
+    local -r version_patch="${BASH_REMATCH[3]}"
+    local -r version_beta_rev="${BASH_REMATCH[4]}"
   elif [[ "${new_version}" =~ $official_version_regex ]]; then
     local -r release_type='official'
     local -r version_major="${BASH_REMATCH[1]}"
@@ -114,11 +121,23 @@ EOM
 
   if [[ "${release_type}" == 'alpha' ]]; then
     local -r ancestor="v${version_major}.${version_minor}.0-alpha.$((${version_alpha_rev}-1))"
+
     git checkout "${git_commit}"
     verify-at-git-commit "${git_commit}"
     verify-ancestor "${ancestor}"
 
     alpha-release "${new_version}"
+  elif [[ "${release_type}" == 'beta' ]]; then
+    local -r release_branch="release-${version_major}.${version_minor}"
+    local -r ancestor="v${version_major}.${version_minor}.${version_patch}-beta.$((${version_beta_rev}-1))"
+
+    git checkout "${release_branch}"
+    verify-at-git-commit "${git_commit}"
+    verify-ancestor "${ancestor}"
+
+    beta-release "${new_version}"
+
+    git-push ${release_branch}
   elif [[ "${release_type}" == 'official' ]]; then
     local -r release_branch="release-${version_major}.${version_minor}"
     local -r beta_version="v${version_major}.${version_minor}.$((${version_patch}+1))-beta"
@@ -130,6 +149,8 @@ EOM
 
     official-release "${new_version}"
     beta-release "${beta_version}"
+
+    git-push ${release_branch}
   else # [[ "${release_type}" == 'series' ]]
     local -r release_branch="release-${version_major}.${version_minor}"
     local -r alpha_version="v${version_major}.$((${version_minor}+1)).0-alpha.0"
@@ -151,6 +172,7 @@ EOM
     versionize-docs-and-commit "${release_branch}"
 
     beta-release "${beta_version}"
+
     git-push ${release_branch}
   fi
 
@@ -208,9 +230,13 @@ function beta-release() {
   git tag -a -m "Kubernetes pre-release ${beta_version}" "${beta_version}"
   git-push "${beta_version}"
 
-  # NOTE: We currently don't build/release beta versions, since they're almost
-  # identical to the prior version, so we don't prompt for build or release
-  # here.
+  # NOTE: We currently don't publish beta release notes, since they'll go out
+  # with the official release, so we don't prompt for compiling them here.
+  cat >> "${INSTRUCTIONS}" <<- EOM
+- Finish the ${beta_version} release build:
+  - From this directory (clone of upstream/master),
+      ./release/build-official-release.sh ${beta_version}
+EOM
 }
 
 function official-release() {
@@ -245,9 +271,9 @@ function verify-at-git-commit() {
   echo "Verifying we are at ${git_commit}."
   if [[ $(current-git-commit) != ${git_commit} ]]; then
     cat <<- EOM
-!!! We are not at commit ${git_commit}! (If you're cutting an official release,
-that probably means your release branch isn't frozen, so the commit you want to
-release isn't at HEAD of the release branch.)"
+!!! We are not at commit ${git_commit}! (If you're cutting a beta or official
+release, that probably means your release branch isn't frozen, so the commit
+you want to release isn't at HEAD of the release branch.)"
 EOM
     exit 1
   fi
@@ -279,14 +305,14 @@ function rev-version-and-commit() {
   local -r version="${1}"
   local -r version_file="pkg/version/base.go"
 
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-beta)?$"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-beta\\.(0|[1-9][0-9]*))?$"
   if [[ "${version}" =~ $version_regex ]]; then
     local -r version_major="${BASH_REMATCH[1]}"
     # We append a '+' to the minor version on a beta build per hack/lib/version.sh's logic.
-    if [[ "${BASH_REMATCH[4]}" == '-beta' ]]; then
-      local -r version_minor="${BASH_REMATCH[2]}+"
-    else
+    if [[ -z "${BASH_REMATCH[4]}" ]]; then
       local -r version_minor="${BASH_REMATCH[2]}"
+    else
+      local -r version_minor="${BASH_REMATCH[2]}+"
     fi
   else
     echo "!!! Something went wrong.  Tried to rev version to invalid version; should not have gotten to this point."
