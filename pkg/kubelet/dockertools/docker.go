@@ -210,25 +210,6 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 	return p.puller.IsImagePresent(name)
 }
 
-// An internal helper function.
-func findPodContainer(dockerContainers []*docker.APIContainers, podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
-	for _, dockerContainer := range dockerContainers {
-		if len(dockerContainer.Names) == 0 {
-			continue
-		}
-		dockerName, hash, err := ParseDockerName(dockerContainer.Names[0])
-		if err != nil {
-			continue
-		}
-		if dockerName.PodFullName == podFullName &&
-			(uid == "" || dockerName.PodUID == uid) &&
-			dockerName.ContainerName == containerName {
-			return dockerContainer, true, hash
-		}
-	}
-	return nil, false, 0
-}
-
 const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both full pod name and container name.
@@ -343,7 +324,7 @@ func milliCPUToShares(milliCPU int64) int64 {
 }
 
 // GetKubeletDockerContainers lists all container or just the running ones.
-// Returns a list of docker containers that we manage, keyed by container ID.
+// Returns a list of docker containers that we manage
 // TODO: Move this function with dockerCache to DockerManager.
 func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*docker.APIContainers, error) {
 	result := []*docker.APIContainers{}

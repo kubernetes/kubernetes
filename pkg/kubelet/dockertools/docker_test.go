@@ -59,6 +59,24 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	}
 }
 
+func findPodContainer(dockerContainers []*docker.APIContainers, podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
+	for _, dockerContainer := range dockerContainers {
+		if len(dockerContainer.Names) == 0 {
+			continue
+		}
+		dockerName, hash, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
+		if dockerName.PodFullName == podFullName &&
+			(uid == "" || dockerName.PodUID == uid) &&
+			dockerName.ContainerName == containerName {
+			return dockerContainer, true, hash
+		}
+	}
+	return nil, false, 0
+}
+
 func TestGetContainerID(t *testing.T) {
 	fakeDocker := &FakeDockerClient{}
 	fakeDocker.ContainerList = []docker.APIContainers{
