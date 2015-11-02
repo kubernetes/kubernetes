@@ -26,12 +26,12 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/mock"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/mock"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
 //get number of non-expired offers from  offer registry
@@ -110,7 +110,7 @@ func TestResourceOffer_Add(t *testing.T) {
 		}),
 		slaveHostNames:  slave.NewRegistry(),
 		nodeRegistrator: registrator,
-		sched:       mockScheduler(),
+		sched:           mockScheduler(),
 	}
 
 	hostname := "h1"
@@ -155,7 +155,7 @@ func TestResourceOffer_Add_Rescind(t *testing.T) {
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
 		slaveHostNames: slave.NewRegistry(),
-		sched:       mockScheduler(),
+		sched:          mockScheduler(),
 	}
 
 	hostname := "h1"
@@ -209,7 +209,7 @@ func TestSlave_Lost(t *testing.T) {
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
 		slaveHostNames: slave.NewRegistry(),
-		sched:       mockScheduler(),
+		sched:          mockScheduler(),
 	}
 
 	hostname := "h1"
@@ -267,7 +267,7 @@ func TestDisconnect(t *testing.T) {
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
 		slaveHostNames: slave.NewRegistry(),
-		sched:       mockScheduler(),
+		sched:          mockScheduler(),
 	}
 
 	hostname := "h1"
@@ -312,7 +312,7 @@ func TestStatus_Update(t *testing.T) {
 		}),
 		slaveHostNames: slave.NewRegistry(),
 		driver:         &mockdriver,
-		sched:       mockScheduler(),
+		sched:          mockScheduler(),
 	}
 
 	taskStatus_task_starting := util.NewTaskStatus(

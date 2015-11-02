@@ -24,8 +24,13 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/errorhandler"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/podreconciler"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/schedulerloop"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/operations"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
@@ -37,9 +42,9 @@ import (
 
 // Scheduler implements types.Scheduler
 type Scheduler struct {
-	podReconciler *operations.PodReconciler
+	podReconciler *podreconciler.PodReconciler
 	framework     *Framework
-	loop          *operations.SchedulerLoop
+	loop          *schedulerloop.SchedulerLoop
 
 	// unsafe state, needs to be guarded, especially changes to podtask.T objects
 	sync.RWMutex
@@ -61,16 +66,16 @@ func NewScheduler(c *config.Config, framework *Framework, podScheduler podschedu
 
 	q := queuer.New(podUpdates)
 
-	algorithm := operations.NewSchedulerAlgorithm(core, podUpdates, podScheduler)
+	algorithm := algorithm.NewSchedulerAlgorithm(core, podUpdates, podScheduler)
 
-	podDeleter := operations.NewDeleter(core, q)
+	podDeleter := deleter.NewDeleter(core, q)
 
-	core.podReconciler = operations.NewPodReconciler(core, client, q, podDeleter)
+	core.podReconciler = podreconciler.NewPodReconciler(core, client, q, podDeleter)
 
 	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
-	errorHandler := operations.NewErrorHandler(core, bo, q, podScheduler)
+	errorHandler := errorhandler.NewErrorHandler(core, bo, q, podScheduler)
 
-	binder := operations.NewBinder(core)
+	binder := binder.NewBinder(core)
 
 	startLatch := make(chan struct{})
 	eventBroadcaster := record.NewBroadcaster()
@@ -85,7 +90,7 @@ func NewScheduler(c *config.Config, framework *Framework, podScheduler podschedu
 		podtask.InstallDebugHandlers(core.Tasks(), mux)
 	})
 
-	core.loop = operations.NewSchedulerLoop(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
+	core.loop = schedulerloop.NewSchedulerLoop(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
 	return core
 }
 

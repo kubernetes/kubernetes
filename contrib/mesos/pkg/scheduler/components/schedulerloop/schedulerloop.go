@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package operations
+package schedulerloop
 
 import (
 	"time"
 
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -38,8 +40,8 @@ type SchedulerLoopInterface interface {
 }
 
 type SchedulerLoop struct {
-	algorithm *SchedulerAlgorithm
-	binder    *Binder
+	algorithm *algorithm.SchedulerAlgorithm
+	binder    *binder.Binder
 	nextPod   func() *api.Pod
 	error     func(*api.Pod, error)
 	recorder  record.EventRecorder
@@ -47,9 +49,9 @@ type SchedulerLoop struct {
 	started   chan<- struct{} // startup latch
 }
 
-func NewSchedulerLoop(client *client.Client, algorithm *SchedulerAlgorithm,
+func NewSchedulerLoop(client *client.Client, algorithm *algorithm.SchedulerAlgorithm,
 	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
-	binder *Binder, started chan<- struct{}) *SchedulerLoop {
+	binder *binder.Binder, started chan<- struct{}) *SchedulerLoop {
 	return &SchedulerLoop{
 		algorithm: algorithm,
 		binder:    binder,
