@@ -322,33 +322,33 @@ func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, f
 var fieldMappings = versionToResourceToFieldMapping{
 	"v1": resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "metadata.name",
-			NodeUnschedulable: "spec.unschedulable",
+			ObjectNameField:   ObjectNameField,
+			NodeUnschedulable: NodeUnschedulable,
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost:   "spec.nodeName",
-			PodStatus: "status.phase",
+			PodHost:   PodHost,
+			PodStatus: PodStatus,
 		},
 		"secrets": clientFieldNameToAPIVersionFieldName{
-			SecretType: "type",
+			SecretType: SecretType,
 		},
 		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "metadata.name",
+			ObjectNameField: ObjectNameField,
 		},
 		"endpoints": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "metadata.name",
+			ObjectNameField: ObjectNameField,
 		},
 		"events": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:              "metadata.name",
-			EventReason:                  "reason",
-			EventSource:                  "source",
-			EventInvolvedKind:            "involvedObject.kind",
-			EventInvolvedNamespace:       "involvedObject.namespace",
-			EventInvolvedName:            "involvedObject.name",
-			EventInvolvedUID:             "involvedObject.uid",
-			EventInvolvedAPIVersion:      "involvedObject.apiVersion",
-			EventInvolvedResourceVersion: "involvedObject.resourceVersion",
-			EventInvolvedFieldPath:       "involvedObject.fieldPath",
+			ObjectNameField:              ObjectNameField,
+			EventReason:                  EventReason,
+			EventSource:                  EventSource,
+			EventInvolvedKind:            EventInvolvedKind,
+			EventInvolvedNamespace:       EventInvolvedNamespace,
+			EventInvolvedName:            EventInvolvedName,
+			EventInvolvedUID:             EventInvolvedUID,
+			EventInvolvedAPIVersion:      EventInvolvedAPIVersion,
+			EventInvolvedResourceVersion: EventInvolvedResourceVersion,
+			EventInvolvedFieldPath:       EventInvolvedFieldPath,
 		},
 	},
 }
