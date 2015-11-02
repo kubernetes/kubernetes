@@ -142,9 +142,21 @@ RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
 
 # OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
-OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
-OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
-OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
+
+if [[ $NETWORK_PROVIDER == "opencontrail" ]]; then
+   # Assuming braches that have tested code to support kuebernetes	    
+   OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
+   OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-vrouter-manifest}"
+   KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-trusty}"
+   # openctrail will use the following subnets for plumbing the public
+   # and private addresses to the pod
+   # public subnet is used for accessing the pod network from outside
+   # pod traffic is completely isolated and secured to the private network
+   # Even within the pod network, there is an implicit policy based on the 
+   # "uses" label in the service yaml file defined for the pod
+   OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+   OPENCONTRAIL_PRIVATE_SUBNET="${OPENCONTRAIL_PRIVATE_SUBNET:-10.10.0.0/16}"
+fi

@@ -61,6 +61,9 @@ NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
 OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
 OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
 OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
+OPENCONTRAIL_PRIVATE_SUBNET: $(yaml-quote ${OPENCONTRAIL_PRIVATE_SUBNET:-})
+NETWORK_PROVIDER_GATEWAY_ON_MINION: $(yaml-quote ${NETWORK_PROVIDER_GATEWAY_ON_MINION:-false})
+KUBERNETES_NETWORK_PROVIDER_GATEWAY: $(yaml-quote ${KUBERNETES_NETWORK_PROVIDER_GATEWAY:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 EOF
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
@@ -115,6 +118,13 @@ EOF
 SCHEDULER_TEST_ARGS: $(yaml-quote ${SCHEDULER_TEST_ARGS})
 EOF
     fi
+elif [[ "${master}" == "false" ]] && [[ "$file" == *"network-provider-gw"* ]]; then
+     echo "Found network-provider-gw in the file $file"
+     cat >>$file <<EOF
+KUBERNETES_MASTER: "false"
+KUBERNETES_NETWORK_PROVIDER_GATEWAY: "true"
+KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
+EOF
   else
     # Node-only env vars.
     cat >>$file <<EOF
@@ -175,4 +185,29 @@ function create-node-instance-template {
   create-node-template "$template_name" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
+}
+
+# create-opencontrail-gw creates the opencontrail gateway.
+# This gateway provides access to the containers that are
+# network orchestrated by OpenContrail
+function create-network-provider-gw {
+  local address_opt=""
+  [[ -n ${1:-} ]] && address_opt="--address ${1}"
+
+  write-network-provider-gw-env
+
+  gcloud compute instances create "${INSTANCE_PREFIX}-${NETWORK_PROVIDER}-gateway" \
+    ${address_opt} \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --machine-type "${MINION_SIZE}" \
+    --image-project="${MINION_IMAGE_PROJECT}" \
+    --image "${MINION_IMAGE}" \
+    --tags "${2}" \
+    --network "${NETWORK}" \
+    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
+    --boot-disk-size 100GB \
+    --can-ip-forward \
+    --metadata-from-file \
+      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/network-provider-gw-env.yaml"
 }

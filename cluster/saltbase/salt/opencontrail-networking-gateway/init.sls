@@ -1,13 +1,12 @@
-opencontrail-networking-master:
+opencontrail-networking-gateway:
   cmd.script:
-    - unless: test -f /var/log/contrail/provision_master.log
+    - unless: test -f /etc/contrail/vrouter_sgw_prov_run.ok
     - env:
       - 'OPENCONTRAIL_TAG': '{{ pillar.get('opencontrail_tag') }}'
       - 'OPENCONTRAIL_KUBERNETES_TAG': '{{ pillar.get('opencontrail_kubernetes_tag') }}'
       - 'OPENCONTRAIL_PUBLIC_SUBNET': '{{ pillar.get('opencontrail_public_subnet') }}'
-      - 'OPENCONTRAIL_PRIVATE_SUBNET': '{{ pillar.get('opencontrail_private_subnet') }}'
-      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
-    - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/provision_master.sh
+      - 'NETWORK_PROVIDER_GATEWAY_ON_MINION': '{{ pillar.get('network_provider_gw_on_minion') }}'
+    - source: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/provision_gateway.sh
     - source_hash: https://raw.githubusercontent.com/juniper/contrail-kubernetes/{{ pillar.get('opencontrail_kubernetes_tag') }}/cluster/manifests.hash
     - cwd: /
     - user: root
