@@ -211,10 +211,9 @@ var _ = Describe("Kubectl client", func() {
 
 			// Build the static kubectl
 			By("Finding a static kubectl for upload")
-			testStaticKubectlPath := path.Join(testContext.RepoRoot, "platforms/linux/386/kubectl")
-			_, err = os.Stat(testStaticKubectlPath)
+			testStaticKubectlPath, err := findBinary("kubectl", "linux/386")
 			if err != nil {
-				Logf("No kubectl in %s. Attempting a local build...", testStaticKubectlPath)
+				Logf("No kubectl found: %v.\nAttempting a local build...", err)
 				// Fall back to trying to build a local static kubectl
 				kubectlContainerPath := path.Join(testContext.RepoRoot, "/examples/kubectl-container/")
 				if _, err := os.Stat(path.Join(testContext.RepoRoot, "hack/build-go.sh")); err != nil {
@@ -1200,4 +1199,35 @@ func streamingUpload(file *os.File, fileName string, postBodyWriter *multipart.W
 	if err := postBodyWriter.Close(); err != nil {
 		Failf("Unable to close the writer for file upload. Error: %s", err)
 	}
+}
+
+var binPrefixes = []string{
+	"_output/dockerized/bin",
+	"_output/local/bin",
+	"platforms",
+}
+
+// findBinary searches through likely paths to find the specified binary.  It
+// takes the one that has been built most recently.  Platform should be
+// specified as '<os>/<arch>'.  For example: 'linux/amd64'.
+func findBinary(binName string, platform string) (string, error) {
+	var binTime time.Time
+	var binPath string
+
+	for _, pre := range binPrefixes {
+		tryPath := path.Join(testContext.RepoRoot, pre, platform, binName)
+		fi, err := os.Stat(tryPath)
+		if err != nil {
+			continue
+		}
+		if fi.ModTime().After(binTime) {
+			binPath = tryPath
+			binTime = fi.ModTime()
+		}
+	}
+
+	if len(binPath) > 0 {
+		return binPath, nil
+	}
+	return binPath, fmt.Errorf("Could not find %v for %v", binName, platform)
 }
