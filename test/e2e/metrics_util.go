@@ -110,7 +110,8 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 	}
 
 	ignoredResources := sets.NewString("events")
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY")
+	// TODO: figure out why we're getting non-capitalized proxy and fix this.
+	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY", "proxy")
 
 	for _, sample := range samples {
 		// Example line:
