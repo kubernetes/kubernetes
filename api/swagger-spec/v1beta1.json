@@ -2513,10 +2513,6 @@
       "type": "string",
       "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
      },
-     "namespace": {
-      "type": "string",
-      "description": "Namespace of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
-     },
      "name": {
       "type": "string",
       "description": "Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
