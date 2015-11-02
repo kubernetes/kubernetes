@@ -183,11 +183,13 @@ all or certain hosts, and when it needs to start before other pods.
 
 DaemonSet objects are in the [`extensions` API Group](../api.md#api-groups).
 DaemonSet is not enabled by default. Enable it by setting
-`--runtime-config=extensions/v1beta1/daemonset` on the api server.
+`--runtime-config=extensions/v1beta1/daemonsets=true` on the api server. This can be
+achieved by exporting ENABLE_DAEMONSETS=true before running kube-up.sh script
+on GCE.
 
 DaemonSet objects effectively have [API version `v1alpha1`](../api.md#api-versioning).
  Alpha objects may change or even be discontinued in future software releases.
-However, due to to a known issue, they may appear as API version `v1beta1` if enabled.
+However, due to to a known issue, they will appear as API version `v1beta1` if enabled.
 
 
 
