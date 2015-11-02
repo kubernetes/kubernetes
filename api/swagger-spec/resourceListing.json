@@ -14,7 +14,7 @@
     "description": "API at /apis/extensions/v1beta1"
    },
    {
-    "path": "/apis/extensions/",
+    "path": "/apis/extensions",
     "description": "get information of a group"
    },
    {
