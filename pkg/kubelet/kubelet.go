@@ -2854,7 +2854,7 @@ func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerSt
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
 		// return unready status.
-		return readyPodCondition(false, fmt.Sprint("ContainersNotReady"), unreadyMessage)
+		return readyPodCondition(false, "ContainersNotReady", unreadyMessage)
 	}
 	// return ready status.
 	return readyPodCondition(true, "", "")
