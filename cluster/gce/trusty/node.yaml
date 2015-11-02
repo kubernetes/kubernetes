@@ -118,8 +118,8 @@ script
 	# Install docker and brctl if they are not in the image.
 	if ! which docker > /dev/null; then
   	echo "Do not find docker. Install it."
-		# We should install the docker that passes qualification. At present, it is version 1.7.1.
-		curl -sSL https://get.docker.com/ubuntu/ | DOCKER_VERSION=1.7.1 sh
+		# We should install the latest qualified docker, which is version 1.8.3 at present.
+		curl -sSL https://get.docker.com/ | DOCKER_VERSION=1.8.3 sh
 	fi
 	if ! which brctl > /dev/null; then
 		echo "Do not find brctl. Install it."
