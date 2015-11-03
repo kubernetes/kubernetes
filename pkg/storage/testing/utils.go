@@ -18,7 +18,6 @@ package testing
 
 import (
 	"path"
-	"testing"
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -27,31 +26,36 @@ import (
 )
 
 // CreateObj will create a single object using the storage interface
-func CreateObj(t *testing.T, helper storage.Interface, name string, obj, out runtime.Object, ttl uint64) error {
-	err := helper.Set(context.TODO(), name, obj, out, ttl)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	return err
+func CreateObj(helper storage.Interface, name string, obj, out runtime.Object, ttl uint64) error {
+	return helper.Set(context.TODO(), name, obj, out, ttl)
 }
 
-// CreateList will properly create a list using the storage interface
-func CreateList(t *testing.T, prefix string, helper storage.Interface, list runtime.Object) error {
-	items, err := runtime.ExtractList(list)
-	if err != nil {
-		return err
-	}
+//CreateObjList will create a list from the array of objects
+func CreateObjList(prefix string, helper storage.Interface, items []runtime.Object) error {
 	for i := range items {
 		obj := items[i]
 		meta, err := meta.Accessor(obj)
 		if err != nil {
 			return err
 		}
-		err = CreateObj(t, helper, path.Join(prefix, meta.Name()), obj, obj, 0)
+		err = CreateObj(helper, path.Join(prefix, meta.Name()), obj, obj, 0)
 		if err != nil {
 			return err
 		}
 		items[i] = obj
+	}
+	return nil
+}
+
+// CreateList will properly create a list using the storage interface
+func CreateList(prefix string, helper storage.Interface, list runtime.Object) error {
+	items, err := runtime.ExtractList(list)
+	if err != nil {
+		return err
+	}
+	err = CreateObjList(prefix, helper, items)
+	if err != nil {
+		return err
 	}
 	return runtime.SetList(list, items)
 }
