@@ -19,7 +19,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-cd "${KUBE_ROOT}"
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+kube::golang::setup_env
 
 generated_files=$(
   find . -not \( \
@@ -38,6 +40,7 @@ function cleanup {
   rm -f "${CODECGEN:-}"
 }
 trap cleanup EXIT
+
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
