@@ -82,15 +82,20 @@ function get_vpc_id {
 }
 
 function get_subnet_id {
-  python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
+  local vpc_id=$1
+  local az=$2
+  $AWS_CMD --output text describe-subnets \
+           --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                     Name=availabilityZone,Values=${az} \
+                     Name=vpc-id,Values=${vpc_id} \
+           --query Subnets[].SubnetId
 }
 
 function get_igw_id {
-  python -c "import json,sys; lst = [str(igw['InternetGatewayId']) for igw in json.load(sys.stdin)['InternetGateways'] for attachment in igw['Attachments'] if attachment['VpcId'] == '$1']; print ''.join(lst)"
-}
-
-function get_route_table_id {
-  python -c "import json,sys; lst = [str(route_table['RouteTableId']) for route_table in json.load(sys.stdin)['RouteTables'] if route_table['VpcId'] == '$1']; print ''.join(lst)"
+  local vpc_id=$1
+  $AWS_CMD --output text describe-internet-gateways \
+           --filters Name=attachment.vpc-id,Values=${vpc_id} \
+           --query InternetGateways[].InternetGatewayId
 }
 
 function get_elbs_in_vpc {
@@ -713,7 +718,7 @@ function kube-up {
   create-dhcp-option-set
 
   if [[ -z "${SUBNET_ID:-}" ]]; then
-    SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+    SUBNET_ID=$(get_subnet_id $VPC_ID $ZONE)
   fi
 
   if [[ -z "$SUBNET_ID" ]]; then
@@ -729,7 +734,7 @@ function kube-up {
 
   echo "Using subnet $SUBNET_ID"
 
-  IGW_ID=$($AWS_CMD describe-internet-gateways | get_igw_id $VPC_ID)
+  IGW_ID=$(get_igw_id $VPC_ID)
   if [[ -z "$IGW_ID" ]]; then
 	  echo "Creating Internet Gateway."
 	  IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
