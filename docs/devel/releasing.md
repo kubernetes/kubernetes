@@ -74,7 +74,7 @@ from, and other prerequisites.
     probably shouldn't be doing this release, and should talk to someone on the
     release team.
   * New release series cut a new release branch, `release-X.Y`, off of
-    `master`, and also release the first beta in the series, `vX.Y.0-beta`.
+    `master`, and also release the first beta in the series, `vX.Y.0-beta.0`.
   * Every change in the `vX.Y` series from this point on will have to be
     cherry picked, so be sure you want to do this before proceeding.
   * You should still look for green tests, (see below).
