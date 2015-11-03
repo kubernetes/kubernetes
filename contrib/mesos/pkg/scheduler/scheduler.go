@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -42,7 +43,7 @@ import (
 )
 
 // Scheduler implements types.Scheduler
-type Scheduler struct {
+type scheduler struct {
 	podReconciler podreconciler.PodReconciler
 	framework     framework.Framework
 	loop          schedulerloop.SchedulerLoop
@@ -53,9 +54,9 @@ type Scheduler struct {
 }
 
 func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
-	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, lw *cache.ListWatch) *Scheduler {
+	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, lw *cache.ListWatch) types.Scheduler {
 
-	core := &Scheduler{
+	core := &scheduler{
 		framework:    fw,
 		taskRegistry: podtask.NewInMemoryRegistry(),
 	}
@@ -95,26 +96,26 @@ func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.Pod
 	return core
 }
 
-func (c *Scheduler) Run(done <-chan struct{}) {
+func (c *scheduler) Run(done <-chan struct{}) {
 	c.loop.Run(done)
 }
 
-func (c *Scheduler) Reconcile(t *podtask.T) {
+func (c *scheduler) Reconcile(t *podtask.T) {
 	c.podReconciler.Reconcile(t)
 }
 
-func (c *Scheduler) Tasks() podtask.Registry {
+func (c *scheduler) Tasks() podtask.Registry {
 	return c.taskRegistry
 }
 
-func (c *Scheduler) Offers() offers.Registry {
+func (c *scheduler) Offers() offers.Registry {
 	return c.framework.Offers()
 }
 
-func (c *Scheduler) KillTask(id string) error {
+func (c *scheduler) KillTask(id string) error {
 	return c.framework.KillTask(id)
 }
 
-func (c *Scheduler) LaunchTask(t *podtask.T) error {
+func (c *scheduler) LaunchTask(t *podtask.T) error {
 	return c.framework.LaunchTask(t)
 }

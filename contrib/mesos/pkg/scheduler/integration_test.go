@@ -430,7 +430,7 @@ type lifecycleTest struct {
 	podsListWatch *MockPodsListWatch
 	framework     framework.Framework
 	schedulerProc *ha.SchedulerProcess
-	scheduler     *Scheduler
+	scheduler     *scheduler
 	t             *testing.T
 }
 
