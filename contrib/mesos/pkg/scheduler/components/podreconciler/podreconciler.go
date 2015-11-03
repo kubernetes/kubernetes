@@ -31,15 +31,19 @@ import (
 )
 
 // PodReconciler reconciles a pod with the apiserver
-type PodReconciler struct {
+type PodReconciler interface {
+	Reconcile(t *podtask.T)
+}
+
+type podReconciler struct {
 	sched   types.Scheduler
 	client  *client.Client
 	qr      *queuer.Queuer
-	deleter *deleter.Deleter
+	deleter deleter.Deleter
 }
 
-func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Queuer, deleter *deleter.Deleter) *PodReconciler {
-	return &PodReconciler{
+func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Queuer, deleter deleter.Deleter) PodReconciler {
+	return &podReconciler{
 		sched:   sched,
 		client:  client,
 		qr:      qr,
@@ -58,7 +62,7 @@ func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Q
 //      host="..." |  host="..."    ; perhaps no updates to process?
 //
 // TODO(jdef) this needs an integration test
-func (s *PodReconciler) Reconcile(t *podtask.T) {
+func (s *podReconciler) Reconcile(t *podtask.T) {
 	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
 	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)

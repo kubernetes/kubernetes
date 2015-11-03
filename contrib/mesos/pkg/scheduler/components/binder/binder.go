@@ -28,18 +28,22 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-type Binder struct {
+type Binder interface {
+	Bind(binding *api.Binding) error
+}
+
+type binder struct {
 	sched types.Scheduler
 }
 
-func NewBinder(sched types.Scheduler) *Binder {
-	return &Binder{
+func NewBinder(sched types.Scheduler) Binder {
+	return &binder{
 		sched: sched,
 	}
 }
 
 // implements binding.Registry, launches the pod-associated-task in mesos
-func (b *Binder) Bind(binding *api.Binding) error {
+func (b *binder) Bind(binding *api.Binding) error {
 
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
 
@@ -63,7 +67,7 @@ func (b *Binder) Bind(binding *api.Binding) error {
 	}
 }
 
-func (b *Binder) rollback(task *podtask.T, err error) error {
+func (b *binder) rollback(task *podtask.T, err error) error {
 	task.Offer.Release()
 	task.Reset()
 	if err2 := b.sched.Tasks().Update(task); err2 != nil {
@@ -78,7 +82,7 @@ func (b *Binder) rollback(task *podtask.T, err error) error {
 // kubernetes executor on the slave will finally do the binding. This is different from the
 // upstream scheduler in the sense that the upstream scheduler does the binding and the
 // kubelet will notice that and launches the pod.
-func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
+func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
 	// sanity check: ensure that the task hasAcceptedOffer(), it's possible that between
 	// Schedule() and now that the offer for this task was rescinded or invalidated.
 	// ((we should never see this here))
@@ -111,7 +115,7 @@ func (b *Binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 }
 
 //TODO(jdef) unit test this, ensure that task's copy of api.Pod is not modified
-func (b *Binder) prepareTaskForLaunch(ctx api.Context, machine string, task *podtask.T, offerId string) error {
+func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *podtask.T, offerId string) error {
 	pod := task.Pod
 
 	// we make an effort here to avoid making changes to the task's copy of the pod, since

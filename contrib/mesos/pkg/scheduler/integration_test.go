@@ -427,7 +427,7 @@ type lifecycleTest struct {
 	driver        *mmock.JoinableDriver
 	eventObs      *EventObserver
 	podsListWatch *MockPodsListWatch
-	framework     *Framework
+	framework     Framework
 	schedulerProc *ha.SchedulerProcess
 	scheduler     *Scheduler
 	t             *testing.T

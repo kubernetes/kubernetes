@@ -29,25 +29,29 @@ import (
 
 type ReconcilerAction func(driver bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error
 
-type TasksReconciler struct {
+type TasksReconciler interface {
+	RequestExplicit()
+	RequestImplicit()
+	Run(driver bindings.SchedulerDriver, done <-chan struct{})
+}
+
+type tasksReconciler struct {
 	proc.Doer
 	Action                             ReconcilerAction
 	explicit                           chan struct{}   // send an empty struct to trigger explicit reconciliation
 	implicit                           chan struct{}   // send an empty struct to trigger implicit reconciliation
-	done                               <-chan struct{} // close this when you want the reconciler to exit
 	cooldown                           time.Duration
 	explicitReconciliationAbortTimeout time.Duration
 }
 
 func NewTasksReconciler(doer proc.Doer, action ReconcilerAction,
-	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) *TasksReconciler {
-	return &TasksReconciler{
+	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) TasksReconciler {
+	return &tasksReconciler{
 		Doer:     doer,
 		explicit: make(chan struct{}, 1),
 		implicit: make(chan struct{}, 1),
 		cooldown: cooldown,
 		explicitReconciliationAbortTimeout: explicitReconciliationAbortTimeout,
-		done: done,
 		Action: func(driver bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
 			// trigged the reconciler action in the doer's execution context,
 			// but it could take a while and the scheduler needs to be able to
@@ -67,14 +71,14 @@ func NewTasksReconciler(doer proc.Doer, action ReconcilerAction,
 	}
 }
 
-func (r *TasksReconciler) RequestExplicit() {
+func (r *tasksReconciler) RequestExplicit() {
 	select {
 	case r.explicit <- struct{}{}: // noop
 	default: // request queue full; noop
 	}
 }
 
-func (r *TasksReconciler) RequestImplicit() {
+func (r *tasksReconciler) RequestImplicit() {
 	select {
 	case r.implicit <- struct{}{}: // noop
 	default: // request queue full; noop
@@ -84,12 +88,12 @@ func (r *TasksReconciler) RequestImplicit() {
 // execute task reconciliation, returns when r.done is closed. intended to run as a goroutine.
 // if reconciliation is requested while another is in progress, the in-progress operation will be
 // cancelled before the new reconciliation operation begins.
-func (r *TasksReconciler) Run(driver bindings.SchedulerDriver) {
+func (r *tasksReconciler) Run(driver bindings.SchedulerDriver, done <-chan struct{}) {
 	var cancel, finished chan struct{}
 requestLoop:
 	for {
 		select {
-		case <-r.done:
+		case <-done:
 			return
 		default: // proceed
 		}
@@ -97,7 +101,7 @@ requestLoop:
 		case <-r.implicit:
 			metrics.ReconciliationRequested.WithLabelValues("implicit").Inc()
 			select {
-			case <-r.done:
+			case <-done:
 				return
 			case <-r.explicit:
 				break // give preference to a pending request for explicit
@@ -111,7 +115,7 @@ requestLoop:
 						continue requestLoop
 					}
 				}
-				errOnce := proc.NewErrorOnce(r.done)
+				errOnce := proc.NewErrorOnce(done)
 				errCh := r.Do(func() {
 					var err error
 					defer errOnce.Report(err)
@@ -123,10 +127,10 @@ requestLoop:
 				})
 				proc.OnError(errOnce.Send(errCh).Err(), func(err error) {
 					log.Errorf("failed to run implicit reconciliation: %v", err)
-				}, r.done)
+				}, done)
 				goto slowdown
 			}
-		case <-r.done:
+		case <-done:
 			return
 		case <-r.explicit: // continue
 			metrics.ReconciliationRequested.WithLabelValues("explicit").Inc()
@@ -139,7 +143,7 @@ requestLoop:
 			// play nice and wait for the prior operation to finish, complain
 			// if it doesn't
 			select {
-			case <-r.done:
+			case <-done:
 				return
 			case <-finished: // noop, expected
 			case <-time.After(r.explicitReconciliationAbortTimeout): // very unexpected
@@ -170,7 +174,7 @@ requestLoop:
 	slowdown:
 		// don't allow reconciliation to run very frequently, either explicit or implicit
 		select {
-		case <-r.done:
+		case <-done:
 			return
 		case <-time.After(r.cooldown): // noop
 		}
