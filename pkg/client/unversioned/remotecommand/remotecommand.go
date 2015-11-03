@@ -130,10 +130,6 @@ func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, strin
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusSwitchingProtocols {
-		return nil, "", fmt.Errorf("unexpected response status code %d (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
-	}
-
 	conn, err := e.upgrader.NewConnection(resp)
 	if err != nil {
 		return nil, "", err
