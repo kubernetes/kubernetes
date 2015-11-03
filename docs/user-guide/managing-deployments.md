@@ -44,9 +44,12 @@ You’ve deployed your application and exposed it via a service. Now what? Kuber
   - [Using labels effectively](#using-labels-effectively)
   - [Canary deployments](#canary-deployments)
   - [Updating labels](#updating-labels)
+  - [Updating annotations](#updating-annotations)
   - [Scaling your application](#scaling-your-application)
   - [Updating your application without a service outage](#updating-your-application-without-a-service-outage)
   - [In-place updates of resources](#in-place-updates-of-resources)
+    - [kubectl patch](#kubectl-patch)
+    - [kubectl edit](#kubectl-edit)
   - [Using configuration files](#using-configuration-files)
   - [Disruptive updates](#disruptive-updates)
   - [What's next?](#whats-next)
@@ -243,16 +246,11 @@ Sometimes existing pods and other resources need to be relabeled before creating
 
 ```console
 $ kubectl label pods -lapp=nginx tier=fe
-NAME                READY     STATUS    RESTARTS   AGE
-my-nginx-v4-9gw19   1/1       Running   0          14m
-NAME                READY     STATUS    RESTARTS   AGE
-my-nginx-v4-hayza   1/1       Running   0          13m
-NAME                READY     STATUS    RESTARTS   AGE
-my-nginx-v4-mde6m   1/1       Running   0          17m
-NAME                READY     STATUS    RESTARTS   AGE
-my-nginx-v4-sh6m8   1/1       Running   0          18m
-NAME                READY     STATUS    RESTARTS   AGE
-my-nginx-v4-wfof4   1/1       Running   0          16m
+pod "my-nginx-v4-9gw19" labeled
+pod "my-nginx-v4-hayza" labeled
+pod "my-nginx-v4-mde6m" labeled
+pod "my-nginx-v4-sh6m8" labeled
+pod "my-nginx-v4-wfof4" labeled
 $ kubectl get pods -lapp=nginx -Ltier
 NAME                READY     STATUS    RESTARTS   AGE       TIER
 my-nginx-v4-9gw19   1/1       Running   0          15m       fe
@@ -262,19 +260,54 @@ my-nginx-v4-sh6m8   1/1       Running   0          19m       fe
 my-nginx-v4-wfof4   1/1       Running   0          16m       fe
 ```
 
+For more information, please see [labels](labels.md) and [kubectl label](kubectl/kubectl_label.md) document.
+
+## Updating annotations
+
+Sometimes you want to attach annotations to resources. Annotations are arbitrary non-identifying metadata for retrieval by API clients such as tools, libraries, etc. This can be done with `kubectl annotate`. For example:
+
+```console
+$ kubectl annotate pods my-nginx-v4-9gw19 decscription='my frontend running nginx'
+$ kubectl get pods my-nginx-v4-9gw19 -o yaml
+apiversion: v1
+kind: pod
+metadata:
+  annotations:
+    description: my frontend running nginx
+...
+```
+
+For more information, please see [annotations](annotations.md) and [kubectl annotate](kubectl/kubectl_annotate.md) document.
+
 ## Scaling your application
 
 When load on your application grows or shrinks, it’s easy to scale with `kubectl`. For instance, to increase the number of nginx replicas from 2 to 3, do:
 
 ```console
 $ kubectl scale rc my-nginx --replicas=3
-scaled
+replicationcontroller "my-nginx" scaled
 $ kubectl get pods -lapp=nginx
 NAME             READY     STATUS    RESTARTS   AGE
 my-nginx-1jgkf   1/1       Running   0          3m
 my-nginx-divi2   1/1       Running   0          1h
 my-nginx-o0ef1   1/1       Running   0          1h
 ```
+
+To have the system automatically choose the number of nginx replicas as needed, range from 1 to 3, do:
+
+```console 
+$ kubectl autoscale rc my-nginx --min=1 --max=3
+replicationcontroller "my-nginx" autoscaled
+$ kubectl get pods -lapp=nginx
+NAME             READY     STATUS    RESTARTS   AGE
+my-nginx-1jgkf   1/1       Running   0          3m
+my-nginx-divi2   1/1       Running   0          3m
+$ kubectl get horizontalpodautoscaler 
+NAME      REFERENCE                           TARGET    CURRENT     MINPODS   MAXPODS   AGE
+nginx     ReplicationController/nginx/scale   80%       <waiting>   1         3         1m
+```
+
+For more information, please see [kubectl scale](kubectl/kubectl_scale.md), [kubectl autoscale](kubectl/kubectl_autoscale.md) and [horizontal pod autoscaler](horizontal-pod-autoscaling/README.md) document.
 
 ## Updating your application without a service outage
 
@@ -412,35 +445,65 @@ You can also run the [update demo](update-demo/) to see a visual representation 
 
 ## In-place updates of resources
 
-Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object.
+Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to update the container's image of your pod.
 
-One way to do that is with `kubectl patch`:
+### kubectl patch
+
+Suppose you want to fix a typo of the container's image of a pod. One way to do that is with `kubectl patch`:
 
 ```console
-$ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
-my-nginx-v4
-$ kubectl get rc my-nginx-v4 -o yaml
-apiVersion: v1
-kind: ReplicationController
-metadata:
-  annotations:
-    description: my frontend running nginx
+# Suppose you have a pod with a container named "nginx" and its image "nignx" (typo), 
+# use container name "nginx" as a key to update the image from "nignx" (typo) to "nginx"
+$ kubectl get pod my-nginx-1jgkf -o yaml
+apiversion: v1
+kind: pod
+...
+spec:
+  containers:
+  -image: nignx
+   name: nginx
+...
+$ kubectl patch pod my-nginx-1jgkf -p '{"spec":{"containers":[{"name":"nginx","image":"nginx"}]}}'
+"my-nginx-1jgkf" patched
+$ kubectl get pod my-nginx-1jgkf -o yaml
+apiversion: v1
+kind: pod
+...
+spec:
+  containers:
+  -image: nginx
+   name: nginx
 ...
 ```
 
 The patch is specified using json.
 
-For more significant changes, you can `get` the resource, edit it, and then `replace` the resource with the updated version:
+The system ensures that you don’t clobber changes made by other users or components by confirming that the `resourceVersion` doesn’t differ from the version you edited. If you want to update regardless of other changes, remove the `resourceVersion` field when you edit the resource. However, if you do this, don’t use your original configuration file as the source since additional fields most likely were set in the live state.
+
+For more information, please see [kubectl patch](kubectl/kubectl_patch.md) document.
+
+### kubectl edit
+
+Alternatively, you may also update resources with `kubectl edit`:
 
 ```console
-$ kubectl get rc my-nginx-v4 -o yaml > /tmp/nginx.yaml
-$ vi /tmp/nginx.yaml
-$ kubectl replace -f /tmp/nginx.yaml
-replicationcontrollers/my-nginx-v4
-$ rm $TMP
+$ kubectl edit pod my-nginx-1jgkf
 ```
 
-The system ensures that you don’t clobber changes made by other users or components by confirming that the `resourceVersion` doesn’t differ from the version you edited. If you want to update regardless of other changes, remove the `resourceVersion` field when you edit the resource. However, if you do this, don’t use your original configuration file as the source since additional fields most likely were set in the live state.
+This is equivalent to first `get` the resource, edit it in text editor, and then `replace` the resource with the updated version:
+
+```console
+$ kubectl get pod my-nginx-1jgkf -o yaml > /tmp/nginx.yaml
+$ vi /tmp/nginx.yaml
+# do some edit, and then save the file
+$ kubectl replace -f /tmp/nginx.yaml
+pod "my-nginx-1jgkf" replaced
+$ rm /tmp/nginx.yaml
+```
+
+This allows you to do more significant changes more easily. Note that you can specify the editor with your `EDITOR`, `KUBE_EDITOR`, or `GIT_EDITOR` environment variables.
+
+For more information, please see [kubectl edit](kubectl/kubectl_edit.md) document.
 
 ## Using configuration files
 
