@@ -144,6 +144,25 @@ func TestRequestSetTwiceError(t *testing.T) {
 	}
 }
 
+func TestInvalidSegments(t *testing.T) {
+	invalidSegments := []string{".", "..", "test/segment", "test%2bsegment"}
+	setters := map[string]func(string, *Request){
+		"namespace":   func(s string, r *Request) { r.Namespace(s) },
+		"resource":    func(s string, r *Request) { r.Resource(s) },
+		"name":        func(s string, r *Request) { r.Name(s) },
+		"subresource": func(s string, r *Request) { r.SubResource(s) },
+	}
+	for _, invalidSegment := range invalidSegments {
+		for setterName, setter := range setters {
+			r := &Request{}
+			setter(invalidSegment, r)
+			if r.err == nil {
+				t.Errorf("%s: %s: expected error, got none", setterName, invalidSegment)
+			}
+		}
+	}
+}
+
 func TestRequestParam(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
