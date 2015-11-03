@@ -151,7 +151,7 @@ func (d *DeploymentController) getNewRC(deployment extensions.Deployment) (*api.
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 0,
 			Selector: newRCSelector,
-			Template: newRCTemplate,
+			Template: &newRCTemplate,
 		},
 	}
 	createdRC, err := d.client.ReplicationControllers(namespace).Create(&newRC)

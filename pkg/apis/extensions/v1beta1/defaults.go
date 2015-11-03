@@ -45,10 +45,8 @@ func addDefaultingFuncs() {
 		},
 		func(obj *Deployment) {
 			// Default labels and selector to labels from pod template spec.
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
+			labels := obj.Spec.Template.Labels
+
 			if labels != nil {
 				if len(obj.Spec.Selector) == 0 {
 					obj.Spec.Selector = labels

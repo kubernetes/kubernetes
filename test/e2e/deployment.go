@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -54,7 +55,7 @@ func testNewDeployment(f *Framework) {
 			Replicas:       1,
 			Selector:       podLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,
 				},
@@ -147,7 +148,7 @@ func testRollingUpdateDeployment(f *Framework) {
 			Replicas:       3,
 			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: deploymentPodLabels,
 				},
@@ -228,7 +229,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 			Replicas:       1,
 			Selector:       deploymentPodLabels,
 			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: deploymentPodLabels,
 				},
