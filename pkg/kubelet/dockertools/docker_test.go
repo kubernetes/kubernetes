@@ -59,6 +59,24 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	}
 }
 
+func findPodContainer(dockerContainers []*docker.APIContainers, podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
+	for _, dockerContainer := range dockerContainers {
+		if len(dockerContainer.Names) == 0 {
+			continue
+		}
+		dockerName, hash, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
+		if dockerName.PodFullName == podFullName &&
+			(uid == "" || dockerName.PodUID == uid) &&
+			dockerName.ContainerName == containerName {
+			return dockerContainer, true, hash
+		}
+	}
+	return nil, false, 0
+}
+
 func TestGetContainerID(t *testing.T) {
 	fakeDocker := &FakeDockerClient{}
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -83,13 +101,14 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", fakeDocker.ContainerList, dockerContainers)
 	}
 	verifyCalls(t, fakeDocker, []string{"list"})
-	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux_ns", "", "foo")
+
+	dockerContainer, found, _ := findPodContainer(dockerContainers, "qux_ns", "", "foo")
 	if dockerContainer == nil || !found {
 		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
 
 	fakeDocker.ClearCalls()
-	dockerContainer, found, _ = dockerContainers.FindPodContainer("foobar", "", "foo")
+	dockerContainer, found, _ = findPodContainer(dockerContainers, "foobar", "", "foo")
 	verifyCalls(t, fakeDocker, []string{})
 	if dockerContainer != nil || found {
 		t.Errorf("Should not have found container %#v", dockerContainer)
