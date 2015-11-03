@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
@@ -53,7 +53,7 @@ func (autoscalerStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // Validate validates a new autoscaler.
-func (autoscalerStrategy) Validate(ctx api.Context, obj runtime.Object) errs.ValidationErrorList {
+func (autoscalerStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
 	autoscaler := obj.(*extensions.HorizontalPodAutoscaler)
 	return validation.ValidateHorizontalPodAutoscaler(autoscaler)
 }
@@ -76,7 +76,7 @@ func (autoscalerStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (autoscalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
+func (autoscalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*extensions.HorizontalPodAutoscaler), old.(*extensions.HorizontalPodAutoscaler))
 }
 
@@ -115,6 +115,6 @@ func (autoscalerStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newAutoscaler.Spec = oldAutoscaler.Spec
 }
 
-func (autoscalerStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
+func (autoscalerStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	return validation.ValidateHorizontalPodAutoscalerStatusUpdate(obj.(*extensions.HorizontalPodAutoscaler), old.(*extensions.HorizontalPodAutoscaler))
 }

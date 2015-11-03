@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type testRESTStrategy struct {
@@ -49,10 +49,10 @@ func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUncon
 
 func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object)      {}
 func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
-func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) validation.ValidationErrorList {
 	return nil
 }
-func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) validation.ValidationErrorList {
 	return nil
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}

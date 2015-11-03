@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // podTemplateStrategy implements behavior for PodTemplates
@@ -49,7 +49,7 @@ func (podTemplateStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // Validate validates a new pod template.
-func (podTemplateStrategy) Validate(ctx api.Context, obj runtime.Object) errs.ValidationErrorList {
+func (podTemplateStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
 	pod := obj.(*api.PodTemplate)
 	return validation.ValidatePodTemplate(pod)
 }
@@ -69,7 +69,7 @@ func (podTemplateStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podTemplateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
+func (podTemplateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
 }
 

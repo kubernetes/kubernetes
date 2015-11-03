@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -702,14 +701,14 @@ const qualifiedNameErrorMsg string = "must match regex [" + validation.DNS1123Su
 
 func validateLabelKey(k string) error {
 	if !validation.IsQualifiedName(k) {
-		return fielderrors.NewFieldInvalid("label key", k, qualifiedNameErrorMsg)
+		return validation.NewFieldInvalid("label key", k, qualifiedNameErrorMsg)
 	}
 	return nil
 }
 
 func validateLabelValue(v string) error {
 	if !validation.IsValidLabelValue(v) {
-		return fielderrors.NewFieldInvalid("label value", v, qualifiedNameErrorMsg)
+		return validation.NewFieldInvalid("label value", v, qualifiedNameErrorMsg)
 	}
 	return nil
 }
