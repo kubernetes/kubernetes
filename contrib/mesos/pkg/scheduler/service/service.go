@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
@@ -719,7 +720,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	fcfs := podschedulers.NewFCFSPodScheduler(as, lookupNode)
-	framework := scheduler.New(scheduler.Config{
+	framework := framework.New(framework.Config{
 		SchedulerConfig:   *sc,
 		Executor:          executor,
 		Client:            client,
