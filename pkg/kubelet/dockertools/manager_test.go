@@ -1600,6 +1600,44 @@ func TestGetRestartCount(t *testing.T) {
 	pod.Status = verifyRestartCount(&pod, 4)
 }
 
+func TestGetTerminationMessagePath(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	containers := []api.Container{
+		{
+			Name: "bar",
+			TerminationMessagePath: "/dev/somepath",
+		},
+	}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	fakeDocker.ContainerMap = map[string]*docker.Container{}
+
+	runSyncPod(t, dm, fakeDocker, pod, nil)
+
+	containerList := fakeDocker.ContainerList
+	if len(containerList) != 2 {
+		// One for infra container, one for container "bar"
+		t.Fatalf("unexpected container list length %d", len(containerList))
+	}
+	inspectResult, err := dm.client.InspectContainer(containerList[0].ID)
+	if err != nil {
+		t.Fatalf("unexpected inspect error %v", err)
+	}
+	terminationMessagePath := getTerminationMessagePathFromLabel(inspectResult.Config.Labels)
+	if terminationMessagePath != containers[0].TerminationMessagePath {
+		t.Errorf("expected termination message path %s, got %s", containers[0].TerminationMessagePath, terminationMessagePath)
+	}
+}
+
 func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	fakeHTTPClient := &fakeHTTP{}
 	dm, fakeDocker := newTestDockerManagerWithHTTPClient(fakeHTTPClient)
