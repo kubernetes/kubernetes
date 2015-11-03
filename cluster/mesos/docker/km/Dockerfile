@@ -14,4 +14,4 @@ RUN apt-get update -qq && \
     apt-get clean
 
 COPY ./bin/* /usr/local/bin/
-ADD ./opt/mesos-cloud.conf /opt/
+COPY ./opt/* /opt/

@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -150,6 +151,7 @@ type SchedulerServer struct {
 	ContainPodResources           bool
 	AccountForPodResources        bool
 	nodeRelistPeriod              time.Duration
+	SandboxOverlay                string
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -258,6 +260,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
 	fs.DurationVar(&s.ExecutorSuicideTimeout, "executor-suicide-timeout", s.ExecutorSuicideTimeout, "Executor self-terminates after this period of inactivity. Zero disables suicide watch.")
 	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
+	fs.StringVar(&s.SandboxOverlay, "mesos-sandbox-overlay", s.SandboxOverlay, "Path to an archive (tar.gz, tar.bz2 or zip) extracted into the sandbox.")
 
 	fs.BoolVar(&s.ProxyBindall, "proxy-bindall", s.ProxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.RunProxy, "run-proxy", s.RunProxy, "Run the kube-proxy as a side process of the executor.")
@@ -292,15 +295,7 @@ func (s *SchedulerServer) AddHyperkubeFlags(fs *pflag.FlagSet) {
 
 // returns (downloadURI, basename(path))
 func (s *SchedulerServer) serveFrameworkArtifact(path string) (string, string) {
-	pathSplit := strings.Split(path, "/")
-
-	var basename string
-	if len(pathSplit) > 0 {
-		basename = pathSplit[len(pathSplit)-1]
-	} else {
-		basename = path
-	}
-
+	basename := filepath.Base(path)
 	return s.serveFrameworkArtifactWithFilename(path, basename), basename
 }
 
@@ -364,6 +359,14 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-size=%v", s.MinionLogMaxSize.String()))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-backups=%d", s.MinionLogMaxBackups))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-age=%d", s.MinionLogMaxAgeInDays))
+	}
+
+	if s.SandboxOverlay != "" {
+		if _, err := os.Stat(s.SandboxOverlay); os.IsNotExist(err) {
+			log.Fatalf("Sandbox overlay archive not found: %s", s.SandboxOverlay)
+		}
+		uri, _ := s.serveFrameworkArtifact(s.SandboxOverlay)
+		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(false), Extract: proto.Bool(true)})
 	}
 
 	if s.DockerCfgPath != "" {
