@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package integration
 
 import (
 	"encoding/json"
@@ -33,6 +33,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/schedulerloop"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
@@ -430,7 +432,7 @@ type lifecycleTest struct {
 	podsListWatch *MockPodsListWatch
 	framework     framework.Framework
 	schedulerProc *ha.SchedulerProcess
-	scheduler     *scheduler
+	sched         scheduler.Scheduler
 	t             *testing.T
 }
 
@@ -486,7 +488,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 
 	// create scheduler
 	eventObs := NewEventObserver()
-	scheduler := NewScheduler(&c, framework, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	scheduler := components.NewScheduler(&c, framework, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(scheduler)
 
 	// create mock mesos scheduler driver
@@ -499,18 +501,18 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		podsListWatch: podsListWatch,
 		framework:     framework,
 		schedulerProc: schedulerProc,
-		scheduler:     scheduler,
+		sched:         scheduler,
 		t:             t,
 	}
 }
 
 func (lt lifecycleTest) Start() <-chan LaunchedTask {
 	assert := &EventAssertions{*assert.New(lt.t)}
-	lt.scheduler.Run(lt.schedulerProc.Terminal())
+	lt.sched.Run(lt.schedulerProc.Terminal())
 
 	// init framework
 	err := lt.framework.Init(
-		lt.scheduler,
+		lt.sched,
 		lt.schedulerProc.Master(),
 		http.DefaultServeMux,
 	)
@@ -795,7 +797,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 
 	podKey, _ := podtask.MakePodKey(api.NewDefaultContext(), pod.Name)
 	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
-		t, _ := lt.scheduler.Tasks().ForPod(podKey)
+		t, _ := lt.sched.Tasks().ForPod(podKey)
 		return t == nil
 	})
 

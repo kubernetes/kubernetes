@@ -54,7 +54,6 @@ import (
 	minioncfg "k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
@@ -75,6 +74,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components"
 )
 
 const (
@@ -763,14 +763,14 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
 	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
-	scheduler := scheduler.NewScheduler(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
+	sched := components.NewScheduler(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
 
-	runtime.On(framework.Registration(), func() { scheduler.Run(schedulerProcess.Terminal()) })
+	runtime.On(framework.Registration(), func() { sched.Run(schedulerProcess.Terminal()) })
 	runtime.On(framework.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))
 
 	driverFactory := ha.DriverFactory(func() (drv bindings.SchedulerDriver, err error) {
 		log.V(1).Infoln("performing deferred initialization")
-		if err = framework.Init(scheduler, schedulerProcess.Master(), s.mux); err != nil {
+		if err = framework.Init(sched, schedulerProcess.Master(), s.mux); err != nil {
 			return nil, fmt.Errorf("failed to initialize pod scheduler: %v", err)
 		}
 		log.V(1).Infoln("deferred init complete")

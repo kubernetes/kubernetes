@@ -24,7 +24,7 @@ import (
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -36,13 +36,13 @@ type PodReconciler interface {
 }
 
 type podReconciler struct {
-	sched   types.Scheduler
+	sched   scheduler.Scheduler
 	client  *client.Client
 	qr      *queuer.Queuer
 	deleter deleter.Deleter
 }
 
-func NewPodReconciler(sched types.Scheduler, client *client.Client, qr *queuer.Queuer, deleter deleter.Deleter) PodReconciler {
+func NewPodReconciler(sched scheduler.Scheduler, client *client.Client, qr *queuer.Queuer, deleter deleter.Deleter) PodReconciler {
 	return &podReconciler{
 		sched:   sched,
 		client:  client,

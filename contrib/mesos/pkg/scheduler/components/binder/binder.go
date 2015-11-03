@@ -21,10 +21,10 @@ import (
 	"strconv"
 
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -33,10 +33,10 @@ type Binder interface {
 }
 
 type binder struct {
-	sched types.Scheduler
+	sched scheduler.Scheduler
 }
 
-func NewBinder(sched types.Scheduler) Binder {
+func NewBinder(sched scheduler.Scheduler) Binder {
 	return &binder{
 		sched: sched,
 	}
