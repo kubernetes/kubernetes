@@ -213,13 +213,8 @@ func convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(v1.PodTemplateSpec)
-		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	if err := convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
@@ -244,13 +239,8 @@ func convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
 	}
 	if err := convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err

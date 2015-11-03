@@ -613,7 +613,7 @@ func validDeployment() *extensions.Deployment {
 			Selector: map[string]string{
 				"name": "abc",
 			},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "abc",
 					Namespace: api.NamespaceDefault,

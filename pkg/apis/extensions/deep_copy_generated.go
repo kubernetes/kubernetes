@@ -1049,13 +1049,8 @@ func deepCopy_extensions_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, 
 	} else {
 		out.Selector = nil
 	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := deepCopy_api_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
+	if err := deepCopy_api_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
+		return err
 	}
 	if err := deepCopy_extensions_DeploymentStrategy(in.Strategy, &out.Strategy, c); err != nil {
 		return err
