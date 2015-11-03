@@ -188,7 +188,7 @@ EOM
 }
 
 function usage() {
-  echo "Usage: ${0} <version> <githash>"
+  echo "Usage: ${0} <version> <githash> [--no-dry-run]"
   echo
   echo "See docs/devel/releasing.md for more info."
 }
