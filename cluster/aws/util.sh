@@ -796,6 +796,24 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
+  # Create the master
+  start-master
+
+  # Start minions
+  start-minions
+
+  # Wait for the master to be ready
+  wait-master
+
+  # Build ~/.kube/config
+  build-config
+
+  # Check the cluster is OK
+  check-cluster
+}
+
+# Starts the master node
+function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
@@ -957,7 +975,10 @@ function kube-up {
     attempt=$(($attempt+1))
     sleep 10
   done
+}
 
+# Creates an ASG for the minion nodes
+function start-minions() {
   echo "Creating minion configuration"
   generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
   local public_ip_option
@@ -1012,7 +1033,10 @@ function kube-up {
     attempt=$(($attempt+1))
     sleep 10
   done
+}
 
+# Wait for the master to be started
+function wait-master() {
   detect-master > $LOG
   detect-minions > $LOG
 
@@ -1043,7 +1067,11 @@ function kube-up {
   done
 
   echo "Kubernetes cluster created."
+}
 
+# Creates the ~/.kube/config file, getting the information from the master
+# The master much be running and set in KUBE_MASTER_IP
+function build-config() {
   # TODO use token instead of kube_auth
   export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
   export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
@@ -1062,7 +1090,10 @@ function kube-up {
 
     create-kubeconfig
   )
+}
 
+# Sanity check the cluster and print confirmation messages
+function check-cluster() {
   echo "Sanity checking cluster..."
 
   sleep 5
