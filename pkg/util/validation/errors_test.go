@@ -31,7 +31,7 @@ func TestMakeFuncs(t *testing.T) {
 			ErrorTypeInvalid,
 		},
 		{
-			func() *Error { return NewFieldValueNotSupported("f", "v", nil) },
+			func() *Error { return NewFieldNotSupported("f", "v", nil) },
 			ErrorTypeNotSupported,
 		},
 		{
