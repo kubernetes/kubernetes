@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-func expectPrefix(t *testing.T, prefix string, errs validation.ValidationErrorList) {
+func expectPrefix(t *testing.T, prefix string, errs validation.ErrorList) {
 	for i := range errs {
 		if f, p := errs[i].(*validation.Error).Field, prefix; !strings.HasPrefix(f, p) {
 			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])

@@ -53,7 +53,7 @@ func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new endpoints.
-func (endpointsStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (endpointsStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateEndpoints(obj.(*api.Endpoints))
 }
 
@@ -69,7 +69,7 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	errorList := validation.ValidateEndpoints(obj.(*api.Endpoints))
 	return append(errorList, validation.ValidateEndpointsUpdate(obj.(*api.Endpoints), old.(*api.Endpoints))...)
 }

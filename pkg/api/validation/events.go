@@ -22,8 +22,8 @@ import (
 )
 
 // ValidateEvent makes sure that the event makes sense.
-func ValidateEvent(event *api.Event) validation.ValidationErrorList {
-	allErrs := validation.ValidationErrorList{}
+func ValidateEvent(event *api.Event) validation.ErrorList {
+	allErrs := validation.ErrorList{}
 	// TODO: There is no namespace required for node.
 	if event.InvolvedObject.Kind != "Node" &&
 		event.Namespace != event.InvolvedObject.Namespace {

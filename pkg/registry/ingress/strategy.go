@@ -70,7 +70,7 @@ func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new Ingress.
-func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	ingress := obj.(*extensions.Ingress)
 	err := validation.ValidateIngress(ingress)
 	return err
@@ -86,7 +86,7 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
 	updateErrorList := validation.ValidateIngressUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 	return append(validationErrorList, updateErrorList...)
@@ -134,6 +134,6 @@ func (ingressStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (ingressStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (ingressStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateIngressStatusUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 }

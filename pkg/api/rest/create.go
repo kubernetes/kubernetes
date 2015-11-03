@@ -42,7 +42,7 @@ type RESTCreateStrategy interface {
 	PrepareForCreate(obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.  This method should not mutate the object.
-	Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList
+	Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
 	// object has been persisted.  This method may mutate the object.
 	Canonicalize(obj runtime.Object)

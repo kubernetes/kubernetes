@@ -217,7 +217,7 @@ func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
 		},
 	}
 
-	validator := func(obj runtime.Object) utilvalidation.ValidationErrorList {
+	validator := func(obj runtime.Object) utilvalidation.ErrorList {
 		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec))
 	}
 

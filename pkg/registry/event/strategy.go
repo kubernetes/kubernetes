@@ -48,7 +48,7 @@ func (eventStrategy) PrepareForCreate(obj runtime.Object) {
 func (eventStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)
 }
@@ -61,7 +61,7 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (eventStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (eventStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)
 }

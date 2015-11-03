@@ -42,7 +42,7 @@ type RESTUpdateStrategy interface {
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
-	ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList
+	ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
 	// object has been persisted.  This method may mutate the object.
 	Canonicalize(obj runtime.Object)
@@ -53,8 +53,8 @@ type RESTUpdateStrategy interface {
 }
 
 // TODO: add other common fields that require global validation.
-func validateCommonFields(obj, old runtime.Object) utilvalidation.ValidationErrorList {
-	allErrs := utilvalidation.ValidationErrorList{}
+func validateCommonFields(obj, old runtime.Object) utilvalidation.ErrorList {
+	allErrs := utilvalidation.ErrorList{}
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return append(allErrs, errors.NewInternalError(err))

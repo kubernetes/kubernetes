@@ -58,7 +58,7 @@ func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new job.
-func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	job := obj.(*extensions.Job)
 	return validation.ValidateJob(job)
 }
@@ -77,7 +77,7 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*extensions.Job))
 	updateErrorList := validation.ValidateJobUpdate(obj.(*extensions.Job), old.(*extensions.Job))
 	return append(validationErrorList, updateErrorList...)
@@ -95,7 +95,7 @@ func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newJob.Spec = oldJob.Spec
 }
 
-func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*extensions.Job), old.(*extensions.Job))
 }
 

@@ -84,7 +84,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		// Allocate next available.
 		ip, err := rs.serviceIPs.AllocateNext()
 		if err != nil {
-			el := utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
+			el := utilvalidation.ErrorList{utilvalidation.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 		service.Spec.ClusterIP = ip.String()
@@ -92,7 +92,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
 		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
-			el := utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
+			el := utilvalidation.ErrorList{utilvalidation.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 		releaseServiceIP = true
@@ -104,13 +104,13 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		if servicePort.NodePort != 0 {
 			err := nodePortOp.Allocate(servicePort.NodePort)
 			if err != nil {
-				el := utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("nodePort", servicePort.NodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
+				el := utilvalidation.ErrorList{utilvalidation.NewFieldInvalid("nodePort", servicePort.NodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
 				return nil, errors.NewInvalid("Service", service.Name, el)
 			}
 		} else if assignNodePorts {
 			nodePort, err := nodePortOp.AllocateNext()
 			if err != nil {
-				el := utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("nodePort", servicePort.NodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
+				el := utilvalidation.ErrorList{utilvalidation.NewFieldInvalid("nodePort", servicePort.NodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
 				return nil, errors.NewInvalid("Service", service.Name, el)
 			}
 			servicePort.NodePort = nodePort
@@ -223,14 +223,14 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 				if !contains(oldNodePorts, nodePort) {
 					err := nodePortOp.Allocate(nodePort)
 					if err != nil {
-						el := utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("nodePort", nodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
+						el := utilvalidation.ErrorList{utilvalidation.NewFieldInvalid("nodePort", nodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
 						return nil, false, errors.NewInvalid("Service", service.Name, el)
 					}
 				}
 			} else {
 				nodePort, err = nodePortOp.AllocateNext()
 				if err != nil {
-					el := utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("nodePort", nodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
+					el := utilvalidation.ErrorList{utilvalidation.NewFieldInvalid("nodePort", nodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
 					return nil, false, errors.NewInvalid("Service", service.Name, el)
 				}
 				servicePort.NodePort = nodePort

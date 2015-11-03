@@ -42,7 +42,7 @@ func TestCompatibility(
 	t *testing.T,
 	version string,
 	input []byte,
-	validator func(obj runtime.Object) validation.ValidationErrorList,
+	validator func(obj runtime.Object) validation.ErrorList,
 	expectedKeys map[string]string,
 	absentKeys []string,
 ) {

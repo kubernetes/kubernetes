@@ -71,7 +71,7 @@ func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new node.
-func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateNode(node)
 }
@@ -81,7 +81,7 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	errorList := validation.ValidateNode(obj.(*api.Node))
 	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
 }
@@ -107,7 +107,7 @@ func (nodeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newNode.Spec = oldNode.Spec
 }
 
-func (nodeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (nodeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
 }
 

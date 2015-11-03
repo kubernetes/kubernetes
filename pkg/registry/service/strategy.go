@@ -58,7 +58,7 @@ func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new service.
-func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
 }
@@ -71,7 +71,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
