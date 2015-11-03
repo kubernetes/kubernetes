@@ -244,7 +244,7 @@ $ kubectl run nginx \-\-image=nginx \-\-dry\-run
 $ kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of nginx and keep it in the foreground, don't restart it if it exits.
-$ kubectl run \-i \-tty nginx \-\-image=nginx \-\-restart=Never
+$ kubectl run \-i \-\-tty nginx \-\-image=nginx \-\-restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
 $ kubectl run nginx \-\-image=nginx \-\- <arg1> <arg2> ... <argN>
