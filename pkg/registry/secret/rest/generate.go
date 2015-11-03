@@ -24,15 +24,14 @@ import (
   "k8s.io/kubernetes/pkg/api/rest"
   "k8s.io/kubernetes/pkg/api/validation"
   etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
-  "k8s.io/kubernetes/pkg/registry/secret"
   "k8s.io/kubernetes/pkg/runtime"
+  secretplugins "k8s.io/kubernetes/pkg/secret"
   "k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
 // GenerateREST implements the generate endpoint for a Secret.
 type GenerateREST struct {
-  Store      *etcdgeneric.Etcd
-  Generators secret.Generators
+  Store *etcdgeneric.Etcd
 }
 
 // GenerateREST implements Creater
@@ -52,28 +51,24 @@ func (r *GenerateREST) Create(ctx api.Context, name string, obj runtime.Object) 
   if errs := validation.ValidateGenerateSecretRequest(req); len(errs) > 0 {
     return nil, errors.NewInvalid("generatesecretrequest", name, errs)
   }
-  generator, ok := r.Generators[req.Type]
-  if !ok {
-    generators := make([]string, len(r.Generators))
+  generator := secretplugins.GetPlugin(string(req.Type))
+  if generator == nil {
+    generators := secretplugins.GetPlugins()
 
-    i := 0
-    for k := range r.Generators {
-      generators[i] = string(k)
-      i++
-    }
     msg := fmt.Sprintf("unknown generator '%s'. Known generators are %v", req.Type, generators)
     err := fielderrors.NewFieldInvalid("type", req.Type, msg)
     errs := fielderrors.ValidationErrorList{err}
     return nil, errors.NewInvalid("generatesecretrequest", name, errs)
   }
-  vals, err := generator.GenerateValues()
+  vals, err := generator.GenerateValues(req)
   if err != nil {
     return nil, err
   }
   secret := &api.Secret{
     ObjectMeta: api.ObjectMeta{
-      Name:      name,
-      Namespace: api.NamespaceValue(ctx),
+      Name:        name,
+      Namespace:   api.NamespaceValue(ctx),
+      Annotations: req.Annotations,
     },
     Type: req.Type,
     Data: vals,

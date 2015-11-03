@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/secret"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -117,6 +118,7 @@ type APIServer struct {
 	SSHKeyfile                 string
 	MaxConnectionBytesPerSec   int64
 	KubernetesServiceNodePort  int
+	SecretGenerators           string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -144,6 +146,7 @@ func NewAPIServer() *APIServer {
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
+		SecretGenerators: "kubernetes.io/password,kubernetes.io/sshkey",
 	}
 
 	return &s
@@ -266,6 +269,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", 0, "If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be of type NodePort, using this as the value of the port. If zero, the Kubernetes master service will be of type ClusterIP.")
 	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
 	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", true, "If true, server will do its best to fix the update request to pass the validation, e.g., setting empty UID in update request to its existing value. This flag can be turned off after we fix all the clients that send malformed updates.")
+	fs.StringVar(&s.SecretGenerators, "secret-generators", s.SecretGenerators, "List of plug-ins to do secret generation. Comma-delimited list of: "+strings.Join(secret.GetPlugins(), ", "))
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -534,6 +538,9 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}
 	}
+
+	secretGeneratorNames := strings.Split(s.SecretGenerators, ",")
+	secret.InitPlugins(secretGeneratorNames, "", client)
 
 	config := &master.Config{
 		StorageDestinations:       storageDestinations,

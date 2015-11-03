@@ -82,6 +82,7 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
+PUBLIC_API_HOST=${PUBLIC_API_HOST:-172.17.42.1}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
@@ -229,6 +230,7 @@ function start_apiserver {
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
+      --bind-address="${PUBLIC_API_HOST}" \
       --insecure-bind-address="${API_HOST}" \
       --insecure-port="${API_PORT}" \
       --etcd-servers="http://127.0.0.1:4001" \
