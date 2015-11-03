@@ -39,30 +39,42 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 		clientTLS              *tls.Config
 		serverConnectionHeader string
 		serverUpgradeHeader    string
+		serverStatusCode       int
 		shouldError            bool
 	}{
 		"no headers": {
 			serverFunc:             httptest.NewServer,
 			serverConnectionHeader: "",
 			serverUpgradeHeader:    "",
+			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            true,
 		},
 		"no upgrade header": {
 			serverFunc:             httptest.NewServer,
 			serverConnectionHeader: "Upgrade",
 			serverUpgradeHeader:    "",
+			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            true,
 		},
 		"no connection header": {
 			serverFunc:             httptest.NewServer,
 			serverConnectionHeader: "",
 			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            true,
+		},
+		"no switching protocol status code": {
+			serverFunc:             httptest.NewServer,
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusForbidden,
 			shouldError:            true,
 		},
 		"http": {
 			serverFunc:             httptest.NewServer,
 			serverConnectionHeader: "Upgrade",
 			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
 		"https (invalid hostname + InsecureSkipVerify)": {
@@ -81,6 +93,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			clientTLS:              &tls.Config{InsecureSkipVerify: true},
 			serverConnectionHeader: "Upgrade",
 			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
 		"https (valid hostname + RootCAs)": {
@@ -99,6 +112,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			clientTLS:              &tls.Config{RootCAs: localhostPool},
 			serverConnectionHeader: "Upgrade",
 			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
 	}
@@ -112,7 +126,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 				w.Header().Set(httpstream.HeaderConnection, testCase.serverConnectionHeader)
 				w.Header().Set(httpstream.HeaderUpgrade, testCase.serverUpgradeHeader)
-				w.WriteHeader(http.StatusSwitchingProtocols)
+				w.WriteHeader(testCase.serverStatusCode)
 
 				return
 			}
