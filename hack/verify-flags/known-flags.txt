@@ -172,10 +172,11 @@ mesos-authentication-secret-file
 mesos-cgroup-prefix
 mesos-executor-cpus
 mesos-executor-mem
+mesos-launch-grace-period
 mesos-master
 mesos-role
+mesos-sandbox-overlay
 mesos-user
-mesos-launch-grace-period
 minimum-container-ttl-duration
 minion-max-log-age
 minion-max-log-backups
@@ -300,4 +301,3 @@ retry_time
 file_content_in_loop
 cpu-cfs-quota
 terminated-pod-gc-threshold
-
