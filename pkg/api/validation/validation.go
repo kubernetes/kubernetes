@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
@@ -708,6 +709,15 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *api.PersistentVolume) errs.Val
 	allErrs := errs.ValidationErrorList{}
 	allErrs = ValidatePersistentVolume(newPv)
 	newPv.Status = oldPv.Status
+
+	// you cannot change the spec of a PV while it is in the bound state.  That would mean that the conditions that
+	// let to its binding may no longer be valid
+	if oldPv.Status.Phase == api.VolumeBound {
+		if !conversion.Equalities.DeepEqual(newPv.Spec, oldPv.Spec) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec", newPv.Spec, fmt.Sprintf("cannot change while in state: %q", api.VolumeBound)))
+		}
+	}
+
 	return allErrs
 }
 
