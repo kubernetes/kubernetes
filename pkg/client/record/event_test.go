@@ -19,10 +19,8 @@ package record
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"runtime"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -85,7 +83,7 @@ func OnPatchFactory(testCache map[string]*api.Event, patchEvent chan<- *api.Even
 	return func(event *api.Event, patch []byte) (*api.Event, error) {
 		cachedEvent, found := testCache[getEventKey(event)]
 		if !found {
-			return nil, fmt.Errorf("unexpected error: couldn't find Event in testCache. Try to find Event: %v", event)
+			return nil, fmt.Errorf("unexpected error: couldn't find Event in testCache.")
 		}
 		originalData, err := json.Marshal(cachedEvent)
 		if err != nil {
@@ -337,7 +335,7 @@ func TestEventf(t *testing.T) {
 
 	clock := &util.FakeClock{time.Now()}
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
-	for _, item := range table {
+	for index, item := range table {
 		clock.Step(1 * time.Second)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
@@ -353,50 +351,15 @@ func TestEventf(t *testing.T) {
 		// validate event
 		if item.expectUpdate {
 			actualEvent := <-patchEvent
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		}
 		logWatcher1.Stop()
 		logWatcher2.Stop()
 	}
 	sinkWatcher.Stop()
-}
-
-func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.T) (*api.Event, error) {
-	recvEvent := *actualEvent
-	expectCompression := expectedEvent.Count > 1
-	t.Logf("expectedEvent.Count is %d\n", expectedEvent.Count)
-	// Just check that the timestamp was set.
-	if recvEvent.FirstTimestamp.IsZero() || recvEvent.LastTimestamp.IsZero() {
-		t.Errorf("timestamp wasn't set: %#v", recvEvent)
-	}
-	actualFirstTimestamp := recvEvent.FirstTimestamp
-	actualLastTimestamp := recvEvent.LastTimestamp
-	if actualFirstTimestamp.Equal(actualLastTimestamp) {
-		if expectCompression {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, recvEvent)
-		}
-	} else {
-		if expectedEvent.Count == 1 {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, recvEvent)
-		}
-	}
-	// Temp clear time stamps for comparison because actual values don't matter for comparison
-	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
-	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
-	// Check that name has the right prefix.
-	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
-		t.Errorf("Name '%v' does not contain prefix '%v'", n, en)
-	}
-	recvEvent.Name = expectedEvent.Name
-	if e, a := expectedEvent, &recvEvent; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", util.ObjectGoPrintDiff(e, a))
-	}
-	recvEvent.FirstTimestamp = actualFirstTimestamp
-	recvEvent.LastTimestamp = actualLastTimestamp
-	return actualEvent, nil
 }
 
 func recorderWithFakeClock(eventSource api.EventSource, eventBroadcaster EventBroadcaster, clock util.Clock) EventRecorder {
@@ -520,7 +483,8 @@ func TestLotsOfEvents(t *testing.T) {
 		APIVersion: "version",
 	}
 	for i := 0; i < maxQueuedEvents; i++ {
-		go recorder.Eventf(ref, "Reason", strconv.Itoa(i))
+		// we need to vary the reason to prevent aggregation
+		go recorder.Eventf(ref, "Reason-"+string(i), strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
 	for i := 0; i < maxQueuedEvents; i++ {
@@ -605,7 +569,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	clock := &util.FakeClock{time.Now()}
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
-	for _, item := range table {
+	for index, item := range table {
 		clock.Step(1 * time.Second)
 		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
@@ -621,10 +585,10 @@ func TestEventfNoNamespace(t *testing.T) {
 		// validate event
 		if item.expectUpdate {
 			actualEvent := <-patchEvent
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		}
 
 		logWatcher1.Stop()
@@ -878,33 +842,33 @@ func TestMultiSinkCache(t *testing.T) {
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
-	for _, item := range table {
+	for index, item := range table {
 		clock.Step(1 * time.Second)
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		// validate event
 		if item.expectUpdate {
 			actualEvent := <-patchEvent
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		}
 	}
 
 	// Another StartRecordingToSink call should start to record events with new clean cache.
 	sinkWatcher2 := eventBroadcaster.StartRecordingToSink(&testEvents2)
-	for _, item := range table {
+	for index, item := range table {
 		clock.Step(1 * time.Second)
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		// validate event
 		if item.expectUpdate {
 			actualEvent := <-patchEvent2
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent2
-			validateEvent(actualEvent, item.expect, t)
+			validateEvent(string(index), actualEvent, item.expect, t)
 		}
 	}
 
