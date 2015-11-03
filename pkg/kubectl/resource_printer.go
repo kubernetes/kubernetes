@@ -1383,9 +1383,8 @@ func printDeploymentList(list *extensions.DeploymentList, w io.Writer, withNames
 func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	namespace := hpa.Namespace
 	name := hpa.Name
-	reference := fmt.Sprintf("%s/%s/%s/%s",
+	reference := fmt.Sprintf("%s/%s/%s",
 		hpa.Spec.ScaleRef.Kind,
-		hpa.Spec.ScaleRef.Namespace,
 		hpa.Spec.ScaleRef.Name,
 		hpa.Spec.ScaleRef.Subresource)
 	target := "<unset>"

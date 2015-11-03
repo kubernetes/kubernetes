@@ -1406,7 +1406,6 @@ func deepCopy_v1beta1_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversio
 
 func deepCopy_v1beta1_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
 	out.Kind = in.Kind
-	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
 	out.Subresource = in.Subresource

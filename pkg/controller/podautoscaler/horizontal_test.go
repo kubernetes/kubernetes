@@ -90,7 +90,6 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 						ScaleRef: extensions.SubresourceReference{
 							Kind:        "replicationController",
 							Name:        rcName,
-							Namespace:   namespace,
 							Subresource: "scale",
 						},
 						MinReplicas: &tc.minReplicas,
