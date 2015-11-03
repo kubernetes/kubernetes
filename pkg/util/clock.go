@@ -59,3 +59,20 @@ func (f *FakeClock) Since(ts time.Time) time.Duration {
 func (f *FakeClock) Step(d time.Duration) {
 	f.Time = f.Time.Add(d)
 }
+
+// IntervalClock implements Clock, but each invocation of Now steps the clock forward the specified duration
+type IntervalClock struct {
+	Time     time.Time
+	Duration time.Duration
+}
+
+// Now returns i's time.
+func (i *IntervalClock) Now() time.Time {
+	i.Time = i.Time.Add(i.Duration)
+	return i.Time
+}
+
+// Since returns time since the time in i.
+func (i *IntervalClock) Since(ts time.Time) time.Duration {
+	return i.Time.Sub(ts)
+}
