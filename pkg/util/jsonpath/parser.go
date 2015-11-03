@@ -63,8 +63,12 @@ func NewParser(name string) *Parser {
 // parseAction parsed the expression inside delimiter
 func parseAction(name, text string) (*Parser, error) {
 	p, err := Parse(name, fmt.Sprintf("%s%s%s", leftDelim, text, rightDelim))
+	// when error happens, p will be nil, so we need to return here
+	if err != nil {
+		return p, err
+	}
 	p.Root = p.Root.Nodes[0].(*ListNode)
-	return p, err
+	return p, nil
 }
 
 func (p *Parser) Parse(text string) error {
