@@ -169,6 +169,8 @@ type Spec struct {
 	Volume           *api.Volume
 	PersistentVolume *api.PersistentVolume
 	ReadOnly         bool
+	// used in CanSupport to tell a plugin to perform checks for existing binaries.
+	BypassBinaryChecks bool
 }
 
 // Name returns the name of either Volume or PersistentVolume, one of which must not be nil.

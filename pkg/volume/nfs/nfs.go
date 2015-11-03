@@ -89,6 +89,12 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	if (spec.Volume != nil && spec.Volume.NFS == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS == nil) {
 		return false
 	}
+
+	// PV Controller running in master may not have the required binaries.
+	if spec.BypassBinaryChecks {
+		return true
+	}
+
 	// see if /sbin/mount.nfs* is there
 	return hasNFSMount()
 }

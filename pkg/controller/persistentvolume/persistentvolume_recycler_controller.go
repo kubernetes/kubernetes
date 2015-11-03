@@ -129,6 +129,9 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	nextPhase := currentPhase
 
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
+	// checking for binaries when running in master may fail when the master
+	// is running in a container and/or is not configured like a node.
+	spec.BypassBinaryChecks = true
 	plugin, err := recycler.pluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		return fmt.Errorf("Could not find recyclable volume plugin for spec: %+v", err)
