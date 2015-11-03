@@ -55,7 +55,7 @@ func newTestCacher(client tools.EtcdClient) *storage.Cacher {
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
 		StopChannel:    util.NeverStop,
 	}
-	return storage.NewCacher(config)
+	return storage.NewCacherFromConfig(config)
 }
 
 func makeTestPod(name string) *api.Pod {
