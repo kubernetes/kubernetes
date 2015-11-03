@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package framework
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
+	mscheduler "github.com/mesos/mesos-go/scheduler"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
@@ -53,13 +54,12 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
-	mscheduler "github.com/mesos/mesos-go/scheduler"
 )
 
 type Framework interface {
 	mscheduler.Scheduler
 
-	Init(scheduler *Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
+	Init(sched types.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
 	Registration() <-chan struct{}
 	Offers() offers.Registry
 	LaunchTask(t *podtask.T) error
@@ -168,10 +168,10 @@ func New(config Config) Framework {
 	return k
 }
 
-func (k *framework) Init(scheduler *Scheduler, electedMaster proc.Process, mux *http.ServeMux) error {
+func (k *framework) Init(sched types.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error {
 	log.V(1).Infoln("initializing kubernetes mesos scheduler")
 
-	k.sched = scheduler
+	k.sched = sched
 	k.mux = mux
 	k.asRegisteredMaster = proc.DoerFunc(func(a proc.Action) <-chan error {
 		if !k.registered {

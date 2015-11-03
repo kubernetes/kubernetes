@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/errorhandler"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/podreconciler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/schedulerloop"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
@@ -43,7 +44,7 @@ import (
 // Scheduler implements types.Scheduler
 type Scheduler struct {
 	podReconciler podreconciler.PodReconciler
-	framework     Framework
+	framework     framework.Framework
 	loop          schedulerloop.SchedulerLoop
 
 	// unsafe state, needs to be guarded, especially changes to podtask.T objects
@@ -51,29 +52,29 @@ type Scheduler struct {
 	taskRegistry podtask.Registry
 }
 
-func NewScheduler(c *config.Config, framework Framework, podScheduler podschedulers.PodScheduler,
-	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, podsWatcher *cache.ListWatch) *Scheduler {
+func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
+	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, lw *cache.ListWatch) *Scheduler {
 
 	core := &Scheduler{
-		framework:    framework,
+		framework:    fw,
 		taskRegistry: podtask.NewInMemoryRegistry(),
 	}
 
 	// Watch and queue pods that need scheduling.
 	updates := make(chan queue.Entry, c.UpdatesBacklog)
 	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
-	reflector := cache.NewReflector(podsWatcher, &api.Pod{}, podUpdates, 0)
+	reflector := cache.NewReflector(lw, &api.Pod{}, podUpdates, 0)
 
 	q := queuer.New(podUpdates)
 
-	algorithm := algorithm.NewSchedulerAlgorithm(core, podUpdates, podScheduler)
+	algorithm := algorithm.NewSchedulerAlgorithm(core, podUpdates, ps)
 
 	podDeleter := deleter.NewDeleter(core, q)
 
 	core.podReconciler = podreconciler.NewPodReconciler(core, client, q, podDeleter)
 
 	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
-	errorHandler := errorhandler.NewErrorHandler(core, bo, q, podScheduler)
+	errorHandler := errorhandler.NewErrorHandler(core, bo, q, ps)
 
 	binder := binder.NewBinder(core)
 

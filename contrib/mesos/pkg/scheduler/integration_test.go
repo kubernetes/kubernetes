@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/schedulerloop"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
@@ -427,7 +428,7 @@ type lifecycleTest struct {
 	driver        *mmock.JoinableDriver
 	eventObs      *EventObserver
 	podsListWatch *MockPodsListWatch
-	framework     Framework
+	framework     framework.Framework
 	schedulerProc *ha.SchedulerProcess
 	scheduler     *Scheduler
 	t             *testing.T
@@ -455,7 +456,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		Version: testapi.Default.Version(),
 	})
 	c := *schedcfg.CreateDefaultConfig()
-	framework := New(Config{
+	framework := framework.New(framework.Config{
 		Executor:        ei,
 		Client:          client,
 		SchedulerConfig: c,
