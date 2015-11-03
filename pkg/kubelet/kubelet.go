@@ -106,9 +106,8 @@ const (
 	// system default DNS resolver configuration
 	ResolvConfDefault = "/etc/resolv.conf"
 
-	// Minimum period for performing global cleanup tasks, i.e., housekeeping
-	// will not be performed more than once per housekeepingMinimumPeriod.
-	housekeepingMinimumPeriod = time.Second * 2
+	// Period for performing global cleanup tasks.
+	housekeepingPeriod = time.Second * 2
 
 	etcHostsPath = "/etc/hosts"
 )
@@ -481,7 +480,6 @@ type Kubelet struct {
 	podWorkers    PodWorkers
 
 	resyncInterval time.Duration
-	resyncTicker   *time.Ticker
 	sourcesReady   SourcesReadyFn
 	// sourcesSeen records the sources seen by kubelet. This set is not thread
 	// safe and should only be access by the main kubelet syncloop goroutine.
@@ -2086,8 +2084,8 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	// The resyncTicker wakes up kubelet to checks if there are any pod workers
 	// that need to be sync'd. A one-second period is sufficient because the
 	// sync interval is defaulted to 10s.
-	kl.resyncTicker = time.NewTicker(time.Second)
-	var housekeepingTimestamp time.Time
+	syncTicker := time.NewTicker(time.Second)
+	housekeepingTicker := time.NewTicker(housekeepingPeriod)
 	for {
 		if !kl.containerRuntimeUp() {
 			time.Sleep(5 * time.Second)
@@ -2099,35 +2097,14 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 			glog.Infof("Skipping pod synchronization, network is not configured")
 			continue
 		}
-
-		// Make sure we sync first to receive the pods from the sources before
-		// performing housekeeping.
-		if !kl.syncLoopIteration(updates, handler) {
+		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C) {
 			break
-		}
-		// We don't want to perform housekeeping too often, so we set a minimum
-		// period for it. Housekeeping would be performed at least once every
-		// kl.resyncInterval, and *no* more than once every
-		// housekeepingMinimumPeriod.
-		// TODO (#13418): Investigate whether we can/should spawn a dedicated
-		// goroutine for housekeeping
-		if !kl.allSourcesReady() {
-			// If the sources aren't ready, skip housekeeping, as we may
-			// accidentally delete pods from unready sources.
-			glog.V(4).Infof("Skipping cleanup, sources aren't ready yet.")
-		} else if housekeepingTimestamp.IsZero() {
-			housekeepingTimestamp = time.Now()
-		} else if time.Since(housekeepingTimestamp) > housekeepingMinimumPeriod {
-			glog.V(4).Infof("SyncLoop (housekeeping)")
-			if err := handler.HandlePodCleanups(); err != nil {
-				glog.Errorf("Failed cleaning pods: %v", err)
-			}
-			housekeepingTimestamp = time.Now()
 		}
 	}
 }
 
-func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler SyncHandler) bool {
+func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler SyncHandler,
+	syncCh <-chan time.Time, housekeepingCh <-chan time.Time) bool {
 	kl.syncLoopMonitor.Store(time.Now())
 	select {
 	case u, open := <-updates:
@@ -2150,7 +2127,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
-	case <-kl.resyncTicker.C:
+	case <-syncCh:
 		podUIDs := kl.workQueue.GetWork()
 		var podsToSync []*api.Pod
 		for _, uid := range podUIDs {
@@ -2158,13 +2135,24 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 				podsToSync = append(podsToSync, pod)
 			}
 		}
-		glog.V(2).Infof("SyncLoop (SYNC): %d pods", len(podsToSync))
+		glog.V(2).Infof("SyncLoop (SYNC): %d pods", kubeletutil.FormatPodNames(podsToSync))
 		kl.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		// We only care about failures (signalling container death) here.
 		if update.Result == proberesults.Failure {
-			glog.V(1).Infof("SyncLoop (container unhealthy).")
+			glog.V(1).Infof("SyncLoop (container unhealthy): %q", kubeletutil.FormatPodName(update.Pod))
 			handler.HandlePodSyncs([]*api.Pod{update.Pod})
+		}
+	case <-housekeepingCh:
+		if !kl.allSourcesReady() {
+			// If the sources aren't ready, skip housekeeping, as we may
+			// accidentally delete pods from unready sources.
+			glog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
+		} else {
+			glog.V(4).Infof("SyncLoop (housekeeping)")
+			if err := handler.HandlePodCleanups(); err != nil {
+				glog.Errorf("Failed cleaning pods: %v", err)
+			}
 		}
 	}
 	kl.syncLoopMonitor.Store(time.Now())
