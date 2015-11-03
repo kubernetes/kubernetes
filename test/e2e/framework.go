@@ -119,6 +119,12 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 	return waitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
+// WaitForPodRunningSlow waits for the pod to run in the namespace.
+// It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
+func (f *Framework) WaitForPodRunningSlow(podName string) error {
+	return waitForPodRunningInNamespaceSlow(f.Client, podName, f.Namespace.Name)
+}
+
 // Runs the given pod and verifies that the output of exact container matches the desired output.
 func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
 	testContainerOutputInNamespace(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
