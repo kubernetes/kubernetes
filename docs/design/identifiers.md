@@ -19,8 +19,8 @@ If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/design/identifiers.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/design/identifiers.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
