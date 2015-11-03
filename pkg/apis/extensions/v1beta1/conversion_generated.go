@@ -3019,7 +3019,6 @@ func autoconvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference
 		defaulting.(func(*extensions.SubresourceReference))(in)
 	}
 	out.Kind = in.Kind
-	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
 	out.Subresource = in.Subresource
@@ -3983,7 +3982,6 @@ func autoconvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference
 		defaulting.(func(*SubresourceReference))(in)
 	}
 	out.Kind = in.Kind
-	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
 	out.Subresource = in.Subresource
