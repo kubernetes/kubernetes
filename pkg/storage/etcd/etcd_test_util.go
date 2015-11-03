@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 
 	"github.com/coreos/etcd/etcdserver"
@@ -154,4 +156,11 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		return nil
 	}
 	return server
+}
+
+// NewEtcdTestStorage creates a new storage.Interface and TestServer
+func NewEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*EtcdTestServer, storage.Interface) {
+	server := NewEtcdTestClientServer(t)
+	storage := NewEtcdStorage(server.client, codec, prefix)
+	return server, storage
 }
