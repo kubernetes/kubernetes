@@ -21,6 +21,8 @@ function build-kube-env {
   local master=$1
   local file=$2
 
+  build-runtime-config
+
   rm -f ${file}
   # TODO(dawnchen): master node is still running with debian image
   if [[ "${master}" == "true" ]]; then
