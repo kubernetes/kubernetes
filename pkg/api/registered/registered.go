@@ -35,6 +35,7 @@ func init() {
 		"v1":                       true,
 		"extensions/v1beta1":       true,
 		"componentconfig/v1alpha1": true,
+		"metrics/v1alpha1":         true,
 	}
 
 	// The default list of supported api versions, in order of most preferred to the least.
