@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -48,7 +48,7 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 	version, err := strconv.ParseUint(resourceVersion, 10, 64)
 	if err != nil {
 		// TODO: Does this need to be a ValidationErrorList?  I can't convince myself it does.
-		return 0, errors.NewInvalid(kind, "", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("resourceVersion", resourceVersion, err.Error())})
+		return 0, errors.NewInvalid(kind, "", utilvalidation.ValidationErrorList{utilvalidation.NewFieldInvalid("resourceVersion", resourceVersion, err.Error())})
 	}
 	return version + 1, nil
 }

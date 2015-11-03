@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	errors "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 func TestValidateHorizontalPodAutoscaler(t *testing.T) {
@@ -675,7 +675,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(*errors.ValidationError).Field
+			field := errs[i].(*validation.ValidationError).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
 				field != "metadata.name" &&
 				field != "metadata.namespace" &&
@@ -918,7 +918,7 @@ func TestValidateJob(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		} else {
 			s := strings.Split(k, ":")
-			err := errs[0].(*errors.ValidationError)
+			err := errs[0].(*validation.ValidationError)
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
 			}
@@ -1019,7 +1019,7 @@ func TestValidateIngress(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		} else {
 			s := strings.Split(k, ":")
-			err := errs[0].(*errors.ValidationError)
+			err := errs[0].(*validation.ValidationError)
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
 			}
@@ -1111,7 +1111,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		} else {
 			s := strings.Split(k, ":")
-			err := errs[0].(*errors.ValidationError)
+			err := errs[0].(*validation.ValidationError)
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
 			}

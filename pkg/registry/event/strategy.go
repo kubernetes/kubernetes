@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 type eventStrategy struct {
@@ -48,7 +48,7 @@ func (eventStrategy) PrepareForCreate(obj runtime.Object) {
 func (eventStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)
 }
@@ -61,7 +61,7 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (eventStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (eventStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)
 }

@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -42,7 +42,7 @@ type RESTCreateStrategy interface {
 	PrepareForCreate(obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.  This method should not mutate the object.
-	Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList
+	Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
 	// object has been persisted.  This method may mutate the object.
 	Canonicalize(obj runtime.Object)

@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 )
@@ -42,7 +42,7 @@ func TestCompatibility(
 	t *testing.T,
 	version string,
 	input []byte,
-	validator func(obj runtime.Object) fielderrors.ValidationErrorList,
+	validator func(obj runtime.Object) validation.ValidationErrorList,
 	expectedKeys map[string]string,
 	absentKeys []string,
 ) {

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
@@ -48,7 +48,7 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
 	pv.Status = api.PersistentVolumeClaimStatus{}
 }
 
-func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	return validation.ValidatePersistentVolumeClaim(pvc)
 }
@@ -68,7 +68,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPvc.Status = oldPvc.Status
 }
 
-func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
 }
@@ -90,7 +90,7 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Obj
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 

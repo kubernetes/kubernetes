@@ -18,20 +18,19 @@ package validation
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // ValidateEvent makes sure that the event makes sense.
-func ValidateEvent(event *api.Event) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
+func ValidateEvent(event *api.Event) validation.ValidationErrorList {
+	allErrs := validation.ValidationErrorList{}
 	// TODO: There is no namespace required for node.
 	if event.InvolvedObject.Kind != "Node" &&
 		event.Namespace != event.InvolvedObject.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
+		allErrs = append(allErrs, validation.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
 	}
 	if !validation.IsDNS1123Subdomain(event.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", event.Namespace, ""))
+		allErrs = append(allErrs, validation.NewFieldInvalid("namespace", event.Namespace, ""))
 	}
 	return allErrs
 }

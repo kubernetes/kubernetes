@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -58,7 +58,7 @@ func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new job.
-func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
 	job := obj.(*extensions.Job)
 	return validation.ValidateJob(job)
 }
@@ -77,7 +77,7 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*extensions.Job))
 	updateErrorList := validation.ValidateJobUpdate(obj.(*extensions.Job), old.(*extensions.Job))
 	return append(validationErrorList, updateErrorList...)
@@ -95,7 +95,7 @@ func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newJob.Spec = oldJob.Spec
 }
 
-func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*extensions.Job), old.(*extensions.Job))
 }
 

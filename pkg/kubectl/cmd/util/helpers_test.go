@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 func TestMerge(t *testing.T) {
@@ -274,15 +274,15 @@ func TestCheckInvalidErr(t *testing.T) {
 		expected string
 	}{
 		{
-			errors.NewInvalid("Invalid1", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "single", "details")}),
+			errors.NewInvalid("Invalid1", "invalidation", validation.ValidationErrorList{validation.NewFieldInvalid("Cause", "single", "details")}),
 			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single', Details: details`,
 		},
 		{
-			errors.NewInvalid("Invalid2", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "multi1", "details"), fielderrors.NewFieldInvalid("Cause", "multi2", "details")}),
+			errors.NewInvalid("Invalid2", "invalidation", validation.ValidationErrorList{validation.NewFieldInvalid("Cause", "multi1", "details"), validation.NewFieldInvalid("Cause", "multi2", "details")}),
 			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1', Details: details, Cause: invalid value 'multi2', Details: details]`,
 		},
 		{
-			errors.NewInvalid("Invalid3", "invalidation", fielderrors.ValidationErrorList{}),
+			errors.NewInvalid("Invalid3", "invalidation", validation.ValidationErrorList{}),
 			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
 		},
 	}
