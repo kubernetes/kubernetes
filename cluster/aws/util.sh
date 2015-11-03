@@ -189,6 +189,7 @@ function query-running-minions () {
            --filters Name=instance-state-name,Values=running \
                      Name=vpc-id,Values=${VPC_ID} \
                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                     Name=tag:aws:autoscaling:groupName,Values=${ASG_NAME} \
                      Name=tag:Role,Values=${MINION_TAG} \
            --query ${query}
 }
