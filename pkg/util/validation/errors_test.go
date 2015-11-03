@@ -105,18 +105,6 @@ func TestErrListFilter(t *testing.T) {
 	if len(list.Filter(NewErrorTypeMatcher(ErrorTypeInvalid))) != 1 {
 		t.Errorf("should filter")
 	}
-	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("test"))) != 1 {
-		t.Errorf("should filter")
-	}
-	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("test."))) != 2 {
-		t.Errorf("should filter")
-	}
-	if len(list.Filter(NewValidationErrorFieldPrefixMatcher(""))) != 0 {
-		t.Errorf("should filter")
-	}
-	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("field."), NewErrorTypeMatcher(ErrorTypeDuplicate))) != 1 {
-		t.Errorf("should filter")
-	}
 }
 
 func TestErrListPrefix(t *testing.T) {
