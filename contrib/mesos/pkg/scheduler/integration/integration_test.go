@@ -40,7 +40,6 @@ import (
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	mmock "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/mock"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
@@ -427,7 +426,7 @@ type LaunchedTask struct {
 
 type lifecycleTest struct {
 	apiServer     *TestServer
-	driver        *mmock.JoinableDriver
+	driver        *framework.JoinableDriver
 	eventObs      *EventObserver
 	podsListWatch *MockPodsListWatch
 	framework     framework.Framework
@@ -458,7 +457,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		Version: testapi.Default.Version(),
 	})
 	c := *schedcfg.CreateDefaultConfig()
-	framework := framework.New(framework.Config{
+	fw := framework.New(framework.Config{
 		Executor:        ei,
 		Client:          client,
 		SchedulerConfig: c,
@@ -484,22 +483,22 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	fcfs := podschedulers.NewFCFSPodScheduler(strategy, apiServer.LookupNode)
 
 	// create scheduler process
-	schedulerProc := ha.New(framework)
+	schedulerProc := ha.New(fw)
 
 	// create scheduler
 	eventObs := NewEventObserver()
-	scheduler := components.NewScheduler(&c, framework, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	scheduler := components.NewScheduler(&c, fw, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(scheduler)
 
 	// create mock mesos scheduler driver
-	driver := &mmock.JoinableDriver{}
+	driver := &framework.JoinableDriver{}
 
 	return lifecycleTest{
 		apiServer:     apiServer,
 		driver:        driver,
 		eventObs:      eventObs,
 		podsListWatch: podsListWatch,
-		framework:     framework,
+		framework:     fw,
 		schedulerProc: schedulerProc,
 		sched:         scheduler,
 		t:             t,

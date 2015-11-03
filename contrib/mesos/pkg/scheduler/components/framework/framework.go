@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -90,7 +89,7 @@ type framework struct {
 	registration   chan struct{} // signal chan that closes upon first successful registration
 	onRegistration sync.Once
 	offers         offers.Registry
-	slaveHostNames *slave.Registry
+	slaveHostNames *slaveRegistry
 
 	// via deferred init
 	tasksReconciler    taskreconciler.TasksReconciler
@@ -157,7 +156,7 @@ func New(config Config) Framework {
 			TTL:           config.SchedulerConfig.OfferTTL.Duration,
 			ListenerDelay: config.SchedulerConfig.ListenerDelay.Duration,
 		}),
-		slaveHostNames:    slave.NewRegistry(),
+		slaveHostNames:    newSlaveRegistry(),
 		reconcileCooldown: config.ReconcileCooldown,
 		registration:      make(chan struct{}),
 		asRegisteredMaster: proc.DoerFunc(func(proc.Action) <-chan error {

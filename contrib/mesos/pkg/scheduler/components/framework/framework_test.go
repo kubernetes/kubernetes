@@ -25,11 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
-	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/mock"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
+	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -108,7 +106,7 @@ func TestResourceOffer_Add(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames:  slave.NewRegistry(),
+		slaveHostNames:  newSlaveRegistry(),
 		nodeRegistrator: registrator,
 		sched:           mockScheduler(),
 	}
@@ -154,7 +152,7 @@ func TestResourceOffer_Add_Rescind(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: slave.NewRegistry(),
+		slaveHostNames: newSlaveRegistry(),
 		sched:          mockScheduler(),
 	}
 
@@ -208,7 +206,7 @@ func TestSlave_Lost(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: slave.NewRegistry(),
+		slaveHostNames: newSlaveRegistry(),
 		sched:          mockScheduler(),
 	}
 
@@ -266,7 +264,7 @@ func TestDisconnect(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: slave.NewRegistry(),
+		slaveHostNames: newSlaveRegistry(),
 		sched:          mockScheduler(),
 	}
 
@@ -296,7 +294,7 @@ func TestDisconnect(t *testing.T) {
 //test we can handle different status updates, TODO check state transitions
 func TestStatus_Update(t *testing.T) {
 
-	mockdriver := mock.MockSchedulerDriver{}
+	mockdriver := MockSchedulerDriver{}
 	// setup expectations
 	mockdriver.On("KillTask", util.NewTaskID("test-task-001")).Return(mesos.Status_DRIVER_RUNNING, nil)
 
@@ -310,7 +308,7 @@ func TestStatus_Update(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: slave.NewRegistry(),
+		slaveHostNames: newSlaveRegistry(),
 		driver:         &mockdriver,
 		sched:          mockScheduler(),
 	}
