@@ -122,6 +122,9 @@ __custom_func() {
    * persistentvolumeclaims (aka 'pvc')
    * limitranges (aka 'limits')
    * resourcequotas (aka 'quota')
+   * componentstatuses (aka 'cs')
+   * endpoints (aka 'ep')
+   * quota
 `
 )
 
