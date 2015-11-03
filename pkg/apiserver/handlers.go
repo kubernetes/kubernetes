@@ -40,11 +40,10 @@ import (
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
 // TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
 // master's Mux.
-var specialVerbs = map[string]bool{
-	"proxy":    true,
-	"redirect": true,
-	"watch":    true,
-}
+var specialVerbs = sets.NewString("proxy", "redirect", "watch")
+
+// specialVerbsNoSubresources contains root verbs which do not allow subresources
+var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
 
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
@@ -436,11 +435,13 @@ type RequestInfoResolver struct {
 // /api/{version}/{resource}
 // /api/{version}/{resource}/{resourceName}
 //
-// Special verbs:
+// Special verbs without subresources:
 // /api/{version}/proxy/{resource}/{resourceName}
 // /api/{version}/proxy/namespaces/{namespace}/{resource}/{resourceName}
 // /api/{version}/redirect/namespaces/{namespace}/{resource}/{resourceName}
 // /api/{version}/redirect/{resource}/{resourceName}
+//
+// Special verbs with subresources:
 // /api/{version}/watch/{resource}
 // /api/{version}/watch/namespaces/{namespace}/{resource}
 //
@@ -489,7 +490,7 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	currentParts = currentParts[1:]
 
 	// handle input of form /{specialVerb}/*
-	if _, ok := specialVerbs[currentParts[0]]; ok {
+	if specialVerbs.Has(currentParts[0]) {
 		if len(currentParts) < 2 {
 			return requestInfo, fmt.Errorf("unable to determine kind and namespace from url, %v", req.URL)
 		}
@@ -534,13 +535,13 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 
 	// parts look like: resource/resourceName/subresource/other/stuff/we/don't/interpret
 	switch {
-	case len(requestInfo.Parts) >= 3:
+	case len(requestInfo.Parts) >= 3 && !specialVerbsNoSubresources.Has(requestInfo.Verb):
 		requestInfo.Subresource = requestInfo.Parts[2]
 		fallthrough
-	case len(requestInfo.Parts) == 2:
+	case len(requestInfo.Parts) >= 2:
 		requestInfo.Name = requestInfo.Parts[1]
 		fallthrough
-	case len(requestInfo.Parts) == 1:
+	case len(requestInfo.Parts) >= 1:
 		requestInfo.Resource = requestInfo.Parts[0]
 	}
 
