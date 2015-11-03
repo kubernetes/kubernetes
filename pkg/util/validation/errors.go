@@ -25,52 +25,52 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-// ValidationErrorType is a machine readable value providing more detail about why
+// ErrorType is a machine readable value providing more detail about why
 // a field is invalid.  These values are expected to match 1-1 with
 // CauseType in api/types.go.
-type ValidationErrorType string
+type ErrorType string
 
 // TODO: These values are duplicated in api/types.go, but there's a circular dep.  Fix it.
 const (
-	// ValidationErrorTypeNotFound is used to report failure to find a requested value
+	// ErrorType is used to report failure to find a requested value
 	// (e.g. looking up an ID).
-	ValidationErrorTypeNotFound ValidationErrorType = "FieldValueNotFound"
-	// ValidationErrorTypeRequired is used to report required values that are not
+	ErrorTypeNotFound ErrorType = "FieldValueNotFound"
+	// ErrorTypeRequired is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).
-	ValidationErrorTypeRequired ValidationErrorType = "FieldValueRequired"
-	// ValidationErrorTypeDuplicate is used to report collisions of values that must be
+	ErrorTypeRequired ErrorType = "FieldValueRequired"
+	// ErrorTypeDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).
-	ValidationErrorTypeDuplicate ValidationErrorType = "FieldValueDuplicate"
-	// ValidationErrorTypeInvalid is used to report malformed values (e.g. failed regex
+	ErrorTypeDuplicate ErrorType = "FieldValueDuplicate"
+	// ErrorTypeInvalid is used to report malformed values (e.g. failed regex
 	// match).
-	ValidationErrorTypeInvalid ValidationErrorType = "FieldValueInvalid"
-	// ValidationErrorTypeNotSupported is used to report valid (as per formatting rules)
+	ErrorTypeInvalid ErrorType = "FieldValueInvalid"
+	// ErrorTypeNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
-	ValidationErrorTypeNotSupported ValidationErrorType = "FieldValueNotSupported"
-	// ValidationErrorTypeForbidden is used to report valid (as per formatting rules)
+	ErrorTypeNotSupported ErrorType = "FieldValueNotSupported"
+	// ErrorTypeForbidden is used to report valid (as per formatting rules)
 	// values which would be accepted by some api instances, but which would invoke behavior
 	// not permitted by this api instance (such as due to stricter security policy).
-	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
-	// ValidationErrorTypeTooLong is used to report that given value is too long.
-	ValidationErrorTypeTooLong ValidationErrorType = "FieldValueTooLong"
+	ErrorTypeForbidden ErrorType = "FieldValueForbidden"
+	// ErrorTypeTooLong is used to report that given value is too long.
+	ErrorTypeTooLong ErrorType = "FieldValueTooLong"
 )
 
-// String converts a ValidationErrorType into its corresponding error message.
-func (t ValidationErrorType) String() string {
+// String converts a ErrorType into its corresponding error message.
+func (t ErrorType) String() string {
 	switch t {
-	case ValidationErrorTypeNotFound:
+	case ErrorTypeNotFound:
 		return "not found"
-	case ValidationErrorTypeRequired:
+	case ErrorTypeRequired:
 		return "required value"
-	case ValidationErrorTypeDuplicate:
+	case ErrorTypeDuplicate:
 		return "duplicate value"
-	case ValidationErrorTypeInvalid:
+	case ErrorTypeInvalid:
 		return "invalid value"
-	case ValidationErrorTypeNotSupported:
+	case ErrorTypeNotSupported:
 		return "unsupported value"
-	case ValidationErrorTypeForbidden:
+	case ErrorTypeForbidden:
 		return "forbidden"
-	case ValidationErrorTypeTooLong:
+	case ErrorTypeTooLong:
 		return "too long"
 	default:
 		panic(fmt.Sprintf("unrecognized validation type: %#v", t))
@@ -80,7 +80,7 @@ func (t ValidationErrorType) String() string {
 
 // ValidationError is an implementation of the 'error' interface, which represents an error of validation.
 type ValidationError struct {
-	Type     ValidationErrorType
+	Type     ErrorType
 	Field    string
 	BadValue interface{}
 	Detail   string
@@ -95,7 +95,7 @@ func (v *ValidationError) Error() string {
 func (v *ValidationError) ErrorBody() string {
 	var s string
 	switch v.Type {
-	case ValidationErrorTypeRequired, ValidationErrorTypeTooLong:
+	case ErrorTypeRequired, ErrorTypeTooLong:
 		s = spew.Sprintf("%s", v.Type)
 	default:
 		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
@@ -108,12 +108,12 @@ func (v *ValidationError) ErrorBody() string {
 
 // NewFieldRequired returns a *ValidationError indicating "value required"
 func NewFieldRequired(field string) *ValidationError {
-	return &ValidationError{ValidationErrorTypeRequired, field, "", ""}
+	return &ValidationError{ErrorTypeRequired, field, "", ""}
 }
 
 // NewFieldInvalid returns a *ValidationError indicating "invalid value"
 func NewFieldInvalid(field string, value interface{}, detail string) *ValidationError {
-	return &ValidationError{ValidationErrorTypeInvalid, field, value, detail}
+	return &ValidationError{ErrorTypeInvalid, field, value, detail}
 }
 
 // NewFieldValueNotSupported returns a *ValidationError indicating "unsupported value"
@@ -122,26 +122,26 @@ func NewFieldValueNotSupported(field string, value interface{}, validValues []st
 	if validValues != nil && len(validValues) > 0 {
 		detail = "supported values: " + strings.Join(validValues, ", ")
 	}
-	return &ValidationError{ValidationErrorTypeNotSupported, field, value, detail}
+	return &ValidationError{ErrorTypeNotSupported, field, value, detail}
 }
 
 // NewFieldForbidden returns a *ValidationError indicating "forbidden"
 func NewFieldForbidden(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeForbidden, field, value, ""}
+	return &ValidationError{ErrorTypeForbidden, field, value, ""}
 }
 
 // NewFieldDuplicate returns a *ValidationError indicating "duplicate value"
 func NewFieldDuplicate(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeDuplicate, field, value, ""}
+	return &ValidationError{ErrorTypeDuplicate, field, value, ""}
 }
 
 // NewFieldNotFound returns a *ValidationError indicating "value not found"
 func NewFieldNotFound(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeNotFound, field, value, ""}
+	return &ValidationError{ErrorTypeNotFound, field, value, ""}
 }
 
 func NewFieldTooLong(field string, value interface{}, maxLength int) *ValidationError {
-	return &ValidationError{ValidationErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
+	return &ValidationError{ErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 
 type ValidationErrorList []error
@@ -173,8 +173,8 @@ func (list ValidationErrorList) PrefixIndex(index int) ValidationErrorList {
 }
 
 // NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
-// if the provided error is a ValidationError and has the provided ValidationErrorType.
-func NewValidationErrorTypeMatcher(t ValidationErrorType) utilerrors.Matcher {
+// if the provided error is a ValidationError and has the provided ErrorType.
+func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 	return func(err error) bool {
 		if e, ok := err.(*ValidationError); ok {
 			return e.Type == t

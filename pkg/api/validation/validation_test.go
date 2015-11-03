@@ -536,30 +536,30 @@ func TestValidateVolumes(t *testing.T) {
 	slashInName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "foo/bar"}}
 	errorCases := map[string]struct {
 		V []api.Volume
-		T validation.ValidationErrorType
+		T validation.ErrorType
 		F string
 		D string
 	}{
-		"zero-length name":           {[]api.Volume{{Name: "", VolumeSource: emptyVS}}, validation.ValidationErrorTypeRequired, "[0].name", ""},
-		"name > 63 characters":       {[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}}, validation.ValidationErrorTypeInvalid, "[0].name", "must be a DNS label (at most 63 characters, matching regex [a-z0-9]([-a-z0-9]*[a-z0-9])?): e.g. \"my-name\""},
-		"name not a DNS label":       {[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}}, validation.ValidationErrorTypeInvalid, "[0].name", "must be a DNS label (at most 63 characters, matching regex [a-z0-9]([-a-z0-9]*[a-z0-9])?): e.g. \"my-name\""},
-		"name not unique":            {[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}}, validation.ValidationErrorTypeDuplicate, "[1].name", ""},
-		"empty portal":               {[]api.Volume{{Name: "badportal", VolumeSource: emptyPortal}}, validation.ValidationErrorTypeRequired, "[0].source.iscsi.targetPortal", ""},
-		"empty iqn":                  {[]api.Volume{{Name: "badiqn", VolumeSource: emptyIQN}}, validation.ValidationErrorTypeRequired, "[0].source.iscsi.iqn", ""},
-		"empty hosts":                {[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}}, validation.ValidationErrorTypeRequired, "[0].source.glusterfs.endpoints", ""},
-		"empty path":                 {[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}}, validation.ValidationErrorTypeRequired, "[0].source.glusterfs.path", ""},
-		"empty datasetName":          {[]api.Volume{{Name: "badname", VolumeSource: emptyName}}, validation.ValidationErrorTypeRequired, "[0].source.flocker.datasetName", ""},
-		"empty mon":                  {[]api.Volume{{Name: "badmon", VolumeSource: emptyMon}}, validation.ValidationErrorTypeRequired, "[0].source.rbd.monitors", ""},
-		"empty image":                {[]api.Volume{{Name: "badimage", VolumeSource: emptyImage}}, validation.ValidationErrorTypeRequired, "[0].source.rbd.image", ""},
-		"empty cephfs mon":           {[]api.Volume{{Name: "badmon", VolumeSource: emptyCephFSMon}}, validation.ValidationErrorTypeRequired, "[0].source.cephfs.monitors", ""},
-		"empty metatada path":        {[]api.Volume{{Name: "emptyname", VolumeSource: emptyPathName}}, validation.ValidationErrorTypeRequired, "[0].source.downwardApi.path", ""},
-		"absolute path":              {[]api.Volume{{Name: "absolutepath", VolumeSource: absolutePathName}}, validation.ValidationErrorTypeForbidden, "[0].source.downwardApi.path", ""},
-		"dot dot path":               {[]api.Volume{{Name: "dotdotpath", VolumeSource: dotDotInPath}}, validation.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not contain \"..\"."},
-		"dot dot file name":          {[]api.Volume{{Name: "dotdotfilename", VolumeSource: dotDotPathName}}, validation.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
-		"dot dot first level dirent": {[]api.Volume{{Name: "dotdotdirfilename", VolumeSource: dotDotFirstLevelDirent}}, validation.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
-		"empty wwn":                  {[]api.Volume{{Name: "badimage", VolumeSource: zeroWWN}}, validation.ValidationErrorTypeRequired, "[0].source.fc.targetWWNs", ""},
-		"empty lun":                  {[]api.Volume{{Name: "badimage", VolumeSource: emptyLun}}, validation.ValidationErrorTypeRequired, "[0].source.fc.lun", ""},
-		"slash in datasetName":       {[]api.Volume{{Name: "slashinname", VolumeSource: slashInName}}, validation.ValidationErrorTypeInvalid, "[0].source.flocker.datasetName", "must not contain '/'"},
+		"zero-length name":           {[]api.Volume{{Name: "", VolumeSource: emptyVS}}, validation.ErrorTypeRequired, "[0].name", ""},
+		"name > 63 characters":       {[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}}, validation.ErrorTypeInvalid, "[0].name", "must be a DNS label (at most 63 characters, matching regex [a-z0-9]([-a-z0-9]*[a-z0-9])?): e.g. \"my-name\""},
+		"name not a DNS label":       {[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}}, validation.ErrorTypeInvalid, "[0].name", "must be a DNS label (at most 63 characters, matching regex [a-z0-9]([-a-z0-9]*[a-z0-9])?): e.g. \"my-name\""},
+		"name not unique":            {[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}}, validation.ErrorTypeDuplicate, "[1].name", ""},
+		"empty portal":               {[]api.Volume{{Name: "badportal", VolumeSource: emptyPortal}}, validation.ErrorTypeRequired, "[0].source.iscsi.targetPortal", ""},
+		"empty iqn":                  {[]api.Volume{{Name: "badiqn", VolumeSource: emptyIQN}}, validation.ErrorTypeRequired, "[0].source.iscsi.iqn", ""},
+		"empty hosts":                {[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}}, validation.ErrorTypeRequired, "[0].source.glusterfs.endpoints", ""},
+		"empty path":                 {[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}}, validation.ErrorTypeRequired, "[0].source.glusterfs.path", ""},
+		"empty datasetName":          {[]api.Volume{{Name: "badname", VolumeSource: emptyName}}, validation.ErrorTypeRequired, "[0].source.flocker.datasetName", ""},
+		"empty mon":                  {[]api.Volume{{Name: "badmon", VolumeSource: emptyMon}}, validation.ErrorTypeRequired, "[0].source.rbd.monitors", ""},
+		"empty image":                {[]api.Volume{{Name: "badimage", VolumeSource: emptyImage}}, validation.ErrorTypeRequired, "[0].source.rbd.image", ""},
+		"empty cephfs mon":           {[]api.Volume{{Name: "badmon", VolumeSource: emptyCephFSMon}}, validation.ErrorTypeRequired, "[0].source.cephfs.monitors", ""},
+		"empty metatada path":        {[]api.Volume{{Name: "emptyname", VolumeSource: emptyPathName}}, validation.ErrorTypeRequired, "[0].source.downwardApi.path", ""},
+		"absolute path":              {[]api.Volume{{Name: "absolutepath", VolumeSource: absolutePathName}}, validation.ErrorTypeForbidden, "[0].source.downwardApi.path", ""},
+		"dot dot path":               {[]api.Volume{{Name: "dotdotpath", VolumeSource: dotDotInPath}}, validation.ErrorTypeInvalid, "[0].source.downwardApi.path", "must not contain \"..\"."},
+		"dot dot file name":          {[]api.Volume{{Name: "dotdotfilename", VolumeSource: dotDotPathName}}, validation.ErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
+		"dot dot first level dirent": {[]api.Volume{{Name: "dotdotdirfilename", VolumeSource: dotDotFirstLevelDirent}}, validation.ErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
+		"empty wwn":                  {[]api.Volume{{Name: "badimage", VolumeSource: zeroWWN}}, validation.ErrorTypeRequired, "[0].source.fc.targetWWNs", ""},
+		"empty lun":                  {[]api.Volume{{Name: "badimage", VolumeSource: emptyLun}}, validation.ErrorTypeRequired, "[0].source.fc.lun", ""},
+		"slash in datasetName":       {[]api.Volume{{Name: "slashinname", VolumeSource: slashInName}}, validation.ErrorTypeInvalid, "[0].source.flocker.datasetName", "must not contain '/'"},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
@@ -603,23 +603,23 @@ func TestValidatePorts(t *testing.T) {
 
 	errorCases := map[string]struct {
 		P []api.ContainerPort
-		T validation.ValidationErrorType
+		T validation.ErrorType
 		F string
 		D string
 	}{
-		"name > 15 characters":                     {[]api.ContainerPort{{Name: strings.Repeat("a", 16), ContainerPort: 80, Protocol: "TCP"}}, validation.ValidationErrorTypeInvalid, "[0].name", PortNameErrorMsg},
-		"name not a IANA svc name ":                {[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, validation.ValidationErrorTypeInvalid, "[0].name", PortNameErrorMsg},
-		"name not a IANA svc name (i.e. a number)": {[]api.ContainerPort{{Name: "80", ContainerPort: 80, Protocol: "TCP"}}, validation.ValidationErrorTypeInvalid, "[0].name", PortNameErrorMsg},
+		"name > 15 characters":                     {[]api.ContainerPort{{Name: strings.Repeat("a", 16), ContainerPort: 80, Protocol: "TCP"}}, validation.ErrorTypeInvalid, "[0].name", PortNameErrorMsg},
+		"name not a IANA svc name ":                {[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, validation.ErrorTypeInvalid, "[0].name", PortNameErrorMsg},
+		"name not a IANA svc name (i.e. a number)": {[]api.ContainerPort{{Name: "80", ContainerPort: 80, Protocol: "TCP"}}, validation.ErrorTypeInvalid, "[0].name", PortNameErrorMsg},
 		"name not unique": {[]api.ContainerPort{
 			{Name: "abc", ContainerPort: 80, Protocol: "TCP"},
 			{Name: "abc", ContainerPort: 81, Protocol: "TCP"},
-		}, validation.ValidationErrorTypeDuplicate, "[1].name", ""},
-		"zero container port":    {[]api.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}}, validation.ValidationErrorTypeInvalid, "[0].containerPort", PortRangeErrorMsg},
-		"invalid container port": {[]api.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}}, validation.ValidationErrorTypeInvalid, "[0].containerPort", PortRangeErrorMsg},
-		"invalid host port":      {[]api.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, validation.ValidationErrorTypeInvalid, "[0].hostPort", PortRangeErrorMsg},
-		"invalid protocol case":  {[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}}, validation.ValidationErrorTypeNotSupported, "[0].protocol", "supported values: TCP, UDP"},
-		"invalid protocol":       {[]api.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}}, validation.ValidationErrorTypeNotSupported, "[0].protocol", "supported values: TCP, UDP"},
-		"protocol required":      {[]api.ContainerPort{{Name: "abc", ContainerPort: 80}}, validation.ValidationErrorTypeRequired, "[0].protocol", ""},
+		}, validation.ErrorTypeDuplicate, "[1].name", ""},
+		"zero container port":    {[]api.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}}, validation.ErrorTypeInvalid, "[0].containerPort", PortRangeErrorMsg},
+		"invalid container port": {[]api.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}}, validation.ErrorTypeInvalid, "[0].containerPort", PortRangeErrorMsg},
+		"invalid host port":      {[]api.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, validation.ErrorTypeInvalid, "[0].hostPort", PortRangeErrorMsg},
+		"invalid protocol case":  {[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}}, validation.ErrorTypeNotSupported, "[0].protocol", "supported values: TCP, UDP"},
+		"invalid protocol":       {[]api.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}}, validation.ErrorTypeNotSupported, "[0].protocol", "supported values: TCP, UDP"},
+		"protocol required":      {[]api.ContainerPort{{Name: "abc", ContainerPort: 80}}, validation.ErrorTypeRequired, "[0].protocol", ""},
 	}
 	for k, v := range errorCases {
 		errs := validatePorts(v.P)
@@ -3764,7 +3764,7 @@ func TestValidateEndpoints(t *testing.T) {
 
 	errorCases := map[string]struct {
 		endpoints   api.Endpoints
-		errorType   validation.ValidationErrorType
+		errorType   validation.ErrorType
 		errorDetail string
 	}{
 		"missing namespace": {
@@ -4002,7 +4002,7 @@ func TestValidateSecurityContext(t *testing.T) {
 
 	errorCases := map[string]struct {
 		sc          *api.SecurityContext
-		errorType   validation.ValidationErrorType
+		errorType   validation.ErrorType
 		errorDetail string
 	}{
 		"request privileged when capabilities forbids": {
