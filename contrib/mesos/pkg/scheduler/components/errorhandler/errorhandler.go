@@ -21,11 +21,11 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
-	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -35,13 +35,13 @@ type ErrorHandler interface {
 }
 
 type errorHandler struct {
-	sched        types.Scheduler
+	sched        scheduler.Scheduler
 	backoff      *backoff.Backoff
 	qr           *queuer.Queuer
 	podScheduler podschedulers.PodScheduler
 }
 
-func NewErrorHandler(sched types.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) ErrorHandler {
+func NewErrorHandler(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) ErrorHandler {
 	return &errorHandler{
 		sched:        sched,
 		backoff:      backoff,

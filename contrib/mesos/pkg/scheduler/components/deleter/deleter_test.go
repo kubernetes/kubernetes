@@ -24,7 +24,7 @@ import (
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
-	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
+	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/api"
 )
 

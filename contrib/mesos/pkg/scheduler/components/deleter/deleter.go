@@ -25,8 +25,8 @@ import (
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
-	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 )
 
 type Deleter interface {
@@ -35,11 +35,11 @@ type Deleter interface {
 }
 
 type deleter struct {
-	sched types.Scheduler
+	sched scheduler.Scheduler
 	qr    *queuer.Queuer
 }
 
-func NewDeleter(sched types.Scheduler, qr *queuer.Queuer) Deleter {
+func NewDeleter(sched scheduler.Scheduler, qr *queuer.Queuer) Deleter {
 	return &deleter{
 		sched: sched,
 		qr:    qr,

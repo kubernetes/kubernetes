@@ -22,10 +22,10 @@ import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -36,12 +36,12 @@ type SchedulerAlgorithm interface {
 
 // SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
 type schedulerAlgorithm struct {
-	sched        types.Scheduler
+	sched        scheduler.Scheduler
 	podUpdates   queue.FIFO
 	podScheduler podschedulers.PodScheduler
 }
 
-func NewSchedulerAlgorithm(sched types.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) SchedulerAlgorithm {
+func NewSchedulerAlgorithm(sched scheduler.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) SchedulerAlgorithm {
 	return &schedulerAlgorithm{
 		sched:        sched,
 		podUpdates:   podUpdates,

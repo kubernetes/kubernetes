@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/mock"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -83,8 +83,8 @@ func (r *mockRegistrator) Register(hostName string, labels map[string]string) (b
 	}
 }
 
-func mockScheduler() types.Scheduler {
-	mockScheduler := &types.MockScheduler{}
+func mockScheduler() scheduler.Scheduler {
+	mockScheduler := &scheduler.MockScheduler{}
 	reg := podtask.NewInMemoryRegistry()
 	mockScheduler.On("Tasks").Return(reg)
 	return mockScheduler

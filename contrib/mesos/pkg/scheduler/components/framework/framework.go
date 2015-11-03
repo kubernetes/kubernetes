@@ -37,6 +37,7 @@ import (
 	offermetrics "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/tasksreconciler"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/types"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -59,7 +59,7 @@ import (
 type Framework interface {
 	mscheduler.Scheduler
 
-	Init(sched types.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
+	Init(sched scheduler.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
 	Registration() <-chan struct{}
 	Offers() offers.Registry
 	LaunchTask(t *podtask.T) error
@@ -72,7 +72,7 @@ type framework struct {
 	*sync.RWMutex
 
 	// Config related, write-once
-	sched             types.Scheduler
+	sched             scheduler.Scheduler
 	schedulerConfig   *schedcfg.Config
 	executor          *mesos.ExecutorInfo
 	executorGroup     uint64
@@ -168,7 +168,7 @@ func New(config Config) Framework {
 	return k
 }
 
-func (k *framework) Init(sched types.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error {
+func (k *framework) Init(sched scheduler.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error {
 	log.V(1).Infoln("initializing kubernetes mesos scheduler")
 
 	k.sched = sched
