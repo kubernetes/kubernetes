@@ -740,7 +740,7 @@ function kube-up {
 
   # curl in mavericks is borked.
   secure=""
-  if which sw_vers > /dev/null; then
+  if which sw_vers >& /dev/null; then
     if [[ $(sw_vers | grep ProductVersion | awk '{print $2}') = "10.9."* ]]; then
       secure="--insecure"
     fi
