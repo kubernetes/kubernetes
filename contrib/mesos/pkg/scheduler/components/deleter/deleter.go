@@ -22,11 +22,11 @@ import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 )
 
 type Deleter interface {

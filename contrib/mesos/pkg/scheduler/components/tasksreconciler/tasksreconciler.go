@@ -38,8 +38,8 @@ type TasksReconciler interface {
 type tasksReconciler struct {
 	proc.Doer
 	Action                             ReconcilerAction
-	explicit                           chan struct{}   // send an empty struct to trigger explicit reconciliation
-	implicit                           chan struct{}   // send an empty struct to trigger implicit reconciliation
+	explicit                           chan struct{} // send an empty struct to trigger explicit reconciliation
+	implicit                           chan struct{} // send an empty struct to trigger implicit reconciliation
 	cooldown                           time.Duration
 	explicitReconciliationAbortTimeout time.Duration
 }
