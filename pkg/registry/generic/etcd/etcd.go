@@ -129,7 +129,7 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
-	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+	if ok, msg := validation.IsValidPathSegmentName(name); !ok {
 		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %v.", msg))
 	}
 	key = key + "/" + name
@@ -141,7 +141,7 @@ func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, er
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
-	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+	if ok, msg := validation.IsValidPathSegmentName(name); !ok {
 		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %v.", msg))
 	}
 	key := prefix + "/" + name

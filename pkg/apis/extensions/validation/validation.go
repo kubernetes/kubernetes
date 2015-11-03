@@ -55,6 +55,33 @@ func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAuto
 	if autoscaler.CPUUtilization != nil && autoscaler.CPUUtilization.TargetPercentage < 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, `must be bigger or equal to 1`))
 	}
+	if refErrs := ValidateSubresourceReference(autoscaler.ScaleRef); len(refErrs) > 0 {
+		allErrs = append(allErrs, refErrs.Prefix("scaleRef")...)
+	} else if autoscaler.ScaleRef.Subresource != "scale" {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("scaleRef.subresource", autoscaler.ScaleRef.Subresource, []string{"scale"}))
+	}
+	return allErrs
+}
+
+func ValidateSubresourceReference(ref extensions.SubresourceReference) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(ref.Kind) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("kind"))
+	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Kind); !ok {
+		allErrs = append(allErrs, errs.NewFieldInvalid("kind", ref.Kind, msg))
+	}
+
+	if len(ref.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name"))
+	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Name); !ok {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", ref.Name, msg))
+	}
+
+	if len(ref.Subresource) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("subresource"))
+	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Subresource); !ok {
+		allErrs = append(allErrs, errs.NewFieldInvalid("subresource", ref.Subresource, msg))
+	}
 	return allErrs
 }
 
