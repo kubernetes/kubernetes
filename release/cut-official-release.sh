@@ -24,7 +24,7 @@ set -o pipefail
 # Sets DIR, INSTRUCTIONS
 function main() {
   # Parse arguments
-  if [[ "$#" -ne 2 ]]; then
+  if [[ "$#" -ne 2 && "$#" -ne 3 ]]; then
     usage
     exit 1
   fi
@@ -93,7 +93,7 @@ function main() {
   local -r release_umask=${release_umask:-022}
   umask "${release_umask}"
 
-  local -r github="https://github.com/kubernetes/kubernetes.git"
+  local -r github="git@github.com:kubernetes/kubernetes.git"
   declare -r DIR=$(mktemp -d "/tmp/kubernetes-${release_type}-release-${new_version}-XXXXXXX")
 
   # Start a tmp file that will hold instructions for the user.
@@ -340,10 +340,9 @@ function rev-version-and-commit() {
 function git-push() {
   local -r object="${1}"
   if $DRY_RUN; then
-    echo "Dry run: would have done git push ${object}"
+    echo "Dry run: would have done git push origin ${object}"
   else
-    echo "NOT A DRY RUN: you don't really want to git push ${object}, do you?"
-    # git push "${object}"
+    git push origin "${object}"
   fi
 }
 
