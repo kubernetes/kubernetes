@@ -68,8 +68,7 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler,
-	scale *extensions.Scale) (int, *int, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, error) {
 	if hpa.Spec.CPUUtilization == nil {
 		// If CPUTarget is not specified than we should return some default values.
 		// Since we always take maximum number of replicas from all policies it is safe
@@ -77,7 +76,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 		return 0, nil, nil
 	}
 	currentReplicas := scale.Status.Replicas
-	currentUtilization, err := a.metricsClient.GetCPUUtilization(hpa.Spec.ScaleRef.Namespace, scale.Status.Selector)
+	currentUtilization, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -94,9 +93,9 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 }
 
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
-	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
+	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Namespace, hpa.Spec.ScaleRef.Name)
 
-	scale, err := a.client.Extensions().Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+	scale, err := a.client.Extensions().Scales(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)

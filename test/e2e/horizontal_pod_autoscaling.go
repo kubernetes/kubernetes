@@ -68,7 +68,6 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu int) {
 			ScaleRef: extensions.SubresourceReference{
 				Kind:        kind,
 				Name:        rc.name,
-				Namespace:   rc.framework.Namespace.Name,
 				Subresource: subresource,
 			},
 			MinReplicas:    &minReplicas,
