@@ -27,14 +27,11 @@ var NameMayNotBe = []string{".", ".."}
 // NameMayNotContain specifies substrings that cannot be used in names specified as path segments (like the REST API or etcd store)
 var NameMayNotContain = []string{"/", "%"}
 
-// ValidatePathSegmentName validates the name can be used as a path segment
-func ValidatePathSegmentName(name string, prefix bool) (bool, string) {
-	// Only check for exact matches if this is the full name (not a prefix)
-	if prefix == false {
-		for _, illegalName := range NameMayNotBe {
-			if name == illegalName {
-				return false, fmt.Sprintf(`name may not be %q`, illegalName)
-			}
+// IsValidPathSegmentName validates the name can be safely encoded as a path segment
+func IsValidPathSegmentName(name string) (bool, string) {
+	for _, illegalName := range NameMayNotBe {
+		if name == illegalName {
+			return false, fmt.Sprintf(`name may not be %q`, illegalName)
 		}
 	}
 
@@ -45,4 +42,25 @@ func ValidatePathSegmentName(name string, prefix bool) (bool, string) {
 	}
 
 	return true, ""
+}
+
+// IsValidPathSegmentPrefix validates the name can be used as a prefix for a name which will be encoded as a path segment
+// It does not check for exact matches with disallowed names, since an arbitrary suffix might make the name valid
+func IsValidPathSegmentPrefix(name string) (bool, string) {
+	for _, illegalContent := range NameMayNotContain {
+		if strings.Contains(name, illegalContent) {
+			return false, fmt.Sprintf(`name may not contain %q`, illegalContent)
+		}
+	}
+
+	return true, ""
+}
+
+// ValidatePathSegmentName validates the name can be safely encoded as a path segment
+func ValidatePathSegmentName(name string, prefix bool) (bool, string) {
+	if prefix {
+		return IsValidPathSegmentPrefix(name)
+	} else {
+		return IsValidPathSegmentName(name)
+	}
 }
