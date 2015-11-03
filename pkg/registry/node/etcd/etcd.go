@@ -50,27 +50,16 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewREST returns a RESTStorage object that will work against nodes.
-func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
 	prefix := "/minions"
 
-	storageInterface := s
-	if useCacher {
-		config := storage.CacherConfig{
-			CacheCapacity:  1000,
-			Storage:        s,
-			Type:           &api.Node{},
-			ResourcePrefix: prefix,
-			KeyFunc: func(obj runtime.Object) (string, error) {
-				return storage.NoNamespaceKeyFunc(prefix, obj)
-			},
-			NewListFunc: func() runtime.Object { return &api.NodeList{} },
-		}
-		storageInterface = storage.NewCacher(config)
-	}
+	newListFunc := func() runtime.Object { return &api.NodeList{} }
+	storageInterface := storageFactory(
+		s, 1000, nil, &api.Node{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
-		NewListFunc: func() runtime.Object { return &api.NodeList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},

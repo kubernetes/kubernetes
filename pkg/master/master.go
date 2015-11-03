@@ -535,8 +535,14 @@ func (m *Master) init(c *Config) {
 
 	healthzChecks := []healthz.HealthzChecker{}
 
+	var storageFactory storage.StorageFactory
+	if c.EnableWatchCache {
+		storageFactory = storage.NewCacher
+	} else {
+		storageFactory = storage.NoDecoration
+	}
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.get("", resource) }
-	podStorage := podetcd.NewStorage(dbClient("pods"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
+	podStorage := podetcd.NewStorage(dbClient("pods"), storageFactory, c.KubeletClient, m.proxyTransport)
 
 	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"))
 
@@ -552,10 +558,10 @@ func (m *Master) init(c *Config) {
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(dbClient("namespaces"))
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), c.EnableWatchCache)
+	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), storageFactory)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), c.EnableWatchCache, c.KubeletClient, m.proxyTransport)
+	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), storageFactory, c.KubeletClient, m.proxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage)
 
 	serviceStorage := serviceetcd.NewREST(dbClient("services"))
