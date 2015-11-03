@@ -118,7 +118,7 @@ if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
 fi
 
 # Optional: Enable deployment experimental feature, not ready for production use.
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-true}"
 if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
   ENABLE_EXPERIMENTAL_API=true
 fi
