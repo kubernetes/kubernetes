@@ -194,16 +194,17 @@ func NewKubeletServer() *KubeletServer {
 		NodeStatusUpdateFrequency:   10 * time.Second,
 		OOMScoreAdj:                 qos.KubeletOomScoreAdj,
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
-		Port:              ports.KubeletPort,
-		ReadOnlyPort:      ports.KubeletReadOnlyPort,
-		RegisterNode:      true, // will be ignored if no apiserver is configured
-		RegistryBurst:     10,
-		ResourceContainer: "/kubelet",
-		RktPath:           "",
-		RktStage1Image:    "",
-		RootDirectory:     defaultRootDir,
-		SyncFrequency:     10 * time.Second,
-		SystemContainer:   "",
+		Port:                ports.KubeletPort,
+		ReadOnlyPort:        ports.KubeletReadOnlyPort,
+		RegisterNode:        true, // will be ignored if no apiserver is configured
+		RegistryBurst:       10,
+		ResourceContainer:   "/kubelet",
+		RktPath:             "",
+		RktStage1Image:      "",
+		RootDirectory:       defaultRootDir,
+		SerializeImagePulls: true,
+		SyncFrequency:       10 * time.Second,
+		SystemContainer:     "",
 	}
 }
 
