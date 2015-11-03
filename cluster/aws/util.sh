@@ -16,6 +16,19 @@
 
 # A library of helper functions and constant for the local config.
 
+# Experimental flags can be removed/renamed at any time.
+# The intent is to allow experimentation/advanced functionality before we
+# are ready to commit to supporting it.
+# Experimental functionality:
+#   KUBE_SHARE_MASTER=true
+#     Detects an existing master and reuse it; useful if you want to
+#     create more nodes, perhaps with a different instance type or in
+#     a different subnet/AZ
+#   KUBE_SUBNET_CIDR=172.20.1.0/24
+#     Override the default subnet CIDR; useful if you want to create
+#     a second subnet.  The default subnet is 172.20.0.0/24.  The VPC
+#     is created with 172.20.0.0/16; you must pick a sub-CIDR of that.
+
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
@@ -25,7 +38,9 @@ source "${KUBE_ROOT}/cluster/common.sh"
 ALLOCATE_NODE_CIDRS=true
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
-ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
+
+# The ASG name must be unique, so we include the zone
+ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
 
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
@@ -53,9 +68,15 @@ AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
 AWS_ASG_CMD="aws --output json autoscaling"
 
-INTERNAL_IP_BASE=172.20.0
+VPC_CIDR_BASE=172.20
 MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
+SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
+if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
+  echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
+  SUBNET_CIDR=${KUBE_SUBNET_CIDR}
+fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
@@ -706,7 +727,7 @@ function kube-up {
   fi
   if [[ -z "$VPC_ID" ]]; then
 	  echo "Creating vpc."
-	  VPC_ID=$($AWS_CMD create-vpc --cidr-block $INTERNAL_IP_BASE.0/16 | json_val '["Vpc"]["VpcId"]')
+	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} | json_val '["Vpc"]["VpcId"]')
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
 	  add-tag $VPC_ID Name kubernetes-vpc
@@ -723,13 +744,16 @@ function kube-up {
 
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
-    SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
+    SUBNET_ID=$($AWS_CMD create-subnet --cidr-block ${SUBNET_CIDR} --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
     add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
-    echo "Using existing CIDR $EXISTING_CIDR"
-    INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
-    MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+    echo "Using existing subnet with CIDR $EXISTING_CIDR"
+    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock --output text)
+    echo "VPC CIDR is $VPC_CIDR"
+    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
+    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+    echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
   fi
 
   echo "Using subnet $SUBNET_ID"
@@ -796,17 +820,26 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
-  # Create the master
-  start-master
+  # KUBE_SHARE_MASTER is used to add minions to an existing master
+  if [[ "${KUBE_SHARE_MASTER:-}" == "true" ]]; then
+    # Detect existing master
+    detect-master
 
-  # Start minions
-  start-minions
+    # Start minions
+    start-minions
+  else
+    # Create the master
+    start-master
 
-  # Wait for the master to be ready
-  wait-master
+    # Start minions
+    start-minions
 
-  # Build ~/.kube/config
-  build-config
+    # Wait for the master to be ready
+    wait-master
+
+    # Build ~/.kube/config
+    build-config
+  fi
 
   # Check the cluster is OK
   check-cluster
@@ -1038,7 +1071,6 @@ function start-minions() {
 # Wait for the master to be started
 function wait-master() {
   detect-master > $LOG
-  detect-minions > $LOG
 
   # TODO(justinsb): This is really not necessary any more
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
@@ -1097,6 +1129,8 @@ function check-cluster() {
   echo "Sanity checking cluster..."
 
   sleep 5
+
+  detect-minions > $LOG
 
   # Don't bail on errors, we want to be able to print some info.
   set +e
@@ -1167,6 +1201,7 @@ function kube-down {
       echo "Deleting auto-scaling group: ${ASG_NAME}"
       ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${ASG_NAME}
     fi
+
     if [[ -n $(${AWS_ASG_CMD} --output text describe-launch-configurations --launch-configuration-names ${ASG_NAME} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
       echo "Deleting auto-scaling launch configuration: ${ASG_NAME}"
       ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${ASG_NAME}
