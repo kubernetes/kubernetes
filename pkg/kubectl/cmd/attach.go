@@ -160,9 +160,16 @@ func (p *AttachOptions) Run() error {
 		return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
 	}
 
-	// TODO: refactor with terminal helpers from the edit utility once that is merged
 	var stdin io.Reader
 	tty := p.TTY
+
+	containerToAttach := p.GetContainer(pod)
+	if tty && !containerToAttach.TTY {
+		tty = false
+		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s doesn't allocate one\n", containerToAttach.Name)
+	}
+
+	// TODO: refactor with terminal helpers from the edit utility once that is merged
 	if p.Stdin {
 		stdin = p.In
 		if tty {
@@ -204,7 +211,7 @@ func (p *AttachOptions) Run() error {
 		Namespace(pod.Namespace).
 		SubResource("attach")
 	req.VersionedParams(&api.PodAttachOptions{
-		Container: p.GetContainerName(pod),
+		Container: containerToAttach.Name,
 		Stdin:     stdin != nil,
 		Stdout:    p.Out != nil,
 		Stderr:    p.Err != nil,
@@ -214,12 +221,21 @@ func (p *AttachOptions) Run() error {
 	return p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
 }
 
-// GetContainerName returns the name of the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainerName(pod *api.Pod) string {
+// GetContainer returns the container to attach to, with a fallback.
+func (p *AttachOptions) GetContainer(pod *api.Pod) api.Container {
 	if len(p.ContainerName) > 0 {
-		return p.ContainerName
+		for _, container := range pod.Spec.Containers {
+			if container.Name == p.ContainerName {
+				return container
+			}
+		}
 	}
 
 	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-	return pod.Spec.Containers[0].Name
+	return pod.Spec.Containers[0]
+}
+
+// GetContainerName returns the name of the container to attach to, with a fallback.
+func (p *AttachOptions) GetContainerName(pod *api.Pod) string {
+	return p.GetContainer(pod).Name
 }
