@@ -30,15 +30,19 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-type ErrorHandler struct {
+type ErrorHandler interface {
+	Error(pod *api.Pod, schedulingErr error)
+}
+
+type errorHandler struct {
 	sched        types.Scheduler
 	backoff      *backoff.Backoff
 	qr           *queuer.Queuer
 	podScheduler podschedulers.PodScheduler
 }
 
-func NewErrorHandler(sched types.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) *ErrorHandler {
-	return &ErrorHandler{
+func NewErrorHandler(sched types.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) ErrorHandler {
+	return &errorHandler{
 		sched:        sched,
 		backoff:      backoff,
 		qr:           qr,
@@ -47,7 +51,7 @@ func NewErrorHandler(sched types.Scheduler, backoff *backoff.Backoff, qr *queuer
 }
 
 // implementation of scheduling plugin's Error func; see plugin/pkg/scheduler
-func (k *ErrorHandler) Error(pod *api.Pod, schedulingErr error) {
+func (k *errorHandler) Error(pod *api.Pod, schedulingErr error) {
 
 	if schedulingErr == merrors.NoSuchPodErr {
 		log.V(2).Infof("Not rescheduling non-existent pod %v", pod.Name)

@@ -42,16 +42,16 @@ import (
 
 // Scheduler implements types.Scheduler
 type Scheduler struct {
-	podReconciler *podreconciler.PodReconciler
-	framework     *Framework
-	loop          *schedulerloop.SchedulerLoop
+	podReconciler podreconciler.PodReconciler
+	framework     Framework
+	loop          schedulerloop.SchedulerLoop
 
 	// unsafe state, needs to be guarded, especially changes to podtask.T objects
 	sync.RWMutex
 	taskRegistry podtask.Registry
 }
 
-func NewScheduler(c *config.Config, framework *Framework, podScheduler podschedulers.PodScheduler,
+func NewScheduler(c *config.Config, framework Framework, podScheduler podschedulers.PodScheduler,
 	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, podsWatcher *cache.ListWatch) *Scheduler {
 
 	core := &Scheduler{
@@ -107,7 +107,7 @@ func (c *Scheduler) Tasks() podtask.Registry {
 }
 
 func (c *Scheduler) Offers() offers.Registry {
-	return c.framework.offers
+	return c.framework.Offers()
 }
 
 func (c *Scheduler) KillTask(id string) error {

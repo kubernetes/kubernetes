@@ -53,9 +53,20 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
+	mscheduler "github.com/mesos/mesos-go/scheduler"
 )
 
-type Framework struct {
+type Framework interface {
+	mscheduler.Scheduler
+
+	Init(scheduler *Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
+	Registration() <-chan struct{}
+	Offers() offers.Registry
+	LaunchTask(t *podtask.T) error
+	KillTask(id string) error
+}
+
+type framework struct {
 	// We use a lock here to avoid races
 	// between invoking the mesos callback
 	*sync.RWMutex
@@ -71,7 +82,7 @@ type Framework struct {
 	nodeRegistrator   node.Registrator
 	storeFrameworkId  func(id string)
 
-	// Mesos context.
+	// Mesos context
 	driver         bindings.SchedulerDriver // late initialization
 	frameworkId    *mesos.FrameworkID
 	masterInfo     *mesos.MasterInfo
@@ -82,7 +93,8 @@ type Framework struct {
 	slaveHostNames *slave.Registry
 
 	// via deferred init
-	tasksReconciler    *taskreconciler.TasksReconciler
+	tasksReconciler    taskreconciler.TasksReconciler
+	mux                *http.ServeMux
 	reconcileCooldown  time.Duration
 	asRegisteredMaster proc.Doer
 	terminate          <-chan struct{} // signal chan, closes when we should kill background tasks
@@ -100,9 +112,9 @@ type Config struct {
 }
 
 // New creates a new Framework
-func New(config Config) *Framework {
-	var k *Framework
-	k = &Framework{
+func New(config Config) Framework {
+	var k *framework
+	k = &framework{
 		schedulerConfig:   &config.SchedulerConfig,
 		RWMutex:           new(sync.RWMutex),
 		executor:          config.Executor,
@@ -156,10 +168,11 @@ func New(config Config) *Framework {
 	return k
 }
 
-func (k *Framework) Init(scheduler *Scheduler, electedMaster proc.Process, mux *http.ServeMux) error {
+func (k *framework) Init(scheduler *Scheduler, electedMaster proc.Process, mux *http.ServeMux) error {
 	log.V(1).Infoln("initializing kubernetes mesos scheduler")
 
 	k.sched = scheduler
+	k.mux = mux
 	k.asRegisteredMaster = proc.DoerFunc(func(a proc.Action) <-chan error {
 		if !k.registered {
 			return proc.ErrorChanf("failed to execute action, scheduler is disconnected")
@@ -168,18 +181,17 @@ func (k *Framework) Init(scheduler *Scheduler, electedMaster proc.Process, mux *
 	})
 	k.terminate = electedMaster.Done()
 	k.offers.Init(k.terminate)
-	k.InstallDebugHandlers(mux)
 	k.nodeRegistrator.Run(k.terminate)
 	return k.recoverTasks()
 }
 
-func (k *Framework) asMaster() proc.Doer {
+func (k *framework) asMaster() proc.Doer {
 	k.RLock()
 	defer k.RUnlock()
 	return k.asRegisteredMaster
 }
 
-func (k *Framework) InstallDebugHandlers(mux *http.ServeMux) {
+func (k *framework) installDebugHandlers(mux *http.ServeMux) {
 	wrappedHandler := func(uri string, h http.Handler) {
 		mux.HandleFunc(uri, func(w http.ResponseWriter, r *http.Request) {
 			ch := make(chan struct{})
@@ -227,12 +239,12 @@ func (k *Framework) InstallDebugHandlers(mux *http.ServeMux) {
 	}))
 }
 
-func (k *Framework) Registration() <-chan struct{} {
+func (k *framework) Registration() <-chan struct{} {
 	return k.registration
 }
 
 // Registered is called when the scheduler registered with the master successfully.
-func (k *Framework) Registered(drv bindings.SchedulerDriver, fid *mesos.FrameworkID, mi *mesos.MasterInfo) {
+func (k *framework) Registered(drv bindings.SchedulerDriver, fid *mesos.FrameworkID, mi *mesos.MasterInfo) {
 	log.Infof("Scheduler registered with the master: %v with frameworkId: %v\n", mi, fid)
 
 	k.driver = drv
@@ -246,7 +258,7 @@ func (k *Framework) Registered(drv bindings.SchedulerDriver, fid *mesos.Framewor
 
 // Reregistered is called when the scheduler re-registered with the master successfully.
 // This happends when the master fails over.
-func (k *Framework) Reregistered(drv bindings.SchedulerDriver, mi *mesos.MasterInfo) {
+func (k *framework) Reregistered(drv bindings.SchedulerDriver, mi *mesos.MasterInfo) {
 	log.Infof("Scheduler reregistered with the master: %v\n", mi)
 
 	k.driver = drv
@@ -258,7 +270,7 @@ func (k *Framework) Reregistered(drv bindings.SchedulerDriver, mi *mesos.MasterI
 }
 
 // perform one-time initialization actions upon the first registration event received from Mesos.
-func (k *Framework) onInitialRegistration(driver bindings.SchedulerDriver) {
+func (k *framework) onInitialRegistration(driver bindings.SchedulerDriver) {
 	defer close(k.registration)
 
 	if k.failoverTimeout > 0 {
@@ -276,17 +288,19 @@ func (k *Framework) onInitialRegistration(driver bindings.SchedulerDriver) {
 
 	k.tasksReconciler = taskreconciler.NewTasksReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
 		k.reconcileCooldown, k.schedulerConfig.ExplicitReconciliationAbortTimeout.Duration, k.terminate)
-	go k.tasksReconciler.Run(driver)
+	go k.tasksReconciler.Run(driver, k.terminate)
 
 	if k.reconcileInterval > 0 {
 		ri := time.Duration(k.reconcileInterval) * time.Second
 		time.AfterFunc(k.schedulerConfig.InitialImplicitReconciliationDelay.Duration, func() { runtime.Until(k.tasksReconciler.RequestImplicit, ri, k.terminate) })
 		log.Infof("will perform implicit task reconciliation at interval: %v after %v", ri, k.schedulerConfig.InitialImplicitReconciliationDelay.Duration)
 	}
+
+	k.installDebugHandlers(k.mux)
 }
 
 // Disconnected is called when the scheduler loses connection to the master.
-func (k *Framework) Disconnected(driver bindings.SchedulerDriver) {
+func (k *framework) Disconnected(driver bindings.SchedulerDriver) {
 	log.Infof("Master disconnected!\n")
 
 	k.registered = false
@@ -296,7 +310,7 @@ func (k *Framework) Disconnected(driver bindings.SchedulerDriver) {
 }
 
 // ResourceOffers is called when the scheduler receives some offers from the master.
-func (k *Framework) ResourceOffers(driver bindings.SchedulerDriver, offers []*mesos.Offer) {
+func (k *framework) ResourceOffers(driver bindings.SchedulerDriver, offers []*mesos.Offer) {
 	log.V(2).Infof("Received offers %+v", offers)
 
 	// Record the offers in the global offer map as well as each slave's offer map.
@@ -317,7 +331,7 @@ func (k *Framework) ResourceOffers(driver bindings.SchedulerDriver, offers []*me
 }
 
 // OfferRescinded is called when the resources are recinded from the scheduler.
-func (k *Framework) OfferRescinded(driver bindings.SchedulerDriver, offerId *mesos.OfferID) {
+func (k *framework) OfferRescinded(driver bindings.SchedulerDriver, offerId *mesos.OfferID) {
 	log.Infof("Offer rescinded %v\n", offerId)
 
 	oid := offerId.GetValue()
@@ -325,7 +339,7 @@ func (k *Framework) OfferRescinded(driver bindings.SchedulerDriver, offerId *mes
 }
 
 // StatusUpdate is called when a status update message is sent to the scheduler.
-func (k *Framework) StatusUpdate(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
+func (k *framework) StatusUpdate(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
 
 	source, reason := "none", "none"
 	if taskStatus.Source != nil {
@@ -401,7 +415,7 @@ func (k *Framework) StatusUpdate(driver bindings.SchedulerDriver, taskStatus *me
 	}
 }
 
-func (k *Framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
+func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
 	task, state := k.sched.Tasks().UpdateStatus(taskStatus)
 
 	if (state == podtask.StateRunning || state == podtask.StatePending) &&
@@ -441,7 +455,7 @@ func (k *Framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 }
 
 // reconcile an unknown (from the perspective of our registry) non-terminal task
-func (k *Framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
+func (k *framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
 	// attempt to recover task from pod info:
 	// - task data may contain an api.PodStatusResult; if status.reason == REASON_RECONCILIATION then status.data == nil
 	// - the Name can be parsed by container.ParseFullName() to yield a pod Name and Namespace
@@ -513,13 +527,13 @@ func (k *Framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, ta
 }
 
 // FrameworkMessage is called when the scheduler receives a message from the executor.
-func (k *Framework) FrameworkMessage(driver bindings.SchedulerDriver,
+func (k *framework) FrameworkMessage(driver bindings.SchedulerDriver,
 	executorId *mesos.ExecutorID, slaveId *mesos.SlaveID, message string) {
 	log.Infof("Received messages from executor %v of slave %v, %v\n", executorId, slaveId, message)
 }
 
 // SlaveLost is called when some slave is lost.
-func (k *Framework) SlaveLost(driver bindings.SchedulerDriver, slaveId *mesos.SlaveID) {
+func (k *framework) SlaveLost(driver bindings.SchedulerDriver, slaveId *mesos.SlaveID) {
 	log.Infof("Slave %v is lost\n", slaveId)
 
 	sid := slaveId.GetValue()
@@ -534,14 +548,14 @@ func (k *Framework) SlaveLost(driver bindings.SchedulerDriver, slaveId *mesos.Sl
 }
 
 // ExecutorLost is called when some executor is lost.
-func (k *Framework) ExecutorLost(driver bindings.SchedulerDriver, executorId *mesos.ExecutorID, slaveId *mesos.SlaveID, status int) {
+func (k *framework) ExecutorLost(driver bindings.SchedulerDriver, executorId *mesos.ExecutorID, slaveId *mesos.SlaveID, status int) {
 	log.Infof("Executor %v of slave %v is lost, status: %v\n", executorId, slaveId, status)
 	// TODO(yifan): Restart any unfinished tasks of the executor.
 }
 
 // Error is called when there is an unrecoverable error in the scheduler or scheduler driver.
 // The driver should have been aborted before this is invoked.
-func (k *Framework) Error(driver bindings.SchedulerDriver, message string) {
+func (k *framework) Error(driver bindings.SchedulerDriver, message string) {
 	log.Fatalf("fatal scheduler error: %v\n", message)
 }
 
@@ -561,7 +575,7 @@ func explicitTaskFilter(t *podtask.T) bool {
 // invoke the given ReconcilerAction funcs in sequence, aborting the sequence if reconciliation
 // is cancelled. if any other errors occur the composite reconciler will attempt to complete the
 // sequence, reporting only the last generated error.
-func (k *Framework) makeCompositeReconciler(actions ...taskreconciler.ReconcilerAction) taskreconciler.ReconcilerAction {
+func (k *framework) makeCompositeReconciler(actions ...taskreconciler.ReconcilerAction) taskreconciler.ReconcilerAction {
 	if x := len(actions); x == 0 {
 		// programming error
 		panic("no actions specified for composite reconciler")
@@ -612,7 +626,7 @@ func (k *Framework) makeCompositeReconciler(actions ...taskreconciler.Reconciler
 
 // reconciler action factory, performs explicit task reconciliation for non-terminal
 // tasks listed in the scheduler's internal taskRegistry.
-func (k *Framework) makeTaskRegistryReconciler() taskreconciler.ReconcilerAction {
+func (k *framework) makeTaskRegistryReconciler() taskreconciler.ReconcilerAction {
 	return taskreconciler.ReconcilerAction(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
 		taskToSlave := make(map[string]string)
 		for _, t := range k.sched.Tasks().List(explicitTaskFilter) {
@@ -626,7 +640,7 @@ func (k *Framework) makeTaskRegistryReconciler() taskreconciler.ReconcilerAction
 
 // reconciler action factory, performs explicit task reconciliation for non-terminal
 // tasks identified by annotations in the Kubernetes pod registry.
-func (k *Framework) makePodRegistryReconciler() taskreconciler.ReconcilerAction {
+func (k *framework) makePodRegistryReconciler() taskreconciler.ReconcilerAction {
 	return taskreconciler.ReconcilerAction(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
 		podList, err := k.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		if err != nil {
@@ -652,7 +666,7 @@ func (k *Framework) makePodRegistryReconciler() taskreconciler.ReconcilerAction 
 }
 
 // execute an explicit task reconciliation, as per http://mesos.apache.org/documentation/latest/reconciliation/
-func (k *Framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, taskToSlave map[string]string, cancel <-chan struct{}) error {
+func (k *framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, taskToSlave map[string]string, cancel <-chan struct{}) error {
 	log.Info("explicit reconcile tasks")
 
 	// tell mesos to send us the latest status updates for all the non-terminal tasks that we know about
@@ -703,7 +717,7 @@ func (k *Framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, ta
 	return nil
 }
 
-func (ks *Framework) recoverTasks() error {
+func (ks *framework) recoverTasks() error {
 	podList, err := ks.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		log.V(1).Infof("failed to recover pod registry, madness may ensue: %v", err)
@@ -737,13 +751,13 @@ func (ks *Framework) recoverTasks() error {
 	return nil
 }
 
-func (ks *Framework) KillTask(id string) error {
+func (ks *framework) KillTask(id string) error {
 	killTaskId := mutil.NewTaskID(id)
 	_, err := ks.driver.KillTask(killTaskId)
 	return err
 }
 
-func (ks *Framework) LaunchTask(t *podtask.T) error {
+func (ks *framework) LaunchTask(t *podtask.T) error {
 	// assume caller is holding scheduler lock
 	taskList := []*mesos.TaskInfo{t.BuildTaskInfo(ks.executor)}
 	offerIds := []*mesos.OfferID{t.Offer.Details().Id}
@@ -752,6 +766,6 @@ func (ks *Framework) LaunchTask(t *podtask.T) error {
 	return err
 }
 
-func (ks *Framework) Offers() offers.Registry {
+func (ks *framework) Offers() offers.Registry {
 	return ks.offers
 }

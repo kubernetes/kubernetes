@@ -30,15 +30,19 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
+type SchedulerAlgorithm interface {
+	Schedule(pod *api.Pod) (string, error)
+}
+
 // SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
-type SchedulerAlgorithm struct {
+type schedulerAlgorithm struct {
 	sched        types.Scheduler
 	podUpdates   queue.FIFO
 	podScheduler podschedulers.PodScheduler
 }
 
-func NewSchedulerAlgorithm(sched types.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) *SchedulerAlgorithm {
-	return &SchedulerAlgorithm{
+func NewSchedulerAlgorithm(sched types.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) SchedulerAlgorithm {
+	return &schedulerAlgorithm{
 		sched:        sched,
 		podUpdates:   podUpdates,
 		podScheduler: podScheduler,
@@ -47,7 +51,7 @@ func NewSchedulerAlgorithm(sched types.Scheduler, podUpdates queue.FIFO, podSche
 
 // Schedule implements the Scheduler interface of Kubernetes.
 // It returns the selectedMachine's name and error (if there's any).
-func (k *SchedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
+func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 	log.Infof("Try to schedule pod %v\n", pod.Name)
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 
@@ -105,7 +109,7 @@ func (k *SchedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 }
 
 // Call ScheduleFunc and subtract some resources, returning the name of the machine the task is scheduled on
-func (k *SchedulerAlgorithm) doSchedule(task *podtask.T, err error) (string, error) {
+func (k *schedulerAlgorithm) doSchedule(task *podtask.T, err error) (string, error) {
 	var offer offers.Perishable
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table

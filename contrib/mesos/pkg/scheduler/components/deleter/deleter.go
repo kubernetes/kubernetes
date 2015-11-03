@@ -29,13 +29,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-type Deleter struct {
+type Deleter interface {
+	Run(updates <-chan queue.Entry, done <-chan struct{})
+	DeleteOne(pod *queuer.Pod) error
+}
+
+type deleter struct {
 	sched types.Scheduler
 	qr    *queuer.Queuer
 }
 
-func NewDeleter(sched types.Scheduler, qr *queuer.Queuer) *Deleter {
-	return &Deleter{
+func NewDeleter(sched types.Scheduler, qr *queuer.Queuer) Deleter {
+	return &deleter{
 		sched: sched,
 		qr:    qr,
 	}
@@ -43,7 +48,7 @@ func NewDeleter(sched types.Scheduler, qr *queuer.Queuer) *Deleter {
 
 // currently monitors for "pod deleted" events, upon which handle()
 // is invoked.
-func (k *Deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
+func (k *deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
 	go runtime.Until(func() {
 		for {
 			entry := <-updates
@@ -59,7 +64,7 @@ func (k *Deleter) Run(updates <-chan queue.Entry, done <-chan struct{}) {
 	}, 1*time.Second, done)
 }
 
-func (k *Deleter) DeleteOne(pod *queuer.Pod) error {
+func (k *deleter) DeleteOne(pod *queuer.Pod) error {
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 	podKey, err := podtask.MakePodKey(ctx, pod.Name)
 	if err != nil {

@@ -35,13 +35,13 @@ const (
 	Scheduled        = "Scheduled"
 )
 
-type SchedulerLoopInterface interface {
+type SchedulerLoop interface {
 	Run(<-chan struct{})
 }
 
-type SchedulerLoop struct {
-	algorithm *algorithm.SchedulerAlgorithm
-	binder    *binder.Binder
+type schedulerLoop struct {
+	algorithm algorithm.SchedulerAlgorithm
+	binder    binder.Binder
 	nextPod   func() *api.Pod
 	error     func(*api.Pod, error)
 	recorder  record.EventRecorder
@@ -49,10 +49,10 @@ type SchedulerLoop struct {
 	started   chan<- struct{} // startup latch
 }
 
-func NewSchedulerLoop(client *client.Client, algorithm *algorithm.SchedulerAlgorithm,
+func NewSchedulerLoop(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
 	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
-	binder *binder.Binder, started chan<- struct{}) *SchedulerLoop {
-	return &SchedulerLoop{
+	binder binder.Binder, started chan<- struct{}) SchedulerLoop {
+	return &schedulerLoop{
 		algorithm: algorithm,
 		binder:    binder,
 		nextPod:   nextPod,
@@ -63,14 +63,14 @@ func NewSchedulerLoop(client *client.Client, algorithm *algorithm.SchedulerAlgor
 	}
 }
 
-func (s *SchedulerLoop) Run(done <-chan struct{}) {
+func (s *schedulerLoop) Run(done <-chan struct{}) {
 	defer close(s.started)
 	go runtime.Until(s.scheduleOne, recoveryDelay, done)
 }
 
 // hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/scheduler.go,
 // with the Modeler stuff removed since we don't use it because we have mesos.
-func (s *SchedulerLoop) scheduleOne() {
+func (s *schedulerLoop) scheduleOne() {
 	pod := s.nextPod()
 
 	// pods which are pre-scheduled (i.e. NodeName is set) are deleted by the kubelet
