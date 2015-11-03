@@ -212,6 +212,7 @@ func NewKubeletServer() *KubeletServer {
 		RktPath:             "",
 		RktStage1Image:      "",
 		RootDirectory:       defaultRootDir,
+		SerializeImagePulls: true,
 		SyncFrequency:       10 * time.Second,
 		SystemContainer:     "",
 		ReconcileCIDR:       true,
