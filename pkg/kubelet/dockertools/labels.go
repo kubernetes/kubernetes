@@ -32,10 +32,12 @@ const (
 	kubernetesPodNamespaceLabel = "io.kubernetes.pod.namespace"
 	kubernetesPodUID            = "io.kubernetes.pod.uid"
 
+	kubernetesContainerRestartCountLabel      = "io.kubernetes.container.restartCount"
+	kubernetesContainerTerminationMessagePath = "io.kubernetes.container.terminationMessagePath"
+
 	kubernetesPodLabel                    = "io.kubernetes.pod.data"
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
-	kubernetesContainerRestartCountLabel  = "io.kubernetes.container.restartCount"
 )
 
 func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
@@ -46,6 +48,7 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[str
 	labels[kubernetesPodUID] = string(pod.UID)
 
 	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
+	labels[kubernetesContainerTerminationMessagePath] = container.TerminationMessagePath
 
 	return labels
 }
@@ -64,4 +67,15 @@ func getRestartCountFromLabel(labels map[string]string) (restartCount int, err e
 		glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", kubernetesContainerRestartCountLabel)
 	}
 	return restartCount, err
+}
+
+func getTerminationMessagePathFromLabel(labels map[string]string) string {
+	if terminationMessagePath, found := labels[kubernetesContainerTerminationMessagePath]; found {
+		return terminationMessagePath
+	} else {
+		// Do not report error, because there should be many old containers without this label now.
+		// Return empty string "" for these containers, the caller will get terminationMessagePath by other ways.
+		glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", kubernetesContainerTerminationMessagePath)
+		return ""
+	}
 }
