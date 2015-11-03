@@ -356,7 +356,7 @@ func apiContainerToContainer(c docker.APIContainers) kubecontainer.Container {
 	}
 }
 
-func dockerContainersToPod(containers DockerContainers) kubecontainer.Pod {
+func dockerContainersToPod(containers []*docker.APIContainers) kubecontainer.Pod {
 	var pod kubecontainer.Pod
 	for _, c := range containers {
 		dockerName, hash, err := ParseDockerName(c.Names[0])
