@@ -172,24 +172,12 @@ func (list ErrorList) PrefixIndex(index int) ErrorList {
 	return list.Prefix(fmt.Sprintf("[%d]", index))
 }
 
-// NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
+// NewErrorTypeMatcher returns an errors.Matcher that returns true
 // if the provided error is a Error and has the provided ErrorType.
 func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 	return func(err error) bool {
 		if e, ok := err.(*Error); ok {
 			return e.Type == t
-		}
-		return false
-	}
-}
-
-// NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
-// if the provided error is a Error and has a field with the provided
-// prefix.
-func NewValidationErrorFieldPrefixMatcher(prefix string) utilerrors.Matcher {
-	return func(err error) bool {
-		if e, ok := err.(*Error); ok {
-			return strings.HasPrefix(e.Field, prefix)
 		}
 		return false
 	}
