@@ -368,18 +368,15 @@ func computePercentiles(timeSeries map[time.Time]resourceUsagePerContainer, perc
 		return make(map[int]resourceUsagePerContainer)
 	}
 	dataMap := make(map[string]*usageDataPerContainer)
-	for _, v := range timeSeries {
-		for k := range v {
-			dataMap[k] = &usageDataPerContainer{
-				cpuData:        make([]float64, len(timeSeries)),
-				memUseData:     make([]int64, len(timeSeries)),
-				memWorkSetData: make([]int64, len(timeSeries)),
-			}
-		}
-		break
-	}
 	for _, singleStatistic := range timeSeries {
 		for name, data := range singleStatistic {
+			if dataMap[name] == nil {
+				dataMap[name] = &usageDataPerContainer{
+					cpuData:        make([]float64, len(timeSeries)),
+					memUseData:     make([]int64, len(timeSeries)),
+					memWorkSetData: make([]int64, len(timeSeries)),
+				}
+			}
 			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)
 			dataMap[name].memUseData = append(dataMap[name].memUseData, data.MemoryUsageInBytes)
 			dataMap[name].memWorkSetData = append(dataMap[name].memWorkSetData, data.MemoryWorkingSetInBytes)
