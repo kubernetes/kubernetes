@@ -335,14 +335,17 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	}
 
 	// Start sync ticker.
-	kubelet.resyncTicker = time.NewTicker(time.Millisecond)
-
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet)
+	syncCh := make(chan time.Time, 1)
+	housekeepingCh := make(chan time.Time, 1)
+	syncCh <- time.Now()
+	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh)
 	loopTime2 := kubelet.LatestLoopEntryTime()
 	if loopTime2.IsZero() {
 		t.Errorf("Unexpected sync loop time: 0, expected non-zero value.")
 	}
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet)
+
+	syncCh <- time.Now()
+	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh)
 	loopTime3 := kubelet.LatestLoopEntryTime()
 	if !loopTime3.After(loopTime1) {
 		t.Errorf("Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
@@ -355,15 +358,12 @@ func TestSyncLoopAbort(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.lastTimestampRuntimeUp = time.Now()
 	kubelet.networkConfigured = true
-	// The syncLoop waits on the resyncTicker, so we stop it immediately to avoid a race.
-	kubelet.resyncTicker = time.NewTicker(time.Second)
-	kubelet.resyncTicker.Stop()
 
 	ch := make(chan kubetypes.PodUpdate)
 	close(ch)
 
 	// sanity check (also prevent this test from hanging in the next step)
-	ok := kubelet.syncLoopIteration(ch, kubelet)
+	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan time.Time), make(chan time.Time))
 	if ok {
 		t.Fatalf("expected syncLoopIteration to return !ok since update chan was closed")
 	}
