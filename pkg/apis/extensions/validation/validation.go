@@ -56,7 +56,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAuto
 	if refErrs := ValidateSubresourceReference(autoscaler.ScaleRef); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs.Prefix("scaleRef")...)
 	} else if autoscaler.ScaleRef.Subresource != "scale" {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("scaleRef.subresource", autoscaler.ScaleRef.Subresource, []string{"scale"}))
+		allErrs = append(allErrs, validation.NewFieldNotSupported("scaleRef.subresource", autoscaler.ScaleRef.Subresource, []string{"scale"}))
 	}
 	return allErrs
 }
@@ -206,7 +206,7 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec) validation.ErrorList 
 	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		allErrs = append(allErrs, validation.NewFieldNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
 
 	return allErrs
@@ -360,7 +360,7 @@ func ValidateJobSpec(spec *extensions.JobSpec) validation.ErrorList {
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template).Prefix("template")...)
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
 		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("template.spec.restartPolicy",
+		allErrs = append(allErrs, validation.NewFieldNotSupported("template.spec.restartPolicy",
 			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
 	}
 	return allErrs

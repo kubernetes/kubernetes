@@ -77,9 +77,8 @@ const (
 	// ErrorTypeInvalid is used to report malformed values (e.g. failed regex
 	// match, too long, out of bounds).  See NewFieldInvalid.
 	ErrorTypeInvalid ErrorType = "FieldValueInvalid"
-	// ErrorTypeNotSupported is used to report valid (as per formatting rules)
-	// values that can not be handled (e.g. an enumerated string).  See
-	// NewFieldValueNotSupported.
+	// ErrorTypeNotSupported is used to report unknown values for enumerated
+	// fields (e.g. a list of valid values).  See NewFieldNotSupported.
 	ErrorTypeNotSupported ErrorType = "FieldValueNotSupported"
 	// ErrorTypeForbidden is used to report valid (as per formatting rules)
 	// values which would be accepted under some conditions, but which are not
@@ -140,10 +139,10 @@ func NewFieldInvalid(field string, value interface{}, detail string) *Error {
 	return &Error{ErrorTypeInvalid, field, value, detail}
 }
 
-// NewFieldValueNotSupported returns a *Error indicating "unsupported value".
-// This is used to report valid (as per formatting rules) values that can not
-// be handled (e.g. an enumerated string).
-func NewFieldValueNotSupported(field string, value interface{}, validValues []string) *Error {
+// NewFieldNotSupported returns a *Error indicating "unsupported value".
+// This is used to report unknown values for enumerated fields (e.g. a list of
+// valid values).
+func NewFieldNotSupported(field string, value interface{}, validValues []string) *Error {
 	detail := ""
 	if validValues != nil && len(validValues) > 0 {
 		detail = "supported values: " + strings.Join(validValues, ", ")
