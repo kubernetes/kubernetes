@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -90,21 +91,11 @@ func (g TestGroup) GroupAndVersion() string {
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
-	if g.Group == "" {
-		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.GroupVersionUnderTest)
-		if err != nil {
-			panic(err)
-		}
-		return interfaces.Codec
+	interfaces, err := latest.GroupOrDie(g.Group).InterfacesFor(g.GroupVersionUnderTest)
+	if err != nil {
+		panic(err)
 	}
-	if g.Group == "extensions" {
-		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.GroupVersionUnderTest)
-		if err != nil {
-			panic(err)
-		}
-		return interfaces.Codec
-	}
-	panic(fmt.Errorf("cannot test group %s", g.Group))
+	return interfaces.Codec
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the
