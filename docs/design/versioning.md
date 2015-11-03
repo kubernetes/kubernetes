@@ -51,9 +51,9 @@ Legend:
 
 There is no mandated timeline for major versions. They only occur when we need to start the clock on deprecating features. A given major version should be the latest major version for at least one year from its original release date.
 
-### CI version scheme
+### CI and dev version scheme
 
-* Continuous integration versions also exist, and are versioned off of alpha and beta releases.  X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an additional +aaaa build suffix added; X.Y.Z-beta.W.C+bbbb is C commits after X.Y.Z-beta.W, with an additional +bbbb build suffix added.  Furthermore, builds that are built off of a dirty build tree, (with things in the tree that are not checked it,) it will be appended with -dirty.
+* Continuous integration versions also exist, and are versioned off of alpha and beta releases.  X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an additional +aaaa build suffix added; X.Y.Z-beta.W.C+bbbb is C commits after X.Y.Z-beta.W, with an additional +bbbb build suffix added.  Furthermore, builds that are built off of a dirty build tree, (during development, with things in the tree that are not checked it,) it will be appended with -dirty.
 
 ## Release versions as related to API versions
 
