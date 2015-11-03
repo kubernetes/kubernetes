@@ -21,7 +21,7 @@
 # are ready to commit to supporting it.
 # Experimental functionality:
 #   KUBE_SHARE_MASTER=true
-#     Detects an existing master and reuse it; useful if you want to
+#     Detect and reuse an existing master; useful if you want to
 #     create more nodes, perhaps with a different instance type or in
 #     a different subnet/AZ
 #   KUBE_SUBNET_CIDR=172.20.1.0/24
@@ -39,7 +39,7 @@ ALLOCATE_NODE_CIDRS=true
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
-# The ASG name must be unique, so we include the zone
+# The Auto Scaling Group (ASG) name must be unique, so we include the zone
 ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
 
 # We could allow the master disk volume id to be specified in future
