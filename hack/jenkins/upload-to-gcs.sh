@@ -17,10 +17,13 @@
 # Source this script in the Jenkins "Execute shell" build action to have all
 # test artifacts and the console log uploaded at the end of the test run.
 
-# For example, you might use the following line as the first command:
-# mkdir -p _tmp/ && curl -fsS --retry 3 -o _tmp/upload-to-gcs.sh \
-#   "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" \
-#   && source _tmp/upload-to-gcs.sh
+# For example, you might use the following snippet as the first few lines:
+#
+# if [[ -f ./hack/jenkins/upload-to-gcs.sh ]]; then
+#   source ./hack/jenkins/upload-to-gcs.sh
+# else
+#   curl -fsS -o upload-to-gcs.sh --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" && source upload-to-gcs.sh; rm -f upload-to-gcs.sh
+# fi
 
 # Note that this script requires the Jenkins shell binary to be set to bash, not
 # the system default (which may be dash on Debian-based systems).
