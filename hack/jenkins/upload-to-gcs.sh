@@ -72,6 +72,8 @@ function upload_logs_to_gcs() {
       cp -a "${gcs_acl}" - "${gcs_job_path}/latest-build.txt" || continue
     break  # all uploads succeeded if we hit this point
   done
+  local -r results_url=${gcs_build_path//"gs:/"/"https://storage.cloud.google.com"}
+  echo -e "\n\n\n*** View logs and artifacts at ${results_url} ***\n\n"
 }
 
 # Automatically upload logs to GCS on exit or timeout.
