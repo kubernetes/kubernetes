@@ -24,27 +24,27 @@ import (
 func TestMakeFuncs(t *testing.T) {
 	testCases := []struct {
 		fn       func() *ValidationError
-		expected ValidationErrorType
+		expected ErrorType
 	}{
 		{
 			func() *ValidationError { return NewFieldInvalid("f", "v", "d") },
-			ValidationErrorTypeInvalid,
+			ErrorTypeInvalid,
 		},
 		{
 			func() *ValidationError { return NewFieldValueNotSupported("f", "v", nil) },
-			ValidationErrorTypeNotSupported,
+			ErrorTypeNotSupported,
 		},
 		{
 			func() *ValidationError { return NewFieldDuplicate("f", "v") },
-			ValidationErrorTypeDuplicate,
+			ErrorTypeDuplicate,
 		},
 		{
 			func() *ValidationError { return NewFieldNotFound("f", "v") },
-			ValidationErrorTypeNotFound,
+			ErrorTypeNotFound,
 		},
 		{
 			func() *ValidationError { return NewFieldRequired("f") },
-			ValidationErrorTypeRequired,
+			ErrorTypeRequired,
 		},
 	}
 
@@ -59,7 +59,7 @@ func TestMakeFuncs(t *testing.T) {
 func TestValidationErrorUsefulMessage(t *testing.T) {
 	s := NewFieldInvalid("foo", "bar", "deet").Error()
 	t.Logf("message: %v", s)
-	for _, part := range []string{"foo", "bar", "deet", ValidationErrorTypeInvalid.String()} {
+	for _, part := range []string{"foo", "bar", "deet", ErrorTypeInvalid.String()} {
 		if !strings.Contains(s, part) {
 			t.Errorf("error message did not contain expected part '%v'", part)
 		}
@@ -83,7 +83,7 @@ func TestValidationErrorUsefulMessage(t *testing.T) {
 	).Error()
 	t.Logf("message: %v", s)
 	for _, part := range []string{
-		"foo", ValidationErrorTypeInvalid.String(),
+		"foo", ErrorTypeInvalid.String(),
 		"Baz", "Qux", "Inner", "KV", "detail",
 		"1", "aoeu", "asdf", "Billy", "2",
 	} {
@@ -99,10 +99,10 @@ func TestErrListFilter(t *testing.T) {
 		NewFieldInvalid("field.test", "", ""),
 		NewFieldDuplicate("test", "value"),
 	}
-	if len(list.Filter(NewValidationErrorTypeMatcher(ValidationErrorTypeDuplicate))) != 2 {
+	if len(list.Filter(NewErrorTypeMatcher(ErrorTypeDuplicate))) != 2 {
 		t.Errorf("should not filter")
 	}
-	if len(list.Filter(NewValidationErrorTypeMatcher(ValidationErrorTypeInvalid))) != 1 {
+	if len(list.Filter(NewErrorTypeMatcher(ErrorTypeInvalid))) != 1 {
 		t.Errorf("should filter")
 	}
 	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("test"))) != 1 {
@@ -114,7 +114,7 @@ func TestErrListFilter(t *testing.T) {
 	if len(list.Filter(NewValidationErrorFieldPrefixMatcher(""))) != 0 {
 		t.Errorf("should filter")
 	}
-	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("field."), NewValidationErrorTypeMatcher(ValidationErrorTypeDuplicate))) != 1 {
+	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("field."), NewErrorTypeMatcher(ErrorTypeDuplicate))) != 1 {
 		t.Errorf("should filter")
 	}
 }
