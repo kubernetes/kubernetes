@@ -88,7 +88,7 @@ func TestErrorNew(t *testing.T) {
 
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     *validation.ValidationError
+		Err     *validation.Error
 		Details *unversioned.StatusDetails
 	}{
 		{

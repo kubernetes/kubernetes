@@ -78,21 +78,21 @@ func (t ErrorType) String() string {
 	}
 }
 
-// ValidationError is an implementation of the 'error' interface, which represents an error of validation.
-type ValidationError struct {
+// Error is an implementation of the 'error' interface, which represents an error of validation.
+type Error struct {
 	Type     ErrorType
 	Field    string
 	BadValue interface{}
 	Detail   string
 }
 
-var _ error = &ValidationError{}
+var _ error = &Error{}
 
-func (v *ValidationError) Error() string {
+func (v *Error) Error() string {
 	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
 }
 
-func (v *ValidationError) ErrorBody() string {
+func (v *Error) ErrorBody() string {
 	var s string
 	switch v.Type {
 	case ErrorTypeRequired, ErrorTypeTooLong:
@@ -106,51 +106,51 @@ func (v *ValidationError) ErrorBody() string {
 	return s
 }
 
-// NewFieldRequired returns a *ValidationError indicating "value required"
-func NewFieldRequired(field string) *ValidationError {
-	return &ValidationError{ErrorTypeRequired, field, "", ""}
+// NewFieldRequired returns a *Error indicating "value required"
+func NewFieldRequired(field string) *Error {
+	return &Error{ErrorTypeRequired, field, "", ""}
 }
 
-// NewFieldInvalid returns a *ValidationError indicating "invalid value"
-func NewFieldInvalid(field string, value interface{}, detail string) *ValidationError {
-	return &ValidationError{ErrorTypeInvalid, field, value, detail}
+// NewFieldInvalid returns a *Error indicating "invalid value"
+func NewFieldInvalid(field string, value interface{}, detail string) *Error {
+	return &Error{ErrorTypeInvalid, field, value, detail}
 }
 
-// NewFieldValueNotSupported returns a *ValidationError indicating "unsupported value"
-func NewFieldValueNotSupported(field string, value interface{}, validValues []string) *ValidationError {
+// NewFieldValueNotSupported returns a *Error indicating "unsupported value"
+func NewFieldValueNotSupported(field string, value interface{}, validValues []string) *Error {
 	detail := ""
 	if validValues != nil && len(validValues) > 0 {
 		detail = "supported values: " + strings.Join(validValues, ", ")
 	}
-	return &ValidationError{ErrorTypeNotSupported, field, value, detail}
+	return &Error{ErrorTypeNotSupported, field, value, detail}
 }
 
-// NewFieldForbidden returns a *ValidationError indicating "forbidden"
-func NewFieldForbidden(field string, value interface{}) *ValidationError {
-	return &ValidationError{ErrorTypeForbidden, field, value, ""}
+// NewFieldForbidden returns a *Error indicating "forbidden"
+func NewFieldForbidden(field string, value interface{}) *Error {
+	return &Error{ErrorTypeForbidden, field, value, ""}
 }
 
-// NewFieldDuplicate returns a *ValidationError indicating "duplicate value"
-func NewFieldDuplicate(field string, value interface{}) *ValidationError {
-	return &ValidationError{ErrorTypeDuplicate, field, value, ""}
+// NewFieldDuplicate returns a *Error indicating "duplicate value"
+func NewFieldDuplicate(field string, value interface{}) *Error {
+	return &Error{ErrorTypeDuplicate, field, value, ""}
 }
 
-// NewFieldNotFound returns a *ValidationError indicating "value not found"
-func NewFieldNotFound(field string, value interface{}) *ValidationError {
-	return &ValidationError{ErrorTypeNotFound, field, value, ""}
+// NewFieldNotFound returns a *Error indicating "value not found"
+func NewFieldNotFound(field string, value interface{}) *Error {
+	return &Error{ErrorTypeNotFound, field, value, ""}
 }
 
-func NewFieldTooLong(field string, value interface{}, maxLength int) *ValidationError {
-	return &ValidationError{ErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
+func NewFieldTooLong(field string, value interface{}, maxLength int) *Error {
+	return &Error{ErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 
 type ValidationErrorList []error
 
-// Prefix adds a prefix to the Field of every ValidationError in the list.
+// Prefix adds a prefix to the Field of every Error in the list.
 // Returns the list for convenience.
 func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 	for i := range list {
-		if err, ok := list[i].(*ValidationError); ok {
+		if err, ok := list[i].(*Error); ok {
 			if strings.HasPrefix(err.Field, "[") {
 				err.Field = prefix + err.Field
 			} else if len(err.Field) != 0 {
@@ -160,23 +160,23 @@ func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 			}
 			list[i] = err
 		} else {
-			panic(fmt.Sprintf("Programmer error: ValidationErrorList holds non-ValidationError: %#v", list[i]))
+			panic(fmt.Sprintf("Programmer error: ValidationErrorList holds non-Error: %#v", list[i]))
 		}
 	}
 	return list
 }
 
-// PrefixIndex adds an index to the Field of every ValidationError in the list.
+// PrefixIndex adds an index to the Field of every Error in the list.
 // Returns the list for convenience.
 func (list ValidationErrorList) PrefixIndex(index int) ValidationErrorList {
 	return list.Prefix(fmt.Sprintf("[%d]", index))
 }
 
 // NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
-// if the provided error is a ValidationError and has the provided ErrorType.
+// if the provided error is a Error and has the provided ErrorType.
 func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 	return func(err error) bool {
-		if e, ok := err.(*ValidationError); ok {
+		if e, ok := err.(*Error); ok {
 			return e.Type == t
 		}
 		return false
@@ -184,11 +184,11 @@ func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 }
 
 // NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
-// if the provided error is a ValidationError and has a field with the provided
+// if the provided error is a Error and has a field with the provided
 // prefix.
 func NewValidationErrorFieldPrefixMatcher(prefix string) utilerrors.Matcher {
 	return func(err error) bool {
-		if e, ok := err.(*ValidationError); ok {
+		if e, ok := err.(*Error); ok {
 			return strings.HasPrefix(e.Field, prefix)
 		}
 		return false
