@@ -253,7 +253,22 @@ function start_controller_manager {
 
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
+
+    mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
+      # On selinux enabled systems, it might
+      # require to relabel /var/lib/kubelet
+      if which selinuxenabled &> /dev/null && \
+         selinuxenabled && \
+         which chcon > /dev/null ; then
+         if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
+            echo "Applying SELinux label to /var/lib/kubelet directory."
+            if ! chcon -R system_u:object_r:svirt_sandbox_file_t:s0 /var/lib/kubelet; then
+               echo "Failed to apply selinux label to /var/lib/kubelet."
+            fi
+	 fi
+      fi
+
       sudo -E "${GO_OUT}/kubelet" ${priv_arg}\
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
@@ -277,7 +292,7 @@ function start_kubelet {
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
         --volume=/var/lib/docker/:/var/lib/docker:ro \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw,z \
         --net=host \
         --privileged=true \
         -i \
