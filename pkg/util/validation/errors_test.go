@@ -94,7 +94,7 @@ func TestErrorUsefulMessage(t *testing.T) {
 }
 
 func TestErrListFilter(t *testing.T) {
-	list := ValidationErrorList{
+	list := ErrorList{
 		NewFieldInvalid("test.field", "", ""),
 		NewFieldInvalid("field.test", "", ""),
 		NewFieldDuplicate("test", "value"),
@@ -138,7 +138,7 @@ func TestErrListPrefix(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errList := ValidationErrorList{testCase.Err}
+		errList := ErrorList{testCase.Err}
 		prefix := errList.Prefix("foo")
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("Prefix should return self")
@@ -168,7 +168,7 @@ func TestErrListPrefixIndex(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errList := ValidationErrorList{testCase.Err}
+		errList := ErrorList{testCase.Err}
 		prefix := errList.PrefixIndex(1)
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("PrefixIndex should return self")

@@ -129,10 +129,10 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 	binding := obj.(*api.Binding)
 	// TODO: move me to a binding strategy
 	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
-		return nil, errors.NewInvalid("binding", binding.Name, validation.ValidationErrorList{validation.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty or 'Node'")})
+		return nil, errors.NewInvalid("binding", binding.Name, validation.ErrorList{validation.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty or 'Node'")})
 	}
 	if len(binding.Target.Name) == 0 {
-		return nil, errors.NewInvalid("binding", binding.Name, validation.ValidationErrorList{validation.NewFieldRequired("to.name")})
+		return nil, errors.NewInvalid("binding", binding.Name, validation.ErrorList{validation.NewFieldRequired("to.name")})
 	}
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &unversioned.Status{Status: unversioned.StatusSuccess}

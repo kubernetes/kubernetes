@@ -46,7 +46,7 @@ func (strategy) PrepareForCreate(obj runtime.Object) {
 	cleanSecretReferences(obj.(*api.ServiceAccount))
 }
 
-func (strategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (strategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateServiceAccount(obj.(*api.ServiceAccount))
 }
 
@@ -68,7 +68,7 @@ func cleanSecretReferences(serviceAccount *api.ServiceAccount) {
 	}
 }
 
-func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateServiceAccountUpdate(obj.(*api.ServiceAccount), old.(*api.ServiceAccount))
 }
 

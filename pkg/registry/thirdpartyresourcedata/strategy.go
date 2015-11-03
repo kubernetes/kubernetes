@@ -51,7 +51,7 @@ func (strategy) NamespaceScoped() bool {
 func (strategy) PrepareForCreate(obj runtime.Object) {
 }
 
-func (strategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (strategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateThirdPartyResourceData(obj.(*extensions.ThirdPartyResourceData))
 }
 
@@ -66,7 +66,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidateThirdPartyResourceDataUpdate(obj.(*extensions.ThirdPartyResourceData), old.(*extensions.ThirdPartyResourceData))
 }
 

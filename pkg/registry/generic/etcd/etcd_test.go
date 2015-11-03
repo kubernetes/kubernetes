@@ -49,10 +49,10 @@ func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUncon
 
 func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object)      {}
 func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
-func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) validation.ValidationErrorList {
+func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) validation.ErrorList {
 	return nil
 }
-func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) validation.ValidationErrorList {
+func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) validation.ErrorList {
 	return nil
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}

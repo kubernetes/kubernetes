@@ -144,11 +144,11 @@ func NewFieldTooLong(field string, value interface{}, maxLength int) *Error {
 	return &Error{ErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 
-type ValidationErrorList []error
+type ErrorList []error
 
 // Prefix adds a prefix to the Field of every Error in the list.
 // Returns the list for convenience.
-func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
+func (list ErrorList) Prefix(prefix string) ErrorList {
 	for i := range list {
 		if err, ok := list[i].(*Error); ok {
 			if strings.HasPrefix(err.Field, "[") {
@@ -160,7 +160,7 @@ func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 			}
 			list[i] = err
 		} else {
-			panic(fmt.Sprintf("Programmer error: ValidationErrorList holds non-Error: %#v", list[i]))
+			panic(fmt.Sprintf("Programmer error: ErrorList holds non-Error: %#v", list[i]))
 		}
 	}
 	return list
@@ -168,7 +168,7 @@ func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 
 // PrefixIndex adds an index to the Field of every Error in the list.
 // Returns the list for convenience.
-func (list ValidationErrorList) PrefixIndex(index int) ValidationErrorList {
+func (list ErrorList) PrefixIndex(index int) ErrorList {
 	return list.Prefix(fmt.Sprintf("[%d]", index))
 }
 
@@ -195,13 +195,13 @@ func NewValidationErrorFieldPrefixMatcher(prefix string) utilerrors.Matcher {
 	}
 }
 
-// Filter removes items from the ValidationErrorList that match the provided fns.
-func (list ValidationErrorList) Filter(fns ...utilerrors.Matcher) ValidationErrorList {
+// Filter removes items from the ErrorList that match the provided fns.
+func (list ErrorList) Filter(fns ...utilerrors.Matcher) ErrorList {
 	err := utilerrors.FilterOut(utilerrors.NewAggregate(list), fns...)
 	if err == nil {
 		return nil
 	}
 	// FilterOut that takes an Aggregate returns an Aggregate
 	agg := err.(utilerrors.Aggregate)
-	return ValidationErrorList(agg.Errors())
+	return ErrorList(agg.Errors())
 }

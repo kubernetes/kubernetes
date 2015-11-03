@@ -159,7 +159,7 @@ func NewConflict(kind, name string, err error) error {
 }
 
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
-func NewInvalid(kind, name string, errs validation.ValidationErrorList) error {
+func NewInvalid(kind, name string, errs validation.ErrorList) error {
 	causes := make([]unversioned.StatusCause, 0, len(errs))
 	for i := range errs {
 		if err, ok := errs[i].(*validation.Error); ok {

@@ -48,7 +48,7 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
 	pv.Status = api.PersistentVolumeClaimStatus{}
 }
 
-func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ValidationErrorList {
+func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	return validation.ValidatePersistentVolumeClaim(pvc)
 }
@@ -68,7 +68,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPvc.Status = oldPvc.Status
 }
 
-func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
 }
@@ -90,7 +90,7 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Obj
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ValidationErrorList {
+func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
 	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 
