@@ -1497,7 +1497,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) validation.ValidationErrorList 
 	// Clear status
 	oldNode.Status = node.Status
 
-	// TODO: Add a 'real' ValidationError type for this error and provide print actual diffs.
+	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !api.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or capacity changes"))

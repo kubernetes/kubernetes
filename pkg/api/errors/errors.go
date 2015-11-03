@@ -162,7 +162,7 @@ func NewConflict(kind, name string, err error) error {
 func NewInvalid(kind, name string, errs validation.ValidationErrorList) error {
 	causes := make([]unversioned.StatusCause, 0, len(errs))
 	for i := range errs {
-		if err, ok := errs[i].(*validation.ValidationError); ok {
+		if err, ok := errs[i].(*validation.Error); ok {
 			causes = append(causes, unversioned.StatusCause{
 				Type:    unversioned.CauseType(err.Type),
 				Message: err.ErrorBody(),

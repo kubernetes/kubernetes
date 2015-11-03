@@ -36,7 +36,7 @@ import (
 
 func expectPrefix(t *testing.T, prefix string, errs validation.ValidationErrorList) {
 	for i := range errs {
-		if f, p := errs[i].(*validation.ValidationError).Field, prefix; !strings.HasPrefix(f, p) {
+		if f, p := errs[i].(*validation.Error).Field, prefix; !strings.HasPrefix(f, p) {
 			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])
 		}
 	}
@@ -150,7 +150,7 @@ func TestValidateLabels(t *testing.T) {
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		} else {
-			detail := errs[0].(*validation.ValidationError).Detail
+			detail := errs[0].(*validation.Error).Detail
 			if detail != qualifiedNameErrorMsg {
 				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
 			}
@@ -168,7 +168,7 @@ func TestValidateLabels(t *testing.T) {
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		} else {
-			detail := errs[0].(*validation.ValidationError).Detail
+			detail := errs[0].(*validation.Error).Detail
 			if detail != labelValueErrorMsg {
 				t.Errorf("error detail %s should be equal %s", detail, labelValueErrorMsg)
 			}
@@ -215,7 +215,7 @@ func TestValidateAnnotations(t *testing.T) {
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		}
-		detail := errs[0].(*validation.ValidationError).Detail
+		detail := errs[0].(*validation.Error).Detail
 		if detail != qualifiedNameErrorMsg {
 			t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
 		}
@@ -568,13 +568,13 @@ func TestValidateVolumes(t *testing.T) {
 			continue
 		}
 		for i := range errs {
-			if errs[i].(*validation.ValidationError).Type != v.T {
+			if errs[i].(*validation.Error).Type != v.T {
 				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
 			}
-			if errs[i].(*validation.ValidationError).Field != v.F {
+			if errs[i].(*validation.Error).Field != v.F {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
-			detail := errs[i].(*validation.ValidationError).Detail
+			detail := errs[i].(*validation.Error).Detail
 			if detail != v.D {
 				t.Errorf("%s: expected error detail \"%s\", got \"%s\"", k, v.D, detail)
 			}
@@ -627,13 +627,13 @@ func TestValidatePorts(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			if errs[i].(*validation.ValidationError).Type != v.T {
+			if errs[i].(*validation.Error).Type != v.T {
 				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
 			}
-			if errs[i].(*validation.ValidationError).Field != v.F {
+			if errs[i].(*validation.Error).Field != v.F {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
-			detail := errs[i].(*validation.ValidationError).Detail
+			detail := errs[i].(*validation.Error).Detail
 			if detail != v.D {
 				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
 			}
@@ -772,7 +772,7 @@ func TestValidateEnv(t *testing.T) {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
-				str := errs[i].(*validation.ValidationError).Error()
+				str := errs[i].(*validation.Error).Error()
 				if str != "" && str != tc.expectedError {
 					t.Errorf("%s: expected error detail either empty or %s, got %s", tc.name, tc.expectedError, str)
 				}
@@ -2560,7 +2560,7 @@ func TestValidateReplicationController(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(*validation.ValidationError).Field
+			field := errs[i].(*validation.Error).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
 				field != "metadata.name" &&
 				field != "metadata.namespace" &&
@@ -2676,7 +2676,7 @@ func TestValidateNode(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(*validation.ValidationError).Field
+			field := errs[i].(*validation.Error).Field
 			expectedFields := map[string]bool{
 				"metadata.name":        true,
 				"metadata.labels":      true,
@@ -3008,7 +3008,7 @@ func TestValidateResourceNames(t *testing.T) {
 		} else if len(err) == 0 && !item.success {
 			t.Errorf("expected failure for input %q", item.input)
 			for i := range err {
-				detail := err[i].(*validation.ValidationError).Detail
+				detail := err[i].(*validation.Error).Detail
 				if detail != "" && detail != qualifiedNameErrorMsg {
 					t.Errorf("%d: expected error detail either empty or %s, got %s", k, qualifiedNameErrorMsg, detail)
 				}
@@ -3224,7 +3224,7 @@ func TestValidateLimitRange(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			detail := errs[i].(*validation.ValidationError).Detail
+			detail := errs[i].(*validation.Error).Detail
 			if detail != v.D {
 				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
 			}
@@ -3329,8 +3329,8 @@ func TestValidateResourceQuota(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(*validation.ValidationError).Field
-			detail := errs[i].(*validation.ValidationError).Detail
+			field := errs[i].(*validation.Error).Field
+			detail := errs[i].(*validation.Error).Detail
 			if field != "metadata.name" && field != "metadata.namespace" && !api.IsStandardResourceName(field) {
 				t.Errorf("%s: missing prefix for: %v", k, field)
 			}
@@ -3937,7 +3937,7 @@ func TestValidateEndpoints(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].(*validation.ValidationError).Type != v.errorType || !strings.Contains(errs[0].(*validation.ValidationError).Detail, v.errorDetail) {
+		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].(*validation.Error).Type != v.errorType || !strings.Contains(errs[0].(*validation.Error).Detail, v.errorDetail) {
 			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
 		}
 	}
@@ -4017,7 +4017,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateSecurityContext(v.sc); len(errs) == 0 || errs[0].(*validation.ValidationError).Type != v.errorType || errs[0].(*validation.ValidationError).Detail != v.errorDetail {
+		if errs := ValidateSecurityContext(v.sc); len(errs) == 0 || errs[0].(*validation.Error).Type != v.errorType || errs[0].(*validation.Error).Detail != v.errorDetail {
 			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
 		}
 	}

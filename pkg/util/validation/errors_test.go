@@ -23,27 +23,27 @@ import (
 
 func TestMakeFuncs(t *testing.T) {
 	testCases := []struct {
-		fn       func() *ValidationError
+		fn       func() *Error
 		expected ErrorType
 	}{
 		{
-			func() *ValidationError { return NewFieldInvalid("f", "v", "d") },
+			func() *Error { return NewFieldInvalid("f", "v", "d") },
 			ErrorTypeInvalid,
 		},
 		{
-			func() *ValidationError { return NewFieldValueNotSupported("f", "v", nil) },
+			func() *Error { return NewFieldValueNotSupported("f", "v", nil) },
 			ErrorTypeNotSupported,
 		},
 		{
-			func() *ValidationError { return NewFieldDuplicate("f", "v") },
+			func() *Error { return NewFieldDuplicate("f", "v") },
 			ErrorTypeDuplicate,
 		},
 		{
-			func() *ValidationError { return NewFieldNotFound("f", "v") },
+			func() *Error { return NewFieldNotFound("f", "v") },
 			ErrorTypeNotFound,
 		},
 		{
-			func() *ValidationError { return NewFieldRequired("f") },
+			func() *Error { return NewFieldRequired("f") },
 			ErrorTypeRequired,
 		},
 	}
@@ -56,7 +56,7 @@ func TestMakeFuncs(t *testing.T) {
 	}
 }
 
-func TestValidationErrorUsefulMessage(t *testing.T) {
+func TestErrorUsefulMessage(t *testing.T) {
 	s := NewFieldInvalid("foo", "bar", "deet").Error()
 	t.Logf("message: %v", s)
 	for _, part := range []string{"foo", "bar", "deet", ErrorTypeInvalid.String()} {
@@ -121,7 +121,7 @@ func TestErrListFilter(t *testing.T) {
 
 func TestErrListPrefix(t *testing.T) {
 	testCases := []struct {
-		Err      *ValidationError
+		Err      *Error
 		Expected string
 	}{
 		{
@@ -143,7 +143,7 @@ func TestErrListPrefix(t *testing.T) {
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("Prefix should return self")
 		}
-		if e, a := testCase.Expected, errList[0].(*ValidationError).Field; e != a {
+		if e, a := testCase.Expected, errList[0].(*Error).Field; e != a {
 			t.Errorf("expected %s, got %s", e, a)
 		}
 	}
@@ -151,7 +151,7 @@ func TestErrListPrefix(t *testing.T) {
 
 func TestErrListPrefixIndex(t *testing.T) {
 	testCases := []struct {
-		Err      *ValidationError
+		Err      *Error
 		Expected string
 	}{
 		{
@@ -173,7 +173,7 @@ func TestErrListPrefixIndex(t *testing.T) {
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("PrefixIndex should return self")
 		}
-		if e, a := testCase.Expected, errList[0].(*ValidationError).Field; e != a {
+		if e, a := testCase.Expected, errList[0].(*Error).Field; e != a {
 			t.Errorf("expected %s, got %s", e, a)
 		}
 	}
