@@ -59,7 +59,7 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.Name()
-	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+	if ok, msg := validation.IsValidPathSegmentName(name); !ok {
 		return "", fmt.Errorf("invalid name: %v", msg)
 	}
 	return prefix + "/" + meta.Namespace() + "/" + meta.Name(), nil
@@ -71,7 +71,7 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.Name()
-	if ok, msg := validation.ValidatePathSegmentName(name, false); !ok {
+	if ok, msg := validation.IsValidPathSegmentName(name); !ok {
 		return "", fmt.Errorf("invalid name: %v", msg)
 	}
 	return prefix + "/" + meta.Name(), nil
