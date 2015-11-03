@@ -30,6 +30,13 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"sync"
+)
+
+const (
+	Interval = time.Second * 1
+	Timeout  = time.Minute * 5
 )
 
 type DeploymentController struct {
@@ -84,8 +91,61 @@ func (d *DeploymentController) reconcileDeployment(deployment *extensions.Deploy
 }
 
 func (d *DeploymentController) reconcileRecreateDeployment(deployment extensions.Deployment) error {
-	// TODO: implement me.
-	return nil
+	oldRCs, err := d.getOldRCs(deployment)
+	if err != nil {
+		return err
+	}
+
+	// kill all existing pods for old rcs
+	waitScale := sync.WaitGroup{}
+	waitScale.Add(len(oldRCs))
+	for oldRC := range oldRCs {
+		go func(rc *api.ReplicationController) {
+			defer waitScale.Done()
+			if _, err := d.scaleRCAndRecordEvent(rc, 0, d); err != nil {
+				return err
+			}
+		}(oldRC)
+	}
+	waitScale.Wait()
+
+	// waite for all pods killed, then delete all old rcs
+	if err := wait.Poll(Interval, Timeout, client.ControllerHasDesiredReplicas(d.client, oldRCs[0])); err != nil {
+		return err
+	}
+
+	waitDelete := sync.WaitGroup{}
+	waitDelete.Add(len(oldRCs))
+	for oldRC := range oldRCs {
+		go func(rc *api.ReplicationController) {
+			defer waitDelete.Done()
+			if err := d.client.ReplicationControllers(rc.Namespace).Delete(rc.Name); err != nil {
+				return err
+			}
+		}(oldRC)
+	}
+	waitDelete.Wait()
+
+	// create new rc
+	newRC, err := d.getNewRC(deployment)
+	if err != nil {
+		return err
+	}
+	if _, err := d.scaleRCAndRecordEvent(newRC, deployment.Spec.Replicas, d); err != nil {
+		return err
+	}
+
+	// update deployment status
+	oldRCs, err = d.getOldRCs(deployment)
+	if err != nil {
+		return err
+	}
+	newRC, err = d.getNewRC(deployment)
+	if err != nil {
+		return err
+	}
+	allRCs := append(oldRCs, newRC)
+	return d.updateDeploymentStatus(allRCs, newRC, deployment)
 }
 
 func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment extensions.Deployment) error {
