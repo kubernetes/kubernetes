@@ -245,6 +245,7 @@ func ValidateImmutableField(old, new interface{}, fieldName string) errs.Validat
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
+// It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
