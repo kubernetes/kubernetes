@@ -374,12 +374,12 @@ function kube::release::parse_and_validate_release_version() {
 #    local -r version_minor="${BASH_REMATCH[2]}"
 #    local -r version_patch="${BASH_REMATCH[3]}"
 #    local -r version_prerelease="${BASH_REMATCH[4]}"
-#    local -r version_alpha_rev="${BASH_REMATCH[5]}"
+#    local -r version_prerelease_rev="${BASH_REMATCH[5]}"
 #    local -r version_build_info="${BASH_REMATCH[6]}"
 #    local -r version_commits="${BASH_REMATCH[7]}"
 function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.0.456+abcd789-dirty" or "v1.2.3-beta.456"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha\\.(0|[1-9][0-9]*))(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+  # Accept things like "v1.2.3-alpha.0.456+abcd789-dirty" or "v1.2.3-beta.0.456"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
     kube::log::error "Invalid ci version: '${version}'"
@@ -1213,7 +1213,7 @@ function kube::release::gcs::verify_ci_ge() {
   local -r version_minor="${BASH_REMATCH[2]}"
   local -r version_patch="${BASH_REMATCH[3]}"
   local -r version_prerelease="${BASH_REMATCH[4]}"
-  local -r version_alpha_rev="${BASH_REMATCH[5]}"
+  local -r version_prerelease_rev="${BASH_REMATCH[5]}"
   local -r version_commits="${BASH_REMATCH[7]}"
 
   local gcs_version
@@ -1227,7 +1227,7 @@ function kube::release::gcs::verify_ci_ge() {
     local -r gcs_version_minor="${BASH_REMATCH[2]}"
     local -r gcs_version_patch="${BASH_REMATCH[3]}"
     local -r gcs_version_prerelease="${BASH_REMATCH[4]}"
-    local -r gcs_version_alpha_rev="${BASH_REMATCH[5]}"
+    local -r gcs_version_prerelease_rev="${BASH_REMATCH[5]}"
     local -r gcs_version_commits="${BASH_REMATCH[7]}"
 
     local greater=true
@@ -1243,14 +1243,15 @@ function kube::release::gcs::verify_ci_ge() {
       greater=false
     elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
       : # fall out
-    elif [[ "${version_prerelease}" =~ alpha.* && "${gcs_version_prerelease}" == "beta" ]]; then
+    # Use lexicographic (instead of integer) comparison because
+    # version_prerelease is a string, ("alpha" or "beta")
+    elif [[ "${version_prerelease}" < "${gcs_version_prerelease}" ]]; then
       greater=false
-    elif [[ "${version_prerelease}" == "beta" && "${gcs_version_prerelease}" =~ alpha.* ]]; then
+    elif [[ "${version_prerelease}" > "${gcs_version_prerelease}" ]]; then
       : # fall out
-    # Check the alpha revision; if they are both beta, this is just comparing empty strings.
-    elif [[ "${version_alpha_rev}" -lt "${gcs_version_alpha_rev}" ]]; then
+    elif [[ "${version_prerelease_rev}" -lt "${gcs_version_prerelease_rev}" ]]; then
       greater=false
-    elif [[ "${version_alpha_rev}" -gt "${gcs_version_alpha_rev}" ]]; then
+    elif [[ "${version_prerelease_rev}" -gt "${gcs_version_prerelease_rev}" ]]; then
       : # fall out
     elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
       greater=false
