@@ -46,6 +46,8 @@ type RESTClient struct {
 	// used.
 	Client HTTPClient
 
+	// Timeout will be converted to a query parameter and be sent with the request to the API
+	// server. The API server will fail the request if it does not finish within timeout.
 	Timeout time.Duration
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
