@@ -1,0 +1,94 @@
+{
+	"ImportPath": "github.com/coreos/flannel",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/goauth2/compute/serviceaccount",
+			"Comment": "weekly-56",
+			"Rev": "afe77d958c701557ec5dc56f6936fcc194d15520"
+		},
+		{
+			"ImportPath": "code.google.com/p/goauth2/oauth",
+			"Comment": "weekly-56",
+			"Rev": "afe77d958c701557ec5dc56f6936fcc194d15520"
+		},
+		{
+			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
+			"Comment": "release-107",
+			"Rev": "6ddfebb10ece847f1ae09c701834f1b15abbd8b2"
+		},
+		{
+			"ImportPath": "code.google.com/p/google-api-go-client/googleapi",
+			"Comment": "release-107",
+			"Rev": "6ddfebb10ece847f1ae09c701834f1b15abbd8b2"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/client",
+			"Comment": "v2.1.1-85-gff0b872",
+			"Rev": "ff0b8723c747e76d2651bcddaff26563128ab216"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/transport",
+			"Comment": "v2.1.1-85-gff0b872",
+			"Rev": "ff0b8723c747e76d2651bcddaff26563128ab216"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.1.1-85-gff0b872",
+			"Rev": "ff0b8723c747e76d2651bcddaff26563128ab216"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-iptables/iptables",
+			"Rev": "74b0926558061d3a23824e9c18c9cf9c1b9c11f4"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-systemd/activation",
+			"Comment": "v2-26-ga606a1e",
+			"Rev": "a606a1e936df81b70d85448221c7b1c6d8a74ef1"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-systemd/daemon",
+			"Comment": "v2-26-ga606a1e",
+			"Rev": "a606a1e936df81b70d85448221c7b1c6d8a74ef1"
+		},
+		{
+			"ImportPath": "github.com/coreos/pkg/flagutil",
+			"Rev": "b0d3d81732aea341039d191d8618a3466fe54395"
+		},
+		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "d1c4472bf2efd3826f2b5bdcc02d8416798d678c"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "50c25fb3b2b3b3cc724e9b6ac75fb44b3bccd0da"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "e444e69cbd2e2e3e0749a2f3c717cec491552bbf"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/aws",
+			"Rev": "caaaea8b30ee15616494ee68abd5d8ebbbef05cf"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/ec2",
+			"Rev": "caaaea8b30ee15616494ee68abd5d8ebbbef05cf"
+		},
+		{
+			"ImportPath": "github.com/vaughan0/go-ini",
+			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netlink",
+			"Rev": "991a7a2fa7c073968fb27f36669df199b1fdf412"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "1dfe7915deaf3f80b962c163b918868d8a6d8974"
+		}
+	]
+}

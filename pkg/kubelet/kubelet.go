@@ -110,6 +110,8 @@ const (
 	housekeepingMinimumPeriod = time.Second * 2
 
 	etcHostsPath = "/etc/hosts"
+	// TODO: Pipe as cmd line arg
+	useDefaultOverlay = true
 )
 
 var (
@@ -196,7 +198,8 @@ func NewMainKubelet(
 	daemonEndpoints *api.NodeDaemonEndpoints,
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
-) (*Kubelet, error) {
+	useDefaultOverlay bool,
+	networkConfig string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -308,6 +311,15 @@ func NewMainKubelet(
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
+
+		// Flannel parameters
+		useDefaultOverlay: useDefaultOverlay && kubeClient != nil,
+		networkConfig:     networkConfig,
+	}
+	if klet.useDefaultOverlay {
+		// TODO: Don't cast client, don't hardcode flannel as overlay etc
+		klet.flannelServer = NewFlannelServer(kubeClient.(*client.Client), klet.networkConfig)
+		go klet.flannelServer.RunServer(util.NeverStop)
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -642,6 +654,13 @@ type Kubelet struct {
 
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *api.NodeDaemonEndpoints
+
+	// Flannel parameters
+	useDefaultOverlay bool
+	networkConfig     string
+
+	// Serves flannel interface over http
+	flannelServer *FlannelServer
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -2436,6 +2455,21 @@ func (kl *Kubelet) syncNetworkStatus() {
 
 	networkConfigured := true
 	if kl.configureCBR0 {
+		// We need to wait for flannel to write the mtu before restarting docker
+		// Note that the podCIDR returned by flannel is the same as the one
+		// received from the nodecontroller, so we can safely ignore it.
+		if kl.useDefaultOverlay && !kl.networkConfigured {
+			podCIDR, err := kl.flannelServer.Handshake()
+			if err != nil {
+				glog.Infof(" server handshake failed %v", err)
+				return
+			}
+			if kl.podCIDR != podCIDR {
+				glog.Warningf(
+					"Kubelet and flannel pod cidrs don't match, kubelet %v flannel %v",
+					kl.podCIDR, podCIDR)
+			}
+		}
 		if err := ensureIPTablesMasqRule(); err != nil {
 			networkConfigured = false
 			glog.Errorf("Error on adding ip table rules: %v", err)

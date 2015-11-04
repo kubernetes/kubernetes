@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+ORG_PATH="github.com/coreos"
+REPO_PATH="${ORG_PATH}/flannel"
+
+if [ ! -h gopath/src/${REPO_PATH} ]; then
+	mkdir -p gopath/src/${ORG_PATH}
+	ln -s ../../../.. gopath/src/${REPO_PATH} || exit 255
+fi
+
+export GOBIN=${PWD}/bin
+export GOPATH=${PWD}/gopath
+
+eval $(go env)
+
+if [ ${GOOS} = "linux" ]; then
+	echo "Building flanneld..."
+	go build -o ${GOBIN}/flanneld ${REPO_PATH}
+else
+	echo "Not on Linux - skipping flanneld build"
+fi
