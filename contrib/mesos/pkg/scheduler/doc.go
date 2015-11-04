@@ -19,6 +19,7 @@ package scheduler
 
 // Created from contrib/mesos/docs/scheduler.monopic:
 //
+//
 //                     ┌───────────────────────────────────────────────────────────────────────┐
 //                     │                ┌───────────────────────────────────────┐            ┌─┴──────────────────────┐             ┌───────────────┐
 //               ┌─────▼─────┐          │Queuer                                 │  Await()   │       podUpdates       │             │               │
@@ -31,7 +32,7 @@ package scheduler
 //                                     ││                                        │                     │    ┌────────────────────┼─────────────────┐
 //                 ┌───────────────────┼┼──────────────────────────────────────┐ │ ┌───────────────────┼────┼───────────┐        │                 │
 //     ┌───────────▼──────────┐┌───────┴┴───────┐   ┌───────────────────┐   ┌──┴─┴─┴──────┐   ┌────────┴────┴───┐  ┌────▼────────▼─────────────┐   │
-//     │Binder (task launcher)││Deleter         │   │PodReconciler      │   │SchedulerLoop│   │  ErrorHandler   │  │SchedulerAlgorithm         │   │
+//     │Binder (task launcher)││Deleter         │   │PodReconciler      │   │Controller   │   │  ErrorHandler   │  │SchedulerAlgorithm         │   │
 //     │- Bind(binding)       ││- DeleteOne(pod)│   │- Reconcile(pod)   │   │- Run()      │   │- Error(pod, err)│  │- Schedule(pod) -> NodeName│   │
 //     │                      ││                │◀──│                   │   │             │──▶│                 │  │                           │   │
 //     │               ┌─────┐││    ┌─────┐     │   │      ┌─────┐      │   │   ┌─────┐   │   │    ┌─────┐      │  │┌─────┐                    │   │
