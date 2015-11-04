@@ -21,7 +21,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"reflect"
 	"sync"
 	"time"
 
@@ -669,7 +668,7 @@ func (k *framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, ta
 
 	// tell mesos to send us the latest status updates for all the non-terminal tasks that we know about
 	statusList := []*mesos.TaskStatus{}
-	remaining := sets.KeySet(reflect.ValueOf(taskToSlave))
+	remaining := sets.StringKeySet(taskToSlave)
 	for taskId, slaveId := range taskToSlave {
 		if slaveId == "" {
 			delete(taskToSlave, taskId)

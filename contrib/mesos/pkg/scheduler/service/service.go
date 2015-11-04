@@ -156,11 +156,11 @@ type SchedulerServer struct {
 	nodeRelistPeriod              time.Duration
 	sandboxOverlay                string
 
-	executable                    string // path to the binary running this service
-	client                        *client.Client
-	driver                        bindings.SchedulerDriver
-	driverMutex                   sync.RWMutex
-	mux                           *http.ServeMux
+	executable  string // path to the binary running this service
+	client      *client.Client
+	driver      bindings.SchedulerDriver
+	driverMutex sync.RWMutex
+	mux         *http.ServeMux
 }
 
 // useful for unit testing specific funcs
