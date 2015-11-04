@@ -43,7 +43,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// Scheduler implements types.Scheduler
+// sched implements the Scheduler interface.
 type sched struct {
 	podReconciler podreconciler.PodReconciler
 	framework     framework.Framework
