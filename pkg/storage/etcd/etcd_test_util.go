@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/runtime"
@@ -49,8 +48,14 @@ type EtcdTestServer struct {
 	hss         []*httptest.Server
 }
 
+type testingInterface interface {
+	Fatalf(string, ...interface{})
+	Fatal(...interface{})
+	Errorf(string, ...interface{})
+}
+
 // newLocalListener opens a port localhost using any port
-func newLocalListener(t *testing.T) net.Listener {
+func newLocalListener(t testingInterface) net.Listener {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +64,7 @@ func newLocalListener(t *testing.T) net.Listener {
 }
 
 // configureTestCluster will set the params to start an etcd server
-func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
+func configureTestCluster(t testingInterface, name string) *EtcdTestServer {
 	var err error
 	m := &EtcdTestServer{}
 
@@ -101,7 +106,7 @@ func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 }
 
 // launch will attempt to start the etcd server
-func (m *EtcdTestServer) launch(t *testing.T) error {
+func (m *EtcdTestServer) launch(t testingInterface) error {
 	var err error
 	if m.s, err = etcdserver.NewServer(&m.ServerConfig); err != nil {
 		return fmt.Errorf("failed to initialize the etcd server: %v", err)
@@ -129,7 +134,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 }
 
 // Terminate will shutdown the running etcd server
-func (m *EtcdTestServer) Terminate(t *testing.T) {
+func (m *EtcdTestServer) Terminate(t testingInterface) {
 	m.client.(*goetcd.Client).Close()
 	m.s.Stop()
 	for _, hs := range m.hss {
@@ -142,7 +147,7 @@ func (m *EtcdTestServer) Terminate(t *testing.T) {
 }
 
 // NewEtcdTestClientServer creates a new client and server for testing
-func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
+func NewEtcdTestClientServer(t testingInterface) *EtcdTestServer {
 	server := configureTestCluster(t, "foo")
 	err := server.launch(t)
 	if err != nil {
