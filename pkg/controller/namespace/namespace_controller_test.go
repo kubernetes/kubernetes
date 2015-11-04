@@ -74,9 +74,8 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 }
 
 func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIVersions) {
-	mockClient := &testclient.Fake{}
 	now := unversioned.Now()
-	testNamespace := &api.Namespace{
+	testNamespacePendingFinalize := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test",
 			ResourceVersion:   "1",
@@ -89,26 +88,21 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 			Phase: api.NamespaceTerminating,
 		},
 	}
-
-	if containsVersion(versions, "extensions/v1beta1") {
-		resources := []unversioned.APIResource{}
-		for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingresses"} {
-			resources = append(resources, unversioned.APIResource{Name: resource})
-		}
-		mockClient.Resources = map[string]*unversioned.APIResourceList{
-			"extensions/v1beta1": {
-				GroupVersion: "extensions/v1beta1",
-				APIResources: resources,
-			},
-		}
+	testNamespaceFinalizeComplete := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test",
+			ResourceVersion:   "1",
+			DeletionTimestamp: &now,
+		},
+		Spec: api.NamespaceSpec{},
+		Status: api.NamespaceStatus{
+			Phase: api.NamespaceTerminating,
+		},
 	}
 
-	err := syncNamespace(mockClient, versions, testNamespace)
-	if err != nil {
-		t.Errorf("Unexpected error when synching namespace %v", err)
-	}
 	// TODO: Reuse the constants for all these strings from testclient
-	expectedActionSet := sets.NewString(
+	pendingActionSet := sets.NewString(
+		strings.Join([]string{"get", "namespaces", ""}, "-"),
 		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
 		strings.Join([]string{"list", "services", ""}, "-"),
 		strings.Join([]string{"list", "pods", ""}, "-"),
@@ -119,11 +113,10 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		strings.Join([]string{"list", "serviceaccounts", ""}, "-"),
 		strings.Join([]string{"list", "persistentvolumeclaims", ""}, "-"),
 		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
-		strings.Join([]string{"delete", "namespaces", ""}, "-"),
 	)
 
 	if containsVersion(versions, "extensions/v1beta1") {
-		expectedActionSet.Insert(
+		pendingActionSet.Insert(
 			strings.Join([]string{"list", "daemonsets", ""}, "-"),
 			strings.Join([]string{"list", "deployments", ""}, "-"),
 			strings.Join([]string{"list", "jobs", ""}, "-"),
@@ -133,15 +126,51 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		)
 	}
 
-	actionSet := sets.NewString()
-	for _, action := range mockClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+	scenarios := map[string]struct {
+		testNamespace     *api.Namespace
+		expectedActionSet sets.String
+	}{
+		"pending-finalize": {
+			testNamespace:     testNamespacePendingFinalize,
+			expectedActionSet: pendingActionSet,
+		},
+		"complete-finalize": {
+			testNamespace: testNamespaceFinalizeComplete,
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"get", "namespaces", ""}, "-"),
+				strings.Join([]string{"delete", "namespaces", ""}, "-"),
+			),
+		},
 	}
-	if !actionSet.HasAll(expectedActionSet.List()...) {
-		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
-	}
-	if !expectedActionSet.HasAll(actionSet.List()...) {
-		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, actionSet.Difference(expectedActionSet))
+
+	for scenario, testInput := range scenarios {
+		mockClient := testclient.NewSimpleFake(testInput.testNamespace)
+		if containsVersion(versions, "extensions/v1beta1") {
+			resources := []unversioned.APIResource{}
+			for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingresses"} {
+				resources = append(resources, unversioned.APIResource{Name: resource})
+			}
+			mockClient.Resources = map[string]*unversioned.APIResourceList{
+				"extensions/v1beta1": {
+					GroupVersion: "extensions/v1beta1",
+					APIResources: resources,
+				},
+			}
+		}
+		err := syncNamespace(mockClient, versions, testInput.testNamespace)
+		if err != nil {
+			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
+		}
+		actionSet := sets.NewString()
+		for _, action := range mockClient.Actions() {
+			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		}
+		if !actionSet.HasAll(testInput.expectedActionSet.List()...) {
+			t.Errorf("scenario %s - Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario, testInput.expectedActionSet, actionSet, testInput.expectedActionSet.Difference(actionSet))
+		}
+		if !testInput.expectedActionSet.HasAll(actionSet.List()...) {
+			t.Errorf("scenario %s - Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario, testInput.expectedActionSet, actionSet, actionSet.Difference(testInput.expectedActionSet))
+		}
 	}
 }
 
