@@ -366,7 +366,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 
 	if s.sandboxOverlay != "" {
 		if _, err := os.Stat(s.sandboxOverlay); os.IsNotExist(err) {
-			log.Fatalf("Sandbox overlay archive not found: %s", s.sandboxOverlay)
+			return nil, nil, fmt.Errorf("Sandbox overlay archive not found: %s", s.sandboxOverlay)
 		}
 		uri, _ := s.serveFrameworkArtifact(s.sandboxOverlay)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(false), Extract: proto.Bool(true)})
