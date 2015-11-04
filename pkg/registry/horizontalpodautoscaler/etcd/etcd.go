@@ -33,12 +33,17 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
 	prefix := "/horizontalpodautoscalers"
+
+	newListFunc := func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &extensions.HorizontalPodAutoscaler{}, prefix, false, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscaler{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} },
+		NewListFunc: newListFunc,
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -65,7 +70,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		// Used to validate autoscaler updates
 		UpdateStrategy: horizontalpodautoscaler.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	statusStore := *store
 	statusStore.UpdateStrategy = horizontalpodautoscaler.StatusStrategy

@@ -28,31 +28,33 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-const (
-	IngressPath string = "/ingress"
-)
-
 // rest implements a RESTStorage for replication controllers against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+	prefix := "/ingress"
+
+	newListFunc := func() runtime.Object { return &extensions.IngressList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &extensions.Ingress{}, prefix, false, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Ingress{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &extensions.IngressList{} },
+		NewListFunc: newListFunc,
 		// Produces a ingress that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, IngressPath)
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		// Produces a ingress that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, IngressPath, name)
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		// Retrieve the name field of a replication controller
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -70,7 +72,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		// Used to validate controller updates
 		UpdateStrategy: ingress.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	statusStore := *store
 	statusStore.UpdateStrategy = ingress.StatusStrategy

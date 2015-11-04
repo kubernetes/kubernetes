@@ -48,11 +48,16 @@ type FinalizeREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against namespaces.
-func NewREST(s storage.Interface) (*REST, *StatusREST, *FinalizeREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST, *FinalizeREST) {
 	prefix := "/namespaces"
+
+	newListFunc := func() runtime.Object { return &api.NamespaceList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.Namespace{}, prefix, true, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
-		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
@@ -71,7 +76,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST, *FinalizeREST) {
 		UpdateStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	statusStore := *store

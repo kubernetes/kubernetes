@@ -32,11 +32,16 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volumes.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
 	prefix := "/persistentvolumes"
+
+	newListFunc := func() runtime.Object { return &api.PersistentVolumeList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.PersistentVolume{}, prefix, true, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },
-		NewListFunc: func() runtime.Object { return &api.PersistentVolumeList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
@@ -55,7 +60,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		UpdateStrategy:      persistentvolume.Strategy,
 		ReturnDeletedObject: true,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	statusStore := *store
