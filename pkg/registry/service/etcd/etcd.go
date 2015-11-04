@@ -32,11 +32,16 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
 	prefix := "/services/specs"
+
+	newListFunc := func() runtime.Object { return &api.ServiceList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.Service{}, prefix, false, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Service{} },
-		NewListFunc: func() runtime.Object { return &api.ServiceList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
@@ -54,7 +59,7 @@ func NewREST(s storage.Interface) *REST {
 		CreateStrategy: service.Strategy,
 		UpdateStrategy: service.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	return &REST{store}
 }

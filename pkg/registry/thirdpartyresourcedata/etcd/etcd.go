@@ -36,8 +36,11 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store ThirdPartyResourceData in the given helper
-func NewREST(s storage.Interface, group, kind string) *REST {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory, group, kind string) *REST {
 	prefix := "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
+
+	// We explicitly do NOT do any decoration here yet.
+	storageInterface := s
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResourceData{} },
@@ -58,7 +61,7 @@ func NewREST(s storage.Interface, group, kind string) *REST {
 		CreateStrategy: thirdpartyresourcedata.Strategy,
 		UpdateStrategy: thirdpartyresourcedata.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	return &REST{store}

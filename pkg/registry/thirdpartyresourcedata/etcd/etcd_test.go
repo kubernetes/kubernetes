@@ -27,12 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "extensions")
-	return NewREST(etcdStorage, "foo", "bar"), fakeClient
+	return NewREST(etcdStorage, storage.NoDecoration, "foo", "bar"), fakeClient
 }
 
 func validNewThirdPartyResourceData(name string) *extensions.ThirdPartyResourceData {
