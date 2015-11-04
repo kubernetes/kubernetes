@@ -69,6 +69,8 @@ curl -fs ${SWAGGER_API_PATH} > ${SWAGGER_ROOT_DIR}/resourceListing.json
 curl -fs ${SWAGGER_API_PATH}version > ${SWAGGER_ROOT_DIR}/version.json
 curl -fs ${SWAGGER_API_PATH}api > ${SWAGGER_ROOT_DIR}/api.json
 curl -fs ${SWAGGER_API_PATH}api/v1 > ${SWAGGER_ROOT_DIR}/v1.json
+curl -fs ${SWAGGER_API_PATH}apis > ${SWAGGER_ROOT_DIR}/apis.json
+curl -fs ${SWAGGER_API_PATH}apis/extensions > ${SWAGGER_ROOT_DIR}/extensions.json
 curl -fs ${SWAGGER_API_PATH}apis/extensions/v1beta1 > ${SWAGGER_ROOT_DIR}/v1beta1.json
 
 kube::log::status "SUCCESS"
