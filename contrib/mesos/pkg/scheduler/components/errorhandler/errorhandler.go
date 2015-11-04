@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
@@ -53,7 +53,7 @@ func NewErrorHandler(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *qu
 // implementation of scheduling plugin's Error func; see plugin/pkg/scheduler
 func (k *errorHandler) Error(pod *api.Pod, schedulingErr error) {
 
-	if schedulingErr == merrors.NoSuchPodErr {
+	if schedulingErr == errors.NoSuchPodErr {
 		log.V(2).Infof("Not rescheduling non-existent pod %v", pod.Name)
 		return
 	}

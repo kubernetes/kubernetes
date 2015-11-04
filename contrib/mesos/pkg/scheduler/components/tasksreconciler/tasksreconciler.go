@@ -23,7 +23,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	bindings "github.com/mesos/mesos-go/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 )
 
@@ -164,7 +164,7 @@ requestLoop:
 			metrics.ReconciliationExecuted.WithLabelValues("explicit").Inc()
 			defer close(fin)
 			err := <-r.Action(driver, cancel)
-			if err == merrors.ReconciliationCancelledErr {
+			if err == errors.ReconciliationCancelledErr {
 				metrics.ReconciliationCancelled.WithLabelValues("explicit").Inc()
 				log.Infoln(err.Error())
 			} else if err != nil {

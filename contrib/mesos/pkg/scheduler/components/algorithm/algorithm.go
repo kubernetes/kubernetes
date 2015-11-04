@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
@@ -72,12 +72,12 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 		podName, err := cache.MetaNamespaceKeyFunc(pod)
 		if err != nil {
 			log.Warningf("aborting Schedule, unable to understand pod object %+v", pod)
-			return "", merrors.NoSuchPodErr
+			return "", errors.NoSuchPodErr
 		}
 		if deleted := k.podUpdates.Poll(podName, queue.DELETE_EVENT); deleted {
 			// avoid scheduling a pod that's been deleted between yieldPod() and Schedule()
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
-			return "", merrors.NoSuchPodErr
+			return "", errors.NoSuchPodErr
 		}
 		podTask, err := podtask.New(ctx, "", pod)
 		if err != nil {
