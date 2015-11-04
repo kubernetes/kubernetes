@@ -22,7 +22,7 @@ import (
 
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
@@ -63,7 +63,7 @@ func (b *binder) Bind(binding *api.Binding) error {
 		// in this case it's likely that the pod has been deleted between Schedule
 		// and Bind calls
 		log.Infof("No pending task for pod %s", podKey)
-		return merrors.NoSuchPodErr //TODO(jdef) this error is somewhat misleading since the task could be running?!
+		return errors.NoSuchPodErr //TODO(jdef) this error is somewhat misleading since the task could be running?!
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
@@ -43,7 +43,7 @@ func TestDeleteOne_NonexistentPod(t *testing.T) {
 			Namespace: api.NamespaceDefault,
 		}}}
 	err := d.DeleteOne(pod)
-	assert.Equal(err, merrors.NoSuchPodErr)
+	assert.Equal(err, errors.NoSuchPodErr)
 	obj.AssertExpectations(t)
 }
 

@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
@@ -89,7 +89,7 @@ func (k *deleter) DeleteOne(pod *queuer.Pod) error {
 	switch task, state := k.sched.Tasks().ForPod(podKey); state {
 	case podtask.StateUnknown:
 		log.V(2).Infof("Could not resolve pod '%s' to task id", podKey)
-		return merrors.NoSuchPodErr
+		return errors.NoSuchPodErr
 
 	// determine if the task has already been launched to mesos, if not then
 	// cleanup is easier (unregister) since there's no state to sync
@@ -120,6 +120,6 @@ func (k *deleter) DeleteOne(pod *queuer.Pod) error {
 
 	default:
 		log.Infof("cannot kill pod '%s': non-terminal task not found %v", podKey, task.ID)
-		return merrors.NoSuchTaskErr
+		return errors.NoSuchTaskErr
 	}
 }

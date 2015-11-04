@@ -22,7 +22,7 @@ import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"
-	merrors "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
@@ -69,7 +69,7 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// attempt to delete
-			if err = s.deleter.DeleteOne(&queuer.Pod{Pod: &t.Pod}); err != nil && err != merrors.NoSuchPodErr && err != merrors.NoSuchTaskErr {
+			if err = s.deleter.DeleteOne(&queuer.Pod{Pod: &t.Pod}); err != nil && err != errors.NoSuchPodErr && err != errors.NoSuchTaskErr {
 				log.Errorf("failed to delete pod: %v: %v", t.Pod.Name, err)
 			}
 		} else {
