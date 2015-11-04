@@ -163,26 +163,30 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 	return modified, nil
 }
 
-// If the last applied configuration annotation is already present, then
-// UpdateApplyAnnotation gets the modified configuration of the object,
-// without embedding it again, and then sets it on the object as the annotation.
-// Otherwise, it does nothing.
+// UpdateApplyAnnotation calls CreateApplyAnnotation if the last applied
+// configuration annotation is already present. Otherwise, it does nothing.
 func UpdateApplyAnnotation(info *resource.Info) error {
-	original, err := GetOriginalConfiguration(info)
+	if original, err := GetOriginalConfiguration(info); err != nil || len(original) <= 0 {
+		return err
+	}
+	return CreateApplyAnnotation(info)
+}
+
+// CreateApplyAnnotation gets the modified configuration of the object,
+// without embedding it again, and then sets it on the object as the annotation.
+func CreateApplyAnnotation(info *resource.Info) error {
+	modified, err := GetModifiedConfiguration(info, false)
 	if err != nil {
 		return err
 	}
+	return SetOriginalConfiguration(info, modified)
+}
 
-	if len(original) > 0 {
-		modified, err := GetModifiedConfiguration(info, false)
-		if err != nil {
-			return err
-		}
-
-		if err := SetOriginalConfiguration(info, modified); err != nil {
-			return err
-		}
+// Create the annotation used by kubectl apply only when createAnnotation is true
+// Otherwise, only update the annotation when it already exists
+func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info) error {
+	if createAnnotation {
+		return CreateApplyAnnotation(info)
 	}
-
-	return nil
+	return UpdateApplyAnnotation(info)
 }

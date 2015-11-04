@@ -83,6 +83,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
+	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
 }
 
@@ -128,9 +129,8 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 			return err
 		}
 
-		// Serialize the configuration into an annotation.
-		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
-			return err
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info); err != nil {
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
 		// Serialize the object with the annotation applied.
@@ -216,8 +216,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			return err
 		}
 
-		// Serialize the configuration into an annotation.
-		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info); err != nil {
 			return err
 		}
 
