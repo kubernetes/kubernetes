@@ -40,16 +40,16 @@ const (
 
 type Queuer struct {
 	lock            sync.Mutex       // shared by condition variables of this struct
-	podUpdates      queue.FIFO       // queue of pod updates to be processed
-	PodQueue        *queue.DelayFIFO // queue of pods to be scheduled
+	updates         queue.FIFO       // queue of pod updates to be processed
+	queue           *queue.DelayFIFO // queue of pods to be scheduled
 	deltaCond       sync.Cond        // pod changes are available for processing
 	unscheduledCond sync.Cond        // there are unscheduled pods for processing
 }
 
-func New(store queue.FIFO) *Queuer {
+func New(updates queue.FIFO) *Queuer {
 	q := &Queuer{
-		PodQueue:   queue.NewDelayFIFO(),
-		podUpdates: store,
+		queue:   queue.NewDelayFIFO(),
+		updates: updates,
 	}
 	q.deltaCond.L = &q.lock
 	q.unscheduledCond.L = &q.lock
@@ -58,14 +58,14 @@ func New(store queue.FIFO) *Queuer {
 
 func (q *Queuer) InstallDebugHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/debug/scheduler/podqueue", func(w http.ResponseWriter, r *http.Request) {
-		for _, x := range q.PodQueue.List() {
+		for _, x := range q.queue.List() {
 			if _, err := io.WriteString(w, fmt.Sprintf("%+v\n", x)); err != nil {
 				break
 			}
 		}
 	})
 	mux.HandleFunc("/debug/scheduler/podstore", func(w http.ResponseWriter, r *http.Request) {
-		for _, x := range q.podUpdates.List() {
+		for _, x := range q.updates.List() {
 			if _, err := io.WriteString(w, fmt.Sprintf("%+v\n", x)); err != nil {
 				break
 			}
@@ -80,7 +80,7 @@ func (q *Queuer) UpdatesAvailable() {
 
 // delete a pod from the to-be-scheduled queue
 func (q *Queuer) Dequeue(id string) {
-	q.PodQueue.Delete(id)
+	q.queue.Delete(id)
 }
 
 // re-add a pod to the to-be-scheduled queue, will not overwrite existing pod data (that
@@ -88,7 +88,7 @@ func (q *Queuer) Dequeue(id string) {
 func (q *Queuer) Requeue(pod *Pod) {
 	// use KeepExisting in case the pod has already been updated (can happen if binding fails
 	// due to constraint voilations); we don't want to overwrite a newer entry with stale data.
-	q.PodQueue.Add(pod, queue.KeepExisting)
+	q.queue.Add(pod, queue.KeepExisting)
 	q.unscheduledCond.Broadcast()
 }
 
@@ -96,7 +96,7 @@ func (q *Queuer) Requeue(pod *Pod) {
 func (q *Queuer) Reoffer(pod *Pod) {
 	// use KeepExisting in case the pod has already been updated (can happen if binding fails
 	// due to constraint voilations); we don't want to overwrite a newer entry with stale data.
-	if q.PodQueue.Offer(pod, queue.KeepExisting) {
+	if q.queue.Offer(pod, queue.KeepExisting) {
 		q.unscheduledCond.Broadcast()
 	}
 }
@@ -112,7 +112,7 @@ func (q *Queuer) Run(done <-chan struct{}) {
 		for {
 			// limit blocking here for short intervals so that scheduling
 			// may proceed even if there have been no recent pod changes
-			p := q.podUpdates.Await(enqueuePopTimeout)
+			p := q.updates.Await(enqueuePopTimeout)
 			if p == nil {
 				signalled := runtime.After(q.deltaCond.Wait)
 				// we've yielded the lock
@@ -136,7 +136,7 @@ func (q *Queuer) Run(done <-chan struct{}) {
 				// use ReplaceExisting because we are always pushing the latest state
 				now := time.Now()
 				pod.deadline = &now
-				if q.PodQueue.Offer(pod, queue.ReplaceExisting) {
+				if q.queue.Offer(pod, queue.ReplaceExisting) {
 					q.unscheduledCond.Broadcast()
 					log.V(3).Infof("queued pod for scheduling: %v", pod.Pod.Name)
 				} else {
@@ -156,7 +156,7 @@ func (q *Queuer) Yield() *api.Pod {
 	for {
 		// limit blocking here to short intervals so that we don't block the
 		// enqueuer Run() routine for very long
-		kpod := q.PodQueue.Await(yieldPopTimeout)
+		kpod := q.queue.Await(yieldPopTimeout)
 		if kpod == nil {
 			signalled := runtime.After(q.unscheduledCond.Wait)
 			// lock is yielded at this point and we're going to wait for either
@@ -176,7 +176,7 @@ func (q *Queuer) Yield() *api.Pod {
 		pod := kpod.(*Pod).Pod
 		if podName, err := cache.MetaNamespaceKeyFunc(pod); err != nil {
 			log.Warningf("yield unable to understand pod object %+v, will skip: %v", pod, err)
-		} else if !q.podUpdates.Poll(podName, queue.POP_EVENT) {
+		} else if !q.updates.Poll(podName, queue.POP_EVENT) {
 			log.V(1).Infof("yield popped a transitioning pod, skipping: %+v", pod)
 		} else if recoverAssignedSlave(pod) != "" {
 			// should never happen if enqueuePods is filtering properly
