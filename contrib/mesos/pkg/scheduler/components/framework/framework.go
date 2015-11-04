@@ -29,7 +29,6 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
 	bindings "github.com/mesos/mesos-go/scheduler"
-	mscheduler "github.com/mesos/mesos-go/scheduler"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
@@ -56,7 +55,7 @@ import (
 )
 
 type Framework interface {
-	mscheduler.Scheduler
+	bindings.Scheduler
 
 	Init(sched scheduler.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
 	Registration() <-chan struct{}
