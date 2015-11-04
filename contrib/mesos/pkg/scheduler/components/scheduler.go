@@ -51,7 +51,7 @@ type sched struct {
 
 	// unsafe state, needs to be guarded, especially changes to podtask.T objects
 	sync.RWMutex
-	taskRegistry  podtask.Registry
+	taskRegistry podtask.Registry
 }
 
 func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
