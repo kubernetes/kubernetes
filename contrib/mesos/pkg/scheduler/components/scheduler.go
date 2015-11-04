@@ -80,10 +80,8 @@ func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.Pod
 	binder := binder.NewBinder(core)
 
 	startLatch := make(chan struct{})
-	eventBroadcaster := record.NewBroadcaster()
 
 	runtime.On(startLatch, func() {
-		eventBroadcaster.StartRecordingToSink(client.Events(""))
 		reflector.Run() // TODO(jdef) should listen for termination
 		podDeleter.Run(updates, terminate)
 		q.Run(terminate)
