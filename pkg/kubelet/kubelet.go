@@ -1340,6 +1340,29 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
+	// Create Mirror Pod for Static Pod if it doesn't already exist
+	if kubepod.IsStaticPod(pod) {
+		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
+			// The mirror pod is semantically different from the static pod. Remove
+			// it. The mirror pod will get recreated later.
+			glog.Errorf("Deleting mirror pod %q because it is outdated", podFullName)
+			if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
+				glog.Errorf("Failed deleting mirror pod %q: %v", podFullName, err)
+			}
+		}
+		if mirrorPod == nil {
+			glog.V(3).Infof("Creating a mirror pod for static pod %q", podFullName)
+			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
+				glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
+			}
+
+			_, ok := kl.podManager.GetMirrorPodByPod(pod)
+			if !ok {
+				glog.Errorf("Mirror pod not available")
+			}
+		}
+	}
+
 	if err := kl.makePodDataDirs(pod); err != nil {
 		glog.Errorf("Unable to make pod data directories for pod %q (uid %q): %v", podFullName, uid, err)
 		return err
@@ -1440,22 +1463,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}
 
-	if isStaticPod(pod) {
-		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
-			// The mirror pod is semantically different from the static pod. Remove
-			// it. The mirror pod will get recreated later.
-			glog.Errorf("Deleting mirror pod %q because it is outdated", podFullName)
-			if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
-				glog.Errorf("Failed deleting mirror pod %q: %v", podFullName, err)
-			}
-		}
-		if mirrorPod == nil {
-			glog.V(3).Infof("Creating a mirror pod %q", podFullName)
-			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-				glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
-			}
-		}
-	}
 	return nil
 }
 
