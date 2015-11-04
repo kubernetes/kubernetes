@@ -40,38 +40,42 @@ Please also read about [API conventions](api-conventions.md) and [API changes](a
 
 ### Your core group package:
 
-1. creaet a folder in pkg/apis to hold you group. Create types.go in pkg/apis/\<group\>/ and pkg/apis/\<group\>/\<version\>/ to define API objects in your group.
+We plan on improving the way the types are factored in the future; see [#16062](https://github.com/kubernetes/kubernetes/pull/16062) for the directions in which this might evolve.
 
-2. create pkg/apis/\<group\>/{register.go, \<version\>/register.go} to register this group's API objects to the scheme;
+1. Create a folder in pkg/apis to hold you group. Create types.go in pkg/apis/`<group>`/ and pkg/apis/`<group>`/`<version>`/ to define API objects in your group;
 
-3. add a pkg/apis/\<group\>/install/install.go, which is responsible for adding the group to the `latest` package, so that other packages can access the group's meta through `latest.Group`. You need to import this `install` package in {pkg/master, pkg/client/unversioned, cmd/kube-version-change}/import_known_versions.go, if you want to make your group accessible to other packages in the kube-apiserver binary, binaries that uses the client package, or the kube-version-change tool.
+2. Create pkg/apis/`<group>`/{register.go, `<version>`/register.go} to register this group's API objects to the encoding/decoding scheme;
+
+3. Add a pkg/apis/`<group>`/install/install.go, which is responsible for adding the group to the `latest` package, so that other packages can access the group's meta through `latest.Group`. You need to import this `install` package in {pkg/master, pkg/client/unversioned, cmd/kube-version-change}/import_known_versions.go, if you want to make your group accessible to other packages in the kube-apiserver binary, binaries that uses the client package, or the kube-version-change tool.
+
+Step 2 and 3 are mechanical, we plan on autogenerate these using the cmd/libs/go2idl/ tool.
 
 ### Scripts changes and auto-generated code:
 
 1. Generate conversions and deep-copies:
 
-    1. add your "group/" or "group/version" into hack/after-build/{update-generated-conversions.sh, update-generated-deep-copies.sh, verify-generated-conversions.sh, verify-generated-deep-copies.sh};
-    2. run hack/update-generated-conversions.sh, hack/update-generated-deep-copies.sh.
+    1. Add your "group/" or "group/version" into hack/after-build/{update-generated-conversions.sh, update-generated-deep-copies.sh, verify-generated-conversions.sh, verify-generated-deep-copies.sh};
+    2. Run hack/update-generated-conversions.sh, hack/update-generated-deep-copies.sh.
 
 2. Generate files for Ugorji codec:
 
-    1. touch types.generated.go in pkg/apis/\<group\>{/, \<version\>}, and run hack/update-codecgen.sh.
+    1. Touch types.generated.go in pkg/apis/`<group>`{/, `<version>`}, and run hack/update-codecgen.sh.
 
 ### Client (optional):
 
-We are overhauling pkg/client, so this section might be outdated. Currently, to add your group to the client package, you need to
+We are overhauling pkg/client, so this section might be outdated; see [#15730](https://github.com/kubernetes/kubernetes/pull/15730) for how the client package might evolve. Currently, to add your group to the client package, you need to
 
-1. create pkg/client/unversioned/\<group\>.go, define a group client interface and implement the client. You can take pkg/client/unversioned/extensions.go as a reference.
+1. Create pkg/client/unversioned/`<group>`.go, define a group client interface and implement the client. You can take pkg/client/unversioned/extensions.go as a reference.
 
-2. add the group client interface to the `Interface` in pkg/client/unversioned/client.go and add method to fetch the interface. Again, you can take how we add the Extensions group there as an example.
+2. Add the group client interface to the `Interface` in pkg/client/unversioned/client.go and add method to fetch the interface. Again, you can take how we add the Extensions group there as an example.
 
-3. if you need to support the group in kubectl, you'll also need to modify pkg/kubectl/cmd/util/factory.go.
+3. If you need to support the group in kubectl, you'll also need to modify pkg/kubectl/cmd/util/factory.go.
 
 ### Make the group/version selectable in unit tests (optional):
 
-1. add your group in pkg/api/testapi/testapi.go, then you can access the group in tests through testapi.\<group\>;
+1. Add your group in pkg/api/testapi/testapi.go, then you can access the group in tests through testapi.`<group>`;
 
-2. add your "group/version" to `KUBE_API_VERSIONS` and `KUBE_TEST_API_VERSIONS` in hack/test-go.sh.
+2. Add your "group/version" to `KUBE_API_VERSIONS` and `KUBE_TEST_API_VERSIONS` in hack/test-go.sh.
 
 
 
