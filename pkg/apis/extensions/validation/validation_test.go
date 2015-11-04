@@ -168,7 +168,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas: 5,
 				},
 			},
-			msg: "must be bigger or equal to 1",
+			msg: "must be greater than or equal to 1",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -184,7 +184,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas: 5,
 				},
 			},
-			msg: "must be bigger or equal to minReplicas",
+			msg: "must be greater than or equal to minReplicas",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -201,16 +201,16 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: -70},
 				},
 			},
-			msg: "must be bigger or equal to 1",
+			msg: "must be greater than or equal to 1",
 		},
 	}
 
 	for _, c := range errorCases {
 		errs := ValidateHorizontalPodAutoscaler(&c.horizontalPodAutoscaler)
 		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", c.msg)
+			t.Errorf("expected failure for %q", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], c.msg)
 		}
 	}
 }
@@ -764,7 +764,7 @@ func TestValidateDeployment(t *testing.T) {
 		Type:          extensions.RecreateDeploymentStrategyType,
 		RollingUpdate: &extensions.RollingUpdateDeployment{},
 	}
-	errorCases["rollingUpdate should be nil when strategy type is Recreate"] = invalidRecreateDeployment
+	errorCases["should be nil when strategy type is Recreate"] = invalidRecreateDeployment
 
 	// MaxSurge should be in the form of 20%.
 	invalidMaxSurgeDeployment := validDeployment()
@@ -994,20 +994,19 @@ func TestValidateIngress(t *testing.T) {
 			Backend: defaultBackend,
 		},
 	}
-	badPathErr := fmt.Sprintf("spec.rules.ingressRule.http.path: invalid value '%v'",
-		badPathExpr)
+	badPathErr := fmt.Sprintf("spec.rules[0].http.paths[0].path: invalid value '%v'", badPathExpr)
 	hostIP := "127.0.0.1"
 	badHostIP := newValid()
 	badHostIP.Spec.Rules[0].Host = hostIP
-	badHostIPErr := fmt.Sprintf("spec.rules.host: invalid value '%v'", hostIP)
+	badHostIPErr := fmt.Sprintf("spec.rules[0].host: invalid value '%v'", hostIP)
 
 	errorCases := map[string]extensions.Ingress{
-		"spec.backend.serviceName: required value":          servicelessBackend,
-		"spec.backend.serviceName: invalid value":           invalidNameBackend,
-		"spec.backend.servicePort: invalid value":           noPortBackend,
-		"spec.rules.host: invalid value":                    badHost,
-		"spec.rules.ingressRule.http.paths: required value": noPaths,
-		"spec.rules.ingressRule.http.path: invalid value":   noForwardSlashPath,
+		"spec.backend.serviceName: required value":        servicelessBackend,
+		"spec.backend.serviceName: invalid value":         invalidNameBackend,
+		"spec.backend.servicePort: invalid value":         noPortBackend,
+		"spec.rules[0].host: invalid value":               badHost,
+		"spec.rules[0].http.paths: required value":        noPaths,
+		"spec.rules[0].http.paths[0].path: invalid value": noForwardSlashPath,
 	}
 	errorCases[badPathErr] = badRegexPath
 	errorCases[badHostIPErr] = badHostIP
@@ -1015,12 +1014,12 @@ func TestValidateIngress(t *testing.T) {
 	for k, v := range errorCases {
 		errs := ValidateIngress(&v)
 		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+			t.Errorf("expected failure for %q", k)
 		} else {
 			s := strings.Split(k, ":")
 			err := errs[0]
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
+				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
 		}
 	}
@@ -1101,8 +1100,8 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	}
 
 	errorCases := map[string]extensions.Ingress{
-		"status.loadBalancer.ingress.ip: invalid value":       invalidIP,
-		"status.loadBalancer.ingress.hostname: invalid value": invalidHostname,
+		"status.loadBalancer.ingress[0].ip: invalid value":       invalidIP,
+		"status.loadBalancer.ingress[0].hostname: invalid value": invalidHostname,
 	}
 	for k, v := range errorCases {
 		errs := ValidateIngressStatusUpdate(&v, &oldValue)
@@ -1112,7 +1111,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			s := strings.Split(k, ":")
 			err := errs[0]
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
+				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
 		}
 	}
@@ -1193,7 +1192,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 				},
 			},
 		},
-		`must be bigger or equal to minNodes`: {
+		`must be greater than or equal to minNodes`: {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "ClusterAutoscaler",
 				Namespace: api.NamespaceDefault,

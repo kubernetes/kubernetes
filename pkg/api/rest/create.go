@@ -77,7 +77,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	// Custom validation (including name validation) passed
 	// Now run common validation on object meta
 	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	if errs := validation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), validation.ValidatePathSegmentName); len(errs) > 0 {
+	if errs := validation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), validation.ValidatePathSegmentName, utilvalidation.NewFieldPath("metadata")); len(errs) > 0 {
 		return errors.NewInvalid(kind, objectMeta.Name, errs)
 	}
 
