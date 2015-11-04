@@ -573,14 +573,14 @@ func explicitTaskFilter(t *podtask.T) bool {
 // invoke the given ReconcilerAction funcs in sequence, aborting the sequence if reconciliation
 // is cancelled. if any other errors occur the composite reconciler will attempt to complete the
 // sequence, reporting only the last generated error.
-func (k *framework) makeCompositeReconciler(actions ...taskreconciler.ReconcilerAction) taskreconciler.ReconcilerAction {
+func (k *framework) makeCompositeReconciler(actions ...taskreconciler.Action) taskreconciler.Action {
 	if x := len(actions); x == 0 {
 		// programming error
 		panic("no actions specified for composite reconciler")
 	} else if x == 1 {
 		return actions[0]
 	}
-	chained := func(d bindings.SchedulerDriver, c <-chan struct{}, a, b taskreconciler.ReconcilerAction) <-chan error {
+	chained := func(d bindings.SchedulerDriver, c <-chan struct{}, a, b taskreconciler.Action) <-chan error {
 		ech := a(d, c)
 		ch := make(chan error, 1)
 		go func() {
@@ -615,17 +615,17 @@ func (k *framework) makeCompositeReconciler(actions ...taskreconciler.Reconciler
 	for i := 2; i < len(actions); i++ {
 		i := i
 		next := func(d bindings.SchedulerDriver, c <-chan struct{}) <-chan error {
-			return chained(d, c, taskreconciler.ReconcilerAction(result), actions[i])
+			return chained(d, c, taskreconciler.Action(result), actions[i])
 		}
 		result = next
 	}
-	return taskreconciler.ReconcilerAction(result)
+	return taskreconciler.Action(result)
 }
 
 // reconciler action factory, performs explicit task reconciliation for non-terminal
 // tasks listed in the scheduler's internal taskRegistry.
-func (k *framework) makeTaskRegistryReconciler() taskreconciler.ReconcilerAction {
-	return taskreconciler.ReconcilerAction(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
+func (k *framework) makeTaskRegistryReconciler() taskreconciler.Action {
+	return taskreconciler.Action(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
 		taskToSlave := make(map[string]string)
 		for _, t := range k.sched.Tasks().List(explicitTaskFilter) {
 			if t.Spec.SlaveID != "" {
@@ -638,8 +638,8 @@ func (k *framework) makeTaskRegistryReconciler() taskreconciler.ReconcilerAction
 
 // reconciler action factory, performs explicit task reconciliation for non-terminal
 // tasks identified by annotations in the Kubernetes pod registry.
-func (k *framework) makePodRegistryReconciler() taskreconciler.ReconcilerAction {
-	return taskreconciler.ReconcilerAction(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
+func (k *framework) makePodRegistryReconciler() taskreconciler.Action {
+	return taskreconciler.Action(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
 		podList, err := k.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return proc.ErrorChanf("failed to reconcile pod registry: %v", err)
