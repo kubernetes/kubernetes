@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -45,6 +46,10 @@ func TestMakeFuncs(t *testing.T) {
 		{
 			func() *Error { return NewFieldRequired("f") },
 			ErrorTypeRequired,
+		},
+		{
+			func() *Error { return NewInternalError("f", fmt.Errorf("e")) },
+			ErrorTypeInternal,
 		},
 	}
 
@@ -93,6 +98,27 @@ func TestErrorUsefulMessage(t *testing.T) {
 	}
 }
 
+func TestToAggregate(t *testing.T) {
+	testCases := []ErrorList{
+		nil,
+		{},
+		{NewFieldInvalid("f", "v", "d")},
+		{NewFieldInvalid("f", "v", "d"), NewInternalError("", fmt.Errorf("e"))},
+	}
+	for i, tc := range testCases {
+		agg := tc.ToAggregate()
+		if len(tc) == 0 {
+			if agg != nil {
+				t.Errorf("[%d] Expected nil, got %#v", i, agg)
+			}
+		} else if agg == nil {
+			t.Errorf("[%d] Expected non-nil", i)
+		} else if len(tc) != len(agg.Errors()) {
+			t.Errorf("[%d] Expected %d, got %d", i, len(tc), len(agg.Errors()))
+		}
+	}
+}
+
 func TestErrListFilter(t *testing.T) {
 	list := ErrorList{
 		NewFieldInvalid("test.field", "", ""),
@@ -131,7 +157,7 @@ func TestErrListPrefix(t *testing.T) {
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("Prefix should return self")
 		}
-		if e, a := testCase.Expected, errList[0].(*Error).Field; e != a {
+		if e, a := testCase.Expected, errList[0].Field; e != a {
 			t.Errorf("expected %s, got %s", e, a)
 		}
 	}
@@ -161,7 +187,7 @@ func TestErrListPrefixIndex(t *testing.T) {
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("PrefixIndex should return self")
 		}
-		if e, a := testCase.Expected, errList[0].(*Error).Field; e != a {
+		if e, a := testCase.Expected, errList[0].Field; e != a {
 			t.Errorf("expected %s, got %s", e, a)
 		}
 	}

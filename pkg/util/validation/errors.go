@@ -46,7 +46,7 @@ func (v *Error) Error() string {
 func (v *Error) ErrorBody() string {
 	var s string
 	switch v.Type {
-	case ErrorTypeRequired, ErrorTypeTooLong:
+	case ErrorTypeRequired, ErrorTypeTooLong, ErrorTypeInternal:
 		s = spew.Sprintf("%s", v.Type)
 	default:
 		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
@@ -89,6 +89,9 @@ const (
 	// This is similar to ErrorTypeInvalid, but the error will not include the
 	// too-long value.  See NewFieldTooLong.
 	ErrorTypeTooLong ErrorType = "FieldValueTooLong"
+	// ErrorTypeInternal is used to report other errors that are not related
+	// to user input.
+	ErrorTypeInternal ErrorType = "InternalError"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -108,6 +111,8 @@ func (t ErrorType) String() string {
 		return "forbidden"
 	case ErrorTypeTooLong:
 		return "too long"
+	case ErrorTypeInternal:
+		return "internal error"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", t))
 		return ""
@@ -166,24 +171,27 @@ func NewFieldTooLong(field string, value interface{}, maxLength int) *Error {
 	return &Error{ErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 
+// NewInternalError returns a *Error indicating "internal error".  This is used
+// to signal that an error was found that was not directly related to user
+// input.  The err argument must be non-nil.
+func NewInternalError(field string, err error) *Error {
+	return &Error{ErrorTypeInternal, field, nil, err.Error()}
+}
+
 // ErrorList holds a set of errors.
-type ErrorList []error
+type ErrorList []*Error
 
 // Prefix adds a prefix to the Field of every Error in the list.
 // Returns the list for convenience.
 func (list ErrorList) Prefix(prefix string) ErrorList {
 	for i := range list {
-		if err, ok := list[i].(*Error); ok {
-			if strings.HasPrefix(err.Field, "[") {
-				err.Field = prefix + err.Field
-			} else if len(err.Field) != 0 {
-				err.Field = prefix + "." + err.Field
-			} else {
-				err.Field = prefix
-			}
-			list[i] = err
+		err := list[i]
+		if strings.HasPrefix(err.Field, "[") {
+			err.Field = prefix + err.Field
+		} else if len(err.Field) != 0 {
+			err.Field = prefix + "." + err.Field
 		} else {
-			panic(fmt.Sprintf("Programmer error: ErrorList holds non-Error: %#v", list[i]))
+			err.Field = prefix
 		}
 	}
 	return list
@@ -206,13 +214,30 @@ func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 	}
 }
 
+// ToAggregate converts the ErrorList into an errors.Aggregate.
+func (list ErrorList) ToAggregate() utilerrors.Aggregate {
+	errs := make([]error, len(list))
+	for i := range list {
+		errs[i] = list[i]
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+func fromAggregate(agg utilerrors.Aggregate) ErrorList {
+	errs := agg.Errors()
+	list := make(ErrorList, len(errs))
+	for i := range errs {
+		list[i] = errs[i].(*Error)
+	}
+	return list
+}
+
 // Filter removes items from the ErrorList that match the provided fns.
 func (list ErrorList) Filter(fns ...utilerrors.Matcher) ErrorList {
-	err := utilerrors.FilterOut(utilerrors.NewAggregate(list), fns...)
+	err := utilerrors.FilterOut(list.ToAggregate(), fns...)
 	if err == nil {
 		return nil
 	}
-	// FilterOut that takes an Aggregate returns an Aggregate
-	agg := err.(utilerrors.Aggregate)
-	return ErrorList(agg.Errors())
+	// FilterOut takes an Aggregate and returns an Aggregate
+	return fromAggregate(err.(utilerrors.Aggregate))
 }

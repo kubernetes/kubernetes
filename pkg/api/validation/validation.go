@@ -1480,7 +1480,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) validation.ErrorList {
 	addresses := make(map[api.NodeAddress]bool)
 	for _, address := range node.Status.Addresses {
 		if _, ok := addresses[address]; ok {
-			allErrs = append(allErrs, fmt.Errorf("duplicate node addresses found"))
+			allErrs = append(allErrs, validation.NewFieldDuplicate("addresses", address))
 		}
 		addresses[address] = true
 	}
@@ -1500,7 +1500,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) validation.ErrorList {
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !api.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
-		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or capacity changes"))
+		allErrs = append(allErrs, validation.NewFieldForbidden("", "update contains more than labels or capacity changes"))
 	}
 
 	return allErrs

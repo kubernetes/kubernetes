@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -162,13 +161,12 @@ func NewConflict(kind, name string, err error) error {
 func NewInvalid(kind, name string, errs validation.ErrorList) error {
 	causes := make([]unversioned.StatusCause, 0, len(errs))
 	for i := range errs {
-		if err, ok := errs[i].(*validation.Error); ok {
-			causes = append(causes, unversioned.StatusCause{
-				Type:    unversioned.CauseType(err.Type),
-				Message: err.ErrorBody(),
-				Field:   err.Field,
-			})
-		}
+		err := errs[i]
+		causes = append(causes, unversioned.StatusCause{
+			Type:    unversioned.CauseType(err.Type),
+			Message: err.ErrorBody(),
+			Field:   err.Field,
+		})
 	}
 	return &StatusError{unversioned.Status{
 		Status: unversioned.StatusFailure,
@@ -179,7 +177,7 @@ func NewInvalid(kind, name string, errs validation.ErrorList) error {
 			Name:   name,
 			Causes: causes,
 		},
-		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, utilerrors.NewAggregate(errs)),
+		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, errs.ToAggregate()),
 	}}
 }
 

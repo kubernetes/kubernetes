@@ -29,7 +29,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/config"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
@@ -310,7 +309,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
 	names := sets.String{}
 	for i, pod := range pods {
-		var errlist []error
+		var errlist utilvalidation.ErrorList
 		if errs := validation.ValidatePod(pod); len(errs) != 0 {
 			errlist = append(errlist, errs...)
 			// If validation fails, don't trust it any further -
@@ -325,7 +324,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 		}
 		if len(errlist) > 0 {
 			name := bestPodIdentString(pod)
-			err := utilerrors.NewAggregate(errlist)
+			err := errlist.ToAggregate()
 			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
 			recorder.Eventf(pod, kubecontainer.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
