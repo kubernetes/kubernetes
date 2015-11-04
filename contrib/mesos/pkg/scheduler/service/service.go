@@ -764,7 +764,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
 	broadcaster.StartRecordingToSink(client.Events(""))
 
-	// create scheduler loop
+	// create scheduler core with all components arranged around it
 	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
 	sched := components.New(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
 

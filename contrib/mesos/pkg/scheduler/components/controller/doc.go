@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package schedulerloop implement the scheduler loop which waits for pod
-// events from the queuer and passes them to the SchedulerAlgorithm.
-package schedulerloop
+// Package controller implements the scheduling controller which waits for pod
+// events from the queuer (i.e. from the apiserver), passes them to the
+// SchedulerAlgorithm and in case of success to the binder which does the launch.
+package controller

@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/controller"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/schedulerloop"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
@@ -601,7 +601,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	lt.podsListWatch.Add(pod, true) // notify watchers
 
 	// wait for failedScheduling event because there is no offer
-	assert.EventWithReason(lt.eventObs, schedulerloop.FailedScheduling, "failedScheduling event not received")
+	assert.EventWithReason(lt.eventObs, controller.FailedScheduling, "failedScheduling event not received")
 
 	// add some matching offer
 	offers := []*mesos.Offer{NewTestOffer(fmt.Sprintf("offer%d", i))}
@@ -614,7 +614,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	lt.framework.ResourceOffers(nil, offers)
 
 	// and wait for scheduled pod
-	assert.EventWithReason(lt.eventObs, schedulerloop.Scheduled)
+	assert.EventWithReason(lt.eventObs, controller.Scheduled)
 	select {
 	case launchedTask := <-launchedTasks:
 		// report back that the task has been staged, and then started by mesos
@@ -651,7 +651,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	// Launch a pod and wait until the scheduler driver is called
 	schedulePodWithOffers := func(pod *api.Pod, offers []*mesos.Offer) (*api.Pod, *LaunchedTask, *mesos.Offer) {
 		// wait for failedScheduling event because there is no offer
-		assert.EventWithReason(lt.eventObs, schedulerloop.FailedScheduling, "failedScheduling event not received")
+		assert.EventWithReason(lt.eventObs, controller.FailedScheduling, "failedScheduling event not received")
 
 		// supply a matching offer
 		lt.framework.ResourceOffers(lt.driver, offers)
@@ -666,7 +666,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 		}
 
 		// and wait to get scheduled
-		assert.EventWithReason(lt.eventObs, schedulerloop.Scheduled)
+		assert.EventWithReason(lt.eventObs, controller.Scheduled)
 
 		// wait for driver.launchTasks call
 		select {

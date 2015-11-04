@@ -29,11 +29,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/controller"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/errorhandler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/podreconciler"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/schedulerloop"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
@@ -47,11 +47,11 @@ import (
 type sched struct {
 	podReconciler podreconciler.PodReconciler
 	framework     framework.Framework
-	loop          schedulerloop.SchedulerLoop
+	controller    controller.Controller
 
 	// unsafe state, needs to be guarded, especially changes to podtask.T objects
 	sync.RWMutex
-	taskRegistry podtask.Registry
+	taskRegistry  podtask.Registry
 }
 
 func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
@@ -108,12 +108,12 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 		podtask.InstallDebugHandlers(core.Tasks(), mux)
 	})
 
-	core.loop = schedulerloop.New(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
+	core.controller = controller.New(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
 	return core
 }
 
 func (c *sched) Run(done <-chan struct{}) {
-	c.loop.Run(done)
+	c.controller.Run(done)
 }
 
 func (c *sched) Reconcile(t *podtask.T) {

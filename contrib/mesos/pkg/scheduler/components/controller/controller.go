@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package schedulerloop
+package controller
 
 import (
 	"time"
@@ -35,11 +35,11 @@ const (
 	Scheduled        = "Scheduled"
 )
 
-type SchedulerLoop interface {
+type Controller interface {
 	Run(<-chan struct{})
 }
 
-type schedulerLoop struct {
+type controller struct {
 	algorithm algorithm.SchedulerAlgorithm
 	binder    binder.Binder
 	nextPod   func() *api.Pod
@@ -51,8 +51,8 @@ type schedulerLoop struct {
 
 func New(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
 	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
-	binder binder.Binder, started chan<- struct{}) SchedulerLoop {
-	return &schedulerLoop{
+	binder binder.Binder, started chan<- struct{}) Controller {
+	return &controller{
 		algorithm: algorithm,
 		binder:    binder,
 		nextPod:   nextPod,
@@ -63,14 +63,14 @@ func New(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
 	}
 }
 
-func (s *schedulerLoop) Run(done <-chan struct{}) {
+func (s *controller) Run(done <-chan struct{}) {
 	defer close(s.started)
 	go runtime.Until(s.scheduleOne, recoveryDelay, done)
 }
 
 // hacked from GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/scheduler.go,
 // with the Modeler stuff removed since we don't use it because we have mesos.
-func (s *schedulerLoop) scheduleOne() {
+func (s *controller) scheduleOne() {
 	pod := s.nextPod()
 
 	// pods which are pre-scheduled (i.e. NodeName is set) are deleted by the kubelet
