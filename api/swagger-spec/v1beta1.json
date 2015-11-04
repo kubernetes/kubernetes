@@ -55,7 +55,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -183,7 +183,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -478,7 +478,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -569,7 +569,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -644,7 +644,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -778,7 +778,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -906,7 +906,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -1201,7 +1201,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -1292,7 +1292,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -1367,7 +1367,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -1501,7 +1501,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -1629,7 +1629,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -1924,7 +1924,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -2015,7 +2015,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
@@ -2090,7 +2090,7 @@
         "allowMultiple": false
        },
        {
-        "type": "*int64",
+        "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
