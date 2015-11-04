@@ -102,6 +102,8 @@ func (f *Framework) afterEach() {
 		// you may or may not see the killing/deletion/cleanup events.
 
 		dumpAllPodInfo(f.Client)
+
+		dumpAllNodeInfo(f.Client)
 	}
 
 	// Check whether all nodes are ready after the test.

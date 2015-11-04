@@ -1477,8 +1477,28 @@ func dumpAllPodInfo(c *client.Client) {
 	logPodStates(pods.Items)
 }
 
+func dumpAllNodeInfo(c *client.Client) {
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		Logf("unable to fetch node list: %v", err)
+		return
+	}
+	names := make([]string, len(nodes.Items))
+	for ix := range nodes.Items {
+		names[ix] = nodes.Items[ix].Name
+	}
+	dumpNodeDebugInfo(c, names)
+}
+
 func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 	for _, n := range nodeNames {
+		Logf("\nLogging node info for node %v", n)
+		node, err := c.Nodes().Get(n)
+		if err != nil {
+			Logf("Error getting node info %v", err)
+		}
+		Logf("Node Info: %v", node)
+
 		Logf("\nLogging kubelet events for node %v", n)
 		for _, e := range getNodeEvents(c, n) {
 			Logf("source %v message %v reason %v first ts %v last ts %v, involved obj %+v",
