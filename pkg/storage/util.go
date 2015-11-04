@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
+// Stupid comment.
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
 
 // SimpleUpdateFunc converts SimpleUpdateFunc into UpdateFunc
