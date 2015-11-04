@@ -333,6 +333,7 @@ var _ = Describe("Services", func() {
 
 		defer func() { expectNoError(stopServeHostnameService(c, ns, "service1")) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := NodeSSHHosts(c)
 		Expect(err).NotTo(HaveOccurred())
@@ -355,6 +356,7 @@ var _ = Describe("Services", func() {
 		// Create a new service and check if it's not reusing IP.
 		defer func() { expectNoError(stopServeHostnameService(c, ns, "service2")) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
 			Failf("VIPs conflict: %v", svc1IP)
