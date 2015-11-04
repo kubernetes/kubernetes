@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-generated_files=$(
+generated_files=($(
   find . -not \( \
       \( \
         -wholename './output' \
@@ -33,13 +33,59 @@ generated_files=$(
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
       \) -prune \
-    \) -name '*.generated.go')
+    \) -name '*.generated.go'))
 
 # Build codecgen binary from Godeps.
 function cleanup {
   rm -f "${CODECGEN:-}"
 }
 trap cleanup EXIT
+
+# Sort all files in the dependency order.
+number=${#generated_files[@]}
+for (( i=0; i<${number}; i++ )); do
+  visited[${i}]=false
+done
+result=""
+
+function fullpath {
+  pushd $(dirname $1) > /dev/null
+  fullpathResult="${PWD}/$(basename $1)"
+  popd > /dev/null
+}
+
+function depends {
+  file=${generated_files[$1]//\.generated\.go/.go}
+  deps=$(go list -f {{.Deps}} ${file} | tr "[" " " | tr "]" " ")
+  fullpath ${generated_files[$2]//\.generated\.go/.go}
+  candidate=$(dirname ${fullpathResult})
+  dependsResult=false
+  for dep in ${deps}; do
+    if [[ ${candidate} = *${dep} ]]; then
+      dependsResult=true
+    fi
+  done
+}
+
+function tsort {
+  visited[$1]=true
+	local j=0
+  for (( j=0; j<${number}; j++ )); do
+    if ! ${visited[${j}]}; then
+      depends $1 ${j}
+      if ${dependsResult}; then
+        tsort $j
+      fi
+    fi
+  done
+	result="${result} $1"
+}
+for (( i=0; i<${number}; i++ )); do
+  if ! ${visited[${i}]}; then
+    tsort ${i}
+  fi
+done
+index=(${result})
 
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
@@ -52,7 +98,9 @@ for generated_file in ${generated_files}; do
 	rm -f "${generated_file}"
 done
 
-for generated_file in ${generated_files}; do
+# Generate files in the dependency order.
+for current in ${index[@]}; do
+  generated_file=${generated_files[${current}]}
   initial_dir=${PWD}
   file=${generated_file//\.generated\.go/.go}
   # codecgen work only if invoked from directory where the file
@@ -67,5 +115,6 @@ for generated_file in ${generated_files}; do
   sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
   cat "${base_generated_file}" >> "${base_generated_file}.tmp"
   mv "${base_generated_file}.tmp" "${base_generated_file}"
+  echo "${generated_file} is regenerated."
   popd > /dev/null
 done
