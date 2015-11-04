@@ -714,8 +714,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
     : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
-    # get the latest upgrade logic.
+    # Use upgrade logic of version we're upgrading to.
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
@@ -750,8 +750,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
     : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
-    # get the latest upgrade logic.
+    # Use upgrade logic of version we're upgrading to.
+    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
@@ -829,8 +829,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
-    # get the latest upgrade logic.
+    # Use upgrade logic of version we're upgrading to.
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
@@ -865,8 +865,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gke-upgrade-1-0"}
     : ${E2E_NETWORK:="gke-upgrade-1-0"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
-    # get the latest upgrade logic.
+    # Use upgrade logic of version we're upgrading to.
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
     : ${E2E_UP:="false"}
@@ -1053,8 +1053,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
     : ${E2E_NETWORK:="gce-upgrade-1-0"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
-    # get the latest upgrade logic.
+    # Use upgrade logic of version we're upgrading to.
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="false"}
@@ -1090,8 +1090,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
     : ${E2E_NETWORK:="gce-upgrade-1-0"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
-    # get the latest upgrade logic.
+    # Use upgrade logic of version we're upgrading to.
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-gce-upgrade"}
     : ${E2E_UP:="false"}
