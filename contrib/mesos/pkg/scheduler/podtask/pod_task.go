@@ -152,12 +152,12 @@ func setCommandArgument(ei *mesos.ExecutorInfo, flag, value string, create bool)
 	}
 }
 
-func (t *T) BuildTaskInfo(ei *mesos.ExecutorInfo) *mesos.TaskInfo {
+func (t *T) BuildTaskInfo(prototype *mesos.ExecutorInfo) *mesos.TaskInfo {
 	info := &mesos.TaskInfo{
 		Name:     proto.String(generateTaskName(&t.Pod)),
 		TaskId:   mutil.NewTaskID(t.ID),
 		SlaveId:  mutil.NewSlaveID(t.Spec.SlaveID),
-		Executor: proto.Clone(ei).(*mesos.ExecutorInfo),
+		Executor: proto.Clone(prototype).(*mesos.ExecutorInfo),
 		Data:     t.Spec.Data,
 		Resources: []*mesos.Resource{
 			mutil.NewScalarResource("cpus", float64(t.Spec.CPU)),
