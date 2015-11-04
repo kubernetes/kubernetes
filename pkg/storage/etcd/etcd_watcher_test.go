@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -220,8 +221,8 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
  * with the new 2.2+ client library.
 func TestWatchEtcdError(t *testing.T) {
 	codec := testapi.Default.Codec()
-	server := NewEtcdTestClientServer(t)
-	h := newEtcdHelper(server.client, codec, etcdtest.PathPrefix())
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 	watching, err := h.Watch(context.TODO(), "/some/key", 4, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -237,10 +238,10 @@ func TestWatchEtcdError(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"
-	h := newEtcdHelper(server.client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
@@ -284,10 +285,10 @@ func makeSubsets(ip string, port int) []api.EndpointSubset {
 func TestWatchEtcdState(t *testing.T) {
 	codec := testapi.Default.Codec()
 	key := etcdtest.AddPrefix("/somekey/foo")
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
-	h := newEtcdHelper(server.client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -334,10 +335,10 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	key := etcdtest.AddPrefix("/somekey/foo")
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
-	h := newEtcdHelper(server.client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// set before the watch and verify events
 	err := h.Set(context.TODO(), key, pod, pod, 0)
@@ -383,9 +384,9 @@ func TestWatchFromZeroIndex(t *testing.T) {
 func TestWatchListFromZeroIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
 	key := etcdtest.AddPrefix("/some/key")
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	h := newEtcdHelper(server.client, codec, key)
+	h := newEtcdHelper(server.Client, codec, key)
 
 	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
@@ -415,9 +416,9 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	key := etcdtest.AddPrefix("/some/key")
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	h := newEtcdHelper(server.client, codec, key)
+	h := newEtcdHelper(server.Client, codec, key)
 
 	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
 	if err != nil {
@@ -444,10 +445,10 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"
-	h := newEtcdHelper(server.client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Test purposeful shutdown
 	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
