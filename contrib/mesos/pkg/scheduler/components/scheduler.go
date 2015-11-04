@@ -53,7 +53,7 @@ type sched struct {
 	taskRegistry podtask.Registry
 }
 
-func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
+func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
 	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, lw *cache.ListWatch) scheduler.Scheduler {
 
 	core := &sched{
