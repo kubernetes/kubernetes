@@ -387,7 +387,7 @@ function create-node-template {
       ${preemptible_minions} \
       $2 \
       --can-ip-forward \
-      --metadata-from-file $(echo ${@: 4: $#} | tr ' ' ',') >&2; then
+      --metadata-from-file $(echo ${@: 3} | tr ' ' ',') >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $template_name ${color_norm}" >&2
           exit 2
@@ -1381,9 +1381,9 @@ EOF
   if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME})
-RKT_VERSION: $(yaml-quote ${RKT_VERSION})
-RKT_PATH: $(yaml-quote ${RKT_PATH})
+KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-docker})
+RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
+RKT_PATH: $(yaml-quote ${RKT_PATH:-})
 KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
