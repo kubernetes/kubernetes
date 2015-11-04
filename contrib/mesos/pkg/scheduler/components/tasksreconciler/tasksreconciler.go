@@ -44,7 +44,7 @@ type tasksReconciler struct {
 	explicitReconciliationAbortTimeout time.Duration
 }
 
-func NewTasksReconciler(doer proc.Doer, action ReconcilerAction,
+func New(doer proc.Doer, action ReconcilerAction,
 	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) TasksReconciler {
 	return &tasksReconciler{
 		Doer:     doer,

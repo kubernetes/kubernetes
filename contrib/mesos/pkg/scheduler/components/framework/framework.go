@@ -284,7 +284,7 @@ func (k *framework) onInitialRegistration(driver bindings.SchedulerDriver) {
 	r1 := k.makeTaskRegistryReconciler()
 	r2 := k.makePodRegistryReconciler()
 
-	k.tasksReconciler = taskreconciler.NewTasksReconciler(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
+	k.tasksReconciler = taskreconciler.New(k.asRegisteredMaster, k.makeCompositeReconciler(r1, r2),
 		k.reconcileCooldown, k.schedulerConfig.ExplicitReconciliationAbortTimeout.Duration, k.terminate)
 	go k.tasksReconciler.Run(driver, k.terminate)
 

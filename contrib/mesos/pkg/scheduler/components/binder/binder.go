@@ -36,7 +36,7 @@ type binder struct {
 	sched scheduler.Scheduler
 }
 
-func NewBinder(sched scheduler.Scheduler) Binder {
+func New(sched scheduler.Scheduler) Binder {
 	return &binder{
 		sched: sched,
 	}

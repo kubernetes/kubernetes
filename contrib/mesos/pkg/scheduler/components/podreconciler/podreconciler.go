@@ -42,7 +42,7 @@ type podReconciler struct {
 	deleter deleter.Deleter
 }
 
-func NewPodReconciler(sched scheduler.Scheduler, client *client.Client, qr *queuer.Queuer, deleter deleter.Deleter) PodReconciler {
+func New(sched scheduler.Scheduler, client *client.Client, qr *queuer.Queuer, deleter deleter.Deleter) PodReconciler {
 	return &podReconciler{
 		sched:   sched,
 		client:  client,

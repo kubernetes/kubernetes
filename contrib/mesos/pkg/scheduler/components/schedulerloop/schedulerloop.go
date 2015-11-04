@@ -49,7 +49,7 @@ type schedulerLoop struct {
 	started   chan<- struct{} // startup latch
 }
 
-func NewSchedulerLoop(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
+func New(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
 	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
 	binder binder.Binder, started chan<- struct{}) SchedulerLoop {
 	return &schedulerLoop{

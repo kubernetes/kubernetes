@@ -68,16 +68,16 @@ func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.Pod
 
 	q := queuer.New(podUpdates)
 
-	algorithm := algorithm.NewSchedulerAlgorithm(core, podUpdates, ps)
+	algorithm := algorithm.New(core, podUpdates, ps)
 
-	podDeleter := deleter.NewDeleter(core, q)
+	podDeleter := deleter.New(core, q)
 
-	core.podReconciler = podreconciler.NewPodReconciler(core, client, q, podDeleter)
+	core.podReconciler = podreconciler.New(core, client, q, podDeleter)
 
 	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
-	errorHandler := errorhandler.NewErrorHandler(core, bo, q, ps)
+	errorHandler := errorhandler.New(core, bo, q, ps)
 
-	binder := binder.NewBinder(core)
+	binder := binder.New(core)
 
 	startLatch := make(chan struct{})
 
@@ -90,7 +90,7 @@ func NewScheduler(c *config.Config, fw framework.Framework, ps podschedulers.Pod
 		podtask.InstallDebugHandlers(core.Tasks(), mux)
 	})
 
-	core.loop = schedulerloop.NewSchedulerLoop(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
+	core.loop = schedulerloop.New(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
 	return core
 }
 
