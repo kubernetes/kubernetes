@@ -99,6 +99,7 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
   kube-apiserver,busybox
   kube-controller-manager,busybox
   kube-scheduler,busybox
+  kube-proxy,gcr.io/google_containers/debian-iptables:v1
 )
 
 # The set of addons images that should be prepopulated
