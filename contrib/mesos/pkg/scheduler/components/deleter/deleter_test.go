@@ -36,7 +36,7 @@ func TestDeleteOne_NonexistentPod(t *testing.T) {
 
 	qr := queuer.New(nil)
 	assert.Equal(0, len(qr.PodQueue.List()))
-	d := NewDeleter(obj, qr)
+	d := New(obj, qr)
 	pod := &queuer.Pod{Pod: &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
@@ -72,7 +72,7 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 	assert.True(found)
 
 	// exec & post conditions
-	d := NewDeleter(obj, qr)
+	d := New(obj, qr)
 	err = d.DeleteOne(pod)
 	assert.Nil(err)
 	_, found = qr.PodQueue.Get("foo0")
@@ -114,7 +114,7 @@ func TestDeleteOne_Running(t *testing.T) {
 	obj.On("KillTask", task.ID).Return(nil)
 
 	// exec & post conditions
-	d := NewDeleter(obj, qr)
+	d := New(obj, qr)
 	err = d.DeleteOne(pod)
 	assert.Nil(err)
 	_, found = qr.PodQueue.Get("foo0")
@@ -127,7 +127,7 @@ func TestDeleteOne_badPodNaming(t *testing.T) {
 	assert := assert.New(t)
 	obj := &types.MockScheduler{}
 	pod := &queuer.Pod{Pod: &api.Pod{}}
-	d := NewDeleter(obj, queuer.New(nil))
+	d := New(obj, queuer.New(nil))
 
 	err := d.DeleteOne(pod)
 	assert.NotNil(err)

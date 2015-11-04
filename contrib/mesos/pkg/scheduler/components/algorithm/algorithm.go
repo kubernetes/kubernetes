@@ -41,7 +41,7 @@ type schedulerAlgorithm struct {
 	podScheduler podschedulers.PodScheduler
 }
 
-func NewSchedulerAlgorithm(sched scheduler.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) SchedulerAlgorithm {
+func New(sched scheduler.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) SchedulerAlgorithm {
 	return &schedulerAlgorithm{
 		sched:        sched,
 		podUpdates:   podUpdates,

@@ -39,7 +39,7 @@ type deleter struct {
 	qr    *queuer.Queuer
 }
 
-func NewDeleter(sched scheduler.Scheduler, qr *queuer.Queuer) Deleter {
+func New(sched scheduler.Scheduler, qr *queuer.Queuer) Deleter {
 	return &deleter{
 		sched: sched,
 		qr:    qr,

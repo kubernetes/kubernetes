@@ -41,7 +41,7 @@ type errorHandler struct {
 	podScheduler podschedulers.PodScheduler
 }
 
-func NewErrorHandler(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) ErrorHandler {
+func New(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) ErrorHandler {
 	return &errorHandler{
 		sched:        sched,
 		backoff:      backoff,
