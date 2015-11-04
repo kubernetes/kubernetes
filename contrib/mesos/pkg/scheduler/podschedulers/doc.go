@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package algorithm contains the PodSchedules which process offers and pod
-// create a scheduling match
+// Package podschedulers defines an interface (w/ implementations) for matching
+// pods against offers.
 package podschedulers
