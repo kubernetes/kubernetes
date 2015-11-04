@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"net/http"
 	"sync"
 	"time"
 
@@ -181,12 +182,30 @@ func (w *etcdWatcher) translate() {
 		select {
 		case err := <-w.etcdError:
 			if err != nil {
-				w.emit(watch.Event{
-					Type: watch.Error,
-					Object: &unversioned.Status{
+				var status *unversioned.Status
+				switch {
+				case IsEtcdWatchExpired(err):
+					status = &unversioned.Status{
 						Status:  unversioned.StatusFailure,
 						Message: err.Error(),
-					},
+						Code:    http.StatusGone, // Gone
+						Reason:  unversioned.StatusReasonExpired,
+					}
+				// TODO: need to generate errors using api/errors which has a circular dependency on this package
+				//   no other way to inject errors
+				// case IsEtcdUnreachable(err):
+				//   status = errors.NewServerTimeout(...)
+				default:
+					status = &unversioned.Status{
+						Status:  unversioned.StatusFailure,
+						Message: err.Error(),
+						Code:    http.StatusInternalServerError,
+						Reason:  unversioned.StatusReasonInternalError,
+					}
+				}
+				w.emit(watch.Event{
+					Type:   watch.Error,
+					Object: status,
 				})
 			}
 			return
