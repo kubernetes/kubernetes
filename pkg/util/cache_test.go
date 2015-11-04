@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	maxTestCacheSize int = shardsCount * 2
+	maxTestCacheSize = shardsCount * 2
 )
 
 func ExpectEntry(t *testing.T, cache Cache, index uint64, expectedValue interface{}) {

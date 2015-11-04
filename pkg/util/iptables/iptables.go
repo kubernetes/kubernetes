@@ -94,10 +94,10 @@ const (
 )
 
 const (
-	cmdIptablesSave    string = "iptables-save"
-	cmdIptablesRestore string = "iptables-restore"
-	cmdIptables        string = "iptables"
-	cmdIp6tables       string = "ip6tables"
+	cmdIptablesSave    = "iptables-save"
+	cmdIptablesRestore = "iptables-restore"
+	cmdIptables        = "iptables"
+	cmdIp6tables       = "ip6tables"
 )
 
 // Option flag for Restore

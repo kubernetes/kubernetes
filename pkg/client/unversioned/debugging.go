@@ -80,12 +80,12 @@ type DebuggingRoundTripper struct {
 }
 
 const (
-	JustURL         string = "url"
-	URLTiming       string = "urltiming"
-	CurlCommand     string = "curlcommand"
-	RequestHeaders  string = "requestheaders"
-	ResponseStatus  string = "responsestatus"
-	ResponseHeaders string = "responseheaders"
+	JustURL         = "url"
+	URLTiming       = "urltiming"
+	CurlCommand     = "curlcommand"
+	RequestHeaders  = "requestheaders"
+	ResponseStatus  = "responsestatus"
+	ResponseHeaders = "responseheaders"
 )
 
 func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...string) *DebuggingRoundTripper {

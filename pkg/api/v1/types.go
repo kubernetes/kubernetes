@@ -181,9 +181,9 @@ type ObjectMeta struct {
 
 const (
 	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
-	NamespaceDefault string = "default"
+	NamespaceDefault = "default"
 	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
-	NamespaceAll string = ""
+	NamespaceAll = ""
 )
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
@@ -896,7 +896,7 @@ type ResourceRequirements struct {
 
 const (
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
-	TerminationMessagePathDefault string = "/dev/termination-log"
+	TerminationMessagePathDefault = "/dev/termination-log"
 )
 
 // A single application container that you want to run within a pod.

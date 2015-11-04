@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	shardsCount int = 32
+	shardsCount = 32
 )
 
 type Cache []*cacheShard
