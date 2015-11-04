@@ -766,7 +766,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	// create scheduler loop
 	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.Everything())
-	sched := components.NewScheduler(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
+	sched := components.New(sc, framework, fcfs, client, recorder, schedulerProcess.Terminal(), s.mux, lw)
 
 	runtime.On(framework.Registration(), func() { sched.Run(schedulerProcess.Terminal()) })
 	runtime.On(framework.Registration(), s.newServiceWriter(schedulerProcess.Terminal()))

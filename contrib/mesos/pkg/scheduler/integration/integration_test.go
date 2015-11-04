@@ -487,7 +487,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 
 	// create scheduler
 	eventObs := NewEventObserver()
-	scheduler := components.NewScheduler(&c, fw, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	scheduler := components.New(&c, fw, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
 	assert.NotNil(scheduler)
 
 	// create mock mesos scheduler driver
