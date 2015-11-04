@@ -34,14 +34,14 @@ mesosslave:
   - bash
   - -xc
   - >
-    NAME=$(cut -f2 -d/ <<<${MESOSMASTER1_NAME}) &&
-    N=${NAME##*_} &&
-    DOCKER_NETWORK_OFFSET=0.0.${N}.0
+    NAME=$$(cut -f2 -d/ <<<$${MESOSMASTER1_NAME}) &&
+    N=$${NAME##*_} &&
+    DOCKER_NETWORK_OFFSET=0.0.$${N}.0
     exec wrapdocker mesos-slave
-    --work_dir="/var/tmp/mesos/${N}"
-    --attributes="rack:${N};gen:201${N}"
-    --hostname=$(getent hosts mesosslave | cut -d' ' -f1 | sort -u | tail -1)
-  command: ~
+    --work_dir="/var/tmp/mesos/$${N}"
+    --attributes="rack:$${N};gen:201$${N}"
+    --hostname=$$(getent hosts mesosslave | cut -d' ' -f1 | sort -u | tail -1)
+  command: []
   environment:
   - MESOS_MASTER=mesosmaster1:5050
   - MESOS_PORT=5051
@@ -64,13 +64,13 @@ apiserver:
   - /bin/bash
   - "-ceu"
   - >
-    echo "Hostname: $(hostname -f) ($(hostname -f | xargs resolveip))" &&
+    echo "Hostname: $$(hostname -f) ($$(hostname -f | xargs resolveip))" &&
     (grep "mesos-master\s*=" /opt/mesos-cloud.conf || echo "  mesos-master = mesosmaster1:5050" >> /opt/mesos-cloud.conf) &&
     await-health-check "-t=${MESOS_DOCKER_ETCD_TIMEOUT}" http://etcd:4001/health &&
     await-health-check "-t=${MESOS_DOCKER_MESOS_TIMEOUT}" http://mesosmaster1:5050/health &&
     await-file "-t=${KUBE_KEYGEN_TIMEOUT}" /var/run/kubernetes/auth/apiserver.crt &&
     km apiserver
-    --address=$(resolveip apiserver)
+    --address=$$(resolveip apiserver)
     --external-hostname=apiserver
     --etcd-servers=http://etcd:4001
     --port=8888
@@ -87,10 +87,6 @@ apiserver:
     --tls-private-key-file=/var/run/kubernetes/auth/apiserver.key
     --v=4
   ports: [ "8888:8888", "6443:6443" ]
-  environment:
-  - MESOS_DOCKER_ETCD_TIMEOUT
-  - MESOS_DOCKER_MESOS_TIMEOUT
-  - KUBE_KEYGEN_TIMEOUT
   volumes:
   - ${MESOS_DOCKER_WORK_DIR}/auth:/var/run/kubernetes/auth:ro
   links:
@@ -103,20 +99,17 @@ controller:
   - /bin/bash
   - "-ceu"
   - >
-    echo "Hostname: $(hostname -f) ($(hostname -f | xargs resolveip))" &&
+    echo "Hostname: $$(hostname -f) ($$(hostname -f | xargs resolveip))" &&
     (grep "mesos-master\s*=" /opt/mesos-cloud.conf || echo "  mesos-master = mesosmaster1:5050" >> /opt/mesos-cloud.conf) &&
     await-health-check "-t=${MESOS_DOCKER_MESOS_TIMEOUT}" http://mesosmaster1:5050/health &&
     await-health-check "-t=${MESOS_DOCKER_API_TIMEOUT}" http://apiserver:8888/healthz &&
     km controller-manager
-    --address=$(resolveip controller)
+    --address=$$(resolveip controller)
     --master=http://apiserver:8888
     --cloud-config=/opt/mesos-cloud.conf
     --service-account-private-key-file=/var/run/kubernetes/auth/service-accounts.key
     --root-ca-file=/var/run/kubernetes/auth/root-ca.crt
     --v=4
-  environment:
-  - MESOS_DOCKER_MESOS_TIMEOUT
-  - MESOS_DOCKER_API_TIMEOUT
   volumes:
   - ${MESOS_DOCKER_WORK_DIR}/auth:/var/run/kubernetes/auth:ro
   links:
@@ -129,13 +122,13 @@ scheduler:
   - /bin/bash
   - "-ceu"
   - >
-    echo "Hostname: $(hostname -f) ($(hostname -f | xargs resolveip))" &&
+    echo "Hostname: $$(hostname -f) ($$(hostname -f | xargs resolveip))" &&
     (grep "mesos-master\s*=" /opt/mesos-cloud.conf || echo "  mesos-master = mesosmaster1:5050" >> /opt/mesos-cloud.conf) &&
     await-health-check "-t=${MESOS_DOCKER_ETCD_TIMEOUT}" http://etcd:4001/health &&
     await-health-check "-t=${MESOS_DOCKER_MESOS_TIMEOUT}" http://mesosmaster1:5050/health &&
     await-health-check "-t=${MESOS_DOCKER_API_TIMEOUT}" http://apiserver:8888/healthz &&
     km scheduler
-    --address=$(resolveip scheduler)
+    --address=$$(resolveip scheduler)
     --hostname-override=scheduler
     --etcd-servers=http://etcd:4001
     --mesos-user=root
@@ -144,10 +137,8 @@ scheduler:
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
     --v=4
-  environment:
-  - MESOS_DOCKER_ETCD_TIMEOUT
-  - MESOS_DOCKER_MESOS_TIMEOUT
-  - MESOS_DOCKER_API_TIMEOUT
+    --executor-logv=4
+    --profiling=true
   links:
   - etcd
   - mesosmaster1
