@@ -17,10 +17,13 @@
 # Source this script in the Jenkins "Execute shell" build action to have all
 # test artifacts and the console log uploaded at the end of the test run.
 
-# For example, you might use the following line as the first command:
-# mkdir -p _tmp/ && curl -fsS --retry 3 -o _tmp/upload-to-gcs.sh \
-#   "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" \
-#   && source _tmp/upload-to-gcs.sh
+# For example, you might use the following snippet as the first few lines:
+#
+# if [[ -f ./hack/jenkins/upload-to-gcs.sh ]]; then
+#   source ./hack/jenkins/upload-to-gcs.sh
+# else
+#   curl -fsS -o upload-to-gcs.sh --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" && source upload-to-gcs.sh; rm -f upload-to-gcs.sh
+# fi
 
 # Note that this script requires the Jenkins shell binary to be set to bash, not
 # the system default (which may be dash on Debian-based systems).
@@ -58,12 +61,16 @@ function upload_logs_to_gcs() {
       gsutil -m -q -o "GSUtil:use_magicfile=True" cp -a "${gcs_acl}" -r -c \
         -z log,txt,xml "${artifacts_path}" "${gcs_build_path}/artifacts" || continue
     fi
-    # Remove ANSI escape sequences from the console log before uploading.
-    local -r filtered_console_log="${WORKSPACE}/console-log.txt"
-    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" \
-      "${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log" \
-      > "${filtered_console_log}"
-    gsutil -q cp -a "${gcs_acl}" -z txt "${filtered_console_log}" "${gcs_build_path}/" || continue
+    local -r console_log="${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log"
+    # The console log only exists on the Jenkins master, so don't fail if it
+    # doesn't exist.
+    if [[ -f "${console_log}" ]]; then
+      # Remove ANSI escape sequences from the console log before uploading.
+      local -r filtered_console_log="${WORKSPACE}/console-log.txt"
+      sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" \
+        "${console_log}" > "${filtered_console_log}"
+      gsutil -q cp -a "${gcs_acl}" -z txt "${filtered_console_log}" "${gcs_build_path}/" || continue
+    fi
     # Mark this build as the latest completed.
     {
       echo "BUILD_NUMBER=${BUILD_NUMBER}"
@@ -72,6 +79,8 @@ function upload_logs_to_gcs() {
       cp -a "${gcs_acl}" - "${gcs_job_path}/latest-build.txt" || continue
     break  # all uploads succeeded if we hit this point
   done
+  local -r results_url=${gcs_build_path//"gs:/"/"https://storage.cloud.google.com"}
+  echo -e "\n\n\n*** View logs and artifacts at ${results_url} ***\n\n"
 }
 
 # Automatically upload logs to GCS on exit or timeout.
