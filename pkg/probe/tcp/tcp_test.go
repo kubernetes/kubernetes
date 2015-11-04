@@ -50,7 +50,7 @@ func TestTcpHealthChecker(t *testing.T) {
 	}{
 		// The probe will be filled in below.  This is primarily testing that a connection is made.
 		{probe.Success, true, false, []string{""}},
-		{probe.Failure, false, false, []string{"unknown port", "Servname not supported for ai_socktype"}},
+		{probe.Failure, false, false, []string{"unknown port", "Servname not supported for ai_socktype", "nodename nor servname provided, or not known"}},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
