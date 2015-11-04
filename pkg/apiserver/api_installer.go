@@ -828,17 +828,17 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 // Convert the name of a golang type to the name of a JSON type
 func typeToJSON(typeName string) string {
 	switch typeName {
-	case "bool":
+	case "bool", "*bool":
 		return "boolean"
-	case "uint8", "int", "int32", "int64", "uint32", "uint64":
+	case "uint8", "*uint8", "int", "*int", "int32", "*int32", "int64", "*int64", "uint32", "*uint32", "uint64", "*uint64":
 		return "integer"
-	case "float64", "float32":
+	case "float64", "*float64", "float32", "*float32":
 		return "number"
-	case "unversioned.Time":
+	case "unversioned.Time", "*unversioned.Time":
 		return "string"
-	case "byte":
+	case "byte", "*byte":
 		return "string"
-	case "[]string":
+	case "[]string", "[]*string":
 		// TODO: Fix this when go-restful supports a way to specify an array query param:
 		// https://github.com/emicklei/go-restful/issues/225
 		return "string"
