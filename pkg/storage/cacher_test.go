@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -38,6 +39,12 @@ import (
 
 	"golang.org/x/net/context"
 )
+
+func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix)
+	return server, storage
+}
 
 func newTestCacher(s storage.Interface) *storage.Cacher {
 	prefix := "pods"
@@ -82,7 +89,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 }
 
 func TestList(t *testing.T) {
-	server, etcdStorage := etcdstorage.NewEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
 
@@ -158,7 +165,7 @@ func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType
 }
 
 func TestWatch(t *testing.T) {
-	server, etcdStorage := etcdstorage.NewEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
 
@@ -217,7 +224,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestFiltering(t *testing.T) {
-	server, etcdStorage := etcdstorage.NewEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
 
@@ -269,7 +276,7 @@ func TestFiltering(t *testing.T) {
  * and the watch *never returns.*  I would like to still keep this test here and re-enable
  * with the new 2.2+ client library.
 func TestStorageError(t *testing.T) {
-	server, etcdStorage := etcdstorage.NewEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	cacher := newTestCacher(etcdStorage)
 
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", 1, storage.Everything)

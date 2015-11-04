@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 
 	// TODO: once fakeClient has been purged move utils
@@ -109,10 +110,10 @@ func createPodList(t *testing.T, helper etcdHelper, list *api.PodList) error {
 }
 
 func TestList(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), key)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
 
 	list := api.PodList{
 		Items: []api.Pod{
@@ -145,10 +146,10 @@ func TestList(t *testing.T) {
 }
 
 func TestListFiltered(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), key)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
 
 	list := api.PodList{
 		Items: []api.Pod{
@@ -186,15 +187,15 @@ func TestListFiltered(t *testing.T) {
 
 // TestListAcrossDirectories ensures that the client excludes directories and flattens tree-response - simulates cross-namespace query
 func TestListAcrossDirectories(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	rootkey := etcdtest.AddPrefix("/some/key")
 	key1 := etcdtest.AddPrefix("/some/key/directory1")
 	key2 := etcdtest.AddPrefix("/some/key/directory2")
 
-	roothelper := newEtcdHelper(server.client, testapi.Default.Codec(), rootkey)
-	helper1 := newEtcdHelper(server.client, testapi.Default.Codec(), key1)
-	helper2 := newEtcdHelper(server.client, testapi.Default.Codec(), key2)
+	roothelper := newEtcdHelper(server.Client, testapi.Default.Codec(), rootkey)
+	helper1 := newEtcdHelper(server.Client, testapi.Default.Codec(), key1)
+	helper2 := newEtcdHelper(server.Client, testapi.Default.Codec(), key2)
 
 	list := api.PodList{
 		Items: []api.Pod{
@@ -234,10 +235,10 @@ func TestListAcrossDirectories(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), key)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
 	expect := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
@@ -256,11 +257,11 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetNotFoundErr(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
 	boguskey := etcdtest.AddPrefix("/some/boguskey")
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), key)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
 
 	var got api.Pod
 	err := helper.Get(context.TODO(), boguskey, &got, false)
@@ -271,9 +272,9 @@ func TestGetNotFoundErr(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
 	err := helper.Create(context.TODO(), "/some/key", obj, returnedObj, 5)
 	if err != nil {
@@ -298,9 +299,9 @@ func TestCreate(t *testing.T) {
 
 func TestCreateNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	err := helper.Create(context.TODO(), "/some/key", obj, nil, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -309,9 +310,9 @@ func TestCreateNilOutParam(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
 	err := helper.Set(context.TODO(), "/some/key", obj, returnedObj, 5)
 	if err != nil {
@@ -334,9 +335,9 @@ func TestSet(t *testing.T) {
 
 func TestSetFailCAS(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	err := helper.Set(context.TODO(), "/some/key", obj, nil, 5)
 	if err == nil {
 		t.Errorf("Expecting error.")
@@ -345,9 +346,9 @@ func TestSetFailCAS(t *testing.T) {
 
 func TestSetWithVersion(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 
 	returnedObj := &api.Pod{}
 	err := helper.Set(context.TODO(), "/some/key", obj, returnedObj, 7)
@@ -368,9 +369,9 @@ func TestSetWithVersion(t *testing.T) {
 
 func TestSetWithoutResourceVersioner(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	helper.versioner = nil
 	returnedObj := &api.Pod{}
 	err := helper.Set(context.TODO(), "/some/key", obj, returnedObj, 3)
@@ -384,9 +385,9 @@ func TestSetWithoutResourceVersioner(t *testing.T) {
 
 func TestSetNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	helper.versioner = nil
 	err := helper.Set(context.TODO(), "/some/key", obj, nil, 3)
 	if err != nil {
@@ -395,10 +396,10 @@ func TestSetNilOutParam(t *testing.T) {
 }
 
 func TestGuaranteedUpdate(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, codec, key)
+	helper := newEtcdHelper(server.Client, codec, key)
 
 	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
@@ -436,10 +437,10 @@ func TestGuaranteedUpdate(t *testing.T) {
 }
 
 func TestGuaranteedUpdateNoChange(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, codec, key)
+	helper := newEtcdHelper(server.Client, codec, key)
 
 	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
@@ -465,10 +466,10 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 }
 
 func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, codec, key)
+	helper := newEtcdHelper(server.Client, codec, key)
 
 	// Create a new node.
 	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
@@ -491,10 +492,10 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 }
 
 func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.client, codec, etcdtest.PathPrefix())
+	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	const concurrency = 10
 	var wgDone sync.WaitGroup
@@ -586,10 +587,10 @@ func TestGetEtcdVersion_NotListening(t *testing.T) {
 }
 
 func TestPrefixEtcdKey(t *testing.T) {
-	server := NewEtcdTestClientServer(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	prefix := path.Join("/", etcdtest.PathPrefix())
-	helper := newEtcdHelper(server.client, testapi.Default.Codec(), prefix)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
 
 	baseKey := "/some/key"
 
