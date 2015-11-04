@@ -147,7 +147,7 @@ func ReserveCpu(f *Framework, id string, millicores int) {
 		Name:       id,
 		Namespace:  f.Namespace.Name,
 		Timeout:    10 * time.Minute,
-		Image:      "beta.gcr.io/google_containers/pause:2.0",
+		Image:      "gcr.io/google_containers/pause:2.0",
 		Replicas:   millicores / 100,
 		CpuRequest: 100,
 	}
@@ -161,7 +161,7 @@ func ReserveMemory(f *Framework, id string, megabytes int) {
 		Name:       id,
 		Namespace:  f.Namespace.Name,
 		Timeout:    10 * time.Minute,
-		Image:      "beta.gcr.io/google_containers/pause:2.0",
+		Image:      "gcr.io/google_containers/pause:2.0",
 		Replicas:   megabytes / 500,
 		MemRequest: 500 * 1024 * 1024,
 	}
