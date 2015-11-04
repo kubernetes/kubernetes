@@ -20,20 +20,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
-	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/registry/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -47,10 +44,10 @@ type PodStorage struct {
 	Binding     *BindingREST
 	Status      *StatusREST
 	Log         *podrest.LogREST
-	Proxy       *ProxyREST
-	Exec        *ExecREST
-	Attach      *AttachREST
-	PortForward *PortForwardREST
+	Proxy       *podrest.ProxyREST
+	Exec        *podrest.ExecREST
+	Attach      *podrest.AttachREST
+	PortForward *podrest.PortForwardREST
 }
 
 // REST implements a RESTStorage for pods against etcd
@@ -100,10 +97,10 @@ func NewStorage(s storage.Interface, storageFactory storage.StorageFactory, k cl
 		Binding:     &BindingREST{store: store},
 		Status:      &StatusREST{store: &statusStore},
 		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
-		Proxy:       &ProxyREST{store: store, proxyTransport: proxyTransport},
-		Exec:        &ExecREST{store: store, kubeletConn: k},
-		Attach:      &AttachREST{store: store, kubeletConn: k},
-		PortForward: &PortForwardREST{store: store, kubeletConn: k},
+		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+		Exec:        &podrest.ExecREST{Store: store, KubeletConn: k},
+		Attach:      &podrest.AttachREST{Store: store, KubeletConn: k},
+		PortForward: &podrest.PortForwardREST{Store: store, KubeletConn: k},
 	}
 }
 
@@ -199,165 +196,4 @@ func (r *StatusREST) New() runtime.Object {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, obj)
-}
-
-// ProxyREST implements the proxy subresource for a Pod
-// TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
-type ProxyREST struct {
-	store          *etcdgeneric.Etcd
-	proxyTransport http.RoundTripper
-}
-
-// Implement Connecter
-var _ = rest.Connecter(&ProxyREST{})
-
-var proxyMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"}
-
-// New returns an empty pod resource
-func (r *ProxyREST) New() runtime.Object {
-	return &api.Pod{}
-}
-
-// ConnectMethods returns the list of HTTP methods that can be proxied
-func (r *ProxyREST) ConnectMethods() []string {
-	return proxyMethods
-}
-
-// NewConnectOptions returns versioned resource that represents proxy parameters
-func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return &api.PodProxyOptions{}, true, "path"
-}
-
-// Connect returns a handler for the pod proxy
-func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	proxyOpts, ok := opts.(*api.PodProxyOptions)
-	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
-	}
-	location, transport, err := pod.ResourceLocation(r.store, r.proxyTransport, ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	location.Path = path.Join(location.Path, proxyOpts.Path)
-	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
-}
-
-// Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
-var upgradeableMethods = []string{"GET", "POST"}
-
-// AttachREST implements the attach subresource for a Pod
-// TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
-type AttachREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
-}
-
-// Implement Connecter
-var _ = rest.Connecter(&AttachREST{})
-
-// New creates a new Pod object
-func (r *AttachREST) New() runtime.Object {
-	return &api.Pod{}
-}
-
-// Connect returns a handler for the pod exec proxy
-func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	attachOpts, ok := opts.(*api.PodAttachOptions)
-	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
-	}
-	location, transport, err := pod.AttachLocation(r.store, r.kubeletConn, ctx, name, attachOpts)
-	if err != nil {
-		return nil, err
-	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
-}
-
-// NewConnectOptions returns the versioned object that represents exec parameters
-func (r *AttachREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return &api.PodAttachOptions{}, false, ""
-}
-
-// ConnectMethods returns the methods supported by exec
-func (r *AttachREST) ConnectMethods() []string {
-	return upgradeableMethods
-}
-
-// ExecREST implements the exec subresource for a Pod
-// TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
-type ExecREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
-}
-
-// Implement Connecter
-var _ = rest.Connecter(&ExecREST{})
-
-// New creates a new Pod object
-func (r *ExecREST) New() runtime.Object {
-	return &api.Pod{}
-}
-
-// Connect returns a handler for the pod exec proxy
-func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	execOpts, ok := opts.(*api.PodExecOptions)
-	if !ok {
-		return nil, fmt.Errorf("invalid options object: %#v", opts)
-	}
-	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts)
-	if err != nil {
-		return nil, err
-	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
-}
-
-// NewConnectOptions returns the versioned object that represents exec parameters
-func (r *ExecREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return &api.PodExecOptions{}, false, ""
-}
-
-// ConnectMethods returns the methods supported by exec
-func (r *ExecREST) ConnectMethods() []string {
-	return upgradeableMethods
-}
-
-// PortForwardREST implements the portforward subresource for a Pod
-// TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
-type PortForwardREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
-}
-
-// Implement Connecter
-var _ = rest.Connecter(&PortForwardREST{})
-
-// New returns an empty pod object
-func (r *PortForwardREST) New() runtime.Object {
-	return &api.Pod{}
-}
-
-// NewConnectOptions returns nil since portforward doesn't take additional parameters
-func (r *PortForwardREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return nil, false, ""
-}
-
-// ConnectMethods returns the methods supported by portforward
-func (r *PortForwardREST) ConnectMethods() []string {
-	return upgradeableMethods
-}
-
-// Connect returns a handler for the pod portforward proxy
-func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	location, transport, err := pod.PortForwardLocation(r.store, r.kubeletConn, ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
-}
-
-func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
-	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, wrapTransport, upgradeRequired, responder)
-	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
-	return handler
 }
