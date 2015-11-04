@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evanphx/json-patch"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -39,9 +38,14 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
+	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+)
+
+const (
+	ApplyAnnotationsFlag = "save-config"
 )
 
 type debugError interface {
@@ -281,6 +285,10 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+}
+
+func AddApplyAnnotationFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
