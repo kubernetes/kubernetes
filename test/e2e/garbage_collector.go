@@ -73,7 +73,7 @@ func createTerminatingPod(f *Framework) (*api.Pod, error) {
 			Containers: []api.Container{
 				{
 					Name:  string(uuid),
-					Image: "beta.gcr.io/google_containers/busybox",
+					Image: "gcr.io/google_containers/busybox",
 				},
 			},
 		},
