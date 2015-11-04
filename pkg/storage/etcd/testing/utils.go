@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package testing
 
 import (
 	"fmt"
@@ -26,8 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 
 	"github.com/coreos/etcd/etcdserver"
@@ -42,7 +40,7 @@ import (
 type EtcdTestServer struct {
 	etcdserver.ServerConfig
 	PeerListeners, ClientListeners []net.Listener
-	client                         tools.EtcdClient
+	Client                         tools.EtcdClient
 
 	raftHandler http.Handler
 	s           *etcdserver.EtcdServer
@@ -130,7 +128,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
-	m.client.(*goetcd.Client).Close()
+	m.Client.(*goetcd.Client).Close()
 	m.s.Stop()
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
@@ -149,18 +147,11 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		t.Fatal("Failed to start etcd server error=%v", err)
 		return nil
 	}
-	server.client = goetcd.NewClient(server.ClientURLs.StringSlice())
-	if server.client == nil {
+	server.Client = goetcd.NewClient(server.ClientURLs.StringSlice())
+	if server.Client == nil {
 		t.Errorf("Failed to connect to local etcd server")
 		defer server.Terminate(t)
 		return nil
 	}
 	return server
-}
-
-// NewEtcdTestStorage creates a new storage.Interface and TestServer
-func NewEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*EtcdTestServer, storage.Interface) {
-	server := NewEtcdTestClientServer(t)
-	storage := NewEtcdStorage(server.client, codec, prefix)
-	return server, storage
 }
