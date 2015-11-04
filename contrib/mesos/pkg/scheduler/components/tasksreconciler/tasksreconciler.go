@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 )
 
-type ReconcilerAction func(driver bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error
+type Action func(driver bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error
 
 type TasksReconciler interface {
 	RequestExplicit()
@@ -37,14 +37,14 @@ type TasksReconciler interface {
 
 type tasksReconciler struct {
 	proc.Doer
-	Action                             ReconcilerAction
+	Action                             Action
 	explicit                           chan struct{} // send an empty struct to trigger explicit reconciliation
 	implicit                           chan struct{} // send an empty struct to trigger implicit reconciliation
 	cooldown                           time.Duration
 	explicitReconciliationAbortTimeout time.Duration
 }
 
-func New(doer proc.Doer, action ReconcilerAction,
+func New(doer proc.Doer, action Action,
 	cooldown, explicitReconciliationAbortTimeout time.Duration, done <-chan struct{}) TasksReconciler {
 	return &tasksReconciler{
 		Doer:     doer,
