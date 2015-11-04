@@ -62,7 +62,7 @@ func (strategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateSecretUpdate(old.(*api.Secret), obj.(*api.Secret))
+	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {

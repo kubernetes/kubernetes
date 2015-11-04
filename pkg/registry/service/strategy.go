@@ -68,7 +68,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateServiceUpdate(old.(*api.Service), obj.(*api.Service))
+	return validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
