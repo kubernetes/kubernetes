@@ -317,7 +317,8 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 		} else {
 			name := kubecontainer.GetPodFullName(pod)
 			if names.Has(name) {
-				errlist = append(errlist, utilvalidation.NewDuplicateError("name", pod.Name))
+				//FIXME: this implies an API version
+				errlist = append(errlist, utilvalidation.NewDuplicateError(utilvalidation.NewFieldPath("metadata", "name"), pod.Name))
 			} else {
 				names.Insert(name)
 			}

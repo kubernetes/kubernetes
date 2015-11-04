@@ -274,12 +274,12 @@ func TestCheckInvalidErr(t *testing.T) {
 		expected string
 	}{
 		{
-			errors.NewInvalid("Invalid1", "invalidation", validation.ErrorList{validation.NewInvalidError("Cause", "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single', Details: details`,
+			errors.NewInvalid("Invalid1", "invalidation", validation.ErrorList{validation.NewInvalidError(validation.NewFieldPath("field"), "single", "details")}),
+			`Error from server: Invalid1 "invalidation" is invalid: field: invalid value 'single', Details: details`,
 		},
 		{
-			errors.NewInvalid("Invalid2", "invalidation", validation.ErrorList{validation.NewInvalidError("Cause", "multi1", "details"), validation.NewInvalidError("Cause", "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1', Details: details, Cause: invalid value 'multi2', Details: details]`,
+			errors.NewInvalid("Invalid2", "invalidation", validation.ErrorList{validation.NewInvalidError(validation.NewFieldPath("field1"), "multi1", "details"), validation.NewInvalidError(validation.NewFieldPath("field2"), "multi2", "details")}),
+			`Error from server: Invalid2 "invalidation" is invalid: [field1: invalid value 'multi1', Details: details, field2: invalid value 'multi2', Details: details]`,
 		},
 		{
 			errors.NewInvalid("Invalid3", "invalidation", validation.ErrorList{}),

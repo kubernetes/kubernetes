@@ -701,14 +701,15 @@ const qualifiedNameErrorMsg string = "must match regex [" + validation.DNS1123Su
 
 func validateLabelKey(k string) error {
 	if !validation.IsQualifiedName(k) {
-		return validation.NewInvalidError("label key", k, qualifiedNameErrorMsg)
+		return fmt.Errorf("invalid label key: %s", qualifiedNameErrorMsg)
 	}
 	return nil
 }
 
 func validateLabelValue(v string) error {
 	if !validation.IsValidLabelValue(v) {
-		return validation.NewInvalidError("label value", v, qualifiedNameErrorMsg)
+		//FIXME: this is not the right regex!
+		return fmt.Errorf("invalid label value: %s", qualifiedNameErrorMsg)
 	}
 	return nil
 }
