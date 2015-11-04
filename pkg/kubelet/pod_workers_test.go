@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -66,6 +67,9 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 			return nil
 		},
 		fakeRecorder,
+		queue.NewBasicWorkQueue(),
+		time.Second,
+		time.Second,
 	)
 	return podWorkers, processed
 }
@@ -200,7 +204,7 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder)
+	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeRuntimeCache, t}
 
 	tests := []struct {
