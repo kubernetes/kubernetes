@@ -61,12 +61,16 @@ function upload_logs_to_gcs() {
       gsutil -m -q -o "GSUtil:use_magicfile=True" cp -a "${gcs_acl}" -r -c \
         -z log,txt,xml "${artifacts_path}" "${gcs_build_path}/artifacts" || continue
     fi
-    # Remove ANSI escape sequences from the console log before uploading.
-    local -r filtered_console_log="${WORKSPACE}/console-log.txt"
-    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" \
-      "${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log" \
-      > "${filtered_console_log}"
-    gsutil -q cp -a "${gcs_acl}" -z txt "${filtered_console_log}" "${gcs_build_path}/" || continue
+    local -r console_log="${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log"
+    # The console log only exists on the Jenkins master, so don't fail if it
+    # doesn't exist.
+    if [[ -f "${console_log}" ]]; then
+      # Remove ANSI escape sequences from the console log before uploading.
+      local -r filtered_console_log="${WORKSPACE}/console-log.txt"
+      sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" \
+        "${console_log}" > "${filtered_console_log}"
+      gsutil -q cp -a "${gcs_acl}" -z txt "${filtered_console_log}" "${gcs_build_path}/" || continue
+    fi
     # Mark this build as the latest completed.
     {
       echo "BUILD_NUMBER=${BUILD_NUMBER}"
