@@ -28,23 +28,23 @@ func TestMakeFuncs(t *testing.T) {
 		expected ErrorType
 	}{
 		{
-			func() *Error { return NewFieldInvalid("f", "v", "d") },
+			func() *Error { return NewInvalidError("f", "v", "d") },
 			ErrorTypeInvalid,
 		},
 		{
-			func() *Error { return NewFieldNotSupported("f", "v", nil) },
+			func() *Error { return NewNotSupportedError("f", "v", nil) },
 			ErrorTypeNotSupported,
 		},
 		{
-			func() *Error { return NewFieldDuplicate("f", "v") },
+			func() *Error { return NewDuplicateError("f", "v") },
 			ErrorTypeDuplicate,
 		},
 		{
-			func() *Error { return NewFieldNotFound("f", "v") },
+			func() *Error { return NewNotFoundError("f", "v") },
 			ErrorTypeNotFound,
 		},
 		{
-			func() *Error { return NewFieldRequired("f") },
+			func() *Error { return NewRequiredError("f") },
 			ErrorTypeRequired,
 		},
 		{
@@ -62,7 +62,7 @@ func TestMakeFuncs(t *testing.T) {
 }
 
 func TestErrorUsefulMessage(t *testing.T) {
-	s := NewFieldInvalid("foo", "bar", "deet").Error()
+	s := NewInvalidError("foo", "bar", "deet").Error()
 	t.Logf("message: %v", s)
 	for _, part := range []string{"foo", "bar", "deet", ErrorTypeInvalid.String()} {
 		if !strings.Contains(s, part) {
@@ -76,7 +76,7 @@ func TestErrorUsefulMessage(t *testing.T) {
 		Inner interface{}
 		KV    map[string]int
 	}
-	s = NewFieldInvalid(
+	s = NewInvalidError(
 		"foo",
 		&complicated{
 			Baz:   1,
@@ -102,8 +102,8 @@ func TestToAggregate(t *testing.T) {
 	testCases := []ErrorList{
 		nil,
 		{},
-		{NewFieldInvalid("f", "v", "d")},
-		{NewFieldInvalid("f", "v", "d"), NewInternalError("", fmt.Errorf("e"))},
+		{NewInvalidError("f", "v", "d")},
+		{NewInvalidError("f", "v", "d"), NewInternalError("", fmt.Errorf("e"))},
 	}
 	for i, tc := range testCases {
 		agg := tc.ToAggregate()
@@ -121,9 +121,9 @@ func TestToAggregate(t *testing.T) {
 
 func TestErrListFilter(t *testing.T) {
 	list := ErrorList{
-		NewFieldInvalid("test.field", "", ""),
-		NewFieldInvalid("field.test", "", ""),
-		NewFieldDuplicate("test", "value"),
+		NewInvalidError("test.field", "", ""),
+		NewInvalidError("field.test", "", ""),
+		NewDuplicateError("test", "value"),
 	}
 	if len(list.Filter(NewErrorTypeMatcher(ErrorTypeDuplicate))) != 2 {
 		t.Errorf("should not filter")
@@ -139,15 +139,15 @@ func TestErrListPrefix(t *testing.T) {
 		Expected string
 	}{
 		{
-			NewFieldNotFound("[0].bar", "value"),
+			NewNotFoundError("[0].bar", "value"),
 			"foo[0].bar",
 		},
 		{
-			NewFieldInvalid("field", "value", ""),
+			NewInvalidError("field", "value", ""),
 			"foo.field",
 		},
 		{
-			NewFieldDuplicate("", "value"),
+			NewDuplicateError("", "value"),
 			"foo",
 		},
 	}
@@ -169,15 +169,15 @@ func TestErrListPrefixIndex(t *testing.T) {
 		Expected string
 	}{
 		{
-			NewFieldNotFound("[0].bar", "value"),
+			NewNotFoundError("[0].bar", "value"),
 			"[1][0].bar",
 		},
 		{
-			NewFieldInvalid("field", "value", ""),
+			NewInvalidError("field", "value", ""),
 			"[1].field",
 		},
 		{
-			NewFieldDuplicate("", "value"),
+			NewDuplicateError("", "value"),
 			"[1]",
 		},
 	}

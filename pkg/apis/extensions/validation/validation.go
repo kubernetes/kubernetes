@@ -42,21 +42,21 @@ func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string
 func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 1 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("minReplicas", autoscaler.MinReplicas, `must be bigger or equal to 1`))
+		allErrs = append(allErrs, validation.NewInvalidError("minReplicas", autoscaler.MinReplicas, `must be bigger or equal to 1`))
 	}
 	if autoscaler.MaxReplicas < 1 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to 1`))
+		allErrs = append(allErrs, validation.NewInvalidError("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to 1`))
 	}
 	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
-		allErrs = append(allErrs, validation.NewFieldInvalid("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
+		allErrs = append(allErrs, validation.NewInvalidError("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
 	}
 	if autoscaler.CPUUtilization != nil && autoscaler.CPUUtilization.TargetPercentage < 1 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, `must be bigger or equal to 1`))
+		allErrs = append(allErrs, validation.NewInvalidError("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, `must be bigger or equal to 1`))
 	}
 	if refErrs := ValidateSubresourceReference(autoscaler.ScaleRef); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs.Prefix("scaleRef")...)
 	} else if autoscaler.ScaleRef.Subresource != "scale" {
-		allErrs = append(allErrs, validation.NewFieldNotSupported("scaleRef.subresource", autoscaler.ScaleRef.Subresource, []string{"scale"}))
+		allErrs = append(allErrs, validation.NewNotSupportedError("scaleRef.subresource", autoscaler.ScaleRef.Subresource, []string{"scale"}))
 	}
 	return allErrs
 }
@@ -64,21 +64,21 @@ func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAuto
 func ValidateSubresourceReference(ref extensions.SubresourceReference) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if len(ref.Kind) == 0 {
-		allErrs = append(allErrs, validation.NewFieldRequired("kind"))
+		allErrs = append(allErrs, validation.NewRequiredError("kind"))
 	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Kind); !ok {
-		allErrs = append(allErrs, validation.NewFieldInvalid("kind", ref.Kind, msg))
+		allErrs = append(allErrs, validation.NewInvalidError("kind", ref.Kind, msg))
 	}
 
 	if len(ref.Name) == 0 {
-		allErrs = append(allErrs, validation.NewFieldRequired("name"))
+		allErrs = append(allErrs, validation.NewRequiredError("name"))
 	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Name); !ok {
-		allErrs = append(allErrs, validation.NewFieldInvalid("name", ref.Name, msg))
+		allErrs = append(allErrs, validation.NewInvalidError("name", ref.Name, msg))
 	}
 
 	if len(ref.Subresource) == 0 {
-		allErrs = append(allErrs, validation.NewFieldRequired("subresource"))
+		allErrs = append(allErrs, validation.NewRequiredError("subresource"))
 	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Subresource); !ok {
-		allErrs = append(allErrs, validation.NewFieldInvalid("subresource", ref.Subresource, msg))
+		allErrs = append(allErrs, validation.NewInvalidError("subresource", ref.Subresource, msg))
 	}
 	return allErrs
 }
@@ -126,10 +126,10 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) validation.E
 	for ix := range obj.Versions {
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {
-			allErrs = append(allErrs, validation.NewFieldInvalid("name", version, "name can not be empty"))
+			allErrs = append(allErrs, validation.NewInvalidError("name", version, "name can not be empty"))
 		}
 		if versions.Has(version.Name) {
-			allErrs = append(allErrs, validation.NewFieldDuplicate("version", version))
+			allErrs = append(allErrs, validation.NewDuplicateError("version", version))
 		}
 		versions.Insert(version.Name)
 	}
@@ -180,7 +180,7 @@ func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplat
 	// In particular, we do not allow updates to container images at this point.
 	if !api.Semantic.DeepEqual(oldPodTemplate.Spec, podSpec) {
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		allErrs = append(allErrs, validation.NewFieldInvalid("spec", "content of spec is not printed out, please refer to the \"details\"", "may not update fields other than spec.nodeSelector"))
+		allErrs = append(allErrs, validation.NewInvalidError("spec", "content of spec is not printed out, please refer to the \"details\"", "may not update fields other than spec.nodeSelector"))
 	}
 	return allErrs
 }
@@ -192,13 +192,13 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec) validation.ErrorList 
 	allErrs = append(allErrs, ValidatePodSelector(spec.Selector)...)
 
 	if spec.Template == nil {
-		allErrs = append(allErrs, validation.NewFieldRequired("template"))
+		allErrs = append(allErrs, validation.NewRequiredError("template"))
 		return allErrs
 	}
 
 	selector, err := extensions.PodSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
-		allErrs = append(allErrs, validation.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+		allErrs = append(allErrs, validation.NewInvalidError("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
@@ -206,7 +206,7 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec) validation.ErrorList 
 	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
-		allErrs = append(allErrs, validation.NewFieldNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		allErrs = append(allErrs, validation.NewNotSupportedError("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
 
 	return allErrs
@@ -228,7 +228,7 @@ func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fieldName str
 	allErrs := validation.ErrorList{}
 	if intOrPercent.Type == intstr.String {
 		if !validation.IsValidPercent(intOrPercent.StrVal) {
-			allErrs = append(allErrs, validation.NewFieldInvalid(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
+			allErrs = append(allErrs, validation.NewInvalidError(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
 		}
 	} else if intOrPercent.Type == intstr.Int {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(intOrPercent.IntVal), fieldName)...)
@@ -258,7 +258,7 @@ func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fieldName stri
 	if !isPercent || value <= 100 {
 		return nil
 	}
-	allErrs = append(allErrs, validation.NewFieldInvalid(fieldName, intOrStringValue, "should not be more than 100%"))
+	allErrs = append(allErrs, validation.NewInvalidError(fieldName, intOrStringValue, "should not be more than 100%"))
 	return allErrs
 }
 
@@ -268,7 +268,7 @@ func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDepl
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fieldName+".maxSurge")...)
 	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 && getIntOrPercentValue(rollingUpdate.MaxSurge) == 0 {
 		// Both MaxSurge and MaxUnavailable cannot be zero.
-		allErrs = append(allErrs, validation.NewFieldInvalid(fieldName+".maxUnavailable", rollingUpdate.MaxUnavailable, "cannot be 0 when maxSurge is 0 as well"))
+		allErrs = append(allErrs, validation.NewInvalidError(fieldName+".maxUnavailable", rollingUpdate.MaxUnavailable, "cannot be 0 when maxSurge is 0 as well"))
 	}
 	// Validate that MaxUnavailable is not more than 100%.
 	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fieldName+".maxUnavailable")...)
@@ -283,7 +283,7 @@ func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fieldNa
 	}
 	switch strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
-		allErrs = append(allErrs, validation.NewFieldForbidden("rollingUpdate", "rollingUpdate should be nil when strategy type is "+extensions.RecreateDeploymentStrategyType))
+		allErrs = append(allErrs, validation.NewForbiddenError("rollingUpdate", "rollingUpdate should be nil when strategy type is "+extensions.RecreateDeploymentStrategyType))
 	case extensions.RollingUpdateDeploymentStrategyType:
 		allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, "rollingUpdate")...)
 	}
@@ -322,7 +322,7 @@ func ValidateThirdPartyResourceDataUpdate(update, old *extensions.ThirdPartyReso
 func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if len(obj.Name) == 0 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
+		allErrs = append(allErrs, validation.NewInvalidError("name", obj.Name, "name must be non-empty"))
 	}
 	return allErrs
 }
@@ -345,7 +345,7 @@ func ValidateJobSpec(spec *extensions.JobSpec) validation.ErrorList {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Completions), "completions")...)
 	}
 	if spec.Selector == nil {
-		allErrs = append(allErrs, validation.NewFieldRequired("selector"))
+		allErrs = append(allErrs, validation.NewRequiredError("selector"))
 	} else {
 		allErrs = append(allErrs, ValidatePodSelector(spec.Selector).Prefix("selector")...)
 	}
@@ -353,14 +353,14 @@ func ValidateJobSpec(spec *extensions.JobSpec) validation.ErrorList {
 	if selector, err := extensions.PodSelectorAsSelector(spec.Selector); err == nil {
 		labels := labels.Set(spec.Template.Labels)
 		if !selector.Matches(labels) {
-			allErrs = append(allErrs, validation.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+			allErrs = append(allErrs, validation.NewInvalidError("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
 		}
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template).Prefix("template")...)
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
 		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
-		allErrs = append(allErrs, validation.NewFieldNotSupported("template.spec.restartPolicy",
+		allErrs = append(allErrs, validation.NewNotSupportedError("template.spec.restartPolicy",
 			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
 	}
 	return allErrs
@@ -423,7 +423,7 @@ func ValidateIngressSpec(spec *extensions.IngressSpec) validation.ErrorList {
 	if spec.Backend != nil {
 		allErrs = append(allErrs, validateIngressBackend(spec.Backend).Prefix("backend")...)
 	} else if len(spec.Rules) == 0 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("rules", spec.Rules, "Either a default backend or a set of host rules are required for ingress."))
+		allErrs = append(allErrs, validation.NewInvalidError("rules", spec.Rules, "Either a default backend or a set of host rules are required for ingress."))
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules).Prefix("rules")...)
@@ -450,17 +450,17 @@ func ValidateIngressStatusUpdate(ingress, oldIngress *extensions.Ingress) valida
 func validateIngressRules(IngressRules []extensions.IngressRule) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if len(IngressRules) == 0 {
-		return append(allErrs, validation.NewFieldRequired("IngressRules"))
+		return append(allErrs, validation.NewRequiredError("IngressRules"))
 	}
 	for _, ih := range IngressRules {
 		if len(ih.Host) > 0 {
 			// TODO: Ports and ips are allowed in the host part of a url
 			// according to RFC 3986, consider allowing them.
 			if valid, errMsg := apivalidation.NameIsDNSSubdomain(ih.Host, false); !valid {
-				allErrs = append(allErrs, validation.NewFieldInvalid("host", ih.Host, errMsg))
+				allErrs = append(allErrs, validation.NewInvalidError("host", ih.Host, errMsg))
 			}
 			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
-				allErrs = append(allErrs, validation.NewFieldInvalid("host", ih.Host, "Host must be a DNS name, not ip address"))
+				allErrs = append(allErrs, validation.NewInvalidError("host", ih.Host, "Host must be a DNS name, not ip address"))
 			}
 		}
 		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue).Prefix("ingressRule")...)
@@ -479,12 +479,12 @@ func validateIngressRuleValue(ingressRule *extensions.IngressRuleValue) validati
 func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRuleValue) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if len(httpIngressRuleValue.Paths) == 0 {
-		allErrs = append(allErrs, validation.NewFieldRequired("paths"))
+		allErrs = append(allErrs, validation.NewRequiredError("paths"))
 	}
 	for _, rule := range httpIngressRuleValue.Paths {
 		if len(rule.Path) > 0 {
 			if !strings.HasPrefix(rule.Path, "/") {
-				allErrs = append(allErrs, validation.NewFieldInvalid("path", rule.Path, "path must begin with /"))
+				allErrs = append(allErrs, validation.NewInvalidError("path", rule.Path, "path must begin with /"))
 			}
 			// TODO: More draconian path regex validation.
 			// Path must be a valid regex. This is the basic requirement.
@@ -497,7 +497,7 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRu
 			// the user is confusing url regexes with path regexes.
 			_, err := regexp.CompilePOSIX(rule.Path)
 			if err != nil {
-				allErrs = append(allErrs, validation.NewFieldInvalid("path", rule.Path, "httpIngressRuleValue.path must be a valid regex."))
+				allErrs = append(allErrs, validation.NewInvalidError("path", rule.Path, "httpIngressRuleValue.path must be a valid regex."))
 			}
 		}
 		allErrs = append(allErrs, validateIngressBackend(&rule.Backend).Prefix("backend")...)
@@ -511,19 +511,19 @@ func validateIngressBackend(backend *extensions.IngressBackend) validation.Error
 
 	// All backends must reference a single local service by name, and a single service port by name or number.
 	if len(backend.ServiceName) == 0 {
-		return append(allErrs, validation.NewFieldRequired("serviceName"))
+		return append(allErrs, validation.NewRequiredError("serviceName"))
 	} else if ok, errMsg := apivalidation.ValidateServiceName(backend.ServiceName, false); !ok {
-		allErrs = append(allErrs, validation.NewFieldInvalid("serviceName", backend.ServiceName, errMsg))
+		allErrs = append(allErrs, validation.NewInvalidError("serviceName", backend.ServiceName, errMsg))
 	}
 	if backend.ServicePort.Type == intstr.String {
 		if !validation.IsDNS1123Label(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, validation.NewFieldInvalid("servicePort", backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
+			allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
 		}
 		if !validation.IsValidPortName(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, validation.NewFieldInvalid("servicePort", backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))
+			allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))
 		}
 	} else if !validation.IsValidPortNum(backend.ServicePort.IntVal) {
-		allErrs = append(allErrs, validation.NewFieldInvalid("servicePort", backend.ServicePort, apivalidation.PortRangeErrorMsg))
+		allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort, apivalidation.PortRangeErrorMsg))
 	}
 	return allErrs
 }
@@ -531,23 +531,23 @@ func validateIngressBackend(backend *extensions.IngressBackend) validation.Error
 func validateClusterAutoscalerSpec(spec extensions.ClusterAutoscalerSpec) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if spec.MinNodes < 0 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("minNodes", spec.MinNodes, `must be non-negative`))
+		allErrs = append(allErrs, validation.NewInvalidError("minNodes", spec.MinNodes, `must be non-negative`))
 	}
 	if spec.MaxNodes < spec.MinNodes {
-		allErrs = append(allErrs, validation.NewFieldInvalid("maxNodes", spec.MaxNodes, `must be bigger or equal to minNodes`))
+		allErrs = append(allErrs, validation.NewInvalidError("maxNodes", spec.MaxNodes, `must be bigger or equal to minNodes`))
 	}
 	if len(spec.TargetUtilization) == 0 {
-		allErrs = append(allErrs, validation.NewFieldRequired("targetUtilization"))
+		allErrs = append(allErrs, validation.NewRequiredError("targetUtilization"))
 	}
 	for _, target := range spec.TargetUtilization {
 		if len(target.Resource) == 0 {
-			allErrs = append(allErrs, validation.NewFieldRequired("targetUtilization.resource"))
+			allErrs = append(allErrs, validation.NewRequiredError("targetUtilization.resource"))
 		}
 		if target.Value <= 0 {
-			allErrs = append(allErrs, validation.NewFieldInvalid("targetUtilization.value", target.Value, "must be greater than 0"))
+			allErrs = append(allErrs, validation.NewInvalidError("targetUtilization.value", target.Value, "must be greater than 0"))
 		}
 		if target.Value > 1 {
-			allErrs = append(allErrs, validation.NewFieldInvalid("targetUtilization.value", target.Value, "must be less or equal 1"))
+			allErrs = append(allErrs, validation.NewInvalidError("targetUtilization.value", target.Value, "must be less or equal 1"))
 		}
 	}
 	return allErrs
@@ -556,10 +556,10 @@ func validateClusterAutoscalerSpec(spec extensions.ClusterAutoscalerSpec) valida
 func ValidateClusterAutoscaler(autoscaler *extensions.ClusterAutoscaler) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if autoscaler.Name != "ClusterAutoscaler" {
-		allErrs = append(allErrs, validation.NewFieldInvalid("name", autoscaler.Name, `name must be ClusterAutoscaler`))
+		allErrs = append(allErrs, validation.NewInvalidError("name", autoscaler.Name, `name must be ClusterAutoscaler`))
 	}
 	if autoscaler.Namespace != api.NamespaceDefault {
-		allErrs = append(allErrs, validation.NewFieldInvalid("namespace", autoscaler.Namespace, `namespace must be default`))
+		allErrs = append(allErrs, validation.NewInvalidError("namespace", autoscaler.Namespace, `namespace must be default`))
 	}
 	allErrs = append(allErrs, validateClusterAutoscalerSpec(autoscaler.Spec)...)
 	return allErrs
@@ -582,14 +582,14 @@ func ValidatePodSelectorRequirement(sr extensions.PodSelectorRequirement) valida
 	switch sr.Operator {
 	case extensions.PodSelectorOpIn, extensions.PodSelectorOpNotIn:
 		if len(sr.Values) == 0 {
-			allErrs = append(allErrs, validation.NewFieldInvalid("values", sr.Values, "must be non-empty when operator is In or NotIn"))
+			allErrs = append(allErrs, validation.NewInvalidError("values", sr.Values, "must be non-empty when operator is In or NotIn"))
 		}
 	case extensions.PodSelectorOpExists, extensions.PodSelectorOpDoesNotExist:
 		if len(sr.Values) > 0 {
-			allErrs = append(allErrs, validation.NewFieldInvalid("values", sr.Values, "must be empty when operator is Exists or DoesNotExist"))
+			allErrs = append(allErrs, validation.NewInvalidError("values", sr.Values, "must be empty when operator is Exists or DoesNotExist"))
 		}
 	default:
-		allErrs = append(allErrs, validation.NewFieldInvalid("operator", sr.Operator, "not a valid pod selector operator"))
+		allErrs = append(allErrs, validation.NewInvalidError("operator", sr.Operator, "not a valid pod selector operator"))
 	}
 	allErrs = append(allErrs, apivalidation.ValidateLabelName(sr.Key, "key")...)
 	return allErrs
@@ -600,7 +600,7 @@ func ValidateScale(scale *extensions.Scale) validation.ErrorList {
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain).Prefix("metadata")...)
 
 	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, validation.NewFieldInvalid("spec.replicas", scale.Spec.Replicas, "must be non-negative"))
+		allErrs = append(allErrs, validation.NewInvalidError("spec.replicas", scale.Spec.Replicas, "must be non-negative"))
 	}
 
 	return allErrs

@@ -65,29 +65,29 @@ type ErrorType string
 // TODO: These values are duplicated in api/types.go, but there's a circular dep.  Fix it.
 const (
 	// ErrorTypeNotFound is used to report failure to find a requested value
-	// (e.g. looking up an ID).  See NewFieldNotFound.
+	// (e.g. looking up an ID).  See NewNotFoundError.
 	ErrorTypeNotFound ErrorType = "FieldValueNotFound"
 	// ErrorTypeRequired is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).  See
-	// NewFieldRequired.
+	// NewRequiredError.
 	ErrorTypeRequired ErrorType = "FieldValueRequired"
 	// ErrorTypeDuplicate is used to report collisions of values that must be
-	// unique (e.g. unique IDs).  See NewFieldDuplicate.
+	// unique (e.g. unique IDs).  See NewDuplicateError.
 	ErrorTypeDuplicate ErrorType = "FieldValueDuplicate"
 	// ErrorTypeInvalid is used to report malformed values (e.g. failed regex
-	// match, too long, out of bounds).  See NewFieldInvalid.
+	// match, too long, out of bounds).  See NewInvalidError.
 	ErrorTypeInvalid ErrorType = "FieldValueInvalid"
 	// ErrorTypeNotSupported is used to report unknown values for enumerated
-	// fields (e.g. a list of valid values).  See NewFieldNotSupported.
+	// fields (e.g. a list of valid values).  See NewNotSupportedError.
 	ErrorTypeNotSupported ErrorType = "FieldValueNotSupported"
 	// ErrorTypeForbidden is used to report valid (as per formatting rules)
 	// values which would be accepted under some conditions, but which are not
 	// permitted by the current conditions (such as security policy).  See
-	// NewFieldForbidden.
+	// NewForbiddenError.
 	ErrorTypeForbidden ErrorType = "FieldValueForbidden"
 	// ErrorTypeTooLong is used to report that the given value is too long.
 	// This is similar to ErrorTypeInvalid, but the error will not include the
-	// too-long value.  See NewFieldTooLong.
+	// too-long value.  See NewTooLongError.
 	ErrorTypeTooLong ErrorType = "FieldValueTooLong"
 	// ErrorTypeInternal is used to report other errors that are not related
 	// to user input.
@@ -119,35 +119,35 @@ func (t ErrorType) String() string {
 	}
 }
 
-// NewFieldNotFound returns a *Error indicating "value not found".  This is
+// NewNotFoundError returns a *Error indicating "value not found".  This is
 // used to report failure to find a requested value (e.g. looking up an ID).
-func NewFieldNotFound(field string, value interface{}) *Error {
+func NewNotFoundError(field string, value interface{}) *Error {
 	return &Error{ErrorTypeNotFound, field, value, ""}
 }
 
-// NewFieldRequired returns a *Error indicating "value required".  This is used
+// NewRequiredError returns a *Error indicating "value required".  This is used
 // to report required values that are not provided (e.g. empty strings, null
 // values, or empty arrays).
-func NewFieldRequired(field string) *Error {
+func NewRequiredError(field string) *Error {
 	return &Error{ErrorTypeRequired, field, "", ""}
 }
 
-// NewFieldDuplicate returns a *Error indicating "duplicate value".  This is
+// NewDuplicateError returns a *Error indicating "duplicate value".  This is
 // used to report collisions of values that must be unique (e.g. names or IDs).
-func NewFieldDuplicate(field string, value interface{}) *Error {
+func NewDuplicateError(field string, value interface{}) *Error {
 	return &Error{ErrorTypeDuplicate, field, value, ""}
 }
 
-// NewFieldInvalid returns a *Error indicating "invalid value".  This is used
+// NewInvalidError returns a *Error indicating "invalid value".  This is used
 // to report malformed values (e.g. failed regex match, too long, out of bounds).
-func NewFieldInvalid(field string, value interface{}, detail string) *Error {
+func NewInvalidError(field string, value interface{}, detail string) *Error {
 	return &Error{ErrorTypeInvalid, field, value, detail}
 }
 
-// NewFieldNotSupported returns a *Error indicating "unsupported value".
+// NewNotSupportedError returns a *Error indicating "unsupported value".
 // This is used to report unknown values for enumerated fields (e.g. a list of
 // valid values).
-func NewFieldNotSupported(field string, value interface{}, validValues []string) *Error {
+func NewNotSupportedError(field string, value interface{}, validValues []string) *Error {
 	detail := ""
 	if validValues != nil && len(validValues) > 0 {
 		detail = "supported values: " + strings.Join(validValues, ", ")
@@ -155,19 +155,19 @@ func NewFieldNotSupported(field string, value interface{}, validValues []string)
 	return &Error{ErrorTypeNotSupported, field, value, detail}
 }
 
-// NewFieldForbidden returns a *Error indicating "forbidden".  This is used to
+// NewForbiddenError returns a *Error indicating "forbidden".  This is used to
 // report valid (as per formatting rules) values which would be accepted under
 // some conditions, but which are not permitted by current conditions (e.g.
 // security policy).
-func NewFieldForbidden(field string, value interface{}) *Error {
+func NewForbiddenError(field string, value interface{}) *Error {
 	return &Error{ErrorTypeForbidden, field, value, ""}
 }
 
-// NewFieldTooLong returns a *Error indicating "too long".  This is used to
+// NewTooLongError returns a *Error indicating "too long".  This is used to
 // report that the given value is too long.  This is similar to
-// NewFieldInvalid, but the returned error will not include the too-long
+// NewInvalidError, but the returned error will not include the too-long
 // value.
-func NewFieldTooLong(field string, value interface{}, maxLength int) *Error {
+func NewTooLongError(field string, value interface{}, maxLength int) *Error {
 	return &Error{ErrorTypeTooLong, field, value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 

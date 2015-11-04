@@ -92,7 +92,7 @@ func TestNewInvalid(t *testing.T) {
 		Details *unversioned.StatusDetails
 	}{
 		{
-			validation.NewFieldDuplicate("field[0].name", "bar"),
+			validation.NewDuplicateError("field[0].name", "bar"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -103,7 +103,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewFieldInvalid("field[0].name", "bar", "detail"),
+			validation.NewInvalidError("field[0].name", "bar", "detail"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -114,7 +114,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewFieldNotFound("field[0].name", "bar"),
+			validation.NewNotFoundError("field[0].name", "bar"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -125,7 +125,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewFieldNotSupported("field[0].name", "bar", nil),
+			validation.NewNotSupportedError("field[0].name", "bar", nil),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -136,7 +136,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewFieldRequired("field[0].name"),
+			validation.NewRequiredError("field[0].name"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",

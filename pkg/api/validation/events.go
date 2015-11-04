@@ -27,10 +27,10 @@ func ValidateEvent(event *api.Event) validation.ErrorList {
 	// TODO: There is no namespace required for node.
 	if event.InvolvedObject.Kind != "Node" &&
 		event.Namespace != event.InvolvedObject.Namespace {
-		allErrs = append(allErrs, validation.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
+		allErrs = append(allErrs, validation.NewInvalidError("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
 	}
 	if !validation.IsDNS1123Subdomain(event.Namespace) {
-		allErrs = append(allErrs, validation.NewFieldInvalid("namespace", event.Namespace, ""))
+		allErrs = append(allErrs, validation.NewInvalidError("namespace", event.Namespace, ""))
 	}
 	return allErrs
 }
