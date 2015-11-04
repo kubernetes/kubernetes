@@ -84,7 +84,7 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
-	updateErrorList := validation.ValidateIngressUpdate(old.(*extensions.Ingress), obj.(*extensions.Ingress))
+	updateErrorList := validation.ValidateIngressUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 	return append(validationErrorList, updateErrorList...)
 }
 

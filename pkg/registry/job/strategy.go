@@ -75,7 +75,7 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*extensions.Job))
-	updateErrorList := validation.ValidateJobUpdate(old.(*extensions.Job), obj.(*extensions.Job))
+	updateErrorList := validation.ValidateJobUpdate(obj.(*extensions.Job), old.(*extensions.Job))
 	return append(validationErrorList, updateErrorList...)
 }
 
