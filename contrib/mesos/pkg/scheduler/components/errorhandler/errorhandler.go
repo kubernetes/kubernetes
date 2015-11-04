@@ -18,7 +18,6 @@ package errorhandler
 
 import (
 	log "github.com/golang/glog"
-	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
@@ -38,15 +37,15 @@ type errorHandler struct {
 	sched        scheduler.Scheduler
 	backoff      *backoff.Backoff
 	qr           *queuer.Queuer
-	podScheduler podschedulers.PodScheduler
+	newBreakChan func(podKey string) queue.BreakChan
 }
 
-func New(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, podScheduler podschedulers.PodScheduler) ErrorHandler {
+func New(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, newBC func(podKey string) queue.BreakChan) ErrorHandler {
 	return &errorHandler{
 		sched:        sched,
 		backoff:      backoff,
 		qr:           qr,
-		podScheduler: podScheduler,
+		newBreakChan: newBC,
 	}
 }
 
@@ -87,21 +86,7 @@ func (k *errorHandler) Error(pod *api.Pod, schedulingErr error) {
 		breakoutEarly := queue.BreakChan(nil)
 		if schedulingErr == podschedulers.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
-			breakoutEarly = queue.BreakChan(k.sched.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
-				k.sched.Lock()
-				defer k.sched.Unlock()
-				switch task, state := k.sched.Tasks().Get(task.ID); state {
-				case podtask.StatePending:
-					// Assess fitness of pod with the current offer. The scheduler normally
-					// "backs off" when it can't find an offer that matches up with a pod.
-					// The backoff period for a pod can terminate sooner if an offer becomes
-					// available that matches up.
-					return !task.Has(podtask.Launched) && k.podScheduler.FitPredicate()(task, offer, nil)
-				default:
-					// no point in continuing to check for matching offers
-					return true
-				}
-			}))
+			breakoutEarly = k.newBreakChan(podKey)
 		}
 		delay := k.backoff.Get(podKey)
 		log.V(3).Infof("requeuing pod %v with delay %v", podKey, delay)

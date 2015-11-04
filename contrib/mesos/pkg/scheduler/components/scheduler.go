@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"sync"
 
+	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/backoff"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
@@ -75,7 +76,24 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 	core.podReconciler = podreconciler.New(core, client, q, podDeleter)
 
 	bo := backoff.New(c.InitialPodBackoff.Duration, c.MaxPodBackoff.Duration)
-	errorHandler := errorhandler.New(core, bo, q, ps)
+	newBC := func(podKey string) queue.BreakChan {
+		return queue.BreakChan(core.Offers().Listen(podKey, func(offer *mesos.Offer) bool {
+			core.Lock()
+			defer core.Unlock()
+			switch task, state := core.Tasks().ForPod(podKey); state {
+			case podtask.StatePending:
+				// Assess fitness of pod with the current offer. The scheduler normally
+				// "backs off" when it can't find an offer that matches up with a pod.
+				// The backoff period for a pod can terminate sooner if an offer becomes
+				// available that matches up.
+				return !task.Has(podtask.Launched) && ps.FitPredicate()(task, offer, nil)
+			default:
+				// no point in continuing to check for matching offers
+				return true
+			}
+		}))
+	}
+	errorHandler := errorhandler.New(core, bo, q, newBC)
 
 	binder := binder.New(core)
 
