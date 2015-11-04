@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
@@ -101,5 +102,5 @@ func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, task *podtask.T) (of
 		return nil, err
 	}
 	log.V(2).Infof("failed to find a fit for pod: %s", podName)
-	return nil, NoSuitableOffersErr
+	return nil, errors.NoSuitableOffersErr
 }

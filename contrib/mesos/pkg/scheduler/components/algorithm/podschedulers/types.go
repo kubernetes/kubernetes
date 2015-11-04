@@ -17,8 +17,6 @@ limitations under the License.
 package podschedulers
 
 import (
-	"errors"
-
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
@@ -44,15 +42,4 @@ type PodScheduler interface {
 	//
 	// See the FCFSPodScheduler for example.
 	SchedulePod(r offers.Registry, task *podtask.T) (offers.Perishable, error)
-}
-
-// A minimal placeholder
-type empty struct{}
-
-var (
-	NoSuitableOffersErr = errors.New("No suitable offers for pod/task")
-)
-
-type SlaveIndex interface {
-	SlaveHostNameFor(id string) string
 }

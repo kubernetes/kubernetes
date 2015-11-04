@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
@@ -84,7 +83,7 @@ func (k *errorHandler) Error(pod *api.Pod, schedulingErr error) {
 			return
 		}
 		breakoutEarly := queue.BreakChan(nil)
-		if schedulingErr == podschedulers.NoSuitableOffersErr {
+		if schedulingErr == errors.NoSuitableOffersErr {
 			log.V(3).Infof("adding backoff breakout handler for pod %v", podKey)
 			breakoutEarly = k.newBreakChan(podKey)
 		}
