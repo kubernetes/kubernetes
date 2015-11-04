@@ -41,8 +41,11 @@ find-binary() {
 
 km_path=$(find-binary km linux/amd64)
 if [ -z "$km_path" ]; then
-  echo "Failed to find km binary" 1>&2
-  exit 1
+  km_path=$(find-binary km darwin/amd64)
+  if [ -z "$km_path" ]; then
+    echo "Failed to find km binary" 1>&2
+    exit 1
+  fi
 fi
 kube_bin_path=$(dirname ${km_path})
 common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
