@@ -29,11 +29,15 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strconv"
 	"time"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -135,6 +139,49 @@ func Run(s *options.CMServer) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
+	run := func(stop <-chan struct{}) {
+		err := StartControllers(s, kubeClient, kubeconfig, stop)
+		glog.Fatalf("error running controllers: %v", err)
+		panic("unreachable")
+	}
+
+	if !s.LeaderElection.LeaderElect {
+		run(nil)
+		panic("unreachable")
+	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controller-manager"})
+
+	id, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		EndpointsMeta: api.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "kube-controller-manager",
+		},
+		Client:        kubeClient,
+		Identity:      id,
+		EventRecorder: recorder,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				glog.Fatalf("leaderelection lost")
+			},
+		},
+	})
+	panic("unreachable")
+}
+
+func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig *client.Config, stop <-chan struct{}) error {
 	go endpointcontroller.NewEndpointController(clientForUserAgentOrDie(*kubeconfig, "endpoint-controller"), ResyncPeriod(s)).
 		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
