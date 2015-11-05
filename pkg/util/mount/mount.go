@@ -49,16 +49,20 @@ type MountPoint struct {
 	Pass   int
 }
 
-// SafeFormatAndMount probes a device to see if it is formatted. If
-// so it mounts it otherwise it formats it and mounts it
+// SafeFormatAndMount probes a device to see if it is formatted.
+// Namely it checks to see if a file system is present. If so it
+// mounts it otherwise the device is formatted first then mounted.
 type SafeFormatAndMount struct {
 	Interface
 	Runner exec.Interface
 }
 
-// Mount mounts the given disk. If the disk is not formatted and the disk is not being mounted as read only
-// it will format the disk first then mount it.
-func (mounter *SafeFormatAndMount) Mount(source string, target string, fstype string, options []string) error {
+// FormatAndMount formats the given disk, if needed, and mounts it.
+// That is if the disk is not formatted and it is not being mounted as
+// read-only it will format it first then mount it. Otherwise, if the
+// disk is already formatted or it is being mounted as read-only, it
+// will be mounted without formatting.
+func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, fstype string, options []string) error {
 	// Don't attempt to format if mounting as readonly. Go straight to mounting.
 	for _, option := range options {
 		if option == "ro" {
