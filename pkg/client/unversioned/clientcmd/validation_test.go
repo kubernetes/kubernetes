@@ -87,7 +87,7 @@ func TestConfirmUsableEmptyConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"no context chosen"},
+		expectedErrorSubstring: []string{"invalid configuration: no configuration has been provided"},
 	}
 
 	test.testConfirmUsable("", t)
@@ -96,7 +96,7 @@ func TestConfirmUsableMissingConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"context was not found for"},
+		expectedErrorSubstring: []string{"invalid configuration: no configuration has been provided"},
 	}
 
 	test.testConfirmUsable("not-here", t)
@@ -104,7 +104,8 @@ func TestConfirmUsableMissingConfig(t *testing.T) {
 func TestValidateEmptyConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
-		config: config,
+		config:                 config,
+		expectedErrorSubstring: []string{"invalid configuration: no configuration has been provided"},
 	}
 
 	test.testConfig(t)
@@ -125,6 +126,18 @@ func TestIsContextNotFound(t *testing.T) {
 
 	err := Validate(*config)
 	if !IsContextNotFound(err) {
+		t.Errorf("Expected context not found, but got %v", err)
+	}
+	if !IsConfigurationInvalid(err) {
+		t.Errorf("Expected configuration invalid, but got %v", err)
+	}
+}
+
+func TestIsEmptyConfig(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+
+	err := Validate(*config)
+	if !IsEmptyConfig(err) {
 		t.Errorf("Expected context not found, but got %v", err)
 	}
 	if !IsConfigurationInvalid(err) {
@@ -177,7 +190,7 @@ func TestValidateEmptyClusterInfo(t *testing.T) {
 	config.Clusters["empty"] = &clientcmdapi.Cluster{}
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"no server found for"},
+		expectedErrorSubstring: []string{"cluster has no server defined"},
 	}
 
 	test.testCluster("empty", t)
