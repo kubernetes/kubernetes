@@ -53,8 +53,7 @@ func (c *ConversionError) Error() string {
 var Semantic = conversion.EqualitiesOrDie(
 	func(a, b resource.Quantity) bool {
 		// Ignore formatting, only care that numeric value stayed the same.
-		// TODO: if we decide it's important, after we drop v1beta1/2, we
-		// could start comparing format.
+		// TODO: if we decide it's important, it should be safe to start comparing the format.
 		//
 		// Uninitialized quantities are equivalent to 0 quantities.
 		if a.Amount == nil && b.MilliValue() == 0 {
