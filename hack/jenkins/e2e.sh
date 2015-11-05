@@ -691,6 +691,19 @@ case ${JOB_NAME} in
           )"}
     ;;
 
+  kubernetes-e2e-gke-1.1-features)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    : ${E2E_CLUSTER_NAME:="gke-1-1-features"}
+    : ${E2E_NETWORK:="gke-1-1-features"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-1-1-features"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=GCE\sL7\sLoadBalancer\sController|Job|Horizontal\spod\sautoscaling"}
+    MINION_SIZE="n1-standard-2"
+    ;;
+
   # kubernetes-upgrade-gke
   #
   # This suite:
