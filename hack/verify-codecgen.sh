@@ -23,9 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-cd "${KUBE_ROOT}"
-
-generated_files=$(
+generated_files=($(
   find . -not \( \
       \( \
         -wholename './output' \
@@ -35,7 +33,7 @@ generated_files=$(
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
       \) -prune \
-    \) -name '*.generated.go')
+    \) -name '*.generated.go'))
 
 # create a nice clean place to put codecgen there
 _tmpdir="$(mktemp -d -t codecgen.XXXXXX)"
@@ -44,6 +42,46 @@ function cleanup {
   rm -rf "${_tmpdir}"
 }
 trap cleanup EXIT
+
+# Sort all files in the dependency order.
+number=${#generated_files[@]}
+for (( i=0; i<number; i++ )); do
+  visited[${i}]=false
+done
+result=""
+
+function depends {
+  file=${generated_files[$1]//\.generated\.go/.go}
+  deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
+  fullpath=$(readlink -f ${generated_files[$2]//\.generated\.go/.go})
+  candidate=$(dirname "${fullpath}")
+  result=false
+  for dep in ${deps}; do
+    if [[ ${candidate} = *${dep} ]]; then
+      result=true
+    fi
+  done
+  echo ${result}
+}
+
+function tsort {
+  visited[$1]=true
+  local j=0
+  for (( j=0; j<number; j++ )); do
+    if ! ${visited[${j}]}; then
+      if $(depends "$1" ${j}); then
+        tsort $j
+      fi
+    fi
+  done
+  result="${result} $1"
+}
+for (( i=0; i<number; i++ )); do
+  if ! ${visited[${i}]}; then
+    tsort ${i}
+  fi
+done
+index=(${result})
 
 # Build codecgen from Godeps.
 # However, we need to install godep first.
@@ -58,7 +96,9 @@ export GOPATH=${_gopath}
 CODECGEN="${_tmpdir}/codecgen_binary"
 ${GODEP} go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
-for generated_file in ${generated_files}; do
+# Generate files in the dependency order.
+for current in ${index[@]}; do
+  generated_file=${generated_files[${current}]}
   initial_dir=${PWD}
   file=${generated_file//\.generated\.go/.go}
   # codecgen work only if invoked from directory where the file
