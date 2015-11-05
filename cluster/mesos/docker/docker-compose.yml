@@ -5,7 +5,7 @@ ambassador:
   command: "-name docker_apiserver_1"
 etcd:
   hostname: etcd
-  image: quay.io/coreos/etcd:v2.0.12
+  image: quay.io/coreos/etcd:v2.2.1
   ports: [ "4001:4001" ]
   command: >
     --listen-client-urls 'http://etcd:4001'

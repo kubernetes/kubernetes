@@ -20,7 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-ETCD_VERSION=${ETCD_VERSION:-v2.0.12}
+ETCD_VERSION=${ETCD_VERSION:-v2.2.1}
 
 cd "${KUBE_ROOT}/third_party"
 curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz \
