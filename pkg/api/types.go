@@ -1137,7 +1137,6 @@ type ReplicationControllerSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Internally, this takes precedence over a
 	// TemplateRef.
-	// Must be set before converting to a v1beta1 or v1beta2 API object.
 	Template *PodTemplateSpec `json:"template,omitempty"`
 }
 

@@ -44,13 +44,13 @@ func ExampleOfOptionsConfig() {
 	defaultConfig.Preferences.Colors = true
 	defaultConfig.Clusters["alfa"] = &Cluster{
 		Server:                "https://alfa.org:8080",
-		APIVersion:            "v1beta2",
+		APIVersion:            "v1",
 		InsecureSkipTLSVerify: true,
 		CertificateAuthority:  "path/to/my/cert-ca-filename",
 	}
 	defaultConfig.Clusters["bravo"] = &Cluster{
 		Server:                "https://bravo.org:8080",
-		APIVersion:            "v1beta1",
+		APIVersion:            "v1",
 		InsecureSkipTLSVerify: false,
 	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
@@ -86,13 +86,13 @@ func ExampleOfOptionsConfig() {
 	// clusters:
 	//   alfa:
 	//     LocationOfOrigin: ""
-	//     api-version: v1beta2
+	//     api-version: v1
 	//     certificate-authority: path/to/my/cert-ca-filename
 	//     insecure-skip-tls-verify: true
 	//     server: https://alfa.org:8080
 	//   bravo:
 	//     LocationOfOrigin: ""
-	//     api-version: v1beta1
+	//     api-version: v1
 	//     server: https://bravo.org:8080
 	// contexts:
 	//   alfa-as-black-mage:
