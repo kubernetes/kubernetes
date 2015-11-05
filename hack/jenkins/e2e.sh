@@ -516,7 +516,8 @@ case ${JOB_NAME} in
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
     : ${E2E_NETWORK:="e2e-gke-test"}
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_USE_SERVER_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-test"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
