@@ -331,6 +331,7 @@ function kube-up() {
   done
   wait
 
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   verify-cluster
   detect-master
   export CONTEXT="ubuntu"
@@ -414,8 +415,8 @@ function provision-masterandnode() {
 
 # Delete a kubernetes cluster
 function kube-down {
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
-  
   source "${KUBE_ROOT}/cluster/common.sh"
   tear_down_alive_resources
 
@@ -464,12 +465,13 @@ function prepare-push() {
 # Update a kubernetes master with expected release
 function push-master {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
-
+  
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
     exit 1
   fi
-
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
+  
   setClusterInfo
   ii=0
   for i in ${nodes}; do
@@ -512,6 +514,7 @@ function push-node() {
     exit 1
   fi
 
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   node_ip=${1}
   setClusterInfo
   ii=0
@@ -555,7 +558,8 @@ function kube-push {
     echo "There is no required release of kubernetes, please check first"
     exit 1
   fi
-
+  
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   #stop all the kube's process & etcd 
   ii=0
   for i in ${nodes}; do
