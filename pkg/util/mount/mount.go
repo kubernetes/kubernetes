@@ -78,12 +78,15 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
 		notFormatted, err := mounter.diskLooksUnformatted(source)
 		if err == nil && notFormatted {
+			args := []string{source}
 			// Disk is unformatted so format it.
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {
 				fstype = "ext4"
 			}
-			args := []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
+			if fstype == "ext4" || fstype == "ext3" {
+				args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
+			}
 			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
 			_, err := cmd.CombinedOutput()
 			if err == nil {
