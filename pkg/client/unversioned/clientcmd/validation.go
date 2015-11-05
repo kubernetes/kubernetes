@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -27,7 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-var ErrNoContext = errors.New("no context chosen")
+var (
+	ErrNoContext   = errors.New("no context chosen")
+	ErrEmptyConfig = errors.New("no configuration has been provided")
+	// message is for consistency with old behavior
+	ErrEmptyCluster = errors.New("cluster has no server defined")
+)
 
 type errContextNotFound struct {
 	ContextName string
@@ -47,6 +53,16 @@ func IsContextNotFound(err error) bool {
 		return true
 	}
 	return strings.Contains(err.Error(), "context was not found for specified context")
+}
+
+// IsEmptyConfig returns true if the provided error indicates the provided configuration
+// is empty.
+func IsEmptyConfig(err error) bool {
+	switch t := err.(type) {
+	case errConfigurationInvalid:
+		return len(t) == 1 && t[0] == ErrEmptyConfig
+	}
+	return err == ErrEmptyConfig
 }
 
 // errConfigurationInvalid is a set of errors indicating the configuration is invalid.
@@ -88,6 +104,10 @@ func IsConfigurationInvalid(err error) bool {
 func Validate(config clientcmdapi.Config) error {
 	validationErrors := make([]error, 0)
 
+	if clientcmdapi.IsConfigEmpty(&config) {
+		return newErrConfigurationInvalid([]error{ErrEmptyConfig})
+	}
+
 	if len(config.CurrentContext) != 0 {
 		if _, exists := config.Contexts[config.CurrentContext]; !exists {
 			validationErrors = append(validationErrors, &errContextNotFound{config.CurrentContext})
@@ -113,6 +133,10 @@ func Validate(config clientcmdapi.Config) error {
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
 func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 	validationErrors := make([]error, 0)
+
+	if clientcmdapi.IsConfigEmpty(&config) {
+		return newErrConfigurationInvalid([]error{ErrEmptyConfig})
+	}
 
 	var contextName string
 	if len(passedContextName) != 0 {
@@ -142,6 +166,10 @@ func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 // validateClusterInfo looks for conflicts and errors in the cluster info
 func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) []error {
 	validationErrors := make([]error, 0)
+
+	if reflect.DeepEqual(clientcmdapi.Cluster{}, clusterInfo) {
+		return []error{ErrEmptyCluster}
+	}
 
 	if len(clusterInfo.Server) == 0 {
 		if len(clusterName) == 0 {
