@@ -399,13 +399,13 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 
 	expectGroupName := "extensions"
-	expectVersions := []unversioned.GroupVersion{
+	expectVersions := []unversioned.GroupVersionForDiscovery{
 		{
 			GroupVersion: testapi.Extensions.GroupAndVersion(),
 			Version:      testapi.Extensions.Version(),
 		},
 	}
-	expectPreferredVersion := unversioned.GroupVersion{
+	expectPreferredVersion := unversioned.GroupVersionForDiscovery{
 		GroupVersion: config.StorageVersions["extensions"],
 		Version:      apiutil.GetVersion(config.StorageVersions["extensions"]),
 	}

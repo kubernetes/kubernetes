@@ -25,16 +25,16 @@ import (
 )
 
 type GroupVersionHolder struct {
-	GV GroupAndVersion `json:"val"`
+	GV GroupVersion `json:"val"`
 }
 
 func TestGroupVersionUnmarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  []byte
-		expect GroupAndVersion
+		expect GroupVersion
 	}{
-		{[]byte(`{"val": "v1"}`), GroupAndVersion{"", "v1"}},
-		{[]byte(`{"val": "extensions/v1beta1"}`), GroupAndVersion{"extensions", "v1beta1"}},
+		{[]byte(`{"val": "v1"}`), GroupVersion{"", "v1"}},
+		{[]byte(`{"val": "extensions/v1beta1"}`), GroupVersion{"extensions", "v1beta1"}},
 	}
 
 	for _, c := range cases {
@@ -58,11 +58,11 @@ func TestGroupVersionUnmarshalJSON(t *testing.T) {
 
 func TestGroupVersionMarshalJSON(t *testing.T) {
 	cases := []struct {
-		input  GroupAndVersion
+		input  GroupVersion
 		expect []byte
 	}{
-		{GroupAndVersion{"", "v1"}, []byte(`{"val":"v1"}`)},
-		{GroupAndVersion{"extensions", "v1beta1"}, []byte(`{"val":"extensions/v1beta1"}`)},
+		{GroupVersion{"", "v1"}, []byte(`{"val":"v1"}`)},
+		{GroupVersion{"extensions", "v1beta1"}, []byte(`{"val":"extensions/v1beta1"}`)},
 	}
 
 	for _, c := range cases {

@@ -55,9 +55,9 @@ type DiscoveryClient struct {
 // Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
 // group would be "".
 func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unversioned.APIGroup) {
-	groupVersions := []unversioned.GroupVersion{}
+	groupVersions := []unversioned.GroupVersionForDiscovery{}
 	for _, version := range apiVersions.Versions {
-		groupVersion := unversioned.GroupVersion{
+		groupVersion := unversioned.GroupVersionForDiscovery{
 			GroupVersion: version,
 			Version:      version,
 		}
