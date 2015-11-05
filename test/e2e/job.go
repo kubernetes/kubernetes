@@ -40,7 +40,6 @@ const (
 	jobSelectorKey = "job"
 )
 
-// TODO: Activate these tests for GKE when we support experimental APIs there.
 var _ = Describe("Job", func() {
 	f := NewFramework("job")
 	parallelism := 2
@@ -49,7 +48,6 @@ var _ = Describe("Job", func() {
 
 	// Simplest case: all pods succeed promptly
 	It("should run a job to completion when tasks succeed", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		job := newTestJob("succeed", "all-succeed", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
@@ -62,7 +60,6 @@ var _ = Describe("Job", func() {
 
 	// Pods sometimes fail, but eventually succeed.
 	It("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach used by the
@@ -82,7 +79,6 @@ var _ = Describe("Job", func() {
 
 	// Pods sometimes fail, but eventually succeed, after pod restarts
 	It("should run a job to completion when tasks sometimes fail and are not locally restarted", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		// 50% chance of container success, local restarts.
 		// Can't use the failOnce approach because that relies
@@ -100,7 +96,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should keep restarting failed pods", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		job := newTestJob("fail", "all-fail", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
@@ -117,7 +112,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should scale a job up", func() {
-		SkipIfProviderIs("gke")
 		startParallelism := 1
 		endParallelism := 2
 		By("Creating a job")
@@ -143,7 +137,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should scale a job down", func() {
-		SkipIfProviderIs("gke")
 		startParallelism := 2
 		endParallelism := 1
 		By("Creating a job")
@@ -169,7 +162,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should stop a job", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
