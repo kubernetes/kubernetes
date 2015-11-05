@@ -48,7 +48,7 @@ func TestRunOnce(t *testing.T) {
 		recorder:            &record.FakeRecorder{},
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
-		statusManager:       status.NewManager(nil),
+		statusManager:       status.NewManager(nil, podManager),
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
 		os:                  kubecontainer.FakeOS{},

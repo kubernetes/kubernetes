@@ -111,7 +111,6 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
 	kubelet.recorder = fakeRecorder
-	kubelet.statusManager = status.NewManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
@@ -120,6 +119,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.cadvisor = mockCadvisor
 	fakeMirrorClient := kubepod.NewFakeMirrorClient()
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
@@ -160,6 +160,7 @@ func newTestPods(count int) []*api.Pod {
 				},
 			},
 			ObjectMeta: api.ObjectMeta{
+				UID:  types.UID(10000 + i),
 				Name: fmt.Sprintf("pod%d", i),
 			},
 		}
@@ -3247,39 +3248,6 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		t.Fatalf("stats should not be nil")
 	}
 	mockCadvisor.AssertExpectations(t)
-}
-
-func TestDoNotCacheStatusForStaticPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "staticFoo",
-				Namespace: "new",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "file",
-				},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar"},
-				},
-			},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodSyncs(kubelet.podManager.GetPods())
-	status, ok := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	if ok {
-		t.Errorf("unexpected status %#v found for static pod %q", status, pods[0].UID)
-	}
 }
 
 func TestHostNetworkAllowed(t *testing.T) {
