@@ -164,6 +164,11 @@ func addDefaultingFuncs() {
 				obj.Status.Phase = ClaimPending
 			}
 		},
+		func(obj *ISCSIVolumeSource) {
+			if obj.ISCSIInterface == "" {
+				obj.ISCSIInterface = "default"
+			}
+		},
 		func(obj *Endpoints) {
 			for i := range obj.Subsets {
 				ss := &obj.Subsets[i]

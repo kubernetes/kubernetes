@@ -3319,6 +3319,10 @@
       "format": "int32",
       "description": "iSCSI target lun number."
      },
+     "iscsiInterface": {
+      "type": "string",
+      "description": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport."
+     },
      "fsType": {
       "type": "string",
       "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi"

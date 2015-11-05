@@ -266,6 +266,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				c.Fuzz(t.Interface())
 			}
 		},
+		func(i *api.ISCSIVolumeSource, c fuzz.Continue) {
+			i.ISCSIInterface = c.RandString()
+			if i.ISCSIInterface == "" {
+				i.ISCSIInterface = "default"
+			}
+		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
 			*d = policies[c.Rand.Intn(len(policies))]
