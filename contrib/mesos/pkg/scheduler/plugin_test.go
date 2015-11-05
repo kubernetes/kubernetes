@@ -184,7 +184,8 @@ func (lw *MockPodsListWatch) Pods() api.PodList {
 	lw.lock.Lock()
 	defer lw.lock.Unlock()
 
-	return lw.list
+	obj, _ := api.Scheme.DeepCopy(&lw.list)
+	return *(obj.(*api.PodList))
 }
 
 func (lw *MockPodsListWatch) Pod(name string) *api.Pod {
@@ -200,44 +201,56 @@ func (lw *MockPodsListWatch) Pod(name string) *api.Pod {
 	return nil
 }
 func (lw *MockPodsListWatch) Add(pod *api.Pod, notify bool) {
-	lw.lock.Lock()
-	defer lw.lock.Unlock()
+	func() {
+		lw.lock.Lock()
+		defer lw.lock.Unlock()
+		lw.list.Items = append(lw.list.Items, *pod)
+	}()
 
-	lw.list.Items = append(lw.list.Items, *pod)
 	if notify {
 		lw.fakeWatcher.Add(pod)
 	}
 }
 func (lw *MockPodsListWatch) Modify(pod *api.Pod, notify bool) {
-	lw.lock.Lock()
-	defer lw.lock.Unlock()
+	found := false
+	func() {
+		lw.lock.Lock()
+		defer lw.lock.Unlock()
 
-	for i, otherPod := range lw.list.Items {
-		if otherPod.Name == pod.Name {
-			lw.list.Items[i] = *pod
-			if notify {
-				lw.fakeWatcher.Modify(pod)
+		for i, otherPod := range lw.list.Items {
+			if otherPod.Name == pod.Name {
+				lw.list.Items[i] = *pod
+				found = true
+				return
 			}
-			return
 		}
+		log.Fatalf("Cannot find pod %v to modify in MockPodsListWatch", pod.Name)
+	}()
+
+	if notify && found {
+		lw.fakeWatcher.Modify(pod)
 	}
-	log.Fatalf("Cannot find pod %v to modify in MockPodsListWatch", pod.Name)
 }
 
 func (lw *MockPodsListWatch) Delete(pod *api.Pod, notify bool) {
-	lw.lock.Lock()
-	defer lw.lock.Unlock()
+	var notifyPod *api.Pod
+	func() {
+		lw.lock.Lock()
+		defer lw.lock.Unlock()
 
-	for i, otherPod := range lw.list.Items {
-		if otherPod.Name == pod.Name {
-			lw.list.Items = append(lw.list.Items[:i], lw.list.Items[i+1:]...)
-			if notify {
-				lw.fakeWatcher.Delete(&otherPod)
+		for i, otherPod := range lw.list.Items {
+			if otherPod.Name == pod.Name {
+				lw.list.Items = append(lw.list.Items[:i], lw.list.Items[i+1:]...)
+				notifyPod = &otherPod
+				return
 			}
-			return
 		}
+		log.Fatalf("Cannot find pod %v to delete in MockPodsListWatch", pod.Name)
+	}()
+
+	if notifyPod != nil && notify {
+		lw.fakeWatcher.Delete(notifyPod)
 	}
-	log.Fatalf("Cannot find pod %v to delete in MockPodsListWatch", pod.Name)
 }
 
 // Create a pod with a given index, requiring one port
