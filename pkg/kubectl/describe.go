@@ -583,9 +583,10 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
 		"    TargetPortal:\t%v\n"+
 		"    IQN:\t%v\n"+
 		"    Lun:\t%v\n"+
+		"    ISCSIInterface\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.FSType, iscsi.ReadOnly)
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly)
 }
 
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, out io.Writer) {

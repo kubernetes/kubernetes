@@ -919,6 +919,7 @@ func autoconvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolu
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
 	out.Lun = int32(in.Lun)
+	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -3945,6 +3946,7 @@ func autoconvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSo
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
 	out.Lun = int(in.Lun)
+	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil

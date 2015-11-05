@@ -97,6 +97,8 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	lun := strconv.Itoa(iscsi.Lun)
 	portal := portalBuilder(iscsi.TargetPortal)
 
+	iface := iscsi.ISCSIInterface
+
 	return &iscsiDiskBuilder{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
@@ -104,6 +106,7 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 			portal:  portal,
 			iqn:     iscsi.IQN,
 			lun:     lun,
+			iface:   iface,
 			manager: manager,
 			plugin:  plugin},
 		fsType:   iscsi.FSType,
@@ -140,6 +143,7 @@ type iscsiDisk struct {
 	portal  string
 	iqn     string
 	lun     string
+	iface   string
 	plugin  *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
