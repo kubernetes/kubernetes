@@ -635,6 +635,18 @@ runTests() {
   # Clean up
   kubectl delete rc,hpa frontend
 
+  ## kubectl apply should create the resource that doesn't exist yet
+  # Pre-Condition: no POD is running 
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a pod "test-pod" (doesn't exist) should create this pod 
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is running
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up 
+  kubectl delete pods test-pod "${kube_flags[@]}"
+
   ##############
   # Namespaces #
   ##############

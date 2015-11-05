@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -37,6 +38,7 @@ type ApplyOptions struct {
 
 const (
 	apply_long = `Apply a configuration to a resource by filename or stdin.
+The resource will be created if it doesn't exist yet. 
 
 JSON and YAML formats are accepted.`
 	apply_example = `# Apply the configuration in pod.json to a pod.
@@ -119,7 +121,21 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		}
 
 		if err := info.Get(); err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+			if !errors.IsNotFound(err) {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+			}
+			// Create the resource if it doesn't exist
+			// First, update the annotation used by kubectl apply
+			if err := kubectl.CreateApplyAnnotation(info); err != nil {
+				return cmdutil.AddSourceToErr("creating", info.Source, err)
+			}
+			// Then create the resource and skip the three-way merge
+			if err := createAndRefresh(info); err != nil {
+				return cmdutil.AddSourceToErr("creating", info.Source, err)
+			}
+			count++
+			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
+			return nil
 		}
 
 		// Serialize the current configuration of the object from the server.
