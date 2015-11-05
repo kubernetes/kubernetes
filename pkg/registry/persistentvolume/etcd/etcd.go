@@ -32,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volumes.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/persistentvolumes"
 
 	newListFunc := func() runtime.Object { return &api.PersistentVolumeList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &api.PersistentVolume{}, prefix, true, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &api.PersistentVolume{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },

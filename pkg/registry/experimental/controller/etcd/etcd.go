@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/registry/controller"
 	"k8s.io/kubernetes/pkg/registry/controller/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic"
 
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -37,9 +38,9 @@ type ContainerStorage struct {
 	Scale                 *ScaleREST
 }
 
-func NewStorage(s storage.Interface, storageFactory storage.StorageFactory) ContainerStorage {
+func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := etcd.NewREST(s, storageFactory)
+	controllerREST, _ := etcd.NewREST(s, storageDecorator)
 	rcRegistry := controller.NewRegistry(controllerREST)
 
 	return ContainerStorage{

@@ -32,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/controllers"
 
 	newListFunc := func() runtime.Object { return &api.ReplicationControllerList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &api.ReplicationController{}, prefix, true, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &api.ReplicationController{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &api.ReplicationController{} },

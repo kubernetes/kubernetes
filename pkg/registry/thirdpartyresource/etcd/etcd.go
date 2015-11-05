@@ -34,7 +34,7 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store ThirdPartyResource in the given helper
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/thirdpartyresources"
 
 	// We explicitly do NOT do any decoration here yet.
