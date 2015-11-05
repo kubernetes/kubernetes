@@ -114,17 +114,22 @@ func Forever(f func(), period time.Duration) {
 // stop channel is already closed. Pass NeverStop to Until if you
 // don't want it stop.
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
+	select {
+	case <-stopCh:
+		return
+	default:
+	}
+
 	for {
-		select {
-		case <-stopCh:
-			return
-		default:
-		}
 		func() {
 			defer HandleCrash()
 			f()
 		}()
-		time.Sleep(period)
+		select {
+		case <-stopCh:
+			return
+		case <-time.After(period):
+		}
 	}
 }
 
