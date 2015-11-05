@@ -3257,7 +3257,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_probe">v1.Probe</h3>
 <div class="paragraph">
-<p>Probe describes a liveness probe to be examined to the container.</p>
+<p>Probe describes a health check to be performed against a container to determine whether it is alive or ready to recieve traffic.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3307,9 +3307,30 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">periodSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">successThreshold</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness. Minimum value is 1.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">failureThreshold</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4240,7 +4261,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-11-04 22:53:25 UTC
+Last updated 2015-11-06 18:46:07 UTC
 </div>
 </div>
 </body>

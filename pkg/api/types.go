@@ -713,7 +713,8 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// Probe describes a liveness probe to be examined to the container.
+// Probe describes a health check to be performed against a container to determine whether it is
+// alive or ready to recieve traffic.
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
@@ -721,6 +722,13 @@ type Probe struct {
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
 	// Length of time before health checking times out.  In seconds.
 	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
+	// How often (in seconds) to perform the probe.
+	PeriodSeconds int64 `json:"periodSeconds,omitempty"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// Must be 1 for liveness.
+	SuccessThreshold int `json:"successThreshold,omitempty"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	FailureThreshold int `json:"failureThreshold,omitempty"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

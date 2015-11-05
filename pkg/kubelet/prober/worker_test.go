@@ -18,6 +18,7 @@ package prober
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -135,18 +136,8 @@ func TestInitialDelay(t *testing.T) {
 		})
 		m.statusManager.SetPodStatus(w.pod, getRunningStatus())
 
-		if !w.doProbe() {
-			t.Errorf("[%s] Expected to continue, but did not", probeType)
-		}
-
-		expectedResult := results.Result(probeType == liveness)
-		result, ok := resultsManager(m, probeType).Get(containerID)
-		if !ok {
-			t.Errorf("[%s] Expected result to be set during initial delay, but was not set", probeType)
-		} else if result != expectedResult {
-			t.Errorf("[%s] Expected result to be %v during initial delay, but was %v",
-				probeType, expectedResult, result)
-		}
+		expectContinue(t, w, w.doProbe(), "during initial delay")
+		expectResult(t, w, results.Result(probeType == liveness), "during initial delay")
 
 		// 100 seconds later...
 		laterStatus := getRunningStatus()
@@ -155,16 +146,76 @@ func TestInitialDelay(t *testing.T) {
 		m.statusManager.SetPodStatus(w.pod, laterStatus)
 
 		// Second call should succeed (already waited).
-		if !w.doProbe() {
-			t.Errorf("[%s] Expected to continue, but did not", probeType)
+		expectContinue(t, w, w.doProbe(), "after initial delay")
+		expectResult(t, w, results.Success, "after initial delay")
+	}
+}
+
+func TestFailureThreshold(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, readiness, api.Probe{})
+	m.statusManager.SetPodStatus(w.pod, getRunningStatus())
+
+	for i := 0; i < 2; i++ {
+		// First probe should succeed.
+		m.prober.exec = fakeExecProber{probe.Success, nil}
+
+		for j := 0; j < 3; j++ {
+			msg := fmt.Sprintf("%d success (%d)", j+1, i)
+			expectContinue(t, w, w.doProbe(), msg)
+			expectResult(t, w, results.Success, msg)
 		}
 
-		result, ok = resultsManager(m, probeType).Get(containerID)
-		if !ok {
-			t.Errorf("[%s] Expected result to be true, but was not set", probeType)
-		} else if !result {
-			t.Errorf("[%s] Expected result to be true, but was false", probeType)
+		// Prober starts failing :(
+		m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+		// Next 2 probes should still be "success".
+		for j := 0; j < 2; j++ {
+			msg := fmt.Sprintf("%d failure (%d)", j+1, i)
+			expectContinue(t, w, w.doProbe(), msg)
+			expectResult(t, w, results.Success, msg)
 		}
+
+		// Third & following fail.
+		for j := 0; j < 3; j++ {
+			msg := fmt.Sprintf("%d failure (%d)", j+3, i)
+			expectContinue(t, w, w.doProbe(), msg)
+			expectResult(t, w, results.Failure, msg)
+		}
+	}
+}
+
+func TestSuccessThreshold(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, readiness, api.Probe{SuccessThreshold: 3, FailureThreshold: 1})
+	m.statusManager.SetPodStatus(w.pod, getRunningStatus())
+
+	// Start out failure.
+	w.resultsManager.Set(containerID, results.Failure, nil)
+
+	for i := 0; i < 2; i++ {
+		// Probe defaults to Failure.
+		for j := 0; j < 2; j++ {
+			msg := fmt.Sprintf("%d success (%d)", j+1, i)
+			expectContinue(t, w, w.doProbe(), msg)
+			expectResult(t, w, results.Failure, msg)
+		}
+
+		// Continuing success!
+		for j := 0; j < 3; j++ {
+			msg := fmt.Sprintf("%d success (%d)", j+3, i)
+			expectContinue(t, w, w.doProbe(), msg)
+			expectResult(t, w, results.Success, msg)
+		}
+
+		// Prober flakes :(
+		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		msg := fmt.Sprintf("1 failure (%d)", i)
+		expectContinue(t, w, w.doProbe(), msg)
+		expectResult(t, w, results.Failure, msg)
+
+		// Back to success.
+		m.prober.exec = fakeExecProber{probe.Success, nil}
 	}
 }
 
@@ -205,28 +256,41 @@ func TestCleanUp(t *testing.T) {
 
 func TestHandleCrash(t *testing.T) {
 	m := newTestManager()
+	w := newTestWorker(m, readiness, api.Probe{})
+	m.statusManager.SetPodStatus(w.pod, getRunningStatus())
+
+	expectContinue(t, w, w.doProbe(), "Initial successful probe.")
+	expectResult(t, w, results.Success, "Initial successful probe.")
+
+	// Prober starts crashing.
 	m.prober = &prober{
 		refManager: kubecontainer.NewRefManager(),
 		recorder:   &record.FakeRecorder{},
 		exec:       crashingExecProber{},
 	}
 
-	w := newTestWorker(m, readiness, api.Probe{})
-	m.statusManager.SetPodStatus(w.pod, getRunningStatus())
-
 	// doProbe should recover from the crash, and keep going.
-	if !w.doProbe() {
-		t.Error("Expected to keep going, but terminated.")
-	}
-	if _, ok := m.readinessManager.Get(containerID); ok {
-		t.Error("Expected readiness to be unchanged from crash.")
-	}
+	expectContinue(t, w, w.doProbe(), "Crashing probe.")
+	expectResult(t, w, results.Success, "Crashing probe unchanged.")
 }
 
 func newTestWorker(m *manager, probeType probeType, probeSpec api.Probe) *worker {
 	// All tests rely on the fake exec prober.
 	probeSpec.Handler = api.Handler{
 		Exec: &api.ExecAction{},
+	}
+	// Apply default values.
+	defaults := map[string]int64{
+		"TimeoutSeconds":   1,
+		"PeriodSeconds":    10,
+		"SuccessThreshold": 1,
+		"FailureThreshold": 3,
+	}
+	for field, value := range defaults {
+		f := reflect.ValueOf(&probeSpec).Elem().FieldByName(field)
+		if f.Int() == 0 {
+			f.SetInt(value)
+		}
 	}
 
 	pod := getTestPod(probeType, probeSpec)
@@ -264,6 +328,22 @@ func getTestPod(probeType probeType, probeSpec api.Probe) api.Pod {
 	}
 	pod.UID = podUID
 	return pod
+}
+
+func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg string) {
+	result, ok := resultsManager(w.probeManager, w.probeType).Get(containerID)
+	if !ok {
+		t.Errorf("[%s - %s] Expected result to be set, but was not set", w.probeType, msg)
+	} else if result != expectedResult {
+		t.Errorf("[%s - %s] Expected result to be %v, but was %v",
+			w.probeType, msg, expectedResult, result)
+	}
+}
+
+func expectContinue(t *testing.T, w *worker, c bool, msg string) {
+	if !c {
+		t.Errorf("[%s - %s] Expected to continue, but did not", w.probeType, msg)
+	}
 }
 
 func resultsManager(m *manager, probeType probeType) results.Manager {

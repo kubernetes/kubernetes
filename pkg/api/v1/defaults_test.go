@@ -545,3 +545,26 @@ func TestSetDefaultLimitRangeItem(t *testing.T) {
 		t.Errorf("Expected request memory: %s, got: %s", "100Mi", requestMinValue.String())
 	}
 }
+
+func TestSetDefaultProbe(t *testing.T) {
+	originalProbe := versioned.Probe{}
+	expectedProbe := versioned.Probe{
+		InitialDelaySeconds: 0,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
+
+	pod := &versioned.Pod{
+		Spec: versioned.PodSpec{
+			Containers: []versioned.Container{{LivenessProbe: &originalProbe}},
+		},
+	}
+
+	output := roundTrip(t, runtime.Object(pod)).(*versioned.Pod)
+	actualProbe := *output.Spec.Containers[0].LivenessProbe
+	if actualProbe != expectedProbe {
+		t.Errorf("Expected probe: %+v\ngot: %+v\n", expectedProbe, actualProbe)
+	}
+}
