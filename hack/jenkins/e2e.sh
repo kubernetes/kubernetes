@@ -124,6 +124,7 @@ GKE_DEFAULT_SKIP_TESTS=(
     "Daemon\sset"
     "Deployment"
     "Jobs"
+    "resource\susage\stracking"
     "${GKE_REQUIRED_SKIP_TESTS[@]}"
     )
 
