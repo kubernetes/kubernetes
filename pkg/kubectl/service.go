@@ -69,6 +69,7 @@ func paramNames() []GeneratorParam {
 		{"target-port", false},
 		{"port-name", false},
 		{"session-affinity", false},
+		{"headless", false},
 	}
 }
 
@@ -195,6 +196,9 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		default:
 			return nil, fmt.Errorf("unknown session affinity: %s", params["session-affinity"])
 		}
+	}
+	if params["headless"] == "true" {
+		service.Spec.ClusterIP = "None"
 	}
 	return &service, nil
 }
