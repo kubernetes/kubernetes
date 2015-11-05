@@ -90,8 +90,8 @@ SHA1=$(sha1 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 
 cat <<- EOM
 
-Success! You must now do the following: (you may want to cut
-  and paste these instructions elsewhere, step 1 can be spammy)
+Success!  You must now do the following (you may want to cut and paste these
+instructions elsewhere):
 
   1) (cd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION})
   2) Go to https://github.com/GoogleCloudPlatform/kubernetes/releases
