@@ -120,8 +120,8 @@ Spark Command: /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java -cp /opt/spark-1.5
 15/10/27 21:25:07 INFO Master: I have been elected leader! New state: ALIVE
 ```
 
-After you know the master is running, you can use the (cluster
-proxy)[../../docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy] to
+After you know the master is running, you can use the [cluster
+proxy](../../docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy) to
 connect to the Spark WebUI:
 
 ```console
@@ -129,7 +129,7 @@ kubectl proxy --port=8001
 ```
 
 At which point the UI will be available at
-http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/
+[http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
 
 ## Step Two: Start your Spark workers
 
@@ -172,32 +172,40 @@ you should now see the workers in the UI as well. *Note:* The UI will have links
 to worker Web UIs. The worker UI links do not work (the links will attempt to
 connect to cluster IPs, which Kubernetes won't proxy automatically).
 
-## Step Three: Start your Spark driver to launch jobs on your Spark cluster
+## Step Three: Start the Zeppelin UI to launch jobs on your Spark cluster
 
-The Spark driver is used to launch jobs into Spark cluster. You can read more about it in
-[Spark architecture](https://spark.apache.org/docs/latest/cluster-overview.html).
+The Zeppelin UI pod can be used to launch jobs into the Spark cluster either via
+a web notebook frontend or the traditional Spark command line. See
+[Zeppelin](https://zeppelin.incubator.apache.org/) and
+[Spark architecture](https://spark.apache.org/docs/latest/cluster-overview.html)
+for more details.
 
 ```console
-$ kubectl create -f examples/spark/spark-driver-controller.yaml
-replicationcontrollers/spark-driver-controller
+$ kubectl create -f examples/spark/zeppelin-controller.yaml
+replicationcontrollers/zeppelin-controller
 ```
 
-The Spark driver needs the Master service to be running.
+Zeppelin needs the Master service to be running.
 
-### Check to see if the driver is running
+### Check to see if Zeppelin is running
 
 ```console
-$ kubectl get pods -lcomponent=spark-driver
-NAME                            READY     STATUS    RESTARTS   AGE
-spark-driver-controller-vwb9c   1/1       Running   0          1m
+$ kubectl get pods -lcomponent=zeppelin
+NAME                        READY     STATUS    RESTARTS   AGE
+zeppelin-controller-ja09s   1/1       Running   0          53s
 ```
 
 ## Step Four: Do something with the cluster
 
-Use the kubectl exec to connect to Spark driver and run a pipeline.
+Now you have two choices, depending on your predilections. You can do something
+graphical with the Spark cluster, or you can stay in the CLI.
+
+### Do something fast with pyspark!
+
+Use the kubectl exec to connect to the Zeppelin driver and run a pipeline.
 
 ```console
-$ kubectl exec spark-driver-controller-vwb9c -it pyspark
+$ kubectl exec zeppelin-controller-ja09s -it pyspark
 Python 2.7.9 (default, Mar  1 2015, 12:57:24)
 [GCC 4.9.2] on linux2
 Type "help", "copyright", "credits" or "license" for more information.
@@ -217,6 +225,24 @@ SparkContext available as sc, HiveContext available as sqlContext.
 Congratulations, you just counted all of the words in all of the plays of
 Shakespeare.
 
+### Do something graphical and shiny!
+
+Take the Zeppelin pod from above and port-forward the WebUI port:
+
+```console
+$ kubectl port-forward zeppelin-controller-ja09s 8080:8080
+```
+
+This forwards `localhost` 8080 to container port 8080. You can then find
+Zeppelin at (https://localhost:8080/)[https://localhost:8080/].
+
+Create a "New Notebook". In there, type:
+
+```
+%pyspark
+print sc.textFile("gs://dataflow-samples/shakespeare/*").map(lambda s: len(s.split())).sum()
+```
+
 ## Result
 
 You now have services and replication controllers for the Spark master, Spark
@@ -235,9 +261,45 @@ After it's setup:
 
 ```console
 kubectl get pods # Make sure everything is running
-kubectl proxy --port=8001 # Start an application proxy, if you want to see the Spark WebUI
-kubectl get pods -lcomponent=spark-driver # Get the driver pod to interact with.
+kubectl proxy --port=8001 # Start an application proxy, if you want to see the Spark Master WebUI
+kubectl get pods -lcomponent=zeppelin # Get the driver pod to interact with.
 ```
+
+At which point the Master UI will be available at
+[http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+
+You can either interact with the Spark cluster the traditional `spark-shell` /
+`spark-subsubmit` / `pyspark` commands by using `kubectl exec` against the
+`zeppelin-controller` pod, or if you want to interact with Zeppelin:
+
+```console
+kubectl port-forward zeppelin-controller-abc123 8080:8080 &
+```
+
+Then visit [http://localhost:8080/](http://localhost:8080/).
+
+## Known Issues With Spark
+
+* This provides a Spark configuration that is restricted to the cluster network,
+  meaning the Spark master is only available as a cluster service. If you need
+  to submit jobs using external client other than Zeppelin or `spark-submit` on
+  the `zeppelin` pod, you will need to provide a way for your clients to get to
+  the
+  [`examples/spark/spark-master-service.yaml`](spark-master-service.yaml). See
+  [Services](../../docs/user-guide/services.md) for more information.
+
+## Known Issues With Zeppelin
+
+* The Zeppelin pod is large, so it may take a while to pull depending on your
+  network. The size of the Zeppelin pod is something we're working on, see issue #17231.
+
+* Zeppelin may take some time (about a minute) on this pipeline the first time
+  you run it. It seems to take considerable time to load.
+
+* On GKE, `kubectl port-forward` may not be stable over long periods of time. If
+  you see Zeppelin go into `Disconnected` state (there will be a red dot on the
+  top right as well), the `port-forward` probably failed and needs to be
+  restarted. See #12179.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
