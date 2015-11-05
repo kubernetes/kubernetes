@@ -11,7 +11,7 @@ import (
 )
 
 import (
-	"github.com/scalingdata/gcfg/token"
+	"gopkg.in/gcfg.v1/token"
 )
 
 // In an ErrorList, an error is represented by an *Error.
