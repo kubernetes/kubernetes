@@ -31,7 +31,6 @@ import (
 )
 
 // LogREST implements the log endpoint for a Pod
-// TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
 type LogREST struct {
 	Store       *etcdgeneric.Etcd
 	KubeletConn client.ConnectionInfoGetter
