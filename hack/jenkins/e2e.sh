@@ -485,6 +485,23 @@ case ${JOB_NAME} in
     : ${ENABLE_DEPLOYMENTS:=true}
     ;;
 
+  kubernetes-e2e-gke-subnet)
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-subnet"}
+    # auto-subnet manually created - if deleted, it will need to be recreated
+    # gcloud alpha compute networks create auto-subnet --mode auto
+    : ${E2E_NETWORK:="auto-subnet"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${JENKINS_USE_SERVER_VERSION:=y}
+    : ${PROJECT:="k8s-jkns-e2e-gke-subnet"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    ;;
+
   kubernetes-e2e-gke-prod)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-prod"}
