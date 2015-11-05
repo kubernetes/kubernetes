@@ -23,11 +23,14 @@ import (
 )
 
 // TODO: We need to remove the GroupVersion in types.go. We use the name GroupAndVersion here temporarily.
+// GroupVersion contains the "group" and the "version", which uniquely identifies the API.
 type GroupAndVersion struct {
 	Group   string
 	Version string
 }
 
+// String puts "group" and "version" into a single "group/version" string. For the legacy v1
+// it returns "v1".
 func (gv *GroupAndVersion) String() string {
 	// special case of "v1" for backward compatibility
 	if gv.Group == "" && gv.Version == "v1" {
@@ -37,6 +40,8 @@ func (gv *GroupAndVersion) String() string {
 	}
 }
 
+// ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
+// if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupAndVersion, error) {
 	s := strings.Split(gv, "/")
 	// "v1" is the only special case. Otherwise GroupVersion is expected to contain
