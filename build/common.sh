@@ -351,11 +351,14 @@ function kube::build::destroy_container() {
 #    local -r version_major="${BASH_REMATCH[1]}"
 #    local -r version_minor="${BASH_REMATCH[2]}"
 #    local -r version_patch="${BASH_REMATCH[3]}"
+#    local -r version_extra="${BASH_REMATCH[4]}"
+#    local -r version_prerelease="${BASH_REMATCH[5]}"
+#    local -r version_prerelease_rev="${BASH_REMATCH[6]}"
 function kube::release::parse_and_validate_release_version() {
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid release version: '${version}'"
+    kube::log::error "Invalid release version: '${version}', must match regex ${version_regex}"
     return 1
   }
 }
@@ -382,7 +385,7 @@ function kube::release::parse_and_validate_ci_version() {
   local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid ci version: '${version}'"
+    kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
     return 1
   }
 }
@@ -1148,6 +1151,10 @@ function kube::release::gcs::verify_release_files() {
 #   publish_file: the GCS location to look in
 # Returns:
 #   If new version is greater than the GCS version
+#
+# TODO(16529): This should all be outside of build an in release, and should be
+# refactored to reduce code duplication.  Also consider using strictly nested
+# if and explicit handling of equals case.
 function kube::release::gcs::verify_release_gt() {
   local -r publish_file="${1-}"
   local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
@@ -1158,6 +1165,8 @@ function kube::release::gcs::verify_release_gt() {
   local -r version_major="${BASH_REMATCH[1]}"
   local -r version_minor="${BASH_REMATCH[2]}"
   local -r version_patch="${BASH_REMATCH[3]}"
+  local -r version_prerelease="${BASH_REMATCH[5]}"
+  local -r version_prerelease_rev="${BASH_REMATCH[6]}"
 
   local gcs_version
   if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
@@ -1169,6 +1178,8 @@ function kube::release::gcs::verify_release_gt() {
     local -r gcs_version_major="${BASH_REMATCH[1]}"
     local -r gcs_version_minor="${BASH_REMATCH[2]}"
     local -r gcs_version_patch="${BASH_REMATCH[3]}"
+    local -r gcs_version_prerelease="${BASH_REMATCH[5]}"
+    local -r gcs_version_prerelease_rev="${BASH_REMATCH[6]}"
 
     local greater=true
     if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
@@ -1179,7 +1190,26 @@ function kube::release::gcs::verify_release_gt() {
       greater=false
     elif [[ "${version_minor}" -gt "${gcs_version_minor}" ]]; then
       : # fall out
-    elif [[ "${version_patch}" -le "${gcs_version_patch}" ]]; then
+    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
+      greater=false
+    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+      : # fall out
+    # Use lexicographic (instead of integer) comparison because
+    # version_prerelease is a string, ("alpha" or "beta",) but first check if
+    # either is an official release (i.e. empty prerelease string).
+    #
+    # We have to do this because lexicographically "beta" > "alpha" > "", but
+    # we want official > beta > alpha.
+    elif [[ -n "${version_prerelease}" && -z "${gcs_version_prerelease}" ]]; then
+      greater=false
+    elif [[ -z "${version_prerelease}" && -n "${gcs_version_prerelease}" ]]; then
+      : # fall out
+    elif [[ "${version_prerelease}" < "${gcs_version_prerelease}" ]]; then
+      greater=false
+    elif [[ "${version_prerelease}" > "${gcs_version_prerelease}" ]]; then
+      : # fall out
+    # Finally resort to -le here, since we want strictly-greater-than.
+    elif [[ "${version_prerelease_rev}" -le "${gcs_version_prerelease_rev}" ]]; then
       greater=false
     fi
 
@@ -1205,6 +1235,10 @@ function kube::release::gcs::verify_release_gt() {
 #   publish_file: the GCS location to look in
 # Returns:
 #   If new version is greater than the GCS version
+#
+# TODO(16529): This should all be outside of build an in release, and should be
+# refactored to reduce code duplication.  Also consider using strictly nested
+# if and explicit handling of equals case.
 function kube::release::gcs::verify_ci_ge() {
   local -r publish_file="${1-}"
   local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
@@ -1255,10 +1289,6 @@ function kube::release::gcs::verify_ci_ge() {
     elif [[ "${version_prerelease_rev}" -lt "${gcs_version_prerelease_rev}" ]]; then
       greater=false
     elif [[ "${version_prerelease_rev}" -gt "${gcs_version_prerelease_rev}" ]]; then
-      : # fall out
-    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
-      greater=false
-    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
       : # fall out
     # If either version_commits is empty, it will be considered less-than, as
     # expected, (e.g. 1.2.3-beta < 1.2.3-beta.1).
