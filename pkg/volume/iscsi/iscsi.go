@@ -105,10 +105,10 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 			iqn:     iscsi.IQN,
 			lun:     lun,
 			manager: manager,
-			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 			plugin:  plugin},
 		fsType:   iscsi.FSType,
 		readOnly: readOnly,
+		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
 	}, nil
 }
 
@@ -118,13 +118,15 @@ func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID) (volume.
 }
 
 func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &iscsiDiskCleaner{&iscsiDisk{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
+	return &iscsiDiskCleaner{
+		iscsiDisk: &iscsiDisk{
+			podUID:  podUID,
+			volName: volName,
+			manager: manager,
+			plugin:  plugin,
+		},
 		mounter: mounter,
-		plugin:  plugin,
-	}}, nil
+	}, nil
 }
 
 func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, error) {
@@ -139,7 +141,6 @@ type iscsiDisk struct {
 	iqn     string
 	lun     string
 	plugin  *iscsiPlugin
-	mounter mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 }
@@ -154,6 +155,7 @@ type iscsiDiskBuilder struct {
 	*iscsiDisk
 	readOnly bool
 	fsType   string
+	mounter  *mount.SafeFormatAndMount
 }
 
 var _ volume.Builder = &iscsiDiskBuilder{}
@@ -182,6 +184,7 @@ func (b *iscsiDiskBuilder) SetUpAt(dir string) error {
 
 type iscsiDiskCleaner struct {
 	*iscsiDisk
+	mounter mount.Interface
 }
 
 var _ volume.Cleaner = &iscsiDiskCleaner{}

@@ -74,7 +74,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, glob
 		options = append(options, "ro")
 	}
 	if notMnt {
-		err = b.diskMounter.Mount(devicePath, globalPDPath, b.fsType, options)
+		err = b.diskMounter.FormatAndMount(devicePath, globalPDPath, b.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)
 			return err
