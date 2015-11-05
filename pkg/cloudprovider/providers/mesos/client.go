@@ -49,13 +49,14 @@ type mesosClient struct {
 }
 
 type slaveNode struct {
-	hostname  string
-	resources *api.NodeResources
+	hostname       string
+	kubeletRunning bool
+	resources      *api.NodeResources
 }
 
 type mesosState struct {
 	clusterName string
-	nodes       map[string]*slaveNode
+	nodes       map[string]*slaveNode // by hostname
 }
 
 type stateCache struct {
@@ -160,7 +161,7 @@ func unpackIPv4(ip uint32) string {
 	return ipv4.String()
 }
 
-// listSlaves returns a (possibly cached) list of slave nodes.
+// listSlaves returns a (possibly cached) map of slave nodes by hostname.
 // Callers must not mutate the contents of the returned slice.
 func (c *mesosClient) listSlaves(ctx context.Context) (map[string]*slaveNode, error) {
 	return c.state.nodes(ctx)
@@ -225,12 +226,36 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			Hostname  string                 `json:"hostname"`  // ex: 10.22.211.18, or slave-123.nowhere.com
 			Resources map[string]interface{} `json:"resources"` // ex: {"mem": 123, "ports": "[31000-3200]"}
 		} `json:"slaves"`
+		Frameworks []*struct {
+			Id        string `json:"id"`  // ex: 20151105-093752-3745622208-5050-1-0000
+			Pid       string `json:"pid"` // ex: scheduler(1)@192.168.65.228:57124
+			Executors []*struct {
+				SlaveId    string `json:"slave_id"`    // ex: 20151105-093752-3745622208-5050-1-S1
+				ExecutorId string `json:"executor_id"` // ex: 6704d375c68fee1e_k8sm-executor
+				Name       string `json:"name"`        // ex: Kubelet-Executor
+			} `json:"executors"`
+		} `json:"frameworks"`
 	}
+
 	state := &State{ClusterName: defaultClusterName}
 	if err := json.Unmarshal(blob, state); err != nil {
 		return nil, err
 	}
-	nodes := map[string]*slaveNode{}
+
+	executorSlaveIds := map[string]struct{}{}
+	for _, f := range state.Frameworks {
+		for _, e := range f.Executors {
+			// Note that this simple comparison breaks when we support more than one
+			// k8s instance in a cluster. At the moment this is not possible for
+			// a number of reasons.
+			// TODO(sttts): find way to detect executors of this k8s instance
+			if e.Name == "Kubelet-Executor" {
+				executorSlaveIds[e.SlaveId] = struct{}{}
+			}
+		}
+	}
+
+	nodes := map[string]*slaveNode{} // by hostname
 	for _, slave := range state.Slaves {
 		if slave.Hostname == "" {
 			continue
@@ -263,6 +288,9 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 				Capacity: cap,
 			}
 			log.V(4).Infof("node %q reporting capacity %v", node.hostname, cap)
+		}
+		if _, ok := executorSlaveIds[slave.Id]; ok {
+			node.kubeletRunning = true
 		}
 		nodes[node.hostname] = node
 	}
