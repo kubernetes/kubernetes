@@ -2157,3 +2157,36 @@ func OpenWebSocketForURL(url *url.URL, config *client.Config, protocols []string
 	cfg.Protocol = protocols
 	return websocket.DialConfig(cfg)
 }
+
+// getIngressAddress returns the ips/hostnames associated with the Ingress.
+func getIngressAddress(client *client.Client, ns, name string) ([]string, error) {
+	ing, err := client.Extensions().Ingress(ns).Get(name)
+	if err != nil {
+		return nil, err
+	}
+	addresses := []string{}
+	for _, a := range ing.Status.LoadBalancer.Ingress {
+		if a.IP != "" {
+			addresses = append(addresses, a.IP)
+		}
+		if a.Hostname != "" {
+			addresses = append(addresses, a.Hostname)
+		}
+	}
+	return addresses, nil
+}
+
+// waitForIngressAddress waits for the Ingress to acquire an address.
+func waitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Duration) (string, error) {
+	var address string
+	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		ipOrNameList, err := getIngressAddress(c, ns, ingName)
+		if err != nil || len(ipOrNameList) == 0 {
+			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
+			return false, nil
+		}
+		address = ipOrNameList[0]
+		return true, nil
+	})
+	return address, err
+}
