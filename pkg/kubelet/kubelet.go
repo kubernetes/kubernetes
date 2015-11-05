@@ -901,6 +901,23 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// If the cloud has zone information, label the node with the zone information
+		zones, ok := kl.cloud.Zones()
+		if ok {
+			zone, err := zones.GetZone()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
+			}
+			if zone.FailureDomain != "" {
+				glog.Infof("Adding node label from cloud provider: %s=%s", unversioned.LabelZoneFailureDomain, zone.FailureDomain)
+				node.ObjectMeta.Labels[unversioned.LabelZoneFailureDomain] = zone.FailureDomain
+			}
+			if zone.Region != "" {
+				glog.Infof("Adding node label from cloud provider: %s=%s", unversioned.LabelZoneRegion, zone.Region)
+				node.ObjectMeta.Labels[unversioned.LabelZoneRegion] = zone.Region
+			}
+		}
 	} else {
 		node.Spec.ExternalID = kl.hostname
 	}
