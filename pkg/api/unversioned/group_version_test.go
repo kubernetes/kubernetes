@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/ugorji/go/codec"
 )
 
 type GroupVersionHolder struct {
@@ -37,11 +39,19 @@ func TestGroupVersionUnmarshalJSON(t *testing.T) {
 
 	for _, c := range cases {
 		var result GroupVersionHolder
+		// test golang lib's JSON codec
 		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			t.Errorf("JSON codec failed to unmarshal input '%v': %v", c.input, err)
 		}
 		if !reflect.DeepEqual(result.GV, c.expect) {
-			t.Errorf("Failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
+			t.Errorf("JSON codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
+		}
+		// test the Ugorji codec
+		if err := codec.NewDecoderBytes(c.input, new(codec.JsonHandle)).Decode(&result); err != nil {
+			t.Errorf("Ugorji codec failed to unmarshal input '%v': %v", c.input, err)
+		}
+		if !reflect.DeepEqual(result.GV, c.expect) {
+			t.Errorf("Ugorji codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
 		}
 	}
 }

@@ -30,7 +30,7 @@ type GroupAndVersion struct {
 
 func (gv *GroupAndVersion) String() string {
 	// special case of "v1" for backward compatibility
-	if gv.Group == "" {
+	if gv.Group == "" && gv.Version == "v1" {
 		return gv.Version
 	} else {
 		return gv.Group + "/" + gv.Version
@@ -41,11 +41,12 @@ func ParseGroupVersion(gv string) (GroupAndVersion, error) {
 	s := strings.Split(gv, "/")
 	// "v1" is the only special case. Otherwise GroupVersion is expected to contain
 	// one "/" dividing the string into two parts.
-	if len(s) == 1 && gv == "v1" {
+	switch {
+	case len(s) == 1 && gv == "v1":
 		return GroupAndVersion{"", "v1"}, nil
-	} else if len(s) == 2 {
+	case len(s) == 2:
 		return GroupAndVersion{s[0], s[1]}, nil
-	} else {
+	default:
 		return GroupAndVersion{}, fmt.Errorf("Unexpected GroupVersion string: %v", gv)
 	}
 }
@@ -59,8 +60,7 @@ func (gv GroupAndVersion) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// UnmarshalJSON implements the json.Unmarshaller interface.
-func (gv *GroupAndVersion) UnmarshalJSON(value []byte) error {
+func (gv *GroupAndVersion) unmarshal(value []byte) error {
 	var s string
 	if err := json.Unmarshal(value, &s); err != nil {
 		return err
@@ -69,7 +69,16 @@ func (gv *GroupAndVersion) UnmarshalJSON(value []byte) error {
 	if err != nil {
 		return err
 	}
-	gv.Group = parsed.Group
-	gv.Version = parsed.Version
+	*gv = parsed
 	return nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface.
+func (gv *GroupAndVersion) UnmarshalJSON(value []byte) error {
+	return gv.unmarshal(value)
+}
+
+// UnmarshalTEXT implements the Ugorji's encoding.TextUnmarshaler interface.
+func (gv *GroupAndVersion) UnmarshalText(value []byte) error {
+	return gv.unmarshal(value)
 }
