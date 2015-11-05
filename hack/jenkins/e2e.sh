@@ -101,6 +101,7 @@ REBOOT_SKIP_TESTS=(
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
     "Reboot"
+    "ServiceLoadBalancer"
     )
 
 # Tests which cannot be run on GKE, e.g. because they require
@@ -110,6 +111,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Etcd\sFailure"
     "MasterCerts"
     "Shell"
+    "ServiceLoadBalancer" # issue: #16602
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
     )
 
@@ -124,6 +126,7 @@ GKE_DEFAULT_SKIP_TESTS=(
 # Tests which cannot be run on AWS.
 AWS_REQUIRED_SKIP_TESTS=(
     "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "GCE\sL7\sLoadBalancer\sController" # GCE L7 loadbalancing
 )
 
 # The following tests are known to be flaky, and are thus run only in their own
@@ -147,6 +150,11 @@ GCE_FLAKY_TESTS=(
 # comments below, and for poorly implemented tests, please quote the
 # issue number tracking speed improvements.
 GCE_SLOW_TESTS=(
+    # Before enabling this loadbalancer test in any other test list you must
+    # make sure the associated project has enough quota. At the time of this
+    # writing a GCE project is allowed 3 backend services by default. This
+    # test requires at least 5.
+    "GCE\sL7\sLoadBalancer\sController"               # 10 min,       file: ingress.go,              slow by design
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
     "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
@@ -157,6 +165,7 @@ GCE_SLOW_TESTS=(
 GCE_PARALLEL_SKIP_TESTS=(
     "Etcd"
     "NetworkingNew"
+    "GCE\sL7\sLoadBalancer\sController" # TODO: This cannot run in parallel with other L4 tests till quota has been bumped up.
     "Nodes\sNetwork"
     "Nodes\sResize"
     "MaxPods"
@@ -889,6 +898,196 @@ case ${JOB_NAME} in
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  # kubernetes-upgrade-gce-1.0-1.1
+  #
+  # This suite:
+  #
+  # 1. launches a cluster at ci/latest-1.0,
+  # 2. upgrades the master to ci/latest-1.1
+  # 3. runs ci/latest-1.0 e2es,
+  # 4. upgrades the rest of the cluster,
+  # 5. runs ci/latest-1.0 e2es again, then
+  # 6. runs ci/latest-1.1 e2es and tears down the cluster.
+
+    kubernetes-upgrade-1.0-1.1-gce-step1-deploy)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
+    : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
+    : ${PROJECT:="k8s-jkns-gce-upgrade"}
+    : ${E2E_UP:="true"}
+    : ${E2E_TEST:="false"}
+    : ${E2E_DOWN:="false"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  kubernetes-upgrade-1.0-1.1-gce-step2-upgrade-master)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
+    : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
+    # get the latest upgrade logic.
+    : ${JENKINS_FORCE_GET_TARS:=y}
+    : ${PROJECT:="k8s-jkns-gce-upgrade"}
+    : ${E2E_UP:="false"}
+    : ${E2E_TEST:="true"}
+    : ${E2E_DOWN:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=ci/latest-1.1"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  kubernetes-upgrade-1.0-1.1-gce-step3-e2e-old)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
+    : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${JENKINS_FORCE_GET_TARS:=y}
+    # Run old e2es
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
+    : ${PROJECT:="k8s-jkns-gce-upgrade"}
+    : ${E2E_UP:="false"}
+    : ${E2E_TEST:="true"}
+    : ${E2E_DOWN:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  kubernetes-upgrade-1.0-1.1-gce-step4-upgrade-cluster)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
+    : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    # We have to get tars at ci/latest (JENKINS_PUBLISHED_VERSION default) to
+    # get the latest upgrade logic.
+    : ${JENKINS_FORCE_GET_TARS:=y}
+    : ${PROJECT:="k8s-jkns-gce-upgrade"}
+    : ${E2E_UP:="false"}
+    : ${E2E_TEST:="true"}
+    : ${E2E_DOWN:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=ci/latest-1.1"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  kubernetes-upgrade-1.0-1.1-gce-step5-e2e-old)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
+    : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${JENKINS_FORCE_GET_TARS:=y}
+    # Run old e2es
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.0"}
+    : ${PROJECT:="k8s-jkns-gce-upgrade"}
+    : ${E2E_UP:="false"}
+    : ${E2E_TEST:="true"}
+    : ${E2E_DOWN:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  kubernetes-upgrade-1.0-1.1-gce-step6-e2e-new)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade-1-0"}
+    : ${E2E_NETWORK:="gce-upgrade-1-0"}
+    # TODO(15011): these really shouldn't be (very) version skewed, but because
+    # we have to get ci/latest-1.1 again, it could get slightly out of whack.
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${JENKINS_FORCE_GET_TARS:=y}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
+    : ${PROJECT:="k8s-jkns-gce-upgrade"}
+    : ${E2E_UP:="false"}
+    : ${E2E_TEST:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
+    : ${NUM_MINIONS:=5}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
+    ;;
+
+  # Run Kubemark test on a fake 100 node cluster to have a comparison
+  # to the real results from scalability suite
+  kubernetes-kubemark-gce)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark"}
+    : ${E2E_NETWORK:="kubernetes-kubemark"}
+    : ${PROJECT:="k8s-jenkins-kubemark"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    KUBE_GCE_INSTANCE_PREFIX="kubemark100"
+    NUM_MINIONS="10"
+    MASTER_SIZE="n1-standard-2"
+    MINION_SIZE="n1-standard-1"
+    KUBEMARK_MASTER_SIZE="n1-standard-4"
+    KUBEMARK_NUM_MINIONS="100"
+    ;;
+
+  # Run Kubemark test on a fake 500 node cluster to test for regressions on
+  # bigger clusters
+  kubernetes-kubemark-500-gce)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-500"}
+    : ${E2E_NETWORK:="kubernetes-kubemark-500"}
+    : ${PROJECT:="k8s-jenkins-kubemark"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    NUM_MINIONS="6"
+    MASTER_SIZE="n1-standard-4"
+    MINION_SIZE="n1-standard-8"
+    KUBE_GCE_INSTANCE_PREFIX="kubemark500"
+    E2E_ZONE="asia-east1-a"
+    KUBEMARK_MASTER_SIZE="n1-standard-16"
+    KUBEMARK_NUM_MINIONS="500"
+    ;;
+
+  # Run big Kubemark test, this currently means a 1000 node cluster and 16 core master
+  kubernetes-kubemark-gce-scale)
+    : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-scale"}
+    : ${E2E_NETWORK:="kubernetes-kubemark-scale"}
+    : ${PROJECT:="kubernetes-scale"}
+    : ${E2E_UP:="true"}
+    : ${E2E_DOWN:="true"}
+    : ${E2E_TEST:="false"}
+    : ${USE_KUBEMARK:="true"}
+    # Override defaults to be indpendent from GCE defaults and set kubemark parameters
+    # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
+    NUM_MINIONS="11"
+    MASTER_SIZE="n1-standard-4"
+    MINION_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
+    #                                     so NUM_MINIONS x cores_per_minion should
+    #                                     be set accordingly.
+    KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
+    E2E_ZONE="asia-east1-a"
+    KUBEMARK_MASTER_SIZE="n1-standard-16"
+    KUBEMARK_NUM_MINIONS="1000"
     ;;
 esac
 

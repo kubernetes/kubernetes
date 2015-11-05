@@ -22,6 +22,8 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,6 +51,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/websocket"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -1991,4 +1994,115 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 		Logf("Waiting for cluster size %d, current size %d, not ready nodes %d", size, numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
+}
+
+// getHostExternalAddress gets the node for a pod and returns the first External
+// address. Returns an error if the node the pod is on doesn't have an External
+// address.
+func getHostExternalAddress(client *client.Client, p *api.Pod) (externalAddress string, err error) {
+	node, err := client.Nodes().Get(p.Spec.NodeName)
+	if err != nil {
+		return "", err
+	}
+	for _, address := range node.Status.Addresses {
+		if address.Type == api.NodeExternalIP {
+			if address.Address != "" {
+				externalAddress = address.Address
+				break
+			}
+		}
+	}
+	if externalAddress == "" {
+		err = fmt.Errorf("No external address for pod %v on node %v",
+			p.Name, p.Spec.NodeName)
+	}
+	return
+}
+
+type extractRT struct {
+	http.Header
+}
+
+func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.Header = req.Header
+	return nil, nil
+}
+
+// headersForConfig extracts any http client logic necessary for the provided
+// config.
+func headersForConfig(c *client.Config) (http.Header, error) {
+	extract := &extractRT{}
+	rt, err := client.HTTPWrappersForConfig(c, extract)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := rt.RoundTrip(&http.Request{}); err != nil {
+		return nil, err
+	}
+	return extract.Header, nil
+}
+
+// OpenWebSocketForURL constructs a websocket connection to the provided URL, using the client
+// config, with the specified protocols.
+func OpenWebSocketForURL(url *url.URL, config *client.Config, protocols []string) (*websocket.Conn, error) {
+	tlsConfig, err := client.TLSConfigFor(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tls config: %v", err)
+	}
+	if tlsConfig != nil {
+		url.Scheme = "wss"
+		if !strings.Contains(url.Host, ":") {
+			url.Host += ":443"
+		}
+	} else {
+		url.Scheme = "ws"
+		if !strings.Contains(url.Host, ":") {
+			url.Host += ":80"
+		}
+	}
+	headers, err := headersForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load http headers: %v", err)
+	}
+	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create websocket config: %v", err)
+	}
+	cfg.Header = headers
+	cfg.TlsConfig = tlsConfig
+	cfg.Protocol = protocols
+	return websocket.DialConfig(cfg)
+}
+
+// getIngressAddress returns the ips/hostnames associated with the Ingress.
+func getIngressAddress(client *client.Client, ns, name string) ([]string, error) {
+	ing, err := client.Extensions().Ingress(ns).Get(name)
+	if err != nil {
+		return nil, err
+	}
+	addresses := []string{}
+	for _, a := range ing.Status.LoadBalancer.Ingress {
+		if a.IP != "" {
+			addresses = append(addresses, a.IP)
+		}
+		if a.Hostname != "" {
+			addresses = append(addresses, a.Hostname)
+		}
+	}
+	return addresses, nil
+}
+
+// waitForIngressAddress waits for the Ingress to acquire an address.
+func waitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Duration) (string, error) {
+	var address string
+	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		ipOrNameList, err := getIngressAddress(c, ns, ingName)
+		if err != nil || len(ipOrNameList) == 0 {
+			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
+			return false, nil
+		}
+		address = ipOrNameList[0]
+		return true, nil
+	})
+	return address, err
 }
