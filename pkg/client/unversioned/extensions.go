@@ -64,7 +64,7 @@ func (c *ExtensionsClient) ServerVersion() (*version.Info, error) {
 // ServerAPIVersions retrieves and parses the list of experimental API versions the
 // server supports.
 func (c *ExtensionsClient) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	body, err := c.Get().UnversionedPath("").Do().Raw()
+	body, err := c.Get().AbsPath("/apis/extensions").Do().Raw()
 	if err != nil {
 		return nil, err
 	}
