@@ -81,7 +81,7 @@ func TestList_NoError(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	expect := &api.ComponentStatusList{
-		Items: []api.ComponentStatus{*(createTestStatus("test1", api.ConditionTrue, "ok", "nil"))},
+		Items: []api.ComponentStatus{*(createTestStatus("test1", api.ConditionTrue, "ok", ""))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
 		t.Errorf("Got unexpected object. Diff: %s", util.ObjectDiff(e, a))
@@ -124,7 +124,7 @@ func TestGet_NoError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	expect := createTestStatus("test1", api.ConditionTrue, "ok", "nil")
+	expect := createTestStatus("test1", api.ConditionTrue, "ok", "")
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
 		t.Errorf("Got unexpected object. Diff: %s", util.ObjectDiff(e, a))
 	}
