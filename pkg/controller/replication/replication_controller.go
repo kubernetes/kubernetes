@@ -451,7 +451,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	if err := updateReplicaCount(rm.kubeClient.ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the controller ensures
 		// we retry with some fairness.
-		glog.V(2).Infof("Failed to update replica count for controller %v, requeuing", rc.Name)
+		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)
 		rm.enqueueController(&rc)
 	}
 	return nil
