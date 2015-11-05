@@ -97,7 +97,7 @@ kubelet
       --rkt-stage1-image="": image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used
       --root-dir="/var/lib/kubelet": Directory path for managing kubelet files (volume mounts,etc).
       --runonce[=false]: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server
-      --serialize-image-pulls[=false]: Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]
+      --serialize-image-pulls[=true]: Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]
       --streaming-connection-idle-timeout=0: Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'
       --sync-frequency=10s: Max period between synchronizing running containers and config
       --system-container="": Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: "").
