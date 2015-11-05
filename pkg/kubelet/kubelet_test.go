@@ -4014,3 +4014,56 @@ func TestExtractBandwidthResources(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPodsToSync(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	pods := newTestPods(5)
+	podUIDs := []types.UID{}
+	for _, pod := range pods {
+		podUIDs = append(podUIDs, pod.UID)
+	}
+
+	exceededActiveDeadlineSeconds := int64(30)
+	notYetActiveDeadlineSeconds := int64(120)
+	now := unversioned.Now()
+	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	pods[0].Status.StartTime = &startTime
+	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
+	pods[1].Status.StartTime = &startTime
+	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
+	pods[2].Status.StartTime = &startTime
+	pods[2].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
+
+	kubelet.podManager.SetPods(pods)
+	kubelet.workQueue.Enqueue(pods[2].UID, 0)
+	kubelet.workQueue.Enqueue(pods[3].UID, 0)
+	kubelet.workQueue.Enqueue(pods[4].UID, time.Hour)
+
+	expectedPodsUID := []types.UID{pods[0].UID, pods[2].UID, pods[3].UID}
+
+	podsToSync := kubelet.getPodsToSync()
+
+	if len(podsToSync) == len(expectedPodsUID) {
+		var rightNum int
+		for _, podUID := range expectedPodsUID {
+			for _, podToSync := range podsToSync {
+				if podToSync.UID == podUID {
+					rightNum++
+					break
+				}
+			}
+		}
+		if rightNum != len(expectedPodsUID) {
+			// Just for report error
+			podsToSyncUID := []types.UID{}
+			for _, podToSync := range podsToSync {
+				podsToSyncUID = append(podsToSyncUID, podToSync.UID)
+			}
+			t.Errorf("expected pods %v to sync, got %v", expectedPodsUID, podsToSyncUID)
+		}
+
+	} else {
+		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
+	}
+}
