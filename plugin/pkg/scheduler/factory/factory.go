@@ -178,24 +178,24 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 	}
 
 	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, time.Minute).RunUntil(f.StopEverything)
 
 	// Begin populating scheduled pods.
 	go f.scheduledPodPopulator.Run(f.StopEverything)
 
 	// Watch nodes.
 	// Nodes may be listed frequently, so provide a local up-to-date cache.
-	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, time.Minute).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers, so that it can spread them correctly.
 	// Cache this locally.
-	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, time.Minute).RunUntil(f.StopEverything)
 
 	// Watch and cache all ReplicationController objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers, so that it can spread them correctly.
 	// Cache this locally.
-	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Store, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Store, time.Minute).RunUntil(f.StopEverything)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
