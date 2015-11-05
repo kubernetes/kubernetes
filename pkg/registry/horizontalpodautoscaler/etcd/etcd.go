@@ -33,12 +33,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/horizontalpodautoscalers"
 
 	newListFunc := func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &extensions.HorizontalPodAutoscaler{}, prefix, false, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &extensions.HorizontalPodAutoscaler{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscaler{} },

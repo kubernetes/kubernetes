@@ -32,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against endpoints.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/services/endpoints"
 
 	newListFunc := func() runtime.Object { return &api.EndpointsList{} }
-	storageInterface := storageFactory(
-		s, 1000, nil, &api.Endpoints{}, prefix, true, newListFunc)
+	storageInterface := storageDecorator(
+		s, 1000, &api.Endpoints{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Endpoints{} },

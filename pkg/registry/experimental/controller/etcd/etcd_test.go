@@ -22,9 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -32,7 +32,7 @@ import (
 
 func newStorage(t *testing.T) (*ScaleREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
-	return NewStorage(etcdStorage, storage.NoDecoration).Scale, fakeClient
+	return NewStorage(etcdStorage, generic.UndecoratedStorage).Scale, fakeClient
 }
 
 var validPodTemplate = api.PodTemplate{

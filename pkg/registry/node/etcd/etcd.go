@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -50,12 +51,12 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewREST returns a RESTStorage object that will work against nodes.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
 	prefix := "/minions"
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
-	storageInterface := storageFactory(
-		s, 1000, nil, &api.Node{}, prefix, false, newListFunc)
+	storageInterface := storageDecorator(
+		s, 1000, &api.Node{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },

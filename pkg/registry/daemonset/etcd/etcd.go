@@ -34,12 +34,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against DaemonSets.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/daemonsets"
 
 	newListFunc := func() runtime.Object { return &extensions.DaemonSetList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &extensions.DaemonSet{}, prefix, false, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &extensions.DaemonSet{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.DaemonSet{} },
