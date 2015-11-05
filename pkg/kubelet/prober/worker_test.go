@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/probe"
@@ -119,7 +120,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			m.statusManager = status.NewManager(&testclient.Fake{})
+			m.statusManager = status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil))
 			resultsManager(m, probeType).Remove(containerID)
 		}
 	}

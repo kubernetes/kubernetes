@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/types"
@@ -53,6 +54,7 @@ type podStatusSyncRequest struct {
 // All methods are thread-safe.
 type manager struct {
 	kubeClient client.Interface
+	podManager kubepod.Manager
 	// Map from pod UID to sync status of the corresponding pod.
 	podStatuses      map[types.UID]versionedPodStatus
 	podStatusesLock  sync.RWMutex
@@ -87,9 +89,10 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient client.Interface) Manager {
+func NewManager(kubeClient client.Interface, podManager kubepod.Manager) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
+		podManager:        podManager,
 		podStatuses:       make(map[types.UID]versionedPodStatus),
 		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 		apiStatusVersions: make(map[types.UID]uint64),
@@ -131,49 +134,41 @@ func (m *manager) Start() {
 func (m *manager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	status, ok := m.podStatuses[uid]
+	status, ok := m.podStatuses[m.podManager.TranslatePodUID(uid)]
 	return status.status, ok
 }
 
 func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
-	oldStatus, found := m.podStatuses[pod.UID]
 
-	// ensure that the start time does not change across updates.
-	if found && oldStatus.status.StartTime != nil {
-		status.StartTime = oldStatus.status.StartTime
+	var oldStatus api.PodStatus
+	if cachedStatus, ok := m.podStatuses[pod.UID]; ok {
+		oldStatus = cachedStatus.status
+	} else if mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod); ok {
+		oldStatus = mirrorPod.Status
+	} else {
+		oldStatus = pod.Status
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
-	// Note we cannot do this while generating the status since we do not have oldStatus
-	// at that time for mirror pods.
 	if readyCondition := api.GetPodReadyCondition(status); readyCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := unversioned.Now()
-		if found {
-			oldReadyCondition := api.GetPodReadyCondition(oldStatus.status)
-			if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
-				lastTransitionTime = oldReadyCondition.LastTransitionTime
-			}
+		oldReadyCondition := api.GetPodReadyCondition(oldStatus)
+		if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
+			lastTransitionTime = oldReadyCondition.LastTransitionTime
 		}
 		readyCondition.LastTransitionTime = lastTransitionTime
 	}
 
-	// if the status has no start time, we need to set an initial time
-	// TODO(yujuhong): Consider setting StartTime when generating the pod
-	// status instead, which would allow manager to become a simple cache
-	// again.
-	if status.StartTime.IsZero() {
-		if pod.Status.StartTime.IsZero() {
-			// the pod did not have a previously recorded value so set to now
-			now := unversioned.Now()
-			status.StartTime = &now
-		} else {
-			// the pod had a recorded value, but the kubelet restarted so we need to rebuild cache
-			// based on last observed value
-			status.StartTime = pod.Status.StartTime
-		}
+	// ensure that the start time does not change across updates.
+	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
+		status.StartTime = oldStatus.StartTime
+	} else if status.StartTime.IsZero() {
+		// if the status has no start time, we need to set an initial time
+		now := unversioned.Now()
+		status.StartTime = &now
 	}
 
 	newStatus := m.updateStatusInternal(pod, status)
@@ -288,14 +283,14 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
-		glog.V(3).Infof("Pod %q was deleted on the server", status.podName)
+		glog.V(3).Infof("Pod %q (%s) was deleted on the server", status.podName, uid)
 		m.deletePodStatus(uid)
 		return
 	}
 	if err == nil {
-		if len(pod.UID) > 0 && pod.UID != uid {
-			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update",
-				kubeletutil.FormatPodName(pod))
+		translatedUID := m.podManager.TranslatePodUID(pod.UID)
+		if len(translatedUID) > 0 && translatedUID != uid {
+			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", kubeletutil.FormatPodName(pod))
 			m.deletePodStatus(uid)
 			return
 		}
@@ -310,12 +305,12 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				return
 			}
 			if !notRunning(pod.Status.ContainerStatuses) {
-				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", pod.Name)
+				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", kubeletutil.FormatPodName(pod))
 				return
 			}
 			if err := m.kubeClient.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
-				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", pod.Name)
-				m.deletePodStatus(pod.UID)
+				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", kubeletutil.FormatPodName(pod))
+				m.deletePodStatus(uid)
 				return
 			}
 		}

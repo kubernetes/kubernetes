@@ -255,7 +255,6 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
-	statusManager := status.NewManager(kubeClient)
 	containerRefManager := kubecontainer.NewRefManager()
 
 	volumeManager := newVolumeManager()
@@ -287,7 +286,6 @@ func NewMainKubelet(
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
-		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
@@ -417,6 +415,7 @@ func NewMainKubelet(
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
+	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
 		klet.resyncInterval,
@@ -1436,27 +1435,18 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
-		if kubepod.IsStaticPod(pod) && mirrorPod == nil {
-			// No need to cache the status because the mirror pod does not
-			// exist yet.
-			return
-		}
 		status, err := kl.generatePodStatus(pod)
 		if err != nil {
 			glog.Errorf("Unable to generate status for pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 			// Propagate the error upstream.
 			syncErr = err
 		} else {
-			podToUpdate := pod
-			if mirrorPod != nil {
-				podToUpdate = mirrorPod
-			}
-			existingStatus, ok := kl.statusManager.GetPodStatus(podToUpdate.UID)
+			existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 			if !ok || existingStatus.Phase == api.PodPending && status.Phase == api.PodRunning &&
 				!firstSeenTime.IsZero() {
 				metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 			}
-			kl.statusManager.SetPodStatus(podToUpdate, status)
+			kl.statusManager.SetPodStatus(pod, status)
 		}
 	}()
 
