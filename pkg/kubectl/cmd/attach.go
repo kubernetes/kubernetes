@@ -31,6 +31,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -137,16 +138,17 @@ func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn 
 
 // Validate checks that the provided attach options are specified.
 func (p *AttachOptions) Validate() error {
+	allErrs := []error{}
 	if len(p.PodName) == 0 {
-		return fmt.Errorf("pod name must be specified")
+		allErrs = append(allErrs, fmt.Errorf("pod name must be specified"))
 	}
 	if p.Out == nil || p.Err == nil {
-		return fmt.Errorf("both output and error output must be provided")
+		allErrs = append(allErrs, fmt.Errorf("both output and error output must be provided"))
 	}
 	if p.Attach == nil || p.Client == nil || p.Config == nil {
-		return fmt.Errorf("client, client config, and attach must be provided")
+		allErrs = append(allErrs, fmt.Errorf("client, client config, and attach must be provided"))
 	}
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }
 
 // Run executes a validated remote execution against a pod.
