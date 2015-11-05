@@ -2125,7 +2125,10 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 				podsToSync = append(podsToSync, pod)
 			}
 		}
-		glog.V(2).Infof("SyncLoop (SYNC): %d pods", kubeletutil.FormatPodNames(podsToSync))
+		if len(podsToSync) == 0 {
+			break
+		}
+		glog.V(4).Infof("SyncLoop (SYNC): %d pods; %s", len(podsToSync), kubeletutil.FormatPodNames(podsToSync))
 		kl.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		// We only care about failures (signalling container death) here.
