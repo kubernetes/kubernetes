@@ -881,12 +881,11 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 		return allErrs
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler)...)
-	if probe.InitialDelaySeconds < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("initialDelay", probe.InitialDelaySeconds, "may not be less than zero"))
-	}
-	if probe.TimeoutSeconds < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("timeout", probe.TimeoutSeconds, "may not be less than zero"))
-	}
+	allErrs = append(allErrs, ValidatePositiveField(probe.InitialDelaySeconds, "initialDelaySeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(probe.TimeoutSeconds, "timeoutSeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.PeriodSeconds), "periodSeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.SuccessThreshold), "successThreshold")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.FailureThreshold), "failureThreshold")...)
 	return allErrs
 }
 
@@ -1030,6 +1029,11 @@ func validateContainers(containers []api.Container, volumes sets.String) errs.Va
 			cErrs = append(cErrs, validateLifecycle(ctr.Lifecycle).Prefix("lifecycle")...)
 		}
 		cErrs = append(cErrs, validateProbe(ctr.LivenessProbe).Prefix("livenessProbe")...)
+		// Liveness-specific validation
+		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
+			allErrs = append(allErrs, errs.NewFieldForbidden("livenessProbe.successThreshold", "must be 1"))
+		}
+
 		cErrs = append(cErrs, validateProbe(ctr.ReadinessProbe).Prefix("readinessProbe")...)
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
