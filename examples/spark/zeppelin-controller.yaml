@@ -1,19 +1,21 @@
 kind: ReplicationController
 apiVersion: v1
 metadata:
-  name: spark-driver-controller
+  name: zeppelin-controller
 spec:
   replicas: 1
   selector:
-    component: spark-driver
+    component: zeppelin
   template:
     metadata:
       labels:
-        component: spark-driver
+        component: zeppelin
     spec:
       containers:
-        - name: spark-driver
-          image: gcr.io/google_containers/spark-driver:1.5.1_v2
+        - name: zeppelin
+          image: gcr.io/google_containers/zeppelin:v0.5.5_v1
+          ports:
+            - containerPort: 8080
           resources:
             requests:
               cpu: 100m

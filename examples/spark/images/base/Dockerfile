@@ -1,4 +1,4 @@
-FROM java:latest
+FROM java:openjdk-8-jdk
 
 ENV hadoop_ver 2.6.1
 ENV spark_ver 1.5.1
