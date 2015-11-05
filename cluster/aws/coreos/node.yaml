@@ -93,7 +93,8 @@ coreos:
         --master=https://${MASTER_IP} \
         --kubeconfig=/var/lib/kube-proxy/kubeconfig \
         --v=2 \
-        --logtostderr=true
+        --logtostderr=true \
+        --hostname-override=${HOSTNAME_OVERRIDE}
         Restart=always
         RestartSec=10
 
