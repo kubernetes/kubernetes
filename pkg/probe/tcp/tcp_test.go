@@ -20,7 +20,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -39,52 +38,47 @@ func containsAny(s string, substrs []string) bool {
 }
 
 func TestTcpHealthChecker(t *testing.T) {
-	prober := New()
-	tests := []struct {
-		expectedStatus probe.Result
-		usePort        bool
-		expectError    bool
-		// Some errors are different depending on your system, make
-		// the test pass on all of them
-		accOutputs []string
-	}{
-		// The probe will be filled in below.  This is primarily testing that a connection is made.
-		{probe.Success, true, false, []string{""}},
-		{probe.Failure, false, false, []string{"unknown port", "Servname not supported for ai_socktype"}},
-	}
-
+	// Setup a test server that responds to probing correctly
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
-	u, err := url.Parse(server.URL)
+	tHost, tPortStr, err := net.SplitHostPort(server.Listener.Addr().String())
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
-	host, port, err := net.SplitHostPort(u.Host)
+	tPort, err := strconv.Atoi(tPortStr)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
-	for _, test := range tests {
-		p, err := strconv.Atoi(port)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+
+	tests := []struct {
+		host string
+		port int
+
+		expectedStatus probe.Result
+		expectedError  error
+		// Some errors are different depending on your system.
+		// The test passes as long as the output matches one of them.
+		expectedOutputs []string
+	}{
+		// A connection is made and probing would succeed
+		{tHost, tPort, probe.Success, nil, []string{""}},
+		// No connection can be made and probing would fail
+		{tHost, -1, probe.Failure, nil, []string{"unknown port", "Servname not supported for ai_socktype", "nodename nor servname provided, or not known"}},
+	}
+
+	prober := New()
+	for i, tt := range tests {
+		status, output, err := prober.Probe(tt.host, tt.port, 1*time.Second)
+		if status != tt.expectedStatus {
+			t.Errorf("#%d: expected status=%v, get=%v", i, tt.expectedStatus, status)
 		}
-		if !test.usePort {
-			p = -1
+		if err != tt.expectedError {
+			t.Errorf("#%d: expected error=%v, get=%v", i, tt.expectedError, err)
 		}
-		status, output, err := prober.Probe(host, p, 1*time.Second)
-		if status != test.expectedStatus {
-			t.Errorf("expected: %v, got: %v", test.expectedStatus, status)
-		}
-		if err != nil && !test.expectError {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("unexpected non-error.")
-		}
-		if !containsAny(output, test.accOutputs) {
-			t.Errorf("expected one of %#v, got %s", test.accOutputs, output)
+		if !containsAny(output, tt.expectedOutputs) {
+			t.Errorf("#%d: expected output=one of %#v, get=%s", tt.expectedOutputs, output)
 		}
 	}
 }
