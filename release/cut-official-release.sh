@@ -111,7 +111,8 @@ You would now do the following, if not a dry run:
 EOM
   else
     cat > "${INSTRUCTIONS}" <<- EOM
-Success!  You must now do the following:
+Success!  You must now do the following (you may want to cut and paste these
+instructions elsewhere):
 
 EOM
   fi
