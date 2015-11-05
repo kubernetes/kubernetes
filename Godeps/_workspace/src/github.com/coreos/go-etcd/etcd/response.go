@@ -1,6 +1,6 @@
 package etcd
 
-//go:generate codecgen -o response.generated.go response.go
+//go:generate codecgen -d 1978 -o response.generated.go response.go
 
 import (
 	"net/http"
