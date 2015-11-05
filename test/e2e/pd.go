@@ -91,7 +91,7 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(host0Pod)
 		expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-		expectNoError(framework.WaitForPodRunning(host0Pod.Name))
+		expectNoError(framework.WaitForPodRunningSlow(host0Pod.Name))
 
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", math_rand.Int())
@@ -106,7 +106,7 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(host1Pod)
 		expectNoError(err, "Failed to create host1Pod")
 
-		expectNoError(framework.WaitForPodRunning(host1Pod.Name))
+		expectNoError(framework.WaitForPodRunningSlow(host1Pod.Name))
 
 		v, err := framework.ReadFileViaContainer(host1Pod.Name, containerName, testFile)
 		expectNoError(err)
@@ -150,7 +150,7 @@ var _ = Describe("Pod Disks", func() {
 		By("submitting rwPod to ensure PD is formatted")
 		_, err = podClient.Create(rwPod)
 		expectNoError(err, "Failed to create rwPod")
-		expectNoError(framework.WaitForPodRunning(rwPod.Name))
+		expectNoError(framework.WaitForPodRunningSlow(rwPod.Name))
 		expectNoError(podClient.Delete(rwPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		expectNoError(waitForPDDetach(diskName, host0Name))
 
@@ -162,9 +162,9 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(host1ROPod)
 		expectNoError(err, "Failed to create host1ROPod")
 
-		expectNoError(framework.WaitForPodRunning(host0ROPod.Name))
+		expectNoError(framework.WaitForPodRunningSlow(host0ROPod.Name))
 
-		expectNoError(framework.WaitForPodRunning(host1ROPod.Name))
+		expectNoError(framework.WaitForPodRunningSlow(host1ROPod.Name))
 
 		By("deleting host0ROPod")
 		expectNoError(podClient.Delete(host0ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0ROPod")
@@ -204,7 +204,7 @@ var _ = Describe("Pod Disks", func() {
 			_, err = podClient.Create(host0Pod)
 			expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-			expectNoError(framework.WaitForPodRunning(host0Pod.Name))
+			expectNoError(framework.WaitForPodRunningSlow(host0Pod.Name))
 
 			// randomly select a container and read/verify pd contents from it
 			containerName := fmt.Sprintf("mycontainer%v", math_rand.Intn(numContainers)+1)
@@ -263,7 +263,7 @@ var _ = Describe("Pod Disks", func() {
 			_, err = podClient.Create(host0Pod)
 			expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-			expectNoError(framework.WaitForPodRunning(host0Pod.Name))
+			expectNoError(framework.WaitForPodRunningSlow(host0Pod.Name))
 
 			// Read/verify pd contents for both disks from container
 			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
