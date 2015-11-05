@@ -1,8 +1,5 @@
 FROM java:latest
 
-RUN apt-get update -y
-RUN apt-get install -y scala
-
 ENV hadoop_ver 2.6.1
 ENV spark_ver 1.5.1
 
@@ -30,7 +27,6 @@ RUN mkdir -p /opt && \
 RUN wget -O /opt/spark/lib/gcs-connector-latest-hadoop2.jar https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop2.jar
 
 ADD log4j.properties /opt/spark/conf/log4j.properties
-ADD setup_client.sh /
 ADD start-common.sh /
 ADD core-site.xml /opt/spark/conf/core-site.xml
 ADD spark-defaults.conf /opt/spark/conf/spark-defaults.conf
