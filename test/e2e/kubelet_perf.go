@@ -50,8 +50,55 @@ func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	}
 }
 
+func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, resourceMonitor *resourceMonitor) {
+	numNodes := nodeNames.Len()
+	totalPods := podsPerNode * numNodes
+	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
+	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID()))
+
+	// TODO: Use a more realistic workload
+	Expect(RunRC(RCConfig{
+		Client:    framework.Client,
+		Name:      rcName,
+		Namespace: framework.Namespace.Name,
+		Image:     "gcr.io/google_containers/pause:go",
+		Replicas:  totalPods,
+	})).NotTo(HaveOccurred())
+
+	// Log once and flush the stats.
+	resourceMonitor.LogLatest()
+	resourceMonitor.Reset()
+
+	By("Start monitoring resource usage")
+	// Periodically dump the cpu summary until the deadline is met.
+	// Note that without calling resourceMonitor.Reset(), the stats
+	// would occupy increasingly more memory. This should be fine
+	// for the current test duration, but we should reclaim the
+	// entries if we plan to monitor longer (e.g., 8 hours).
+	deadline := time.Now().Add(monitoringTime)
+	for time.Now().Before(deadline) {
+		Logf("Still running...%v left", deadline.Sub(time.Now()))
+		time.Sleep(reportingPeriod)
+		timeLeft := deadline.Sub(time.Now())
+		Logf("Still running...%v left", timeLeft)
+		if timeLeft < reportingPeriod {
+			time.Sleep(timeLeft)
+		} else {
+			time.Sleep(reportingPeriod)
+		}
+		logPodsOnNodes(framework.Client, nodeNames.List())
+	}
+
+	By("Reporting overall resource usage")
+	logPodsOnNodes(framework.Client, nodeNames.List())
+	resourceMonitor.LogCPUSummary()
+	resourceMonitor.LogLatest()
+
+	By("Deleting the RC")
+	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
+}
+
 var _ = Describe("Kubelet", func() {
-	var numNodes int
 	var nodeNames sets.String
 	framework := NewFramework("kubelet-perf")
 	var resourceMonitor *resourceMonitor
@@ -59,7 +106,6 @@ var _ = Describe("Kubelet", func() {
 	BeforeEach(func() {
 		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
@@ -72,49 +118,25 @@ var _ = Describe("Kubelet", func() {
 		resourceMonitor.Stop()
 	})
 
-	Describe("resource usage tracking", func() {
-		density := []int{0, 50}
-		for _, podsPerNode := range density {
+	Describe("regular resource usage tracking", func() {
+		density := []int{0, 35}
+		for i := range density {
+			podsPerNode := density[i]
 			name := fmt.Sprintf(
 				"over %v with %d pods per node.", monitoringTime, podsPerNode)
 			It(name, func() {
-				totalPods := podsPerNode * numNodes
-				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-				rcName := fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID()))
-
-				// TODO: Use a more realistic workload
-				Expect(RunRC(RCConfig{
-					Client:    framework.Client,
-					Name:      rcName,
-					Namespace: framework.Namespace.Name,
-					Image:     "gcr.io/google_containers/pause:go",
-					Replicas:  totalPods,
-				})).NotTo(HaveOccurred())
-
-				// Log once and flush the stats.
-				resourceMonitor.LogLatest()
-				resourceMonitor.Reset()
-
-				By("Start monitoring resource usage")
-				// Periodically dump the cpu summary until the deadline is met.
-				// Note that without calling resourceMonitor.Reset(), the stats
-				// would occupy increasingly more memory. This should be fine
-				// for the current test duration, but we should reclaim the
-				// entries if we plan to monitor longer (e.g., 8 hours).
-				deadline := time.Now().Add(monitoringTime)
-				for time.Now().Before(deadline) {
-					time.Sleep(reportingPeriod)
-					Logf("Still running...")
-					logPodsOnNodes(framework.Client, nodeNames.List())
-				}
-
-				By("Reporting overall resource usage")
-				logPodsOnNodes(framework.Client, nodeNames.List())
-				resourceMonitor.LogCPUSummary()
-				resourceMonitor.LogLatest()
-
-				By("Deleting the RC")
-				DeleteRC(framework.Client, framework.Namespace.Name, rcName)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, resourceMonitor)
+			})
+		}
+	})
+	Describe("experimental resource usage tracking", func() {
+		density := []int{50}
+		for i := range density {
+			podsPerNode := density[i]
+			name := fmt.Sprintf(
+				"over %v with %d pods per node.", monitoringTime, podsPerNode)
+			It(name, func() {
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, resourceMonitor)
 			})
 		}
 	})
