@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package field
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 )
 
 // Error is an implementation of the 'error' interface, which represents a
-// validation error.
+// field-level validation error.
 type Error struct {
 	Type     ErrorType
 	Field    string
@@ -121,33 +121,33 @@ func (t ErrorType) String() string {
 
 // NewNotFoundError returns a *Error indicating "value not found".  This is
 // used to report failure to find a requested value (e.g. looking up an ID).
-func NewNotFoundError(field *FieldPath, value interface{}) *Error {
+func NewNotFoundError(field *Path, value interface{}) *Error {
 	return &Error{ErrorTypeNotFound, field.String(), value, ""}
 }
 
 // NewRequiredError returns a *Error indicating "value required".  This is used
 // to report required values that are not provided (e.g. empty strings, null
 // values, or empty arrays).
-func NewRequiredError(field *FieldPath) *Error {
+func NewRequiredError(field *Path) *Error {
 	return &Error{ErrorTypeRequired, field.String(), "", ""}
 }
 
 // NewDuplicateError returns a *Error indicating "duplicate value".  This is
 // used to report collisions of values that must be unique (e.g. names or IDs).
-func NewDuplicateError(field *FieldPath, value interface{}) *Error {
+func NewDuplicateError(field *Path, value interface{}) *Error {
 	return &Error{ErrorTypeDuplicate, field.String(), value, ""}
 }
 
 // NewInvalidError returns a *Error indicating "invalid value".  This is used
 // to report malformed values (e.g. failed regex match, too long, out of bounds).
-func NewInvalidError(field *FieldPath, value interface{}, detail string) *Error {
+func NewInvalidError(field *Path, value interface{}, detail string) *Error {
 	return &Error{ErrorTypeInvalid, field.String(), value, detail}
 }
 
 // NewNotSupportedError returns a *Error indicating "unsupported value".
 // This is used to report unknown values for enumerated fields (e.g. a list of
 // valid values).
-func NewNotSupportedError(field *FieldPath, value interface{}, validValues []string) *Error {
+func NewNotSupportedError(field *Path, value interface{}, validValues []string) *Error {
 	detail := ""
 	if validValues != nil && len(validValues) > 0 {
 		detail = "supported values: " + strings.Join(validValues, ", ")
@@ -159,7 +159,7 @@ func NewNotSupportedError(field *FieldPath, value interface{}, validValues []str
 // report valid (as per formatting rules) values which would be accepted under
 // some conditions, but which are not permitted by current conditions (e.g.
 // security policy).
-func NewForbiddenError(field *FieldPath, value interface{}) *Error {
+func NewForbiddenError(field *Path, value interface{}) *Error {
 	return &Error{ErrorTypeForbidden, field.String(), value, ""}
 }
 
@@ -167,18 +167,20 @@ func NewForbiddenError(field *FieldPath, value interface{}) *Error {
 // report that the given value is too long.  This is similar to
 // NewInvalidError, but the returned error will not include the too-long
 // value.
-func NewTooLongError(field *FieldPath, value interface{}, maxLength int) *Error {
+func NewTooLongError(field *Path, value interface{}, maxLength int) *Error {
 	return &Error{ErrorTypeTooLong, field.String(), value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 
 // NewInternalError returns a *Error indicating "internal error".  This is used
 // to signal that an error was found that was not directly related to user
 // input.  The err argument must be non-nil.
-func NewInternalError(field *FieldPath, err error) *Error {
+func NewInternalError(field *Path, err error) *Error {
 	return &Error{ErrorTypeInternal, field.String(), nil, err.Error()}
 }
 
-// ErrorList holds a set of errors.
+// ErrorList holds a set of Errors.  It is plausible that we might one day have
+// non-field errors in this same umbrella package, but for now we don't, so
+// we can keep it simple and leave ErrorList here.
 type ErrorList []*Error
 
 // NewErrorTypeMatcher returns an errors.Matcher that returns true
