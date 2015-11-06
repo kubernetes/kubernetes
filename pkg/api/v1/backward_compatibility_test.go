@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testing/compat"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
@@ -217,8 +217,8 @@ func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
 		},
 	}
 
-	validator := func(obj runtime.Object) utilvalidation.ErrorList {
-		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), utilvalidation.NewFieldPath("spec"))
+	validator := func(obj runtime.Object) field.ErrorList {
+		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), field.NewPath("spec"))
 	}
 
 	for _, tc := range cases {

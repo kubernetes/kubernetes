@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestMerge(t *testing.T) {
@@ -274,15 +274,15 @@ func TestCheckInvalidErr(t *testing.T) {
 		expected string
 	}{
 		{
-			errors.NewInvalid("Invalid1", "invalidation", validation.ErrorList{validation.NewInvalidError(validation.NewFieldPath("field"), "single", "details")}),
+			errors.NewInvalid("Invalid1", "invalidation", field.ErrorList{field.NewInvalidError(field.NewPath("field"), "single", "details")}),
 			`Error from server: Invalid1 "invalidation" is invalid: field: invalid value 'single', Details: details`,
 		},
 		{
-			errors.NewInvalid("Invalid2", "invalidation", validation.ErrorList{validation.NewInvalidError(validation.NewFieldPath("field1"), "multi1", "details"), validation.NewInvalidError(validation.NewFieldPath("field2"), "multi2", "details")}),
+			errors.NewInvalid("Invalid2", "invalidation", field.ErrorList{field.NewInvalidError(field.NewPath("field1"), "multi1", "details"), field.NewInvalidError(field.NewPath("field2"), "multi2", "details")}),
 			`Error from server: Invalid2 "invalidation" is invalid: [field1: invalid value 'multi1', Details: details, field2: invalid value 'multi2', Details: details]`,
 		},
 		{
-			errors.NewInvalid("Invalid3", "invalidation", validation.ErrorList{}),
+			errors.NewInvalid("Invalid3", "invalidation", field.ErrorList{}),
 			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
 		},
 	}

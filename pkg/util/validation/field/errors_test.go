@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package field
 
 import (
 	"fmt"
@@ -28,27 +28,27 @@ func TestMakeFuncs(t *testing.T) {
 		expected ErrorType
 	}{
 		{
-			func() *Error { return NewInvalidError(NewFieldPath("f"), "v", "d") },
+			func() *Error { return NewInvalidError(NewPath("f"), "v", "d") },
 			ErrorTypeInvalid,
 		},
 		{
-			func() *Error { return NewNotSupportedError(NewFieldPath("f"), "v", nil) },
+			func() *Error { return NewNotSupportedError(NewPath("f"), "v", nil) },
 			ErrorTypeNotSupported,
 		},
 		{
-			func() *Error { return NewDuplicateError(NewFieldPath("f"), "v") },
+			func() *Error { return NewDuplicateError(NewPath("f"), "v") },
 			ErrorTypeDuplicate,
 		},
 		{
-			func() *Error { return NewNotFoundError(NewFieldPath("f"), "v") },
+			func() *Error { return NewNotFoundError(NewPath("f"), "v") },
 			ErrorTypeNotFound,
 		},
 		{
-			func() *Error { return NewRequiredError(NewFieldPath("f")) },
+			func() *Error { return NewRequiredError(NewPath("f")) },
 			ErrorTypeRequired,
 		},
 		{
-			func() *Error { return NewInternalError(NewFieldPath("f"), fmt.Errorf("e")) },
+			func() *Error { return NewInternalError(NewPath("f"), fmt.Errorf("e")) },
 			ErrorTypeInternal,
 		},
 	}
@@ -62,7 +62,7 @@ func TestMakeFuncs(t *testing.T) {
 }
 
 func TestErrorUsefulMessage(t *testing.T) {
-	s := NewInvalidError(NewFieldPath("foo"), "bar", "deet").Error()
+	s := NewInvalidError(NewPath("foo"), "bar", "deet").Error()
 	t.Logf("message: %v", s)
 	for _, part := range []string{"foo", "bar", "deet", ErrorTypeInvalid.String()} {
 		if !strings.Contains(s, part) {
@@ -77,7 +77,7 @@ func TestErrorUsefulMessage(t *testing.T) {
 		KV    map[string]int
 	}
 	s = NewInvalidError(
-		NewFieldPath("foo"),
+		NewPath("foo"),
 		&complicated{
 			Baz:   1,
 			Qux:   "aoeu",
@@ -102,8 +102,8 @@ func TestToAggregate(t *testing.T) {
 	testCases := []ErrorList{
 		nil,
 		{},
-		{NewInvalidError(NewFieldPath("f"), "v", "d")},
-		{NewInvalidError(NewFieldPath("f"), "v", "d"), NewInternalError(NewFieldPath(""), fmt.Errorf("e"))},
+		{NewInvalidError(NewPath("f"), "v", "d")},
+		{NewInvalidError(NewPath("f"), "v", "d"), NewInternalError(NewPath(""), fmt.Errorf("e"))},
 	}
 	for i, tc := range testCases {
 		agg := tc.ToAggregate()
@@ -121,9 +121,9 @@ func TestToAggregate(t *testing.T) {
 
 func TestErrListFilter(t *testing.T) {
 	list := ErrorList{
-		NewInvalidError(NewFieldPath("test.field"), "", ""),
-		NewInvalidError(NewFieldPath("field.test"), "", ""),
-		NewDuplicateError(NewFieldPath("test"), "value"),
+		NewInvalidError(NewPath("test.field"), "", ""),
+		NewInvalidError(NewPath("field.test"), "", ""),
+		NewDuplicateError(NewPath("test"), "value"),
 	}
 	if len(list.Filter(NewErrorTypeMatcher(ErrorTypeDuplicate))) != 2 {
 		t.Errorf("should not filter")

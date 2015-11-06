@@ -33,13 +33,13 @@ import (
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
-func validateObject(obj runtime.Object) (errors utilvalidation.ErrorList) {
+func validateObject(obj runtime.Object) (errors field.ErrorList) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		if t.Namespace == "" {
@@ -123,7 +123,7 @@ func validateObject(obj runtime.Object) (errors utilvalidation.ErrorList) {
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
 	default:
-		return utilvalidation.ErrorList{utilvalidation.NewInternalError(utilvalidation.NewFieldPath(""), fmt.Errorf("no validation defined for %#v", obj))}
+		return field.ErrorList{field.NewInternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj))}
 	}
 	return errors
 }
