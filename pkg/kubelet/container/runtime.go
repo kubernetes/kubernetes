@@ -198,6 +198,15 @@ func (c *ContainerID) UnmarshalJSON(data []byte) error {
 	return c.ParseString(string(data))
 }
 
+type ContainerStatus string
+
+const (
+	ContainerStatusRunning ContainerStatus = "running"
+	ContainerStatusExited  ContainerStatus = "exited"
+	// This unknown encompasses all the statuses that we currently don't care.
+	ContainerStatusUnknown ContainerStatus = "unknown"
+)
+
 // Container provides the runtime information for a container, such as ID, hash,
 // status of the container.
 type Container struct {
@@ -215,6 +224,8 @@ type Container struct {
 	// The timestamp of the creation time of the container.
 	// TODO(yifan): Consider to move it to api.ContainerStatus.
 	Created int64
+	// Status is the status of the container.
+	Status ContainerStatus
 }
 
 // Basic information about a container image.
