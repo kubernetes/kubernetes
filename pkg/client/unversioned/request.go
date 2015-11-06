@@ -858,7 +858,10 @@ func isTextResponse(resp *http.Response) bool {
 // checkWait returns true along with a number of seconds if the server instructed us to wait
 // before retrying.
 func checkWait(resp *http.Response) (int, bool) {
-	if resp.StatusCode != errors.StatusTooManyRequests {
+	switch r := resp.StatusCode; {
+	// any 500 error code and 429 can trigger a wait
+	case r == errors.StatusTooManyRequests, r >= 500:
+	default:
 		return 0, false
 	}
 	i, ok := retryAfterSeconds(resp)
