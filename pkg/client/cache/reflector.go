@@ -67,6 +67,8 @@ type Reflector struct {
 	lastSyncResourceVersion string
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+
+	verbose bool
 }
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -85,6 +87,20 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 // well as incrementally processing the things that change.
 func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	return NewNamedReflector(getDefaultReflectorName(internalPackages...), lw, expectedType, store, resyncPeriod)
+}
+
+// NewVerboseReflector same as NewNamedReflector, but will log more.
+func NewVerboseReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+	r := &Reflector{
+		name:          name,
+		listerWatcher: lw,
+		store:         store,
+		expectedType:  reflect.TypeOf(expectedType),
+		period:        time.Second,
+		resyncPeriod:  resyncPeriod,
+		verbose:       true,
+	}
+	return r
 }
 
 // NewNamedReflector same as NewReflector, but with a specified name for logging
@@ -176,6 +192,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	resyncCh, cleanup := r.resyncChan()
 	defer cleanup()
 
+	if r.verbose {
+		glog.Infof("watch %v: listwatch cycle started.", r.name)
+		defer glog.Infof("watch %v: listwatch cycle exited.", r.name)
+	}
+
 	list, err := r.listerWatcher.List()
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
@@ -246,16 +267,30 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, res
 	// we're coming back in with the same watch interface.
 	defer w.Stop()
 
+	if r.verbose {
+		glog.Infof("watch %v: watch started.", r.name)
+		defer glog.Infof("watch %v: watch exited.", r.name)
+	}
+
 loop:
 	for {
 		select {
 		case <-stopCh:
+			if r.verbose {
+				glog.Infof("watch %v: stop requested.", r.name)
+			}
 			return errorStopRequested
 		case <-resyncCh:
+			if r.verbose {
+				glog.Infof("watch %v: time to resync.", r.name)
+			}
 			return errorResyncRequested
 		case event, ok := <-w.ResultChan():
 			if !ok {
 				break loop
+			}
+			if r.verbose {
+				glog.Infof("watch %v: about to process result %#v.", r.name, event)
 			}
 			if event.Type == watch.Error {
 				return apierrs.FromObject(event.Object)
@@ -286,6 +321,9 @@ loop:
 			*resourceVersion = newResourceVersion
 			r.setLastSyncResourceVersion(newResourceVersion)
 			eventCount++
+			if r.verbose {
+				glog.Infof("watch %v: now at rv %v.", r.name, *resourceVersion)
+			}
 		}
 	}
 

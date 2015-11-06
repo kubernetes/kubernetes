@@ -185,7 +185,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 
 	// Watch nodes.
 	// Nodes may be listed frequently, so provide a local up-to-date cache.
-	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, time.Minute).RunUntil(f.StopEverything)
+	cache.NewVerboseReflector("schedulerNodes", f.createNodeLW(), &api.Node{}, f.NodeLister.Store, time.Minute).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers, so that it can spread them correctly.
