@@ -416,6 +416,7 @@ function kube::build::source_targets() {
   local targets=(
     api
     build
+    cluster
     cmd
     docs
     examples
@@ -425,9 +426,12 @@ function kube::build::source_targets() {
     LICENSE
     pkg
     plugin
+    DESIGN.md
     README.md
     test
     third_party
+    contrib/completions/bash/kubectl
+    .generated_docs
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
