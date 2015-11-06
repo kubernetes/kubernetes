@@ -74,7 +74,7 @@ function detect-jessie-image () {
         ;;
 
       *)
-        echo "Please specify AWS_IMAGE directly (region not recognized)"
+        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
         exit 1
     esac
   fi
