@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -289,10 +290,12 @@ func (c *Cacher) terminateAllWatchers() {
 	}
 }
 
-func forgetWatcher(c *Cacher, index int) func() {
-	return func() {
-		c.Lock()
-		defer c.Unlock()
+func forgetWatcher(c *Cacher, index int) func(bool) {
+	return func(lock bool) {
+		if lock {
+			c.Lock()
+			defer c.Unlock()
+		}
 		// It's possible that the watcher is already not in the map (e.g. in case of
 		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
 		delete(c.watchers, index)
@@ -365,10 +368,10 @@ type cacheWatcher struct {
 	result  chan watch.Event
 	filter  FilterFunc
 	stopped bool
-	forget  func()
+	forget  func(bool)
 }
 
-func newCacheWatcher(initEvents []watchCacheEvent, filter FilterFunc, forget func()) *cacheWatcher {
+func newCacheWatcher(initEvents []watchCacheEvent, filter FilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:   make(chan watchCacheEvent, 10),
 		result:  make(chan watch.Event, 10),
@@ -387,7 +390,7 @@ func (c *cacheWatcher) ResultChan() <-chan watch.Event {
 
 // Implements watch.Interface.
 func (c *cacheWatcher) Stop() {
-	c.forget()
+	c.forget(true)
 	c.stop()
 }
 
@@ -401,7 +404,15 @@ func (c *cacheWatcher) stop() {
 }
 
 func (c *cacheWatcher) add(event watchCacheEvent) {
-	c.input <- event
+	select {
+	case c.input <- event:
+	case <-time.After(5 * time.Second):
+		// This means that we couldn't send event to that watcher.
+		// Since we don't want to blockin on it infinitely,
+		// we simply terminate it.
+		c.forget(false)
+		c.stop()
+	}
 }
 
 func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
