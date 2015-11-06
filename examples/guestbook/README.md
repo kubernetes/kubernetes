@@ -622,10 +622,10 @@ For Google Compute Engine details about limiting traffic to specific sources, se
 
 ### Step Seven: Cleanup
 
-If you are in a live kubernetes cluster, you can just kill the pods by stopping the replication controllers and deleting the services.  Using labels to select the resources to stop or delete is an easy way to do this in one command.
+If you are in a live kubernetes cluster, you can just kill the pods by deleting the replication controllers and the services.  Using labels to select the resources to stop or delete is an easy way to do this in one command.
 
 ```console
-kubectl stop rc -l "name in (redis-master, redis-slave, frontend)"
+kubectl delete rc -l "name in (redis-master, redis-slave, frontend)"
 kubectl delete service -l "name in (redis-master, redis-slave, frontend)"
 ```
 
