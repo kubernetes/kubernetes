@@ -184,10 +184,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.Li
 			trace.Step("About to read single object")
 			err := e.Storage.GetToList(ctx, key, filterFunc, list)
 			trace.Step("Object extracted")
-			if err != nil {
-				return nil, err
-			}
-			return list, nil
+			return list, etcderr.InterpretListError(err, e.EndpointName)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
@@ -202,10 +199,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.Li
 	}
 	err = e.Storage.List(ctx, e.KeyRootFunc(ctx), version, filterFunc, list)
 	trace.Step("List extracted")
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
+	return list, etcderr.InterpretListError(err, e.EndpointName)
 }
 
 // Create inserts a new item according to the unique key from the object.

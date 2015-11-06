@@ -764,6 +764,38 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	}
 }
 
+func TestCheckRetryHandles429And5xx(t *testing.T) {
+	count := 0
+	ch := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		t.Logf("attempt %d", count)
+		if count >= 4 {
+			w.WriteHeader(http.StatusOK)
+			close(ch)
+			return
+		}
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader([]int{apierrors.StatusTooManyRequests, 500, 501, 504}[count])
+		count++
+	}))
+	defer testServer.Close()
+
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+	_, err := c.Verb("POST").
+		Prefix("foo", "bar").
+		Suffix("baz").
+		Timeout(time.Second).
+		Body([]byte(strings.Repeat("abcd", 1000))).
+		DoRaw()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v %#v", err, err)
+	}
+	<-ch
+	if count != 4 {
+		t.Errorf("unexpected retries: %d", count)
+	}
+}
+
 func BenchmarkCheckRetryClosesBody(t *testing.B) {
 	count := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -790,6 +822,7 @@ func BenchmarkCheckRetryClosesBody(t *testing.B) {
 		}
 	}
 }
+
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := testapi.Default.Codec().Encode(reqObj)
