@@ -24,11 +24,17 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
-# KUBE_VERSION_REGEX matches things like "v1.2.3"
-KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+# KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
+#
+# NOTE This must match the version_regex in build/common.sh
+# kube::release::parse_and_validate_release_version()
+KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
 
-# KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg"
-KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(.*)$"
+# KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg" This
+#
+# NOTE This must match the version_regex in build/common.sh
+# kube::release::parse_and_validate_ci_version()
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
 
 
 # Generate kubeconfig data for the created cluster.
@@ -261,7 +267,7 @@ function set_binary_version() {
 #
 # Assumed vars:
 #   KUBE_VERSION
-#   KUBE_VERSION_REGEX
+#   KUBE_RELEASE_VERSION_REGEX
 #   KUBE_CI_VERSION_REGEX
 # Vars set:
 #   KUBE_TAR_HASH
@@ -273,7 +279,7 @@ function tars_from_version() {
   if [[ -z "${KUBE_VERSION-}" ]]; then
     find-release-tars
     upload-server-tars
-  elif [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
