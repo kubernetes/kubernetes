@@ -17,8 +17,6 @@
 . /start-common.sh
 
 echo "$(hostname -i) spark-master" >> /etc/hosts
-export SPARK_LOCAL_HOSTNAME=spark-master
-export SPARK_MASTER_IP=spark-master
 
-/opt/spark/sbin/start-master.sh
-tail -F /opt/spark/logs/*
+# Run spark-class directly so that when it exits (or crashes), the pod restarts.
+/opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --ip spark-master --port 7077 --webui-port 8080
