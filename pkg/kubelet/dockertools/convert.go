@@ -18,6 +18,7 @@ package dockertools
 
 import (
 	"fmt"
+	"strings"
 
 	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -26,6 +27,19 @@ import (
 
 // This file contains helper functions to convert docker API types to runtime
 // (kubecontainer) types.
+
+func mapStatus(status string) kubecontainer.ContainerStatus {
+	// Parse the status string in docker.APIContainers. This could break when
+	// we upgrade docker.
+	switch {
+	case strings.HasPrefix(status, "Up"):
+		return kubecontainer.ContainerStatusRunning
+	case strings.HasPrefix(status, "Exited"):
+		return kubecontainer.ContainerStatusExited
+	default:
+		return kubecontainer.ContainerStatusUnknown
+	}
+}
 
 // Converts docker.APIContainers to kubecontainer.Container.
 func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, error) {
@@ -37,12 +51,14 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 	if err != nil {
 		return nil, err
 	}
+
 	return &kubecontainer.Container{
 		ID:      kubetypes.DockerID(c.ID).ContainerID(),
 		Name:    dockerName.ContainerName,
 		Image:   c.Image,
 		Hash:    hash,
 		Created: c.Created,
+		Status:  mapStatus(c.Status),
 	}, nil
 }
 

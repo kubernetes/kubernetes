@@ -793,7 +793,14 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	var pods []*kubecontainer.Pod
 	for _, u := range units {
 		if strings.HasPrefix(u.Name, kubernetesUnitPrefix) {
-			if !all && u.SubState != "running" {
+			var status kubecontainer.ContainerStatus
+			switch {
+			case u.SubState == "running":
+				status = kubecontainer.ContainerStatusRunning
+			default:
+				status = kubecontainer.ContainerStatusExited
+			}
+			if !all && status != kubecontainer.ContainerStatusRunning {
 				continue
 			}
 			pod, _, err := r.readServiceFile(u.Name)
