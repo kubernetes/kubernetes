@@ -699,7 +699,7 @@ List Kubernetes
 
 Kill all pods:
 
-    for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
+    for i in `kubectl get pods | awk '{print $1}'`; do kubectl delete pod $i; done
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -76,7 +76,7 @@ coreos:
         ExecStartPre=/bin/bash -c 'while [[ \"\$(curl -s http://127.0.0.1:8080/healthz)\" != \"ok\" ]]; do sleep 1; done'
         ExecStartPre=/bin/sleep 10
         ExecStart=/opt/kubernetes/bin/kubectl create -f /opt/kubernetes/addons
-        ExecStop=/opt/kubernetes/bin/kubectl stop -f /opt/kubernetes/addons
+        ExecStop=/opt/kubernetes/bin/kubectl delete -f /opt/kubernetes/addons
         RemainAfterExit=yes
 
         [Install]

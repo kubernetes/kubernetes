@@ -87,10 +87,10 @@ done
 grep "Exited ([^0])" output.txt
 ```
 
-Eventually you will have sufficient runs for your purposes. At that point you can stop and delete the replication controller by running:
+Eventually you will have sufficient runs for your purposes. At that point you can delete the replication controller by running:
 
 ```sh
-kubectl stop replicationcontroller flakecontroller
+kubectl delete replicationcontroller flakecontroller
 ```
 
 If you do a final check for flakes with `docker ps -a`, ignore tasks that exited -1, since that's what happens when you stop the replication controller.
