@@ -2311,7 +2311,10 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 	}
 	podStatus, found := kl.statusManager.GetPodStatus(podUID)
 	if !found {
-		return fmt.Errorf("failed to get status for pod %q in namespace %q", name, namespace)
+		// If there is no cached status, use the status from the
+		// apiserver. This is useful if kubelet has recently been
+		// restarted.
+		podStatus = pod.Status
 	}
 
 	if err := kl.validatePodPhase(&podStatus); err != nil {
