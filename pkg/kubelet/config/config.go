@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/sets"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // PodConfigNotificationMode describes how changes are sent to the update channel.
@@ -309,7 +309,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
 	names := sets.String{}
 	for i, pod := range pods {
-		var errlist utilvalidation.ErrorList
+		var errlist field.ErrorList
 		if errs := validation.ValidatePod(pod); len(errs) != 0 {
 			errlist = append(errlist, errs...)
 			// If validation fails, don't trust it any further -
@@ -317,8 +317,9 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 		} else {
 			name := kubecontainer.GetPodFullName(pod)
 			if names.Has(name) {
-				//FIXME: this implies an API version
-				errlist = append(errlist, utilvalidation.NewDuplicateError(utilvalidation.NewFieldPath("metadata", "name"), pod.Name))
+				// TODO: when validation becomes versioned, this gets a bit
+				// more complicated.
+				errlist = append(errlist, field.NewDuplicateError(field.NewPath("metadata", "name"), pod.Name))
 			} else {
 				names.Insert(name)
 			}

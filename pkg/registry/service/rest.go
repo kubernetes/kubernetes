@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -84,15 +84,18 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		// Allocate next available.
 		ip, err := rs.serviceIPs.AllocateNext()
 		if err != nil {
-			el := utilvalidation.ErrorList{utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
-			return nil, errors.NewInvalid("Service", service.Name, el)
+			// TODO: what error should be returned here?  It's not a
+			// field-level validation failure (the field is valid), and it's
+			// not really an internal error.
+			return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
 		}
 		service.Spec.ClusterIP = ip.String()
 		releaseServiceIP = true
 	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
 		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
-			el := utilvalidation.ErrorList{utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
+			// TODO: when validation becomes versioned, this gets more complicated.
+			el := field.ErrorList{field.NewInvalidError(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 		releaseServiceIP = true
@@ -104,14 +107,17 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		if servicePort.NodePort != 0 {
 			err := nodePortOp.Allocate(servicePort.NodePort)
 			if err != nil {
-				el := utilvalidation.ErrorList{utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+				// TODO: when validation becomes versioned, this gets more complicated.
+				el := field.ErrorList{field.NewInvalidError(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
 				return nil, errors.NewInvalid("Service", service.Name, el)
 			}
 		} else if assignNodePorts {
 			nodePort, err := nodePortOp.AllocateNext()
 			if err != nil {
-				el := utilvalidation.ErrorList{utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
-				return nil, errors.NewInvalid("Service", service.Name, el)
+				// TODO: what error should be returned here?  It's not a
+				// field-level validation failure (the field is valid), and it's
+				// not really an internal error.
+				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
 			servicePort.NodePort = nodePort
 		}
@@ -223,15 +229,17 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 				if !contains(oldNodePorts, nodePort) {
 					err := nodePortOp.Allocate(nodePort)
 					if err != nil {
-						el := utilvalidation.ErrorList{utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
+						el := field.ErrorList{field.NewInvalidError(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
 						return nil, false, errors.NewInvalid("Service", service.Name, el)
 					}
 				}
 			} else {
 				nodePort, err = nodePortOp.AllocateNext()
 				if err != nil {
-					el := utilvalidation.ErrorList{utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
-					return nil, false, errors.NewInvalid("Service", service.Name, el)
+					// TODO: what error should be returned here?  It's not a
+					// field-level validation failure (the field is valid), and it's
+					// not really an internal error.
+					return nil, false, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 				}
 				servicePort.NodePort = nodePort
 			}

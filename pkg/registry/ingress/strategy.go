@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // ingressStrategy implements verification logic for Replication Ingresss.
@@ -70,7 +70,7 @@ func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new Ingress.
-func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	ingress := obj.(*extensions.Ingress)
 	err := validation.ValidateIngress(ingress)
 	return err
@@ -86,7 +86,7 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
 	updateErrorList := validation.ValidateIngressUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 	return append(validationErrorList, updateErrorList...)
@@ -134,6 +134,6 @@ func (ingressStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (ingressStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (ingressStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateIngressStatusUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 }
