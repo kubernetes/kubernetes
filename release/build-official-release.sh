@@ -45,13 +45,13 @@ declare -r KUBE_GITHUB="https://github.com/kubernetes/kubernetes.git"
 declare -r KUBE_RELEASE_VERSION=${1-}
 declare -r KUBE_RELEASE_UMASK=${KUBE_RELEASE_UMASK:-022}
 
-VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-beta|-alpha\\.(0|[1-9][0-9]*))?$"
+VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
 [[ ${KUBE_RELEASE_VERSION} =~ ${VERSION_REGEX} ]] || {
   echo "!!! You must specify the version you are releasing in the form of '${VERSION_REGEX}'" >&2
   exit 1
 }
 
-declare -r KUBE_BUILD_DIR="/tmp/kubernetes-release-${KUBE_RELEASE_VERSION}-$(date +%s)"
+declare -r KUBE_BUILD_DIR=$(mktemp -d "/tmp/kubernetes-build-release-${KUBE_RELEASE_VERSION}-XXXXXXX")
 
 # Set the default umask for the release. This ensures consistency
 # across our release builds.
@@ -90,8 +90,8 @@ SHA1=$(sha1 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 
 cat <<- EOM
 
-Success! You must now do the following: (you may want to cut
-  and paste these instructions elsewhere, step 1 can be spammy)
+Success!  You must now do the following (you may want to cut and paste these
+instructions elsewhere):
 
   1) (cd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION})
   2) Go to https://github.com/GoogleCloudPlatform/kubernetes/releases
