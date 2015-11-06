@@ -182,7 +182,7 @@ function upgrade-nodes() {
 #   KUBELET_KEY_BASE64
 function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
-  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed s/"\."/-/g)
+  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
 
   detect-minion-names
 
@@ -209,9 +209,10 @@ function prepare-node-upgrade() {
 
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
   #                 through all create-node-instance-template implementations).
-  create-node-instance-template ${SANITIZED_VERSION}
+  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
+  create-node-instance-template "${template_name}"
   # The following is echo'd so that callers can get the template name.
-  echo "${NODE_INSTANCE_PREFIX}-template-${SANITIZED_VERSION}"
+  echo $template_name
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
 }
 
@@ -229,12 +230,13 @@ function do-node-upgrade() {
   if [[ "${exists}" != "0" ]]; then
     subgroup="alpha compute"
   fi
+  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
   gcloud ${subgroup} rolling-updates \
       --project="${PROJECT}" \
       --zone="${ZONE}" \
       start \
       --group="${NODE_INSTANCE_PREFIX}-group" \
-      --template="${NODE_INSTANCE_PREFIX}-template-${SANITIZED_VERSION}" \
+      --template="${template_name}" \
       --instance-startup-timeout=300s \
       --max-num-concurrent-instances=1 \
       --max-num-failed-instances=0 \
