@@ -103,7 +103,10 @@ REBOOT_SKIP_TESTS=(
 
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
-    "${REBOOT_SKIP_TESTS[@]}"
+    "Autoscaling\sSuite"
+    "Skipped"
+    "Restart\sshould\srestart\sall\snodes"
+    "Example"
     "Reboot"
     "ServiceLoadBalancer"
     )
@@ -164,6 +167,7 @@ GCE_SLOW_TESTS=(
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
     # test requires at least 5.
+    "Autoscaling\sSuite"                              # 40 min,       file: horizontal_pod_autoscaling.go slow by design
     "GCE\sL7\sLoadBalancer\sController"               # 10 min,       file: ingress.go,              slow by design
     "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
     "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
