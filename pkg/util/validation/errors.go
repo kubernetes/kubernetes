@@ -181,28 +181,6 @@ func NewInternalError(field *FieldPath, err error) *Error {
 // ErrorList holds a set of errors.
 type ErrorList []*Error
 
-// Prefix adds a prefix to the Field of every Error in the list.
-// Returns the list for convenience.
-func (list ErrorList) Prefix(prefix string) ErrorList {
-	for i := range list {
-		err := list[i]
-		if strings.HasPrefix(err.Field, "[") {
-			err.Field = prefix + err.Field
-		} else if len(err.Field) != 0 {
-			err.Field = prefix + "." + err.Field
-		} else {
-			err.Field = prefix
-		}
-	}
-	return list
-}
-
-// PrefixIndex adds an index to the Field of every Error in the list.
-// Returns the list for convenience.
-func (list ErrorList) PrefixIndex(index int) ErrorList {
-	return list.Prefix(fmt.Sprintf("[%d]", index))
-}
-
 // NewErrorTypeMatcher returns an errors.Matcher that returns true
 // if the provided error is a Error and has the provided ErrorType.
 func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
