@@ -24,7 +24,7 @@ set -o pipefail
 # Sets DIR, INSTRUCTIONS
 function main() {
   # Parse arguments
-  if [[ "$#" -ne 2 ]]; then
+  if [[ "$#" -ne 2 && "$#" -ne 3 ]]; then
     usage
     exit 1
   fi
@@ -93,11 +93,11 @@ function main() {
   local -r release_umask=${release_umask:-022}
   umask "${release_umask}"
 
-  local -r github="https://github.com/kubernetes/kubernetes.git"
-  declare -r DIR="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)"
+  local -r github="git@github.com:kubernetes/kubernetes.git"
+  declare -r DIR=$(mktemp -d "/tmp/kubernetes-${release_type}-release-${new_version}-XXXXXXX")
 
   # Start a tmp file that will hold instructions for the user.
-  declare -r INSTRUCTIONS="/tmp/kubernetes-${release_type}-release-${new_version}-$(date +%s)-instructions"
+  declare -r INSTRUCTIONS=$(mktemp "/tmp/kubernetes-${release_type}-release-${new_version}-instructions-XXXXXXX")
   if $DRY_RUN; then
     cat > "${INSTRUCTIONS}" <<- EOM
 Success on dry run!  Do
@@ -111,7 +111,8 @@ You would now do the following, if not a dry run:
 EOM
   else
     cat > "${INSTRUCTIONS}" <<- EOM
-Success!  You must now do the following:
+Success!  You must now do the following (you may want to cut and paste these
+instructions elsewhere):
 
 EOM
   fi
@@ -340,10 +341,9 @@ function rev-version-and-commit() {
 function git-push() {
   local -r object="${1}"
   if $DRY_RUN; then
-    echo "Dry run: would have done git push ${object}"
+    echo "Dry run: would have done git push origin ${object}"
   else
-    echo "NOT A DRY RUN: you don't really want to git push ${object}, do you?"
-    # git push "${object}"
+    git push origin "${object}"
   fi
 }
 
