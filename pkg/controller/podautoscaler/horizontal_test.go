@@ -205,7 +205,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterService)
+	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 	hpaController := NewHorizontalController(testClient, metricsClient)
 	err := hpaController.reconcileAutoscalers()
 	assert.Equal(t, nil, err)

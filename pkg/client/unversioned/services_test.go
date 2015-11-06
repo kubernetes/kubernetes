@@ -166,6 +166,18 @@ func TestServiceProxyGet(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, RawBody: &body},
 	}
-	response, err := c.Setup(t).Services(ns).ProxyGet("service-1", "foo", map[string]string{"param-name": "param-value"}).DoRaw()
+	response, err := c.Setup(t).Services(ns).ProxyGet("", "service-1", "", "foo", map[string]string{"param-name": "param-value"}).DoRaw()
+	c.ValidateRaw(t, response, err)
+
+	// With scheme and port specified
+	c = &testClient{
+		Request: testRequest{
+			Method: "GET",
+			Path:   testapi.Default.ResourcePathWithPrefix("proxy", "services", ns, "https:service-1:my-port") + "/foo",
+			Query:  buildQueryValues(url.Values{"param-name": []string{"param-value"}}),
+		},
+		Response: Response{StatusCode: 200, RawBody: &body},
+	}
+	response, err = c.Setup(t).Services(ns).ProxyGet("https", "service-1", "my-port", "foo", map[string]string{"param-name": "param-value"}).DoRaw()
 	c.ValidateRaw(t, response, err)
 }
