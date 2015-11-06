@@ -90,7 +90,7 @@ SHA1=$(sha1 "${KUBE_BUILD_DIR}/kubernetes.tar.gz")
 
 cat <<- EOM
 
-Success! You must now do the following (you may want to cut and paste these
+Success!  You must now do the following (you may want to cut and paste these
 instructions elsewhere):
 
   1) pushd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION}
