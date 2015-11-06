@@ -351,6 +351,7 @@ function get-template-name-from-version {
 # $2: The scopes flag.
 # $3: The minion start script metadata from file.
 # $4: The kube-env metadata.
+# $5(optional): Additional metadata for Ubuntu trusty nodes.
 function create-node-template {
   detect-project
   local template_name="$1"
@@ -386,7 +387,7 @@ function create-node-template {
       ${preemptible_minions} \
       $2 \
       --can-ip-forward \
-      --metadata-from-file "$3","$4" >&2; then
+      --metadata-from-file $(echo ${@:3} | tr ' ' ',') >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $template_name ${color_norm}" >&2
           exit 2
