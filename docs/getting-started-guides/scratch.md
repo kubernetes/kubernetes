@@ -350,7 +350,7 @@ options, you may have a Docker-created bridge and iptables rules.  You may want 
 as follows before proceeding to configure Docker for Kubernetes.
 
 ```sh
-iptables -t nat -F 
+iptables -t nat -F
 ifconfig docker0 down
 brctl delbr docker0
 ```
@@ -474,7 +474,7 @@ traffic to the internet, but have no problem with them inside your GCE Project.
 
 - Enable auto-upgrades for your OS package manager, if desired.
 - Configure log rotation for all node components (e.g. using [logrotate](http://linux.die.net/man/8/logrotate)).
-- Setup liveness-monitoring (e.g. using [monit](http://linux.die.net/man/1/monit)).
+- Setup liveness-monitoring (e.g. using [supervisord](http://supervisord.org/)).
 - Setup volume plugin support (optional)
   - Install any client binaries for optional volume types, such as `glusterfs-client` for GlusterFS
     volumes.

@@ -113,9 +113,9 @@ network rules on the host and performing connection forwarding.
 
 `rkt` is supported experimentally as an alternative to docker.
 
-### monit
+### supervisord
 
-`monit` is a lightweight process babysitting system for keeping kubelet and docker
+`supervisord` is a lightweight process babysitting system for keeping kubelet and docker
 running.
 
 
