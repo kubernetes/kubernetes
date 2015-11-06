@@ -57,14 +57,18 @@ func DeadlockWatchdogReadLock(lock *sync.RWMutex, name string, maxLockPeriod tim
 
 func DeadlockWatchdog(lock Lockable, name string, maxLockPeriod time.Duration) {
 	detector := &deadlockDetector{
-		lock:  lock,
-		name:  name,
-		clock: RealClock{},
+		lock:          lock,
+		name:          name,
+		clock:         RealClock{},
+		maxLockPeriod: maxLockPeriod,
 	}
 	go detector.run()
 }
 
 func (d *deadlockDetector) run() {
+	if d.maxLockPeriod <= 0 {
+		panic("Deadlock lock period is <= 0, that can't be right...")
+	}
 	for {
 		ch := make(chan bool, 1)
 		go func() {
