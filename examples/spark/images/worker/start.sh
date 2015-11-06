@@ -16,6 +16,5 @@
 
 . /start-common.sh
 
-/opt/spark/sbin/start-slave.sh spark://spark-master:7077
-
-tail -F /opt/spark/logs/*
+# Run spark-class directly so that when it exits (or crashes), the pod restarts.
+/opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 --webui-port 8081
