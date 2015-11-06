@@ -161,7 +161,8 @@ GCE_FLAKY_TESTS=(
 # comments below, and for poorly implemented tests, please quote the
 # issue number tracking speed improvements.
 GCE_SLOW_TESTS=(
-    "Autoscaling\sSuite"
+    # Temporary disable autoscaling suite due to heapster configuration issues.
+    #"Autoscaling\sSuite"
     # Before enabling this loadbalancer test in any other test list you must
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
