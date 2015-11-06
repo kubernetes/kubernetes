@@ -99,16 +99,13 @@ net.ipv4.ip_forward:
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
 
-# Only upgrade Docker to 1.8.3 for the containerVM image.
-# TODO(dchen1107): For release 1.1, we want to update the ContainerVM image to
-# include Docker 1.8.3 and comment out the upgrade below.
 {% if grains.get('cloud', '') == 'gce'
    and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'wheezy' -%}
-{% set docker_pkg_name='docker-engine' %}
-{% set override_deb='docker-engine_1.8.3-0~wheezy_amd64.deb' %}
-{% set override_deb_sha1='f812e1134e7375b29886a372a6e24d04e1ee33c9' %}
-{% set override_docker_ver='1.8.3-0~wheezy' %}
+{% set docker_pkg_name='' %}
+{% set override_deb='' %}
+{% set override_deb_sha1='' %}
+{% set override_docker_ver='' %}
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
 {% set override_docker_ver='1.7.1' %}
