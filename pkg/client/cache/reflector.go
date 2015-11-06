@@ -290,7 +290,7 @@ loop:
 				break loop
 			}
 			if r.verbose {
-				glog.Infof("watch %v: about to process result %#v.", r.name, event)
+				glog.Infof("watch %v: about to process result %s %#v.", r.name, event.Type, event.Object)
 			}
 			if event.Type == watch.Error {
 				return apierrs.FromObject(event.Object)
