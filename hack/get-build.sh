@@ -18,53 +18,65 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+source "${KUBE_ROOT}/cluster/common.sh"
+
 declare -r KUBE_RELEASE_BUCKET_URL="https://storage.googleapis.com/kubernetes-release"
 declare -r KUBE_TAR_NAME="kubernetes.tar.gz"
 
 usage() {
-	echo "usage:
-  $0 [stable|release|latest|latest-green]
-
-        stable:        latest stable version
-        release:       latest release candidate
-        latest:        latest ci build
-        latest-green:  latest ci build to pass gce e2e"
+  echo "${0} [-v] <version number or publication>"
+  echo "  -v:  Don't get tars, just print the version number"
+  echo ""
+  echo '  Version number or publication is either a proper version number'
+  echo '  (e.g. "v1.0.6", "v1.2.0-alpha.1.881+376438b69c7612") or a version'
+  echo '  publication of the form <bucket>/<version> (e.g. "release/stable",'
+  echo '  "ci/latest-1").  Some common ones are:'
+  echo '    - "release/stable"'
+  echo '    - "release/latest"'
+  echo '    - "ci/latest"'
+  echo '  See the docs on getting builds for more information about version'
+  echo '  publication.'
 }
+
+print_version=false
+
+while getopts ":vh" opt; do
+  case ${opt} in
+    v)
+      print_version="true"
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND-1))
 
 if [[ $# -ne 1 ]]; then
     usage
     exit 1
 fi
 
-case "$1" in
-  "latest")
-    # latest ci version is written in the latest.txt in the /ci dir
-    KUBE_TAR_RELATIVE_PATH="ci"
-    KUBE_VERSION_FILE="latest.txt"
-    ;;
-  "latest-green")
-    # latest ci version to pass gce e2e is written in the latest-green.txt in the /ci dir
-    KUBE_TAR_RELATIVE_PATH="ci"
-    KUBE_VERSION_FILE="latest-green.txt"
-    ;;
-  "stable")
-    # latest stable release version is written in the stable.txt file in the /release dir
-    KUBE_TAR_RELATIVE_PATH="release"
-    KUBE_VERSION_FILE="stable.txt"
-    ;;
-  "release")
-    # latest release candidate version is written in latest.txt in the /release dir
-    KUBE_TAR_RELATIVE_PATH="release"
-    KUBE_VERSION_FILE="latest.txt"
-    ;;
-  *)
-    usage
+set_binary_version ${1}
+
+if [[ "${print_version}" == "true" ]]; then
+  echo "${KUBE_VERSION}"
+else
+  echo "Using version at ${1}: ${KUBE_VERSION}" >&2
+  if [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
+    curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes.tar.gz"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+    curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes.tar.gz"
+  else
+    echo "Version doesn't match regexp" >&2
     exit 1
-    ;;
-esac
-
-KUBE_BINARY_DIRECTORY="${KUBE_RELEASE_BUCKET_URL}/${KUBE_TAR_RELATIVE_PATH}"
-KUBE_VERSION=$(curl --silent --fail "${KUBE_BINARY_DIRECTORY}/${KUBE_VERSION_FILE}")
-KUBE_BINARY_PATH="${KUBE_BINARY_DIRECTORY}/${KUBE_VERSION}/${KUBE_TAR_NAME}"
-
-curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "${KUBE_BINARY_PATH}"
+  fi
+fi
