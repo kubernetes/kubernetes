@@ -50,6 +50,9 @@ if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   KUBE_OS_DISTRIBUTION=vivid
 fi
 
+# Well known tags
+TAG_KEY_MASTERIP="kubernetes.io/masterip"
+
 case "${KUBE_OS_DISTRIBUTION}" in
   trusty|wheezy|jessie|vivid|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
@@ -163,25 +166,32 @@ function get_security_group_id {
   | tr "\t" "\n"
 }
 
-function detect-master () {
+# Finds the master, if it already exists
+function find-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_ID-}" ]]; then
     KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
   fi
+  if [[ -n "${KUBE_MASTER_ID-}" ]]; then
+    if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+      KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
+    fi
+    echo "Found master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP id: $KUBE_MASTER_ID)"
+  fi
+}
+
+# Gets an existing master, exiting if not found
+function detect-master () {
+  find-master
   if [[ -z "${KUBE_MASTER_ID-}" ]]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     echo "Could not detect Kubernetes master node IP.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
-  echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
-
 
 function query-running-minions () {
   local query=$1
@@ -444,6 +454,35 @@ function ensure-master-pd {
   fi
 }
 
+# Finds the existing master IP, or creates/reuses an Elastic IP
+# If MASTER_RESERVED_IP looks like an IP address, we will use it;
+# otherwise we will create a new elastic IP
+# Sets KUBE_MASTER_IP
+function ensure-master-ip {
+  find-master
+
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    # Check if MASTER_RESERVED_IP looks like an IPv4 address
+    # Note that we used to only allocate an elastic IP when MASTER_RESERVED_IP=auto
+    # So be careful changing the IPV4 test, to be sure that 'auto' => 'allocate'
+    if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      KUBE_MASTER_IP="${MASTER_RESERVED_IP}"
+    else
+      # We will tag the master ASG soon
+      # KUBE_MASTER_IP=$(get-tag ${VPC_ID} ${TAG_KEY_MASTERIP})
+      if [[ -z "${KUBE_MASTER_IP}" ]]; then
+        KUBE_MASTER_IP=`$AWS_CMD allocate-address --domain vpc --output text --query PublicIp`
+        echo "Allocated Elastic IP for master: ${KUBE_MASTER_IP}"
+
+        # We will tag the master ASG soon
+        # add-tag ${VPC_ID} ${TAG_KEY_MASTERIP} ${KUBE_MASTER_IP}
+      else
+        echo "Found master IP tagged on VPC: ${KUBE_MASTER_IP}"
+      fi
+    fi
+  fi
+}
+
 # Creates a new DHCP option set configured correctly for Kubernetes
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
@@ -606,6 +645,16 @@ function add-tag {
   exit 1
 }
 
+# Gets a tag value from an AWS resource
+# usage: get-tag <resource-id> <tag-name>
+# outputs: the tag value, or "" if no tag
+function get-tag {
+  $AWS_CMD describe-tags --filters Name=resource-id,Values=${1} \
+                                   Name=key,Values=${2} \
+                         --query Tags[].Value \
+                         --output text
+}
+
 # Creates the IAM profile, based on configuration files in templates/iam
 function create-iam-profile {
   local key=$1
@@ -652,45 +701,29 @@ function wait-for-instance-running {
   done
 }
 
-# Allocates new Elastic IP from Amazon
-# Output: allocated IP address
-function allocate-elastic-ip {
-  $AWS_CMD allocate-address --domain vpc --output text | cut -f3
-}
-
-function assign-ip-to-instance {
+# Attaches an elastic IP to the specified instance
+function attach-ip-to-instance {
   local ip_address=$1
   local instance_id=$2
-  local fallback_ip=$3
 
-  local elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --output text | cut -f2)
-  local association_result=$($AWS_CMD associate-address --instance-id ${master_instance_id} --allocation-id ${elastic_ip_allocation_id} > /dev/null && echo "success" || echo "failure")
-
-  if [[ $association_result = "success" ]]; then
-    echo "${ip_address}"
-  else
-    echo "${fallback_ip}"
-  fi
+  local elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --query Addresses[].AllocationId --output text)
+  echo "Attaching IP ${ip_address} to instance ${instance_id}"
+  $AWS_CMD associate-address --instance-id ${instance_id} --allocation-id ${elastic_ip_allocation_id} > $LOG
 }
 
-# If MASTER_RESERVED_IP looks like IP address, will try to assign it to master instance
-# If MASTER_RESERVED_IP is "auto", will allocate new elastic ip and assign that
-# If none of the above or something fails, will output originally assigne IP
-# Output: assigned IP address
-function assign-elastic-ip {
-  local assigned_public_ip=$1
-  local master_instance_id=$2
+# Releases an elastic IP
+function release-elastic-ip {
+  local ip_address=$1
 
-  # Check that MASTER_RESERVED_IP looks like an IPv4 address
-  if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
-  elif [[ "${MASTER_RESERVED_IP}" = "auto" ]]; then
-    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+  echo "Releasing elastic IP ${ip_address}"
+  local elastic_ip_allocation_id=""
+  elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --query Addresses[].AllocationId 2> $LOG) || true
+  if [[ -z "${elastic_ip_allocation_id}" ]]; then
+    echo "Elastic IP already released"
   else
-    echo "${assigned_public_ip}"
+    $AWS_CMD release-address --allocation-id ${elastic_ip_allocation_id} > $LOG
   fi
 }
-
 
 function kube-up {
   echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
@@ -851,12 +884,14 @@ function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
+  # Get or create master elastic IP
+  ensure-master-ip
+
   # Determine extra certificate names for master
   octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
   service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
-
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
@@ -920,13 +955,14 @@ function start-master() {
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
   add-tag $master_id KubernetesCluster ${CLUSTER_ID}
+  KUBE_MASTER_ID=${master_id}
 
   echo "Waiting for master to be ready"
   local attempt=0
 
   while true; do
     echo -n Attempt "$(($attempt+1))" to check for master node
-    local ip=$(get_instance_public_ip ${master_id})
+    local ip=$(get_instance_public_ip ${KUBE_MASTER_ID})
     if [[ -z "${ip}" ]]; then
       if (( attempt > 30 )); then
         echo
@@ -937,16 +973,16 @@ function start-master() {
       fi
     else
       # We are not able to add an elastic ip, a route or volume to the instance until that instance is in "running" state.
-      wait-for-instance-running $master_id
+      wait-for-instance-running ${KUBE_MASTER_ID}
 
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
+      attach-ip-to-instance ${KUBE_MASTER_IP} ${KUBE_MASTER_ID}
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
       echo "Attaching persistent data volume (${MASTER_DISK_ID}) to master"
-      $AWS_CMD attach-volume --volume-id ${MASTER_DISK_ID} --device /dev/sdb --instance-id ${master_id}
+      $AWS_CMD attach-volume --volume-id ${MASTER_DISK_ID} --device /dev/sdb --instance-id ${KUBE_MASTER_ID} >$LOG
 
       sleep 10
       $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
@@ -1234,7 +1270,7 @@ function kube-down {
       done
     fi
 
-    echo "Deleting VPC: ${vpc_id}"
+    echo "Cleaning up resources in VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
                              --filters Name=vpc-id,Values=${vpc_id} \
                                        Name=group-name,Values=default \
@@ -1305,6 +1341,13 @@ function kube-down {
       $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
     done
 
+    # Once we put the master in an ASG, we will get the tag from there
+    # master_ip=$(get-tag ${vpc_id} ${TAG_KEY_MASTERIP})
+    # if [[ -n "${master_ip}" ]]; then
+    #   release-elastic-ip ${master_ip}
+    # fi
+
+    echo "Deleting VPC: ${vpc_id}"
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
   fi
 }
