@@ -95,7 +95,6 @@ fi
 
 # Specialized to skip when running reboot tests.
 REBOOT_SKIP_TESTS=(
-    "Autoscaling\sSuite"
     "Skipped"
     "Restart\sshould\srestart\sall\snodes"
     "Example"
@@ -104,6 +103,7 @@ REBOOT_SKIP_TESTS=(
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
+    "Autoscaling\sSuite"
     "Reboot"
     "ServiceLoadBalancer"
     )
@@ -136,6 +136,7 @@ AWS_REQUIRED_SKIP_TESTS=(
 
 # Tests which kills or restarts components and/or nodes.
 DISRUPTIVE_TESTS=(
+    "Autoscaling\sSuite"
     "DaemonRestart"
     "Etcd\sfailure"
     "Nodes\sResize"
@@ -160,6 +161,7 @@ GCE_FLAKY_TESTS=(
 # comments below, and for poorly implemented tests, please quote the
 # issue number tracking speed improvements.
 GCE_SLOW_TESTS=(
+    "Autoscaling\sSuite"
     # Before enabling this loadbalancer test in any other test list you must
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
@@ -483,6 +485,27 @@ case ${JOB_NAME} in
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.1"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     : ${ENABLE_DEPLOYMENTS:=true}
+    ;;
+
+  # Runs "disruptive" tests on GCE on the release candidate branch,
+  # sequentially, against the latest 1.1 ci release.
+  kubernetes-e2e-gce-disruptive-1.1)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-disruptive-1.1"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-e2e-disruptive-1-1"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
+          ) --ginkgo.focus=$(join_regex_no_empty \
+          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
+          "GCE\sL7\sLoadBalancer\sController"
+          )"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-disruptive-1-1"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="disruptive-1.1"}
+    # TODO: move into its own project
+    : ${PROJECT:="kubernetes-jenkins"}
+    : ${ENABLE_DEPLOYMENTS:=true}
+    : ${ENABLE_DAEMONSETS:=true}
     ;;
 
   kubernetes-e2e-gke-subnet)
