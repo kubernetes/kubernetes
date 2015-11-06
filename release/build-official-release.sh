@@ -50,6 +50,9 @@ VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alph
   echo "!!! You must specify the version you are releasing in the form of '${VERSION_REGEX}'" >&2
   exit 1
 }
+VERSION_MAJOR="${BASH_REMATCH[1]}"
+VERSION_MINOR="${BASH_REMATCH[2]}"
+RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
 
 declare -r KUBE_BUILD_DIR=$(mktemp -d "/tmp/kubernetes-build-release-${KUBE_RELEASE_VERSION}-XXXXXXX")
 
@@ -108,8 +111,8 @@ instructions elsewhere):
 
      c) Use this template for the description:
 
-## [Documentation](http://releases.k8s.io/${KUBE_RELEASE_VERSION}/docs/README.md)
-## [Examples](http://releases.k8s.io/${KUBE_RELEASE_VERSION}/examples)
+## [Documentation](http://releases.k8s.io/${RELEASE_BRANCH}/docs/README.md)
+## [Examples](http://releases.k8s.io/${RELEASE_BRANCH}/examples)
 ## Changes since <last release> (last PR <last PR>)
 
 <release notes>
