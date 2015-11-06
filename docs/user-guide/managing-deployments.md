@@ -131,8 +131,8 @@ Resource creation isn’t the only operation that `kubectl` can perform in bulk.
 
 ```console
 $ kubectl delete -f ./nginx/
-replicationcontrollers/my-nginx
-services/my-nginx-svc
+replicationcontrollers "my-nginx" deleted
+services "my-nginx-svc" deleted
 ```
 
 In the case of just two resources, it’s also easy to specify both on the command line using the resource/name syntax:
@@ -145,14 +145,14 @@ For larger numbers of resources, one can use labels to filter resources. The sel
 
 ```console
 $ kubectl delete all -lapp=nginx
-replicationcontrollers/my-nginx
-services/my-nginx-svc
+replicationcontrollers "my-nginx" deleted
+services "my-nginx-svc" deleted
 ```
 
 Because `kubectl` outputs resource names in the same syntax it accepts, it’s easy to chain operations using `$()` or `xargs`:
 
 ```console
-$ kubectl get $(kubectl create -f ./nginx/ | grep my-nginx)
+$ kubectl get $(kubectl create -f ./nginx/ -o name | grep my-nginx)
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 my-nginx     nginx          nginx      app=nginx   2
 NAME           LABELS      SELECTOR    IP(S)          PORT(S)
@@ -193,19 +193,19 @@ The labels allow us to slice and dice our resources along any dimension specifie
 
 ```console
 $ kubectl create -f ./guestbook-fe.yaml -f ./redis-master.yaml -f ./redis-slave.yaml
-replicationcontrollers/guestbook-fe
-replicationcontrollers/guestbook-redis-master
-replicationcontrollers/guestbook-redis-slave
+replicationcontrollers "guestbook-fe" created
+replicationcontrollers "guestbook-redis-master" created
+replicationcontrollers "guestbook-redis-slave" created
 $ kubectl get pods -Lapp -Ltier -Lrole
 NAME                           READY     STATUS    RESTARTS   AGE       APP         TIER       ROLE
-guestbook-fe-4nlpb             1/1       Running   0          1m        guestbook   frontend   <n/a>
-guestbook-fe-ght6d             1/1       Running   0          1m        guestbook   frontend   <n/a>
-guestbook-fe-jpy62             1/1       Running   0          1m        guestbook   frontend   <n/a>
+guestbook-fe-4nlpb             1/1       Running   0          1m        guestbook   frontend   <none>
+guestbook-fe-ght6d             1/1       Running   0          1m        guestbook   frontend   <none>
+guestbook-fe-jpy62             1/1       Running   0          1m        guestbook   frontend   <none>
 guestbook-redis-master-5pg3b   1/1       Running   0          1m        guestbook   backend    master
 guestbook-redis-slave-2q2yf    1/1       Running   0          1m        guestbook   backend    slave
 guestbook-redis-slave-qgazl    1/1       Running   0          1m        guestbook   backend    slave
-my-nginx-divi2                 1/1       Running   0          29m       nginx       <n/a>      <n/a>
-my-nginx-o0ef1                 1/1       Running   0          29m       nginx       <n/a>      <n/a>
+my-nginx-divi2                 1/1       Running   0          29m       nginx       <none>     <none>
+my-nginx-o0ef1                 1/1       Running   0          29m       nginx       <none>     <none>
 $ kubectl get pods -lapp=guestbook,role=slave
 NAME                          READY     STATUS    RESTARTS   AGE
 guestbook-redis-slave-2q2yf   1/1       Running   0          3m
@@ -340,7 +340,7 @@ To update to version 1.9.1, you can use [`kubectl rolling-update --image`](../..
 
 ```console
 $ kubectl rolling-update my-nginx --image=nginx:1.9.1
-Creating my-nginx-ccba8fbd8cc8160970f63f9a2696fc46
+Created my-nginx-ccba8fbd8cc8160970f63f9a2696fc46
 ```
 
 In another window, you can see that `kubectl` added a `deployment` label to the pods, whose value is a hash of the configuration, to distinguish the new pods from the old:
@@ -348,7 +348,6 @@ In another window, you can see that `kubectl` added a `deployment` label to the 
 ```console
 $ kubectl get pods -lapp=nginx -Ldeployment
 NAME                                              READY     STATUS    RESTARTS   AGE       DEPLOYMENT
-my-nginx-1jgkf                                    1/1       Running   0          1h        2d1d7a8f682934a254002b56404b813e
 my-nginx-ccba8fbd8cc8160970f63f9a2696fc46-k156z   1/1       Running   0          1m        ccba8fbd8cc8160970f63f9a2696fc46
 my-nginx-ccba8fbd8cc8160970f63f9a2696fc46-v95yh   1/1       Running   0          35s       ccba8fbd8cc8160970f63f9a2696fc46
 my-nginx-divi2                                    1/1       Running   0          2h        2d1d7a8f682934a254002b56404b813e
@@ -359,34 +358,28 @@ my-nginx-q6all                                    1/1       Running   0         
 `kubectl rolling-update` reports progress as it progresses:
 
 ```console
-Updating my-nginx replicas: 4, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 1
-At end of loop: my-nginx replicas: 4, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 1
-At beginning of loop: my-nginx replicas: 3, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 2
-Updating my-nginx replicas: 3, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 2
-At end of loop: my-nginx replicas: 3, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 2
-At beginning of loop: my-nginx replicas: 2, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 3
-Updating my-nginx replicas: 2, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 3
-At end of loop: my-nginx replicas: 2, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 3
-At beginning of loop: my-nginx replicas: 1, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 4
-Updating my-nginx replicas: 1, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 4
-At end of loop: my-nginx replicas: 1, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 4
-At beginning of loop: my-nginx replicas: 0, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 5
-Updating my-nginx replicas: 0, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 5
-At end of loop: my-nginx replicas: 0, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 5
+Scaling up my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 from 0 to 3, scaling down my-nginx from 3 to 0 (keep 3 pods available, don't exceed 4 pods)
+Scaling my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 up to 1
+Scaling my-nginx down to 2
+Scaling my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 up to 2
+Scaling my-nginx down to 1
+Scaling my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 up to 3
+Scaling my-nginx down to 0
 Update succeeded. Deleting old controller: my-nginx
 Renaming my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 to my-nginx
-my-nginx
+replicationcontroller "my-nginx" rolling updated
 ```
 
 If you encounter a problem, you can stop the rolling update midway and revert to the previous version using `--rollback`:
 
 ```console
-$ kubectl kubectl rolling-update my-nginx  --image=nginx:1.9.1 --rollback
-Found existing update in progress (my-nginx-ccba8fbd8cc8160970f63f9a2696fc46), resuming.
-Found desired replicas.Continuing update with existing controller my-nginx.
-Stopping my-nginx-02ca3e87d8685813dbe1f8c164a46f02 replicas: 1 -> 0
+$ kubectl rolling-update my-nginx --rollback
+Setting "my-nginx" replicas to 1
+Continuing update with existing controller my-nginx.
+Scaling up nginx from 1 to 1, scaling down my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
+Scaling my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 down to 0
 Update succeeded. Deleting my-nginx-ccba8fbd8cc8160970f63f9a2696fc46
-my-nginx
+replicationcontroller "my-nginx" rolling updated
 ```
 
 This is one example where the immutability of containers is a huge asset.
@@ -421,24 +414,19 @@ and roll it out:
 
 ```console
 $ kubectl rolling-update my-nginx -f ./nginx-rc.yaml
-Creating my-nginx-v4
-At beginning of loop: my-nginx replicas: 4, my-nginx-v4 replicas: 1
-Updating my-nginx replicas: 4, my-nginx-v4 replicas: 1
-At end of loop: my-nginx replicas: 4, my-nginx-v4 replicas: 1
-At beginning of loop: my-nginx replicas: 3, my-nginx-v4 replicas: 2
-Updating my-nginx replicas: 3, my-nginx-v4 replicas: 2
-At end of loop: my-nginx replicas: 3, my-nginx-v4 replicas: 2
-At beginning of loop: my-nginx replicas: 2, my-nginx-v4 replicas: 3
-Updating my-nginx replicas: 2, my-nginx-v4 replicas: 3
-At end of loop: my-nginx replicas: 2, my-nginx-v4 replicas: 3
-At beginning of loop: my-nginx replicas: 1, my-nginx-v4 replicas: 4
-Updating my-nginx replicas: 1, my-nginx-v4 replicas: 4
-At end of loop: my-nginx replicas: 1, my-nginx-v4 replicas: 4
-At beginning of loop: my-nginx replicas: 0, my-nginx-v4 replicas: 5
-Updating my-nginx replicas: 0, my-nginx-v4 replicas: 5
-At end of loop: my-nginx replicas: 0, my-nginx-v4 replicas: 5
-Update succeeded. Deleting my-nginx
-my-nginx-v4
+Created my-nginx-v4
+Scaling up my-nginx-v4 from 0 to 5, scaling down my-nginx from 4 to 0 (keep 4 pods available, don't exceed 5 pods)
+Scaling my-nginx-v4 up to 1
+Scaling my-nginx down to 3
+Scaling my-nginx-v4 up to 2
+Scaling my-nginx down to 2
+Scaling my-nginx-v4 up to 3
+Scaling my-nginx down to 1
+Scaling my-nginx-v4 up to 4
+Scaling my-nginx down to 0
+Scaling my-nginx-v4 up to 5
+Update succeeded. Deleting old controller: my-nginx
+replicationcontroller "my-nginx-v4" rolling updated
 ```
 
 You can also run the [update demo](update-demo/) to see a visual representation of the rolling update process.
@@ -501,7 +489,7 @@ pod "my-nginx-1jgkf" replaced
 $ rm /tmp/nginx.yaml
 ```
 
-This allows you to do more significant changes more easily. Note that you can specify the editor with your `EDITOR`, `KUBE_EDITOR`, or `GIT_EDITOR` environment variables.
+This allows you to do more significant changes more easily. Note that you can specify the editor with your `EDITOR` or `KUBE_EDITOR` environment variables.
 
 For more information, please see [kubectl edit](kubectl/kubectl_edit.md) document.
 
@@ -532,8 +520,7 @@ In some cases, you may need to update resource fields that cannot be updated onc
 
 ```console
 $ kubectl replace -f ./nginx-rc.yaml --force
-replicationcontrollers/my-nginx-v4
-replicationcontrollers/my-nginx-v4
+replicationcontrollers "my-nginx-v4" replaced
 ```
 
 ## What's next?
