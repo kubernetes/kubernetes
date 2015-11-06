@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -1126,36 +1125,14 @@ func TestBody(t *testing.T) {
 	}
 }
 
-func authFromReq(r *http.Request) (*Config, bool) {
-	auth, ok := r.Header["Authorization"]
-	if !ok {
-		return nil, false
-	}
-
-	encoded := strings.Split(auth[0], " ")
-	if len(encoded) != 2 || encoded[0] != "Basic" {
-		return nil, false
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(encoded[1])
-	if err != nil {
-		return nil, false
-	}
-	parts := strings.Split(string(decoded), ":")
-	if len(parts) != 2 {
-		return nil, false
-	}
-	return &Config{Username: parts[0], Password: parts[1]}, true
-}
-
 // checkAuth sets errors if the auth found in r doesn't match the expectation.
 // TODO: Move to util, test in more places.
-func checkAuth(t *testing.T, expect *Config, r *http.Request) {
-	foundAuth, found := authFromReq(r)
+func checkAuth(t *testing.T, expectedUser, expectedPass string, r *http.Request) {
+	user, pass, found := r.BasicAuth()
 	if !found {
 		t.Errorf("no auth found")
-	} else if e, a := expect, foundAuth; !api.Semantic.DeepDerivative(e, a) {
-		t.Fatalf("Wrong basic auth: wanted %#v, got %#v", e, a)
+	} else if user != expectedUser || pass != expectedPass {
+		t.Fatalf("Wrong basic auth: wanted %s:%s, got %s:%s", expectedUser, expectedPass, user, pass)
 	}
 }
 
@@ -1169,9 +1146,8 @@ func TestWatch(t *testing.T) {
 		{watch.Deleted, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "last"}}},
 	}
 
-	auth := &Config{Username: "user", Password: "pass"}
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		checkAuth(t, auth, r)
+		checkAuth(t, "user", "pass", r)
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			panic("need flusher!")
@@ -1225,11 +1201,10 @@ func TestWatch(t *testing.T) {
 }
 
 func TestStream(t *testing.T) {
-	auth := &Config{Username: "user", Password: "pass"}
 	expectedBody := "expected body"
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		checkAuth(t, auth, r)
+		checkAuth(t, "user", "pass", r)
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			panic("need flusher!")
