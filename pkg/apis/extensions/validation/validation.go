@@ -53,7 +53,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAuto
 		allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("cpuUtilization", "targetPercentage"), autoscaler.CPUUtilization.TargetPercentage, `must be greater than or equal to 1`))
 	}
 	if refErrs := ValidateSubresourceReference(autoscaler.ScaleRef, fldPath.Child("scaleRef")); len(refErrs) > 0 {
-		allErrs = append(allErrs, refErrs.Prefix("scaleRef")...)
+		allErrs = append(allErrs, refErrs...)
 	} else if autoscaler.ScaleRef.Subresource != "scale" {
 		allErrs = append(allErrs, validation.NewNotSupportedError(fldPath.Child("scaleRef", "subresource"), autoscaler.ScaleRef.Subresource, []string{"scale"}))
 	}
