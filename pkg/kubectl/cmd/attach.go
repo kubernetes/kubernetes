@@ -182,6 +182,7 @@ func (p *AttachOptions) Run() error {
 					if err != nil {
 						glog.Fatal(err)
 					}
+					fmt.Fprintln(p.Out, "\nHit enter for command prompt")
 					// this handles a clean exit, where the command finished
 					defer term.RestoreTerminal(inFd, oldState)
 
