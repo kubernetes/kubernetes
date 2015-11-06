@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -234,15 +233,7 @@ func (s *CMServer) ResyncPeriod() time.Duration {
 
 // Run runs the CMServer.  This should never exit.
 func (s *CMServer) Run(_ []string) error {
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
-	}
-
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
-	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return err
 	}
