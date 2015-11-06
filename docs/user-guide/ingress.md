@@ -10,6 +10,7 @@
 
 - [Ingress](#ingress)
   - [What is Ingress?](#what-is-ingress)
+  - [Prerequisites](#prerequisites)
   - [The Ingress Resource](#the-ingress-resource)
   - [Ingress controllers](#ingress-controllers)
   - [Types of Ingress](#types-of-ingress)
@@ -55,6 +56,14 @@ An Ingress is a collection of rules that allow inbound connections to reach the 
 ```
 
 It can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc. Users request ingress by POSTing the Ingress resource to the API server. An [Ingress controller](#ingress-controllers) is responsible for fulfilling the Ingress, usually with a loadbalancer, though it may also configure your edge router or additional frontends to help handle the traffic in an HA manner.
+
+## Prerequisites
+
+Before you start using the Ingress resource, there are a few things you should understand:
+* The Ingress resource is not available in any Kubernetes release prior to 1.1
+* You need an Ingress controller to satisfy an Ingress. Simply creating the resource will have no effect.
+* On GCE/GKE there should be a [L7 cluster addon](../../cluster/addons/cluster-loadbalancing/glbc/README.md#prerequisites), on other platforms you either need to write your own or [deploy an existing controller](https://github.com/kubernetes/contrib/tree/master/Ingress) as a pod.
+* The resource currently does not support HTTPS, but will do so before it leaves beta.
 
 ## The Ingress Resource
 
