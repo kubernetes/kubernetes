@@ -291,7 +291,7 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 //
 // Example:
 // c.RegisterConversionFunc(
-//         func(in *Pod, out *v1beta1.Pod, s Scope) error {
+//         func(in *Pod, out *v1.Pod, s Scope) error {
 //                 // conversion logic...
 //                 return nil
 //          })
@@ -343,7 +343,7 @@ func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName st
 //
 // Example:
 // c.RegisteDefaultingFunc(
-//         func(in *v1beta1.Pod) {
+//         func(in *v1.Pod) {
 //                 // defaulting logic...
 //          })
 func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {

@@ -184,7 +184,7 @@ func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
 //		// the source version, e.g., ""
 //		s.Meta().SrcVersion
 //		// You can depend on this being set to the destination version,
-//		// e.g., "v1beta1".
+//		// e.g., "v1".
 //		s.Meta().DestVersion
 //		// Call scope.Convert to copy sub-fields.
 //		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
@@ -256,7 +256,7 @@ func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName
 // how to call these functions from the types of their two parameters.
 //
 // s.AddDefaultingFuncs(
-//	func(obj *v1beta1.Pod) {
+//	func(obj *v1.Pod) {
 //		if obj.OptionalField == "" {
 //			obj.OptionalField = "DefaultValue"
 //		}

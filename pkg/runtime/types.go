@@ -84,7 +84,7 @@ type EmbeddedObject struct {
 // // On the wire, the JSON will look something like this:
 // {
 //	"kind":"MyAPIObject",
-//	"apiVersion":"v1beta1",
+//	"apiVersion":"v1",
 //	"myPlugin": {
 //		"kind":"PluginA",
 //		"aOption":"foo",
