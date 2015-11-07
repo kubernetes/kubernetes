@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"runtime"
-	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 
@@ -71,9 +70,6 @@ func createClientFromFile(path string) (*client.Client, error) {
 	client, err := client.New(config)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating client: %v", err)
-	}
-	if client.Timeout == 0 {
-		client.Timeout = 30 * time.Second
 	}
 	return client, nil
 }
