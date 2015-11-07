@@ -178,8 +178,8 @@ release/cut-official-release.sh "${VER}" "${GITHASH}"
 
 This will do a dry run of:
 
-1. do a series of commits on the release branch for `vX.Y.Z-beta`;
-1. mark the `vX.Y.Z-beta` tag at the beta version commit;
+1. do a series of commits on the release branch for `vX.Y.Z-beta.W`;
+1. mark the `vX.Y.Z-beta.W` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
@@ -209,9 +209,9 @@ This will do a dry run of:
 
 1. do a series of commits on the branch for `vX.Y.Z`;
 1. mark the `vX.Y.Z` tag at the release version commit;
-1. do a series of commits on the branch for `vX.Y.(Z+1)-beta` on top of the
+1. do a series of commits on the branch for `vX.Y.(Z+1)-beta.0` on top of the
    previous commits;
-1. mark the `vX.Y.(Z+1)-beta` tag at the beta version commit;
+1. mark the `vX.Y.(Z+1)-beta.0` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
@@ -245,8 +245,8 @@ This will do a dry run of:
 
 1. mark the `vX.(Y+1).0-alpha.0` tag at the given git hash on `master`;
 1. fork a new branch `release-X.Y` off of `master` at the given git hash;
-1. do a series of commits on the branch for `vX.Y.0-beta`;
-1. mark the `vX.Y.0-beta` tag at the beta version commit;
+1. do a series of commits on the branch for `vX.Y.0-beta.0`;
+1. mark the `vX.Y.0-beta.0` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
