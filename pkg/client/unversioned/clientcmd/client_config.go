@@ -233,7 +233,11 @@ func (config DirectClientConfig) ConfirmUsable() error {
 	validationErrors := make([]error, 0)
 	validationErrors = append(validationErrors, validateAuthInfo(config.getAuthInfoName(), config.getAuthInfo())...)
 	validationErrors = append(validationErrors, validateClusterInfo(config.getClusterName(), config.getCluster())...)
-
+	// when direct client config is specified, and our only error is that no server is defined, we should
+	// return a standard "no config" error
+	if len(validationErrors) == 1 && validationErrors[0] == ErrEmptyCluster {
+		return newErrConfigurationInvalid([]error{ErrEmptyConfig})
+	}
 	return newErrConfigurationInvalid(validationErrors)
 }
 
