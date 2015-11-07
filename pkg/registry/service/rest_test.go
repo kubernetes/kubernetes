@@ -462,6 +462,14 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
+			Ports: []api.ServicePort{
+				// Service port 9393 should route to endpoint port "p", which is port 93
+				{Name: "p", Port: 9393, TargetPort: intstr.FromString("p")},
+
+				// Service port 93 should route to unnamed endpoint port, which is port 80
+				// This is to test that the service port definition is used when determining resource location
+				{Name: "", Port: 93, TargetPort: intstr.FromInt(80)},
+			},
 		},
 	})
 	redirector := rest.Redirector(storage)
@@ -490,8 +498,20 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
-	// Test a name + port number.
+	// Test a name + port number (service port 93 -> target port 80)
 	location, _, err = redirector.ResourceLocation(ctx, "foo:93")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//1.2.3.4:80", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93)
+	location, _, err = redirector.ResourceLocation(ctx, "foo:9393")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
