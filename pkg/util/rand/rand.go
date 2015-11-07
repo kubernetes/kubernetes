@@ -54,3 +54,11 @@ func Seed(seed int64) {
 
 	rng.rand = rand.New(rand.NewSource(seed))
 }
+
+// Perm returns, as a slice of n ints, a pseudo-random permutation of the integers [0,n)
+// from the default Source.
+func Perm(n int) []int {
+	rng.Lock()
+	defer rng.Unlock()
+	return rng.rand.Perm(n)
+}

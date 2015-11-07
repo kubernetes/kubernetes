@@ -19,7 +19,7 @@ package validation
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
@@ -34,5 +34,5 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 		}
 	}
 
-	return errors.NewAggregate(validationErrors)
+	return utilerrors.NewAggregate(validationErrors)
 }

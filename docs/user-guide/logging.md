@@ -33,6 +33,20 @@ Documentation for other releases can be found at
 
 # Logging
 
+**Table of Contents**
+
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Logging](#logging)
+  - [Logging by Kubernetes Components](#logging-by-kubernetes-components)
+  - [Examining the logs of running containers](#examining-the-logs-of-running-containers)
+  - [Cluster level logging to Google Cloud Logging](#cluster-level-logging-to-google-cloud-logging)
+  - [Cluster level logging with Elasticsearch and Kibana](#cluster-level-logging-with-elasticsearch-and-kibana)
+  - [Ingesting Application Log Files](#ingesting-application-log-files)
+  - [Known issues](#known-issues)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Logging by Kubernetes Components
 
 Kubernetes components, such as kubelet and apiserver, use the [glog](https://godoc.org/github.com/golang/glog) logging library.  Developer conventions for logging severity are described in [docs/devel/logging.md](../devel/logging.md).
@@ -58,7 +72,7 @@ spec:
            'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 ```
 
-[Download example](../../examples/blog-logging/counter-pod.yaml)
+[Download example](../../examples/blog-logging/counter-pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
 
 we can run the pod:
@@ -116,7 +130,7 @@ describes how to ingest cluster level logs into Elasticsearch and view them usin
 ## Ingesting Application Log Files
 
 Cluster level logging only collects the standard output and standard error output of the applications
-running in containers. The guide [Collecting log files within containers with Fluentd](http://releases.k8s.io/HEAD/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
+running in containers. The guide [Collecting log files within containers with Fluentd](http://releases.k8s.io/release-1.0/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
 
 ## Known issues
 

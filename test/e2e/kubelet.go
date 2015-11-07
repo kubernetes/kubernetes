@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -36,13 +37,12 @@ const (
 	pollInterval = 1 * time.Second
 	// Interval to poll /stats/container on a node
 	containerStatsPollingInterval = 5 * time.Second
-	resourceCollectionTime        = 1 * time.Minute
 )
 
 // getPodMatches returns a set of pod names on the given node that matches the
 // podNamePrefix and namespace.
-func getPodMatches(c *client.Client, nodeName string, podNamePrefix string, namespace string) util.StringSet {
-	matches := util.NewStringSet()
+func getPodMatches(c *client.Client, nodeName string, podNamePrefix string, namespace string) sets.String {
+	matches := sets.NewString()
 	Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
 	runningPods, err := GetKubeletPods(c, nodeName)
 	if err != nil {
@@ -65,9 +65,9 @@ func getPodMatches(c *client.Client, nodeName string, podNamePrefix string, name
 // information; they are reconstructed by examining the container runtime. In
 // the scope of this test, we do not expect pod naming conflicts so
 // podNamePrefix should be sufficient to identify the pods.
-func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames util.StringSet, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
+func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames sets.String, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
 	return wait.Poll(pollInterval, timeout, func() (bool, error) {
-		matchCh := make(chan util.StringSet, len(nodeNames))
+		matchCh := make(chan sets.String, len(nodeNames))
 		for _, item := range nodeNames.List() {
 			// Launch a goroutine per node to check the pods running on the nodes.
 			nodeName := item
@@ -76,7 +76,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames util.StringSet, pod
 			}()
 		}
 
-		seen := util.NewStringSet()
+		seen := sets.NewString()
 		for i := 0; i < len(nodeNames.List()); i++ {
 			seen = seen.Union(<-matchCh)
 		}
@@ -90,7 +90,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames util.StringSet, pod
 
 var _ = Describe("kubelet", func() {
 	var numNodes int
-	var nodeNames util.StringSet
+	var nodeNames sets.String
 	framework := NewFramework("kubelet")
 	var resourceMonitor *resourceMonitor
 
@@ -98,11 +98,11 @@ var _ = Describe("kubelet", func() {
 		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		numNodes = len(nodes.Items)
-		nodeNames = util.NewStringSet()
+		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		resourceMonitor = newResourceMonitor(framework.Client, targetContainers, containerStatsPollingInterval)
+		resourceMonitor = newResourceMonitor(framework.Client, targetContainers(), containerStatsPollingInterval)
 		resourceMonitor.Start()
 	})
 
@@ -130,7 +130,7 @@ var _ = Describe("kubelet", func() {
 					Client:    framework.Client,
 					Name:      rcName,
 					Namespace: framework.Namespace.Name,
-					Image:     "gcr.io/google_containers/pause:go",
+					Image:     "beta.gcr.io/google_containers/pause:2.0",
 					Replicas:  totalPods,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
@@ -158,17 +158,5 @@ var _ = Describe("kubelet", func() {
 				resourceMonitor.LogCPUSummary()
 			})
 		}
-	})
-
-	Describe("Monitor resource usage on node", func() {
-		It("Ask kubelet to report container resource usage", func() {
-			// TODO: After gathering some numbers, we should set a resource
-			// limit for each container and fail the test if the usage exceeds
-			// the preset limit.
-			By(fmt.Sprintf("Waiting %v to collect resource usage on node", resourceCollectionTime))
-			time.Sleep(resourceCollectionTime)
-			resourceMonitor.LogLatest()
-			resourceMonitor.LogCPUSummary()
-		})
 	})
 })

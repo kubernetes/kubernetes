@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -453,7 +453,7 @@ func (s *offerStorage) nextListener() *offerListener {
 // notify listeners if we find an acceptable offer for them. listeners
 // are garbage collected after a certain age (see offerListenerMaxAge).
 // ids lists offer IDs that are retrievable from offer storage.
-func (s *offerStorage) notifyListeners(ids func() (util.StringSet, uint64)) {
+func (s *offerStorage) notifyListeners(ids func() (sets.String, uint64)) {
 	listener := s.nextListener() // blocking
 
 	offerIds, version := ids()
@@ -493,8 +493,8 @@ func (s *offerStorage) Init(done <-chan struct{}) {
 
 	// cached offer ids for the purposes of listener notification
 	idCache := &stringsCache{
-		refill: func() util.StringSet {
-			result := util.NewStringSet()
+		refill: func() sets.String {
+			result := sets.NewString()
 			for _, v := range s.offers.List() {
 				if offer, ok := v.(Perishable); ok {
 					result.Insert(offer.Id())
@@ -510,14 +510,14 @@ func (s *offerStorage) Init(done <-chan struct{}) {
 
 type stringsCache struct {
 	expiresAt time.Time
-	cached    util.StringSet
+	cached    sets.String
 	ttl       time.Duration
-	refill    func() util.StringSet
+	refill    func() sets.String
 	version   uint64
 }
 
 // not thread-safe
-func (c *stringsCache) Strings() (util.StringSet, uint64) {
+func (c *stringsCache) Strings() (sets.String, uint64) {
 	now := time.Now()
 	if c.expiresAt.Before(now) {
 		old := c.cached
@@ -549,8 +549,8 @@ func (self *slaveStorage) add(slaveId, offerId string) {
 }
 
 // delete the slave-offer mappings for slaveId, returns the IDs of the offers that were unmapped
-func (self *slaveStorage) deleteSlave(slaveId string) util.StringSet {
-	offerIds := util.NewStringSet()
+func (self *slaveStorage) deleteSlave(slaveId string) sets.String {
+	offerIds := sets.NewString()
 	self.Lock()
 	defer self.Unlock()
 	for oid, sid := range self.index {

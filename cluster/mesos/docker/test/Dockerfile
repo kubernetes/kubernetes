@@ -1,4 +1,4 @@
-FROM golang:1.4.2
+FROM golang:1.4.3
 MAINTAINER Mesosphere <support@mesosphere.io>
 
 # docker.io is suppossed to be in backports, but it's not there yet.
@@ -36,7 +36,7 @@ RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 581
         && \
     apt-get clean
 
-RUN pip install -U docker-compose
+RUN pip install -U docker-compose==1.5.0
 
 RUN go get github.com/tools/godep
 

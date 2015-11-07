@@ -22,8 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // TestAdmission verifies a namespace is created on create requests for namespace managed resources
@@ -107,7 +108,9 @@ func TestIgnoreAdmission(t *testing.T) {
 func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	namespace := "test"
 	mockClient := &testclient.Fake{}
-	mockClient.SetErr(errors.NewAlreadyExists("namespaces", namespace))
+	mockClient.AddReactor("create", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.NewAlreadyExists("namespaces", namespace)
+	})
 
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	handler := &provision{

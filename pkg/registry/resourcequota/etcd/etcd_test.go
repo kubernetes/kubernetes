@@ -19,28 +19,24 @@ package etcd
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/registry/resourcequota"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
-	storage, statusStorage := NewREST(etcdStorage)
-	return storage, statusStorage, fakeClient
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+	resourceQuotaStorage, statusStorage := NewREST(etcdStorage, storage.NoDecoration)
+	return resourceQuotaStorage, statusStorage, fakeClient
 }
 
 func validNewResourceQuota() *api.ResourceQuota {
@@ -62,48 +58,19 @@ func validNewResourceQuota() *api.ResourceQuota {
 	}
 }
 
-func validChangedResourceQuota() *api.ResourceQuota {
-	resourcequota := validNewResourceQuota()
-	resourcequota.ResourceVersion = "1"
-	resourcequota.Labels = map[string]string{
-		"foo": "bar",
-	}
-	return resourcequota
-}
-
-func TestStorage(t *testing.T) {
-	storage, _, _ := newStorage(t)
-	resourcequota.NewRegistry(storage)
-}
-
 func TestCreate(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		resourcequota,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.ResourceQuota{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
 		},
 	)
-}
-
-func expectResourceQuota(t *testing.T, out runtime.Object) (*api.ResourceQuota, bool) {
-	resourcequota, ok := out.(*api.ResourceQuota)
-	if !ok || resourcequota == nil {
-		t.Errorf("Expected an api.ResourceQuota object, was %#v", out)
-		return nil, false
-	}
-	return resourcequota, true
 }
 
 func TestCreateRegistryError(t *testing.T) {
@@ -139,81 +106,54 @@ func TestCreateSetsFields(t *testing.T) {
 	}
 }
 
-func TestResourceQuotaDecode(t *testing.T) {
-	storage, _, _ := newStorage(t)
-	expected := validNewResourceQuota()
-	body, err := testapi.Codec().Encode(expected)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	actual := storage.New()
-	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !api.Semantic.DeepEqual(expected, actual) {
-		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
+func TestDelete(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).ReturnDeletedObject()
+	test.TestDelete(validNewResourceQuota())
 }
 
-func TestDeleteResourceQuota(t *testing.T) {
+func TestGet(t *testing.T) {
 	storage, _, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	ctx := api.NewDefaultContext()
-	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.ResourceQuota{
-					ObjectMeta: api.ObjectMeta{
-						Name:      "foo",
-						Namespace: api.NamespaceDefault,
-					},
-					Status: api.ResourceQuotaStatus{},
-				}),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestGet(validNewResourceQuota())
+}
+
+func TestList(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestList(validNewResourceQuota())
+}
+
+func TestWatch(t *testing.T) {
+	storage, _, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestWatch(
+		validNewResourceQuota(),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
 		},
-	}
-	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestEtcdGet(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	resourcequota := validNewResourceQuota()
-	test.TestGet(resourcequota)
-}
-
-func TestEtcdList(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	key := etcdtest.AddPrefix(storage.Etcd.KeyRootFunc(test.TestContext()))
-	resourcequota := validNewResourceQuota()
-	test.TestList(
-		resourcequota,
-		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeClient, key, objects)
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
 		},
-		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeClient, resourceVersion)
-		})
+		// not matchin fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+		},
+	)
 }
 
-func TestEtcdUpdateStatus(t *testing.T) {
+func TestUpdateStatus(t *testing.T) {
 	storage, status, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	resourcequotaStart := validNewResourceQuota()
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), resourcequotaStart), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), resourcequotaStart), 0)
 
 	resourcequotaIn := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
@@ -253,108 +193,5 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	rqOut, err := storage.Get(ctx, "foo")
 	if !api.Semantic.DeepEqual(&expected, rqOut) {
 		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, rqOut))
-	}
-}
-
-func TestEtcdWatchResourceQuotas(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	watching, err := storage.Watch(ctx,
-		labels.Everything(),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchResourceQuotasMatch(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	resourcequota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
-			Labels: map[string]string{
-				"name": "foo",
-			},
-		},
-	}
-	resourcequotaBytes, _ := testapi.Codec().Encode(resourcequota)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(resourcequotaBytes),
-		},
-	}
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Error("unexpected timeout from result channel")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchResourceQuotasNotMatch(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	watching, err := storage.Watch(ctx,
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	resourcequota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"name": "bar",
-			},
-		},
-	}
-	resourcequotaBytes, _ := testapi.Codec().Encode(resourcequota)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(resourcequotaBytes),
-		},
-	}
-
-	select {
-	case <-watching.ResultChan():
-		t.Error("unexpected result from result channel")
-	case <-time.After(time.Millisecond * 100):
-		// expected case
 	}
 }

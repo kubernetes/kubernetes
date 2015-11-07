@@ -42,12 +42,12 @@ Currently, you can look at:
  * The filesystem to make sure the mounted volumes and files are also what you expect.
  * Perform DNS lookups, to see how DNS works.
 
-`pod.json` is supplied as an example. You can control the port it serves on with the -port flag.
+`pod.yaml` is supplied as an example. You can control the port it serves on with the -port flag.
 
 Example from command line (the DNS lookup looks better from a web browser):
 
 ```console
-$ kubectl create -f examples/explorer/pod.json
+$ kubectl create -f examples/explorer/pod.yaml
 $ kubectl proxy &
 Starting to serve on localhost:8001
 

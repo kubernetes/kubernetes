@@ -22,7 +22,6 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestToRuntimeContainer(t *testing.T) {
@@ -33,7 +32,7 @@ func TestToRuntimeContainer(t *testing.T) {
 		Names:   []string{"/k8s_bar.5678_foo_ns_1234_42"},
 	}
 	expected := &kubecontainer.Container{
-		ID:      types.UID("ab2cdf"),
+		ID:      kubecontainer.ContainerID{"docker", "ab2cdf"},
 		Name:    "bar",
 		Image:   "bar_image",
 		Hash:    0x5678,

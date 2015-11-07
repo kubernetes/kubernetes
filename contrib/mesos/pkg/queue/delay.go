@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type qitem struct {
@@ -277,13 +277,13 @@ func (f *DelayFIFO) List() []UniqueID {
 	return list
 }
 
-// ContainedIDs returns a util.StringSet containing all IDs of the stored items.
+// ContainedIDs returns a stringset.StringSet containing all IDs of the stored items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (c *DelayFIFO) ContainedIDs() util.StringSet {
+func (c *DelayFIFO) ContainedIDs() sets.String {
 	c.rlock()
 	defer c.runlock()
-	set := util.StringSet{}
+	set := sets.String{}
 	for id := range c.items {
 		set.Insert(id)
 	}

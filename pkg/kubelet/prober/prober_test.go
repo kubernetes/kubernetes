@@ -17,9 +17,14 @@ limitations under the License.
 package prober
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -160,11 +165,93 @@ func TestGetTCPAddrParts(t *testing.T) {
 	}
 }
 
-type FakeExecProber struct {
+func TestProbe(t *testing.T) {
+	prober := &prober{
+		refManager: kubecontainer.NewRefManager(),
+		recorder:   &record.FakeRecorder{},
+	}
+	containerID := kubecontainer.ContainerID{"test", "foobar"}
+
+	execProbe := &api.Probe{
+		Handler: api.Handler{
+			Exec: &api.ExecAction{},
+		},
+	}
+	tests := []struct {
+		probe          *api.Probe
+		execError      bool
+		expectError    bool
+		execResult     probe.Result
+		expectedResult results.Result
+	}{
+		{ // No probe
+			probe:          nil,
+			expectedResult: results.Success,
+		},
+		{ // No handler
+			probe:          &api.Probe{},
+			expectError:    true,
+			expectedResult: results.Failure,
+		},
+		{ // Probe fails
+			probe:          execProbe,
+			execResult:     probe.Failure,
+			expectedResult: results.Failure,
+		},
+		{ // Probe succeeds
+			probe:          execProbe,
+			execResult:     probe.Success,
+			expectedResult: results.Success,
+		},
+		{ // Probe result is unknown
+			probe:          execProbe,
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
+		{ // Probe has an error
+			probe:          execProbe,
+			execError:      true,
+			expectError:    true,
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
+	}
+
+	for i, test := range tests {
+		for _, probeType := range [...]probeType{liveness, readiness} {
+			testID := fmt.Sprintf("%d-%s", i, probeType)
+			testContainer := api.Container{}
+			switch probeType {
+			case liveness:
+				testContainer.LivenessProbe = test.probe
+			case readiness:
+				testContainer.ReadinessProbe = test.probe
+			}
+			if test.execError {
+				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
+			} else {
+				prober.exec = fakeExecProber{test.execResult, nil}
+			}
+
+			result, err := prober.probe(probeType, &api.Pod{}, api.PodStatus{}, testContainer, containerID)
+			if test.expectError && err == nil {
+				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
+			}
+			if test.expectedResult != result {
+				t.Errorf("[%s] Expected result to be %v but was %v", testID, test.expectedResult, result)
+			}
+		}
+	}
+}
+
+type fakeExecProber struct {
 	result probe.Result
 	err    error
 }
 
-func (p FakeExecProber) Probe(_ exec.Cmd) (probe.Result, error) {
-	return p.result, p.err
+func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
+	return p.result, "", p.err
 }

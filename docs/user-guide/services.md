@@ -51,6 +51,7 @@ Documentation for other releases can be found at
   - [Publishing services - service types](#publishing-services---service-types)
     - [Type NodePort](#type-nodeport)
     - [Type LoadBalancer](#type-loadbalancer)
+    - [External IPs](#external-ips)
   - [Shortcomings](#shortcomings)
   - [Future work](#future-work)
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
@@ -172,7 +173,7 @@ In any of these scenarios you can define a service without a selector:
 }
 ```
 
-Because this has no selector, the corresponding `Endpoints` object will not be
+Because this service has no selector, the corresponding `Endpoints` object will not be
 created. You can manually map the service to your own specific endpoints:
 
 ```json
@@ -188,7 +189,7 @@ created. You can manually map the service to your own specific endpoints:
                 { "IP": "1.2.3.4" }
             ],
             "ports": [
-                { "port": 80 }
+                { "port": 9376 }
             ]
         }
     ]
@@ -199,7 +200,7 @@ NOTE: Endpoint IPs may not be loopback (127.0.0.0/8), link-local
 (169.254.0.0/16), or link-local multicast ((224.0.0.0/24).
 
 Accessing a `Service` without a selector works the same as if it had selector.
-The traffic will be routed to endpoints defined by the user (`1.2.3.4:80` in
+The traffic will be routed to endpoints defined by the user (`1.2.3.4:9376` in
 this example).
 
 ## Virtual IPs and service proxies
@@ -207,11 +208,11 @@ this example).
 Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
 watches the Kubernetes master for the addition and removal of `Service`
 and `Endpoints` objects. For each `Service` it opens a port (randomly chosen)
-on the local node.  Any connections made to that port will be proxied to one of
-the corresponding backend `Pods`.  Which backend to use is decided based on the
+on the local node.  Any connections to `service`  port will be proxied to one of
+the corresponding backend `Pods`.  Which backend `Pod`  to use is decided based on the
 `SessionAffinity` of the `Service`.  Lastly, it installs iptables rules which
-capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` and
-redirects that traffic to the previously described port.
+capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` then
+redirects that traffic to the backend `Pod` (`Endpoints`).
 
 The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
@@ -219,7 +220,7 @@ appropriate backend without the clients knowing anything about Kubernetes or
 
 ![Services overview diagram](services-overview.png)
 
-By default, the choice of backend is random.  Client-IP based session affinity
+By default, the choice of backend is round robin.  Client-IP based session affinity
 can be selected by setting `service.spec.sessionAffinity` to `"ClientIP"` (the
 default is `"None"`).
 
@@ -433,6 +434,7 @@ information about the provisioned balancer will be published in the `Service`'s
             }
         ],
         "clusterIP": "10.0.171.239",
+        "loadBalancerIP": "78.11.24.19",
         "type": "LoadBalancer"
     },
     "status": {
@@ -448,7 +450,47 @@ information about the provisioned balancer will be published in the `Service`'s
 ```
 
 Traffic from the external load balancer will be directed at the backend `Pods`,
-though exactly how that works depends on the cloud provider.
+though exactly how that works depends on the cloud provider. Some cloud providers allow
+the `loadBalancerIP` to be specified. In those cases, the load-balancer will be created
+with the user-specified `loadBalancerIP`. If the `loadBalancerIP` field is not specified,
+an ephemeral IP will be assigned to the loadBalancer. If the `loadBalancerIP` is specified, but the
+cloud provider does not support the feature, the field will be ignored.
+
+### External IPs
+
+If there are external IPs that route to one or more cluster nodes, Kubernetes services can be exposed on those
+`externalIPs`. Traffic that ingresses into the cluster with the external IP (as destination IP), on the service port,
+will be routed to one of the service endpoints. `externalIPs` are not managed by Kubernetes and are the responsibility
+of the cluster administrator.
+
+In the ServiceSpec, `externalIPs` can be specified along with any of the `ServiceTypes`.
+In the example below, my-service can be accessed by clients on 80.11.12.10:80 (externalIP:port)
+
+```json
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "selector": {
+            "app": "MyApp"
+        },
+        "ports": [
+            {
+                "name": "http",
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376
+            }
+        ],
+        "externalIPs" : [
+            "80.11.12.10"
+        ]
+    }
+}
+```
 
 ## Shortcomings
 
@@ -545,7 +587,7 @@ of which `Pods` they are actually accessing.
 
 Service is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Service API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html#_v1_service).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

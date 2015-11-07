@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -38,10 +39,9 @@ import (
 
 type APIInstaller struct {
 	group             *APIGroupVersion
-	info              *APIRequestInfoResolver
+	info              *RequestInfoResolver
 	prefix            string // Path prefix where API resources are to be registered.
 	minRequestTimeout time.Duration
-	proxyDialerFn     ProxyDialerFunc
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -61,13 +61,10 @@ type documentable interface {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
+func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
 	errors = make([]error, 0)
 
-	// Create the WebService.
-	ws = a.newWebService()
-
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
@@ -78,17 +75,23 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler); err != nil {
+		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
+		if err != nil {
 			errors = append(errors, err)
 		}
+		if apiResource != nil {
+			apiResources = append(apiResources, *apiResource)
+		}
 	}
-	return ws, errors
+	return apiResources, errors
 }
 
-func (a *APIInstaller) newWebService() *restful.WebService {
+// NewWebService creates a new restful webservice with the api installer's prefix and version.
+func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
-	ws.Doc("API at " + a.prefix + " version " + a.group.Version)
+	// a.prefix contains "prefix/group/version"
+	ws.Doc("API at " + a.prefix)
 	// TODO: change to restful.MIME_JSON when we set content type in client
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
@@ -97,7 +100,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) error {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
 	admit := a.group.Admit
 	context := a.group.Context
 
@@ -114,40 +117,40 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resource = parts[0]
 	default:
 		// TODO: support deeper paths
-		return fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
+		return nil, fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
 	}
 	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
 	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	versionedPtr, err := a.group.Creater.New(a.group.Version, kind)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
 	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// subresources must have parent resources, and follow the namespacing rules of their parent
 	if hasSubresource {
 		parentStorage, ok := a.group.Storage[resource]
 		if !ok {
-			return fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
+			return nil, fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
 		}
 		parentObject := parentStorage.New()
 		_, parentKind, err := a.group.Typer.ObjectVersionAndKind(parentObject)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		mapping.Scope = parentMapping.Scope
 	}
@@ -180,14 +183,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
 		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
 	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var versionedDeleterObject interface{}
@@ -195,7 +198,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	case isGracefulDeleter:
 		objectPtr, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
 		isDeleter = true
@@ -205,7 +208,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
@@ -219,11 +222,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
 		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		versionedGetOptions, err = a.group.Creater.New(serverVersion, getOptionsKind)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		isGetter = true
 	}
@@ -240,7 +243,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if connectOptions != nil {
 			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			versionedConnectOptions, err = a.group.Creater.New(serverVersion, connectOptionsKind)
 		}
@@ -248,6 +251,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var ctxFn ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
+		if context == nil {
+			return api.NewContext()
+		}
 		if ctx, ok := context.Get(req.Request); ok {
 			return ctx
 		}
@@ -257,10 +263,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
-	pathParam := ws.PathParameter("path:*", "path to the resource").DataType("string")
+	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 	params := []*restful.Parameter{}
 	actions := []action{}
 
+	var apiResource unversioned.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
 	case meta.RESTScopeNameRoot:
@@ -275,6 +282,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
+		apiResource.Name = path
+		apiResource.Namespaced = false
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -313,6 +322,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
+		apiResource.Name = path
+		apiResource.Namespaced = true
 		namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
@@ -343,7 +354,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		break
 	default:
-		return fmt.Errorf("unsupported restscope: %s", scope.Name())
+		return nil, fmt.Errorf("unsupported restscope: %s", scope.Name())
 	}
 
 	// Create Routes for the actions.
@@ -403,7 +414,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Writes(versionedObject)
 			if isGetterWithOptions {
 				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
-					return err
+					return nil, err
 				}
 			}
 			addParams(route, action.Params)
@@ -422,7 +433,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
-				return err
+				return nil, err
 			}
 			switch {
 			case isLister && isWatcher:
@@ -469,7 +480,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("patch"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
-				Reads(api.Patch{}).
+				Reads(unversioned.Patch{}).
 				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -528,7 +539,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
-				return err
+				return nil, err
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -547,7 +558,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
-				return err
+				return nil, err
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -575,18 +586,18 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					Writes("string")
 				if versionedConnectOptions != nil {
 					if err := addObjectParams(ws, route, versionedConnectOptions); err != nil {
-						return err
+						return nil, err
 					}
 				}
 				addParams(route, action.Params)
 				ws.Route(route)
 			}
 		default:
-			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
+			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
 		// Note: update GetAttribs() when adding a custom handler.
 	}
-	return nil
+	return &apiResource, nil
 }
 
 // rootScopeNaming reads only names from a request and ignores namespaces. It implements ScopeNamer
@@ -806,7 +817,7 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				if docable, ok := obj.(documentable); ok {
 					desc = docable.SwaggerDoc()[jsonName]
 				}
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.Name())))
+				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
 	}
@@ -817,15 +828,19 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 // Convert the name of a golang type to the name of a JSON type
 func typeToJSON(typeName string) string {
 	switch typeName {
-	case "bool":
+	case "bool", "*bool":
 		return "boolean"
-	case "uint8", "int", "int32", "int64", "uint32", "uint64":
+	case "uint8", "*uint8", "int", "*int", "int32", "*int32", "int64", "*int64", "uint32", "*uint32", "uint64", "*uint64":
 		return "integer"
-	case "byte":
-		return "string"
-	case "float64", "float32":
+	case "float64", "*float64", "float32", "*float32":
 		return "number"
-	case "util.Time":
+	case "unversioned.Time", "*unversioned.Time":
+		return "string"
+	case "byte", "*byte":
+		return "string"
+	case "[]string", "[]*string":
+		// TODO: Fix this when go-restful supports a way to specify an array query param:
+		// https://github.com/emicklei/go-restful/issues/225
 		return "string"
 	default:
 		return typeName

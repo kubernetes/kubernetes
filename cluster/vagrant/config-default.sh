@@ -55,7 +55,10 @@ MASTER_USER=vagrant
 MASTER_PASSWD=vagrant
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+
+# Optional: Enable experimental API features
+ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-true}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
@@ -76,7 +79,10 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # TODO Enable selinux when Fedora 21 repositories get an updated docker package
 #   see https://bugzilla.redhat.com/show_bug.cgi?id=1216151
 #EXTRA_DOCKER_OPTS="-b=cbr0 --selinux-enabled --insecure-registry 10.0.0.0/8"
-EXTRA_DOCKER_OPTS="-b=cbr0 --insecure-registry 10.0.0.0/8"
+EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+
+# Flag to tell the kubelet to enable CFS quota support
+ENABLE_CPU_CFS_QUOTA="${KUBE_ENABLE_CPU_CFS_QUOTA:-true}"
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
@@ -88,14 +94,18 @@ DNS_REPLICAS=1
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
-#RUNTIME_CONFIG=""
-RUNTIME_CONFIG="api/v1"
-
-# Specify the inter-node network fabric. Valid values: openvswitch, calico
-NETWORK_MODE=${NETWORK_MODE-"openvswitch"}
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Determine extra certificate names for master
 octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
 ((octets[3]+=1))
 service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
 MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
+
+# OpenContrail networking plugin specific settings
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
+OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
+OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
+OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

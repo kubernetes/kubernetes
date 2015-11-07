@@ -18,18 +18,9 @@ package integration
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apiserver"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"os"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -65,27 +56,16 @@ func deleteAllEtcdKeys() {
 
 }
 
-func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func MakeTempDirOrDie(prefix string, baseDir string) string {
+	if baseDir == "" {
+		baseDir = "/tmp"
 	}
-
-	m := master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableProfiling:       true,
-		EnableUISupport:       false,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-	})
-
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-
-	return m, s
+	tempDir, err := ioutil.TempDir(baseDir, prefix)
+	if err != nil {
+		glog.Fatalf("Can't make a temp rootdir: %v", err)
+	}
+	if err = os.MkdirAll(tempDir, 0750); err != nil {
+		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
+	}
+	return tempDir
 }

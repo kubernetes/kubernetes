@@ -28,48 +28,77 @@ import (
 var _ = Describe("Downward API", func() {
 	framework := NewFramework("downward-api")
 
-	It("should provide pod name and namespace as env vars", func() {
+	It("should provide pod name and namespace as env vars [Conformance]", func() {
 		podName := "downward-api-" + string(util.NewUUID())
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
-				Labels: map[string]string{"name": podName},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"sh", "-c", "env"},
-						Env: []api.EnvVar{
-							{
-								Name: "POD_NAME",
-								ValueFrom: &api.EnvVarSource{
-									FieldRef: &api.ObjectFieldSelector{
-										APIVersion: "v1",
-										FieldPath:  "metadata.name",
-									},
-								},
-							},
-							{
-								Name: "POD_NAMESPACE",
-								ValueFrom: &api.EnvVarSource{
-									FieldRef: &api.ObjectFieldSelector{
-										APIVersion: "v1",
-										FieldPath:  "metadata.namespace",
-									},
-								},
-							},
-						},
+		env := []api.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.namespace",
+					},
+				},
 			},
 		}
 
-		framework.TestContainerOutput("downward api env vars", pod, 0, []string{
+		expectations := []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
 			fmt.Sprintf("POD_NAMESPACE=%v", framework.Namespace.Name),
-		})
+		}
+
+		testDownwardAPI(framework, podName, env, expectations)
+	})
+
+	It("should provide pod IP as an env var", func() {
+		podName := "downward-api-" + string(util.NewUUID())
+		env := []api.EnvVar{
+			{
+				Name: "POD_IP",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIP",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
+		}
+
+		testDownwardAPI(framework, podName, env, expectations)
 	})
 })
+
+func testDownwardAPI(framework *Framework, podName string, env []api.EnvVar, expectations []string) {
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:   podName,
+			Labels: map[string]string{"name": podName},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    "dapi-container",
+					Image:   "gcr.io/google_containers/busybox",
+					Command: []string{"sh", "-c", "env"},
+					Env:     env,
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+
+	framework.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
+}

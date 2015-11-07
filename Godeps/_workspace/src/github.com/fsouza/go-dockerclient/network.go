@@ -38,12 +38,13 @@ type Endpoint struct {
 //
 // See https://goo.gl/4hCNtZ for more details.
 func (c *Client) ListNetworks() ([]Network, error) {
-	body, _, err := c.do("GET", "/networks", doOptions{})
+	resp, err := c.do("GET", "/networks", doOptions{})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var networks []Network
-	if err := json.Unmarshal(body, &networks); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&networks); err != nil {
 		return nil, err
 	}
 	return networks, nil
@@ -54,15 +55,16 @@ func (c *Client) ListNetworks() ([]Network, error) {
 // See https://goo.gl/4hCNtZ for more details.
 func (c *Client) NetworkInfo(id string) (*Network, error) {
 	path := "/networks/" + id
-	body, status, err := c.do("GET", path, doOptions{})
-	if status == http.StatusNotFound {
-		return nil, &NoSuchNetwork{ID: id}
-	}
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return nil, &NoSuchNetwork{ID: id}
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var network Network
-	if err := json.Unmarshal(body, &network); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&network); err != nil {
 		return nil, err
 	}
 	return &network, nil
@@ -83,35 +85,34 @@ type CreateNetworkOptions struct {
 //
 // See http://goo.gl/mErxNp for more details.
 func (c *Client) CreateNetwork(opts CreateNetworkOptions) (*Network, error) {
-	body, status, err := c.do(
+	resp, err := c.do(
 		"POST",
 		"/networks",
 		doOptions{
 			data: opts,
 		},
 	)
-
-	if status == http.StatusConflict {
-		return nil, ErrNetworkAlreadyExists
-	}
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusConflict {
+			return nil, ErrNetworkAlreadyExists
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	type createNetworkResponse struct {
 		ID string
 	}
 	var (
 		network Network
-		resp    createNetworkResponse
+		cnr     createNetworkResponse
 	)
-	err = json.Unmarshal(body, &resp)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&cnr); err != nil {
 		return nil, err
 	}
 
 	network.Name = opts.Name
-	network.ID = resp.ID
+	network.ID = cnr.ID
 	network.Type = opts.NetworkType
 
 	return &network, nil

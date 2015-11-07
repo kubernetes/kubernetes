@@ -1,7 +1,7 @@
-FROM gcr.io/google_containers/spark-base:1.4.0_v1
+FROM gcr.io/google_containers/spark-base:latest
 
 ADD start.sh /
 ADD log4j.properties /opt/spark/conf/log4j.properties
+EXPOSE 8081
 
-EXPOSE 8080
 ENTRYPOINT ["/start.sh"]

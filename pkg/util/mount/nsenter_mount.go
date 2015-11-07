@@ -71,8 +71,8 @@ func NewNsenterMounter() *NsenterMounter {
 		// default to root
 		m.paths[binary] = filepath.Join("/", binary)
 		for _, path := range []string{"/bin", "/usr/sbin", "/usr/bin"} {
-			binPath := filepath.Join(hostRootFsPath, path, binary)
-			if _, err := os.Stat(binPath); err != nil {
+			binPath := filepath.Join(path, binary)
+			if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
 				continue
 			}
 			m.paths[binary] = binPath
@@ -176,8 +176,9 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	exec := exec.New()
 	out, err := exec.Command(nsenterPath, args...).CombinedOutput()
 	if err != nil {
-		// If findmnt didn't run, just claim it's not a mount point.
-		return true, nil
+		// If the command itself is correct, then if we encountered error
+		// then most likely this means that the directory does not exist.
+		return true, os.ErrNotExist
 	}
 	strOut := strings.TrimSuffix(string(out), "\n")
 

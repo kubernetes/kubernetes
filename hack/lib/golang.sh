@@ -32,6 +32,7 @@ kube::golang::server_targets() {
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kubelet
+    cmd/kubemark
     cmd/hyperkube
     cmd/linkcheck
     plugin/cmd/kube-scheduler
@@ -63,13 +64,14 @@ kube::golang::test_targets() {
   local targets=(
     cmd/integration
     cmd/gendocs
+    cmd/genkubedocs
     cmd/genman
     cmd/mungedocs
     cmd/genbashcomp
     cmd/genconversion
     cmd/gendeepcopy
     cmd/genswaggertypedocs
-    examples/k8petstore/web-server
+    examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
@@ -86,8 +88,10 @@ readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
   test/images/network-tester/rc.json
   test/images/network-tester/service.json
+  test/kubemark
   hack/e2e.go
   hack/e2e-internal
+  hack/get-build.sh
   hack/ginkgo-e2e.sh
   hack/lib
 )

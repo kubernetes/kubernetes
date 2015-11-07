@@ -38,7 +38,6 @@ spec:
         - containerPort: 5000
           name: registry
           protocol: TCP
-      # TODO: use a persistent volume claim
       volumes:
       - name: image-store
         persistentVolumeClaim:

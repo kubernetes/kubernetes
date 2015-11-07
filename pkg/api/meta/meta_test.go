@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestGenericTypeMeta(t *testing.T) {
@@ -31,7 +31,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		Name              string            `json:"name,omitempty"`
 		GenerateName      string            `json:"generateName,omitempty"`
 		UID               string            `json:"uid,omitempty"`
-		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+		CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
 		SelfLink          string            `json:"selfLink,omitempty"`
 		ResourceVersion   string            `json:"resourceVersion,omitempty"`
 		APIVersion        string            `json:"apiVersion,omitempty"`
@@ -146,7 +146,7 @@ type InternalTypeMeta struct {
 	Name              string            `json:"name,omitempty"`
 	GenerateName      string            `json:"generateName,omitempty"`
 	UID               string            `json:"uid,omitempty"`
-	CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+	CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
 	SelfLink          string            `json:"selfLink,omitempty"`
 	ResourceVersion   string            `json:"resourceVersion,omitempty"`
 	APIVersion        string            `json:"apiVersion,omitempty"`
@@ -321,7 +321,7 @@ func TestGenericObjectMeta(t *testing.T) {
 		Name              string            `json:"name,omitempty"`
 		GenerateName      string            `json:"generateName,omitempty"`
 		UID               string            `json:"uid,omitempty"`
-		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+		CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
 		SelfLink          string            `json:"selfLink,omitempty"`
 		ResourceVersion   string            `json:"resourceVersion,omitempty"`
 		Labels            map[string]string `json:"labels,omitempty"`

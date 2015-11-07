@@ -3,7 +3,7 @@ summary: Container Cluster Management Master
 description: |
   Provides a kubernetes api endpoint, scheduler for managing containers.
 maintainers:
-    - Matt Bruzek <matt.bruzek@canonical.com>
+    - Matt Bruzek <matthew.bruzek@canonical.com>
     - Whit Morriss <whit.morriss@canonical.com>
     - Charles Butler <charles.butler@canonical.com>
 tags:

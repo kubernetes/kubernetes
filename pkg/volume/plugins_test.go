@@ -29,11 +29,11 @@ func TestSpecSourceConverters(t *testing.T) {
 	}
 
 	converted := NewSpecFromVolume(v)
-	if converted.VolumeSource.EmptyDir == nil {
+	if converted.Volume.EmptyDir == nil {
 		t.Errorf("Unexpected nil EmptyDir: %+v", converted)
 	}
-	if v.Name != converted.Name {
-		t.Errorf("Expected %v but got %v", v.Name, converted.Name)
+	if v.Name != converted.Name() {
+		t.Errorf("Expected %v but got %v", v.Name, converted.Name())
 	}
 
 	pv := &api.PersistentVolume{
@@ -44,10 +44,10 @@ func TestSpecSourceConverters(t *testing.T) {
 	}
 
 	converted = NewSpecFromPersistentVolume(pv, false)
-	if converted.PersistentVolumeSource.AWSElasticBlockStore == nil {
+	if converted.PersistentVolume.Spec.AWSElasticBlockStore == nil {
 		t.Errorf("Unexpected nil AWSElasticBlockStore: %+v", converted)
 	}
-	if pv.Name != converted.Name {
-		t.Errorf("Expected %v but got %v", pv.Name, converted.Name)
+	if pv.Name != converted.Name() {
+		t.Errorf("Expected %v but got %v", pv.Name, converted.Name())
 	}
 }

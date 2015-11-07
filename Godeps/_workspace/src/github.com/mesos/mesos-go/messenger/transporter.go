@@ -43,11 +43,11 @@ type Transporter interface {
 
 	//Start starts the transporter and returns immediately. The error chan
 	//is never nil.
-	Start() <-chan error
+	Start() (upid.UPID, <-chan error)
 
 	//Stop kills the transporter.
 	Stop(graceful bool) error
 
 	//UPID returns the PID for transporter.
-	UPID() *upid.UPID
+	UPID() upid.UPID
 }

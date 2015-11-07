@@ -15,9 +15,34 @@
 # limitations under the License.
 
 ZONE=${KUBE_AWS_ZONE:-us-west-2a}
-MASTER_SIZE=${MASTER_SIZE:-t2.micro}
-MINION_SIZE=${MINION_SIZE:-t2.micro}
+
+MASTER_SIZE=${MASTER_SIZE:-}
+MINION_SIZE=${MINION_SIZE:-}
 NUM_MINIONS=${NUM_MINIONS:-2}
+
+# Dynamically set node sizes so that Heapster has enough space to run
+if [[ -z ${MINION_SIZE} ]]; then
+  if (( ${NUM_MINIONS} < 50 )); then
+    MINION_SIZE="t2.micro"
+  elif (( ${NUM_MINIONS} < 150 )); then
+    MINION_SIZE="t2.small"
+  else
+    MINION_SIZE="t2.medium"
+  fi
+fi
+
+# Dynamically set the master size by the number of nodes, these are guesses
+# TODO: gather some data
+if [[ -z ${MASTER_SIZE} ]]; then
+  if (( ${NUM_MINIONS} < 50 )); then
+    MASTER_SIZE="t2.micro"
+  elif (( ${NUM_MINIONS} < 150 )); then
+    MASTER_SIZE="t2.small"
+  else
+    MASTER_SIZE="t2.medium"
+  fi
+fi
+
 
 # Because regions are globally named, we want to create in a single region; default to us-east-1
 AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
@@ -35,6 +60,12 @@ LOG="/dev/null"
 
 MASTER_DISK_TYPE="${MASTER_DISK_TYPE:-gp2}"
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20}
+# The master root EBS volume size (typically does not need to be very large)
+MASTER_ROOT_DISK_TYPE="${MASTER_ROOT_DISK_TYPE:-gp2}"
+MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-8}
+# The minions root EBS volume size (used to house Docker images)
+MINION_ROOT_DISK_TYPE="${MINION_ROOT_DISK_TYPE:-gp2}"
+MINION_ROOT_DISK_SIZE=${MINION_ROOT_DISK_SIZE:-32}
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
@@ -48,6 +79,8 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # If set to auto, a new Elastic IP will be acquired
 # Otherwise amazon-given public ip will be used (it'll change with reboot).
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
+ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
@@ -76,8 +109,23 @@ DNS_REPLICAS=1
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
+# Optional: Create autoscaler for cluster's nodes.
+ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
+if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  # TODO: actually configure ASG or similar
+  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
+  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
+  TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
+fi
+
+# Optional: Enable deployment experimental feature, not ready for production use.
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
+if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
@@ -89,3 +137,6 @@ KUBE_MINION_IMAGE="${KUBE_MINION_IMAGE:-}"
 COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"
 RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
+
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

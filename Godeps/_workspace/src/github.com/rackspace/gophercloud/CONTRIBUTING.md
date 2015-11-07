@@ -28,11 +28,10 @@ fork as `origin` instead:
    git remote add origin git@github.com/<my_username>/gophercloud
    ```
 
-4. Checkout the latest development branch ([click here](/branches) to see all
-the branches):
+4. Checkout the latest development branch:
 
    ```bash
-   git checkout release/v1.0.1
+   git checkout master
    ```
 
 5. If you're working on something (discussed more in detail below), you will

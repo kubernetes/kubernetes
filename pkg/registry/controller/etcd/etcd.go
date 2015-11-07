@@ -32,13 +32,18 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
 	prefix := "/controllers"
+
+	newListFunc := func() runtime.Object { return &api.ReplicationControllerList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.ReplicationController{}, prefix, true, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &api.ReplicationController{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &api.ReplicationControllerList{} },
+		NewListFunc: newListFunc,
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -65,7 +70,24 @@ func NewREST(s storage.Interface) *REST {
 		// Used to validate controller updates
 		UpdateStrategy: controller.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = controller.StatusStrategy
+
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a replication controller
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.ReplicationController{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

@@ -44,18 +44,18 @@ We use the Prometheus monitoring system's golang client library for instrumentin
   2. Give the metric a name and description.
   3. Pick whether you want to distinguish different categories of things using labels on the metric. If so, add "Vec" to the name of the type of metric you want and add a slice of the label names to the definition.
 
-   https://github.com/GoogleCloudPlatform/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/apiserver/apiserver.go#L53
-   https://github.com/GoogleCloudPlatform/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/kubelet/metrics/metrics.go#L31
+   https://github.com/kubernetes/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/apiserver/apiserver.go#L53
+   https://github.com/kubernetes/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/kubelet/metrics/metrics.go#L31
 
 3. Register the metric so that prometheus will know to export it.
 
-   https://github.com/GoogleCloudPlatform/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/kubelet/metrics/metrics.go#L74
-   https://github.com/GoogleCloudPlatform/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/apiserver/apiserver.go#L78
+   https://github.com/kubernetes/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/kubelet/metrics/metrics.go#L74
+   https://github.com/kubernetes/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/apiserver/apiserver.go#L78
 
 4. Use the metric by calling the appropriate method for your metric type (Set, Inc/Add, or Observe, respectively for Gauge, Counter, or Histogram/Summary), first calling WithLabelValues if your metric has any labels
 
-   https://github.com/GoogleCloudPlatform/kubernetes/blob/3ce7fe8310ff081dbbd3d95490193e1d5250d2c9/pkg/kubelet/kubelet.go#L1384
-   https://github.com/GoogleCloudPlatform/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/apiserver/apiserver.go#L87
+   https://github.com/kubernetes/kubernetes/blob/3ce7fe8310ff081dbbd3d95490193e1d5250d2c9/pkg/kubelet/kubelet.go#L1384
+   https://github.com/kubernetes/kubernetes/blob/cd3299307d44665564e1a5c77d0daa0286603ff5/pkg/apiserver/apiserver.go#L87
 
 
 These are the metric type definitions if you're curious to learn about them or need more information:

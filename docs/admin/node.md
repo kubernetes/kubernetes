@@ -211,8 +211,12 @@ preparatory step before a node reboot, etc.  For example, to mark a node
 unschedulable, run this command:
 
 ```sh
-kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
+kubectl patch nodes $NODENAME -p '{"spec": {"unschedulable": true}}'
 ```
+
+Note that pods which are created by a daemonSet controller bypass the Kubernetes scheduler,
+and do not respect the unschedulable attribute on a node.   The assumption is that daemons belong on
+the machine even if it is being drained of applications in preparation for a reboot.
 
 ### Node capacity
 
@@ -222,7 +226,7 @@ you are doing [manual node administration](#manual-node-administration), then yo
 capacity when adding a node.
 
 The Kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
-checks that the sum of the limits of containers on the node is no greater than than the node capacity.  It
+checks that the sum of the limits of containers on the node is no greater than the node capacity.  It
 includes all containers started by kubelet, but not containers started directly by docker, nor
 processes not in containers.
 
@@ -253,7 +257,7 @@ on each kubelet where you want to reserve resources.
 
 Node is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Node API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html#_v1_node).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

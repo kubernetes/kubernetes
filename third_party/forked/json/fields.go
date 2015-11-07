@@ -44,9 +44,12 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string
 		}
 	}
 	if f != nil {
-		// Find the reflect.Value of the most preferential
-		// struct field.
+		// Find the reflect.Value of the most preferential struct field.
 		tjf := t.Field(f.index[0])
+		// we must navigate down all the anonymously included structs in the chain
+		for i := 1; i < len(f.index); i++ {
+			tjf = tjf.Type.Field(f.index[i])
+		}
 		patchStrategy := tjf.Tag.Get("patchStrategy")
 		patchMergeKey := tjf.Tag.Get("patchMergeKey")
 		return tjf.Type, patchStrategy, patchMergeKey, nil
@@ -60,11 +63,18 @@ type field struct {
 	nameBytes []byte                 // []byte(name)
 	equalFold func(s, t []byte) bool // bytes.EqualFold or equivalent
 
-	tag       bool
+	tag bool
+	// index is the sequence of indexes from the containing type fields to this field.
+	// it is a slice because anonymous structs will need multiple navigation steps to correctly
+	// resolve the proper fields
 	index     []int
 	typ       reflect.Type
 	omitEmpty bool
 	quoted    bool
+}
+
+func (f field) String() string {
+	return fmt.Sprintf("{name: %s, type: %v, tag: %v, index: %v, omitEmpty: %v, quoted: %v}", f.name, f.typ, f.tag, f.index, f.omitEmpty, f.quoted)
 }
 
 func fillField(f field) field {

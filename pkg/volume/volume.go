@@ -18,6 +18,7 @@ package volume
 
 import (
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/api"
 	"os"
 	"path"
 )
@@ -44,6 +45,18 @@ type Builder interface {
 	// IsReadOnly is a flag that gives the builder's ReadOnly attribute.
 	// All persistent volumes have a private readOnly flag in their builders.
 	IsReadOnly() bool
+	// SupportsOwnershipManagement returns whether this builder wants
+	// ownership management for the volume.  If this method returns true,
+	// the Kubelet will:
+	//
+	// 1. Make the volume owned by group FSGroup
+	// 2. Set the setgid bit is set (new files created in the volume will be owned by FSGroup)
+	// 3. Logical OR the permission bits with rw-rw----
+	SupportsOwnershipManagement() bool
+	// SupportsSELinux reports whether the given builder supports
+	// SELinux and would like the kubelet to relabel the volume to
+	// match the pod to which it will be attached.
+	SupportsSELinux() bool
 }
 
 // Cleaner interface provides methods to cleanup/unmount the volumes.
@@ -63,6 +76,20 @@ type Recycler interface {
 	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
 	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
 	Recycle() error
+}
+
+// Create adds a new resource in the storage provider and creates a PersistentVolume for the new resource.
+// Calls to Create should block until complete.
+type Creater interface {
+	Create() (*api.PersistentVolume, error)
+}
+
+// Delete removes the resource from the underlying storage provider.  Calls to this method should block until
+// the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
+// A nil return indicates success.
+type Deleter interface {
+	Volume
+	Delete() error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {

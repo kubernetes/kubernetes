@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/leaky"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -37,38 +38,61 @@ type SimpleSecurityContextProvider struct{}
 // The security context provider can make changes to the Config with which
 // the container is created.
 func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) {
-	if container.SecurityContext == nil {
+	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
+	if effectiveSC == nil {
 		return
 	}
-	if container.SecurityContext.RunAsUser != nil {
-		config.User = strconv.FormatInt(*container.SecurityContext.RunAsUser, 10)
+	if effectiveSC.RunAsUser != nil {
+		config.User = strconv.Itoa(int(*effectiveSC.RunAsUser))
 	}
 }
 
 // ModifyHostConfig is called before the Docker runContainer call.
 // The security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-// An error is returned if it's not possible to secure the container as requested
-// with a security context.
 func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
-	if container.SecurityContext == nil {
-		return
-	}
-	if container.SecurityContext.Privileged != nil {
-		hostConfig.Privileged = *container.SecurityContext.Privileged
+	// Apply pod security context
+	if container.Name != leaky.PodInfraContainerName && pod.Spec.SecurityContext != nil {
+		// TODO: We skip application of supplemental groups to the
+		// infra container to work around a runc issue which
+		// requires containers to have the '/etc/group'. For
+		// more information see:
+		// https://github.com/opencontainers/runc/pull/313
+		// This can be removed once the fix makes it into the
+		// required version of docker.
+		if pod.Spec.SecurityContext.SupplementalGroups != nil {
+			hostConfig.GroupAdd = make([]string, len(pod.Spec.SecurityContext.SupplementalGroups))
+			for i, group := range pod.Spec.SecurityContext.SupplementalGroups {
+				hostConfig.GroupAdd[i] = strconv.Itoa(int(group))
+			}
+		}
+
+		if pod.Spec.SecurityContext.FSGroup != nil {
+			hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(*pod.Spec.SecurityContext.FSGroup)))
+		}
 	}
 
-	if container.SecurityContext.Capabilities != nil {
-		add, drop := makeCapabilites(container.SecurityContext.Capabilities.Add, container.SecurityContext.Capabilities.Drop)
+	// Apply effective security context for container
+	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
+	if effectiveSC == nil {
+		return
+	}
+
+	if effectiveSC.Privileged != nil {
+		hostConfig.Privileged = *effectiveSC.Privileged
+	}
+
+	if effectiveSC.Capabilities != nil {
+		add, drop := makeCapabilites(effectiveSC.Capabilities.Add, effectiveSC.Capabilities.Drop)
 		hostConfig.CapAdd = add
 		hostConfig.CapDrop = drop
 	}
 
-	if container.SecurityContext.SELinuxOptions != nil {
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelUser, container.SecurityContext.SELinuxOptions.User)
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelRole, container.SecurityContext.SELinuxOptions.Role)
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelType, container.SecurityContext.SELinuxOptions.Type)
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelLevel, container.SecurityContext.SELinuxOptions.Level)
+	if effectiveSC.SELinuxOptions != nil {
+		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelUser, effectiveSC.SELinuxOptions.User)
+		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelRole, effectiveSC.SELinuxOptions.Role)
+		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelType, effectiveSC.SELinuxOptions.Type)
+		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelLevel, effectiveSC.SELinuxOptions.Level)
 	}
 }
 
@@ -94,4 +118,70 @@ func makeCapabilites(capAdd []api.Capability, capDrop []api.Capability) ([]strin
 		dropCaps = append(dropCaps, string(cap))
 	}
 	return addCaps, dropCaps
+}
+
+func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
+	effectiveSc := securityContextFromPodSecurityContext(pod)
+	containerSc := container.SecurityContext
+
+	if effectiveSc == nil && containerSc == nil {
+		return nil
+	}
+	if effectiveSc != nil && containerSc == nil {
+		return effectiveSc
+	}
+	if effectiveSc == nil && containerSc != nil {
+		return containerSc
+	}
+
+	if containerSc.SELinuxOptions != nil {
+		effectiveSc.SELinuxOptions = new(api.SELinuxOptions)
+		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.Capabilities != nil {
+		effectiveSc.Capabilities = new(api.Capabilities)
+		*effectiveSc.Capabilities = *containerSc.Capabilities
+	}
+
+	if containerSc.Privileged != nil {
+		effectiveSc.Privileged = new(bool)
+		*effectiveSc.Privileged = *containerSc.Privileged
+	}
+
+	if containerSc.RunAsUser != nil {
+		effectiveSc.RunAsUser = new(int64)
+		*effectiveSc.RunAsUser = *containerSc.RunAsUser
+	}
+
+	if containerSc.RunAsNonRoot != nil {
+		effectiveSc.RunAsNonRoot = new(bool)
+		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
+	}
+
+	return effectiveSc
+}
+
+func securityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
+	if pod.Spec.SecurityContext == nil {
+		return nil
+	}
+
+	synthesized := &api.SecurityContext{}
+
+	if pod.Spec.SecurityContext.SELinuxOptions != nil {
+		synthesized.SELinuxOptions = &api.SELinuxOptions{}
+		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
+	}
+	if pod.Spec.SecurityContext.RunAsUser != nil {
+		synthesized.RunAsUser = new(int64)
+		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
+	}
+
+	if pod.Spec.SecurityContext.RunAsNonRoot != nil {
+		synthesized.RunAsNonRoot = new(bool)
+		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
+	}
+
+	return synthesized
 }

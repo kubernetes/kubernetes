@@ -33,12 +33,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
 	plugin "k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -53,11 +52,17 @@ const (
 	pluginRecoveryDelay = 100 * time.Millisecond // delay after scheduler plugin crashes, before we resume scheduling
 )
 
+const (
+	FailedScheduling = "FailedScheduling"
+	Scheduled        = "Scheduled"
+)
+
 // scheduler abstraction to allow for easier unit testing
 type schedulerInterface interface {
 	sync.Locker // synchronize scheduler plugin operations
+
 	SlaveIndex
-	algorithm() PodScheduleFunc // see types.go
+	algorithm() PodScheduler
 	offers() offers.Registry
 	tasks() podtask.Registry
 
@@ -76,8 +81,8 @@ type k8smScheduler struct {
 	internal *KubernetesScheduler
 }
 
-func (k *k8smScheduler) algorithm() PodScheduleFunc {
-	return k.internal.scheduleFunc
+func (k *k8smScheduler) algorithm() PodScheduler {
+	return k.internal
 }
 
 func (k *k8smScheduler) offers() offers.Registry {
@@ -92,9 +97,8 @@ func (k *k8smScheduler) createPodTask(ctx api.Context, pod *api.Pod) (*podtask.T
 	return podtask.New(ctx, "", *pod, k.internal.executor)
 }
 
-func (k *k8smScheduler) slaveFor(id string) (slave *Slave, ok bool) {
-	slave, ok = k.internal.slaves.getSlave(id)
-	return
+func (k *k8smScheduler) slaveHostNameFor(id string) string {
+	return k.internal.slaveHostNames.HostName(id)
 }
 
 func (k *k8smScheduler) killTask(taskId string) error {
@@ -231,10 +235,8 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 }
 
 type kubeScheduler struct {
-	api                      schedulerInterface
-	podUpdates               queue.FIFO
-	defaultContainerCPULimit mresource.CPUShares
-	defaultContainerMemLimit mresource.MegaBytes
+	api        schedulerInterface
+	podUpdates queue.FIFO
 }
 
 // recoverAssignedSlave recovers the assigned Mesos slave from a pod by searching
@@ -248,7 +250,7 @@ func recoverAssignedSlave(pod *api.Pod) string {
 
 // Schedule implements the Scheduler interface of Kubernetes.
 // It returns the selectedMachine's name and error (if there's any).
-func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.MinionLister) (string, error) {
+func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (string, error) {
 	log.Infof("Try to schedule pod %v\n", pod.Name)
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 
@@ -318,7 +320,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		}
 	}
 	if err == nil && offer == nil {
-		offer, err = k.api.algorithm()(k.api.offers(), k.api, task)
+		offer, err = k.api.algorithm().SchedulePod(k.api.offers(), k.api, task)
 	}
 	if err != nil {
 		return "", err
@@ -328,7 +330,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
 	slaveId := details.GetSlaveId().GetValue()
-	if slave, ok := k.api.slaveFor(slaveId); !ok {
+	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
 		k.api.offers().Invalidate(details.Id.GetValue())
@@ -338,24 +340,14 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 		}
 
-		// write resource limits into the pod spec which is transferred to the executor. From here
-		// on we can expect that the pod spec of a task has proper limits for CPU and memory.
-		// TODO(sttts): For a later separation of the kubelet and the executor also patch the pod on the apiserver
-		if unlimitedCPU := mresource.LimitPodCPU(&task.Pod, k.defaultContainerCPULimit); unlimitedCPU {
-			log.Warningf("Pod %s/%s without cpu limits is admitted %.2f cpu shares", task.Pod.Namespace, task.Pod.Name, mresource.PodCPULimit(&task.Pod))
-		}
-		if unlimitedMem := mresource.LimitPodMem(&task.Pod, k.defaultContainerMemLimit); unlimitedMem {
-			log.Warningf("Pod %s/%s without memory limits is admitted %.2f MB", task.Pod.Namespace, task.Pod.Name, mresource.PodMemLimit(&task.Pod))
-		}
-
 		task.Offer = offer
-		task.FillFromDetails(details)
+		k.api.algorithm().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
 
 		if err := k.api.tasks().Update(task); err != nil {
 			offer.Release()
 			return "", err
 		}
-		return slave.HostName, nil
+		return slaveHostName, nil
 	}
 }
 
@@ -451,7 +443,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 
 			pod := p.(*Pod)
 			if recoverAssignedSlave(pod.Pod) != "" {
-				log.V(3).Infof("dequeuing pod for scheduling: %v", pod.Pod.Name)
+				log.V(3).Infof("dequeuing assigned pod for scheduling: %v", pod.Pod.Name)
 				q.dequeue(pod.GetUID())
 			} else {
 				// use ReplaceExisting because we are always pushing the latest state
@@ -556,7 +548,11 @@ func (k *errorHandler) handleSchedulingError(pod *api.Pod, schedulingErr error) 
 				defer k.api.Unlock()
 				switch task, state := k.api.tasks().Get(task.ID); state {
 				case podtask.StatePending:
-					return !task.Has(podtask.Launched) && task.AcceptOffer(offer)
+					// Assess fitness of pod with the current offer. The scheduler normally
+					// "backs off" when it can't find an offer that matches up with a pod.
+					// The backoff period for a pod can terminate sooner if an offer becomes
+					// available that matches up.
+					return !task.Has(podtask.Launched) && k.api.algorithm().FitPredicate()(task, offer, nil)
 				default:
 					// no point in continuing to check for matching offers
 					return true
@@ -696,12 +692,10 @@ func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *ht
 	})
 	return &PluginConfig{
 		Config: &plugin.Config{
-			MinionLister: nil,
+			NodeLister: nil,
 			Algorithm: &kubeScheduler{
-				api:                      kapi,
-				podUpdates:               podUpdates,
-				defaultContainerCPULimit: k.defaultContainerCPULimit,
-				defaultContainerMemLimit: k.defaultContainerMemLimit,
+				api:        kapi,
+				podUpdates: podUpdates,
 			},
 			Binder:   &binder{api: kapi},
 			NextPod:  q.yield,
@@ -754,11 +748,21 @@ func (s *schedulingPlugin) Run(done <-chan struct{}) {
 // with the Modeler stuff removed since we don't use it because we have mesos.
 func (s *schedulingPlugin) scheduleOne() {
 	pod := s.config.NextPod()
+
+	// pods which are pre-scheduled (i.e. NodeName is set) are deleted by the kubelet
+	// in upstream. Not so in Mesos because the kubelet hasn't see that pod yet. Hence,
+	// the scheduler has to take care of this:
+	if pod.Spec.NodeName != "" && pod.DeletionTimestamp != nil {
+		log.V(3).Infof("deleting pre-scheduled, not yet running pod: %s/%s", pod.Namespace, pod.Name)
+		s.client.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
+		return
+	}
+
 	log.V(3).Infof("Attempting to schedule: %+v", pod)
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister) // call kubeScheduler.Schedule
+	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister) // call kubeScheduler.Schedule
 	if err != nil {
 		log.V(1).Infof("Failed to schedule: %+v", pod)
-		s.config.Recorder.Eventf(pod, "FailedScheduling", "Error scheduling: %v", err)
+		s.config.Recorder.Eventf(pod, FailedScheduling, "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -771,11 +775,11 @@ func (s *schedulingPlugin) scheduleOne() {
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		log.V(1).Infof("Failed to bind pod: %+v", err)
-		s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
+		s.config.Recorder.Eventf(pod, FailedScheduling, "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	s.config.Recorder.Eventf(pod, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	s.config.Recorder.Eventf(pod, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
 }
 
 // this pod may be out of sync with respect to the API server registry:
@@ -893,11 +897,11 @@ func (psa *podStoreAdapter) Get(obj interface{}) (interface{}, bool, error) {
 
 // Replace will delete the contents of the store, using instead the
 // given map. This store implementation does NOT take ownership of the map.
-func (psa *podStoreAdapter) Replace(objs []interface{}) error {
+func (psa *podStoreAdapter) Replace(objs []interface{}, resourceVersion string) error {
 	newobjs := make([]interface{}, len(objs))
 	for i, v := range objs {
 		pod := v.(*api.Pod)
 		newobjs[i] = &Pod{Pod: pod}
 	}
-	return psa.FIFO.Replace(newobjs)
+	return psa.FIFO.Replace(newobjs, resourceVersion)
 }

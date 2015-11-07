@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replicationcontroller
+package replication
 
 import (
 	"reflect"
@@ -24,9 +24,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -39,15 +39,9 @@ import (
 
 const (
 	// We'll attempt to recompute the required replicas of all replication controllers
-	// the have fulfilled their expectations at least this often. This recomputation
+	// that have fulfilled their expectations at least this often. This recomputation
 	// happens based on contents in local pod storage.
 	FullControllerResyncPeriod = 30 * time.Second
-
-	// If a watch misdelivers info about a pod, it'll take at least this long
-	// to rectify the number of replicas. Note that dropped deletes are only
-	// rectified after the expectation times out because we don't know the
-	// final resting state of the pod.
-	PodRelistPeriod = 5 * time.Minute
 
 	// Realistic value of the burstReplica field for the replication manager based off
 	// performance requirements for kubernetes 1.0.
@@ -75,28 +69,27 @@ type ReplicationManager struct {
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(rcKey string) error
 
-	// podStoreSynced returns true if the pod store has been synced at least once.
-	// Added as a member to the struct to allow injection for testing.
-	podStoreSynced func() bool
-
 	// A TTLCache of pod creates/deletes each rc expects to see
 	expectations controller.ControllerExpectationsInterface
 
 	// A store of replication controllers, populated by the rcController
 	rcStore cache.StoreToReplicationControllerLister
-
-	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
 	// Watches changes to all replication controllers
 	rcController *framework.Controller
+	// A store of pods, populated by the podController
+	podStore cache.StoreToPodLister
 	// Watches changes to all pods
 	podController *framework.Controller
-	// Controllers that need to be updated
+	// podStoreSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	podStoreSynced func() bool
+
+	// Controllers that need to be synced
 	queue *workqueue.Type
 }
 
 // NewReplicationManager creates a new ReplicationManager.
-func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *ReplicationManager {
+func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -115,23 +108,30 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything())
+				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.ReplicationController{},
+		// TODO: Can we have much longer period here?
 		FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				// We only really need to do this when spec changes, but for correctness it is safer to
-				// periodically double check. It is overkill for 2 reasons:
-				// 1. Status.Replica updates will cause a sync
-				// 2. Every 30s we will get a full resync (this will happen anyway every 5 minutes when pods relist)
-				// However, it shouldn't be that bad as rcs that haven't met expectations won't sync, and all
-				// the listing is done using local stores.
+				// You might imagine that we only really need to enqueue the
+				// controller when Spec changes, but it is safer to sync any
+				// time this function is triggered. That way a full informer
+				// resync can requeue any controllers that don't yet have pods
+				// but whose last attempts at creating a pod have failed (since
+				// we don't block on creation of pods) instead of those
+				// controllers stalling indefinitely. Enqueueing every time
+				// does result in some spurious syncs (like when Status.Replica
+				// is updated and the watch notification from it retriggers
+				// this function), but in general extra resyncs shouldn't be
+				// that bad as rcs that haven't met expectations yet won't
+				// sync, and all the listing is done using local stores.
 				oldRC := old.(*api.ReplicationController)
 				curRC := cur.(*api.ReplicationController)
 				if oldRC.Status.Replicas != curRC.Status.Replicas {
@@ -151,12 +151,12 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 			ListFunc: func() (runtime.Object, error) {
 				return rm.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return rm.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return rm.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Pod{},
-		PodRelistPeriod,
+		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.addPod,
 			// This invokes the rc for every pod change, eg: host assignment. Though this might seem like overkill
@@ -206,7 +206,13 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 	// rc1 (older rc): [(k1=v1)], replicas=1 rc2: [(k2=v2)], replicas=2
 	// pod: [(k1:v1), (k2:v2)] will wake both rc1 and rc2, and we will sync rc1.
 	// pod: [(k2:v2)] will wake rc2 which creates a new replica.
-	sort.Sort(overlappingControllers(controllers))
+	if len(controllers) > 1 {
+		// More than two items in this list indicates user error. If two replication-controller
+		// overlap, sort by creation timestamp, subsort by name, then pick
+		// the first.
+		glog.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels)
+		sort.Sort(overlappingControllers(controllers))
+	}
 	return &controllers[0]
 }
 
@@ -350,7 +356,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := rm.podControl.CreateReplica(rc.Namespace, rc); err != nil {
+				if err := rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc); err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)
@@ -382,6 +388,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.DeletionObserved(rcKey)
+					util.HandleError(err)
 				}
 			}(i)
 		}
@@ -444,7 +451,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	if err := updateReplicaCount(rm.kubeClient.ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the controller ensures
 		// we retry with some fairness.
-		glog.V(2).Infof("Failed to update replica count for controller %v, requeuing", rc.Name)
+		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)
 		rm.enqueueController(&rc)
 	}
 	return nil

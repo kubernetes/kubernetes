@@ -25,16 +25,16 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
-	// TODO: enable when exapi problems are fixed #13083
-	//_ "k8s.io/kubernetes/pkg/expapi"
-	//_ "k8s.io/kubernetes/pkg/expapi/v1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 
 	flag "github.com/spf13/pflag"
 )
@@ -70,7 +70,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj2) {
-		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v\nFinal: %#v", name, util.ObjectGoPrintDiff(item, obj2), codec, string(data), printer.Sprintf("%#v", item), printer.Sprintf("%#v", obj2))
+		t.Errorf("1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, util.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), string(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
@@ -88,13 +88,20 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 // roundTripSame verifies the same source object is tested in all API versions.
 func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
-	set := util.NewStringSet(except...)
+	set := sets.NewString(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
-	version := testapi.Version()
+
+	codec, err := testapi.GetCodecForObject(item)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	version := testapi.Default.Version()
 	if !set.Has(version) {
 		fuzzInternalObject(t, version, item, seed)
-		roundTrip(t, testapi.Codec(), item)
+		roundTrip(t, codec, item)
 	}
 }
 
@@ -103,13 +110,8 @@ func TestSpecificKind(t *testing.T) {
 	api.Scheme.Log(t)
 	defer api.Scheme.Log(nil)
 
-	kind := "PodList"
-	item, err := api.Scheme.New("", kind)
-	if err != nil {
-		t.Errorf("Couldn't make a %v? %v", kind, err)
-		return
-	}
-	roundTripSame(t, item)
+	kind := "Pod"
+	doRoundTripTest(kind, t)
 }
 
 func TestList(t *testing.T) {
@@ -125,8 +127,8 @@ func TestList(t *testing.T) {
 	roundTripSame(t, item)
 }
 
-var nonRoundTrippableTypes = util.NewStringSet("ThirdPartyResource")
-var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions", "PodAttachOptions")
+var nonRoundTrippableTypes = sets.NewString()
+var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "PodExecOptions", "PodAttachOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 
 func TestRoundTripTypes(t *testing.T) {
@@ -139,18 +141,22 @@ func TestRoundTripTypes(t *testing.T) {
 		}
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
-			item, err := api.Scheme.New("", kind)
-			if err != nil {
-				t.Fatalf("Couldn't make a %v? %v", kind, err)
-			}
-			if _, err := meta.TypeAccessor(item); err != nil {
-				t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
-			}
-			roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
-			if !nonInternalRoundTrippableTypes.Has(kind) {
-				roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
-			}
+			doRoundTripTest(kind, t)
 		}
+	}
+}
+
+func doRoundTripTest(kind string, t *testing.T) {
+	item, err := api.Scheme.New("", kind)
+	if err != nil {
+		t.Fatalf("Couldn't make a %v? %v", kind, err)
+	}
+	if _, err := meta.TypeAccessor(item); err != nil {
+		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
+	}
+	roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
+	if !nonInternalRoundTrippableTypes.Has(kind) {
+		roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
 	}
 }
 
@@ -165,11 +171,13 @@ func TestEncode_Ptr(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 
 			TerminationGracePeriodSeconds: &grace,
+
+			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
 	obj := runtime.Object(pod)
-	data, err := latest.Codec.Encode(obj)
-	obj2, err2 := latest.Codec.Decode(data)
+	data, err := testapi.Default.Codec().Encode(obj)
+	obj2, err2 := testapi.Default.Codec().Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -177,23 +185,55 @@ func TestEncode_Ptr(t *testing.T) {
 		t.Fatalf("Got wrong type")
 	}
 	if !api.Semantic.DeepEqual(obj2, pod) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", pod, obj2)
+		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, util.ObjectDiff(obj2, pod))
+
 	}
 }
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := latest.Codec.Decode(badJSONMissingKind); err == nil {
+	if _, err := testapi.Default.Codec().Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := latest.Codec.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := testapi.Default.Codec().Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
 	if err2 := DecodeInto(badJSONKindMismatch, &Minion{}); err2 == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}*/
+}
+
+func TestUnversionedTypes(t *testing.T) {
+	testcases := []runtime.Object{
+		&unversioned.Status{Status: "Failure", Message: "something went wrong"},
+		&unversioned.APIVersions{Versions: []string{"A", "B", "C"}},
+		&unversioned.APIGroupList{Groups: []unversioned.APIGroup{{Name: "mygroup"}}},
+		&unversioned.APIGroup{Name: "mygroup"},
+		&unversioned.APIResourceList{GroupVersion: "mygroup/myversion"},
+	}
+
+	for _, obj := range testcases {
+		// Make sure the unversioned codec can encode
+		unversionedJSON, err := api.Codec.Encode(obj)
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", obj, err)
+			continue
+		}
+
+		// Make sure the versioned codec under test can decode
+		versionDecodedObject, err := testapi.Default.Codec().Decode(unversionedJSON)
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", obj, err)
+			continue
+		}
+		// Make sure it decodes correctly
+		if !reflect.DeepEqual(obj, versionDecodedObject) {
+			t.Errorf("%v: expected %#v, got %#v", obj, obj, versionDecodedObject)
+			continue
+		}
+	}
 }
 
 const benchmarkSeed = 100
@@ -203,7 +243,7 @@ func BenchmarkEncode(b *testing.B) {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	for i := 0; i < b.N; i++ {
-		latest.Codec.Encode(&pod)
+		testapi.Default.Codec().Encode(&pod)
 	}
 }
 
@@ -221,9 +261,9 @@ func BenchmarkDecode(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := latest.Codec.Encode(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
 	for i := 0; i < b.N; i++ {
-		latest.Codec.Decode(data)
+		testapi.Default.Codec().Decode(data)
 	}
 }
 
@@ -231,10 +271,10 @@ func BenchmarkDecodeInto(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := latest.Codec.Encode(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
 	for i := 0; i < b.N; i++ {
 		obj := api.Pod{}
-		latest.Codec.DecodeInto(data, &obj)
+		testapi.Default.Codec().DecodeInto(data, &obj)
 	}
 }
 
@@ -243,7 +283,7 @@ func BenchmarkDecodeJSON(b *testing.B) {
 	pod := api.Pod{}
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := latest.Codec.Encode(&pod)
+	data, _ := testapi.Default.Codec().Encode(&pod)
 	for i := 0; i < b.N; i++ {
 		obj := api.Pod{}
 		json.Unmarshal(data, &obj)

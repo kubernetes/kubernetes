@@ -6,7 +6,7 @@ virtualenv:
 	.venv/bin/pip install -q -r requirements.txt
 
 lint: virtualenv
-	@.venv/bin/flake8 hooks unit_tests --exclude=charmhelpers
+	@.venv/bin/flake8 hooks --exclude=charmhelpers --ignore=W391
 	@.venv/bin/charm proof
 
 test: virtualenv 
@@ -27,3 +27,4 @@ endif
 clean:
 	rm -rf .venv
 	find -name *.pyc -delete
+	rm -rf unit_tests/.cache

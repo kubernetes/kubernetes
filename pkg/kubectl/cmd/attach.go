@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -30,16 +31,17 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
-	attach_example = `# get output from running pod 123456-7890, using the first container by default
+	attach_example = `# Get output from running pod 123456-7890, using the first container by default
 $ kubectl attach 123456-7890
 
-# get output from ruby-container from pod 123456-7890
+# Get output from ruby-container from pod 123456-7890
 $ kubectl attach 123456-7890 -c ruby-container date
 
-# switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-780
+# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 # and sends stdout/stderr from 'bash' back to the client
 $ kubectl attach 123456-7890 -c ruby-container -i -t`
 )
@@ -64,7 +66,7 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 		},
 	}
 	// TODO support UID
-	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name")
+	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
 	return cmd
@@ -72,15 +74,18 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 
 // RemoteAttach defines the interface accepted by the Attach command - provided for test stubbing
 type RemoteAttach interface {
-	Attach(req *client.Request, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
 }
 
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
-func (*DefaultRemoteAttach) Attach(req *client.Request, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	attach := remotecommand.NewAttach(req, config, stdin, stdout, stderr, tty)
-	return attach.Execute()
+func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+	exec, err := remotecommand.NewExecutor(config, method, url)
+	if err != nil {
+		return err
+	}
+	return exec.Stream(stdin, stdout, stderr, tty)
 }
 
 // AttachOptions declare the arguments accepted by the Exec command
@@ -133,16 +138,17 @@ func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn 
 
 // Validate checks that the provided attach options are specified.
 func (p *AttachOptions) Validate() error {
+	allErrs := []error{}
 	if len(p.PodName) == 0 {
-		return fmt.Errorf("pod name must be specified")
+		allErrs = append(allErrs, fmt.Errorf("pod name must be specified"))
 	}
 	if p.Out == nil || p.Err == nil {
-		return fmt.Errorf("both output and error output must be provided")
+		allErrs = append(allErrs, fmt.Errorf("both output and error output must be provided"))
 	}
 	if p.Attach == nil || p.Client == nil || p.Config == nil {
-		return fmt.Errorf("client, client config, and attach must be provided")
+		allErrs = append(allErrs, fmt.Errorf("client, client config, and attach must be provided"))
 	}
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }
 
 // Run executes a validated remote execution against a pod.
@@ -156,15 +162,16 @@ func (p *AttachOptions) Run() error {
 		return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
 	}
 
-	containerName := p.ContainerName
-	if len(containerName) == 0 {
-		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-		containerName = pod.Spec.Containers[0].Name
+	var stdin io.Reader
+	tty := p.TTY
+
+	containerToAttach := p.GetContainer(pod)
+	if tty && !containerToAttach.TTY {
+		tty = false
+		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s doesn't allocate one\n", containerToAttach.Name)
 	}
 
 	// TODO: refactor with terminal helpers from the edit utility once that is merged
-	var stdin io.Reader
-	tty := p.TTY
 	if p.Stdin {
 		stdin = p.In
 		if tty {
@@ -204,8 +211,33 @@ func (p *AttachOptions) Run() error {
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
-		SubResource("attach").
-		Param("container", containerName)
+		SubResource("attach")
+	req.VersionedParams(&api.PodAttachOptions{
+		Container: containerToAttach.Name,
+		Stdin:     stdin != nil,
+		Stdout:    p.Out != nil,
+		Stderr:    p.Err != nil,
+		TTY:       tty,
+	}, api.Scheme)
 
-	return p.Attach.Attach(req, p.Config, stdin, p.Out, p.Err, tty)
+	return p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
+}
+
+// GetContainer returns the container to attach to, with a fallback.
+func (p *AttachOptions) GetContainer(pod *api.Pod) api.Container {
+	if len(p.ContainerName) > 0 {
+		for _, container := range pod.Spec.Containers {
+			if container.Name == p.ContainerName {
+				return container
+			}
+		}
+	}
+
+	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
+	return pod.Spec.Containers[0]
+}
+
+// GetContainerName returns the name of the container to attach to, with a fallback.
+func (p *AttachOptions) GetContainerName(pod *api.Pod) string {
+	return p.GetContainer(pod).Name
 }

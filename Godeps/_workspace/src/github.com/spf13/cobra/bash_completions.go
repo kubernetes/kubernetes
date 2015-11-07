@@ -19,12 +19,19 @@ const (
 func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, `#!/bin/bash
 
-
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
         echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
     fi
+}
+
+# Homebrew on Macs have version 1.3 of bash-completion which doesn't include
+# _init_completion. This is a very minimal version of that function.
+__my_init_completion()
+{
+    COMPREPLY=()
+    _get_comp_words_by_ref cur prev words cword
 }
 
 __index_of_word()
@@ -188,7 +195,11 @@ func postscript(out *bytes.Buffer, name string) {
 	fmt.Fprintf(out, "__start_%s()\n", name)
 	fmt.Fprintf(out, `{
     local cur prev words cword
-    _init_completion -s || return
+    if declare -F _init_completions >/dev/null 2>&1; then
+        _init_completion -s || return
+    else
+        __my_init_completion || return
+    fi
 
     local c=0
     local flags=()
@@ -212,7 +223,7 @@ func postscript(out *bytes.Buffer, name string) {
 func writeCommands(cmd *Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
-		if len(c.Deprecated) > 0 {
+		if !c.IsAvailableCommand() || c == cmd.helpCommand {
 			continue
 		}
 		fmt.Fprintf(out, "    commands+=(%q)\n", c.Name())
@@ -292,7 +303,7 @@ func writeRequiredFlag(cmd *Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    must_have_one_flag=()\n")
 	flags := cmd.NonInheritedFlags()
 	flags.VisitAll(func(flag *pflag.Flag) {
-		for key, _ := range flag.Annotations {
+		for key := range flag.Annotations {
 			switch key {
 			case BashCompOneRequiredFlag:
 				format := "    must_have_one_flag+=(\"--%s"
@@ -321,7 +332,7 @@ func writeRequiredNoun(cmd *Command, out *bytes.Buffer) {
 
 func gen(cmd *Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
-		if len(c.Deprecated) > 0 {
+		if !c.IsAvailableCommand() || c == cmd.helpCommand {
 			continue
 		}
 		gen(c, out)

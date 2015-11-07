@@ -91,7 +91,7 @@ func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType
 // This assumes that lb.lock is already held.
 func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
-		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimeted instead????
+		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimited instead????
 	}
 
 	if _, exists := lb.services[svcPort]; !exists {

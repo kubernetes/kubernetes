@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -72,17 +71,11 @@ func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator,
 	}
 
 	// Copied from http.DefaultTransport.
-	tr := &http.Transport{
+	tr := util.SetTransportDefaults(&http.Transport{
 		// According to golang's doc, if RootCAs is nil,
 		// TLS uses the host's root CA set.
 		TLSClientConfig: &tls.Config{RootCAs: roots},
-		Proxy:           http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
+	})
 
 	hc := &http.Client{}
 	hc.Transport = tr

@@ -16,7 +16,11 @@ limitations under the License.
 
 package proc
 
-// something that executes in the context of a process
+import (
+	"time"
+)
+
+// Action is something that executes in the context of a process
 type Action func()
 
 type Context interface {
@@ -36,8 +40,16 @@ type Doer interface {
 	Do(Action) <-chan error
 }
 
-// adapter func for Doer interface
+// DoerFunc is an adapter func for Doer interface
 type DoerFunc func(Action) <-chan error
+
+// invoke the f on action a. returns an illegal state error if f is nil.
+func (f DoerFunc) Do(a Action) <-chan error {
+	if f != nil {
+		return f(a)
+	}
+	return ErrorChan(errIllegalState)
+}
 
 type Process interface {
 	Context
@@ -71,4 +83,7 @@ type ErrorOnce interface {
 
 	// Send is non-blocking; it spins up a goroutine that reports an error (if any) that occurs on the error chan.
 	Send(<-chan error) ErrorOnce
+
+	// WaitFor returns true if an error is received within the specified duration, otherwise false
+	WaitFor(time.Duration) (error, bool)
 }

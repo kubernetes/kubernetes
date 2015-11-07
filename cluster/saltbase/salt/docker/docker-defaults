@@ -1,3 +1,7 @@
 {% set grains_opts = grains.get('docker_opts', '') -%}
-DOCKER_OPTS="{{grains_opts}} --bridge=cbr0 --iptables=false --ip-masq=false"
+{% set e2e_opts = '' -%}
+{% if pillar.get('e2e_storage_test_environment', '').lower() == 'true' -%}
+{% set e2e_opts = '-s devicemapper' -%}
+{% endif -%}
+DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} --bridge=cbr0 --iptables=false --ip-masq=false --log-level=warn"
 DOCKER_NOFILE=1000000

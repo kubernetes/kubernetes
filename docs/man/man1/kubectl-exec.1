@@ -22,10 +22,6 @@ Execute a command in a container.
     Container name. If omitted, the first container in the pod will be chosen
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for exec
-
-.PP
 \fB\-p\fP, \fB\-\-pod\fP=""
     Pod name
 
@@ -137,13 +133,13 @@ Execute a command in a container.
 .RS
 
 .nf
-# get output from running 'date' from pod 123456\-7890, using the first container by default
+# Get output from running 'date' from pod 123456\-7890, using the first container by default
 $ kubectl exec 123456\-7890 date
 	
-# get output from running 'date' in ruby\-container from pod 123456\-7890
+# Get output from running 'date' in ruby\-container from pod 123456\-7890
 $ kubectl exec 123456\-7890 \-c ruby\-container date
 
-# switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
+# Switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-7890
 # and sends stdout/stderr from 'bash' back to the client
 $ kubectl exec 123456\-7890 \-c ruby\-container \-i \-t \-\- bash \-il
 

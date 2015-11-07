@@ -41,8 +41,7 @@ readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 # KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
 readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel}/
 readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
-readonly KUBE_GCS_LATEST_FILE=${KUBE_GCS_LATEST_FILE:-}
-readonly KUBE_GCS_LATEST_CONTENTS=${KUBE_GCS_LATEST_CONTENTS:-}
+readonly KUBE_GCS_PUBLISH_VERSION=${KUBE_GCS_PUBLISH_VERSION:-}
 readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
@@ -102,7 +101,7 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
 
 # The set of addons images that should be prepopulated
 readonly KUBE_ADDON_PATHS=(
-  gcr.io/google_containers/pause:0.8.0
+  beta.gcr.io/google_containers/pause:2.0
   gcr.io/google_containers/kube-registry-proxy:0.3
 )
 
@@ -126,66 +125,11 @@ readonly KUBE_ADDON_PATHS=(
 function kube::build::verify_prereqs() {
   kube::log::status "Verifying Prerequisites...."
   kube::build::ensure_tar || return 1
-
-  if [[ "${1-}" != "clean" ]]; then
-    if [[ -z "$(which docker)" ]]; then
-      echo "Can't find 'docker' in PATH, please fix and retry." >&2
-      echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
-      exit 1
-    fi
-
-    if kube::build::is_osx; then
-      if [[ -z "$DOCKER_NATIVE" ]];then
-        if [[ -z "$(which boot2docker)" ]]; then
-          echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
-          echo "See: https://docs.docker.com/installation/mac/" >&2
-          exit 1
-        fi
-        if [[ $(boot2docker status) != "running" ]]; then
-          echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
-          exit 1
-        else
-          # Reach over and set the clock. After sleep/resume the clock will skew.
-          kube::log::status "Setting boot2docker clock"
-          boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
-          if [[ -z "$DOCKER_HOST" ]]; then
-            kube::log::status "Setting boot2docker env variables"
-            $(boot2docker shellinit)
-          fi
-        fi
-      fi
-    fi
-
-    if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
-      {
-        echo "Can't connect to 'docker' daemon.  please fix and retry."
-        echo
-        echo "Possible causes:"
-        echo "  - On Mac OS X, boot2docker VM isn't installed or started"
-        echo "  - On Mac OS X, docker env variable isn't set appropriately. Run:"
-        echo "      \$(boot2docker shellinit)"
-        echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
-        echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
-        echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
-        echo "  - On Linux, Docker daemon hasn't been started or has crashed"
-      } >&2
-      exit 1
-    fi
-  else
-
-    # On OS X, set boot2docker env vars for the 'clean' target if boot2docker is running
-    if kube::build::is_osx && kube::build::has_docker ; then
-      if [[ ! -z "$(which boot2docker)" ]]; then
-        if [[ $(boot2docker status) == "running" ]]; then
-          if [[ -z "$DOCKER_HOST" ]]; then
-            kube::log::status "Setting boot2docker env variables"
-            $(boot2docker shellinit)
-          fi
-        fi
-      fi
-    fi
-
+  kube::build::ensure_docker_in_path || return 1
+  if kube::build::is_osx; then
+      kube::build::docker_available_on_osx || return 1
   fi
+  kube::build::ensure_docker_daemon_connectivity || return 1
 
   KUBE_ROOT_HASH=$(kube::build::short_hash "$KUBE_ROOT")
   KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
@@ -198,8 +142,94 @@ function kube::build::verify_prereqs() {
 # ---------------------------------------------------------------------------
 # Utility functions
 
+function kube::build::docker_available_on_osx() {
+  if [[ -z "${DOCKER_HOST}" ]]; then
+    kube::log::status "No docker host is set. Checking options for setting one..."
+
+    if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
+      kube::log::status "It looks like you're running Mac OS X, and neither docker-machine or boot2docker are nowhere to be found."
+      kube::log::status "See: https://docs.docker.com/machine/ for installation instructions."
+      return 1
+    elif [[ -n "$(which docker-machine)" ]]; then
+      kube::build::prepare_docker_machine
+    elif [[ -n "$(which boot2docker)" ]]; then
+      kube::build::prepare_boot2docker
+    fi
+  fi
+}
+
+function kube::build::prepare_docker_machine() {
+  kube::log::status "docker-machine was found."
+  docker-machine inspect kube-dev >/dev/null || {
+    kube::log::status "Creating a machine to build Kubernetes"
+    docker-machine create -d virtualbox kube-dev > /dev/null || {
+      kube::log::error "Something went wrong creating a machine."
+      kube::log::error "Try the following: "
+      kube::log::error "docker-machine create -d <provider> kube-dev"
+      return 1
+    }
+  }
+  docker-machine start kube-dev > /dev/null
+  eval $(docker-machine env kube-dev)
+  kube::log::status "A Docker host using docker-machine named kube-dev is ready to go!"
+  return 0
+}
+
+function kube::build::prepare_boot2docker() {
+  kube::log::status "boot2docker cli has been deprecated in favor of docker-machine."
+  kube::log::status "See: https://github.com/boot2docker/boot2docker-cli for more details."
+  if [[ $(boot2docker status) != "running" ]]; then
+    kube::log::status "boot2docker isn't running. We'll try to start it."
+    boot2docker up || {
+      kube::log::error "Can't start boot2docker."
+      kube::log::error "You may need to 'boot2docker init' to create your VM."
+      return 1
+    }
+  fi
+
+  # Reach over and set the clock. After sleep/resume the clock will skew.
+  kube::log::status "Setting boot2docker clock"
+  boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+
+  kube::log::status "Setting boot2docker env variables"
+  $(boot2docker shellinit)
+  kube::log::status "boot2docker-vm has been successfully started."
+
+  return 0
+}
+
 function kube::build::is_osx() {
   [[ "$(uname)" == "Darwin" ]]
+}
+
+function kube::build::ensure_docker_in_path() {
+  if [[ -z "$(which docker)" ]]; then
+    kube::log::error "Can't find 'docker' in PATH, please fix and retry."
+    kube::log::error "See https://docs.docker.com/installation/#installation for installation instructions."
+    return 1
+  fi
+}
+
+function kube::build::ensure_docker_daemon_connectivity {
+  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
+    {
+      echo "Can't connect to 'docker' daemon.  please fix and retry."
+      echo
+      echo "Possible causes:"
+      echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
+      echo "    - Create and start your VM using docker-machine or boot2docker: "
+      echo "      - docker-machine create -d <driver> kube-dev"
+      echo "      - boot2docker init && boot2docker start"
+      echo "    - Set your environment variables using: "
+      echo "      - eval \$(docker-machine env kube-dev)"
+      echo "      - \$(boot2docker shellinit)"
+      echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
+      echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
+      echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
+      echo "  - On Linux, Docker daemon hasn't been started or has crashed."
+    } >&2
+    return 1
+  fi
 }
 
 function kube::build::ensure_tar() {
@@ -308,6 +338,54 @@ function kube::build::destroy_container() {
   "${DOCKER[@]}" rm -f -v "$1" >/dev/null 2>&1 || true
 }
 
+# Validate a release version
+#
+# Globals:
+#   None
+# Arguments:
+#   version
+# Returns:
+#   If version is a valid release version
+# Sets:
+#  BASH_REMATCH, so you can do something like:
+#    local -r version_major="${BASH_REMATCH[1]}"
+#    local -r version_minor="${BASH_REMATCH[2]}"
+#    local -r version_patch="${BASH_REMATCH[3]}"
+function kube::release::parse_and_validate_release_version() {
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  local -r version="${1-}"
+  [[ "${version}" =~ ${version_regex} ]] || {
+    kube::log::error "Invalid release version: '${version}'"
+    return 1
+  }
+}
+
+# Validate a ci version
+#
+# Globals:
+#   None
+# Arguments:
+#   version
+# Returns:
+#   If version is a valid ci version
+# Sets:
+#  BASH_REMATCH, so you can do something like:
+#    local -r version_major="${BASH_REMATCH[1]}"
+#    local -r version_minor="${BASH_REMATCH[2]}"
+#    local -r version_patch="${BASH_REMATCH[3]}"
+#    local -r version_prerelease="${BASH_REMATCH[4]}"
+#    local -r version_prerelease_rev="${BASH_REMATCH[5]}"
+#    local -r version_build_info="${BASH_REMATCH[6]}"
+#    local -r version_commits="${BASH_REMATCH[7]}"
+function kube::release::parse_and_validate_ci_version() {
+  # Accept things like "v1.2.3-alpha.0.456+abcd789-dirty" or "v1.2.3-beta.0.456"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+  local -r version="${1-}"
+  [[ "${version}" =~ ${version_regex} ]] || {
+    kube::log::error "Invalid ci version: '${version}'"
+    return 1
+  }
+}
 
 # ---------------------------------------------------------------------------
 # Building
@@ -615,7 +693,7 @@ function kube::release::package_server_tarballs() {
     # KUBE_SERVER_BINARIES array.
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
-    
+
     kube::release::create_docker_images_for_server "${release_stage}/server/bin";
     kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
 
@@ -754,6 +832,9 @@ function kube::release::package_test_tarball() {
       "${release_stage}/platforms/${platform}"
   done
 
+  # Add the test image files
+  mkdir -p "${release_stage}/test/images"
+  cp -fR "${KUBE_ROOT}/test/images" "${release_stage}/test/"
   tar c ${KUBE_TEST_PORTABLE[@]} | tar x -C ${release_stage}
 
   kube::release::clean_cruft
@@ -804,6 +885,8 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
+  mkdir -p "${release_stage}/contrib/completions/bash"
+  cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
 
   kube::release::clean_cruft
 
@@ -909,9 +992,11 @@ function kube::release::gcs::copy_release_artifacts() {
   # Stage everything in release directory
   kube::release::gcs::stage_and_hash "${RELEASE_DIR}"/* . || return 1
 
-  # Having the configure-vm.sh script from the GCE cluster deploy hosted with the
-  # release is useful for GKE.
+  # Having the configure-vm.sh and trusty/node.yaml scripts from the GCE cluster
+  # deploy hosted with the release is useful for GKE.
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" extra/gce || return 1
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/node.yaml" extra/gce || return 1
+
 
   # Upload the "naked" binaries to GCS.  This is useful for install scripts that
   # download the binaries directly and don't need tars.
@@ -940,14 +1025,15 @@ function kube::release::gcs::copy_release_artifacts() {
     kube::log::error "${gcs_destination} not empty."
     [[ ${KUBE_GCS_DELETE_EXISTING} =~ ^[yY]$ ]] || {
       read -p "Delete everything under ${gcs_destination}? [y/n] " -r || {
-        echo "EOF on prompt.  Skipping upload"
+        kube::log::status "EOF on prompt.  Skipping upload"
         return
       }
       [[ $REPLY =~ ^[yY]$ ]] || {
-        echo "Skipping upload"
+        kube::log::status "Skipping upload"
         return
       }
     }
+    kube::log::status "Deleting everything under ${gcs_destination}"
     gsutil -q -m rm -f -R "${gcs_destination}" || return 1
   fi
 
@@ -971,68 +1057,266 @@ function kube::release::gcs::copy_release_artifacts() {
   gsutil ls -lhr "${gcs_destination}" || return 1
 }
 
-function kube::release::gcs::publish_latest() {
-  local latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+# Publish a new ci version, (latest,) but only if the release files actually
+# exist on GCS.
+#
+# Globals:
+#   See callees
+# Arguments:
+#   None
+# Returns:
+#   Success
+function kube::release::gcs::publish_ci() {
+  kube::release::gcs::verify_release_files || return 1
 
-  mkdir -p "${RELEASE_STAGE}/upload" || return 1
-  echo ${KUBE_GCS_LATEST_CONTENTS} > "${RELEASE_STAGE}/upload/latest" || return 1
+  kube::release::parse_and_validate_ci_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
 
-  gsutil -m cp "${RELEASE_STAGE}/upload/latest" "${latest_file_dst}" || return 1
+  local -r publish_files=(ci/latest.txt ci/latest-${version_major}.txt ci/latest-${version_major}.${version_minor}.txt)
 
-  if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
-    gsutil acl ch -R -g all:R "${latest_file_dst}" >/dev/null 2>&1 || return 1
-  fi
-
-  kube::log::status "gsutil cat ${latest_file_dst}:"
-  gsutil cat ${latest_file_dst} || return 1
+  for publish_file in ${publish_files[*]}; do
+    # If there's a version that's above the one we're trying to release, don't
+    # do anything, and just try the next one.
+    kube::release::gcs::verify_ci_ge "${publish_file}" || continue
+    kube::release::gcs::publish "${publish_file}" || return 1
+  done
 }
 
-# Publish a new latest.txt, but only if the release we're dealing with
-# is newer than the contents in GCS.
-function kube::release::gcs::publish_latest_official() {
-  local -r new_version=${KUBE_GCS_LATEST_CONTENTS}
-  local -r latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+# Publish a new official version, (latest or stable,) but only if the release
+# files actually exist on GCS and the release we're dealing with is newer than
+# the contents in GCS.
+#
+# Globals:
+#   KUBE_GCS_PUBLISH_VERSION
+#   See callees
+# Arguments:
+#   release_kind: either 'latest' or 'stable'
+# Returns:
+#   Success
+function kube::release::gcs::publish_official() {
+  local -r release_kind="${1-}"
 
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-  [[ ${new_version} =~ ${version_regex} ]] || {
-    kube::log::error "publish_latest_official passed bogus value: '${new_version}'"
+  kube::release::gcs::verify_release_files || return 1
+
+  kube::release::parse_and_validate_release_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
+
+  local publish_files
+  if [[ "${release_kind}" == 'latest' ]]; then
+    publish_files=(release/latest.txt release/latest-${version_major}.txt release/latest-${version_major}.${version_minor}.txt)
+  elif [[ "${release_kind}" == 'stable' ]]; then
+    publish_files=(release/stable.txt release/stable-${version_major}.txt release/stable-${version_major}.${version_minor}.txt)
+  else
+    kube::log::error "Wrong release_kind: must be 'latest' or 'stable'."
     return 1
-  }
+  fi
+
+  for publish_file in ${publish_files[*]}; do
+    # If there's a version that's above the one we're trying to release, don't
+    # do anything, and just try the next one.
+    kube::release::gcs::verify_release_gt "${publish_file}" || continue
+    kube::release::gcs::publish "${publish_file}" || return 1
+  done
+}
+
+# Verify that the release files we expect actually exist.
+#
+# Globals:
+#   KUBE_GCS_RELEASE_BUCKET
+#   KUBE_GCS_RELEASE_PREFIX
+# Arguments:
+#   None
+# Returns:
+#   If release files exist
+function kube::release::gcs::verify_release_files() {
+  local -r release_dir="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_RELEASE_PREFIX}"
+  if ! gsutil ls "${release_dir}" >/dev/null 2>&1 ; then
+    kube::log::error "Release files don't exist at '${release_dir}'"
+    return 1
+  fi
+}
+
+# Check if the new version is greater than the version currently published on
+# GCS.
+#
+# Globals:
+#   KUBE_GCS_PUBLISH_VERSION
+#   KUBE_GCS_RELEASE_BUCKET
+# Arguments:
+#   publish_file: the GCS location to look in
+# Returns:
+#   If new version is greater than the GCS version
+function kube::release::gcs::verify_release_gt() {
+  local -r publish_file="${1-}"
+  local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
+  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  kube::release::parse_and_validate_release_version "${new_version}" || return 1
 
   local -r version_major="${BASH_REMATCH[1]}"
   local -r version_minor="${BASH_REMATCH[2]}"
   local -r version_patch="${BASH_REMATCH[3]}"
 
   local gcs_version
-  gcs_version=$(gsutil cat "${latest_file_dst}")
+  if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
+    kube::release::parse_and_validate_release_version "${gcs_version}" || {
+      kube::log::error "${publish_file_dst} contains invalid release version, can't compare: '${gcs_version}'"
+      return 1
+    }
 
-  [[ ${gcs_version} =~ ${version_regex} ]] || {
-    kube::log::error "${latest_file_dst} contains invalid release version, can't compare: '${gcs_version}'"
-    return 1
-  }
+    local -r gcs_version_major="${BASH_REMATCH[1]}"
+    local -r gcs_version_minor="${BASH_REMATCH[2]}"
+    local -r gcs_version_patch="${BASH_REMATCH[3]}"
 
-  local -r gcs_version_major="${BASH_REMATCH[1]}"
-  local -r gcs_version_minor="${BASH_REMATCH[2]}"
-  local -r gcs_version_patch="${BASH_REMATCH[3]}"
+    local greater=true
+    if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
+      greater=false
+    elif [[ "${version_major}" -gt "${gcs_version_major}" ]]; then
+      : # fall out
+    elif [[ "${version_minor}" -lt "${gcs_version_minor}" ]]; then
+      greater=false
+    elif [[ "${version_minor}" -gt "${gcs_version_minor}" ]]; then
+      : # fall out
+    elif [[ "${version_patch}" -le "${gcs_version_patch}" ]]; then
+      greater=false
+    fi
 
-  local greater=true
-  if [[ "${gcs_version_major}" -gt "${version_major}" ]]; then
-    greater=false
-  elif [[ "${gcs_version_major}" -lt "${version_major}" ]]; then
-    : # fall out
-  elif [[ "${gcs_version_minor}" -gt "${version_minor}" ]]; then
-    greater=false
-  elif [[ "${gcs_version_minor}" -lt "${version_minor}" ]]; then
-    : # fall out
-  elif [[ "${gcs_version_patch}" -ge "${version_patch}" ]]; then
-    greater=false
-  fi
-
-  if [[ "${greater}" != "true" ]]; then
-    kube::log::status "${gcs_version} (latest on GCS) >= ${new_version} (just uploaded), not updating ${latest_file_dst}"
+    if [[ "${greater}" != "true" ]]; then
+      kube::log::status "${new_version} (just uploaded) <= ${gcs_version} (latest on GCS), not updating ${publish_file_dst}"
+      return 1
+    else
+      kube::log::status "${new_version} (just uploaded) > ${gcs_version} (latest on GCS), updating ${publish_file_dst}"
+    fi
+  else  # gsutil cat failed; file does not exist
+    kube::log::error "Release file '${publish_file_dst}' does not exist.  Continuing."
     return 0
   fi
+}
 
-  kube::log::status "${new_version} (just uploaded) > ${gcs_version} (latest on GCS), updating ${latest_file_dst}"
-  kube::release::gcs::publish_latest || return 1
+# Check if the new version is greater than or equal to the version currently
+# published on GCS.  (Ignore the build; if it's different, overwrite anyway.)
+#
+# Globals:
+#   KUBE_GCS_PUBLISH_VERSION
+#   KUBE_GCS_RELEASE_BUCKET
+# Arguments:
+#   publish_file: the GCS location to look in
+# Returns:
+#   If new version is greater than the GCS version
+function kube::release::gcs::verify_ci_ge() {
+  local -r publish_file="${1-}"
+  local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
+  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  kube::release::parse_and_validate_ci_version "${new_version}" || return 1
+
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_patch="${BASH_REMATCH[3]}"
+  local -r version_prerelease="${BASH_REMATCH[4]}"
+  local -r version_prerelease_rev="${BASH_REMATCH[5]}"
+  local -r version_commits="${BASH_REMATCH[7]}"
+
+  local gcs_version
+  if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
+    kube::release::parse_and_validate_ci_version "${gcs_version}" || {
+      kube::log::error "${publish_file_dst} contains invalid ci version, can't compare: '${gcs_version}'"
+      return 1
+    }
+
+    local -r gcs_version_major="${BASH_REMATCH[1]}"
+    local -r gcs_version_minor="${BASH_REMATCH[2]}"
+    local -r gcs_version_patch="${BASH_REMATCH[3]}"
+    local -r gcs_version_prerelease="${BASH_REMATCH[4]}"
+    local -r gcs_version_prerelease_rev="${BASH_REMATCH[5]}"
+    local -r gcs_version_commits="${BASH_REMATCH[7]}"
+
+    local greater=true
+    if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
+      greater=false
+    elif [[ "${version_major}" -gt "${gcs_version_major}" ]]; then
+      : # fall out
+    elif [[ "${version_minor}" -lt "${gcs_version_minor}" ]]; then
+      greater=false
+    elif [[ "${version_minor}" -gt "${gcs_version_minor}" ]]; then
+      : # fall out
+    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
+      greater=false
+    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+      : # fall out
+    # Use lexicographic (instead of integer) comparison because
+    # version_prerelease is a string, ("alpha" or "beta")
+    elif [[ "${version_prerelease}" < "${gcs_version_prerelease}" ]]; then
+      greater=false
+    elif [[ "${version_prerelease}" > "${gcs_version_prerelease}" ]]; then
+      : # fall out
+    elif [[ "${version_prerelease_rev}" -lt "${gcs_version_prerelease_rev}" ]]; then
+      greater=false
+    elif [[ "${version_prerelease_rev}" -gt "${gcs_version_prerelease_rev}" ]]; then
+      : # fall out
+    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
+      greater=false
+    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+      : # fall out
+    # If either version_commits is empty, it will be considered less-than, as
+    # expected, (e.g. 1.2.3-beta < 1.2.3-beta.1).
+    elif [[ "${version_commits}" -lt "${gcs_version_commits}" ]]; then
+      greater=false
+    fi
+
+    if [[ "${greater}" != "true" ]]; then
+      kube::log::status "${new_version} (just uploaded) < ${gcs_version} (latest on GCS), not updating ${publish_file_dst}"
+      return 1
+    else
+      kube::log::status "${new_version} (just uploaded) >= ${gcs_version} (latest on GCS), updating ${publish_file_dst}"
+    fi
+  else  # gsutil cat failed; file does not exist
+    kube::log::error "File '${publish_file_dst}' does not exist.  Continuing."
+    return 0
+  fi
+}
+
+# Publish a release to GCS: upload a version file, if KUBE_GCS_MAKE_PUBLIC,
+# make it public, and verify the result.
+#
+# Globals:
+#   KUBE_GCS_RELEASE_BUCKET
+#   RELEASE_STAGE
+#   KUBE_GCS_PUBLISH_VERSION
+#   KUBE_GCS_MAKE_PUBLIC
+# Arguments:
+#   publish_file: the GCS location to look in
+# Returns:
+#   If new version is greater than the GCS version
+function kube::release::gcs::publish() {
+  local -r publish_file="${1-}"
+  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  mkdir -p "${RELEASE_STAGE}/upload" || return 1
+  echo "${KUBE_GCS_PUBLISH_VERSION}" > "${RELEASE_STAGE}/upload/latest" || return 1
+
+  gsutil -m cp "${RELEASE_STAGE}/upload/latest" "${publish_file_dst}" || return 1
+
+  local contents
+  if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
+    kube::log::status "Making uploaded version file public and non-cacheable."
+    gsutil acl ch -R -g all:R "${publish_file_dst}" >/dev/null 2>&1 || return 1
+    gsutil setmeta -h "Cache-Control:private, max-age=0" "${publish_file_dst}" >/dev/null 2>&1 || return 1
+    # If public, validate public link
+    local -r public_link="https://storage.googleapis.com/${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+    kube::log::status "Validating uploaded version file at ${public_link}"
+    contents="$(curl -s "${public_link}")"
+  else
+    # If not public, validate using gsutil
+    kube::log::status "Validating uploaded version file at ${publish_file_dst}"
+    contents="$(gsutil cat "${publish_file_dst}")"
+  fi
+  if [[ "${contents}" == "${KUBE_GCS_PUBLISH_VERSION}" ]]; then
+    kube::log::status "Contents as expected: ${contents}"
+  else
+    kube::log::error "Expected contents of file to be ${KUBE_GCS_PUBLISH_VERSION}, but got ${contents}"
+    return 1
+  fi
 }

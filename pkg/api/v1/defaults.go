@@ -44,21 +44,6 @@ func addDefaultingFuncs() {
 				*obj.Spec.Replicas = 1
 			}
 		},
-		func(obj *Daemon) {
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				if len(obj.Spec.Selector) == 0 {
-					obj.Spec.Selector = labels
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-		},
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.VolumeSource) {
 				obj.VolumeSource = VolumeSource{
@@ -103,6 +88,24 @@ func addDefaultingFuncs() {
 				}
 			}
 		},
+		func(obj *Pod) {
+			// If limits are specified, but requests are not, default requests to limits
+			// This is done here rather than a more specific defaulting pass on ResourceRequirements
+			// because we only want this defaulting semantic to take place on a Pod and not a PodTemplate
+			for i := range obj.Spec.Containers {
+				// set requests to limits if requests are not specified, but limits are
+				if obj.Spec.Containers[i].Resources.Limits != nil {
+					if obj.Spec.Containers[i].Resources.Requests == nil {
+						obj.Spec.Containers[i].Resources.Requests = make(ResourceList)
+					}
+					for key, value := range obj.Spec.Containers[i].Resources.Limits {
+						if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
+							obj.Spec.Containers[i].Resources.Requests[key] = *(value.Copy())
+						}
+					}
+				}
+			}
+		},
 		func(obj *PodSpec) {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
@@ -112,6 +115,9 @@ func addDefaultingFuncs() {
 			}
 			if obj.HostNetwork {
 				defaultHostNetworkPorts(&obj.Containers)
+			}
+			if obj.SecurityContext == nil {
+				obj.SecurityContext = &PodSecurityContext{}
 			}
 			if obj.TerminationGracePeriodSeconds == nil {
 				period := int64(DefaultTerminationGracePeriodSeconds)
@@ -175,15 +181,33 @@ func addDefaultingFuncs() {
 				obj.APIVersion = "v1"
 			}
 		},
-		func(obj *ResourceRequirements) {
-			// Set requests to limits if requests are not specified (but limits are).
-			if obj.Limits != nil {
-				if obj.Requests == nil {
-					obj.Requests = make(ResourceList)
+		func(obj *LimitRangeItem) {
+			// for container limits, we apply default values
+			if obj.Type == LimitTypeContainer {
+
+				if obj.Default == nil {
+					obj.Default = make(ResourceList)
 				}
-				for key, value := range obj.Limits {
-					if _, exists := obj.Requests[key]; !exists {
-						obj.Requests[key] = *(value.Copy())
+				if obj.DefaultRequest == nil {
+					obj.DefaultRequest = make(ResourceList)
+				}
+
+				// If a default limit is unspecified, but the max is specified, default the limit to the max
+				for key, value := range obj.Max {
+					if _, exists := obj.Default[key]; !exists {
+						obj.Default[key] = *(value.Copy())
+					}
+				}
+				// If a default limit is specified, but the default request is not, default request to limit
+				for key, value := range obj.Default {
+					if _, exists := obj.DefaultRequest[key]; !exists {
+						obj.DefaultRequest[key] = *(value.Copy())
+					}
+				}
+				// If a default request is not specified, but the min is provided, default request to the min
+				for key, value := range obj.Min {
+					if _, exists := obj.DefaultRequest[key]; !exists {
+						obj.DefaultRequest[key] = *(value.Copy())
 					}
 				}
 			}

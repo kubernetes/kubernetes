@@ -24,19 +24,28 @@ import (
 
 // NewKubeProxy creates a new hyperkube Server object that includes the
 // description and flags.
+
 func NewKubeProxy() *Server {
-	s := kubeproxy.NewProxyServer()
+	config := kubeproxy.NewProxyConfig()
 
 	hks := Server{
 		SimpleUsage: hyperkube.CommandProxy,
 		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
-		services and forwarding it to the appropriate pods.  It generally runs on
+		services and forwarding it to the appropriate pods. It generally runs on
 		nodes next to the Kubelet and proxies traffic from local pods to remote pods.
 		It is also used when handling incoming external traffic.`,
-		Run: func(_ *Server, args []string) error {
-			return s.Run(args)
-		},
 	}
-	s.AddFlags(hks.Flags())
+
+	config.AddFlags(hks.Flags())
+
+	hks.Run = func(_ *Server, args []string) error {
+		s, err := kubeproxy.NewProxyServerDefault(config)
+		if err != nil {
+			return err
+		}
+
+		return s.Run(args)
+	}
+
 	return &hks
 }

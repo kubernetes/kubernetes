@@ -23,16 +23,16 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-// MinionLister interface represents anything that can list minions for a scheduler.
-type MinionLister interface {
+// NodeLister interface represents anything that can list nodes for a scheduler.
+type NodeLister interface {
 	List() (list api.NodeList, err error)
 }
 
-// FakeMinionLister implements MinionLister on a []string for test purposes.
-type FakeMinionLister api.NodeList
+// FakeNodeLister implements NodeLister on a []string for test purposes.
+type FakeNodeLister api.NodeList
 
-// List returns minions as a []string.
-func (f FakeMinionLister) List() (api.NodeList, error) {
+// List returns nodes as a []string.
+func (f FakeNodeLister) List() (api.NodeList, error) {
 	return api.NodeList(f), nil
 }
 

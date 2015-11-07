@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -24,6 +25,27 @@ import (
 
 // AttrFunc returns label and field sets for List or Watch to compare against, or an error.
 type AttrFunc func(obj runtime.Object) (label labels.Set, field fields.Set, err error)
+
+// ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
+func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
+	if !hasNamespaceField {
+		return fields.Set{
+			"metadata.name": objectMeta.Name,
+		}
+	}
+	return fields.Set{
+		"metadata.name":      objectMeta.Name,
+		"metadata.namespace": objectMeta.Namespace,
+	}
+}
+
+// MergeFieldsSets merges a fields'set from fragment into the source.
+func MergeFieldsSets(source fields.Set, fragment fields.Set) fields.Set {
+	for k, value := range fragment {
+		source[k] = value
+	}
+	return source
+}
 
 // SelectionPredicate implements a generic predicate that can be passed to
 // GenericRegistry's List or Watch methods. Implements the Matcher interface.
@@ -47,7 +69,7 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	return s.Label.Matches(labels) && s.Field.Matches(fields), nil
 }
 
-// MatchesSingle will return (name, true) iff s.Field matches on the object's
+// MatchesSingle will return (name, true) if and only if s.Field matches on the object's
 // name.
 func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 	// TODO: should be namespace.name
@@ -118,38 +140,3 @@ var (
 	_ = Matcher(&SelectionPredicate{})
 	_ = Matcher(matcherFunc(nil))
 )
-
-// DecoratorFunc can mutate the provided object prior to being returned.
-type DecoratorFunc func(obj runtime.Object) error
-
-// FilterList filters any list object that conforms to the api conventions,
-// provided that 'm' works with the concrete type of list. d is an optional
-// decorator for the returned functions. Only matching items are decorated.
-func FilterList(list runtime.Object, m Matcher, d DecoratorFunc) (filtered runtime.Object, err error) {
-	// TODO: push a matcher down into tools.etcdHelper to avoid all this
-	// nonsense. This is a lot of unnecessary copies.
-	items, err := runtime.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-	var filteredItems []runtime.Object
-	for _, obj := range items {
-		match, err := m.Matches(obj)
-		if err != nil {
-			return nil, err
-		}
-		if match {
-			if d != nil {
-				if err := d(obj); err != nil {
-					return nil, err
-				}
-			}
-			filteredItems = append(filteredItems, obj)
-		}
-	}
-	err = runtime.SetList(list, filteredItems)
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
-}

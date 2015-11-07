@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -31,6 +32,25 @@ import (
 
 // Container Terminated and Kubelet is backing off the restart
 var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
+
+var (
+	// Container image pull failed, kubelet is backing off image pull
+	ErrImagePullBackOff = errors.New("ImagePullBackOff")
+
+	// Unable to inspect image
+	ErrImageInspect = errors.New("ImageInspectError")
+
+	// General image pull error
+	ErrImagePull = errors.New("ErrImagePull")
+
+	// Required Image is absent on host and PullPolicy is NeverPullImage
+	ErrImageNeverPull = errors.New("ErrImageNeverPull")
+
+	// Get http error when pulling image from registry
+	RegistryUnavailable = errors.New("RegistryUnavailable")
+)
+
+var ErrRunContainer = errors.New("RunContainerError")
 
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
@@ -50,13 +70,19 @@ type ImageSpec struct {
 
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.
+// Thread safety is required from implementations of this interface.
 type Runtime interface {
+	// Type returns the type of the container runtime.
+	Type() string
+
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
+	// GarbageCollect removes dead containers using the specified container gc policy
+	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -79,7 +105,7 @@ type Runtime interface {
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
+	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability
@@ -87,20 +113,18 @@ type Runtime interface {
 }
 
 type ContainerAttacher interface {
-	AttachContainer(id string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
+	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
 }
 
 // CommandRunner encapsulates the command runner interfaces for testability.
 type ContainerCommandRunner interface {
 	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
 	// Runs the command in the container of the specified pod using nsinit.
-	// TODO(yifan): Use strong type for containerID.
-	RunInContainer(containerID string, cmd []string) ([]byte, error)
+	RunInContainer(containerID ContainerID, cmd []string) ([]byte, error)
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
-	// TODO(yifan): Use strong type for containerID.
-	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
+	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
@@ -109,7 +133,7 @@ type ContainerCommandRunner interface {
 // It will check the presence of the image, and report the 'image pulling',
 // 'image pulled' events correspondingly.
 type ImagePuller interface {
-	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error
+	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 }
 
 // Pod is a group of containers, with the status of the pod.
@@ -139,6 +163,15 @@ func BuildContainerID(typ, ID string) ContainerID {
 	return ContainerID{Type: typ, ID: ID}
 }
 
+// Convenience method for creating a ContainerID from an ID string.
+func ParseContainerID(containerID string) ContainerID {
+	var id ContainerID
+	if err := id.ParseString(containerID); err != nil {
+		glog.Error(err)
+	}
+	return id
+}
+
 func (c *ContainerID) ParseString(data string) error {
 	// Trim the quotes and split the type and ID.
 	parts := strings.Split(strings.Trim(data, "\""), "://")
@@ -151,6 +184,10 @@ func (c *ContainerID) ParseString(data string) error {
 
 func (c *ContainerID) String() string {
 	return fmt.Sprintf("%s://%s", c.Type, c.ID)
+}
+
+func (c *ContainerID) IsEmpty() bool {
+	return *c == ContainerID{}
 }
 
 func (c *ContainerID) MarshalJSON() ([]byte, error) {
@@ -166,7 +203,7 @@ func (c *ContainerID) UnmarshalJSON(data []byte) error {
 type Container struct {
 	// The ID of the container, used by the container runtime to identify
 	// a container.
-	ID types.UID
+	ID ContainerID
 	// The name of the container, which should be the same as specified by
 	// api.Container.
 	Name string
@@ -204,6 +241,8 @@ type Mount struct {
 	HostPath string
 	// Whether the mount is read-only.
 	ReadOnly bool
+	// Whether the mount needs SELinux relabeling
+	SELinuxRelabel bool
 }
 
 type PortMapping struct {
@@ -239,7 +278,16 @@ type RunContainerOptions struct {
 	CgroupParent string
 }
 
-type VolumeMap map[string]volume.Volume
+// VolumeInfo contains information about the volume.
+type VolumeInfo struct {
+	// Builder is the volume's builder
+	Builder volume.Builder
+	// SELinuxLabeled indicates whether this volume has had the
+	// pod's SELinux label applied to it or not
+	SELinuxLabeled bool
+}
+
+type VolumeMap map[string]VolumeInfo
 
 type Pods []*Pod
 
@@ -313,7 +361,7 @@ func (p *Pod) IsEmpty() bool {
 func GetPodFullName(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
-	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
+	return pod.Name + "_" + pod.Namespace
 }
 
 // Build the pod full name from pod name and namespace.

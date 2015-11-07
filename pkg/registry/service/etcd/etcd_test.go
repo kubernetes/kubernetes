@@ -20,16 +20,18 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
-	return NewREST(etcdStorage), fakeClient
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+	return NewREST(etcdStorage, storage.NoDecoration), fakeClient
 }
 
 func validService() *api.Service {
@@ -54,18 +56,12 @@ func validService() *api.Service {
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
 	validService := validService()
 	validService.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		validService,
-		func(ctx api.Context, obj runtime.Object) error {
-			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
-		},
-		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
-		},
 		// invalid
 		&api.Service{
 			Spec: api.ServiceSpec{},
@@ -83,6 +79,70 @@ func TestCreate(t *testing.T) {
 					TargetPort: util.NewIntOrStringFromInt(6502),
 				}},
 			},
+		},
+	)
+}
+
+func TestUpdate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestUpdate(
+		// valid
+		validService(),
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.Service)
+			object.Spec = api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz2"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
+				}},
+			}
+			return object
+		},
+	)
+}
+
+func TestDelete(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestDelete(validService())
+}
+
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestGet(validService())
+}
+
+func TestList(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd).AllowCreateOnUpdate()
+	test.TestList(validService())
+}
+
+func TestWatch(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := registrytest.New(t, fakeClient, storage.Etcd)
+	test.TestWatch(
+		validService(),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matchin fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
 		},
 	)
 }

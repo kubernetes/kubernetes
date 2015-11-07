@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -44,31 +44,31 @@ func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (boo
 	return len(existingPods) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
+func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
 	result := []algorithm.HostPriority{}
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %v", err)
 	}
-	for _, minion := range nodes.Items {
-		score, err := strconv.Atoi(minion.Name)
+	for _, node := range nodes.Items {
+		score, err := strconv.Atoi(node.Name)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, algorithm.HostPriority{
-			Host:  minion.Name,
+			Host:  node.Name,
 			Score: score,
 		})
 	}
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []algorithm.HostPriority{}
-	result, err := numericPriority(pod, podLister, minionLister)
+	result, err := numericPriority(pod, podLister, nodeLister)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func TestSelectHost(t *testing.T) {
 	scheduler := genericScheduler{random: rand.New(rand.NewSource(0))}
 	tests := []struct {
 		list          algorithm.HostPriorityList
-		possibleHosts util.StringSet
+		possibleHosts sets.String
 		expectsErr    bool
 	}{
 		{
@@ -109,7 +109,7 @@ func TestSelectHost(t *testing.T) {
 				{Host: "machine1.1", Score: 1},
 				{Host: "machine2.1", Score: 2},
 			},
-			possibleHosts: util.NewStringSet("machine2.1"),
+			possibleHosts: sets.NewString("machine2.1"),
 			expectsErr:    false,
 		},
 		// equal scores
@@ -120,7 +120,7 @@ func TestSelectHost(t *testing.T) {
 				{Host: "machine1.3", Score: 2},
 				{Host: "machine2.1", Score: 2},
 			},
-			possibleHosts: util.NewStringSet("machine1.2", "machine1.3", "machine2.1"),
+			possibleHosts: sets.NewString("machine1.2", "machine1.3", "machine2.1"),
 			expectsErr:    false,
 		},
 		// out of order scores
@@ -132,13 +132,13 @@ func TestSelectHost(t *testing.T) {
 				{Host: "machine3.1", Score: 1},
 				{Host: "machine1.3", Score: 3},
 			},
-			possibleHosts: util.NewStringSet("machine1.1", "machine1.2", "machine1.3"),
+			possibleHosts: sets.NewString("machine1.1", "machine1.2", "machine1.3"),
 			expectsErr:    false,
 		},
 		// empty priorityList
 		{
 			list:          []algorithm.HostPriority{},
-			possibleHosts: util.NewStringSet(),
+			possibleHosts: sets.NewString(),
 			expectsErr:    true,
 		},
 	}
@@ -288,7 +288,7 @@ func TestGenericScheduler(t *testing.T) {
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
 		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, algorithm.FakePodLister(test.pods), random)
-		machine, err := scheduler.Schedule(test.pod, algorithm.FakeMinionLister(makeNodeList(test.nodes)))
+		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Error("Unexpected non-error")

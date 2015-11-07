@@ -29,12 +29,70 @@ func TestAdmission(t *testing.T) {
 
 	var runAsUser int64 = 1
 	priv := true
-	successCases := map[string]*api.SecurityContext{
-		"no sc":    nil,
-		"empty sc": {},
-		"valid sc": {Privileged: &priv, Capabilities: &api.Capabilities{}},
+
+	cases := []struct {
+		name        string
+		sc          *api.SecurityContext
+		podSc       *api.PodSecurityContext
+		expectError bool
+	}{
+		{
+			name: "unset",
+		},
+		{
+			name: "empty container.SecurityContext",
+			sc:   &api.SecurityContext{},
+		},
+		{
+			name:  "empty pod.Spec.SecurityContext",
+			podSc: &api.PodSecurityContext{},
+		},
+		{
+			name: "valid container.SecurityContext",
+			sc:   &api.SecurityContext{Privileged: &priv, Capabilities: &api.Capabilities{}},
+		},
+		{
+			name:  "valid pod.Spec.SecurityContext",
+			podSc: &api.PodSecurityContext{},
+		},
+		{
+			name:        "container.SecurityContext.RunAsUser",
+			sc:          &api.SecurityContext{RunAsUser: &runAsUser},
+			expectError: true,
+		},
+		{
+			name:        "container.SecurityContext.SELinuxOptions",
+			sc:          &api.SecurityContext{SELinuxOptions: &api.SELinuxOptions{}},
+			expectError: true,
+		},
+		{
+			name:        "pod.Spec.SecurityContext.RunAsUser",
+			podSc:       &api.PodSecurityContext{RunAsUser: &runAsUser},
+			expectError: true,
+		},
+		{
+			name:        "pod.Spec.SecurityContext.SELinuxOptions",
+			podSc:       &api.PodSecurityContext{SELinuxOptions: &api.SELinuxOptions{}},
+			expectError: true,
+		},
 	}
 
+	for _, tc := range cases {
+		pod := pod()
+		pod.Spec.SecurityContext = tc.podSc
+		pod.Spec.Containers[0].SecurityContext = tc.sc
+
+		err := handler.Admit(admission.NewAttributesRecord(pod, "Pod", "foo", "name", string(api.ResourcePods), "", "ignored", nil))
+		if err != nil && !tc.expectError {
+			t.Errorf("%v: unexpected error: %v", tc.name, err)
+		} else if err == nil && tc.expectError {
+			t.Errorf("%v: expected error", tc.name)
+		}
+	}
+}
+
+func TestPodSecurityContextAdmission(t *testing.T) {
+	handler := NewSecurityContextDeny(nil)
 	pod := api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -42,24 +100,40 @@ func TestAdmission(t *testing.T) {
 			},
 		},
 	}
-	for k, v := range successCases {
-		pod.Spec.Containers[0].SecurityContext = v
-		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", "name", string(api.ResourcePods), "", "ignored", nil))
-		if err != nil {
-			t.Errorf("Unexpected error returned from admission handler for case %s", k)
-		}
-	}
 
-	errorCases := map[string]*api.SecurityContext{
-		"run as user":     {RunAsUser: &runAsUser},
-		"se linux optons": {SELinuxOptions: &api.SELinuxOptions{}},
-		"mixed settings":  {Privileged: &priv, RunAsUser: &runAsUser, SELinuxOptions: &api.SELinuxOptions{}},
+	fsGroup := int64(1001)
+
+	tests := []struct {
+		securityContext api.PodSecurityContext
+		errorExpected   bool
+	}{
+		{
+			securityContext: api.PodSecurityContext{},
+			errorExpected:   false,
+		},
+		{
+			securityContext: api.PodSecurityContext{
+				SupplementalGroups: []int64{1234},
+			},
+			errorExpected: true,
+		},
+		{
+			securityContext: api.PodSecurityContext{
+				FSGroup: &fsGroup,
+			},
+			errorExpected: true,
+		},
 	}
-	for k, v := range errorCases {
-		pod.Spec.Containers[0].SecurityContext = v
+	for _, test := range tests {
+		pod.Spec.SecurityContext = &test.securityContext
 		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", "name", string(api.ResourcePods), "", "ignored", nil))
-		if err == nil {
-			t.Errorf("Expected error returned from admission handler for case %s", k)
+
+		if test.errorExpected && err == nil {
+			t.Errorf("Expected error for security context %+v but did not get an error", test.securityContext)
+		}
+
+		if !test.errorExpected && err != nil {
+			t.Errorf("Unexpected error %v for security context %+v", err, test.securityContext)
 		}
 	}
 }
@@ -77,5 +151,15 @@ func TestHandles(t *testing.T) {
 		if result != expected {
 			t.Errorf("Unexpected result for operation %s: %v\n", op, result)
 		}
+	}
+}
+
+func pod() *api.Pod {
+	return &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{},
+			},
+		},
 	}
 }

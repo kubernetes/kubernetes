@@ -23,7 +23,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/emicklei/go-restful/swagger"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -33,7 +36,6 @@ type Interface interface {
 	PodsNamespacer
 	PodTemplatesNamespacer
 	ReplicationControllersNamespacer
-	DaemonsNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
 	VersionInterface
@@ -47,14 +49,13 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
+	SwaggerSchemaInterface
+	Extensions() ExtensionsInterface
+	Discovery() DiscoveryInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	return newReplicationControllers(c, namespace)
-}
-
-func (c *Client) Daemons(namespace string) DaemonInterface {
-	return newDaemons(c, namespace)
 }
 
 func (c *Client) Nodes() NodeInterface {
@@ -115,18 +116,21 @@ func (c *Client) ComponentStatuses() ComponentStatusInterface {
 // VersionInterface has a method to retrieve the server version.
 type VersionInterface interface {
 	ServerVersion() (*version.Info, error)
-	ServerAPIVersions() (*api.APIVersions, error)
+	ServerAPIVersions() (*unversioned.APIVersions, error)
 }
 
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
-	Status() api.Status
+	Status() unversioned.Status
 }
 
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
+	*ExtensionsClient
+	// TODO: remove this when we re-structure pkg/client.
+	*DiscoveryClient
 }
 
 // ServerVersion retrieves and parses the server's version.
@@ -144,12 +148,12 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 }
 
 // ServerAPIVersions retrieves and parses the list of API versions the server supports.
-func (c *Client) ServerAPIVersions() (*api.APIVersions, error) {
-	body, err := c.Get().UnversionedPath("").Do().Raw()
+func (c *Client) ServerAPIVersions() (*unversioned.APIVersions, error) {
+	body, err := c.Get().AbsPath("/api").Do().Raw()
 	if err != nil {
 		return nil, err
 	}
-	var v api.APIVersions
+	var v unversioned.APIVersions
 	err = json.Unmarshal(body, &v)
 	if err != nil {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
@@ -176,6 +180,55 @@ func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
 	return &api.ComponentStatusList{Items: statuses}, nil
 }
 
+// SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
+// client.Interface
+type SwaggerSchemaInterface interface {
+	SwaggerSchema(groupVersion string) (*swagger.ApiDeclaration, error)
+}
+
+// SwaggerSchema retrieves and parses the swagger API schema the server supports.
+func (c *Client) SwaggerSchema(groupVersion string) (*swagger.ApiDeclaration, error) {
+	if groupVersion == "" {
+		return nil, fmt.Errorf("groupVersion cannot be empty")
+	}
+
+	groupList, err := c.Discovery().ServerGroups()
+	if err != nil {
+		return nil, err
+	}
+	groupVersions := ExtractGroupVersions(groupList)
+	// This check also takes care the case that kubectl is newer than the running endpoint
+	if stringDoesntExistIn(groupVersion, groupVersions) {
+		return nil, fmt.Errorf("API version: %s is not supported by the server. Use one of: %v", groupVersion, groupVersions)
+	}
+	var path string
+	if groupVersion == "v1" {
+		path = "/swaggerapi/api/" + groupVersion
+	} else {
+		path = "/swaggerapi/apis/" + groupVersion
+	}
+
+	body, err := c.Get().AbsPath(path).Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var schema swagger.ApiDeclaration
+	err = json.Unmarshal(body, &schema)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &schema, nil
+}
+
+func stringDoesntExistIn(str string, slice []string) bool {
+	for _, s := range slice {
+		if s == str {
+			return false
+		}
+	}
+	return true
+}
+
 // IsTimeout tests if this is a timeout error in the underlying transport.
 // This is unbelievably ugly.
 // See: http://stackoverflow.com/questions/23494950/specifically-check-for-timeout-error for details
@@ -196,4 +249,12 @@ func IsTimeout(err error) bool {
 		return true
 	}
 	return false
+}
+
+func (c *Client) Extensions() ExtensionsInterface {
+	return c.ExtensionsClient
+}
+
+func (c *Client) Discovery() DiscoveryInterface {
+	return c.DiscoveryClient
 }

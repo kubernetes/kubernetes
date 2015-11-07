@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/prometheus/client_golang/model"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -49,6 +48,10 @@ type Histogram interface {
 	Observe(float64)
 }
 
+// bucketLabel is used for the label that defines the upper bound of a
+// bucket of a histogram ("le" -> "less or equal").
+const bucketLabel = "le"
+
 var (
 	// DefBuckets are the default Histogram buckets. The default buckets are
 	// tailored to broadly measure the response time (in seconds) of a
@@ -57,7 +60,7 @@ var (
 	DefBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
 
 	errBucketLabelNotAllowed = fmt.Errorf(
-		"%q is not allowed as label name in histograms", model.BucketLabel,
+		"%q is not allowed as label name in histograms", bucketLabel,
 	)
 )
 
@@ -147,7 +150,7 @@ type HistogramOpts struct {
 	// element in the slice is the upper inclusive bound of a bucket. The
 	// values must be sorted in strictly increasing order. There is no need
 	// to add a highest bucket with +Inf bound, it will be added
-	// implicitly. The default value is DefObjectives.
+	// implicitly. The default value is DefBuckets.
 	Buckets []float64
 }
 
@@ -171,12 +174,12 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 	}
 
 	for _, n := range desc.variableLabels {
-		if n == model.BucketLabel {
+		if n == bucketLabel {
 			panic(errBucketLabelNotAllowed)
 		}
 	}
 	for _, lp := range desc.constLabelPairs {
-		if lp.GetName() == model.BucketLabel {
+		if lp.GetName() == bucketLabel {
 			panic(errBucketLabelNotAllowed)
 		}
 	}
@@ -213,6 +216,13 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 }
 
 type histogram struct {
+	// sumBits contains the bits of the float64 representing the sum of all
+	// observations. sumBits and count have to go first in the struct to
+	// guarantee alignment for atomic operations.
+	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	sumBits uint64
+	count   uint64
+
 	SelfCollector
 	// Note that there is no mutex required.
 
@@ -222,9 +232,6 @@ type histogram struct {
 	counts      []uint64
 
 	labelPairs []*dto.LabelPair
-
-	sumBits uint64 // The bits of the float64 representing the sum of all observations.
-	count   uint64
 }
 
 func (h *histogram) Desc() *Desc {
@@ -341,4 +348,103 @@ func (m *HistogramVec) WithLabelValues(lvs ...string) Histogram {
 //     myVec.With(Labels{"code": "404", "method": "GET"}).Observe(42.21)
 func (m *HistogramVec) With(labels Labels) Histogram {
 	return m.MetricVec.With(labels).(Histogram)
+}
+
+type constHistogram struct {
+	desc       *Desc
+	count      uint64
+	sum        float64
+	buckets    map[float64]uint64
+	labelPairs []*dto.LabelPair
+}
+
+func (h *constHistogram) Desc() *Desc {
+	return h.desc
+}
+
+func (h *constHistogram) Write(out *dto.Metric) error {
+	his := &dto.Histogram{}
+	buckets := make([]*dto.Bucket, 0, len(h.buckets))
+
+	his.SampleCount = proto.Uint64(h.count)
+	his.SampleSum = proto.Float64(h.sum)
+
+	for upperBound, count := range h.buckets {
+		buckets = append(buckets, &dto.Bucket{
+			CumulativeCount: proto.Uint64(count),
+			UpperBound:      proto.Float64(upperBound),
+		})
+	}
+
+	if len(buckets) > 0 {
+		sort.Sort(buckSort(buckets))
+	}
+	his.Bucket = buckets
+
+	out.Histogram = his
+	out.Label = h.labelPairs
+
+	return nil
+}
+
+// NewConstHistogram returns a metric representing a Prometheus histogram with
+// fixed values for the count, sum, and bucket counts. As those parameters
+// cannot be changed, the returned value does not implement the Histogram
+// interface (but only the Metric interface). Users of this package will not
+// have much use for it in regular operations. However, when implementing custom
+// Collectors, it is useful as a throw-away metric that is generated on the fly
+// to send it to Prometheus in the Collect method.
+//
+// buckets is a map of upper bounds to cumulative counts, excluding the +Inf
+// bucket.
+//
+// NewConstHistogram returns an error if the length of labelValues is not
+// consistent with the variable labels in Desc.
+func NewConstHistogram(
+	desc *Desc,
+	count uint64,
+	sum float64,
+	buckets map[float64]uint64,
+	labelValues ...string,
+) (Metric, error) {
+	if len(desc.variableLabels) != len(labelValues) {
+		return nil, errInconsistentCardinality
+	}
+	return &constHistogram{
+		desc:       desc,
+		count:      count,
+		sum:        sum,
+		buckets:    buckets,
+		labelPairs: makeLabelPairs(desc, labelValues),
+	}, nil
+}
+
+// MustNewConstHistogram is a version of NewConstHistogram that panics where
+// NewConstMetric would have returned an error.
+func MustNewConstHistogram(
+	desc *Desc,
+	count uint64,
+	sum float64,
+	buckets map[float64]uint64,
+	labelValues ...string,
+) Metric {
+	m, err := NewConstHistogram(desc, count, sum, buckets, labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return m
+}
+
+type buckSort []*dto.Bucket
+
+func (s buckSort) Len() int {
+	return len(s)
+}
+
+func (s buckSort) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s buckSort) Less(i, j int) bool {
+	return s[i].GetUpperBound() < s[j].GetUpperBound()
 }

@@ -17,18 +17,15 @@ limitations under the License.
 package unversioned
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
-	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 const (
@@ -222,7 +219,7 @@ func TestTLSTransportCache(t *testing.T) {
 		"host":           {Insecure: true, Host: "foo"},
 		"prefix":         {Insecure: true, Prefix: "foo"},
 		"version":        {Insecure: true, Version: "foo"},
-		"codec":          {Insecure: true, Codec: latest.Codec},
+		"codec":          {Insecure: true, Codec: testapi.Default.Codec()},
 		"basic":          {Insecure: true, Username: "bob", Password: "password"},
 		"bearer":         {Insecure: true, BearerToken: "token"},
 		"user agent":     {Insecure: true, UserAgent: "useragent"},
@@ -336,8 +333,8 @@ func TestSetKubernetesDefaults(t *testing.T) {
 			Config{},
 			Config{
 				Prefix:  "/api",
-				Version: latest.Version,
-				Codec:   latest.Codec,
+				Version: testapi.Default.Version(),
+				Codec:   testapi.Default.Codec(),
 				QPS:     5,
 				Burst:   10,
 			},
@@ -381,83 +378,58 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	}
 }
 
-func objBody(object interface{}) io.ReadCloser {
-	output, err := json.MarshalIndent(object, "", "")
-	if err != nil {
-		panic(err)
-	}
-	return ioutil.NopCloser(bytes.NewReader([]byte(output)))
-}
-
-func TestNegotiateVersion(t *testing.T) {
-	tests := []struct {
-		name, version, expectedVersion string
-		serverVersions                 []string
-		clientVersions                 []string
-		config                         *Config
-		expectErr                      bool
-	}{
-		{
-			name:            "server supports client default",
-			version:         "version1",
-			config:          &Config{},
-			serverVersions:  []string{"version1", testapi.Version()},
-			clientVersions:  []string{"version1", testapi.Version()},
-			expectedVersion: "version1",
-			expectErr:       false,
-		},
-		{
-			name:            "server falls back to client supported",
-			version:         testapi.Version(),
-			config:          &Config{},
-			serverVersions:  []string{"version1"},
-			clientVersions:  []string{"version1", testapi.Version()},
-			expectedVersion: "version1",
-			expectErr:       false,
-		},
-		{
-			name:            "explicit version supported",
-			version:         "",
-			config:          &Config{Version: testapi.Version()},
-			serverVersions:  []string{"version1", testapi.Version()},
-			clientVersions:  []string{"version1", testapi.Version()},
-			expectedVersion: testapi.Version(),
-			expectErr:       false,
-		},
-		{
-			name:            "explicit version not supported",
-			version:         "",
-			config:          &Config{Version: testapi.Version()},
-			serverVersions:  []string{"version1"},
-			clientVersions:  []string{"version1", testapi.Version()},
-			expectedVersion: "",
-			expectErr:       true,
-		},
-	}
-	codec := testapi.Codec()
-
-	for _, test := range tests {
-		fakeClient := &FakeRESTClient{
-			Codec: codec,
-			Resp: &http.Response{
-				StatusCode: 200,
-				Body:       objBody(&api.APIVersions{Versions: test.serverVersions}),
+func TestHelperGetServerAPIVersions(t *testing.T) {
+	expect := []string{"v1", "v2", "v3"}
+	APIVersions := unversioned.APIVersions{Versions: expect}
+	expect = append(expect, "group1/v1", "group1/v2", "group2/v1", "group2/v2")
+	APIGroupList := unversioned.APIGroupList{
+		Groups: []unversioned.APIGroup{
+			{
+				Versions: []unversioned.GroupVersion{
+					{
+						GroupVersion: "group1/v1",
+					},
+					{
+						GroupVersion: "group1/v2",
+					},
+				},
 			},
-			Client: HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 200, Body: objBody(&api.APIVersions{Versions: test.serverVersions})}, nil
-			}),
+			{
+				Versions: []unversioned.GroupVersion{
+					{
+						GroupVersion: "group2/v1",
+					},
+					{
+						GroupVersion: "group2/v2",
+					},
+				},
+			},
+		},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var output []byte
+		var err error
+		switch req.URL.Path {
+		case "/api":
+			output, err = json.Marshal(APIVersions)
+
+		case "/apis":
+			output, err = json.Marshal(APIGroupList)
 		}
-		c := NewOrDie(test.config)
-		c.Client = fakeClient.Client
-		response, err := NegotiateVersion(c, test.config, test.version, test.clientVersions)
-		if err == nil && test.expectErr {
-			t.Errorf("expected error, got nil for [%s].", test.name)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
 		}
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected error for [%s]: %v.", test.name, err)
-		}
-		if response != test.expectedVersion {
-			t.Errorf("expected version %s, got %s.", test.expectedVersion, response)
-		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	got, err := ServerAPIVersions(&Config{Host: server.URL, Version: "invalid version", Codec: testapi.Default.Codec()})
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 }

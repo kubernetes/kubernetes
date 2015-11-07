@@ -19,7 +19,7 @@ package queue
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 type EventType int

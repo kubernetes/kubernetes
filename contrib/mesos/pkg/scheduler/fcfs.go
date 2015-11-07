@@ -18,14 +18,51 @@ package scheduler
 
 import (
 	"fmt"
+
 	log "github.com/golang/glog"
 
+	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
+type allocationStrategy struct {
+	fitPredicate podtask.FitPredicate
+	procurement  podtask.Procurement
+}
+
+func (a *allocationStrategy) FitPredicate() podtask.FitPredicate {
+	return a.fitPredicate
+}
+
+func (a *allocationStrategy) Procurement() podtask.Procurement {
+	return a.procurement
+}
+
+func NewAllocationStrategy(fitPredicate podtask.FitPredicate, procurement podtask.Procurement) AllocationStrategy {
+	if fitPredicate == nil {
+		panic("fitPredicate is required")
+	}
+	if procurement == nil {
+		panic("procurement is required")
+	}
+	return &allocationStrategy{
+		fitPredicate: fitPredicate,
+		procurement:  procurement,
+	}
+}
+
+type fcfsPodScheduler struct {
+	AllocationStrategy
+	lookupNode node.LookupFunc
+}
+
+func NewFCFSPodScheduler(as AllocationStrategy, lookupNode node.LookupFunc) PodScheduler {
+	return &fcfsPodScheduler{as, lookupNode}
+}
+
 // A first-come-first-serve scheduler: acquires the first offer that can support the task
-func FCFSScheduleFunc(r offers.Registry, unused SlaveIndex, task *podtask.T) (offers.Perishable, error) {
+func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, unused SlaveIndex, task *podtask.T) (offers.Perishable, error) {
 	podName := fmt.Sprintf("%s/%s", task.Pod.Namespace, task.Pod.Name)
 	var acceptedOffer offers.Perishable
 	err := r.Walk(func(p offers.Perishable) (bool, error) {
@@ -33,7 +70,18 @@ func FCFSScheduleFunc(r offers.Registry, unused SlaveIndex, task *podtask.T) (of
 		if offer == nil {
 			return false, fmt.Errorf("nil offer while scheduling task %v", task.ID)
 		}
-		if task.AcceptOffer(offer) {
+
+		// check that the node actually exists. As offers are declined if not, the
+		// case n==nil can only happen when the node object was deleted since the
+		// offer came in.
+		nodeName := offer.GetHostname()
+		n := fps.lookupNode(nodeName)
+		if n == nil {
+			log.V(3).Infof("ignoring offer for node %s because node went away", nodeName)
+			return false, nil
+		}
+
+		if fps.FitPredicate()(task, offer, n) {
 			if p.Acquire() {
 				acceptedOffer = p
 				log.V(3).Infof("Pod %s accepted offer %v", podName, offer.Id.GetValue())

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_cloud
+package aws
 
 import (
 	"fmt"
@@ -24,16 +24,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
-	elbClient, err := s.getELBClient(region)
-	if err != nil {
-		return nil, err
-	}
-
-	loadBalancer, err := s.describeLoadBalancer(region, name)
+func (s *AWSCloud) ensureLoadBalancer(name string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string) (*elb.LoadBalancerDescription, error) {
+	loadBalancer, err := s.describeLoadBalancer(name)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +48,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
 
 		glog.Info("Creating load balancer with name: ", name)
-		_, err := elbClient.CreateLoadBalancer(createRequest)
+		_, err := s.elb.CreateLoadBalancer(createRequest)
 		if err != nil {
 			return nil, err
 		}
@@ -61,30 +56,30 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 	} else {
 		{
 			// Sync subnets
-			expected := util.NewStringSet(subnetIDs...)
+			expected := sets.NewString(subnetIDs...)
 			actual := stringSetFromPointers(loadBalancer.Subnets)
 
 			additions := expected.Difference(actual)
 			removals := actual.Difference(expected)
 
-			if len(removals) != 0 {
+			if removals.Len() != 0 {
 				request := &elb.DetachLoadBalancerFromSubnetsInput{}
 				request.LoadBalancerName = aws.String(name)
 				request.Subnets = stringSetToPointers(removals)
 				glog.V(2).Info("Detaching load balancer from removed subnets")
-				_, err := elbClient.DetachLoadBalancerFromSubnets(request)
+				_, err := s.elb.DetachLoadBalancerFromSubnets(request)
 				if err != nil {
 					return nil, fmt.Errorf("error detaching AWS loadbalancer from subnets: %v", err)
 				}
 				dirty = true
 			}
 
-			if len(additions) != 0 {
+			if additions.Len() != 0 {
 				request := &elb.AttachLoadBalancerToSubnetsInput{}
 				request.LoadBalancerName = aws.String(name)
 				request.Subnets = stringSetToPointers(additions)
 				glog.V(2).Info("Attaching load balancer to added subnets")
-				_, err := elbClient.AttachLoadBalancerToSubnets(request)
+				_, err := s.elb.AttachLoadBalancerToSubnets(request)
 				if err != nil {
 					return nil, fmt.Errorf("error attaching AWS loadbalancer to subnets: %v", err)
 				}
@@ -94,7 +89,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 
 		{
 			// Sync security groups
-			expected := util.NewStringSet(securityGroupIDs...)
+			expected := sets.NewString(securityGroupIDs...)
 			actual := stringSetFromPointers(loadBalancer.SecurityGroups)
 
 			if !expected.Equal(actual) {
@@ -103,7 +98,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 				request.LoadBalancerName = aws.String(name)
 				request.SecurityGroups = stringPointerArray(securityGroupIDs)
 				glog.V(2).Info("Applying updated security groups to load balancer")
-				_, err := elbClient.ApplySecurityGroupsToLoadBalancer(request)
+				_, err := s.elb.ApplySecurityGroupsToLoadBalancer(request)
 				if err != nil {
 					return nil, fmt.Errorf("error applying AWS loadbalancer security groups: %v", err)
 				}
@@ -138,7 +133,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
 						continue
 					}
-					if orEmpty(actual.SSLCertificateID) != orEmpty(expected.SSLCertificateID) {
+					if orEmpty(actual.SSLCertificateId) != orEmpty(expected.SSLCertificateId) {
 						continue
 					}
 					found = i
@@ -163,7 +158,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 				request.LoadBalancerName = aws.String(name)
 				request.LoadBalancerPorts = removals
 				glog.V(2).Info("Deleting removed load balancer listeners")
-				_, err := elbClient.DeleteLoadBalancerListeners(request)
+				_, err := s.elb.DeleteLoadBalancerListeners(request)
 				if err != nil {
 					return nil, fmt.Errorf("error deleting AWS loadbalancer listeners: %v", err)
 				}
@@ -175,7 +170,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 				request.LoadBalancerName = aws.String(name)
 				request.Listeners = additions
 				glog.V(2).Info("Creating added load balancer listeners")
-				_, err := elbClient.CreateLoadBalancerListeners(request)
+				_, err := s.elb.CreateLoadBalancerListeners(request)
 				if err != nil {
 					return nil, fmt.Errorf("error creating AWS loadbalancer listeners: %v", err)
 				}
@@ -185,7 +180,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 	}
 
 	if dirty {
-		loadBalancer, err = s.describeLoadBalancer(region, name)
+		loadBalancer, err = s.describeLoadBalancer(name)
 		if err != nil {
 			glog.Warning("Unable to retrieve load balancer after creation/update")
 			return nil, err
@@ -196,12 +191,7 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 }
 
 // Makes sure that the health check for an ELB matches the configured listeners
-func (s *AWSCloud) ensureLoadBalancerHealthCheck(region string, loadBalancer *elb.LoadBalancerDescription, listeners []*elb.Listener) error {
-	elbClient, err := s.getELBClient(region)
-	if err != nil {
-		return err
-	}
-
+func (s *AWSCloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, listeners []*elb.Listener) error {
 	actual := loadBalancer.HealthCheck
 
 	// Default AWS settings
@@ -245,7 +235,7 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(region string, loadBalancer *el
 	request.HealthCheck = healthCheck
 	request.LoadBalancerName = loadBalancer.LoadBalancerName
 
-	_, err = elbClient.ConfigureHealthCheck(request)
+	_, err := s.elb.ConfigureHealthCheck(request)
 	if err != nil {
 		return fmt.Errorf("error configuring load-balancer health-check: %v", err)
 	}
@@ -254,31 +244,31 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(region string, loadBalancer *el
 }
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
-func (s *AWSCloud) ensureLoadBalancerInstances(elbClient ELB, loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
-	expected := util.NewStringSet()
+func (s *AWSCloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
+	expected := sets.NewString()
 	for _, instance := range instances {
-		expected.Insert(orEmpty(instance.InstanceID))
+		expected.Insert(orEmpty(instance.InstanceId))
 	}
 
-	actual := util.NewStringSet()
+	actual := sets.NewString()
 	for _, lbInstance := range lbInstances {
-		actual.Insert(orEmpty(lbInstance.InstanceID))
+		actual.Insert(orEmpty(lbInstance.InstanceId))
 	}
 
 	additions := expected.Difference(actual)
 	removals := actual.Difference(expected)
 
 	addInstances := []*elb.Instance{}
-	for instanceId := range additions {
+	for _, instanceId := range additions.List() {
 		addInstance := &elb.Instance{}
-		addInstance.InstanceID = aws.String(instanceId)
+		addInstance.InstanceId = aws.String(instanceId)
 		addInstances = append(addInstances, addInstance)
 	}
 
 	removeInstances := []*elb.Instance{}
-	for instanceId := range removals {
+	for _, instanceId := range removals.List() {
 		removeInstance := &elb.Instance{}
-		removeInstance.InstanceID = aws.String(instanceId)
+		removeInstance.InstanceId = aws.String(instanceId)
 		removeInstances = append(removeInstances, removeInstance)
 	}
 
@@ -286,7 +276,7 @@ func (s *AWSCloud) ensureLoadBalancerInstances(elbClient ELB, loadBalancerName s
 		registerRequest := &elb.RegisterInstancesWithLoadBalancerInput{}
 		registerRequest.Instances = addInstances
 		registerRequest.LoadBalancerName = aws.String(loadBalancerName)
-		_, err := elbClient.RegisterInstancesWithLoadBalancer(registerRequest)
+		_, err := s.elb.RegisterInstancesWithLoadBalancer(registerRequest)
 		if err != nil {
 			return err
 		}
@@ -297,7 +287,7 @@ func (s *AWSCloud) ensureLoadBalancerInstances(elbClient ELB, loadBalancerName s
 		deregisterRequest := &elb.DeregisterInstancesFromLoadBalancerInput{}
 		deregisterRequest.Instances = removeInstances
 		deregisterRequest.LoadBalancerName = aws.String(loadBalancerName)
-		_, err := elbClient.DeregisterInstancesFromLoadBalancer(deregisterRequest)
+		_, err := s.elb.DeregisterInstancesFromLoadBalancer(deregisterRequest)
 		if err != nil {
 			return err
 		}

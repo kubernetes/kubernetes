@@ -231,20 +231,21 @@ func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) e
 	}
 
 	data := &pageData{
-		DisplayName:        displayName,
-		ContainerName:      escapeContainerName(cont.Name),
-		ParentContainers:   parentContainers,
-		Subcontainers:      subcontainerLinks,
-		Spec:               cont.Spec,
-		Stats:              cont.Stats,
-		MachineInfo:        machineInfo,
-		IsRoot:             cont.Name == "/",
-		ResourcesAvailable: cont.Spec.HasCpu || cont.Spec.HasMemory || cont.Spec.HasNetwork || cont.Spec.HasFilesystem,
-		CpuAvailable:       cont.Spec.HasCpu,
-		MemoryAvailable:    cont.Spec.HasMemory,
-		NetworkAvailable:   cont.Spec.HasNetwork,
-		FsAvailable:        cont.Spec.HasFilesystem,
-		Root:               rootDir,
+		DisplayName:            displayName,
+		ContainerName:          escapeContainerName(cont.Name),
+		ParentContainers:       parentContainers,
+		Subcontainers:          subcontainerLinks,
+		Spec:                   cont.Spec,
+		Stats:                  cont.Stats,
+		MachineInfo:            machineInfo,
+		IsRoot:                 cont.Name == "/",
+		ResourcesAvailable:     cont.Spec.HasCpu || cont.Spec.HasMemory || cont.Spec.HasNetwork || cont.Spec.HasFilesystem,
+		CpuAvailable:           cont.Spec.HasCpu,
+		MemoryAvailable:        cont.Spec.HasMemory,
+		NetworkAvailable:       cont.Spec.HasNetwork,
+		FsAvailable:            cont.Spec.HasFilesystem,
+		CustomMetricsAvailable: cont.Spec.HasCustomMetrics,
+		Root: rootDir,
 	}
 	err = pageTemplate.Execute(w, data)
 	if err != nil {

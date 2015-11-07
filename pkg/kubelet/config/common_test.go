@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
@@ -33,7 +34,7 @@ func noDefault(*api.Pod) error { return nil }
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -52,9 +53,10 @@ func TestDecodeSinglePod(t *testing.T) {
 				TerminationMessagePath: "/dev/termination-log",
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
+			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
-	json, err := testapi.Codec().Encode(pod)
+	json, err := testapi.Default.Codec().Encode(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -69,8 +71,8 @@ func TestDecodeSinglePod(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, podOut, string(json))
 	}
 
-	for _, version := range registered.RegisteredVersions {
-		externalPod, err := testapi.Converter().ConvertToVersion(pod, version)
+	for _, version := range registered.GroupVersionsForGroup("") {
+		externalPod, err := testapi.Default.Converter().ConvertToVersion(pod, version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -95,7 +97,7 @@ func TestDecodeSinglePod(t *testing.T) {
 func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -114,12 +116,13 @@ func TestDecodePodList(t *testing.T) {
 				TerminationMessagePath: "/dev/termination-log",
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
+			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
 	podList := &api.PodList{
 		Items: []api.Pod{*pod},
 	}
-	json, err := testapi.Codec().Encode(podList)
+	json, err := testapi.Default.Codec().Encode(podList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -134,8 +137,8 @@ func TestDecodePodList(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", podList, &podListOut, string(json))
 	}
 
-	for _, version := range registered.RegisteredVersions {
-		externalPodList, err := testapi.Converter().ConvertToVersion(podList, version)
+	for _, version := range registered.GroupVersionsForGroup("") {
+		externalPodList, err := testapi.Default.Converter().ConvertToVersion(podList, version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

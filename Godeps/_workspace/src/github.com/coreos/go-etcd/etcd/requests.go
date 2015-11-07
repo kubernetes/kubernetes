@@ -348,7 +348,7 @@ func DefaultCheckRetry(cluster *Cluster, numReqs int, lastResp http.Response,
 	}
 	// sleep some time and expect leader election finish
 	time.Sleep(time.Millisecond * 200)
-	logger.Warning("bad response status code", lastResp.StatusCode)
+	logger.Warning("bad response status code ", lastResp.StatusCode)
 	return nil
 }
 

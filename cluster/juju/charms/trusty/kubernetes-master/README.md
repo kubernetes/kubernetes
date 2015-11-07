@@ -67,7 +67,7 @@ The charm store version of the Kubernetes bundle can be deployed as follows:
 
 Alternately you could deploy a Kubernetes bundle straight from github or a file:
 
-    juju quickstart -i https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml
+    juju quickstart https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/juju/bundles/local.yaml
 
 The command above does few things for you:
 

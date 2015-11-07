@@ -1,23 +1,28 @@
 {{var "v"}} := *{{ .Varname }}
 {{var "l"}} := r.ReadMapStart()
+{{var "bh"}} := z.DecBasicHandle()
 if {{var "v"}} == nil {
-	if {{var "l"}} > 0 {
-		{{var "v"}} = make(map[{{ .KTyp }}]{{ .Typ }}, {{var "l"}})
-	} else {
-		{{var "v"}} = make(map[{{ .KTyp }}]{{ .Typ }}) // supports indefinite-length, etc
-	}
+	{{var "rl"}}, _ := z.DecInferLen({{var "l"}}, {{var "bh"}}.MaxInitLen, {{ .Size }})
+	{{var "v"}} = make(map[{{ .KTyp }}]{{ .Typ }}, {{var "rl"}})
 	*{{ .Varname }} = {{var "v"}}
 }
+var {{var "mk"}} {{ .KTyp }}
+var {{var "mv"}} {{ .Typ }}
+var {{var "mg"}} bool
+if {{var "bh"}}.MapValueReset {
+	{{if decElemKindPtr}}{{var "mg"}} = true
+	{{else if decElemKindIntf}}if !{{var "bh"}}.InterfaceReset { {{var "mg"}} = true }
+	{{else if not decElemKindImmutable}}{{var "mg"}} = true
+	{{end}} }
 if {{var "l"}} > 0  {
 for {{var "j"}} := 0; {{var "j"}} < {{var "l"}}; {{var "j"}}++ {
-	var {{var "mk"}} {{ .KTyp }} 
 	{{ $x := printf "%vmk%v" .TempVar .Rand }}{{ decLineVarK $x }}
-{{ if eq .KTyp "interface{}" }}// special case if a byte array.
-	if {{var "bv"}}, {{var "bok"}} := {{var "mk"}}.([]byte); {{var "bok"}} {
+{{ if eq .KTyp "interface{}" }}{{/* // special case if a byte array. */}}if {{var "bv"}}, {{var "bok"}} := {{var "mk"}}.([]byte); {{var "bok"}} {
 		{{var "mk"}} = string({{var "bv"}})
-	}
-{{ end }}
-	{{var "mv"}} := {{var "v"}}[{{var "mk"}}]
+	}{{ end }}
+	if {{var "mg"}} {
+		{{var "mv"}} = {{var "v"}}[{{var "mk"}}]
+	} {{if not decElemKindImmutable}}else { {{var "mv"}} = {{decElemZero}} }{{end}}
 	{{ $x := printf "%vmv%v" .TempVar .Rand }}{{ decLineVar $x }}
 	if {{var "v"}} != nil {
 		{{var "v"}}[{{var "mk"}}] = {{var "mv"}}
@@ -25,22 +30,17 @@ for {{var "j"}} := 0; {{var "j"}} < {{var "l"}}; {{var "j"}}++ {
 }
 } else if {{var "l"}} < 0  {
 for {{var "j"}} := 0; !r.CheckBreak(); {{var "j"}}++ {
-	if {{var "j"}} > 0 {
-		r.ReadMapEntrySeparator()
-	}
-	var {{var "mk"}} {{ .KTyp }} 
 	{{ $x := printf "%vmk%v" .TempVar .Rand }}{{ decLineVarK $x }}
-{{ if eq .KTyp "interface{}" }}// special case if a byte array.
-	if {{var "bv"}}, {{var "bok"}} := {{var "mk"}}.([]byte); {{var "bok"}} {
+{{ if eq .KTyp "interface{}" }}{{/* // special case if a byte array. */}}if {{var "bv"}}, {{var "bok"}} := {{var "mk"}}.([]byte); {{var "bok"}} {
 		{{var "mk"}} = string({{var "bv"}})
-	}
-{{ end }}
-	r.ReadMapKVSeparator()
-	{{var "mv"}} := {{var "v"}}[{{var "mk"}}]
+	}{{ end }}
+	if {{var "mg"}} {
+		{{var "mv"}} = {{var "v"}}[{{var "mk"}}]
+	} {{if not decElemKindImmutable}}else { {{var "mv"}} = {{decElemZero}} }{{end}}
 	{{ $x := printf "%vmv%v" .TempVar .Rand }}{{ decLineVar $x }}
 	if {{var "v"}} != nil {
 		{{var "v"}}[{{var "mk"}}] = {{var "mv"}}
 	}
 }
-r.ReadMapEnd()
+r.ReadEnd()
 } // else len==0: TODO: Should we clear map entries?

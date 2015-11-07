@@ -75,6 +75,15 @@ NAME                ENDPOINTS
 glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 ```
 
+We need also create a service for this endpoints, so that the endpoints will be persistented. We will add this service without a selector to tell Kubernetes we want to add its endpoints manually. You can see [glusterfs-service.json](glusterfs-service.json) for details.
+
+Use this command to create the service:
+
+```sh
+$ kubectl create -f examples/glusterfs/glusterfs-service.json
+```
+
+
 ### Create a POD
 
 The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustrates a sample configuration.

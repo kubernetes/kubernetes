@@ -20,12 +20,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/fields"
 )
 
-// NewSourceAPIserver creates config source that watches for changes to the services and endpoints.
+// NewSourceAPI creates config source that watches for changes to the services and endpoints.
 func NewSourceAPI(c *client.Client, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
 	servicesLW := cache.NewListWatchFromClient(c, "services", api.NamespaceAll, fields.Everything())
 	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", api.NamespaceAll, fields.Everything())

@@ -25,12 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
-func GetVersion(w io.Writer, kubeClient client.Interface) {
-	GetClientVersion(w)
-
+func GetServerVersion(w io.Writer, kubeClient client.Interface) {
 	serverVersion, err := kubeClient.ServerVersion()
 	if err != nil {
-		fmt.Printf("Couldn't read version from server: %v\n", err)
+		fmt.Printf("Couldn't read server version from server: %v\n", err)
 		os.Exit(1)
 	}
 

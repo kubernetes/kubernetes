@@ -21,26 +21,27 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
 func TestObjectVersioner(t *testing.T) {
 	v := APIObjectVersioner{}
-	if ver, err := v.ObjectResourceVersion(&TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
+	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
-	if ver, err := v.ObjectResourceVersion(&TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
+	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
-	obj := &TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
+	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
 	if err := v.UpdateObject(obj, nil, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
 		t.Errorf("unexpected resource version: %#v", obj)
 	}
-	now := util.Time{Time: time.Now()}
-	obj = &TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
+	now := unversioned.Time{Time: time.Now()}
+	obj = &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
 	if err := v.UpdateObject(obj, &now.Time, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

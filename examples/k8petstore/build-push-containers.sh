@@ -27,3 +27,6 @@ docker push jayunit100/k8-petstore-redis:$version
 docker push jayunit100/k8-petstore-redis-master:$version
 docker push jayunit100/k8-petstore-redis-slave:$version
 docker push jayunit100/k8-petstore-web-server:$version
+
+### Now, start the application.
+

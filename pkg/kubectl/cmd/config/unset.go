@@ -47,7 +47,9 @@ func NewCmdConfigUnset(out io.Writer, configAccess ConfigAccess) *cobra.Command 
 
 			err := options.run()
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "property %q unset.\n", options.propertyName)
 			}
 		},
 	}
@@ -95,7 +97,7 @@ func (o *unsetOptions) complete(cmd *cobra.Command) bool {
 
 func (o unsetOptions) validate() error {
 	if len(o.propertyName) == 0 {
-		return errors.New("You must specify a property")
+		return errors.New("you must specify a property")
 	}
 
 	return nil

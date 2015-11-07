@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -31,22 +31,23 @@ type HorizontalPodAutoscalersNamespacer interface {
 
 // HorizontalPodAutoscalerInterface has methods to work with HorizontalPodAutoscaler resources.
 type HorizontalPodAutoscalerInterface interface {
-	List(label labels.Selector, field fields.Selector) (*expapi.HorizontalPodAutoscalerList, error)
-	Get(name string) (*expapi.HorizontalPodAutoscaler, error)
+	List(label labels.Selector, field fields.Selector) (*extensions.HorizontalPodAutoscalerList, error)
+	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Create(horizontalPodAutoscaler *expapi.HorizontalPodAutoscaler) (*expapi.HorizontalPodAutoscaler, error)
-	Update(horizontalPodAutoscaler *expapi.HorizontalPodAutoscaler) (*expapi.HorizontalPodAutoscaler, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
 type horizontalPodAutoscalers struct {
-	client *ExperimentalClient
+	client *ExtensionsClient
 	ns     string
 }
 
 // newHorizontalPodAutoscalers returns a horizontalPodAutoscalers
-func newHorizontalPodAutoscalers(c *ExperimentalClient, namespace string) *horizontalPodAutoscalers {
+func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
 		client: c,
 		ns:     namespace,
@@ -54,15 +55,15 @@ func newHorizontalPodAutoscalers(c *ExperimentalClient, namespace string) *horiz
 }
 
 // List takes label and field selectors, and returns the list of horizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (result *expapi.HorizontalPodAutoscalerList, err error) {
-	result = &expapi.HorizontalPodAutoscalerList{}
+func (c *horizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (result *extensions.HorizontalPodAutoscalerList, err error) {
+	result = &extensions.HorizontalPodAutoscalerList{}
 	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the horizontalPodAutoscaler, and returns the corresponding HorizontalPodAutoscaler object, and an error if it occurs
-func (c *horizontalPodAutoscalers) Get(name string) (result *expapi.HorizontalPodAutoscaler, err error) {
-	result = &expapi.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Do().Into(result)
 	return
 }
@@ -81,26 +82,34 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 }
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
-func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *expapi.HorizontalPodAutoscaler) (result *expapi.HorizontalPodAutoscaler, err error) {
-	result = &expapi.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Post().Namespace(c.ns).Resource("horizontalPodAutoscalers").Body(horizontalPodAutoscaler).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a horizontalPodAutoscaler and updates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
-func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *expapi.HorizontalPodAutoscaler) (result *expapi.HorizontalPodAutoscaler, err error) {
-	result = &expapi.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Put().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).Body(horizontalPodAutoscaler).Do().Into(result)
 	return
 }
 
+// UpdateStatus takes the representation of a horizontalPodAutoscaler and updates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
+	err = c.client.Put().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
+	return
+}
+
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *horizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("horizontalPodAutoscalers").
-		Param("resourceVersion", resourceVersion).
+		Param("resourceVersion", opts.ResourceVersion).
+		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

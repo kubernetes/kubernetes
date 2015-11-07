@@ -41,7 +41,14 @@ func NewEtcdClient() *etcd.Client {
 }
 
 func NewEtcdStorage() (storage.Interface, error) {
-	return master.NewEtcdStorage(NewEtcdClient(), latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
+	return master.NewEtcdStorage(NewEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+}
+
+func NewExtensionsEtcdStorage(client *etcd.Client) (storage.Interface, error) {
+	if client == nil {
+		client = NewEtcdClient()
+	}
+	return master.NewEtcdStorage(client, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
 }
 
 func RequireEtcd() {

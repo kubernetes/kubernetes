@@ -49,7 +49,7 @@ declare -a resources=(
 )
 
 # Find all the namespaces.
-namespaces=( $("${KUBECTL}" get namespaces -o template -t "{{range.items}}{{.metadata.name}} {{end}}"))
+namespaces=( $("${KUBECTL}" get namespaces -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
 if [ -z "${namespaces:-}" ]
 then
   echo "Unexpected: No namespace found. Nothing to do."
@@ -59,7 +59,7 @@ for resource in "${resources[@]}"
 do
   for namespace in "${namespaces[@]}"
   do
-    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o template -t "{{range.items}}{{.metadata.name}} {{end}}"))
+    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
     # Nothing to do if there is no instance of that resource.
     if [[ -z "${instances:-}" ]]
     then
@@ -84,7 +84,7 @@ do
           echo "Looks like ${instance} got deleted. Ignoring it"
           continue
         fi
-        output=$("${KUBECTL}" update -f "${filename}" --namespace="${namespace}") || true
+        output=$("${KUBECTL}" replace -f "${filename}" --namespace="${namespace}") || true
         rm "${filename}"
         if [ -n "${output:-}" ]
         then

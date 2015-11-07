@@ -17,8 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"path"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -34,16 +32,21 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volumes.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
 	prefix := "/persistentvolumes"
+
+	newListFunc := func() runtime.Object { return &api.PersistentVolumeList{} }
+	storageInterface := storageFactory(
+		s, 100, nil, &api.PersistentVolume{}, prefix, true, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },
-		NewListFunc: func() runtime.Object { return &api.PersistentVolumeList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return path.Join(prefix, name), nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PersistentVolume).Name, nil
@@ -57,7 +60,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		UpdateStrategy:      persistentvolume.Strategy,
 		ReturnDeletedObject: true,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	statusStore := *store

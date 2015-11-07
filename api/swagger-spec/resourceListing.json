@@ -3,10 +3,22 @@
   "apis": [
    {
     "path": "/api/v1",
-    "description": "API at /api/v1 version v1"
+    "description": "API at /api/v1"
    },
    {
     "path": "/api",
+    "description": "get available API versions"
+   },
+   {
+    "path": "/apis/extensions/v1beta1",
+    "description": "API at /apis/extensions/v1beta1"
+   },
+   {
+    "path": "/apis/extensions",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis",
     "description": "get available API versions"
    },
    {

@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package routecontroller contains code for syncing cloud routing rules with
+// Package route contains code for syncing cloud routing rules with
 // the list of registered nodes.
-package routecontroller
+package route

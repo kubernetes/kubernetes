@@ -16,6 +16,19 @@
 
 # A library of helper functions and constant for the local config.
 
+# Experimental flags can be removed/renamed at any time.
+# The intent is to allow experimentation/advanced functionality before we
+# are ready to commit to supporting it.
+# Experimental functionality:
+#   KUBE_SHARE_MASTER=true
+#     Detect and reuse an existing master; useful if you want to
+#     create more nodes, perhaps with a different instance type or in
+#     a different subnet/AZ
+#   KUBE_SUBNET_CIDR=172.20.1.0/24
+#     Override the default subnet CIDR; useful if you want to create
+#     a second subnet.  The default subnet is 172.20.0.0/24.  The VPC
+#     is created with 172.20.0.0/16; you must pick a sub-CIDR of that.
+
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
@@ -25,7 +38,9 @@ source "${KUBE_ROOT}/cluster/common.sh"
 ALLOCATE_NODE_CIDRS=true
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
-ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
+
+# The Auto Scaling Group (ASG) name must be unique, so we include the zone
+ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
 
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
@@ -53,9 +68,15 @@ AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
 AWS_ASG_CMD="aws --output json autoscaling"
 
-INTERNAL_IP_BASE=172.20.0
+VPC_CIDR_BASE=172.20
 MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
+SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
+if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
+  echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
+  SUBNET_CIDR=${KUBE_SUBNET_CIDR}
+fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
@@ -82,15 +103,20 @@ function get_vpc_id {
 }
 
 function get_subnet_id {
-  python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
+  local vpc_id=$1
+  local az=$2
+  $AWS_CMD --output text describe-subnets \
+           --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                     Name=availabilityZone,Values=${az} \
+                     Name=vpc-id,Values=${vpc_id} \
+           --query Subnets[].SubnetId
 }
 
 function get_igw_id {
-  python -c "import json,sys; lst = [str(igw['InternetGatewayId']) for igw in json.load(sys.stdin)['InternetGateways'] for attachment in igw['Attachments'] if attachment['VpcId'] == '$1']; print ''.join(lst)"
-}
-
-function get_route_table_id {
-  python -c "import json,sys; lst = [str(route_table['RouteTableId']) for route_table in json.load(sys.stdin)['RouteTables'] if route_table['VpcId'] == '$1']; print ''.join(lst)"
+  local vpc_id=$1
+  $AWS_CMD --output text describe-internet-gateways \
+           --filters Name=attachment.vpc-id,Values=${vpc_id} \
+           --query InternetGateways[].InternetGatewayId
 }
 
 function get_elbs_in_vpc {
@@ -163,6 +189,7 @@ function query-running-minions () {
            --filters Name=instance-state-name,Values=running \
                      Name=vpc-id,Values=${VPC_ID} \
                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                     Name=tag:aws:autoscaling:groupName,Values=${ASG_NAME} \
                      Name=tag:Role,Values=${MINION_TAG} \
            --query ${query}
 }
@@ -244,7 +271,7 @@ case "${KUBE_OS_DISTRIBUTION}" in
     detect-jessie-image
     ;;
   *)
-    echo "Please specify AWS_IMAGE directly (distro not recognized)"
+    echo "Please specify AWS_IMAGE directly (distro ${KUBE_OS_DISTRIBUTION} not recognized)"
     exit 2
     ;;
 esac
@@ -306,7 +333,7 @@ function detect-trusty-image () {
         ;;
 
       *)
-        echo "Please specify AWS_IMAGE directly (region not recognized)"
+        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
         exit 1
     esac
   fi
@@ -417,8 +444,49 @@ function ensure-master-pd {
   fi
 }
 
+# Creates a new DHCP option set configured correctly for Kubernetes
+# Sets DHCP_OPTION_SET_ID
+function create-dhcp-option-set () {
+  case "${AWS_REGION}" in
+    us-east-1)
+      OPTION_SET_DOMAIN=ec2.internal
+      ;;
+
+    *)
+      OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
+  esac
+
+  DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS | json_val '["DhcpOptions"]["DhcpOptionsId"]')
+
+  add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
+  add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+
+  $AWS_CMD associate-dhcp-options --dhcp-options-id ${DHCP_OPTION_SET_ID} --vpc-id ${VPC_ID}
+
+  echo "Using DHCP option set ${DHCP_OPTION_SET_ID}"
+}
+
 # Verify prereqs
 function verify-prereqs {
+  if [[ "${ENABLE_EXPERIMENTAL_API}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1=true"
+    else
+      # TODO: add checking if RUNTIME_CONFIG contains "extensions/v1beta1=false" and appending "extensions/v1beta1=true" if not.
+      if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1=true"; then
+        echo "Experimental API should be turned on, but is not turned on in RUNTIME_CONFIG!"
+        exit 1
+      fi
+    fi
+  fi
+  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+    if [[ -z "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
+    else
+      RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
+    fi
+  fi
+
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
@@ -434,31 +502,6 @@ function ensure-temp-dir {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
-# Verify and find the various tar files that we are going to use on the server.
-#
-# Vars set:
-#   SERVER_BINARY_TAR
-#   SALT_TAR
-function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
-    exit 1
-  fi
-
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
-  fi
-  if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
-    exit 1
   fi
 }
 
@@ -498,10 +541,12 @@ function upload-server-tars() {
     # and then the bucket is most-simply named (s3.amazonaws.com)
     aws s3 mb "s3://${AWS_S3_BUCKET}" --region ${AWS_S3_REGION}
 
+    echo "Confirming bucket was created..."
+
     local attempt=0
     while true; do
       if ! aws s3 ls --region ${AWS_S3_REGION} "s3://${AWS_S3_BUCKET}" > /dev/null 2>&1; then
-        if (( attempt > 5 )); then
+        if (( attempt > 120 )); then
           echo
           echo -e "${color_red}Unable to confirm bucket creation." >&2
           echo "Please ensure that s3://${AWS_S3_BUCKET} exists" >&2
@@ -663,7 +708,7 @@ function kube-up {
 
   ensure-iam-profiles
 
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
 
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
@@ -683,7 +728,7 @@ function kube-up {
   fi
   if [[ -z "$VPC_ID" ]]; then
 	  echo "Creating vpc."
-	  VPC_ID=$($AWS_CMD create-vpc --cidr-block $INTERNAL_IP_BASE.0/16 | json_val '["Vpc"]["VpcId"]')
+	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} | json_val '["Vpc"]["VpcId"]')
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
 	  add-tag $VPC_ID Name kubernetes-vpc
@@ -692,23 +737,29 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
+  create-dhcp-option-set
+
   if [[ -z "${SUBNET_ID:-}" ]]; then
-    SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+    SUBNET_ID=$(get_subnet_id $VPC_ID $ZONE)
   fi
+
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
-    SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
+    SUBNET_ID=$($AWS_CMD create-subnet --cidr-block ${SUBNET_CIDR} --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
     add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
-    echo "Using existing CIDR $EXISTING_CIDR"
-    INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
-    MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+    echo "Using existing subnet with CIDR $EXISTING_CIDR"
+    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock --output text)
+    echo "VPC CIDR is $VPC_CIDR"
+    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
+    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+    echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
   fi
 
   echo "Using subnet $SUBNET_ID"
 
-  IGW_ID=$($AWS_CMD describe-internet-gateways | get_igw_id $VPC_ID)
+  IGW_ID=$(get_igw_id $VPC_ID)
   if [[ -z "$IGW_ID" ]]; then
 	  echo "Creating Internet Gateway."
 	  IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
@@ -770,6 +821,33 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
+  # KUBE_SHARE_MASTER is used to add minions to an existing master
+  if [[ "${KUBE_SHARE_MASTER:-}" == "true" ]]; then
+    # Detect existing master
+    detect-master
+
+    # Start minions
+    start-minions
+  else
+    # Create the master
+    start-master
+
+    # Start minions
+    start-minions
+
+    # Wait for the master to be ready
+    wait-master
+
+    # Build ~/.kube/config
+    build-config
+  fi
+
+  # Check the cluster is OK
+  check-cluster
+}
+
+# Starts the master node
+function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
@@ -803,6 +881,8 @@ function kube-up {
     echo "readonly ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "readonly ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI:-false}'"
+    echo "readonly ENABLE_EXPERIMENTAL_API='${ENABLE_EXPERIMENTAL_API:-false}'"
+    echo "readonly RUNTIME_CONFIG='${RUNTIME_CONFIG}'"
     echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
@@ -812,6 +892,11 @@ function kube-up {
     echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
     echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
     echo "readonly MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
+    echo "readonly NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
+    echo "readonly OPENCONTRAIL_TAG='${OPENCONTRAIL_TAG:-}'"
+    echo "readonly OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
+    echo "readonly OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
+    echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
@@ -851,12 +936,12 @@ function kube-up {
         exit 1
       fi
     else
+      # We are not able to add an elastic ip, a route or volume to the instance until that instance is in "running" state.
+      wait-for-instance-running $master_id
+
       KUBE_MASTER=${MASTER_NAME}
       KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
-
-      # We are not able to add a route or volume to the instance until that instance is in "running" state.
-      wait-for-instance-running $master_id
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
@@ -924,7 +1009,10 @@ function kube-up {
     attempt=$(($attempt+1))
     sleep 10
   done
+}
 
+# Creates an ASG for the minion nodes
+function start-minions() {
   echo "Creating minion configuration"
   generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
   local public_ip_option
@@ -979,9 +1067,11 @@ function kube-up {
     attempt=$(($attempt+1))
     sleep 10
   done
+}
 
+# Wait for the master to be started
+function wait-master() {
   detect-master > $LOG
-  detect-minions > $LOG
 
   # TODO(justinsb): This is really not necessary any more
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
@@ -1010,7 +1100,11 @@ function kube-up {
   done
 
   echo "Kubernetes cluster created."
+}
 
+# Creates the ~/.kube/config file, getting the information from the master
+# The master much be running and set in KUBE_MASTER_IP
+function build-config() {
   # TODO use token instead of kube_auth
   export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
   export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
@@ -1029,10 +1123,15 @@ function kube-up {
 
     create-kubeconfig
   )
+}
 
+# Sanity check the cluster and print confirmation messages
+function check-cluster() {
   echo "Sanity checking cluster..."
 
   sleep 5
+
+  detect-minions > $LOG
 
   # Don't bail on errors, we want to be able to print some info.
   set +e
@@ -1099,20 +1198,26 @@ function kube-down {
       done
     fi
 
-    if [[ -n $(${AWS_ASG_CMD} --output text describe-auto-scaling-groups --auto-scaling-group-names ${ASG_NAME} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
-      echo "Deleting auto-scaling group: ${ASG_NAME}"
-      ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${ASG_NAME}
-    fi
-    if [[ -n $(${AWS_ASG_CMD} --output text describe-launch-configurations --launch-configuration-names ${ASG_NAME} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
-      echo "Deleting auto-scaling launch configuration: ${ASG_NAME}"
-      ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${ASG_NAME}
-    fi
-
     echo "Deleting instances in VPC: ${vpc_id}"
     instance_ids=$($AWS_CMD --output text describe-instances \
                             --filters Name=vpc-id,Values=${vpc_id} \
                                       Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                             --query Reservations[].Instances[].InstanceId)
+
+    asg_groups=$($AWS_CMD   --output text describe-instances \
+                            --query 'Reservations[].Instances[].Tags[?Key==`aws:autoscaling:groupName`].Value[]' \
+                            --instance-ids ${instance_ids})
+    for asg_group in ${asg_groups}; do
+      if [[ -n $(${AWS_ASG_CMD} --output text describe-auto-scaling-groups --auto-scaling-group-names ${asg_group} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
+        echo "Deleting auto-scaling group: ${asg_group}"
+        ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${asg_group}
+      fi
+      if [[ -n $(${AWS_ASG_CMD} --output text describe-launch-configurations --launch-configuration-names ${asg_group} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
+        echo "Deleting auto-scaling launch configuration: ${asg_group}"
+        ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${asg_group}
+      fi
+    done
+
     if [[ -n "${instance_ids}" ]]; then
       $AWS_CMD terminate-instances --instance-ids ${instance_ids} > $LOG
       echo "Waiting for instances to be deleted"

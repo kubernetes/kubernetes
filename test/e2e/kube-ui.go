@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -30,7 +31,7 @@ import (
 var _ = Describe("kube-ui", func() {
 	const (
 		uiServiceName = "kube-ui"
-		uiRcName      = uiServiceName
+		uiAppName     = uiServiceName
 		uiNamespace   = api.NamespaceSystem
 
 		serverStartTimeout = 1 * time.Minute
@@ -38,13 +39,14 @@ var _ = Describe("kube-ui", func() {
 
 	f := NewFramework("kube-ui")
 
-	It("should check that the kube-ui instance is alive", func() {
+	It("should check that the kube-ui instance is alive [Conformance]", func() {
 		By("Checking the kube-ui service exists.")
 		err := waitForService(f.Client, uiNamespace, uiServiceName, true, poll, serviceStartTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking to make sure the kube-ui pods are running")
-		err = waitForRCPodsRunning(f.Client, uiNamespace, uiRcName)
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
+		err = waitForPodsWithLabelRunning(f.Client, uiNamespace, selector)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking to make sure we get a response from the kube-ui.")

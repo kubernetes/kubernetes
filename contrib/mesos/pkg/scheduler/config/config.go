@@ -20,7 +20,7 @@ import (
 	"io"
 	"time"
 
-	"code.google.com/p/gcfg"
+	"github.com/scalingdata/gcfg"
 )
 
 const (

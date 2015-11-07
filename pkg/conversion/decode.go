@@ -17,9 +17,10 @@ limitations under the License.
 package conversion
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/ugorji/go/codec"
 )
 
 func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version, kind string, err error) {
@@ -38,7 +39,7 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 		return nil, "", "", err
 	}
 
-	if err := json.Unmarshal(data, obj); err != nil {
+	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
 		return nil, "", "", err
 	}
 	return
@@ -139,7 +140,7 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, external); err != nil {
+	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(external); err != nil {
 		return err
 	}
 	flags, meta := s.generateConvertMeta(dataVersion, objVersion, external)

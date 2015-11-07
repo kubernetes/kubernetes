@@ -165,7 +165,7 @@ Use of imagePullSecrets is described in the [images documentation](images.md#spe
 
 You can manually create an imagePullSecret, and reference it from
 a serviceAccount.  Any pods created with that serviceAccount
-or that default to use that serviceAccount, will get have the imagePullSecret of the
+or that default to use that serviceAccount, will get their imagePullSecret
 field set to that of the service account.
 See [here](service-accounts.md#adding-imagepullsecrets-to-a-service-account)
  for a detailed explanation of that process.

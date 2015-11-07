@@ -92,7 +92,7 @@ func testPreStop(c *client.Client, ns string) {
 		},
 	}
 
-	By(fmt.Sprintf("Creating tester pod %s in namespace %s", podDescr.Name, ns))
+	By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
 	_, err = c.Pods(ns).Create(preStopDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
@@ -144,7 +144,7 @@ func testPreStop(c *client.Client, ns string) {
 var _ = Describe("PreStop", func() {
 	f := NewFramework("prestop")
 
-	It("should call prestop when killing a pod", func() {
+	It("should call prestop when killing a pod [Conformance]", func() {
 		testPreStop(f.Client, f.Namespace.Name)
 	})
 })

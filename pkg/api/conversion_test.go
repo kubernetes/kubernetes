@@ -37,7 +37,7 @@ func BenchmarkPodConversion(b *testing.B) {
 	scheme := api.Scheme.Raw()
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Version())
+		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Default.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -65,7 +65,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 	scheme := api.Scheme.Raw()
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Version())
+		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -93,7 +93,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	scheme := api.Scheme.Raw()
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Version())
+		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}

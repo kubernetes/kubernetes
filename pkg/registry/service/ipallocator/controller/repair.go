@@ -22,11 +22,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -84,19 +83,17 @@ func (c *Repair) RunOnce() error {
 	// important when we start apiserver and etcd at the same time.
 	var latest *api.RangeAllocation
 	var err error
-	for i := 0; i < 10; i++ {
-		if latest, err = c.alloc.Get(); err != nil {
-			time.Sleep(time.Second)
-		} else {
-			break
-		}
-	}
+	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+		latest, err = c.alloc.Get()
+		return err == nil, err
+	})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	list, err := c.registry.ListServices(ctx, labels.Everything(), fields.Everything())
+	options := &api.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
+	list, err := c.registry.ListServices(ctx, options)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}

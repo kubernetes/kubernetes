@@ -33,8 +33,8 @@ Documentation for other releases can be found at
 **Note: this is a design doc, which describes features that have not been completely implemented.
 User documentation of the current state is [here](../user-guide/compute-resources.md).  The tracking issue for
 implementation of this model is
-[#168](http://issue.k8s.io/168).  Currently, only memory and
-cpu limits on containers (not pods) are supported.  "memory" is in bytes and "cpu" is in
+[#168](http://issue.k8s.io/168).  Currently, both limits and requests of memory and
+cpu on containers (not pods) are supported.  "memory" is in bytes and "cpu" is in
 milli-cores.**
 
 # The Kubernetes resource model
@@ -121,7 +121,6 @@ Where:
   * If multiple pods are running on the same node and attempting to use more resources than they have requested, the result is implementation-defined. For example: unallocated or unused resources might be spread equally across claimants, or the assignment might be weighted by the size of the original request, or as a function of limits, or priority, or the phase of the moon, perhaps modulated by the direction of the tide. Thus, although it's not mandatory to provide a _request_, it's probably a good idea.  (Note that the _request_ could be filled in by an automated system that is observing actual usage and/or historical data.)
 
   * Internally, the Kubernetes master can decide the defaulting behavior and the kubelet implementation may expected an absolute specification.  For example, if the master decided that "the default is unbounded" it would pass 2^64 to the kubelet.
-
 
 
 ## Kubernetes-defined resource types

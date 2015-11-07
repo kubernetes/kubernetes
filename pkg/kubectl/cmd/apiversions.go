@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
+	unversioned_client "k8s.io/kubernetes/pkg/client/unversioned"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -32,7 +33,7 @@ func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "api-versions",
 		// apiversions is deprecated.
 		Aliases: []string{"apiversions"},
-		Short:   "Print available API versions.",
+		Short:   "Print the supported API versions on the server, in the form of \"group/version\".",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunApiVersions(f, out)
 			cmdutil.CheckErr(err)
@@ -51,24 +52,14 @@ func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
 		return err
 	}
 
-	apiVersions, err := client.ServerAPIVersions()
+	groupList, err := client.Discovery().ServerGroups()
 	if err != nil {
-		fmt.Printf("Couldn't get available api versions from server: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
 	}
-
-	var expAPIVersions *api.APIVersions
-	showExpVersions := false
-	expClient, err := f.ExperimentalClient()
-	if err == nil {
-		expAPIVersions, err = expClient.ServerAPIVersions()
-		showExpVersions = err == nil
+	apiVersions := unversioned_client.ExtractGroupVersions(groupList)
+	sort.Strings(apiVersions)
+	for _, v := range apiVersions {
+		fmt.Fprintln(w, v)
 	}
-
-	fmt.Fprintf(w, "Available Server Api Versions: %#v\n", *apiVersions)
-	if showExpVersions {
-		fmt.Fprintf(w, "Available Server Experimental Api Versions: %#v\n", *expAPIVersions)
-	}
-
 	return nil
 }

@@ -37,11 +37,13 @@ attached, the output is compatible with the
 [logfmt](http://godoc.org/github.com/kr/logfmt) format:
 
 ```text
-time="2014-04-20 15:36:23.830442383 -0400 EDT" level="info" msg="A group of walrus emerges from the ocean" animal="walrus" size=10
-time="2014-04-20 15:36:23.830584199 -0400 EDT" level="warning" msg="The group's number increased tremendously!" omg=true number=122
-time="2014-04-20 15:36:23.830596521 -0400 EDT" level="info" msg="A giant walrus appears!" animal="walrus" size=10
-time="2014-04-20 15:36:23.830611837 -0400 EDT" level="info" msg="Tremendously sized cow enters the ocean." animal="walrus" size=9
-time="2014-04-20 15:36:23.830626464 -0400 EDT" level="fatal" msg="The ice breaks!" omg=true number=100
+time="2015-03-26T01:27:38-04:00" level=debug msg="Started observing beach" animal=walrus number=8
+time="2015-03-26T01:27:38-04:00" level=info msg="A group of walrus emerges from the ocean" animal=walrus size=10
+time="2015-03-26T01:27:38-04:00" level=warning msg="The group's number increased tremendously!" number=122 omg=true
+time="2015-03-26T01:27:38-04:00" level=debug msg="Temperature changes" temperature=-4
+time="2015-03-26T01:27:38-04:00" level=panic msg="It's over 9000!" animal=orca size=9009
+time="2015-03-26T01:27:38-04:00" level=fatal msg="The ice breaks!" err=&{0x2082280c0 map[animal:orca size:9009] 2015-03-26 01:27:38.441574009 -0400 EDT panic It's over 9000!} number=100 omg=true
+exit status 1
 ```
 
 #### Example
@@ -82,7 +84,7 @@ func init() {
 
   // Use the Airbrake hook to report errors that have Error severity or above to
   // an exception tracker. You can create custom hooks, see the Hooks section.
-  log.AddHook(&logrus_airbrake.AirbrakeHook{})
+  log.AddHook(airbrake.NewHook("https://example.com", "xyz", "development"))
 
   // Output to stderr instead of stdout, could also be a file.
   log.SetOutput(os.Stderr)
@@ -106,6 +108,16 @@ func main() {
     "omg":    true,
     "number": 100,
   }).Fatal("The ice breaks!")
+
+  // A common pattern is to re-use fields between logging statements by re-using
+  // the logrus.Entry returned from WithFields()
+  contextLogger := log.WithFields(log.Fields{
+    "common": "this is a common field",
+    "other": "I also should be logged always",
+  })
+
+  contextLogger.Info("I'll be logged with common and other field")
+  contextLogger.Info("Me too")
 }
 ```
 
@@ -164,43 +176,8 @@ You can add hooks for logging levels. For example to send errors to an exception
 tracking service on `Error`, `Fatal` and `Panic`, info to StatsD or log to
 multiple places simultaneously, e.g. syslog.
 
-```go
-// Not the real implementation of the Airbrake hook. Just a simple sample.
-import (
-  log "github.com/Sirupsen/logrus"
-)
-
-func init() {
-  log.AddHook(new(AirbrakeHook))
-}
-
-type AirbrakeHook struct{}
-
-// `Fire()` takes the entry that the hook is fired for. `entry.Data[]` contains
-// the fields for the entry. See the Fields section of the README.
-func (hook *AirbrakeHook) Fire(entry *logrus.Entry) error {
-  err := airbrake.Notify(entry.Data["error"].(error))
-  if err != nil {
-    log.WithFields(log.Fields{
-      "source":   "airbrake",
-      "endpoint": airbrake.Endpoint,
-    }).Info("Failed to send error to Airbrake")
-  }
-
-  return nil
-}
-
-// `Levels()` returns a slice of `Levels` the hook is fired for.
-func (hook *AirbrakeHook) Levels() []log.Level {
-  return []log.Level{
-    log.ErrorLevel,
-    log.FatalLevel,
-    log.PanicLevel,
-  }
-}
-```
-
-Logrus comes with built-in hooks. Add those, or your custom hook, in `init`:
+Logrus comes with [built-in hooks](hooks/). Add those, or your custom hook, in
+`init`:
 
 ```go
 import (
@@ -211,7 +188,7 @@ import (
 )
 
 func init() {
-  log.AddHook(new(logrus_airbrake.AirbrakeHook))
+  log.AddHook(airbrake.NewHook("https://example.com", "xyz", "development"))
 
   hook, err := logrus_syslog.NewSyslogHook("udp", "localhost:514", syslog.LOG_INFO, "")
   if err != nil {
@@ -222,28 +199,18 @@ func init() {
 }
 ```
 
-* [`github.com/Sirupsen/logrus/hooks/airbrake`](https://github.com/Sirupsen/logrus/blob/master/hooks/airbrake/airbrake.go)
-  Send errors to an exception tracking service compatible with the Airbrake API.
-  Uses [`airbrake-go`](https://github.com/tobi/airbrake-go) behind the scenes.
 
-* [`github.com/Sirupsen/logrus/hooks/papertrail`](https://github.com/Sirupsen/logrus/blob/master/hooks/papertrail/papertrail.go)
-  Send errors to the Papertrail hosted logging service via UDP.
-
-* [`github.com/Sirupsen/logrus/hooks/syslog`](https://github.com/Sirupsen/logrus/blob/master/hooks/syslog/syslog.go)
-  Send errors to remote syslog server.
-  Uses standard library `log/syslog` behind the scenes.
-
-* [`github.com/nubo/hiprus`](https://github.com/nubo/hiprus)
-  Send errors to a channel in hipchat.
-
-* [`github.com/sebest/logrusly`](https://github.com/sebest/logrusly)
-  Send logs to Loggly (https://www.loggly.com/)
-
-* [`github.com/johntdyer/slackrus`](https://github.com/johntdyer/slackrus)
-  Hook for Slack chat.
-
-* [`github.com/wercker/journalhook`](https://github.com/wercker/journalhook).
-  Hook for logging to `systemd-journald`.
+| Hook  | Description |
+| ----- | ----------- |
+| [Airbrake](https://github.com/Sirupsen/logrus/blob/master/hooks/airbrake/airbrake.go) | Send errors to an exception tracking service compatible with the Airbrake API. Uses [`airbrake-go`](https://github.com/tobi/airbrake-go) behind the scenes. |
+| [Papertrail](https://github.com/Sirupsen/logrus/blob/master/hooks/papertrail/papertrail.go) | Send errors to the Papertrail hosted logging service via UDP. |
+| [Syslog](https://github.com/Sirupsen/logrus/blob/master/hooks/syslog/syslog.go) | Send errors to remote syslog server. Uses standard library `log/syslog` behind the scenes. |
+| [BugSnag](https://github.com/Sirupsen/logrus/blob/master/hooks/bugsnag/bugsnag.go) | Send errors to the Bugsnag exception tracking service. |
+| [Hiprus](https://github.com/nubo/hiprus) | Send errors to a channel in hipchat. |
+| [Logrusly](https://github.com/sebest/logrusly) | Send logs to [Loggly](https://www.loggly.com/) |
+| [Slackrus](https://github.com/johntdyer/slackrus) | Hook for Slack chat. |
+| [Journalhook](https://github.com/wercker/journalhook) | Hook for logging to `systemd-journald` |
+| [Graylog](https://github.com/gemnasium/logrus-hooks/tree/master/graylog) | Hook for logging to [Graylog](http://graylog2.org/) |
 
 #### Level logging
 
@@ -321,6 +288,11 @@ The built-in logging formatters are:
     field to `true`.  To force no colored output even if there is a TTY  set the
     `DisableColors` field to `true`
 * `logrus.JSONFormatter`. Logs fields as JSON.
+* `logrus_logstash.LogstashFormatter`. Logs fields as Logstash Events (http://logstash.net).
+
+    ```go
+      logrus.SetFormatter(&logrus_logstash.LogstashFormatter{Type: “application_name"})
+    ```
 
 Third party logging formatters:
 

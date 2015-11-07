@@ -55,3 +55,26 @@ func TestPreformatted(t *testing.T) {
 		}
 	}
 }
+
+func TestPreformattedImbalance(t *testing.T) {
+	var cases = []struct {
+		in string
+		ok bool
+	}{
+		{"", true},
+		{"```\nin\n```", true},
+		{"```\nin\n```\nout", true},
+		{"```", false},
+		{"```\nin\n```\nout\n```", false},
+	}
+	for i, c := range cases {
+		in := getMungeLines(c.in)
+		_, err := checkPreformatBalance("filename.md", in)
+		if err != nil && c.ok {
+			t.Errorf("case[%d]: expected success", i)
+		}
+		if err == nil && !c.ok {
+			t.Errorf("case[%d]: expected failure", i)
+		}
+	}
+}

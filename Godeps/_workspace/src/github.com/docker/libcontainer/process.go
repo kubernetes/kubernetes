@@ -23,7 +23,7 @@ type Process struct {
 	Env []string
 
 	// User will set the uid and gid of the executing process running inside the container
-	// local to the contaienr's user and group configuration.
+	// local to the container's user and group configuration.
 	User string
 
 	// Cwd will change the processes current working directory inside the container's rootfs.
@@ -45,7 +45,7 @@ type Process struct {
 	consolePath string
 
 	// Capabilities specify the capabilities to keep when executing the process inside the container
-	// All capbilities not specified will be dropped from the processes capability mask
+	// All capabilities not specified will be dropped from the processes capability mask
 	Capabilities []string
 
 	ops processOperations

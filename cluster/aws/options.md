@@ -29,7 +29,7 @@ AWS_S3_REGION is useful for people that want to control their data location, bec
 
 **MASTER_SIZE**, **MINION_SIZE**
 
-The instance type to use for creating the master/minion.  Defaults to t2.micro.
+The instance type to use for creating the master/minion.  Defaults to auto-sizing based on the number of nodes (see below).
 
 For production usage, we recommend bigger instances, for example:
 
@@ -37,6 +37,10 @@ For production usage, we recommend bigger instances, for example:
 export MASTER_SIZE=c4.large
 export MINION_SIZE=r3.large
 ```
+
+If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_MINIONS}`.
+In particular for clusters less than 50 nodes it will 
+use a `t2.micro` for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with greater than 150 nodes it will use a `t2.medium`.
 
 Please note: `kube-up` utilizes ephemeral storage available on instances for docker storage. EBS-only instance types do not
 support ephemeral storage and will default to docker storage on the root disk which is usually only 8GB.

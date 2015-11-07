@@ -53,7 +53,9 @@ func Enable(c *gophercloud.ServiceClient, containerName string, opts EnableOptsB
 		MoreHeaders: h,
 		OkCodes:     []int{201, 202, 204},
 	})
-	res.Header = resp.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -66,7 +68,9 @@ func Get(c *gophercloud.ServiceClient, containerName string) GetResult {
 	resp, err := c.Request("HEAD", getURL(c, containerName), gophercloud.RequestOpts{
 		OkCodes: []int{200, 204},
 	})
-	res.Header = resp.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -149,7 +153,9 @@ func Update(c *gophercloud.ServiceClient, containerName string, opts UpdateOptsB
 		MoreHeaders: h,
 		OkCodes:     []int{202, 204},
 	})
-	res.Header = resp.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }

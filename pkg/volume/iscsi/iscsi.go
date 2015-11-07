@@ -18,6 +18,7 @@ package iscsi
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -54,7 +55,7 @@ func (plugin *iscsiPlugin) Name() string {
 }
 
 func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.ISCSI == nil && spec.PersistentVolumeSource.ISCSI == nil {
+	if (spec.Volume != nil && spec.Volume.ISCSI == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI == nil) {
 		return false
 	}
 	// TODO:  turn this into a func so CanSupport can be unit tested without
@@ -75,9 +76,9 @@ func (plugin *iscsiPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *iscsiPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *iscsiPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &ISCSIUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
@@ -85,34 +86,35 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	// iscsi volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	var readOnly bool
 	var iscsi *api.ISCSIVolumeSource
-	if spec.VolumeSource.ISCSI != nil {
-		iscsi = spec.VolumeSource.ISCSI
+	if spec.Volume != nil && spec.Volume.ISCSI != nil {
+		iscsi = spec.Volume.ISCSI
 		readOnly = iscsi.ReadOnly
 	} else {
-		iscsi = spec.PersistentVolumeSource.ISCSI
+		iscsi = spec.PersistentVolume.Spec.ISCSI
 		readOnly = spec.ReadOnly
 	}
 
 	lun := strconv.Itoa(iscsi.Lun)
+	portal := portalBuilder(iscsi.TargetPortal)
 
 	return &iscsiDiskBuilder{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
-			volName: spec.Name,
-			portal:  iscsi.TargetPortal,
+			volName: spec.Name(),
+			portal:  portal,
 			iqn:     iscsi.IQN,
 			lun:     lun,
 			manager: manager,
-			mounter: mounter,
+			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 			plugin:  plugin},
 		fsType:   iscsi.FSType,
 		readOnly: readOnly,
 	}, nil
 }
 
-func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -156,6 +158,10 @@ type iscsiDiskBuilder struct {
 
 var _ volume.Builder = &iscsiDiskBuilder{}
 
+func (_ *iscsiDiskBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *iscsiDiskBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
@@ -165,16 +171,8 @@ func (b *iscsiDiskBuilder) SetUpAt(dir string) error {
 	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("iscsi: failed to setup")
-		return err
 	}
-	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
-	var options []string
-	if b.readOnly {
-		options = []string{"remount", "ro"}
-	} else {
-		options = []string{"remount", "rw"}
-	}
-	return b.mounter.Mount(globalPDPath, dir, "", options)
+	return err
 }
 
 type iscsiDiskCleaner struct {
@@ -187,6 +185,10 @@ func (b *iscsiDiskBuilder) IsReadOnly() bool {
 	return b.readOnly
 }
 
+func (b *iscsiDiskBuilder) SupportsSELinux() bool {
+	return true
+}
+
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
 func (c *iscsiDiskCleaner) TearDown() error {
@@ -195,4 +197,11 @@ func (c *iscsiDiskCleaner) TearDown() error {
 
 func (c *iscsiDiskCleaner) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
+}
+
+func portalBuilder(portal string) string {
+	if !strings.Contains(portal, ":") {
+		portal = portal + ":3260"
+	}
+	return portal
 }

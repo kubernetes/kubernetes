@@ -28,29 +28,23 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/ghodss/yaml"
 )
 
-type testStruct struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
-	Key            string         `json:"Key"`
-	Map            map[string]int `json:"Map"`
-	StringList     []string       `json:"StringList"`
-	IntList        []int          `json:"IntList"`
-}
-
-func (ts *testStruct) IsAnAPIObject() {}
-
 func init() {
-	api.Scheme.AddKnownTypes("", &testStruct{})
-	api.Scheme.AddKnownTypes(testapi.Version(), &testStruct{})
+	api.Scheme.AddKnownTypes("", &kubectltesting.TestStruct{})
+	api.Scheme.AddKnownTypes(testapi.Default.Version(), &kubectltesting.TestStruct{})
 }
 
-var testData = testStruct{
+var testData = kubectltesting.TestStruct{
 	Key:        "testValue",
 	Map:        map[string]int{"TestSubkey": 1},
 	StringList: []string{"a", "b", "c"},
@@ -58,19 +52,19 @@ var testData = testStruct{
 }
 
 func TestVersionedPrinter(t *testing.T) {
-	original := &testStruct{Key: "value"}
+	original := &kubectltesting.TestStruct{Key: "value"}
 	p := NewVersionedPrinter(
 		ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
 			if obj == original {
 				t.Fatalf("object should not be identical: %#v", obj)
 			}
-			if obj.(*testStruct).Key != "value" {
+			if obj.(*kubectltesting.TestStruct).Key != "value" {
 				t.Fatalf("object was not converted: %#v", obj)
 			}
 			return nil
 		}),
 		api.Scheme,
-		testapi.Version(),
+		testapi.Default.Version(),
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -101,7 +95,14 @@ func TestPrinter(t *testing.T) {
 	//test inputs
 	simpleTest := &TestPrintType{"foo"}
 	podTest := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Version())
+	podListTest := &api.PodList{
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+		},
+	}
+	emptyListTest := &api.PodList{}
+	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Default.Version())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,6 +119,9 @@ func TestPrinter(t *testing.T) {
 		{"test template", "template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}",
 			podTest, "foo"},
 		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
+		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "foo bar"},
+		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, ""},
+		{"test name", "name", "", podTest, "/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
 	for _, test := range printerTests {
@@ -130,7 +134,7 @@ func TestPrinter(t *testing.T) {
 			t.Errorf("unexpected error: %#v", err)
 		}
 		if buf.String() != test.Expect {
-			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String(), buf.String())
+			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
 		}
 	}
 
@@ -163,15 +167,15 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	if err != nil {
 		t.Fatal(err)
 	}
-	var poutput testStruct
+	var poutput kubectltesting.TestStruct
 	// Verify that given function runs without error.
 	err = unmarshalFunc(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Use real decode function to undo the versioning process.
-	poutput = testStruct{}
-	err = runtime.YAMLDecoder(testapi.Codec()).DecodeInto(buf.Bytes(), &poutput)
+	poutput = kubectltesting.TestStruct{}
+	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +196,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	err = runtime.YAMLDecoder(testapi.Codec()).DecodeInto(buf.Bytes(), &objOut)
+	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &objOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,6 +276,52 @@ func TestTemplatePanic(t *testing.T) {
 	}
 }
 
+func TestNamePrinter(t *testing.T) {
+	tests := map[string]struct {
+		obj    runtime.Object
+		expect string
+	}{
+		"singleObject": {
+			&api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			"pod/foo\n"},
+		"List": {
+			&v1.List{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "List",
+				},
+				Items: []runtime.RawExtension{
+					{
+						RawJSON: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
+					},
+					{
+						RawJSON: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
+					},
+				},
+			},
+			"pod/foo\npod/bar\n"},
+	}
+	printer, _, _ := GetPrinter("name", "")
+	for name, item := range tests {
+		buff := &bytes.Buffer{}
+		err := printer.PrintObj(item.obj, buff)
+		if err != nil {
+			t.Errorf("%v: unexpected err: %v", name, err)
+			continue
+		}
+		got := buff.String()
+		if item.expect != got {
+			t.Errorf("%v: expected %v, got %v", name, item.expect, got)
+		}
+	}
+}
+
 func TestTemplateStrings(t *testing.T) {
 	// This unit tests the "exists" function as well as the template from update.sh
 	table := map[string]struct {
@@ -330,7 +380,7 @@ func TestTemplateStrings(t *testing.T) {
 							Name: "bar",
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
-									StartedAt: util.Time{},
+									StartedAt: unversioned.Time{},
 								},
 							},
 						},
@@ -347,7 +397,7 @@ func TestTemplateStrings(t *testing.T) {
 							Name: "foo",
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
-									StartedAt: util.Time{},
+									StartedAt: unversioned.Time{},
 								},
 							},
 						},
@@ -355,7 +405,7 @@ func TestTemplateStrings(t *testing.T) {
 							Name: "bar",
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
-									StartedAt: util.Time{},
+									StartedAt: unversioned.Time{},
 								},
 							},
 						},
@@ -372,7 +422,7 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, testapi.Version())
+	printer := NewVersionedPrinter(p, api.Scheme, testapi.Default.Version())
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -413,6 +463,7 @@ func TestPrinters(t *testing.T) {
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
 		"jsonpath":             jsonpathPrinter,
+		"name":                 &NamePrinter{},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
@@ -425,9 +476,9 @@ func TestPrinters(t *testing.T) {
 			}}},
 	}
 	// map of printer name to set of objects it should fail on.
-	expectedErrors := map[string]util.StringSet{
-		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
-		"jsonpath":  util.NewStringSet("emptyPodList", "nonEmptyPodList", "endpoints"),
+	expectedErrors := map[string]sets.String{
+		"template2": sets.NewString("pod", "emptyPodList", "endpoints"),
+		"jsonpath":  sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {
@@ -453,22 +504,22 @@ func TestPrintEventsResultSorted(t *testing.T) {
 			{
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
-				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 			{
 				Source:         api.EventSource{Component: "scheduler"},
 				Message:        "Item 2",
-				FirstTimestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 			{
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 3",
-				FirstTimestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 		},
@@ -486,21 +537,21 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "  " /* columnDelimiter */, t)
 }
 
-func TestPrintMinionStatus(t *testing.T) {
+func TestPrintNodeStatus(t *testing.T) {
 	printer := NewHumanReadablePrinter(false, false, false, false, []string{})
 	table := []struct {
-		minion api.Node
+		node   api.Node
 		status string
 	}{
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo1"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
 			},
 			status: "Ready",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo2"},
 				Spec:       api.NodeSpec{Unschedulable: true},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
@@ -508,7 +559,7 @@ func TestPrintMinionStatus(t *testing.T) {
 			status: "Ready,SchedulingDisabled",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
 					{Type: api.NodeReady, Status: api.ConditionTrue},
@@ -517,14 +568,14 @@ func TestPrintMinionStatus(t *testing.T) {
 			status: "Ready",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo4"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
 			},
 			status: "NotReady",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo5"},
 				Spec:       api.NodeSpec{Unschedulable: true},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
@@ -532,21 +583,21 @@ func TestPrintMinionStatus(t *testing.T) {
 			status: "NotReady,SchedulingDisabled",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo6"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
 			},
 			status: "Unknown",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo7"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
 			},
 			status: "Unknown",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo8"},
 				Spec:       api.NodeSpec{Unschedulable: true},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
@@ -554,7 +605,7 @@ func TestPrintMinionStatus(t *testing.T) {
 			status: "Unknown,SchedulingDisabled",
 		},
 		{
-			minion: api.Node{
+			node: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo9"},
 				Spec:       api.NodeSpec{Unschedulable: true},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
@@ -565,12 +616,12 @@ func TestPrintMinionStatus(t *testing.T) {
 
 	for _, test := range table {
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.minion, buffer)
+		err := printer.PrintObj(&test.node, buffer)
 		if err != nil {
-			t.Fatalf("An error occurred printing Minion: %#v", err)
+			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
 		if !contains(strings.Fields(buffer.String()), test.status) {
-			t.Fatalf("Expect printing minion %s with status %#v, got: %#v", test.minion.Name, test.status, buffer.String())
+			t.Fatalf("Expect printing node %s with status %#v, got: %#v", test.node.Name, test.status, buffer.String())
 		}
 	}
 }
@@ -848,8 +899,8 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				ObjectMeta:     api.ObjectMeta{Name: name, Namespace: namespaceName},
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
-				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 			},
 			isNamespaced: true,
@@ -1154,21 +1205,57 @@ type stringTestList []struct {
 
 func TestTranslateTimestamp(t *testing.T) {
 	tl := stringTestList{
-		{"a while from now", translateTimestamp(util.Time{Time: time.Now().Add(2.1e9)}), "<invalid>"},
-		{"almost now", translateTimestamp(util.Time{Time: time.Now().Add(1.9e9)}), "0s"},
-		{"now", translateTimestamp(util.Time{Time: time.Now()}), "0s"},
-		{"unknown", translateTimestamp(util.Time{}), "<unknown>"},
-		{"30 seconds ago", translateTimestamp(util.Time{Time: time.Now().Add(-3e10)}), "30s"},
-		{"5 minutes ago", translateTimestamp(util.Time{Time: time.Now().Add(-3e11)}), "5m"},
-		{"an hour ago", translateTimestamp(util.Time{Time: time.Now().Add(-6e12)}), "1h"},
-		{"2 days ago", translateTimestamp(util.Time{Time: time.Now().AddDate(0, 0, -2)}), "2d"},
-		{"months ago", translateTimestamp(util.Time{Time: time.Now().AddDate(0, -3, 0)}), "92d"},
-		{"10 years ago", translateTimestamp(util.Time{Time: time.Now().AddDate(-10, 0, 0)}), "10y"},
+		{"a while from now", translateTimestamp(unversioned.Time{Time: time.Now().Add(2.1e9)}), "<invalid>"},
+		{"almost now", translateTimestamp(unversioned.Time{Time: time.Now().Add(1.9e9)}), "0s"},
+		{"now", translateTimestamp(unversioned.Time{Time: time.Now()}), "0s"},
+		{"unknown", translateTimestamp(unversioned.Time{}), "<unknown>"},
+		{"30 seconds ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-3e10)}), "30s"},
+		{"5 minutes ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-3e11)}), "5m"},
+		{"an hour ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-6e12)}), "1h"},
+		{"2 days ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(0, 0, -2)}), "2d"},
+		{"months ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(0, -3, 0)}), "92d"},
+		{"10 years ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)}), "10y"},
 	}
 	for _, test := range tl {
 		if test.got != test.exp {
 			t.Errorf("On %v, expected '%v', but got '%v'",
 				test.name, test.exp, test.got)
 		}
+	}
+}
+
+func TestPrintDeployment(t *testing.T) {
+	tests := []struct {
+		deployment extensions.Deployment
+		expect     string
+	}{
+		{
+			extensions.Deployment{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.DeploymentSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.DeploymentStatus{
+					Replicas:        10,
+					UpdatedReplicas: 2,
+				},
+			},
+			"test1\t2/5\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printDeployment(&test.deployment, buf, false, false, true, []string{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
 	}
 }

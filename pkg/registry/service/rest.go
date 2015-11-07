@@ -28,9 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
@@ -46,23 +45,25 @@ type REST struct {
 	endpoints        endpoint.Registry
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
+	proxyTransport   http.RoundTripper
 }
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface) *REST {
+	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *REST {
 	return &REST{
 		registry:         registry,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
+		proxyTransport:   proxyTransport,
 	}
 }
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
-	if err := rest.BeforeCreate(rest.Services, ctx, obj); err != nil {
+	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +118,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
-		err = rest.CheckGeneratedNameError(rest.Services, err, service)
+		err = rest.CheckGeneratedNameError(Strategy, err, service)
 	}
 
 	if err == nil {
@@ -163,21 +164,21 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		}
 	}
 
-	return &api.Status{Status: api.StatusSuccess}, nil
+	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id)
 }
 
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListServices(ctx, label, field)
+func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
 // It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
+func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return rs.registry.WatchServices(ctx, options)
 }
 
 func (*REST) New() runtime.Object {
@@ -276,8 +277,8 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	// Allow ID as "svcname" or "svcname:port".
-	svcName, portStr, valid := util.SplitPort(id)
+	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
+	svcScheme, svcName, portStr, valid := util.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
 	}
@@ -294,16 +295,27 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 	// Find a Subset that has the port.
 	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
 		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		if len(ss.Addresses) == 0 {
+			continue
+		}
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == portStr {
 				// Pick a random address.
 				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
 				port := ss.Ports[i].Port
-				// We leave off the scheme ('http://') because we have no idea what sort of server
-				// is listening at this endpoint.
 				return &url.URL{
-					Host: net.JoinHostPort(ip, strconv.Itoa(port)),
-				}, nil, nil
+					Scheme: svcScheme,
+					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
+				}, rs.proxyTransport, nil
+			} else {
+				port, err := strconv.ParseInt(portStr, 10, 64)
+				if err == nil && int(port) == ss.Ports[i].Port {
+					ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
+					return &url.URL{
+						Scheme: svcScheme,
+						Host:   net.JoinHostPort(ip, portStr),
+					}, rs.proxyTransport, nil
+				}
 			}
 		}
 	}

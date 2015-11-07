@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_cloud
+package gce
 
 import (
 	"fmt"
@@ -22,17 +22,20 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
-	"code.google.com/p/gcfg"
 	"github.com/golang/glog"
+	"github.com/scalingdata/gcfg"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
@@ -43,9 +46,19 @@ import (
 
 const (
 	ProviderName = "gce"
-)
 
-const k8sNodeRouteTag = "k8s-node-route"
+	k8sNodeRouteTag = "k8s-node-route"
+
+	// AffinityTypeNone - no session affinity.
+	gceAffinityTypeNone = "None"
+	// AffinityTypeClientIP - affinity based on Client IP.
+	gceAffinityTypeClientIP = "CLIENT_IP"
+	// AffinityTypeClientIPProto - affinity based on Client IP and port.
+	gceAffinityTypeClientIPProto = "CLIENT_IP_PROTO"
+
+	operationPollInterval        = 3 * time.Second
+	operationPollTimeoutDuration = 30 * time.Minute
+)
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
@@ -61,6 +74,7 @@ type GCECloud struct {
 type Config struct {
 	Global struct {
 		TokenURL    string `gcfg:"token-url"`
+		TokenBody   string `gcfg:"token-body"`
 		ProjectID   string `gcfg:"project-id"`
 		NetworkName string `gcfg:"network-name"`
 	}
@@ -159,7 +173,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			}
 		}
 		if cfg.Global.TokenURL != "" {
-			tokenSource = newAltTokenSource(cfg.Global.TokenURL)
+			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
 	}
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
@@ -189,6 +203,20 @@ func (gce *GCECloud) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (gce *GCECloud) ProviderName() string {
 	return ProviderName
+}
+
+// Known-useless DNS search path.
+var uselessDNSSearchRE = regexp.MustCompile(`^[0-9]+.google.internal.$`)
+
+// ScrubDNS filters DNS settings for pods.
+func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	// GCE has too many search paths by default. Filter the ones we know are useless.
+	for _, s := range searches {
+		if !uselessDNSSearchRE.MatchString(s) {
+			srchOut = append(srchOut, s)
+		}
+	}
+	return nameservers, srchOut
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
@@ -230,84 +258,61 @@ func hostURLToComparablePath(hostURL string) string {
 	return hostURL[idx:]
 }
 
-// Session Affinity Type string
-type GCEAffinityType string
-
-const (
-	// AffinityTypeNone - no session affinity.
-	GCEAffinityTypeNone GCEAffinityType = "None"
-	// AffinityTypeClientIP is the Client IP based.
-	GCEAffinityTypeClientIP GCEAffinityType = "CLIENT_IP"
-	// AffinityTypeClientIP is the Client IP based.
-	GCEAffinityTypeClientIPProto GCEAffinityType = "CLIENT_IP_PROTO"
-)
-
-func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) error {
-	var instances []string
-	for _, host := range hosts {
-		instances = append(instances, makeHostURL(gce.projectID, gce.zone, host))
-	}
-	pool := &compute.TargetPool{
-		Name:            name,
-		Instances:       instances,
-		SessionAffinity: string(affinityType),
-	}
-	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
-	if err != nil {
-		return err
-	}
-	if err = gce.waitForRegionOp(op, region); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (gce *GCECloud) targetPoolURL(name, region string) string {
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
 }
 
-func waitForOp(op *compute.Operation, getOperation func() (*compute.Operation, error)) error {
-	pollOp := op
-	consecPollFails := 0
-	for pollOp.Status != "DONE" {
-		var err error
-		time.Sleep(3 * time.Second)
-		pollOp, err = getOperation()
-		if err != nil {
-			if consecPollFails == 2 {
-				// Only bail if we've seen 3 consecutive polling errors.
-				return err
-			}
-			consecPollFails++
-		} else {
-			consecPollFails = 0
-		}
+func waitForOp(op *compute.Operation, getOperation func(operationName string) (*compute.Operation, error)) error {
+	if op == nil {
+		return fmt.Errorf("operation must not be nil")
 	}
-	if pollOp.Error != nil && len(pollOp.Error.Errors) > 0 {
-		return &googleapi.Error{
-			Code:    int(pollOp.HttpErrorStatusCode),
-			Message: pollOp.Error.Errors[0].Message,
-		}
-	}
-	return nil
 
+	if opIsDone(op) {
+		return getErrorFromOp(op)
+	}
+
+	opName := op.Name
+	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+		pollOp, err := getOperation(opName)
+		if err != nil {
+			glog.Warningf("GCE poll operation failed: %v", err)
+		}
+		return opIsDone(pollOp), getErrorFromOp(pollOp)
+	})
+}
+
+func opIsDone(op *compute.Operation) bool {
+	return op != nil && op.Status == "DONE"
+}
+
+func getErrorFromOp(op *compute.Operation) error {
+	if op != nil && op.Error != nil && len(op.Error.Errors) > 0 {
+		err := &googleapi.Error{
+			Code:    int(op.HttpErrorStatusCode),
+			Message: op.Error.Errors[0].Message,
+		}
+		glog.Errorf("GCE operation failed: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (gce *GCECloud) waitForGlobalOp(op *compute.Operation) error {
-	return waitForOp(op, func() (*compute.Operation, error) {
-		return gce.service.GlobalOperations.Get(gce.projectID, op.Name).Do()
+	return waitForOp(op, func(operationName string) (*compute.Operation, error) {
+		return gce.service.GlobalOperations.Get(gce.projectID, operationName).Do()
 	})
 }
 
 func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
-	return waitForOp(op, func() (*compute.Operation, error) {
-		return gce.service.RegionOperations.Get(gce.projectID, region, op.Name).Do()
+	return waitForOp(op, func(operationName string) (*compute.Operation, error) {
+		return gce.service.RegionOperations.Get(gce.projectID, region, operationName).Do()
 	})
 }
 
 func (gce *GCECloud) waitForZoneOp(op *compute.Operation) error {
-	return waitForOp(op, func() (*compute.Operation, error) {
-		return gce.service.ZoneOperations.Get(gce.projectID, gce.zone, op.Name).Do()
+	return waitForOp(op, func(operationName string) (*compute.Operation, error) {
+		return gce.service.ZoneOperations.Get(gce.projectID, gce.zone, operationName).Do()
 	})
 }
 
@@ -331,52 +336,157 @@ func isHTTPErrorCode(err error, code int) bool {
 	return ok && apiErr.Code == code
 }
 
-// translate from what K8s supports to what the cloud provider supports for session affinity.
-func translateAffinityType(affinityType api.ServiceAffinity) GCEAffinityType {
-	switch affinityType {
-	case api.ServiceAffinityClientIP:
-		return GCEAffinityTypeClientIP
-	case api.ServiceAffinityNone:
-		return GCEAffinityTypeNone
-	default:
-		glog.Errorf("unexpected affinity type: %v", affinityType)
-		return GCEAffinityTypeNone
-	}
-}
-
-func makeFirewallName(name string) string {
-	return fmt.Sprintf("k8s-fw-%s", name)
-}
-
 // EnsureTCPLoadBalancer is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
-// TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
-// owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(2).Info("Checking if load balancer already exists: %s", name)
-	_, exists, err := gce.GetTCPLoadBalancer(name, region)
-	if err != nil {
-		return nil, fmt.Errorf("error checking if GCE load balancer already exists: %v", err)
+// Our load balancers in GCE consist of four separate GCE resources - a static
+// IP address, a firewall rule, a target pool, and a forwarding rule. This
+// function has to manage all of them.
+// Due to an interesting series of design decisions, this handles both creating
+// new load balancers and updating existing load balancers, recognizing when
+// each is needed.
+func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	if len(hosts) == 0 {
+		return nil, fmt.Errorf("Cannot EnsureTCPLoadBalancer() with no hosts")
 	}
 
-	// TODO: Implement a more efficient update strategy for common changes than delete & create
-	// In particular, if we implement hosts update, we can get rid of UpdateHosts
-	if exists {
-		err := gce.EnsureTCPLoadBalancerDeleted(name, region)
-		if err != nil {
-			return nil, fmt.Errorf("error deleting existing GCE load balancer: %v", err)
-		}
+	// Check if the forwarding rule exists, and if so, what its IP is.
+	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(name, region, requestedIP, ports)
+	if err != nil {
+		return nil, err
 	}
 
-	err = gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
-	if err != nil {
-		if !isHTTPErrorCode(err, http.StatusConflict) {
+	// Make sure we know which IP address will be used and have properly reserved
+	// it as static before moving forward with the rest of our operations.
+	//
+	// We use static IP addresses when updating a load balancer to ensure that we
+	// can replace the load balancer's other components without changing the
+	// address its service is reachable on. We do it this way rather than always
+	// keeping the static IP around even though this is more complicated because
+	// it makes it less likely that we'll run into quota issues. Only 7 static
+	// IP addresses are allowed per region by default.
+	//
+	// We could let an IP be allocated for us when the forwarding rule is created,
+	// but we need the IP to set up the firewall rule, and we want to keep the
+	// forwarding rule creation as the last thing that needs to be done in this
+	// function in order to maintain the invariant that "if the forwarding rule
+	// exists, the LB has been fully created".
+	ipAddress := ""
+	if requestedIP != nil {
+		// If a specific IP address has been requested, we have to respect the
+		// user's request and use that IP. If the forwarding rule was already using
+		// a different IP, it will be harmlessly abandoned because it was only an
+		// ephemeral IP (or it was a different static IP owned by the user, in which
+		// case we shouldn't delete it anyway).
+		if err := gce.projectOwnsStaticIP(name, region, requestedIP.String()); err != nil {
 			return nil, err
 		}
-		glog.Infof("Creating forwarding rule pointing at target pool that already exists: %v", err)
+		ipAddress = requestedIP.String()
+	} else {
+		// This will either allocate a new static IP if the forwarding rule didn't
+		// already have an IP, or it will promote the forwarding rule's IP from
+		// ephemeral to static.
+		ipAddress, err = gce.createOrPromoteStaticIP(name, region, fwdRuleIP)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// Deal with the firewall next. The reason we do this here rather than last
+	// is because the forwarding rule is used as the indicator that the load
+	// balancer is fully created - it's what getTCPLoadBalancer checks for.
+	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(name, region, ipAddress, ports)
+	if err != nil {
+		return nil, err
+	}
+
+	if firewallNeedsUpdate {
+		// Unlike forwarding rules and target pools, firewalls can be updated
+		// without needing to be deleted and recreated.
+		if firewallExists {
+			if err := gce.updateFirewall(name, region, ipAddress, ports, hosts); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := gce.createFirewall(name, region, ipAddress, ports, hosts); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	tpExists, tpNeedsUpdate, err := gce.targetPoolNeedsUpdate(name, region, affinityType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now we get to some slightly more interesting logic.
+	// First, neither target pools nor forwarding rules can be updated in place -
+	// they have to be deleted and recreated.
+	// Second, forwarding rules are layered on top of target pools in that you
+	// can't delete a target pool that's currently in use by a forwarding rule.
+	// Thus, we have to tear down the forwarding rule if either it or the target
+	// pool needs to be updated.
+	if fwdRuleExists && (fwdRuleNeedsUpdate || tpNeedsUpdate) {
+		if err := gce.deleteForwardingRule(name, region); err != nil {
+			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", name, err)
+		}
+	}
+	if tpExists && tpNeedsUpdate {
+		if err := gce.deleteTargetPool(name, region); err != nil {
+			return nil, fmt.Errorf("failed to delete existing target pool %s for load balancer update: %v", name, err)
+		}
+	}
+
+	// Once we've deleted the resources (if necessary), build them back up (or for
+	// the first time if they're new).
+	if tpNeedsUpdate {
+		if err := gce.createTargetPool(name, region, hosts, affinityType); err != nil {
+			return nil, fmt.Errorf("failed to create target pool %s: %v", name, err)
+		}
+	}
+	if tpNeedsUpdate || fwdRuleNeedsUpdate {
+		if err := gce.createForwardingRule(name, region, ipAddress, ports); err != nil {
+			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", name, err)
+		}
+	}
+
+	// Now that we're done operating on everything, demote the static IP back to
+	// ephemeral to avoid taking up the user's static IP quota.
+	if err := gce.deleteStaticIP(name, region); err != nil {
+		return nil, fmt.Errorf("failed to release static IP %s after finishing update of load balancer resources: %v", err)
+	}
+
+	status := &api.LoadBalancerStatus{}
+	status.Ingress = []api.LoadBalancerIngress{{IP: ipAddress}}
+	return status, nil
+}
+
+// Passing nil for requested IP is perfectly fine - it just means that no specific
+// IP is being requested.
+// Returns whether the forwarding rule exists, whether it needs to be updated,
+// what its IP address is (if it exists), and any error we encountered.
+func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, requestedIP net.IP, ports []*api.ServicePort) (exists bool, needsUpdate bool, ipAddress string, err error) {
+	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return false, true, "", nil
+		}
+		return false, false, "", fmt.Errorf("error getting load balancer's forwarding rule: %v", err)
+	}
+	if requestedIP != nil && requestedIP.String() != fwd.IPAddress {
+		return true, true, fwd.IPAddress, nil
+	}
+	portRange, err := loadBalancerPortRange(ports)
+	if err != nil {
+		return false, false, "", err
+	}
+	if portRange != fwd.PortRange {
+		return true, true, fwd.IPAddress, nil
+	}
+	return true, false, fwd.IPAddress, nil
+}
+
+func loadBalancerPortRange(ports []*api.ServicePort) (string, error) {
 	if len(ports) == 0 {
-		return nil, fmt.Errorf("no ports specified for GCE load balancer")
+		return "", fmt.Errorf("no ports specified for GCE load balancer")
 	}
 	minPort := 65536
 	maxPort := 0
@@ -388,40 +498,185 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.I
 			maxPort = ports[i].Port
 		}
 	}
-	req := &compute.ForwardingRule{
-		Name:       name,
-		IPProtocol: "TCP",
-		PortRange:  fmt.Sprintf("%d-%d", minPort, maxPort),
-		Target:     gce.targetPoolURL(name, region),
-	}
-	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
-	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return nil, err
-	}
-	if op != nil {
-		err = gce.waitForRegionOp(op, region)
-		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-			return nil, err
-		}
-	}
-	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
-	if err != nil {
-		return nil, err
-	}
+	return fmt.Sprintf("%d-%d", minPort, maxPort), nil
+}
 
+// Doesn't check whether the hosts have changed, since host updating is handled
+// separately.
+func (gce *GCECloud) targetPoolNeedsUpdate(name, region string, affinityType api.ServiceAffinity) (exists bool, needsUpdate bool, err error) {
+	tp, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return false, true, nil
+		}
+		return false, false, fmt.Errorf("error getting load balancer's target pool: %v", err)
+	}
+	if translateAffinityType(affinityType) != tp.SessionAffinity {
+		return true, true, nil
+	}
+	return true, false, nil
+}
+
+// translate from what K8s supports to what the cloud provider supports for session affinity.
+func translateAffinityType(affinityType api.ServiceAffinity) string {
+	switch affinityType {
+	case api.ServiceAffinityClientIP:
+		return gceAffinityTypeClientIP
+	case api.ServiceAffinityNone:
+		return gceAffinityTypeNone
+	default:
+		glog.Errorf("Unexpected affinity type: %v", affinityType)
+		return gceAffinityTypeNone
+	}
+}
+
+func (gce *GCECloud) firewallNeedsUpdate(name, region, ipAddress string, ports []*api.ServicePort) (exists bool, needsUpdate bool, err error) {
+	fw, err := gce.service.Firewalls.Get(gce.projectID, makeFirewallName(name)).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return false, true, nil
+		}
+		return false, false, fmt.Errorf("error getting load balancer's target pool: %v", err)
+	}
+	if fw.Description != makeFirewallDescription(ipAddress) {
+		return true, true, nil
+	}
+	if len(fw.Allowed) != 1 || fw.Allowed[0].IPProtocol != "tcp" {
+		return true, true, nil
+	}
+	// Make sure the allowed ports match.
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
 	}
+	if !slicesEqual(allowedPorts, fw.Allowed[0].Ports) {
+		return true, true, nil
+	}
+	return true, false, nil
+}
 
-	hostTag := gce.computeHostTag(hosts[0])
+func makeFirewallName(name string) string {
+	return fmt.Sprintf("k8s-fw-%s", name)
+}
 
+func makeFirewallDescription(ipAddress string) string {
+	return fmt.Sprintf("KubernetesAutoGenerated_OnlyAllowTrafficForDestinationIP_%s", ipAddress)
+}
+
+func slicesEqual(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	sort.Strings(x)
+	sort.Strings(y)
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (gce *GCECloud) createForwardingRule(name, region, ipAddress string, ports []*api.ServicePort) error {
+	portRange, err := loadBalancerPortRange(ports)
+	if err != nil {
+		return err
+	}
+	req := &compute.ForwardingRule{
+		Name:       name,
+		IPAddress:  ipAddress,
+		IPProtocol: "TCP",
+		PortRange:  portRange,
+		Target:     gce.targetPoolURL(name, region),
+	}
+
+	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+		return err
+	}
+	if op != nil {
+		err = gce.waitForRegionOp(op, region)
+		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (gce *GCECloud) createTargetPool(name, region string, hosts []string, affinityType api.ServiceAffinity) error {
+	var instances []string
+	for _, host := range hosts {
+		instances = append(instances, makeHostURL(gce.projectID, gce.zone, host))
+	}
+	pool := &compute.TargetPool{
+		Name:            name,
+		Instances:       instances,
+		SessionAffinity: translateAffinityType(affinityType),
+	}
+	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+		return err
+	}
+	if op != nil {
+		err = gce.waitForRegionOp(op, region)
+		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (gce *GCECloud) createFirewall(name, region, ipAddress string, ports []*api.ServicePort, hosts []string) error {
+	firewall, err := gce.firewallObject(name, region, ipAddress, ports, hosts)
+	if err != nil {
+		return err
+	}
+	op, err := gce.service.Firewalls.Insert(gce.projectID, firewall).Do()
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+		return err
+	}
+	if op != nil {
+		err = gce.waitForGlobalOp(op)
+		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (gce *GCECloud) updateFirewall(name, region, ipAddress string, ports []*api.ServicePort, hosts []string) error {
+	firewall, err := gce.firewallObject(name, region, ipAddress, ports, hosts)
+	if err != nil {
+		return err
+	}
+	op, err := gce.service.Firewalls.Update(gce.projectID, makeFirewallName(name), firewall).Do()
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+		return err
+	}
+	if op != nil {
+		err = gce.waitForGlobalOp(op)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (gce *GCECloud) firewallObject(name, region, ipAddress string, ports []*api.ServicePort, hosts []string) (*compute.Firewall, error) {
+	allowedPorts := make([]string, len(ports))
+	for ix := range ports {
+		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
+	}
+	hostTags, err := gce.computeHostTags(hosts)
+	if err != nil {
+		return nil, err
+	}
 	firewall := &compute.Firewall{
 		Name:         makeFirewallName(name),
-		Description:  fmt.Sprintf("KubernetesAutoGenerated_OnlyAllowTrafficForDestinationIP_%s", fwd.IPAddress),
+		Description:  makeFirewallDescription(ipAddress),
 		Network:      gce.networkURL,
 		SourceRanges: []string{"0.0.0.0/0"},
-		TargetTags:   []string{hostTag},
+		TargetTags:   hostTags,
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",
@@ -429,28 +684,89 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.I
 			},
 		},
 	}
-	if op, err = gce.service.Firewalls.Insert(gce.projectID, firewall).Do(); err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return nil, err
-	}
-	if err = gce.waitForGlobalOp(op); err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return nil, err
-	}
-
-	status := &api.LoadBalancerStatus{}
-	status.Ingress = []api.LoadBalancerIngress{{IP: fwd.IPAddress}}
-	return status, nil
+	return firewall, nil
 }
 
-// This is kind of hacky, but the managed instance group adds 4 random chars and a hyphen
-// to the base name. Older naming schemes put a hyphen and an incrementing index after
-// the base name. Thus we pull off the characters after the final dash to support both.
-func (gce *GCECloud) computeHostTag(host string) string {
-	host = strings.SplitN(host, ".", 2)[0]
-	lastHyphen := strings.LastIndex(host, "-")
-	if lastHyphen == -1 {
-		return host
+// We grab all tags from all instances being added to the pool.
+// * The longest tag that is a prefix of the instance name is used
+// * If any instance has a prefix tag, all instances must
+// * If no instances have a prefix tag, no tags are used
+func (gce *GCECloud) computeHostTags(hosts []string) ([]string, error) {
+	listCall := gce.service.Instances.List(gce.projectID, gce.zone)
+
+	// Add the filter for hosts
+	listCall = listCall.Filter("name eq (" + strings.Join(hosts, "|") + ")")
+
+	// Add the fields we want
+	listCall = listCall.Fields("items(name,tags)")
+
+	res, err := listCall.Do()
+	if err != nil {
+		return nil, err
 	}
-	return host[:lastHyphen]
+
+	tags := sets.NewString()
+	for _, instance := range res.Items {
+		longest_tag := ""
+		for _, tag := range instance.Tags.Items {
+			if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
+				longest_tag = tag
+			}
+		}
+		if len(longest_tag) > 0 {
+			tags.Insert(longest_tag)
+		} else if len(tags) > 0 {
+			return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
+		}
+	}
+
+	if len(tags) == 0 {
+		glog.V(2).Info("No instances had tags, creating rule without target tags")
+	}
+
+	return tags.List(), nil
+}
+
+func (gce *GCECloud) projectOwnsStaticIP(name, region string, ipAddress string) error {
+	addresses, err := gce.service.Addresses.List(gce.projectID, region).Do()
+	if err != nil {
+		return fmt.Errorf("failed to list gce IP addresses: %v", err)
+	}
+	for _, addr := range addresses.Items {
+		if addr.Address == ipAddress {
+			// This project does own the address, so return success.
+			return nil
+		}
+	}
+	return fmt.Errorf("this gce project doesn't own the IP address: %s", ipAddress)
+}
+
+func (gce *GCECloud) createOrPromoteStaticIP(name, region, existingIP string) (ipAddress string, err error) {
+	// If the address doesn't exist, this will create it.
+	// If the existingIP exists but is ephemeral, this will promote it to static.
+	// If the address already exists, this will harmlessly return a StatusConflict
+	// and we'll grab the IP before returning.
+	addressObj := &compute.Address{Name: name}
+	if existingIP != "" {
+		addressObj.Address = existingIP
+	}
+	op, err := gce.service.Addresses.Insert(gce.projectID, region, addressObj).Do()
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+		return "", fmt.Errorf("error creating gce static IP address: %v", err)
+	}
+	if op != nil {
+		err := gce.waitForRegionOp(op, region)
+		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+			return "", fmt.Errorf("error waiting for gce static IP address to be created: %v", err)
+		}
+	}
+
+	// We have to get the address to know which IP was allocated for us.
+	address, err := gce.service.Addresses.Get(gce.projectID, region, name).Do()
+	if err != nil {
+		return "", fmt.Errorf("error re-getting gce static IP address: %v", err)
+	}
+	return address.Address, nil
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
@@ -459,7 +775,7 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	if err != nil {
 		return err
 	}
-	existing := util.NewStringSet()
+	existing := sets.NewString()
 	for _, instance := range pool.Instances {
 		existing.Insert(hostURLToComparablePath(instance))
 	}
@@ -516,45 +832,450 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 
 // EnsureTCPLoadBalancerDeleted is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
+	err := utilerrors.AggregateGoroutines(
+		func() error { return gce.deleteFirewall(name, region) },
+		// Even though we don't hold on to static IPs for load balancers, it's
+		// possible that EnsureTCPLoadBalancer left one around in a failed
+		// creation/update attempt, so make sure we clean it up here just in case.
+		func() error { return gce.deleteStaticIP(name, region) },
+		func() error {
+			// The forwarding rule must be deleted before either the target pool can,
+			// unfortunately, so we have to do these two serially.
+			if err := gce.deleteForwardingRule(name, region); err != nil {
+				return err
+			}
+			if err := gce.deleteTargetPool(name, region); err != nil {
+				return err
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return utilerrors.Flatten(err)
+	}
+	return nil
+}
+
+func (gce *GCECloud) deleteForwardingRule(name, region string) error {
 	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Forwarding rule %s already deleted. Continuing to delete target pool.", name)
+		glog.Infof("Forwarding rule %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
-		glog.Warningf("Failed to delete Forwarding Rules %s: got error %s.", name, err.Error())
+		glog.Warningf("Failed to delete forwarding rule %s: got error %s.", name, err.Error())
 		return err
 	} else {
-		err = gce.waitForRegionOp(op, region)
-		if err != nil {
-			glog.Warningf("Failed waiting for Forwarding Rule %s to be deleted: got error %s.", name, err.Error())
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for forwarding rule %s to be deleted: got error %s.", name, err.Error())
 			return err
 		}
 	}
-	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
+	return nil
+}
+
+func (gce *GCECloud) deleteTargetPool(name, region string) error {
+	op, err := gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Target pool %s already deleted.", name)
-		return nil
+		glog.Infof("Target pool %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
-		glog.Warningf("Failed to delete Target Pool %s, got error %s.", name, err.Error())
+		glog.Warningf("Failed to delete target pool %s, got error %s.", name, err.Error())
 		return err
+	} else {
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for target pool %s to be deleted: got error %s.", name, err.Error())
+			return err
+		}
 	}
-	err = gce.waitForRegionOp(op, region)
-	if err != nil {
-		glog.Warningf("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
-	}
+	return nil
+}
+
+func (gce *GCECloud) deleteFirewall(name, region string) error {
 	fwName := makeFirewallName(name)
-	op, err = gce.service.Firewalls.Delete(gce.projectID, fwName).Do()
+	op, err := gce.service.Firewalls.Delete(gce.projectID, fwName).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
-		glog.Infof("Firewall doesn't exist, moving on to deleting target pool.")
+		glog.Infof("Firewall %s already deleted. Continuing to delete other resources.", name)
 	} else if err != nil {
 		glog.Warningf("Failed to delete firewall %s, got error %v", fwName, err)
 		return err
 	} else {
-		if err = gce.waitForGlobalOp(op); err != nil {
+		if err := gce.waitForGlobalOp(op); err != nil {
 			glog.Warningf("Failed waiting for Firewall %s to be deleted.  Got error: %v", fwName, err)
 			return err
 		}
 	}
-	return err
+	return nil
+}
+
+func (gce *GCECloud) deleteStaticIP(name, region string) error {
+	op, err := gce.service.Addresses.Delete(gce.projectID, region, name).Do()
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Static IP address %s already deleted. Continuing to delete other resources.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete static IP address %s, got error %v", name, err)
+		return err
+	} else {
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			glog.Warningf("Failed waiting for address %s to be deleted, got error: %v", name, err)
+			return err
+		}
+	}
+	return nil
+}
+
+// UrlMap management
+
+// GetUrlMap returns the UrlMap by name.
+func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
+	return gce.service.UrlMaps.Get(gce.projectID, name).Do()
+}
+
+// CreateUrlMap creates an url map, using the given backend service as the default service.
+func (gce *GCECloud) CreateUrlMap(backend *compute.BackendService, name string) (*compute.UrlMap, error) {
+	urlMap := &compute.UrlMap{
+		Name:           name,
+		DefaultService: backend.SelfLink,
+	}
+	op, err := gce.service.UrlMaps.Insert(gce.projectID, urlMap).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetUrlMap(name)
+}
+
+// UpdateUrlMap applies the given UrlMap as an update, and returns the new UrlMap.
+func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) (*compute.UrlMap, error) {
+	op, err := gce.service.UrlMaps.Update(gce.projectID, urlMap.Name, urlMap).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.service.UrlMaps.Get(gce.projectID, urlMap.Name).Do()
+}
+
+// DeleteUrlMap deletes a url map by name.
+func (gce *GCECloud) DeleteUrlMap(name string) error {
+	op, err := gce.service.UrlMaps.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListUrlMaps lists all UrlMaps in the project.
+func (gce *GCECloud) ListUrlMaps() (*compute.UrlMapList, error) {
+	return gce.service.UrlMaps.List(gce.projectID).Do()
+}
+
+// TargetHttpProxy management
+
+// GetTargetHttpProxy returns the UrlMap by name.
+func (gce *GCECloud) GetTargetHttpProxy(name string) (*compute.TargetHttpProxy, error) {
+	return gce.service.TargetHttpProxies.Get(gce.projectID, name).Do()
+}
+
+// CreateTargetHttpProxy creates and returns a TargetHttpProxy with the given UrlMap.
+func (gce *GCECloud) CreateTargetHttpProxy(urlMap *compute.UrlMap, name string) (*compute.TargetHttpProxy, error) {
+	proxy := &compute.TargetHttpProxy{
+		Name:   name,
+		UrlMap: urlMap.SelfLink,
+	}
+	op, err := gce.service.TargetHttpProxies.Insert(gce.projectID, proxy).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetTargetHttpProxy(name)
+}
+
+// SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
+func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
+	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{urlMap.SelfLink}).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteTargetHttpProxy deletes the TargetHttpProxy by name.
+func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
+	op, err := gce.service.TargetHttpProxies.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListTargetHttpProxies lists all TargetHttpProxies in the project.
+func (gce *GCECloud) ListTargetHttpProxies() (*compute.TargetHttpProxyList, error) {
+	return gce.service.TargetHttpProxies.List(gce.projectID).Do()
+}
+
+// GlobalForwardingRule management
+
+// CreateGlobalForwardingRule creates and returns a GlobalForwardingRule that points to the given TargetHttpProxy.
+func (gce *GCECloud) CreateGlobalForwardingRule(proxy *compute.TargetHttpProxy, name string, portRange string) (*compute.ForwardingRule, error) {
+	rule := &compute.ForwardingRule{
+		Name:       name,
+		Target:     proxy.SelfLink,
+		PortRange:  portRange,
+		IPProtocol: "TCP",
+	}
+	op, err := gce.service.GlobalForwardingRules.Insert(gce.projectID, rule).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForGlobalOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetGlobalForwardingRule(name)
+}
+
+// SetProxyForGlobalForwardingRule links the given TargetHttpProxy with the given GlobalForwardingRule.
+func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, proxy *compute.TargetHttpProxy) error {
+	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{proxy.SelfLink}).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
+func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
+	op, err := gce.service.GlobalForwardingRules.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// GetGlobalForwardingRule returns the GlobalForwardingRule by name.
+func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRule, error) {
+	return gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
+}
+
+// ListGlobalForwardingRules lists all GlobalForwardingRules in the project.
+func (gce *GCECloud) ListGlobalForwardingRules() (*compute.ForwardingRuleList, error) {
+	return gce.service.GlobalForwardingRules.List(gce.projectID).Do()
+}
+
+// BackendService Management
+
+// GetBackendService retrieves a backend by name.
+func (gce *GCECloud) GetBackendService(name string) (*compute.BackendService, error) {
+	return gce.service.BackendServices.Get(gce.projectID, name).Do()
+}
+
+// UpdateBackendService applies the given BackendService as an update to an existing service.
+func (gce *GCECloud) UpdateBackendService(bg *compute.BackendService) error {
+	op, err := gce.service.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteBackendService deletes the given BackendService by name.
+func (gce *GCECloud) DeleteBackendService(name string) error {
+	op, err := gce.service.BackendServices.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// CreateBackendService creates the given BackendService.
+func (gce *GCECloud) CreateBackendService(bg *compute.BackendService) error {
+	op, err := gce.service.BackendServices.Insert(gce.projectID, bg).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListBackendServices lists all backend services in the project.
+func (gce *GCECloud) ListBackendServices() (*compute.BackendServiceList, error) {
+	return gce.service.BackendServices.List(gce.projectID).Do()
+}
+
+// GetHealth returns the health of the BackendService identified by the given
+// name, in the given instanceGroup. The instanceGroupLink is the fully
+// qualified self link of an instance group.
+func (gce *GCECloud) GetHealth(name string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
+	groupRef := &compute.ResourceGroupReference{instanceGroupLink}
+	return gce.service.BackendServices.GetHealth(gce.projectID, name, groupRef).Do()
+}
+
+// Health Checks
+
+// GetHttpHealthCheck returns the given HttpHealthCheck by name.
+func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, error) {
+	return gce.service.HttpHealthChecks.Get(gce.projectID, name).Do()
+}
+
+// UpdateHttpHealthCheck applies the given HttpHealthCheck as an update.
+func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
+	op, err := gce.service.HttpHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteHttpHealthCheck deletes the given HttpHealthCheck by name.
+func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
+	op, err := gce.service.HttpHealthChecks.Delete(gce.projectID, name).Do()
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// CreateHttpHealthCheck creates the given HttpHealthCheck.
+func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
+	op, err := gce.service.HttpHealthChecks.Insert(gce.projectID, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListHttpHealthCheck lists all HttpHealthChecks in the project.
+func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error) {
+	return gce.service.HttpHealthChecks.List(gce.projectID).Do()
+}
+
+// InstanceGroup Management
+
+// CreateInstanceGroup creates an instance group with the given instances. It is the callers responsibility to add named ports.
+func (gce *GCECloud) CreateInstanceGroup(name string) (*compute.InstanceGroup, error) {
+	op, err := gce.service.InstanceGroups.Insert(
+		gce.projectID, gce.zone, &compute.InstanceGroup{Name: name}).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForZoneOp(op); err != nil {
+		return nil, err
+	}
+	return gce.GetInstanceGroup(name)
+}
+
+// DeleteInstanceGroup deletes an instance group.
+func (gce *GCECloud) DeleteInstanceGroup(name string) error {
+	op, err := gce.service.InstanceGroups.Delete(
+		gce.projectID, gce.zone, name).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForZoneOp(op)
+}
+
+// ListInstanceGroups lists all InstanceGroups in the project and zone.
+func (gce *GCECloud) ListInstanceGroups() (*compute.InstanceGroupList, error) {
+	return gce.service.InstanceGroups.List(gce.projectID, gce.zone).Do()
+}
+
+// ListInstancesInInstanceGroup lists all the instances in a given istance group and state.
+func (gce *GCECloud) ListInstancesInInstanceGroup(name string, state string) (*compute.InstanceGroupsListInstances, error) {
+	return gce.service.InstanceGroups.ListInstances(
+		gce.projectID, gce.zone, name,
+		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Do()
+}
+
+// AddInstancesToInstanceGroup adds the given instances to the given instance group.
+func (gce *GCECloud) AddInstancesToInstanceGroup(name string, instanceNames []string) error {
+	if len(instanceNames) == 0 {
+		return nil
+	}
+	// Adding the same instance twice will result in a 4xx error
+	instances := []*compute.InstanceReference{}
+	for _, ins := range instanceNames {
+		instances = append(instances, &compute.InstanceReference{makeHostURL(gce.projectID, gce.zone, ins)})
+	}
+	op, err := gce.service.InstanceGroups.AddInstances(
+		gce.projectID, gce.zone, name,
+		&compute.InstanceGroupsAddInstancesRequest{
+			Instances: instances,
+		}).Do()
+
+	if err != nil {
+		return err
+	}
+	return gce.waitForZoneOp(op)
+}
+
+// RemoveInstancesFromInstanceGroup removes the given instances from the instance group.
+func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, instanceNames []string) error {
+	if len(instanceNames) == 0 {
+		return nil
+	}
+	instances := []*compute.InstanceReference{}
+	for _, ins := range instanceNames {
+		instanceLink := makeHostURL(gce.projectID, gce.zone, ins)
+		instances = append(instances, &compute.InstanceReference{instanceLink})
+	}
+	op, err := gce.service.InstanceGroups.RemoveInstances(
+		gce.projectID, gce.zone, name,
+		&compute.InstanceGroupsRemoveInstancesRequest{
+			Instances: instances,
+		}).Do()
+
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil
+		}
+		return err
+	}
+	return gce.waitForZoneOp(op)
+}
+
+// AddPortToInstanceGroup adds a port to the given instance group.
+func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int64) (*compute.NamedPort, error) {
+	for _, np := range ig.NamedPorts {
+		if np.Port == port {
+			glog.Infof("Instance group %v already has named port %+v", ig.Name, np)
+			return np, nil
+		}
+	}
+	glog.Infof("Adding port %v to instance group %v with %d ports", port, ig.Name, len(ig.NamedPorts))
+	namedPort := compute.NamedPort{fmt.Sprintf("port%v", port), port}
+	ig.NamedPorts = append(ig.NamedPorts, &namedPort)
+	op, err := gce.service.InstanceGroups.SetNamedPorts(
+		gce.projectID, gce.zone, ig.Name,
+		&compute.InstanceGroupsSetNamedPortsRequest{
+			NamedPorts: ig.NamedPorts}).Do()
+	if err != nil {
+		return nil, err
+	}
+	if err = gce.waitForZoneOp(op); err != nil {
+		return nil, err
+	}
+	return &namedPort, nil
+}
+
+// GetInstanceGroup returns an instance group by name.
+func (gce *GCECloud) GetInstanceGroup(name string) (*compute.InstanceGroup, error) {
+	return gce.service.InstanceGroups.Get(gce.projectID, gce.zone, name).Do()
 }
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
@@ -783,28 +1504,22 @@ func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 		readWrite = "READ_ONLY"
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
-	_, err = gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
-	if err != nil {
-		// Check if the disk is already attached to this instance.  We do this only
-		// in the error case, since it is expected to be exceptional.
-		instance, err := gce.service.Instances.Get(gce.projectID, gce.zone, gce.instanceID).Do()
-		if err != nil {
-			return err
-		}
-		for _, disk := range instance.Disks {
-			if disk.Source == attachedDisk.Source {
-				// Disk is already attached, we're good to go.
-				return nil
-			}
-		}
 
+	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
+	if err != nil {
+		return err
 	}
-	return err
+
+	return gce.waitForZoneOp(attachOp)
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string) error {
-	_, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
-	return err
+	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
+	if err != nil {
+		return err
+	}
+
+	return gce.waitForZoneOp(detachOp)
 }
 
 func (gce *GCECloud) getDisk(diskName string) (*compute.Disk, error) {

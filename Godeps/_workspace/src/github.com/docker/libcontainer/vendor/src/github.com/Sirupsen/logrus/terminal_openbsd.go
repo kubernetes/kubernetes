@@ -1,4 +1,3 @@
-
 package logrus
 
 import "syscall"

@@ -18,18 +18,18 @@
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-1}
-MINION_SIZE=${MINION_SIZE:-n1-standard-1}
-NUM_MINIONS=${NUM_MINIONS:-4}
+MASTER_SIZE=${MASTER_SIZE:-n1-standard-2}
+MINION_SIZE=${MINION_SIZE:-n1-standard-2}
+NUM_MINIONS=${NUM_MINIONS:-3}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 MINION_DISK_TYPE=pd-standard
 MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
-REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_MINION=${PREEMPTIBLE_MINION:-false}
 
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150806}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20151103}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-"${MASTER_IMAGE}"}
 MINION_IMAGE_PROJECT=${KUBE_GCE_MINION_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
@@ -44,11 +44,17 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
 MINION_SCOPES="${MINION_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
+ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
 
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
-POLL_SLEEP_INTERVAL=3
-SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
+POLL_SLEEP_INTERVAL="${POLL_SLEEP_INTERVAL:-3}"
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
+
+# Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
+#   glbc           - CE L7 Load Balancer Controller
+ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none           - No cluster monitoring setup
@@ -56,7 +62,7 @@ ALLOCATE_NODE_CIDRS=true
 #   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 #   googleinfluxdb - Enable influxdb and google (except GCM)
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-googleinfluxdb}"
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
@@ -78,7 +84,7 @@ DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 # Optional: Install cluster docker registry.
-ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-true}"
+ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-false}"
 CLUSTER_REGISTRY_DISK="${CLUSTER_REGISTRY_PD:-${INSTANCE_PREFIX}-kube-system-kube-registry}"
 CLUSTER_REGISTRY_DISK_SIZE="${CLUSTER_REGISTRY_DISK_SIZE:-200GB}"
 CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
@@ -87,16 +93,36 @@ CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Create autoscaler for cluster's nodes.
-# NOT WORKING YET!
 ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
 if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
   AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
+  ENABLE_CLUSTER_MONITORING=googleinfluxdb
+fi
+
+# Optional: Enable deployment experimental feature, not ready for production use.
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
+if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
+fi
+# Optional: Enable daemonset experimental feature, not ready for production use.
+ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-false}"
+if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
+  ENABLE_EXPERIMENTAL_API=true
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
+
+# OpenContrail networking plugin specific settings
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
+OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
+OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
+OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

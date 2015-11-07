@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -87,6 +88,28 @@ func TestExtractListGeneric(t *testing.T) {
 	}
 }
 
+func TestExtractListGenericV1(t *testing.T) {
+	pl := &v1.List{
+		Items: []runtime.RawExtension{
+			{RawJSON: []byte("foo")},
+			{RawJSON: []byte("bar")},
+		},
+	}
+	list, err := runtime.ExtractList(pl)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := len(list), len(pl.Items); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+	if obj, ok := list[0].(*runtime.Unknown); !ok {
+		t.Fatalf("Expected list[0] to be *runtime.Unknown, it is %#v", obj)
+	}
+	if obj, ok := list[1].(*runtime.Unknown); !ok {
+		t.Fatalf("Expected list[1] to be *runtime.Unknown, it is %#v", obj)
+	}
+}
+
 type fakePtrInterfaceList struct {
 	Items *[]runtime.Object
 }
@@ -137,7 +160,7 @@ func TestDecodeList(t *testing.T) {
 	pl := &api.List{
 		Items: []runtime.Object{
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: testapi.Version()}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"` + testapi.Version() + `","metadata":{"name":"test"}}`)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: testapi.Default.Version()}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"` + testapi.Default.Version() + `","metadata":{"name":"test"}}`)},
 			&runtime.Unstructured{TypeMeta: runtime.TypeMeta{Kind: "Foo", APIVersion: "Bar"}, Object: map[string]interface{}{"test": "value"}},
 		},
 	}

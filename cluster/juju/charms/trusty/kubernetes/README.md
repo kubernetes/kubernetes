@@ -67,7 +67,7 @@ The charm store version of the Kubernetes bundle can be deployed as follows:
 
 Alternately you could deploy a Kubernetes bundle straight from github or a file:
 
-    juju quickstart -i https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml
+    juju quickstart https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/juju/bundles/local.yaml
 
 The command above does few things for you:
 
@@ -77,7 +77,7 @@ The command above does few things for you:
   deployment environment (machine 0).
 - Deploys the Juju GUI to your environment onto the bootstrap node.
 - Provisions 4 machines, and deploys the Kubernetes services on top of
-  them (Kubernetes-master, two Kubernetes minions using flannel, and etcd).
+  them (Kubernetes-master, two Kubernetes nodes using flannel, and etcd).
 - Orchestrates the relations among the services, and exits.
 
 Now you should have a running Kubernetes. Run `juju status

@@ -40,11 +40,14 @@ while true; do
   # Suppress errors from kubectl output because during cluster bootstrapping
   # for clusters where the master node is registered, the apiserver will become
   # available and then get restarted as the kubelet configures the docker bridge.
-  nodes_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template --template='{{range .items}}{{with index .status.conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}' --api-version=v1)
+  nodes_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template --template='{{range .items}}{{with index .status.conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}' --api-version=v1) || true
   found=$(echo "${nodes_status}" | tr "," "\n" | grep -c 'Ready:') || true
   ready=$(echo "${nodes_status}" | tr "," "\n" | grep -c 'Ready:True') || true
 
   if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
+    break
+  elif (( "${found}" > "${EXPECTED_NUM_NODES}" )) && (( "${ready}" > "${EXPECTED_NUM_NODES}")); then
+    echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Found more nodes than expected, your cluster may not behave correctly.${color_norm}"
     break
   else
     # Set the timeout to ~10minutes (40 x 15 second) to avoid timeouts for 100-node clusters.

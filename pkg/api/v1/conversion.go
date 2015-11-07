@@ -24,13 +24,25 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
+const (
+	// Annotation key used to identify mirror pods.
+	mirrorAnnotationKey = "kubernetes.io/config.mirror"
+
+	// Value used to identify mirror pods from pre-v1.1 kubelet.
+	mirrorAnnotationValue_1_0 = "mirror"
+)
+
 func addConversionFuncs() {
 	// Add non-generated conversion functions
 	err := api.Scheme.AddConversionFuncs(
+		convert_api_Pod_To_v1_Pod,
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
+		convert_api_ServiceSpec_To_v1_ServiceSpec,
+		convert_v1_Pod_To_api_Pod,
 		convert_v1_PodSpec_To_api_PodSpec,
 		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
+		convert_v1_ServiceSpec_To_api_ServiceSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -43,6 +55,8 @@ func addConversionFuncs() {
 			switch label {
 			case "metadata.name",
 				"metadata.namespace",
+				"metadata.labels",
+				"metadata.annotations",
 				"status.phase",
 				"status.podIP",
 				"spec.nodeName":
@@ -279,7 +293,18 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
 	out.DeprecatedServiceAccount = in.ServiceAccountName
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(PodSecurityContext)
+		if err := convert_api_PodSecurityContext_To_v1_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+			return err
+		}
+
+		// the host namespace fields have to be handled here for backward compatibilty
+		// with v1.0.0
+		out.HostPID = in.SecurityContext.HostPID
+		out.HostNetwork = in.SecurityContext.HostNetwork
+		out.HostIPC = in.SecurityContext.HostIPC
+	}
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -346,7 +371,21 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		out.ServiceAccountName = in.DeprecatedServiceAccount
 	}
 	out.NodeName = in.NodeName
-	out.HostNetwork = in.HostNetwork
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(api.PodSecurityContext)
+		if err := convert_v1_PodSecurityContext_To_api_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+			return err
+		}
+	}
+
+	// the host namespace fields have to be handled specially for backward compatibility
+	// with v1.0.0
+	if out.SecurityContext == nil {
+		out.SecurityContext = new(api.PodSecurityContext)
+	}
+	out.SecurityContext.HostNetwork = in.HostNetwork
+	out.SecurityContext.HostPID = in.HostPID
+	out.SecurityContext.HostIPC = in.HostIPC
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
@@ -356,6 +395,124 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		}
 	} else {
 		out.ImagePullSecrets = nil
+	}
+
+	return nil
+}
+
+func convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error {
+	if err := autoconvert_api_Pod_To_v1_Pod(in, out, s); err != nil {
+		return err
+	}
+	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
+	// (#15960).
+	// TODO: Remove this code after we drop support for v1.0 kubelets.
+	if value, ok := in.Annotations[mirrorAnnotationKey]; ok && value == mirrorAnnotationValue_1_0 {
+		// Reset the TerminationGracePeriodSeconds.
+		out.Spec.TerminationGracePeriodSeconds = nil
+		// Reset the resource requests.
+		for i := range out.Spec.Containers {
+			out.Spec.Containers[i].Resources.Requests = nil
+		}
+	}
+	return nil
+}
+
+func convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
+	return autoconvert_v1_Pod_To_api_Pod(in, out, s)
+}
+
+func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
+	if err := autoconvert_api_ServiceSpec_To_v1_ServiceSpec(in, out, s); err != nil {
+		return err
+	}
+	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
+	for _, ip := range in.ExternalIPs {
+		out.DeprecatedPublicIPs = append(out.DeprecatedPublicIPs, ip)
+	}
+	return nil
+}
+
+func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
+	if err := autoconvert_v1_ServiceSpec_To_api_ServiceSpec(in, out, s); err != nil {
+		return err
+	}
+	// Prefer the legacy deprecatedPublicIPs field, if provided.
+	if len(in.DeprecatedPublicIPs) > 0 {
+		out.ExternalIPs = nil
+		for _, ip := range in.DeprecatedPublicIPs {
+			out.ExternalIPs = append(out.ExternalIPs, ip)
+		}
+	}
+	return nil
+}
+
+func convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *PodSecurityContext, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PodSecurityContext))(in)
+	}
+
+	out.SupplementalGroups = in.SupplementalGroups
+	if in.SELinuxOptions != nil {
+		out.SELinuxOptions = new(SELinuxOptions)
+		if err := convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	if in.RunAsUser != nil {
+		out.RunAsUser = new(int64)
+		*out.RunAsUser = *in.RunAsUser
+	} else {
+		out.RunAsUser = nil
+	}
+	if in.RunAsNonRoot != nil {
+		out.RunAsNonRoot = new(bool)
+		*out.RunAsNonRoot = *in.RunAsNonRoot
+	} else {
+		out.RunAsNonRoot = nil
+	}
+	if in.FSGroup != nil {
+		out.FSGroup = new(int64)
+		*out.FSGroup = *in.FSGroup
+	} else {
+		out.FSGroup = nil
+	}
+	return nil
+}
+
+func convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PodSecurityContext))(in)
+	}
+
+	out.SupplementalGroups = in.SupplementalGroups
+	if in.SELinuxOptions != nil {
+		out.SELinuxOptions = new(api.SELinuxOptions)
+		if err := convert_v1_SELinuxOptions_To_api_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	if in.RunAsUser != nil {
+		out.RunAsUser = new(int64)
+		*out.RunAsUser = *in.RunAsUser
+	} else {
+		out.RunAsUser = nil
+	}
+	if in.RunAsNonRoot != nil {
+		out.RunAsNonRoot = new(bool)
+		*out.RunAsNonRoot = *in.RunAsNonRoot
+	} else {
+		out.RunAsNonRoot = nil
+	}
+	if in.FSGroup != nil {
+		out.FSGroup = new(int64)
+		*out.FSGroup = *in.FSGroup
+	} else {
+		out.FSGroup = nil
 	}
 	return nil
 }

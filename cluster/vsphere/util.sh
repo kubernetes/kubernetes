@@ -126,31 +126,6 @@ function ensure-temp-dir {
   fi
 }
 
-# Verify and find the various tar files that we are going to use on the server.
-#
-# Vars set:
-#   SERVER_BINARY_TAR
-#   SALT_TAR
-function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
-    exit 1
-  fi
-
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
-  fi
-  if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
-    exit 1
-  fi
-}
-
 # Take the local tar files and upload them to the master.
 #
 # Assumed vars:
@@ -250,7 +225,7 @@ function kube-up {
 
   ensure-temp-dir
 
-  gen-kube-basicauth
+  load-or-gen-kube-basicauth
   python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
     -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
   local htpasswd
@@ -275,6 +250,7 @@ function kube-up {
     echo "readonly SERVER_BINARY_TAR='${SERVER_BINARY_TAR##*/}'"
     echo "readonly SALT_TAR='${SALT_TAR##*/}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
+    echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/install-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-master.sh"

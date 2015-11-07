@@ -32,12 +32,12 @@ type LimitRangesNamespacer interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	List(selector labels.Selector) (*api.LimitRangeList, error)
+	List(label labels.Selector, field fields.Selector) (*api.LimitRangeList, error)
 	Get(name string) (*api.LimitRange, error)
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // limitRanges implements LimitRangesNamespacer interface
@@ -55,9 +55,9 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 }
 
 // List takes a selector, and returns the list of limitRanges that match that selector.
-func (c *limitRanges) List(selector labels.Selector) (result *api.LimitRangeList, err error) {
+func (c *limitRanges) List(label labels.Selector, field fields.Selector) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
@@ -92,12 +92,12 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *limitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *limitRanges) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("limitRanges").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

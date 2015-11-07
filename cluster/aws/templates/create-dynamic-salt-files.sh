@@ -36,7 +36,19 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+network_provider: '$(echo "$NETWORK_PROVIDER")'
+opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
+opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
+opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+num_nodes: $(echo "${NUM_MINIONS}")
+e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
+
+if [ -n "${ENABLE_EXPERIMENTAL_API:-}" ]; then
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_experimental_api: '$(echo "$ENABLE_EXPERIMENTAL_API" | sed -e "s/'/''/g")'
+EOF
+fi
 
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 if [ ! -e "${BASIC_AUTH_FILE}" ]; then

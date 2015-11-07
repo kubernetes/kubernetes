@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -80,4 +81,24 @@ func UserInfo(namespace, name, uid string) user.Info {
 		UID:    uid,
 		Groups: MakeGroupNames(namespace, name),
 	}
+}
+
+// IsServiceAccountToken returns true if the secret is a valid api token for the service account
+func IsServiceAccountToken(secret *api.Secret, sa *api.ServiceAccount) bool {
+	if secret.Type != api.SecretTypeServiceAccountToken {
+		return false
+	}
+
+	name := secret.Annotations[api.ServiceAccountNameKey]
+	uid := secret.Annotations[api.ServiceAccountUIDKey]
+	if name != sa.Name {
+		// Name must match
+		return false
+	}
+	if len(uid) > 0 && uid != string(sa.UID) {
+		// If UID is specified, it must match
+		return false
+	}
+
+	return true
 }

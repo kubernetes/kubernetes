@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake_cloud
+package fake
 
 import (
 	"errors"
@@ -92,6 +92,11 @@ func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (f *FakeCloud) ProviderName() string {
 	return ProviderName
+}
+
+// ScrubDNS filters DNS settings for pods.
+func (f *FakeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
 }
 
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.

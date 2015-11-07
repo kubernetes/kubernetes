@@ -46,8 +46,7 @@ func NewSecurityContextDeny(client client.Interface) admission.Interface {
 	}
 }
 
-// Admit will deny any SecurityContext that defines options that were not previously available in the api.Container
-// struct (Capabilities and Privileged)
+// Admit will deny any pod that defines SELinuxOptions or RunAsUser.
 func (p *plugin) Admit(a admission.Attributes) (err error) {
 	if a.GetResource() != string(api.ResourcePods) {
 		return nil
@@ -57,6 +56,23 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 	if !ok {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroups != nil {
+		return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.SupplementalGroups is forbidden"))
+	}
+	if pod.Spec.SecurityContext != nil {
+		if pod.Spec.SecurityContext.SELinuxOptions != nil {
+			return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.SELinuxOptions is forbidden"))
+		}
+		if pod.Spec.SecurityContext.RunAsUser != nil {
+			return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.RunAsUser is forbidden"))
+		}
+	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
+		return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
+	}
+
 	for _, v := range pod.Spec.Containers {
 		if v.SecurityContext != nil {
 			if v.SecurityContext.SELinuxOptions != nil {

@@ -21,6 +21,8 @@ function build-kube-env {
   local master=$1
   local file=$2
 
+  build-runtime-config
+
   rm -f ${file}
   # TODO(dawnchen): master node is still running with debian image
   if [[ "${master}" == "true" ]]; then
@@ -44,6 +46,8 @@ LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
 ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
 ENABLE_CLUSTER_REGISTRY: $(yaml-quote ${ENABLE_CLUSTER_REGISTRY:-false})
+CLUSTER_REGISTRY_DISK: $(yaml-quote ${CLUSTER_REGISTRY_DISK})
+CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE})
 DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
@@ -54,6 +58,8 @@ KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
+ENABLE_EXPERIMENTAL_API: $(yaml-quote ${ENABLE_EXPERIMENTAL_API})
+RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION})
@@ -65,6 +71,7 @@ KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
 KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
 KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
+NUM_MINIONS: $(yaml-quote ${NUM_MINIONS})
 EOF
   else
     cat >>$file <<EOF
@@ -81,7 +88,8 @@ ENABLE_NODE_LOGGING=${ENABLE_NODE_LOGGING:-false}
 LOGGING_DESTINATION=${LOGGING_DESTINATION:-}
 ELASTICSEARCH_LOGGING_REPLICAS=${ELASTICSEARCH_LOGGING_REPLICAS:-}
 ENABLE_CLUSTER_DNS=${ENABLE_CLUSTER_DNS:-false}
-ENABLE_CLUSTER_REGISTRY=${ENABLE_CLUSTER_REGISTRY:-false})
+ENABLE_CLUSTER_REGISTRY=${ENABLE_CLUSTER_REGISTRY:-false}
+NUM_MINIONS=${NUM_MINIONS}
 DNS_REPLICAS=${DNS_REPLICAS:-}
 DNS_SERVER_IP=${DNS_SERVER_IP:-}
 DNS_DOMAIN=${DNS_DOMAIN:-}
@@ -95,6 +103,7 @@ EXTRA_DOCKER_OPTS=${EXTRA_DOCKER_OPTS:-}
 PROJECT_ID=${PROJECT}
 KUBERNETES_CONTAINER_RUNTIME=${CONTAINER_RUNTIME}
 RKT_VERSION=${RKT_VERSION}
+KUBERNETES_CONFIGURE_CBR0=${KUBERNETES_CONFIGURE_CBR0:-true}
 CA_CERT=${CA_CERT_BASE64}
 KUBELET_CERT=${KUBELET_CERT_BASE64:-}
 KUBELET_KEY=${KUBELET_KEY_BASE64:-}
@@ -130,7 +139,7 @@ function create-master-instance {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
+    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
       "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
@@ -139,15 +148,10 @@ function create-master-instance {
 
 # TODO(dawnchen): Check $CONTAINER_RUNTIME to decide which
 # cloud_config yaml file should be passed
-# TODO(mbforbes): Make $1 required.
-# TODO(mbforbes): Document required vars (for this and call chain).
-# $1 version
+# $1: template name (required)
 function create-node-instance-template {
-  local suffix=""
-  if [[ -n ${1:-} ]]; then
-    suffix="-${1}"
-  fi
-   create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags}" \
+  local template_name="$1"
+  create-node-template "$template_name" "${scope_flags}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
     "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml"
 }

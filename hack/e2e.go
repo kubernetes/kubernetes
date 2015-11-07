@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -84,6 +85,7 @@ type TestResult struct {
 type ResultsByTest map[string]TestResult
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 
 	if *isup {
@@ -176,6 +178,8 @@ func Up() bool {
 		}
 	}
 
+	// Enable deployments for e2e tests.
+	os.Setenv("KUBE_ENABLE_DEPLOYMENTS", "true")
 	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 
@@ -297,6 +301,10 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 		cmd.Stderr = os.Stderr
 	}
 	log.Printf("Running: %v", stepName)
+	defer func(start time.Time) {
+		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
+	}(time.Now())
+
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
 		return false

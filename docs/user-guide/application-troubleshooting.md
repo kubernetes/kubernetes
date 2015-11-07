@@ -58,7 +58,7 @@ This is *not* a guide for people who want to debug their cluster.  For that you 
 
 ## FAQ
 
-Users are highly encouraged to check out our [FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
+Users are highly encouraged to check out our [FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
 
 ## Diagnosing the problem
 
@@ -152,7 +152,7 @@ If you misspelled `command` as `commnd` then  will give an error like this:
 
 ```
 I0805 10:43:25.129850   46757 schema.go:126] unknown field: commnd
-I0805 10:43:25.129973   46757 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
+I0805 10:43:25.129973   46757 schema.go:129] this may be a false alarm, see https://github.com/kubernetes/kubernetes/issues/6842
 pods/mypod
 ```
 

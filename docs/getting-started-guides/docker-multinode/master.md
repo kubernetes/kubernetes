@@ -68,13 +68,13 @@ across reboots and failures.
 Run:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 ```
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.2.1 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
 ```
 
 
@@ -107,7 +107,7 @@ or it may be something else.
 Now run flanneld itself:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3
 ```
 
 The previous command should have printed a really long hash, copy this hash.
@@ -160,7 +160,18 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
+sudo docker run \
+    --volume=/:/rootfs:ro \
+    --volume=/sys:/sys:ro \
+    --volume=/dev:/dev \
+    --volume=/var/lib/docker/:/var/lib/docker:rw \
+    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+    --volume=/var/run:/var/run:rw \
+    --net=host \
+    --privileged=true \
+    --pid=host \ 
+    -d \
+    gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
 ```
 
 > Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
@@ -175,7 +186,7 @@ sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1
 
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
-Download the kubectl binary
+Download the kubectl binary and make it available by editing your PATH ENV.
 ([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
 ([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
 
@@ -193,7 +204,7 @@ NAME        LABELS                             STATUS
 ```
 
 If the status of the node is `NotReady` or `Unknown` please check that all of the containers you created are successfully running.
-If all else fails, ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers).
+If all else fails, ask questions on [Slack](../../troubleshooting.md#slack).
 
 
 ### Next steps

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // resourcequota contains a controller that makes resource quota usage observations
-package resourcequotacontroller
+package resourcequota

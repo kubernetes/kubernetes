@@ -22,6 +22,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 )
 
+// formatMap formats map[string]string to a string.
+func formatMap(m map[string]string) string {
+	var l string
+	for key, value := range m {
+		l += key + "=" + fmt.Sprintf("%q", value) + "\n"
+	}
+	return l
+}
+
 // ExtractFieldPathAsString extracts the field from the given object
 // and returns it as a string.  The object must be a pointer to an
 // API type.
@@ -37,6 +46,10 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 	}
 
 	switch fieldPath {
+	case "metadata.annotations":
+		return formatMap(accessor.Annotations()), nil
+	case "metadata.labels":
+		return formatMap(accessor.Labels()), nil
 	case "metadata.name":
 		return accessor.Name(), nil
 	case "metadata.namespace":

@@ -1,0 +1,127 @@
+message criu_page_server_info {
+	optional string		address	= 1;
+	optional int32		port	= 2;
+	optional int32		pid	= 3;
+	optional int32		fd	= 4;
+}
+
+message criu_veth_pair {
+	required string		if_in	= 1;
+	required string		if_out	= 2;
+};
+
+message ext_mount_map {
+	required string		key	= 1;
+	required string		val	= 2;
+};
+
+message inherit_fd {
+	required string		key	= 1;
+	required int32		fd	= 2;
+};
+
+message cgroup_root {
+	optional string		ctrl	= 1;
+	required string		path	= 2;
+};
+
+message criu_opts {
+	required int32			images_dir_fd	= 1;
+	optional int32			pid		= 2; /* if not set on dump, will dump requesting process */
+
+	optional bool			leave_running	= 3;
+	optional bool			ext_unix_sk	= 4;
+	optional bool			tcp_established	= 5;
+	optional bool			evasive_devices	= 6;
+	optional bool			shell_job	= 7;
+	optional bool			file_locks	= 8;
+	optional int32			log_level	= 9 [default = 2];
+	optional string			log_file	= 10; /* No subdirs are allowed. Consider using work-dir */
+
+	optional criu_page_server_info	ps		= 11;
+
+	optional bool			notify_scripts	= 12;
+
+	optional string			root		= 13;
+	optional string			parent_img	= 14;
+	optional bool			track_mem	= 15;
+	optional bool			auto_dedup	= 16;
+
+	optional int32			work_dir_fd	= 17;
+	optional bool			link_remap	= 18;
+	repeated criu_veth_pair		veths		= 19;
+
+	optional uint32			cpu_cap		= 20 [default = 0xffffffff];
+	optional bool			force_irmap	= 21;
+	repeated string			exec_cmd	= 22;
+
+	repeated ext_mount_map		ext_mnt		= 23;
+	optional bool			manage_cgroups	= 24;
+	repeated cgroup_root		cg_root		= 25;
+
+	optional bool			rst_sibling	= 26; /* swrk only */
+	repeated inherit_fd		inherit_fd	= 27;
+}
+
+message criu_dump_resp {
+	optional bool restored		= 1;
+}
+
+message criu_restore_resp {
+	required int32 pid		= 1;
+}
+
+message criu_notify {
+	optional string script		= 1;
+	optional int32	pid		= 2;
+}
+
+enum criu_req_type {
+	EMPTY		= 0;
+	DUMP		= 1;
+	RESTORE		= 2;
+	CHECK		= 3;
+	PRE_DUMP	= 4;
+	PAGE_SERVER	= 5;
+
+	NOTIFY		= 6;
+
+	CPUINFO_DUMP	= 7;
+	CPUINFO_CHECK	= 8;
+}
+
+/*
+ * Request -- each type corresponds to must-be-there
+ * request arguments of respective type
+ */
+
+message criu_req {
+	required criu_req_type		type		= 1;
+
+	optional criu_opts		opts		= 2;
+	optional bool			notify_success	= 3;
+
+	/*
+	 * When set service won't close the connection but
+	 * will wait for more req-s to appear. Works not
+	 * for all request types.
+	 */
+	optional bool			keep_open	= 4;
+}
+
+/*
+ * Responce -- it states whether the request was served
+ * and additional request-specific informarion
+ */
+
+message criu_resp {
+	required criu_req_type		type		= 1;
+	required bool			success		= 2;
+
+	optional criu_dump_resp		dump		= 3;
+	optional criu_restore_resp	restore		= 4;
+	optional criu_notify		notify		= 5;
+	optional criu_page_server_info	ps		= 6;
+
+	optional int32			cr_errno	= 7;
+}

@@ -42,15 +42,20 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 }
 
 func TestCanSupport(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", "/tmp/fake")
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "emptydirTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	if plug.Name() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -64,30 +69,10 @@ func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool,
 	return fake.medium, fake.isMount, nil
 }
 
-type fakeChconRequest struct {
-	dir     string
-	context string
-}
-
-type fakeChconRunner struct {
-	requests []fakeChconRequest
-}
-
-func newFakeChconRunner() *fakeChconRunner {
-	return &fakeChconRunner{}
-}
-
-func (f *fakeChconRunner) SetContext(dir, context string) error {
-	f.requests = append(f.requests, fakeChconRequest{dir, context})
-
-	return nil
-}
-
 func TestPluginEmptyRootContext(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                 api.StorageMediumDefault,
 		rootContext:            "",
-		expectedChcons:         0,
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
 }
@@ -101,7 +86,6 @@ func TestPluginRootContextSet(t *testing.T) {
 		medium:                 api.StorageMediumDefault,
 		rootContext:            "user:role:type:range",
 		expectedSELinuxContext: "user:role:type:range",
-		expectedChcons:         1,
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
 }
@@ -115,7 +99,6 @@ func TestPluginTmpfs(t *testing.T) {
 		medium:                        api.StorageMediumMemory,
 		rootContext:                   "user:role:type:range",
 		expectedSELinuxContext:        "user:role:type:range",
-		expectedChcons:                1,
 		expectedSetupMounts:           1,
 		shouldBeMountedBeforeTeardown: true,
 		expectedTeardownMounts:        1})
@@ -127,7 +110,6 @@ type pluginTestConfig struct {
 	SELinuxOptions                *api.SELinuxOptions
 	idempotent                    bool
 	expectedSELinuxContext        string
-	expectedChcons                int
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
@@ -135,10 +117,11 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
-	basePath, err := ioutil.TempDir("/tmp", "emptydir_volume_test")
+	basePath, err := ioutil.TempDir(os.TempDir(), "emptydir_volume_test")
 	if err != nil {
-		t.Fatalf("can't make a temp rootdir")
+		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
+	defer os.RemoveAll(basePath)
 
 	var (
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
@@ -154,7 +137,6 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		mounter       = mount.FakeMounter{}
 		mountDetector = fakeMountDetector{}
 		pod           = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-		fakeChconRnr  = &fakeChconRunner{}
 	)
 
 	// Set up the SELinux options on the pod
@@ -188,8 +170,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		pod,
 		&mounter,
 		&mountDetector,
-		volume.VolumeOptions{RootContext: config.rootContext},
-		fakeChconRnr)
+		volume.VolumeOptions{RootContext: config.rootContext})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -223,19 +204,6 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		// If this test is for idempotency and we were able
 		// to stat the volume path, it's an error.
 		t.Errorf("Volume directory was created unexpectedly")
-	}
-
-	// Check the number of chcons during setup
-	if e, a := config.expectedChcons, len(fakeChconRnr.requests); e != a {
-		t.Errorf("Expected %v chcon calls, got %v", e, a)
-	}
-	if config.expectedChcons == 1 {
-		if e, a := config.expectedSELinuxContext, fakeChconRnr.requests[0].context; e != a {
-			t.Errorf("Unexpected chcon context argument; expected: %v, got: %v", e, a)
-		}
-		if e, a := volPath, fakeChconRnr.requests[0].dir; e != a {
-			t.Errorf("Unexpected chcon path argument: expected: %v, got: %v", e, a)
-		}
 	}
 
 	// Check the number of mounts performed during setup
@@ -281,14 +249,19 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	basePath := "/tmp/fake"
+	basePath, err := ioutil.TempDir(os.TempDir(), "emptydirTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir： %v", err)
+	}
+	defer os.RemoveAll(basePath)
+
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
 	spec := &api.Volume{
 		Name: "vol1",
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""}, nil)
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

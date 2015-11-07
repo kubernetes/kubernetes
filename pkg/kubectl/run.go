@@ -19,9 +19,12 @@ package kubectl
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type BasicReplicationController struct{}
@@ -39,7 +42,50 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"tty", false},
 		{"command", false},
 		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
 	}
+}
+
+// populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
+func populateResourceList(spec string) (api.ResourceList, error) {
+	// empty input gets a nil response to preserve generator test expected behaviors
+	if spec == "" {
+		return nil, nil
+	}
+
+	result := api.ResourceList{}
+	resourceStatements := strings.Split(spec, ",")
+	for _, resourceStatement := range resourceStatements {
+		parts := strings.Split(resourceStatement, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
+		}
+		resourceName := api.ResourceName(parts[0])
+		resourceQuantity, err := resource.ParseQuantity(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		result[resourceName] = *resourceQuantity
+	}
+	return result, nil
+}
+
+// HandleResourceRequirements parses the limits and requests parameters if specified
+func HandleResourceRequirements(params map[string]string) (api.ResourceRequirements, error) {
+	result := api.ResourceRequirements{}
+	limits, err := populateResourceList(params["limits"])
+	if err != nil {
+		return result, err
+	}
+	result.Limits = limits
+	requests, err := populateResourceList(params["requests"])
+	if err != nil {
+		return result, err
+	}
+	result.Requests = requests
+	return result, nil
 }
 
 func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
@@ -53,13 +99,19 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 		return nil, err
 	}
 
+	resourceRequirements, err := HandleResourceRequirements(params)
+	if err != nil {
+		return nil, err
+	}
+
 	spec := api.PodSpec{
 		Containers: []api.Container{
 			{
-				Name:  name,
-				Image: params["image"],
-				Stdin: stdin,
-				TTY:   tty,
+				Name:      name,
+				Image:     params["image"],
+				Stdin:     stdin,
+				TTY:       tty,
+				Resources: resourceRequirements,
 			},
 		},
 	}
@@ -77,6 +129,23 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		}
 		delete(genericParams, "args")
 	}
+
+	// TODO: abstract this logic so that multiple generators can handle env in the same way. Same for parse envs.
+	var envs []api.EnvVar
+	envStrings, found := genericParams["env"]
+	if found {
+		if envStringArray, isArray := envStrings.([]string); isArray {
+			var err error
+			envs, err = parseEnvs(envStringArray)
+			if err != nil {
+				return nil, err
+			}
+			delete(genericParams, "env")
+		} else {
+			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
+		}
+	}
+
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -125,6 +194,10 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		} else {
 			podSpec.Containers[0].Args = args
 		}
+	}
+
+	if len(envs) > 0 {
+		podSpec.Containers[0].Env = envs
 	}
 
 	controller := api.ReplicationController{
@@ -194,10 +267,14 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
+		{"leave-stdin-open", false},
 		{"tty", false},
 		{"restart", false},
 		{"command", false},
 		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
 	}
 }
 
@@ -212,6 +289,22 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		}
 		delete(genericParams, "args")
 	}
+	// TODO: abstract this logic so that multiple generators can handle env in the same way. Same for parse envs.
+	var envs []api.EnvVar
+	envStrings, found := genericParams["env"]
+	if found {
+		if envStringArray, isArray := envStrings.([]string); isArray {
+			var err error
+			envs, err = parseEnvs(envStringArray)
+			if err != nil {
+				return nil, err
+			}
+			delete(genericParams, "env")
+		} else {
+			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
+		}
+	}
+
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -241,8 +334,17 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	if err != nil {
 		return nil, err
 	}
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
 
 	tty, err := GetBool(params, "tty", false)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceRequirements, err := HandleResourceRequirements(params)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +365,9 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 					Image:           params["image"],
 					ImagePullPolicy: api.PullIfNotPresent,
 					Stdin:           stdin,
+					StdinOnce:       !leaveStdinOpen && stdin,
 					TTY:             tty,
+					Resources:       resourceRequirements,
 				},
 			},
 			DNSPolicy:     api.DNSClusterFirst,
@@ -281,8 +385,26 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			pod.Spec.Containers[0].Args = args
 		}
 	}
+
+	if len(envs) > 0 {
+		pod.Spec.Containers[0].Env = envs
+	}
+
 	if err := updatePodPorts(params, &pod.Spec); err != nil {
 		return nil, err
 	}
 	return &pod, nil
+}
+
+func parseEnvs(envArray []string) ([]api.EnvVar, error) {
+	envs := []api.EnvVar{}
+	for _, env := range envArray {
+		parts := strings.Split(env, "=")
+		if len(parts) != 2 || !validation.IsCIdentifier(parts[0]) || len(parts[1]) == 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		envVar := api.EnvVar{Name: parts[0], Value: parts[1]}
+		envs = append(envs, envVar)
+	}
+	return envs, nil
 }

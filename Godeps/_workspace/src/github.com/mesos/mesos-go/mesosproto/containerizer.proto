@@ -21,6 +21,17 @@ package mesosproto;
 import "mesos.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
 
 /**
  * Encodes the launch command sent to the external containerizer
@@ -82,6 +93,8 @@ message Usage {
 message Termination {
   // A container may be killed if it exceeds its resources; this will
   // be indicated by killed=true and described by the message string.
+  // TODO(jaybuff): As part of MESOS-2035 we should remove killed and
+  // replace it with a TaskStatus::Reason.
   required bool killed = 1;
   required string message = 2;
 

@@ -37,222 +37,43 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
-	"github.com/golang/glog"
-	bindings "github.com/mesos/mesos-go/executor"
 	"github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesos/mesos-go/mesosutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-type suicideTracker struct {
-	suicideWatcher
-	stops  uint32
-	resets uint32
-	timers uint32
-	jumps  *uint32
-}
-
-func (t *suicideTracker) Reset(d time.Duration) bool {
-	defer func() { t.resets++ }()
-	return t.suicideWatcher.Reset(d)
-}
-
-func (t *suicideTracker) Stop() bool {
-	defer func() { t.stops++ }()
-	return t.suicideWatcher.Stop()
-}
-
-func (t *suicideTracker) Next(d time.Duration, driver bindings.ExecutorDriver, f jumper) suicideWatcher {
-	tracker := &suicideTracker{
-		stops:  t.stops,
-		resets: t.resets,
-		jumps:  t.jumps,
-		timers: t.timers + 1,
-	}
-	jumper := tracker.makeJumper(f)
-	tracker.suicideWatcher = t.suicideWatcher.Next(d, driver, jumper)
-	return tracker
-}
-
-func (t *suicideTracker) makeJumper(_ jumper) jumper {
-	return jumper(func(driver bindings.ExecutorDriver, cancel <-chan struct{}) {
-		glog.Warningln("jumping?!")
-		if t.jumps != nil {
-			atomic.AddUint32(t.jumps, 1)
-		}
-	})
-}
-
-func TestSuicide_zeroTimeout(t *testing.T) {
-	defer glog.Flush()
-
-	k := New(Config{})
-	tracker := &suicideTracker{suicideWatcher: k.suicideWatch}
-	k.suicideWatch = tracker
-
-	ch := k.resetSuicideWatch(nil)
-
-	select {
-	case <-ch:
-	case <-time.After(2 * time.Second):
-		t.Fatalf("timeout waiting for reset of suicide watch")
-	}
-	if tracker.stops != 0 {
-		t.Fatalf("expected no stops since suicideWatchTimeout was never set")
-	}
-	if tracker.resets != 0 {
-		t.Fatalf("expected no resets since suicideWatchTimeout was never set")
-	}
-	if tracker.timers != 0 {
-		t.Fatalf("expected no timers since suicideWatchTimeout was never set")
-	}
-}
-
-func TestSuicide_WithTasks(t *testing.T) {
-	defer glog.Flush()
-
-	k := New(Config{
-		SuicideTimeout: 50 * time.Millisecond,
-	})
-
-	jumps := uint32(0)
-	tracker := &suicideTracker{suicideWatcher: k.suicideWatch, jumps: &jumps}
-	k.suicideWatch = tracker
-
-	k.tasks["foo"] = &kuberTask{} // prevent suicide attempts from succeeding
-
-	// call reset with a nil timer
-	glog.Infoln("resetting suicide watch with 1 task")
-	select {
-	case <-k.resetSuicideWatch(nil):
-		tracker = k.suicideWatch.(*suicideTracker)
-		if tracker.stops != 1 {
-			t.Fatalf("expected suicide attempt to Stop() since there are registered tasks")
-		}
-		if tracker.resets != 0 {
-			t.Fatalf("expected no resets since")
-		}
-		if tracker.timers != 0 {
-			t.Fatalf("expected no timers since")
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("initial suicide watch setup failed")
-	}
-
-	delete(k.tasks, "foo") // zero remaining tasks
-	k.suicideTimeout = 1500 * time.Millisecond
-	suicideStart := time.Now()
-
-	// reset the suicide watch, which should actually start a timer now
-	glog.Infoln("resetting suicide watch with 0 tasks")
-	select {
-	case <-k.resetSuicideWatch(nil):
-		tracker = k.suicideWatch.(*suicideTracker)
-		if tracker.stops != 1 {
-			t.Fatalf("did not expect suicide attempt to Stop() since there are no registered tasks")
-		}
-		if tracker.resets != 1 {
-			t.Fatalf("expected 1 resets instead of %d", tracker.resets)
-		}
-		if tracker.timers != 1 {
-			t.Fatalf("expected 1 timers instead of %d", tracker.timers)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("2nd suicide watch setup failed")
-	}
-
-	k.lock.Lock()
-	k.tasks["foo"] = &kuberTask{} // prevent suicide attempts from succeeding
-	k.lock.Unlock()
-
-	// reset the suicide watch, which should stop the existing timer
-	glog.Infoln("resetting suicide watch with 1 task")
-	select {
-	case <-k.resetSuicideWatch(nil):
-		tracker = k.suicideWatch.(*suicideTracker)
-		if tracker.stops != 2 {
-			t.Fatalf("expected 2 stops instead of %d since there are registered tasks", tracker.stops)
-		}
-		if tracker.resets != 1 {
-			t.Fatalf("expected 1 resets instead of %d", tracker.resets)
-		}
-		if tracker.timers != 1 {
-			t.Fatalf("expected 1 timers instead of %d", tracker.timers)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("3rd suicide watch setup failed")
-	}
-
-	k.lock.Lock()
-	delete(k.tasks, "foo") // allow suicide attempts to schedule
-	k.lock.Unlock()
-
-	// reset the suicide watch, which should reset a stopped timer
-	glog.Infoln("resetting suicide watch with 0 tasks")
-	select {
-	case <-k.resetSuicideWatch(nil):
-		tracker = k.suicideWatch.(*suicideTracker)
-		if tracker.stops != 2 {
-			t.Fatalf("expected 2 stops instead of %d since there are no registered tasks", tracker.stops)
-		}
-		if tracker.resets != 2 {
-			t.Fatalf("expected 2 resets instead of %d", tracker.resets)
-		}
-		if tracker.timers != 1 {
-			t.Fatalf("expected 1 timers instead of %d", tracker.timers)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("4th suicide watch setup failed")
-	}
-
-	sinceWatch := time.Since(suicideStart)
-	time.Sleep(3*time.Second - sinceWatch) // give the first timer to misfire (it shouldn't since Stop() was called)
-
-	if j := atomic.LoadUint32(&jumps); j != 1 {
-		t.Fatalf("expected 1 jumps instead of %d since stop was called", j)
-	} else {
-		glog.Infoln("jumps verified") // glog so we get a timestamp
-	}
-}
-
 // TestExecutorRegister ensures that the executor thinks it is connected
 // after Register is called.
 func TestExecutorRegister(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	updates := make(chan interface{}, 1024)
-	executor := New(Config{
-		Docker:     dockertools.ConnectToDockerOrDie("fake://"),
-		Updates:    updates,
-		SourceName: "executor_test",
-	})
+	executor, updates := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
 
-	initialPodUpdate := kubelet.PodUpdate{
-		Pods:   []*api.Pod{},
-		Op:     kubelet.SET,
-		Source: executor.sourcename,
+	initialPodUpdate := kubetypes.PodUpdate{
+		Pods: []*api.Pod{},
+		Op:   kubetypes.SET,
 	}
 	receivedInitialPodUpdate := false
 	select {
-	case m := <-updates:
-		update, ok := m.(kubelet.PodUpdate)
-		if ok {
-			if reflect.DeepEqual(initialPodUpdate, update) {
-				receivedInitialPodUpdate = true
-			}
+	case update := <-updates:
+		if reflect.DeepEqual(initialPodUpdate, update) {
+			receivedInitialPodUpdate = true
 		}
-	case <-time.After(time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 	}
 	assert.Equal(t, true, receivedInitialPodUpdate,
 		"executor should have sent an initial PodUpdate "+
@@ -266,7 +87,7 @@ func TestExecutorRegister(t *testing.T) {
 // connected after a call to Disconnected has occurred.
 func TestExecutorDisconnect(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
@@ -281,7 +102,7 @@ func TestExecutorDisconnect(t *testing.T) {
 // after a connection problem happens, followed by a call to Reregistered.
 func TestExecutorReregister(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
@@ -312,19 +133,16 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	defer testApiServer.server.Close()
 
 	mockDriver := &MockExecutorDriver{}
-	updates := make(chan interface{}, 1024)
+	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: updates,
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   updates,
+		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
-			Version: testapi.Version(),
+			Version: testapi.Default.Version(),
 		}),
-		Kubelet: &fakeKubelet{
-			Kubelet: &kubelet.Kubelet{},
-			hostIP:  net.IPv4(127, 0, 0, 1),
-		},
-		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
+		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
 					{
@@ -334,9 +152,11 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 						},
 					},
 				},
-				Phase: api.PodRunning,
+				Phase:  api.PodRunning,
+				HostIP: "127.0.0.1",
 			}, nil
 		},
+		PodLW: &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 
@@ -345,7 +165,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	select {
 	case <-updates:
-	case <-time.After(time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("Executor should send an initial update on Registration")
 	}
 
@@ -355,7 +175,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
 
 	taskInfo := podTask.BuildTaskInfo()
-	data, err := testapi.Codec().Encode(pod)
+	data, err := testapi.Default.Codec().Encode(pod)
 	assert.Equal(t, nil, err, "must be able to encode a pod's spec data")
 	taskInfo.Data = data
 	var statusUpdateCalls sync.WaitGroup
@@ -375,7 +195,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	executor.LaunchTask(mockDriver, taskInfo)
 
-	assertext.EventuallyTrue(t, 5*time.Second, func() bool {
+	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return len(executor.tasks) == 1 && len(executor.pods) == 1
@@ -383,12 +203,11 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	gotPodUpdate := false
 	select {
-	case m := <-updates:
-		update, ok := m.(kubelet.PodUpdate)
-		if ok && len(update.Pods) == 1 {
+	case update := <-updates:
+		if len(update.Pods) == 1 {
 			gotPodUpdate = true
 		}
-	case <-time.After(time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 	}
 	assert.Equal(t, true, gotPodUpdate,
 		"the executor should send an update about a new pod to "+
@@ -398,7 +217,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	finished := kmruntime.After(statusUpdateCalls.Wait)
 	select {
 	case <-finished:
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for status update calls to finish")
 	}
 
@@ -410,7 +229,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	executor.KillTask(mockDriver, taskInfo.TaskId)
 
-	assertext.EventuallyTrue(t, 5*time.Second, func() bool {
+	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return len(executor.tasks) == 0 && len(executor.pods) == 0
@@ -420,7 +239,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	finished = kmruntime.After(statusUpdateCalls.Wait)
 	select {
 	case <-finished:
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for status update calls to finish")
 	}
 	mockDriver.AssertExpectations(t)
@@ -478,16 +297,15 @@ func TestExecutorStaticPods(t *testing.T) {
 	defer os.RemoveAll(staticPodsConfigPath)
 
 	mockDriver := &MockExecutorDriver{}
-	updates := make(chan interface{}, 1024)
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1), // allow kube-executor source to proceed past init
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   make(chan kubetypes.PodUpdate, 1), // allow kube-executor source to proceed past init
+		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
-			Version: testapi.Version(),
+			Version: testapi.Default.Version(),
 		}),
-		Kubelet: &kubelet.Kubelet{},
-		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
+		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
 					{
@@ -501,12 +319,14 @@ func TestExecutorStaticPods(t *testing.T) {
 			}, nil
 		},
 		StaticPodsConfigPath: staticPodsConfigPath,
+		PodLW:                &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
+
+	// register static pod source
 	hostname := "h1"
-	go executor.InitializeStaticPodsSource(func() {
-		kconfig.NewSourceFile(staticPodsConfigPath, hostname, 1*time.Second, updates)
-	})
+	fileSourceUpdates := make(chan interface{}, 1024)
+	kconfig.NewSourceFile(staticPodsConfigPath, hostname, 1*time.Second, fileSourceUpdates)
 
 	// create ExecutorInfo with static pod zip in data field
 	executorInfo := mesosutil.NewExecutorInfo(
@@ -521,18 +341,18 @@ func TestExecutorStaticPods(t *testing.T) {
 
 	// wait for static pod to start
 	seenPods := map[string]struct{}{}
-	timeout := time.After(time.Second)
+	timeout := time.After(util.ForeverTestTimeout)
 	defer mockDriver.AssertExpectations(t)
 	for {
 		// filter by PodUpdate type
 		select {
 		case <-timeout:
 			t.Fatalf("Executor should send pod updates for %v pods, only saw %v", expectedStaticPodsNum, len(seenPods))
-		case update, ok := <-updates:
+		case update, ok := <-fileSourceUpdates:
 			if !ok {
 				return
 			}
-			podUpdate, ok := update.(kubelet.PodUpdate)
+			podUpdate, ok := update.(kubetypes.PodUpdate)
 			if !ok {
 				continue
 			}
@@ -561,17 +381,14 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	kubeletFinished := make(chan struct{})
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1024),
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   make(chan kubetypes.PodUpdate, 1024),
+		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
-			Version: testapi.Version(),
+			Version: testapi.Default.Version(),
 		}),
-		Kubelet: &fakeKubelet{
-			Kubelet: &kubelet.Kubelet{},
-			hostIP:  net.IPv4(127, 0, 0, 1),
-		},
-		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
+		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
 					{
@@ -581,13 +398,15 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 						},
 					},
 				},
-				Phase: api.PodRunning,
+				Phase:  api.PodRunning,
+				HostIP: "127.0.0.1",
 			}, nil
 		},
 		ShutdownAlert: func() {
 			close(kubeletFinished)
 		},
 		KubeletFinished: kubeletFinished,
+		PodLW:           &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 
@@ -602,7 +421,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		*pod, &mesosproto.ExecutorInfo{})
 
 	taskInfo := podTask.BuildTaskInfo()
-	data, _ := testapi.Codec().Encode(pod)
+	data, _ := testapi.Default.Codec().Encode(pod)
 	taskInfo.Data = data
 
 	mockDriver.On(
@@ -623,7 +442,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	// when removing the task from k.tasks through the "task-lost:foo" message below.
 	select {
 	case <-called:
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for SendStatusUpdate for the running task")
 	}
 
@@ -635,7 +454,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	).Return(mesosproto.Status_DRIVER_RUNNING, nil).Run(func(_ mock.Arguments) { close(called) }).Once()
 
 	executor.FrameworkMessage(mockDriver, "task-lost:foo")
-	assertext.EventuallyTrue(t, 5*time.Second, func() bool {
+	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return len(executor.tasks) == 0 && len(executor.pods) == 0
@@ -643,7 +462,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 
 	select {
 	case <-called:
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for SendStatusUpdate")
 	}
 
@@ -660,11 +479,11 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 func NewTestPod(i int) *api.Pod {
 	name := fmt.Sprintf("pod%d", i)
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
-			SelfLink:  testapi.SelfLink("pods", string(i)),
+			SelfLink:  testapi.Default.SelfLink("pods", string(i)),
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -710,7 +529,7 @@ func NewTestServer(t *testing.T, namespace string, pods *api.PodList) *TestServe
 	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(testapi.ResourcePath("bindings", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(testapi.Default.ResourcePath("bindings", namespace, ""), func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -724,7 +543,7 @@ func NewMockPodsListWatch(initialPodList api.PodList) *MockPodsListWatch {
 		list:        initialPodList,
 	}
 	lw.ListWatch = cache.ListWatch{
-		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return lw.fakeWatcher, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
@@ -740,9 +559,11 @@ func TestExecutorShutdown(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	kubeletFinished := make(chan struct{})
 	var exitCalled int32 = 0
+	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1024),
+		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Updates:   updates,
+		NodeInfos: make(chan NodeInfo, 1),
 		ShutdownAlert: func() {
 			close(kubeletFinished)
 		},
@@ -750,6 +571,7 @@ func TestExecutorShutdown(t *testing.T) {
 		ExitFunc: func(_ int) {
 			atomic.AddInt32(&exitCalled, 1)
 		},
+		PodLW: &NewMockPodsListWatch(api.PodList{}).ListWatch,
 	}
 	executor := New(config)
 
@@ -765,11 +587,21 @@ func TestExecutorShutdown(t *testing.T) {
 	assert.Equal(t, true, executor.isDone(),
 		"executor should be in Done state after Shutdown")
 
-	select {
-	case <-executor.Done():
-	default:
-		t.Fatal("done channel should be closed after shutdown")
+	// channel should be closed now, only a constant number of updates left
+	num := len(updates)
+drainLoop:
+	for {
+		select {
+		case _, ok := <-updates:
+			if !ok {
+				break drainLoop
+			}
+			num -= 1
+		default:
+			t.Fatal("Updates chan should be closed after Shutdown")
+		}
 	}
+	assert.Equal(t, num, 0, "Updates chan should get no new updates after Shutdown")
 
 	assert.Equal(t, true, atomic.LoadInt32(&exitCalled) > 0,
 		"the executor should call its ExitFunc when it is ready to close down")
@@ -779,7 +611,7 @@ func TestExecutorShutdown(t *testing.T) {
 
 func TestExecutorsendFrameworkMessage(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor := NewTestKubernetesExecutor()
+	executor, _ := NewTestKubernetesExecutor()
 
 	executor.Init(mockDriver)
 	executor.Registered(mockDriver, nil, nil, nil)
@@ -794,7 +626,7 @@ func TestExecutorsendFrameworkMessage(t *testing.T) {
 	// guard against data race in mock driver between AssertExpectations and Called
 	select {
 	case <-called: // expected
-	case <-time.After(5 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Fatalf("expected call to SendFrameworkMessage")
 	}
 	mockDriver.AssertExpectations(t)

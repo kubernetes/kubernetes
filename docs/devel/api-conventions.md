@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 API Conventions
 ===============
 
-Updated: 8/24/2015
+Updated: 10/8/2015
 
 *This document is oriented at users who want a deeper understanding of the Kubernetes
 API structure, and developers wanting to extend the Kubernetes API.  An introduction to
@@ -59,6 +59,7 @@ using resources with kubectl can be found in [Working with resources](../user-gu
     - [List Operations](#list-operations)
     - [Map Operations](#map-operations)
   - [Idempotency](#idempotency)
+  - [Optional vs Required](#optional-vs-required)
   - [Defaulting](#defaulting)
   - [Late Initialization](#late-initialization)
   - [Concurrency Control and Consistency](#concurrency-control-and-consistency)
@@ -73,6 +74,7 @@ using resources with kubectl can be found in [Working with resources](../user-gu
   - [Events](#events)
   - [Naming conventions](#naming-conventions)
   - [Label, selector, and annotation conventions](#label-selector-and-annotation-conventions)
+  - [WebSockets and SPDY](#websockets-and-spdy)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -172,7 +174,7 @@ When a new version of an object is POSTed or PUT, the "spec" is updated and avai
 
 The Kubernetes API also serves as the foundation for the declarative configuration schema for the system. In order to facilitate level-based operation and expression of declarative configuration, fields in the specification should have declarative rather than imperative names and semantics -- they represent the desired state, not actions intended to yield the desired state.
 
-The PUT and POST verbs on objects will ignore the "status" values. A `/status` subresource is provided to enable system components to update statuses of resources they manage.
+The PUT and POST verbs on objects MUST ignore the "status" values, to avoid accidentally overwriting the status in read-modify-write scenarios. A `/status` subresource MUST be provided to enable system components to update statuses of resources they manage.
 
 Otherwise, PUT expects the whole object to be specified. Therefore, if a field is omitted it is assumed that the client wants to clear that field's value. The PUT verb does not accept partial updates. Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](#concurrency-control-and-consistency), below, regarding read-modify-write consistency when using this pattern. Some objects may expose alternative resource representations that allow mutation of the status, or performing custom actions on the object.
 
@@ -186,11 +188,11 @@ Objects that contain both spec and status should not contain additional top-leve
 
 The `FooCondition` type for some resource type `Foo` may include a subset of the following fields, but must contain at least `type` and `status` fields:
 
-```golang
+```go
 	Type               FooConditionType  `json:"type" description:"type of Foo condition"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of True, False, Unknown"`
-	LastHeartbeatTime  util.Time         `json:"lastHeartbeatTime,omitempty" description:"last time we got an update on a given condition"`
-	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
+	LastHeartbeatTime  unversioned.Time         `json:"lastHeartbeatTime,omitempty" description:"last time we got an update on a given condition"`
+	LastTransitionTime unversioned.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
 	Reason             string            `json:"reason,omitempty" description:"one-word CamelCase reason for the condition's last transition"`
 	Message            string            `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
 ```
@@ -287,7 +289,7 @@ The API supports three different PATCH operations, determined by their correspon
 
 * JSON Patch, `Content-Type: application/json-patch+json`
  * As defined in [RFC6902](https://tools.ietf.org/html/rfc6902), a JSON Patch is a sequence of operations that are executed on the resource, e.g. `{"op": "add", "path": "/a/b/c", "value": [ "foo", "bar" ]}`. For more details on how to use JSON Patch, see the RFC.
-* Merge Patch, `Content-Type: application/merge-json-patch+json`
+* Merge Patch, `Content-Type: application/merge-patch+json`
  * As defined in [RFC7386](https://tools.ietf.org/html/rfc7386), a Merge Patch is essentially a partial representation of the resource. The submitted JSON is "merged" with the current resource to create a new one, then the new one is saved. For more details on how to use Merge Patch, see the RFC.
 * Strategic Merge Patch, `Content-Type: application/strategic-merge-patch+json`
  * Strategic Merge Patch is a custom implementation of Merge Patch. For a detailed explanation of how it works and why it needed to be introduced, see below.
@@ -368,6 +370,38 @@ labels:
 All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [docs/user-guide/identifiers.md](../user-guide/identifiers.md) for details.
 
 Names generated by the system may be requested using `metadata.generateName`. GenerateName indicates that the name should be made unique by the server prior to persisting it. A non-empty value for the field indicates the name will be made unique (and the name returned to the client will be different than the name passed). The value of this field will be combined with a unique suffix on the server if the Name field has not been provided. The provided value must be valid within the rules for Name, and may be truncated by the length of the suffix required to make the value unique on the server. If this field is specified, and Name is not present, the server will NOT return a 409 if the generated name exists - instead, it will either return 201 Created or 504 with Reason `ServerTimeout` indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).
+
+## Optional vs Required
+
+Fields must be either optional or required.
+
+Optional fields have the following properties:
+
+- They have `omitempty` struct tag in Go.
+- They are a pointer type in the Go definition (e.g. `bool *awesomeFlag`).
+- The API server should allow POSTing and PUTing a resource with this field unset.
+
+Required fields have the opposite properties, namely:
+
+- They do not have an `omitempty` struct tag.
+- They are not a pointer type in the Go definition (e.g. `bool otherFlag`).
+- The API server should not allow POSTing or PUTing a resource with this field unset.
+
+Using the `omitempty` tag causes swagger documentation to reflect that the field is optional.
+
+Using a pointer allows distinguishing unset from the zero value for that type.
+There are some cases where, in principle, a pointer is not needed for an optional field
+since the zero value is forbidden, and thus imples unset.   There are examples of this in the
+codebase.  However:
+
+- it can be difficult for implementors to anticipate all cases where an empty value might need to be
+  distinguished from a zero value
+- structs are not omitted from encoder output even where omitempty is specified, which is messy;
+- having a pointer consistently imply optional is clearer for users of the Go language client, and any
+  other clients that use corresponding types
+
+Therefore, we ask that pointers always be used with optional fields.
+
 
 ## Defaulting
 
@@ -679,7 +713,7 @@ Accumulate repeated events in the client, especially for frequent events, to red
 ## Naming conventions
 
 * Go field names must be CamelCase. JSON field names must be camelCase. Other than capitalization of the initial letter, the two should almost always match. No underscores nor dashes in either.
-* Field and resource names should be declarative, not imperative (DoSomething, SomethingDoer).
+* Field and resource names should be declarative, not imperative (DoSomething, SomethingDoer, DoneBy, DoneAt).
 * `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to the node resource in the context of the cluster. Use `Host` where referring to properties of the individual physical/virtual system, such as `hostname`, `hostPath`, `hostNetwork`, etc.
 * `FooController` is a deprecated kind naming convention. Name the kind after the thing being controlled instead (e.g., `Job` rather than `JobController`).
 * The name of a field that specifies the time at which `something` occurs should be called `somethingTime`. Do not use `stamp` (e.g., `creationTimestamp`).
@@ -690,10 +724,11 @@ Accumulate repeated events in the client, especially for frequent events, to red
 * Do not use abbreviations in the API, except where they are extremely commonly used, such as "id", "args", or "stdin".
 * Acronyms should similarly only be used when extremely commonly known. All letters in the acronym should have the same case, using the appropriate case for the situation. For example, at the beginning of a field name, the acronym should be all lowercase, such as "httpGet". Where used as a constant, all letters should be uppercase, such as "TCP" or "UDP".
 * The name of a field referring to another resource of kind `Foo` by name should be called `fooName`. The name of a field referring to another resource of kind `Foo` by ObjectReference (or subset thereof) should be called `fooRef`.
+* More generally, include the units and/or type in the field name if they could be ambiguous and they are not specified by the value or value type.
 
 ## Label, selector, and annotation conventions
 
-Labels are the domain of users. They are intended to facilitate organization and management of API resources using attributes that are meaningful to users, as opposed to meaningful to the system. Think of them as user-created mp3 or email inbox labels, as opposed to the directory structure used by a program to store its data. The former is enables the user to apply an arbitrary ontology, whereas the latter is implementation-centric and inflexible. Users will use labels to select resources to operate on, display label values in CLI/UI columns, etc. Users should always retain full power and flexibility over the label schemas they apply to labels in their namespaces.
+Labels are the domain of users. They are intended to facilitate organization and management of API resources using attributes that are meaningful to users, as opposed to meaningful to the system. Think of them as user-created mp3 or email inbox labels, as opposed to the directory structure used by a program to store its data. The former enables the user to apply an arbitrary ontology, whereas the latter is implementation-centric and inflexible. Users will use labels to select resources to operate on, display label values in CLI/UI columns, etc. Users should always retain full power and flexibility over the label schemas they apply to labels in their namespaces.
 
 However, we should support conveniences for common cases by default. For example, what we now do in ReplicationController is automatically set the RC's selector and labels to the labels in the pod template by default, if they are not already set. That ensures that the selector will match the template, and that the RC can be managed using the same labels as the pods it creates. Note that once we generalize selectors, it won't necessarily be possible to unambiguously generate labels that match an arbitrary selector.
 
@@ -711,7 +746,30 @@ Therefore, resources supporting auto-generation of unique labels should have a `
 
 Annotations have very different intended usage from labels. We expect them to be primarily generated and consumed by tooling and system extensions. I'm inclined to generalize annotations to permit them to directly store arbitrary json. Rigid names and name prefixes make sense, since they are analogous to API fields.
 
-In fact, experimental API fields, including to represent fields of newer alpha/beta API versions in the older, stable storage version, may be represented as annotations with the prefix `experimental.kubernetes.io/`.
+In fact, in-development API fields, including those used to represent fields of newer alpha/beta API versions in the older stable storage version, may be represented as annotations with the form `something.alpha.kubernetes.io/name` or `something.beta.kubernetes.io/name` (depending on our confidence in it).  For example `net.alpha.kubernetes.io/policy` might represent an experimental network policy field.
+
+Other advice regarding use of labels, annotations, and other generic map keys by Kubernetes components and tools:
+  - Key names should be all lowercase, with words separated by dashes, such as `desired-replicas`
+  - Prefix the key with `kubernetes.io/` or `foo.kubernetes.io/`, preferably the latter if the label/annotation is specific to `foo`
+    - For instance, prefer `service-account.kubernetes.io/name` over `kubernetes.io/service-account.name`
+  - Use annotations to store API extensions that the controller responsible for the resource doesn't need to know about, experimental fields that aren't intended to be generally used API fields, etc. Beware that annotations aren't automatically handled by the API conversion machinery.
+
+
+## WebSockets and SPDY
+
+Some of the API operations exposed by Kubernetes involve transfer of binary streams between the client and a container, including attach, exec, portforward, and logging. The API therefore exposes certain operations over upgradeable HTTP connections ([described in RFC 2817](https://tools.ietf.org/html/rfc2817)) via the WebSocket and SPDY protocols. These actions are exposed as subresources with their associated verbs (exec, log, attach, and portforward) and are requested via a GET (to support JavaScript in a browser) and POST (semantically accurate).
+
+There are two primary protocols in use today:
+
+1.  Streamed channels
+
+    When dealing with multiple independent binary streams of data such as the remote execution of a shell command (writing to STDIN, reading from STDOUT and STDERR) or forwarding multiple ports the streams can be multiplexed onto a single TCP connection. Kubernetes supports a SPDY based framing protocol that leverages SPDY channels and a WebSocket framing protocol that multiplexes multiple channels onto the same stream by prefixing each binary chunk with a byte indicating its channel. The WebSocket protocol supports an optional subprotocol that handles base64-encoded bytes from the client and returns base64-encoded bytes from the server and character based channel prefixes ('0', '1', '2') for ease of use from JavaScript in a browser.
+
+2.  Streaming response
+
+    The default log output for a channel of streaming data is an HTTP Chunked Transfer-Encoding, which can return an arbitrary stream of binary data from the server. Browser-based JavaScript is limited in its ability to access the raw data from a chunked response, especially when very large amounts of logs are returned, and in future API calls it may be desirable to transfer large files. The streaming API endpoints support an optional WebSocket upgrade that provides a unidirectional channel from the server to the client and chunks data as binary WebSocket frames. An optional WebSocket subprotocol is exposed that base64 encodes the stream before returning it to the client.
+
+Clients should use the SPDY protocols if their clients have native support, or WebSockets as a fallback. Note that WebSockets is susceptible to Head-of-Line blocking and so clients must read and process each message sequentionally. In the future, an HTTP/2 implementation will be exposed that deprecates SPDY.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

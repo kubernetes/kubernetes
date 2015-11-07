@@ -21,7 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -31,8 +32,9 @@ func TestNewClient(t *testing.T) {
 	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, api.Scheme); err != nil {
 		t.Fatal(err)
 	}
-	client := &Fake{ReactFn: ObjectReaction(o, latest.RESTMapper)}
-	list, err := client.Services("test").List(labels.Everything())
+	client := &Fake{}
+	client.AddReactor("*", "*", ObjectReaction(o, testapi.Default.RESTMapper()))
+	list, err := client.Services("test").List(labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +43,7 @@ func TestNewClient(t *testing.T) {
 	}
 
 	// When list is invoked a second time, the same results are returned.
-	list, err = client.Services("test").List(labels.Everything())
+	list, err = client.Services("test").List(labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,13 +63,14 @@ func TestErrors(t *testing.T) {
 			&(errors.NewForbidden("ServiceList", "", nil).(*errors.StatusError).ErrStatus),
 		},
 	})
-	client := &Fake{ReactFn: ObjectReaction(o, latest.RESTMapper)}
-	_, err := client.Services("test").List(labels.Everything())
+	client := &Fake{}
+	client.AddReactor("*", "*", ObjectReaction(o, testapi.Default.RESTMapper()))
+	_, err := client.Services("test").List(labels.Everything(), fields.Everything())
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	t.Logf("error: %#v", err.(*errors.StatusError).Status())
-	_, err = client.Services("test").List(labels.Everything())
+	_, err = client.Services("test").List(labels.Everything(), fields.Everything())
 	if !errors.IsForbidden(err) {
 		t.Fatalf("unexpected error: %v", err)
 	}

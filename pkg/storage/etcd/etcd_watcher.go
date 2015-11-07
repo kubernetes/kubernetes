@@ -17,10 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"net/http"
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
@@ -181,12 +182,30 @@ func (w *etcdWatcher) translate() {
 		select {
 		case err := <-w.etcdError:
 			if err != nil {
-				w.emit(watch.Event{
-					Type: watch.Error,
-					Object: &api.Status{
-						Status:  api.StatusFailure,
+				var status *unversioned.Status
+				switch {
+				case IsEtcdWatchExpired(err):
+					status = &unversioned.Status{
+						Status:  unversioned.StatusFailure,
 						Message: err.Error(),
-					},
+						Code:    http.StatusGone, // Gone
+						Reason:  unversioned.StatusReasonExpired,
+					}
+				// TODO: need to generate errors using api/errors which has a circular dependency on this package
+				//   no other way to inject errors
+				// case IsEtcdUnreachable(err):
+				//   status = errors.NewServerTimeout(...)
+				default:
+					status = &unversioned.Status{
+						Status:  unversioned.StatusFailure,
+						Message: err.Error(),
+						Code:    http.StatusInternalServerError,
+						Reason:  unversioned.StatusReasonInternalError,
+					}
+				}
+				w.emit(watch.Event{
+					Type:   watch.Error,
+					Object: status,
 				})
 			}
 			return
@@ -208,7 +227,7 @@ func (w *etcdWatcher) translate() {
 }
 
 func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
-	if obj, found := w.cache.getFromCache(node.ModifiedIndex); found {
+	if obj, found := w.cache.getFromCache(node.ModifiedIndex, storage.Everything); found {
 		return obj, nil
 	}
 

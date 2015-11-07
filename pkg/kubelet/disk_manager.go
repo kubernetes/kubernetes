@@ -22,11 +22,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorApi "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 // Manages policy for diskspace management for disks holding docker images and root fs.
+
+// mb is used to easily convert an int to an mb
+const mb = 1024 * 1024
 
 // Implementation is thread-safe.
 type diskSpaceManager interface {
@@ -60,7 +63,7 @@ type realDiskSpaceManager struct {
 	frozen     bool              // space checks always return ok when frozen is set. True on creation.
 }
 
-func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorApi.FsInfo, error)) (fsInfo, error) {
+func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 	fsi := fsInfo{}
@@ -92,7 +95,7 @@ func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
 	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.cadvisor.RootFsInfo)
 }
 
-func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorApi.FsInfo, error)) (bool, error) {
+func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
 	if dm.frozen {
 		return true, nil
 	}
@@ -106,8 +109,6 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 	if fsInfo.Available < 0 {
 		return true, fmt.Errorf("wrong available space for %q: %+v", fsType, fsInfo)
 	}
-
-	const mb = int64(1024 * 1024)
 
 	if fsInfo.Available < int64(threshold)*mb {
 		glog.Infof("Running out of space on disk for %q: available %d MB, threshold %d MB", fsType, fsInfo.Available/mb, threshold)

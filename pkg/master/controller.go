@@ -57,9 +57,12 @@ type Controller struct {
 
 	PublicIP net.IP
 
-	ServiceIP         net.IP
-	ServicePort       int
-	PublicServicePort int
+	ServiceIP                 net.IP
+	ServicePort               int
+	ExtraServicePorts         []api.ServicePort
+	ExtraEndpointPorts        []api.EndpointPort
+	PublicServicePort         int
+	KubernetesServiceNodePort int
 
 	runner *util.Runner
 }
@@ -83,7 +86,8 @@ func (c *Controller) Start() {
 		// If we fail to repair node ports apiserver is useless. We should restart and retry.
 		glog.Fatalf("Unable to perform initial service nodePort check: %v", err)
 	}
-	if err := c.UpdateKubernetesService(); err != nil {
+	// Service definition is reconciled during first run to correct port and type per expectations.
+	if err := c.UpdateKubernetesService(true); err != nil {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
 
@@ -94,14 +98,17 @@ func (c *Controller) Start() {
 // RunKubernetesService periodically updates the kubernetes service
 func (c *Controller) RunKubernetesService(ch chan struct{}) {
 	util.Until(func() {
-		if err := c.UpdateKubernetesService(); err != nil {
+		// Service definition is not reconciled after first
+		// run, ports and type will be corrected only during
+		// start.
+		if err := c.UpdateKubernetesService(false); err != nil {
 			util.HandleError(fmt.Errorf("unable to sync kubernetes service: %v", err))
 		}
 	}, c.EndpointInterval, ch)
 }
 
 // UpdateKubernetesService attempts to update the default Kube service.
-func (c *Controller) UpdateKubernetesService() error {
+func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// Update service & endpoint records.
 	// TODO: when it becomes possible to change this stuff,
 	// stop polling and start watching.
@@ -110,10 +117,12 @@ func (c *Controller) UpdateKubernetesService() error {
 		return err
 	}
 	if c.ServiceIP != nil {
-		if err := c.CreateMasterServiceIfNeeded("kubernetes", c.ServiceIP, c.ServicePort); err != nil {
+		servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+		if err := c.CreateOrUpdateMasterServiceIfNeeded("kubernetes", c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 			return err
 		}
-		if err := c.SetEndpoints("kubernetes", c.PublicIP, c.PublicServicePort); err != nil {
+		endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+		if err := c.ReconcileEndpoints("kubernetes", c.PublicIP, endpointPorts, reconcile); err != nil {
 			return err
 		}
 	}
@@ -140,12 +149,51 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 	return err
 }
 
+// createPortAndServiceSpec creates an array of service ports.
+// If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
+func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName string, extraServicePorts []api.ServicePort) ([]api.ServicePort, api.ServiceType) {
+	//Use the Cluster IP type for the service port if NodePort isn't provided.
+	//Otherwise, we will be binding the master service to a NodePort.
+	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
+		Port:       servicePort,
+		Name:       servicePortName,
+		TargetPort: util.NewIntOrStringFromInt(servicePort)}}
+	serviceType := api.ServiceTypeClusterIP
+	if nodePort > 0 {
+		servicePorts[0].NodePort = nodePort
+		serviceType = api.ServiceTypeNodePort
+	}
+	if extraServicePorts != nil {
+		servicePorts = append(servicePorts, extraServicePorts...)
+	}
+	return servicePorts, serviceType
+}
+
+// createEndpointPortSpec creates an array of endpoint ports
+func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndpointPorts []api.EndpointPort) []api.EndpointPort {
+	endpointPorts := []api.EndpointPort{{Protocol: api.ProtocolTCP,
+		Port: endpointPort,
+		Name: endpointPortName,
+	}}
+	if extraEndpointPorts != nil {
+		endpointPorts = append(endpointPorts, extraEndpointPorts...)
+	}
+	return endpointPorts
+}
+
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort int) error {
+func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
 	ctx := api.NewDefaultContext()
-	if _, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
+	if s, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
 		// The service already exists.
+		if reconcile {
+			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
+				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
+				_, err := c.ServiceRegistry.UpdateService(ctx, svc)
+				return err
+			}
+		}
 		return nil
 	}
 	svc := &api.Service{
@@ -155,16 +203,15 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP, TargetPort: util.NewIntOrStringFromInt(servicePort)}},
+			Ports: servicePorts,
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
 			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
+			Type:            serviceType,
 		},
 	}
-
-	if err := rest.BeforeCreate(rest.Services, ctx, svc); err != nil {
+	if err := rest.BeforeCreate(service.Strategy, ctx, svc); err != nil {
 		return err
 	}
 
@@ -175,20 +222,20 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 	return err
 }
 
-// SetEndpoints sets the endpoints for the given apiserver service (ro or rw).
-// SetEndpoints expects that the endpoints objects it manages will all be
-// managed only by SetEndpoints; therefore, to understand this, you need only
+// ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).
+// ReconcileEndpoints expects that the endpoints objects it manages will all be
+// managed only by ReconcileEndpoints; therefore, to understand this, you need only
 // understand the requirements and the body of this function.
 //
 // Requirements:
 //  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use SetEndpoints and only SetEndpoints to manage the
+//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
 //      endpoints for their {rw, ro} services.
 //  * All apiservers MUST know and agree on the number of apiservers expected
 //      to be running (c.masterCount).
-//  * SetEndpoints is called periodically from all apiservers.
+//  * ReconcileEndpoints is called periodically from all apiservers.
 //
-func (c *Controller) SetEndpoints(serviceName string, ip net.IP, port int) error {
+func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
 	ctx := api.NewDefaultContext()
 	e, err := c.EndpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
@@ -201,29 +248,37 @@ func (c *Controller) SetEndpoints(serviceName string, ip net.IP, port int) error
 	}
 
 	// First, determine if the endpoint is in the format we expect (one
-	// subset, one port, N IP addresses).
-	formatCorrect, ipCorrect := checkEndpointSubsetFormat(e, ip.String(), port, c.MasterCount)
+	// subset, ports matching endpointPorts, N IP addresses).
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, c.MasterCount, reconcilePorts)
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: ip.String()}},
-			Ports:     []api.EndpointPort{{Port: port, Protocol: api.ProtocolTCP}},
+			Ports:     endpointPorts,
 		}}
 		glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
 		return c.EndpointRegistry.UpdateEndpoints(ctx, e)
-	} else if !ipCorrect {
-		// We *always* add our own IP address; if there are too many IP
-		// addresses, we remove the ones lexicographically after our
+	}
+	if ipCorrect && portsCorrect {
+		return nil
+	}
+	if !ipCorrect {
+		// We *always* add our own IP address.
+		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
+
+		// Lexicographic order is retained by this step.
+		e.Subsets = endpoints.RepackSubsets(e.Subsets)
+
+		// If too many IP addresses, remove the ones lexicographically after our
 		// own IP address.  Given the requirements stated at the top of
 		// this function, this should cause the list of IP addresses to
 		// become eventually correct.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
-		e.Subsets = endpoints.RepackSubsets(e.Subsets)
 		if addrs := &e.Subsets[0].Addresses; len(*addrs) > c.MasterCount {
 			// addrs is a pointer because we're going to mutate it.
 			for i, addr := range *addrs {
 				if addr.IP == ip.String() {
 					for len(*addrs) > c.MasterCount {
+						// wrap around if necessary.
 						remove := (i + 1) % len(*addrs)
 						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
 					}
@@ -231,31 +286,83 @@ func (c *Controller) SetEndpoints(serviceName string, ip net.IP, port int) error
 				}
 			}
 		}
-		return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 	}
-	// We didn't make any changes, no need to actually call update.
-	return nil
+	if !portsCorrect {
+		// Reset ports.
+		e.Subsets[0].Ports = endpointPorts
+	}
+	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+	return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 }
 
-// Determine if the endpoint is in the format SetEndpoints expect (one subset,
-// one port, N IP addresses); and if the specified IP address is present and
+// Determine if the endpoint is in the format ReconcileEndpoints expect (one subset,
+// correct ports, N IP addresses); and if the specified IP address is present and
 // the correct number of ip addresses are found.
-func checkEndpointSubsetFormat(e *api.Endpoints, ip string, port int, count int) (formatCorrect, ipCorrect bool) {
+func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
-		return false, false
+		return false, false, false
 	}
 	sub := &e.Subsets[0]
-	if len(sub.Ports) != 1 {
-		return false, false
-	}
-	p := &sub.Ports[0]
-	if p.Port != port || p.Protocol != api.ProtocolTCP {
-		return false, false
+	portsCorrect = true
+	if reconcilePorts {
+		if len(sub.Ports) != len(ports) {
+			portsCorrect = false
+		}
+		for i, port := range ports {
+			if len(sub.Ports) <= i || port != sub.Ports[i] {
+				portsCorrect = false
+				break
+			}
+		}
 	}
 	for _, addr := range sub.Addresses {
 		if addr.IP == ip {
-			return true, len(sub.Addresses) == count
+			ipCorrect = len(sub.Addresses) == count
+			break
 		}
 	}
-	return true, false
+	return true, ipCorrect, portsCorrect
+}
+
+// * getMasterServiceUpdateIfNeeded sets service attributes for the
+//     given apiserver service.
+// * getMasterServiceUpdateIfNeeded expects that the service object it
+//     manages will be managed only by getMasterServiceUpdateIfNeeded;
+//     therefore, to understand this, you need only understand the
+//     requirements and the body of this function.
+// * getMasterServiceUpdateIfNeeded ensures that the correct ports are
+//     are set.
+//
+// Requirements:
+// * All apiservers MUST use getMasterServiceUpdateIfNeeded and only
+//     getMasterServiceUpdateIfNeeded to manage service attributes
+// * updateMasterService is called periodically from all apiservers.
+func getMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.ServicePort, serviceType api.ServiceType) (s *api.Service, updated bool) {
+	// Determine if the service is in the format we expect
+	// (servicePorts are present and service type matches)
+	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
+	if formatCorrect {
+		return svc, false
+	}
+	svc.Spec.Ports = servicePorts
+	svc.Spec.Type = serviceType
+	return svc, true
+}
+
+// Determine if the service is in the correct format
+// getMasterServiceUpdateIfNeeded expects (servicePorts are correct
+// and service type matches).
+func checkServiceFormat(s *api.Service, ports []api.ServicePort, serviceType api.ServiceType) (formatCorrect bool) {
+	if s.Spec.Type != serviceType {
+		return false
+	}
+	if len(ports) != len(s.Spec.Ports) {
+		return false
+	}
+	for i, port := range ports {
+		if port != s.Spec.Ports[i] {
+			return false
+		}
+	}
+	return true
 }

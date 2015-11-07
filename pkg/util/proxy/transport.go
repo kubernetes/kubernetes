@@ -32,37 +32,38 @@ import (
 	"golang.org/x/net/html/atom"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // atomsToAttrs states which attributes of which tags require URL substitution.
 // Sources: http://www.w3.org/TR/REC-html40/index/attributes.html
 //          http://www.w3.org/html/wg/drafts/html/master/index.html#attributes-1
-var atomsToAttrs = map[atom.Atom]util.StringSet{
-	atom.A:          util.NewStringSet("href"),
-	atom.Applet:     util.NewStringSet("codebase"),
-	atom.Area:       util.NewStringSet("href"),
-	atom.Audio:      util.NewStringSet("src"),
-	atom.Base:       util.NewStringSet("href"),
-	atom.Blockquote: util.NewStringSet("cite"),
-	atom.Body:       util.NewStringSet("background"),
-	atom.Button:     util.NewStringSet("formaction"),
-	atom.Command:    util.NewStringSet("icon"),
-	atom.Del:        util.NewStringSet("cite"),
-	atom.Embed:      util.NewStringSet("src"),
-	atom.Form:       util.NewStringSet("action"),
-	atom.Frame:      util.NewStringSet("longdesc", "src"),
-	atom.Head:       util.NewStringSet("profile"),
-	atom.Html:       util.NewStringSet("manifest"),
-	atom.Iframe:     util.NewStringSet("longdesc", "src"),
-	atom.Img:        util.NewStringSet("longdesc", "src", "usemap"),
-	atom.Input:      util.NewStringSet("src", "usemap", "formaction"),
-	atom.Ins:        util.NewStringSet("cite"),
-	atom.Link:       util.NewStringSet("href"),
-	atom.Object:     util.NewStringSet("classid", "codebase", "data", "usemap"),
-	atom.Q:          util.NewStringSet("cite"),
-	atom.Script:     util.NewStringSet("src"),
-	atom.Source:     util.NewStringSet("src"),
-	atom.Video:      util.NewStringSet("poster", "src"),
+var atomsToAttrs = map[atom.Atom]sets.String{
+	atom.A:          sets.NewString("href"),
+	atom.Applet:     sets.NewString("codebase"),
+	atom.Area:       sets.NewString("href"),
+	atom.Audio:      sets.NewString("src"),
+	atom.Base:       sets.NewString("href"),
+	atom.Blockquote: sets.NewString("cite"),
+	atom.Body:       sets.NewString("background"),
+	atom.Button:     sets.NewString("formaction"),
+	atom.Command:    sets.NewString("icon"),
+	atom.Del:        sets.NewString("cite"),
+	atom.Embed:      sets.NewString("src"),
+	atom.Form:       sets.NewString("action"),
+	atom.Frame:      sets.NewString("longdesc", "src"),
+	atom.Head:       sets.NewString("profile"),
+	atom.Html:       sets.NewString("manifest"),
+	atom.Iframe:     sets.NewString("longdesc", "src"),
+	atom.Img:        sets.NewString("longdesc", "src", "usemap"),
+	atom.Input:      sets.NewString("src", "usemap", "formaction"),
+	atom.Ins:        sets.NewString("cite"),
+	atom.Link:       sets.NewString("href"),
+	atom.Object:     sets.NewString("classid", "codebase", "data", "usemap"),
+	atom.Q:          sets.NewString("cite"),
+	atom.Script:     sets.NewString("src"),
+	atom.Source:     sets.NewString("src"),
+	atom.Video:      sets.NewString("poster", "src"),
 
 	// TODO: css URLs hidden in style elements.
 }
@@ -85,8 +86,12 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		forwardedURI = forwardedURI + "/"
 	}
 	req.Header.Set("X-Forwarded-Uri", forwardedURI)
-	req.Header.Set("X-Forwarded-Host", t.Host)
-	req.Header.Set("X-Forwarded-Proto", t.Scheme)
+	if len(t.Host) > 0 {
+		req.Header.Set("X-Forwarded-Host", t.Host)
+	}
+	if len(t.Scheme) > 0 {
+		req.Header.Set("X-Forwarded-Proto", t.Scheme)
+	}
 
 	rt := t.RoundTripper
 	if rt == nil {
@@ -118,6 +123,12 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.rewriteResponse(req, resp)
 }
 
+var _ = util.RoundTripperWrapper(&Transport{})
+
+func (rt *Transport) WrappedRoundTripper() http.RoundTripper {
+	return rt.RoundTripper
+}
+
 // rewriteURL rewrites a single URL to go through the proxy, if the URL refers
 // to the same host as sourceURL, which is the page on which the target URL
 // occurred. If any error occurs (e.g. parsing), it returns targetURL.
@@ -136,8 +147,11 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
 	url.Scheme = t.Scheme
 	url.Host = t.Host
 	origPath := url.Path
+	// Do not rewrite URL if the sourceURL already contains the necessary prefix.
+	if strings.HasPrefix(url.Path, t.PathPrepend) {
+		return url.String()
+	}
 	url.Path = path.Join(t.PathPrepend, url.Path)
-
 	if strings.HasSuffix(origPath, "/") {
 		// Add back the trailing slash, which was stripped by path.Join().
 		url.Path += "/"

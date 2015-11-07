@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-﻿#Getting into containers: kubectl exec
+
+# Getting into containers: kubectl exec
+
 Developers can use `kubectl exec` to run commands in a container. This guide demonstrates two use cases.
 
 ## Using kubectl exec to check the environment variables of a container

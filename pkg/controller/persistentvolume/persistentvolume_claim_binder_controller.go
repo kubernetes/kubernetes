@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumeclaimbinder
+package persistentvolume
 
 import (
 	"fmt"
@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -58,11 +58,12 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.PersistentVolumes().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return kubeClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), resourceVersion)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return kubeClient.PersistentVolumes().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.PersistentVolume{},
+		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    binder.addVolume,
@@ -75,11 +76,12 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.PersistentVolumeClaim{},
+		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    binder.addClaim,
@@ -229,6 +231,8 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		} else {
 			// another process is watching for released volumes.
 			// PersistentVolumeReclaimPolicy is set per PersistentVolume
+			//  Recycle - sets the PV to Pending and back under this controller's management
+			//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
 		}
 
 	// volumes are removed by processes external to this binder and must be removed from the cluster

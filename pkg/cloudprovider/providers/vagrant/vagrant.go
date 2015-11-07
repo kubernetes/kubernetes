@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vagrant_cloud
+package vagrant
 
 import (
 	"encoding/json"
@@ -89,6 +89,11 @@ func (v *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (v *VagrantCloud) ProviderName() string {
 	return ProviderName
+}
+
+// ScrubDNS filters DNS settings for pods.
+func (v *VagrantCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.

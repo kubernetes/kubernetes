@@ -1,5 +1,7 @@
 # YAML marshaling and unmarshaling support for Go
 
+[![Build Status](https://travis-ci.org/ghodss/yaml.svg)](https://travis-ci.org/ghodss/yaml)
+
 ## Introduction
 
 A wrapper around [go-yaml](https://github.com/go-yaml/yaml) designed to enable a better way of handling YAML when marshaling to and from structs. 

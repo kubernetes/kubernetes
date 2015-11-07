@@ -216,10 +216,11 @@ func (ws *Conn) Write(msg []byte) (n int, err error) {
 // Close implements the io.Closer interface.
 func (ws *Conn) Close() error {
 	err := ws.frameHandler.WriteClose(ws.defaultCloseStatus)
+	err1 := ws.rwc.Close()
 	if err != nil {
 		return err
 	}
-	return ws.rwc.Close()
+	return err1
 }
 
 func (ws *Conn) IsClientConn() bool { return ws.request == nil }

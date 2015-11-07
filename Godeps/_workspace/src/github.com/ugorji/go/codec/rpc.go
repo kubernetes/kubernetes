@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -43,8 +43,10 @@ type rpcCodec struct {
 	bw  *bufio.Writer
 	br  *bufio.Reader
 	mu  sync.Mutex
-	cls bool
 	h   Handle
+
+	cls   bool
+	clsmu sync.RWMutex
 }
 
 func newRPCCodec(conn io.ReadWriteCloser, h Handle) rpcCodec {
@@ -69,7 +71,7 @@ func (c *rpcCodec) BufferedWriter() *bufio.Writer {
 }
 
 func (c *rpcCodec) write(obj1, obj2 interface{}, writeObj2, doFlush bool) (err error) {
-	if c.cls {
+	if c.isClosed() {
 		return io.EOF
 	}
 	if err = c.enc.Encode(obj1); err != nil {
@@ -94,7 +96,7 @@ func (c *rpcCodec) write(obj1, obj2 interface{}, writeObj2, doFlush bool) (err e
 }
 
 func (c *rpcCodec) read(obj interface{}) (err error) {
-	if c.cls {
+	if c.isClosed() {
 		return io.EOF
 	}
 	//If nil is passed in, we should still attempt to read content to nowhere.
@@ -105,11 +107,20 @@ func (c *rpcCodec) read(obj interface{}) (err error) {
 	return c.dec.Decode(obj)
 }
 
+func (c *rpcCodec) isClosed() bool {
+	c.clsmu.RLock()
+	x := c.cls
+	c.clsmu.RUnlock()
+	return x
+}
+
 func (c *rpcCodec) Close() error {
-	if c.cls {
+	if c.isClosed() {
 		return io.EOF
 	}
+	c.clsmu.Lock()
 	c.cls = true
+	c.clsmu.Unlock()
 	return c.rwc.Close()
 }
 

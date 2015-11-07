@@ -19,10 +19,12 @@ package kubectl
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -271,6 +273,134 @@ func TestReplicationControllerStop(t *testing.T) {
 	}
 }
 
+func TestJobStop(t *testing.T) {
+	name := "foo"
+	ns := "default"
+	zero := 0
+	tests := []struct {
+		Name            string
+		Objs            []runtime.Object
+		StopError       error
+		StopMessage     string
+		ExpectedActions []string
+	}{
+		{
+			Name: "OnlyOneJob",
+			Objs: []runtime.Object{
+				&extensions.Job{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.JobSpec{
+						Parallelism: &zero,
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"k1": "v1"},
+						},
+					},
+				},
+				&extensions.JobList{ // LIST
+					Items: []extensions.Job{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: extensions.JobSpec{
+								Parallelism: &zero,
+								Selector: &extensions.PodSelector{
+									MatchLabels: map[string]string{"k1": "v1"},
+								},
+							},
+						},
+					},
+				},
+			},
+			StopError:   nil,
+			StopMessage: "foo stopped",
+			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
+				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
+		},
+		{
+			Name: "JobWithDeadPods",
+			Objs: []runtime.Object{
+				&extensions.Job{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.JobSpec{
+						Parallelism: &zero,
+						Selector: &extensions.PodSelector{
+							MatchLabels: map[string]string{"k1": "v1"},
+						},
+					},
+				},
+				&extensions.JobList{ // LIST
+					Items: []extensions.Job{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: extensions.JobSpec{
+								Parallelism: &zero,
+								Selector: &extensions.PodSelector{
+									MatchLabels: map[string]string{"k1": "v1"},
+								},
+							},
+						},
+					},
+				},
+				&api.PodList{ // LIST
+					Items: []api.Pod{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "pod1",
+								Namespace: ns,
+								Labels:    map[string]string{"k1": "v1"},
+							},
+						},
+					},
+				},
+			},
+			StopError:   nil,
+			StopMessage: "foo stopped",
+			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
+				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
+		},
+	}
+
+	for _, test := range tests {
+		fake := testclient.NewSimpleFake(test.Objs...)
+		reaper := JobReaper{fake, time.Millisecond, time.Millisecond}
+		s, err := reaper.Stop(ns, name, 0, nil)
+		if !reflect.DeepEqual(err, test.StopError) {
+			t.Errorf("%s unexpected error: %v", test.Name, err)
+			continue
+		}
+
+		if s != test.StopMessage {
+			t.Errorf("%s expected '%s', got '%s'", test.Name, test.StopMessage, s)
+			continue
+		}
+		actions := fake.Actions()
+		if len(actions) != len(test.ExpectedActions) {
+			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
+			continue
+		}
+		for i, expAction := range test.ExpectedActions {
+			action := strings.Split(expAction, ":")
+			if actions[i].GetVerb() != action[0] {
+				t.Errorf("%s unexpected verb: %+v, expected %s", test.Name, actions[i], expAction)
+			}
+			if actions[i].GetResource() != action[1] {
+				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
+			}
+		}
+	}
+}
+
 type noSuchPod struct {
 	*testclient.FakePods
 }
@@ -365,7 +495,7 @@ func TestSimpleStop(t *testing.T) {
 	}
 	for _, test := range tests {
 		fake := test.fake
-		reaper, err := ReaperFor(test.kind, fake, nil)
+		reaper, err := ReaperFor(test.kind, fake)
 		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}

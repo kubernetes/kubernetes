@@ -9,7 +9,7 @@
   "author": "Ilya Dmitrichenko <errordeveloper@gmail.com>",
   "license": "Apache 2.0",
   "dependencies": {
-    "azure-cli": "^0.9.5",
+    "azure-cli": "^0.9.9",
     "colors": "^1.0.3",
     "js-yaml": "^3.2.5",
     "openssl-wrapper": "^0.2.1",

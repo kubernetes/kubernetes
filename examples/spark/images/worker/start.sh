@@ -14,15 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [[ ${SPARK_MASTER_SERVICE_HOST} == "" ]]; then
-  echo "Spark Master service must be created before starting any workers"
-  sleep 30 # To postpone pod restart
-  exit 1
-fi
+. /start-common.sh
 
-echo "${SPARK_MASTER_SERVICE_HOST} spark-master" >> /etc/hosts
-export SPARK_LOCAL_HOSTNAME=$(hostname -i)
-
-/opt/spark/sbin/start-slave.sh spark://spark-master:${SPARK_MASTER_SERVICE_PORT}
-
-tail -F /opt/spark/logs/*
+# Run spark-class directly so that when it exits (or crashes), the pod restarts.
+/opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 --webui-port 8081

@@ -29,8 +29,6 @@ import (
 
 const datapointAmount = 5
 
-type resourceUsagePerContainer map[string]*containerResourceUsage
-
 var systemContainers = []string{"/docker-daemon", "/kubelet", "/kube-proxy", "/system"}
 
 //TODO tweak those values.
@@ -47,8 +45,8 @@ var allowedUsage = resourceUsagePerContainer{
 	},
 	"/kube-proxy": &containerResourceUsage{
 		CPUUsageInCores:         0.025,
-		MemoryUsageInBytes:      12000000,
-		MemoryWorkingSetInBytes: 12000000,
+		MemoryUsageInBytes:      100000000,
+		MemoryWorkingSetInBytes: 100000000,
 	},
 	"/system": &containerResourceUsage{
 		CPUUsageInCores:         0.03,
@@ -83,9 +81,9 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 	return
 }
 
-// This tests does nothing except checking current resource usage of containers defained in kubelet_stats systemContainers variable.
+// This tests does nothing except checking current resource usage of containers defined in kubelet_stats systemContainers variable.
 // Test fails if an average container resource consumption over datapointAmount tries exceeds amount defined in allowedUsage.
-var _ = Describe("ResourceUsage", func() {
+var _ = Describe("Resource usage of system containers", func() {
 	var c *client.Client
 	BeforeEach(func() {
 		var err error
@@ -102,7 +100,13 @@ var _ = Describe("ResourceUsage", func() {
 
 		for i := 0; i < datapointAmount; i++ {
 			for _, node := range nodeList.Items {
-				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 5*time.Second)
+				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 5*time.Second, func() []string {
+					if providerIs("gce", "gke") {
+						return systemContainers
+					} else {
+						return []string{}
+					}
+				}, false)
 				expectNoError(err)
 				resourceUsagePerNode[node.Name] = append(resourceUsagePerNode[node.Name], resourceUsage)
 			}
@@ -119,7 +123,19 @@ var _ = Describe("ResourceUsage", func() {
 			for container, cUsage := range usage {
 				Logf("%v on %v usage: %#v", container, node, cUsage)
 				if !allowedUsage[container].isStrictlyGreaterThan(cUsage) {
-					violating[node] = usage
+					if _, ok := violating[node]; !ok {
+						violating[node] = make(resourceUsagePerContainer)
+					}
+					if allowedUsage[container].CPUUsageInCores < cUsage.CPUUsageInCores {
+						Logf("CPU is too high for %s (%v)", container, cUsage.CPUUsageInCores)
+					}
+					if allowedUsage[container].MemoryUsageInBytes < cUsage.MemoryUsageInBytes {
+						Logf("Memory use is too high for %s (%v)", container, cUsage.MemoryUsageInBytes)
+					}
+					if allowedUsage[container].MemoryWorkingSetInBytes < cUsage.MemoryWorkingSetInBytes {
+						Logf("Working set is too high for %s (%v)", container, cUsage.MemoryWorkingSetInBytes)
+					}
+					violating[node][container] = usage[container]
 				}
 			}
 		}

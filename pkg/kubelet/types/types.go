@@ -21,12 +21,20 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
+
+func (id DockerID) ContainerID() kubecontainer.ContainerID {
+	return kubecontainer.ContainerID{
+		Type: "docker",
+		ID:   string(id),
+	}
+}
 
 type HttpGetter interface {
 	Get(url string) (*http.Response, error)

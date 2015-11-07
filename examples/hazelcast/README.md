@@ -83,7 +83,7 @@ spec:
     name: hazelcast
 ```
 
-[Download example](hazelcast-service.yaml)
+[Download example](hazelcast-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE hazelcast-service.yaml -->
 
 The important thing to note here is the `selector`. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is `name: hazelcast`.  If you look at the Replication Controller specification below, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
@@ -138,7 +138,7 @@ spec:
               name: hazelcast
 ```
 
-[Download example](hazelcast-controller.yaml)
+[Download example](hazelcast-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE hazelcast-controller.yaml -->
 
 There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingly.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).

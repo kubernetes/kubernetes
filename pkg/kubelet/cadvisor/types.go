@@ -18,25 +18,25 @@ package cadvisor
 
 import (
 	"github.com/google/cadvisor/events"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
 type Interface interface {
 	Start() error
-	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
-	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
-	MachineInfo() (*cadvisorApi.MachineInfo, error)
+	DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error)
+	ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
+	MachineInfo() (*cadvisorapi.MachineInfo, error)
 
-	VersionInfo() (*cadvisorApi.VersionInfo, error)
+	VersionInfo() (*cadvisorapi.VersionInfo, error)
 
 	// Returns usage information about the filesystem holding Docker images.
-	DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error)
+	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 
 	// Returns usage information about the root filesystem.
-	RootFsInfo() (cadvisorApiV2.FsInfo, error)
+	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 
 	// Get events streamed through passedChannel that fit the request.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)

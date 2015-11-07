@@ -23,10 +23,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 const DefaultPluginName = "kubernetes.io/no-op"
@@ -44,19 +46,19 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+	TearDownPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) (*PodNetworkStatus, error)
+	Status(namespace string, name string, podInfraContainerID kubetypes.DockerID) (*PodNetworkStatus, error)
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
 // This struct represents version "v1"
 type PodNetworkStatus struct {
-	api.TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// IP is the primary ipv4/ipv6 address of the pod. Among other things it is the address that -
 	//   - kube expects to be reachable across the cluster
@@ -72,6 +74,9 @@ type Host interface {
 
 	// GetKubeClient returns a client interface
 	GetKubeClient() client.Interface
+
+	// GetContainerRuntime returns the container runtime that implements the containers (e.g. docker/rkt)
+	GetRuntime() kubecontainer.Runtime
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
@@ -87,7 +92,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	allErrs := []error{}
 	for _, plugin := range plugins {
 		name := plugin.Name()
-		if !util.IsQualifiedName(name) {
+		if !validation.IsQualifiedName(name) {
 			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %#v", plugin))
 			continue
 		}
@@ -111,7 +116,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 		allErrs = append(allErrs, fmt.Errorf("Network plugin %q not found.", networkPluginName))
 	}
 
-	return chosenPlugin, errors.NewAggregate(allErrs)
+	return chosenPlugin, utilerrors.NewAggregate(allErrs)
 }
 
 func UnescapePluginName(in string) string {
@@ -129,14 +134,14 @@ func (plugin *noopNetworkPlugin) Name() string {
 	return DefaultPluginName
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
+func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubetypes.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
+func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubetypes.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID) (*PodNetworkStatus, error) {
+func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubetypes.DockerID) (*PodNetworkStatus, error) {
 	return nil, nil
 }

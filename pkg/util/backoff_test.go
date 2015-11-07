@@ -123,3 +123,72 @@ func TestBackoffGC(t *testing.T) {
 		t.Errorf("expected GC of entry after %s got entry %v", tc.Now().Sub(lastUpdate), r)
 	}
 }
+
+func TestIsInBackOffSinceUpdate(t *testing.T) {
+	id := "_idIsInBackOffSinceUpdate"
+	tc := &FakeClock{Time: time.Now()}
+	step := time.Second
+	maxDuration := 10 * step
+	b := NewFakeBackOff(step, maxDuration, tc)
+	startTime := tc.Now()
+
+	cases := []struct {
+		tick      time.Duration
+		inBackOff bool
+		value     int
+	}{
+		{tick: 0, inBackOff: false, value: 0},
+		{tick: 1, inBackOff: false, value: 1},
+		{tick: 2, inBackOff: true, value: 2},
+		{tick: 3, inBackOff: false, value: 2},
+		{tick: 4, inBackOff: true, value: 4},
+		{tick: 5, inBackOff: true, value: 4},
+		{tick: 6, inBackOff: true, value: 4},
+		{tick: 7, inBackOff: false, value: 4},
+		{tick: 8, inBackOff: true, value: 8},
+		{tick: 9, inBackOff: true, value: 8},
+		{tick: 10, inBackOff: true, value: 8},
+		{tick: 11, inBackOff: true, value: 8},
+		{tick: 12, inBackOff: true, value: 8},
+		{tick: 13, inBackOff: true, value: 8},
+		{tick: 14, inBackOff: true, value: 8},
+		{tick: 15, inBackOff: false, value: 8},
+		{tick: 16, inBackOff: true, value: 10},
+		{tick: 17, inBackOff: true, value: 10},
+		{tick: 18, inBackOff: true, value: 10},
+		{tick: 19, inBackOff: true, value: 10},
+		{tick: 20, inBackOff: true, value: 10},
+		{tick: 21, inBackOff: true, value: 10},
+		{tick: 22, inBackOff: true, value: 10},
+		{tick: 23, inBackOff: true, value: 10},
+		{tick: 24, inBackOff: true, value: 10},
+		{tick: 25, inBackOff: false, value: 10},
+		{tick: 26, inBackOff: true, value: 10},
+		{tick: 27, inBackOff: true, value: 10},
+		{tick: 28, inBackOff: true, value: 10},
+		{tick: 29, inBackOff: true, value: 10},
+		{tick: 30, inBackOff: true, value: 10},
+		{tick: 31, inBackOff: true, value: 10},
+		{tick: 32, inBackOff: true, value: 10},
+		{tick: 33, inBackOff: true, value: 10},
+		{tick: 34, inBackOff: true, value: 10},
+		{tick: 35, inBackOff: false, value: 10},
+		{tick: 56, inBackOff: false, value: 0},
+		{tick: 57, inBackOff: false, value: 1},
+	}
+
+	for _, c := range cases {
+		tc.Time = startTime.Add(c.tick * step)
+		if c.inBackOff != b.IsInBackOffSinceUpdate(id, tc.Now()) {
+			t.Errorf("expected IsInBackOffSinceUpdate %v got %v at tick %s", c.inBackOff, b.IsInBackOffSinceUpdate(id, tc.Now()), c.tick*step)
+		}
+
+		if c.inBackOff && (time.Duration(c.value)*step != b.Get(id)) {
+			t.Errorf("expected backoff value=%s got %s at tick %s", time.Duration(c.value)*step, b.Get(id), c.tick*step)
+		}
+
+		if !c.inBackOff {
+			b.Next(id, tc.Now())
+		}
+	}
+}

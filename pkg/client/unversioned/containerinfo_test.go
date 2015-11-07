@@ -28,13 +28,13 @@ import (
 	"testing"
 	"time"
 
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiTest "github.com/google/cadvisor/info/v1/test"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapitest "github.com/google/cadvisor/info/v1/test"
 )
 
 func testHTTPContainerInfoGetter(
-	req *cadvisorApi.ContainerInfoRequest,
-	cinfo *cadvisorApi.ContainerInfo,
+	req *cadvisorapi.ContainerInfoRequest,
+	cinfo *cadvisorapi.ContainerInfo,
 	podID string,
 	containerID string,
 	status int,
@@ -53,7 +53,7 @@ func testHTTPContainerInfoGetter(
 				expectedPath, r.URL.Path)
 		}
 
-		var receivedReq cadvisorApi.ContainerInfoRequest
+		var receivedReq cadvisorapi.ContainerInfoRequest
 		err := json.NewDecoder(r.Body).Decode(&receivedReq)
 		if err != nil {
 			t.Fatal(err)
@@ -87,7 +87,7 @@ func testHTTPContainerInfoGetter(
 		Port:   port,
 	}
 
-	var receivedContainerInfo *cadvisorApi.ContainerInfo
+	var receivedContainerInfo *cadvisorapi.ContainerInfo
 	if len(podID) > 0 && len(containerID) > 0 {
 		receivedContainerInfo, err = containerInfoGetter.GetContainerInfo(parts[0], podID, containerID, req)
 	} else {
@@ -109,10 +109,10 @@ func testHTTPContainerInfoGetter(
 }
 
 func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
-	req := &cadvisorApi.ContainerInfoRequest{
+	req := &cadvisorapi.ContainerInfoRequest{
 		NumStats: 10,
 	}
-	cinfo := cadvisorApiTest.GenerateRandomContainerInfo(
+	cinfo := cadvisorapitest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
 		req,
@@ -122,10 +122,10 @@ func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 }
 
 func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
-	req := &cadvisorApi.ContainerInfoRequest{
+	req := &cadvisorapi.ContainerInfoRequest{
 		NumStats: 10,
 	}
-	cinfo := cadvisorApiTest.GenerateRandomContainerInfo(
+	cinfo := cadvisorapitest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
 		req,
@@ -135,10 +135,10 @@ func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
 }
 
 func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
-	req := &cadvisorApi.ContainerInfoRequest{
+	req := &cadvisorapi.ContainerInfoRequest{
 		NumStats: 10,
 	}
-	cinfo := cadvisorApiTest.GenerateRandomContainerInfo(
+	cinfo := cadvisorapitest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
 		req,
@@ -148,10 +148,10 @@ func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 }
 
 func TestHTTPContainerInfoGetterGetRootInfoWithError(t *testing.T) {
-	req := &cadvisorApi.ContainerInfoRequest{
+	req := &cadvisorapi.ContainerInfoRequest{
 		NumStats: 10,
 	}
-	cinfo := cadvisorApiTest.GenerateRandomContainerInfo(
+	cinfo := cadvisorapitest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
 		req,
@@ -161,7 +161,7 @@ func TestHTTPContainerInfoGetterGetRootInfoWithError(t *testing.T) {
 }
 
 func TestHTTPGetMachineInfo(t *testing.T) {
-	mspec := &cadvisorApi.MachineInfo{
+	mspec := &cadvisorapi.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 2048,
 	}

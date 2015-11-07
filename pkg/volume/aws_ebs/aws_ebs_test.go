@@ -17,11 +17,13 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -29,8 +31,13 @@ import (
 )
 
 func TestCanSupport(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
@@ -39,17 +46,22 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/aws-ebs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
 
 func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
@@ -95,8 +107,13 @@ func (fake *fakePDManager) DetachDisk(c *awsElasticBlockStoreCleaner) error {
 }
 
 func TestPlugin(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v")
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
@@ -118,9 +135,9 @@ func TestPlugin(t *testing.T) {
 	if builder == nil {
 		t.Errorf("Got a nil Builder")
 	}
-
+	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~aws-ebs/vol1")
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~aws-ebs/vol1" {
+	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
@@ -191,16 +208,22 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	o.Add(pv)
 	o.Add(claim)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{}
+	client.AddReactor("*", "*", testclient.ObjectReaction(o, testapi.Default.RESTMapper()))
 
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 
 	if !builder.IsReadOnly() {
 		t.Errorf("Expected true for builder.IsReadOnly")
@@ -208,8 +231,13 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func TestBuilderAndCleanerTypeAssert(t *testing.T) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "awsebsTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {

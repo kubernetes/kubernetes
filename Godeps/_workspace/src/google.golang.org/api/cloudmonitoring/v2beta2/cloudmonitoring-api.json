@@ -1,0 +1,839 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/avMl03W4ktR_Q7PS4O3ogtyT8Dc\"",
+ "discoveryVersion": "v1",
+ "id": "cloudmonitoring:v2beta2",
+ "name": "cloudmonitoring",
+ "canonicalName": "Cloud Monitoring",
+ "version": "v2beta2",
+ "revision": "20150713",
+ "title": "Cloud Monitoring API",
+ "description": "API for accessing Google Cloud and API monitoring data.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://cloud.google.com/monitoring/v2beta2/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/cloudmonitoring/v2beta2/projects/",
+ "basePath": "/cloudmonitoring/v2beta2/projects/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "cloudmonitoring/v2beta2/projects/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/monitoring": {
+     "description": "View and write monitoring data for all of your Google and third-party Cloud and API projects"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "DeleteMetricDescriptorResponse": {
+   "id": "DeleteMetricDescriptorResponse",
+   "type": "object",
+   "description": "The response of cloudmonitoring.metricDescriptors.delete.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#deleteMetricDescriptorResponse\".",
+     "default": "cloudmonitoring#deleteMetricDescriptorResponse"
+    }
+   }
+  },
+  "ListMetricDescriptorsRequest": {
+   "id": "ListMetricDescriptorsRequest",
+   "type": "object",
+   "description": "The request of cloudmonitoring.metricDescriptors.list.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#listMetricDescriptorsRequest\".",
+     "default": "cloudmonitoring#listMetricDescriptorsRequest"
+    }
+   }
+  },
+  "ListMetricDescriptorsResponse": {
+   "id": "ListMetricDescriptorsResponse",
+   "type": "object",
+   "description": "The response of cloudmonitoring.metricDescriptors.list.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#listMetricDescriptorsResponse\".",
+     "default": "cloudmonitoring#listMetricDescriptorsResponse"
+    },
+    "metrics": {
+     "type": "array",
+     "description": "The returned metric descriptors.",
+     "items": {
+      "$ref": "MetricDescriptor"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Pagination token. If present, indicates that additional results are available for retrieval. To access the results past the pagination limit, pass this value to the pageToken query parameter."
+    }
+   }
+  },
+  "ListTimeseriesDescriptorsRequest": {
+   "id": "ListTimeseriesDescriptorsRequest",
+   "type": "object",
+   "description": "The request of cloudmonitoring.timeseriesDescriptors.list",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#listTimeseriesDescriptorsRequest\".",
+     "default": "cloudmonitoring#listTimeseriesDescriptorsRequest"
+    }
+   }
+  },
+  "ListTimeseriesDescriptorsResponse": {
+   "id": "ListTimeseriesDescriptorsResponse",
+   "type": "object",
+   "description": "The response of cloudmonitoring.timeseriesDescriptors.list",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#listTimeseriesDescriptorsResponse\".",
+     "default": "cloudmonitoring#listTimeseriesDescriptorsResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Pagination token. If present, indicates that additional results are available for retrieval. To access the results past the pagination limit, set this value to the pageToken query parameter."
+    },
+    "oldest": {
+     "type": "string",
+     "description": "The oldest timestamp of the interval of this query, as an RFC 3339 string.",
+     "format": "date-time"
+    },
+    "timeseries": {
+     "type": "array",
+     "description": "The returned time series descriptors.",
+     "items": {
+      "$ref": "TimeseriesDescriptor"
+     }
+    },
+    "youngest": {
+     "type": "string",
+     "description": "The youngest timestamp of the interval of this query, as an RFC 3339 string.",
+     "format": "date-time"
+    }
+   }
+  },
+  "ListTimeseriesRequest": {
+   "id": "ListTimeseriesRequest",
+   "type": "object",
+   "description": "The request of cloudmonitoring.timeseries.list",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#listTimeseriesRequest\".",
+     "default": "cloudmonitoring#listTimeseriesRequest"
+    }
+   }
+  },
+  "ListTimeseriesResponse": {
+   "id": "ListTimeseriesResponse",
+   "type": "object",
+   "description": "The response of cloudmonitoring.timeseries.list",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#listTimeseriesResponse\".",
+     "default": "cloudmonitoring#listTimeseriesResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Pagination token. If present, indicates that additional results are available for retrieval. To access the results past the pagination limit, set the pageToken query parameter to this value. All of the points of a time series will be returned before returning any point of the subsequent time series."
+    },
+    "oldest": {
+     "type": "string",
+     "description": "The oldest timestamp of the interval of this query as an RFC 3339 string.",
+     "format": "date-time"
+    },
+    "timeseries": {
+     "type": "array",
+     "description": "The returned time series.",
+     "items": {
+      "$ref": "Timeseries"
+     }
+    },
+    "youngest": {
+     "type": "string",
+     "description": "The youngest timestamp of the interval of this query as an RFC 3339 string.",
+     "format": "date-time"
+    }
+   }
+  },
+  "MetricDescriptor": {
+   "id": "MetricDescriptor",
+   "type": "object",
+   "description": "A metricDescriptor defines the name, label keys, and data type of a particular metric.",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "Description of this metric."
+    },
+    "labels": {
+     "type": "array",
+     "description": "Labels defined for this metric.",
+     "items": {
+      "$ref": "MetricDescriptorLabelDescriptor"
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this metric."
+    },
+    "project": {
+     "type": "string",
+     "description": "The project ID to which the metric belongs."
+    },
+    "typeDescriptor": {
+     "$ref": "MetricDescriptorTypeDescriptor",
+     "description": "Type description for this metric."
+    }
+   }
+  },
+  "MetricDescriptorLabelDescriptor": {
+   "id": "MetricDescriptorLabelDescriptor",
+   "type": "object",
+   "description": "A label in a metric is a description of this metric, including the key of this description (what the description is), and the value for this description.",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "Label description."
+    },
+    "key": {
+     "type": "string",
+     "description": "Label key."
+    }
+   }
+  },
+  "MetricDescriptorTypeDescriptor": {
+   "id": "MetricDescriptorTypeDescriptor",
+   "type": "object",
+   "description": "A type in a metric contains information about how the metric is collected and what its data points look like.",
+   "properties": {
+    "metricType": {
+     "type": "string",
+     "description": "The method of collecting data for the metric. See Metric types."
+    },
+    "valueType": {
+     "type": "string",
+     "description": "The data type of of individual points in the metric's time series. See Metric value types."
+    }
+   }
+  },
+  "Point": {
+   "id": "Point",
+   "type": "object",
+   "description": "Point is a single point in a time series. It consists of a start time, an end time, and a value.",
+   "properties": {
+    "boolValue": {
+     "type": "boolean",
+     "description": "The value of this data point. Either \"true\" or \"false\"."
+    },
+    "distributionValue": {
+     "$ref": "PointDistribution",
+     "description": "The value of this data point as a distribution. A distribution value can contain a list of buckets and/or an underflowBucket and an overflowBucket. The values of these points can be used to create a histogram."
+    },
+    "doubleValue": {
+     "type": "number",
+     "description": "The value of this data point as a double-precision floating-point number.",
+     "format": "double"
+    },
+    "end": {
+     "type": "string",
+     "description": "The interval [start, end] is the time period to which the point's value applies. For gauge metrics, whose values are instantaneous measurements, this interval should be empty (start should equal end). For cumulative metrics (of which deltas and rates are special cases), the interval should be non-empty. Both start and end are RFC 3339 strings.",
+     "format": "date-time"
+    },
+    "int64Value": {
+     "type": "string",
+     "description": "The value of this data point as a 64-bit integer.",
+     "format": "int64"
+    },
+    "start": {
+     "type": "string",
+     "description": "The interval [start, end] is the time period to which the point's value applies. For gauge metrics, whose values are instantaneous measurements, this interval should be empty (start should equal end). For cumulative metrics (of which deltas and rates are special cases), the interval should be non-empty. Both start and end are RFC 3339 strings.",
+     "format": "date-time"
+    },
+    "stringValue": {
+     "type": "string",
+     "description": "The value of this data point in string format."
+    }
+   }
+  },
+  "PointDistribution": {
+   "id": "PointDistribution",
+   "type": "object",
+   "description": "Distribution data point value type. When writing distribution points, try to be consistent with the boundaries of your buckets. If you must modify the bucket boundaries, then do so by merging, partitioning, or appending rather than skewing them.",
+   "properties": {
+    "buckets": {
+     "type": "array",
+     "description": "The finite buckets.",
+     "items": {
+      "$ref": "PointDistributionBucket"
+     }
+    },
+    "overflowBucket": {
+     "$ref": "PointDistributionOverflowBucket",
+     "description": "The overflow bucket."
+    },
+    "underflowBucket": {
+     "$ref": "PointDistributionUnderflowBucket",
+     "description": "The underflow bucket."
+    }
+   }
+  },
+  "PointDistributionBucket": {
+   "id": "PointDistributionBucket",
+   "type": "object",
+   "description": "The histogram's bucket. Buckets that form the histogram of a distribution value. If the upper bound of a bucket, say U1, does not equal the lower bound of the next bucket, say L2, this means that there is no event in [U1, L2).",
+   "properties": {
+    "count": {
+     "type": "string",
+     "description": "The number of events whose values are in the interval defined by this bucket.",
+     "format": "int64"
+    },
+    "lowerBound": {
+     "type": "number",
+     "description": "The lower bound of the value interval of this bucket (inclusive).",
+     "format": "double"
+    },
+    "upperBound": {
+     "type": "number",
+     "description": "The upper bound of the value interval of this bucket (exclusive).",
+     "format": "double"
+    }
+   }
+  },
+  "PointDistributionOverflowBucket": {
+   "id": "PointDistributionOverflowBucket",
+   "type": "object",
+   "description": "The overflow bucket is a special bucket that does not have the upperBound field; it includes all of the events that are no less than its lower bound.",
+   "properties": {
+    "count": {
+     "type": "string",
+     "description": "The number of events whose values are in the interval defined by this bucket.",
+     "format": "int64"
+    },
+    "lowerBound": {
+     "type": "number",
+     "description": "The lower bound of the value interval of this bucket (inclusive).",
+     "format": "double"
+    }
+   }
+  },
+  "PointDistributionUnderflowBucket": {
+   "id": "PointDistributionUnderflowBucket",
+   "type": "object",
+   "description": "The underflow bucket is a special bucket that does not have the lowerBound field; it includes all of the events that are less than its upper bound.",
+   "properties": {
+    "count": {
+     "type": "string",
+     "description": "The number of events whose values are in the interval defined by this bucket.",
+     "format": "int64"
+    },
+    "upperBound": {
+     "type": "number",
+     "description": "The upper bound of the value interval of this bucket (exclusive).",
+     "format": "double"
+    }
+   }
+  },
+  "Timeseries": {
+   "id": "Timeseries",
+   "type": "object",
+   "description": "The monitoring data is organized as metrics and stored as data points that are recorded over time. Each data point represents information like the CPU utilization of your virtual machine. A historical record of these data points is called a time series.",
+   "properties": {
+    "points": {
+     "type": "array",
+     "description": "The data points of this time series. The points are listed in order of their end timestamp, from younger to older.",
+     "items": {
+      "$ref": "Point"
+     }
+    },
+    "timeseriesDesc": {
+     "$ref": "TimeseriesDescriptor",
+     "description": "The descriptor of this time series."
+    }
+   }
+  },
+  "TimeseriesDescriptor": {
+   "id": "TimeseriesDescriptor",
+   "type": "object",
+   "description": "TimeseriesDescriptor identifies a single time series.",
+   "properties": {
+    "labels": {
+     "type": "object",
+     "description": "The label's name.",
+     "additionalProperties": {
+      "type": "string",
+      "description": "The label's name."
+     }
+    },
+    "metric": {
+     "type": "string",
+     "description": "The name of the metric."
+    },
+    "project": {
+     "type": "string",
+     "description": "The Developers Console project number to which this time series belongs."
+    }
+   }
+  },
+  "TimeseriesDescriptorLabel": {
+   "id": "TimeseriesDescriptorLabel",
+   "type": "object",
+   "properties": {
+    "key": {
+     "type": "string",
+     "description": "The label's name."
+    },
+    "value": {
+     "type": "string",
+     "description": "The label's value."
+    }
+   }
+  },
+  "TimeseriesPoint": {
+   "id": "TimeseriesPoint",
+   "type": "object",
+   "description": "When writing time series, TimeseriesPoint should be used instead of Timeseries, to enforce single point for each time series in the timeseries.write request.",
+   "properties": {
+    "point": {
+     "$ref": "Point",
+     "description": "The data point in this time series snapshot."
+    },
+    "timeseriesDesc": {
+     "$ref": "TimeseriesDescriptor",
+     "description": "The descriptor of this time series."
+    }
+   }
+  },
+  "WriteTimeseriesRequest": {
+   "id": "WriteTimeseriesRequest",
+   "type": "object",
+   "description": "The request of cloudmonitoring.timeseries.write",
+   "properties": {
+    "commonLabels": {
+     "type": "object",
+     "description": "The label's name.",
+     "additionalProperties": {
+      "type": "string",
+      "description": "The label's name."
+     }
+    },
+    "timeseries": {
+     "type": "array",
+     "description": "Provide time series specific labels and the data points for each time series. The labels in timeseries and the common_labels should form a complete list of labels that required by the metric.",
+     "items": {
+      "$ref": "TimeseriesPoint"
+     }
+    }
+   }
+  },
+  "WriteTimeseriesResponse": {
+   "id": "WriteTimeseriesResponse",
+   "type": "object",
+   "description": "The response of cloudmonitoring.timeseries.write",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"cloudmonitoring#writeTimeseriesResponse\".",
+     "default": "cloudmonitoring#writeTimeseriesResponse"
+    }
+   }
+  }
+ },
+ "resources": {
+  "metricDescriptors": {
+   "methods": {
+    "create": {
+     "id": "cloudmonitoring.metricDescriptors.create",
+     "path": "{project}/metricDescriptors",
+     "httpMethod": "POST",
+     "description": "Create a new metric.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project id. The value can be the numeric project ID or string-based project name.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "MetricDescriptor"
+     },
+     "response": {
+      "$ref": "MetricDescriptor"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/monitoring"
+     ]
+    },
+    "delete": {
+     "id": "cloudmonitoring.metricDescriptors.delete",
+     "path": "{project}/metricDescriptors/{metric}",
+     "httpMethod": "DELETE",
+     "description": "Delete an existing metric.",
+     "parameters": {
+      "metric": {
+       "type": "string",
+       "description": "Name of the metric.",
+       "required": true,
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project ID to which the metric belongs.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "metric"
+     ],
+     "response": {
+      "$ref": "DeleteMetricDescriptorResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/monitoring"
+     ]
+    },
+    "list": {
+     "id": "cloudmonitoring.metricDescriptors.list",
+     "path": "{project}/metricDescriptors",
+     "httpMethod": "GET",
+     "description": "List metric descriptors that match the query. If the query is not set, then all of the metric descriptors will be returned. Large responses will be paginated, use the nextPageToken returned in the response to request subsequent pages of results by setting the pageToken query parameter to the value of the nextPageToken.",
+     "parameters": {
+      "count": {
+       "type": "integer",
+       "description": "Maximum number of metric descriptors per page. Used for pagination. If not specified, count = 100.",
+       "default": "100",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The pagination token, which is used to page through large result sets. Set this value to the value of the nextPageToken to retrieve the next page of results.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project id. The value can be the numeric project ID or string-based project name.",
+       "required": true,
+       "location": "path"
+      },
+      "query": {
+       "type": "string",
+       "description": "The query used to search against existing metrics. Separate keywords with a space; the service joins all keywords with AND, meaning that all keywords must match for a metric to be returned. If this field is omitted, all metrics are returned. If an empty string is passed with this field, no metrics are returned.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "ListMetricDescriptorsRequest"
+     },
+     "response": {
+      "$ref": "ListMetricDescriptorsResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/monitoring"
+     ]
+    }
+   }
+  },
+  "timeseries": {
+   "methods": {
+    "list": {
+     "id": "cloudmonitoring.timeseries.list",
+     "path": "{project}/timeseries/{metric}",
+     "httpMethod": "GET",
+     "description": "List the data points of the time series that match the metric and labels values and that have data points in the interval. Large responses are paginated; use the nextPageToken returned in the response to request subsequent pages of results by setting the pageToken query parameter to the value of the nextPageToken.",
+     "parameters": {
+      "aggregator": {
+       "type": "string",
+       "description": "The aggregation function that will reduce the data points in each window to a single point. This parameter is only valid for non-cumulative metrics with a value type of INT64 or DOUBLE.",
+       "enum": [
+        "max",
+        "mean",
+        "min",
+        "sum"
+       ],
+       "enumDescriptions": [
+        "",
+        "",
+        "",
+        ""
+       ],
+       "location": "query"
+      },
+      "count": {
+       "type": "integer",
+       "description": "Maximum number of data points per page, which is used for pagination of results.",
+       "default": "6000",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "12000",
+       "location": "query"
+      },
+      "labels": {
+       "type": "string",
+       "description": "A collection of labels for the matching time series, which are represented as:  \n- key==value: key equals the value \n- key=~value: key regex matches the value \n- key!=value: key does not equal the value \n- key!~value: key regex does not match the value  For example, to list all of the time series descriptors for the region us-central1, you could specify:\nlabel=cloud.googleapis.com%2Flocation=~us-central1.*",
+       "pattern": "(.+?)(==|=~|!=|!~)(.+)",
+       "repeated": true,
+       "location": "query"
+      },
+      "metric": {
+       "type": "string",
+       "description": "Metric names are protocol-free URLs as listed in the Supported Metrics page. For example, compute.googleapis.com/instance/disk/read_ops_count.",
+       "required": true,
+       "location": "path"
+      },
+      "oldest": {
+       "type": "string",
+       "description": "Start of the time interval (exclusive), which is expressed as an RFC 3339 timestamp. If neither oldest nor timespan is specified, the default time interval will be (youngest - 4 hours, youngest]",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The pagination token, which is used to page through large result sets. Set this value to the value of the nextPageToken to retrieve the next page of results.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project ID to which this time series belongs. The value can be the numeric project ID or string-based project name.",
+       "required": true,
+       "location": "path"
+      },
+      "timespan": {
+       "type": "string",
+       "description": "Length of the time interval to query, which is an alternative way to declare the interval: (youngest - timespan, youngest]. The timespan and oldest parameters should not be used together. Units:  \n- s: second \n- m: minute \n- h: hour \n- d: day \n- w: week  Examples: 2s, 3m, 4w. Only one unit is allowed, for example: 2w3d is not allowed; you should use 17d instead.\n\nIf neither oldest nor timespan is specified, the default time interval will be (youngest - 4 hours, youngest].",
+       "pattern": "[0-9]+[smhdw]?",
+       "location": "query"
+      },
+      "window": {
+       "type": "string",
+       "description": "The sampling window. At most one data point will be returned for each window in the requested time interval. This parameter is only valid for non-cumulative metric types. Units:  \n- m: minute \n- h: hour \n- d: day \n- w: week  Examples: 3m, 4w. Only one unit is allowed, for example: 2w3d is not allowed; you should use 17d instead.",
+       "pattern": "[0-9]+[mhdw]?",
+       "location": "query"
+      },
+      "youngest": {
+       "type": "string",
+       "description": "End of the time interval (inclusive), which is expressed as an RFC 3339 timestamp.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "metric",
+      "youngest"
+     ],
+     "request": {
+      "$ref": "ListTimeseriesRequest"
+     },
+     "response": {
+      "$ref": "ListTimeseriesResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/monitoring"
+     ]
+    },
+    "write": {
+     "id": "cloudmonitoring.timeseries.write",
+     "path": "{project}/timeseries:write",
+     "httpMethod": "POST",
+     "description": "Put data points to one or more time series for one or more metrics. If a time series does not exist, a new time series will be created. It is not allowed to write a time series point that is older than the existing youngest point of that time series. Points that are older than the existing youngest point of that time series will be discarded silently. Therefore, users should make sure that points of a time series are written sequentially in the order of their end time.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project ID. The value can be the numeric project ID or string-based project name.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "WriteTimeseriesRequest"
+     },
+     "response": {
+      "$ref": "WriteTimeseriesResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/monitoring"
+     ]
+    }
+   }
+  },
+  "timeseriesDescriptors": {
+   "methods": {
+    "list": {
+     "id": "cloudmonitoring.timeseriesDescriptors.list",
+     "path": "{project}/timeseriesDescriptors/{metric}",
+     "httpMethod": "GET",
+     "description": "List the descriptors of the time series that match the metric and labels values and that have data points in the interval. Large responses are paginated; use the nextPageToken returned in the response to request subsequent pages of results by setting the pageToken query parameter to the value of the nextPageToken.",
+     "parameters": {
+      "aggregator": {
+       "type": "string",
+       "description": "The aggregation function that will reduce the data points in each window to a single point. This parameter is only valid for non-cumulative metrics with a value type of INT64 or DOUBLE.",
+       "enum": [
+        "max",
+        "mean",
+        "min",
+        "sum"
+       ],
+       "enumDescriptions": [
+        "",
+        "",
+        "",
+        ""
+       ],
+       "location": "query"
+      },
+      "count": {
+       "type": "integer",
+       "description": "Maximum number of time series descriptors per page. Used for pagination. If not specified, count = 100.",
+       "default": "100",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "labels": {
+       "type": "string",
+       "description": "A collection of labels for the matching time series, which are represented as:  \n- key==value: key equals the value \n- key=~value: key regex matches the value \n- key!=value: key does not equal the value \n- key!~value: key regex does not match the value  For example, to list all of the time series descriptors for the region us-central1, you could specify:\nlabel=cloud.googleapis.com%2Flocation=~us-central1.*",
+       "pattern": "(.+?)(==|=~|!=|!~)(.+)",
+       "repeated": true,
+       "location": "query"
+      },
+      "metric": {
+       "type": "string",
+       "description": "Metric names are protocol-free URLs as listed in the Supported Metrics page. For example, compute.googleapis.com/instance/disk/read_ops_count.",
+       "required": true,
+       "location": "path"
+      },
+      "oldest": {
+       "type": "string",
+       "description": "Start of the time interval (exclusive), which is expressed as an RFC 3339 timestamp. If neither oldest nor timespan is specified, the default time interval will be (youngest - 4 hours, youngest]",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The pagination token, which is used to page through large result sets. Set this value to the value of the nextPageToken to retrieve the next page of results.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project ID to which this time series belongs. The value can be the numeric project ID or string-based project name.",
+       "required": true,
+       "location": "path"
+      },
+      "timespan": {
+       "type": "string",
+       "description": "Length of the time interval to query, which is an alternative way to declare the interval: (youngest - timespan, youngest]. The timespan and oldest parameters should not be used together. Units:  \n- s: second \n- m: minute \n- h: hour \n- d: day \n- w: week  Examples: 2s, 3m, 4w. Only one unit is allowed, for example: 2w3d is not allowed; you should use 17d instead.\n\nIf neither oldest nor timespan is specified, the default time interval will be (youngest - 4 hours, youngest].",
+       "pattern": "[0-9]+[smhdw]?",
+       "location": "query"
+      },
+      "window": {
+       "type": "string",
+       "description": "The sampling window. At most one data point will be returned for each window in the requested time interval. This parameter is only valid for non-cumulative metric types. Units:  \n- m: minute \n- h: hour \n- d: day \n- w: week  Examples: 3m, 4w. Only one unit is allowed, for example: 2w3d is not allowed; you should use 17d instead.",
+       "pattern": "[0-9]+[mhdw]?",
+       "location": "query"
+      },
+      "youngest": {
+       "type": "string",
+       "description": "End of the time interval (inclusive), which is expressed as an RFC 3339 timestamp.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "metric",
+      "youngest"
+     ],
+     "request": {
+      "$ref": "ListTimeseriesDescriptorsRequest"
+     },
+     "response": {
+      "$ref": "ListTimeseriesDescriptorsResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/monitoring"
+     ]
+    }
+   }
+  }
+ }
+}

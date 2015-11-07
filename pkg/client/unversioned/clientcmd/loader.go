@@ -30,17 +30,20 @@ import (
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
 	RecommendedConfigPathFlag   = "kubeconfig"
 	RecommendedConfigPathEnvVar = "KUBECONFIG"
-	RecommendedHomeFileName     = "/.kube/config"
+	RecommendedHomeDir          = ".kube"
+	RecommendedFileName         = "config"
+	RecommendedSchemaName       = "schema"
 )
 
 var OldRecommendedHomeFile = path.Join(os.Getenv("HOME"), "/.kube/.kubeconfig")
-var RecommendedHomeFile = path.Join(os.Getenv("HOME"), RecommendedHomeFileName)
+var RecommendedHomeFile = path.Join(os.Getenv("HOME"), RecommendedHomeDir, RecommendedFileName)
+var RecommendedSchemaFile = path.Join(os.Getenv("HOME"), RecommendedHomeDir, RecommendedSchemaName)
 
 // ClientConfigLoadingRules is an ExplicitPath and string slice of specific locations that are used for merging together a Config
 // Callers can put the chain together however they want, but we'd recommend:
@@ -143,7 +146,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 	}
 
-	return config, errors.NewAggregate(errlist)
+	return config, utilerrors.NewAggregate(errlist)
 }
 
 // Migrate uses the MigrationRules map.  If a destination file is not present, then the source file is checked.

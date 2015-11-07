@@ -53,11 +53,13 @@ Documentation for other releases can be found at
 
 ## What is a _replication controller_?
 
-A _replication controller_ ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it will kill some.  If there are too few, it will start more. Unlike in the case where a user directly created pods, a replication controller replaces pods that are deleted or terminated for any reason, such as in the case of node failure or disruptive node maintenance, such as a kernel upgrade. For this reason, we recommend that you use a replication controller even if your application requires only a single pod. Think of it similarly to a process supervisor, only it supervises multiple pods across multiple nodes instead of individual processes on a single node.  A replication controller delegates local container restarts to some agent on the node (e.g., Kubelet or Docker).
+A _replication controller_ ensures that a specified number of pod "replicas" are running at any one time. In other words, a replication controller makes sure that a pod or homogenous set of pods are always up and available. If there are too many pods, it will kill some. If there are too few, the replication controller will start more. Unlike manually created pods, the pods maintained by a replication controller are automatically replaced if they fail, get deleted, or are terminated. For example, your pods get re-created on a node after disruptive maintenance such as a kernel upgrade. For this reason, we recommend that you use a replication controller even if your application requires only a single pod. You can think of a replication controller as something similar to a process supervisor, but rather then individual processes on a single node, the replication controller supervises multiple pods across multiple nodes.
 
 As discussed in [life of a pod](pod-states.md), `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`. (Note: If `RestartPolicy` is not set, the default value is `Always`.)  `ReplicationController` should refuse to instantiate any pod that has a different restart policy. As discussed in [issue #503](http://issue.k8s.io/503#issuecomment-50169443), we expect other types of controllers to be added to Kubernetes to handle other types of workloads, such as build/test and batch workloads, in the future.
 
 A replication controller will never terminate on its own, but it isn't expected to be as long-lived as services. Services may be composed of pods controlled by multiple replication controllers, and it is expected that many replication controllers may be created and destroyed over the lifetime of a service (for instance, to perform an update of pods that run the service). Both services themselves and their clients should remain oblivious to the replication controllers that maintain the pods of the services.
+
+For local container restarts, replication controllers delegate to an agent on the node, for example the [Kubelet](../admin/kubelet.md) or Docker.
 
 ## How does a replication controller work?
 
@@ -79,7 +81,7 @@ Note that replication controllers may themselves have labels and would generally
 
 Pods may be removed from a replication controller's target set by changing their labels. This technique may be used to remove pods from service for debugging, data recovery, etc. Pods that are removed in this way will be replaced automatically (assuming that the number of replicas is not also changed).
 
-Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. (Note that the client tool, kubectl, provides a single operation, [stop](kubectl/kubectl_stop.md) to delete both the replication controller and the pods it controls. However, there is no such operation in the API at the moment)
+Similarly, deleting a replication controller using the API does not affect the pods it created. Its `replicas` field must first be set to `0` in order to delete the pods controlled. (Note that the client tool, `kubectl`, provides a single operation, [delete](kubectl/kubectl_delete.md) to delete both the replication controller and the pods it controls. If you want to leave the pods running when deleting a replication controller, specify `--cascade=false`. However, there is no such operation in the API at the moment)
 
 ## Responsibilities of the replication controller
 
@@ -122,7 +124,7 @@ For instance, a service might target all pods with `tier in (frontend), environm
 
 Replication controller is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [ReplicationController API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_replicationcontroller).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/v1/definitions.html#_v1_replicationcontroller).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

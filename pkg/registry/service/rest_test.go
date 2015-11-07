@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
@@ -46,7 +44,7 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	portRange := util.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
-	storage := NewStorage(registry, endpointRegistry, r, portAllocator)
+	storage := NewStorage(registry, endpointRegistry, r, portAllocator, nil)
 
 	return storage, registry
 }
@@ -440,6 +438,22 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
 				}},
 			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: api.NamespaceDefault,
+				},
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{},
+					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
+				}, {
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
+				}, {
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.5"}},
+					Ports:     []api.EndpointPort{},
+				}},
+			},
 		},
 	}
 	storage, registry := NewTestREST(t, endpoints)
@@ -475,6 +489,30 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a name + port number.
+	location, _, err = redirector.ResourceLocation(ctx, "foo:93")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a scheme + name + port.
+	location, _, err = redirector.ResourceLocation(ctx, "https:foo:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "https://1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a non-existent name + port.
 	location, _, err = redirector.ResourceLocation(ctx, "foo:q")
 	if err == nil {
@@ -503,7 +541,7 @@ func TestServiceRegistryList(t *testing.T) {
 		},
 	})
 	registry.List.ResourceVersion = "1"
-	s, _ := storage.List(ctx, labels.Everything(), fields.Everything())
+	s, _ := storage.List(ctx, nil)
 	sl := s.(*api.ServiceList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 services, but got %v", len(sl.Items))

@@ -284,8 +284,8 @@ func (t *table) push(i uint32, depth int) bool {
 }
 
 // The lists of element names and attribute keys were taken from
-// http://www.whatwg.org/specs/web-apps/current-work/multipage/section-index.html
-// as of the "HTML Living Standard - Last Updated 30 May 2012" version.
+// https://html.spec.whatwg.org/multipage/indices.html#index
+// as of the "HTML Living Standard - Last Updated 21 February 2015" version.
 
 var elements = []string{
 	"a",
@@ -352,6 +352,7 @@ var elements = []string{
 	"map",
 	"mark",
 	"menu",
+	"menuitem",
 	"meta",
 	"meter",
 	"nav",
@@ -385,6 +386,7 @@ var elements = []string{
 	"table",
 	"tbody",
 	"td",
+	"template",
 	"textarea",
 	"tfoot",
 	"th",
@@ -400,7 +402,10 @@ var elements = []string{
 	"wbr",
 }
 
+// https://html.spec.whatwg.org/multipage/indices.html#attributes-3
+
 var attributes = []string{
+	"abbr",
 	"accept",
 	"accept-charset",
 	"accesskey",
@@ -410,7 +415,6 @@ var attributes = []string{
 	"autocomplete",
 	"autofocus",
 	"autoplay",
-	"border",
 	"challenge",
 	"charset",
 	"checked",
@@ -452,7 +456,7 @@ var attributes = []string{
 	"http-equiv",
 	"icon",
 	"id",
-	"inert",
+	"inputmode",
 	"ismap",
 	"itemid",
 	"itemprop",
@@ -473,6 +477,7 @@ var attributes = []string{
 	"mediagroup",
 	"method",
 	"min",
+	"minlength",
 	"multiple",
 	"muted",
 	"name",
@@ -500,6 +505,8 @@ var attributes = []string{
 	"shape",
 	"size",
 	"sizes",
+	"sortable",
+	"sorted",
 	"span",
 	"src",
 	"srcdoc",
@@ -521,6 +528,8 @@ var attributes = []string{
 
 var eventHandlers = []string{
 	"onabort",
+	"onautocomplete",
+	"onautocompleteerror",
 	"onafterprint",
 	"onbeforeprint",
 	"onbeforeunload",
@@ -552,6 +561,7 @@ var eventHandlers = []string{
 	"onkeydown",
 	"onkeypress",
 	"onkeyup",
+	"onlanguagechange",
 	"onload",
 	"onloadeddata",
 	"onloadedmetadata",
@@ -580,11 +590,13 @@ var eventHandlers = []string{
 	"onseeking",
 	"onselect",
 	"onshow",
+	"onsort",
 	"onstalled",
 	"onstorage",
 	"onsubmit",
 	"onsuspend",
 	"ontimeupdate",
+	"ontoggle",
 	"onunload",
 	"onvolumechange",
 	"onwaiting",

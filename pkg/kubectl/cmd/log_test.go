@@ -24,130 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
-
-func TestSelectContainer(t *testing.T) {
-	tests := []struct {
-		input             string
-		pod               api.Pod
-		expectedContainer string
-	}{
-		{
-			input: "1\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-		{
-			input: "foo\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-		{
-			input: "foo\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bar",
-						},
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-		{
-			input: "2\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bar",
-						},
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-		{
-			input: "-1\n2\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bar",
-						},
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-		{
-			input: "3\n2\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bar",
-						},
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-		{
-			input: "baz\n2\n",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bar",
-						},
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			expectedContainer: "foo",
-		},
-	}
-
-	for _, test := range tests {
-		var buff bytes.Buffer
-		container := selectContainer(&test.pod, bytes.NewBufferString(test.input), &buff)
-		if container != test.expectedContainer {
-			t.Errorf("unexpected output: %s for input: %s", container, test.input)
-		}
-	}
-}
 
 func TestLog(t *testing.T) {
 	tests := []struct {
@@ -165,9 +43,9 @@ func TestLog(t *testing.T) {
 	for _, test := range tests {
 		logContent := "test log content"
 		f, tf, codec := NewAPIFactory()
-		tf.Client = &client.FakeRESTClient{
+		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
 					body := objBody(codec, test.pod)

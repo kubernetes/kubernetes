@@ -18,7 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -34,12 +34,15 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store ThirdPartyResource in the given helper
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
 	prefix := "/thirdpartyresources"
 
+	// We explicitly do NOT do any decoration here yet.
+	storageInterface := s
+
 	store := &etcdgeneric.Etcd{
-		NewFunc:     func() runtime.Object { return &expapi.ThirdPartyResource{} },
-		NewListFunc: func() runtime.Object { return &expapi.ThirdPartyResourceList{} },
+		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResource{} },
+		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceList{} },
 		KeyRootFunc: func(ctx api.Context) string {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
@@ -47,7 +50,7 @@ func NewREST(s storage.Interface) *REST {
 			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*expapi.ThirdPartyResource).Name, nil
+			return obj.(*extensions.ThirdPartyResource).Name, nil
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return thirdpartyresource.Matcher(label, field)
@@ -56,7 +59,7 @@ func NewREST(s storage.Interface) *REST {
 		CreateStrategy: thirdpartyresource.Strategy,
 		UpdateStrategy: thirdpartyresource.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 
 	return &REST{store}

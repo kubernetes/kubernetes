@@ -48,3 +48,14 @@ type MetricConfig struct {
 	//the regular expression that can be used to extract the metric
 	Regex string `json:"regex"`
 }
+
+type Prometheus struct {
+	//the endpoint to hit to scrape metrics
+	Endpoint string `json:"endpoint"`
+
+	//the frequency at which metrics should be collected
+	PollingFrequency time.Duration `json:"polling_frequency"`
+
+	//holds names of different metrics that can be collected
+	MetricsConfig []string `json:"metrics_config"`
+}

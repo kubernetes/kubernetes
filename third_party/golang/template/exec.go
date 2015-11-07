@@ -2,9 +2,10 @@
 //The original private functions indirect and printableValue
 //are exported as public functions.
 package template
+
 import (
-	"reflect"
 	"fmt"
+	"reflect"
 )
 
 var Indirect = indirect
@@ -14,7 +15,6 @@ var (
 	errorType       = reflect.TypeOf((*error)(nil)).Elem()
 	fmtStringerType = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
 )
-
 
 // indirect returns the item at the end of indirection, and a bool to indicate if it's nil.
 // We indirect through pointers and empty interfaces (only) because

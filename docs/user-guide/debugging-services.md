@@ -209,8 +209,7 @@ walk-through - you can use your own `Service`'s details here.
 
 ```console
 $ kubectl expose rc hostnames --port=80 --target-port=9376
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
-hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
+service "hostnames" exposed
 ```
 
 And read it back, just to be sure:
@@ -546,9 +545,9 @@ misbehaving.  And yet your `Service` is not working.  You should probably let
 us know, so we can help investigate!
 
 Contact us on
-[IRC](http://webchat.freenode.net/?channels=google-containers) or
+[Slack](../troubleshooting.md#slack) or
 [email](https://groups.google.com/forum/#!forum/google-containers) or
-[GitHub](https://github.com/GoogleCloudPlatform/kubernetes).
+[GitHub](https://github.com/kubernetes/kubernetes).
 
 ## More information
 

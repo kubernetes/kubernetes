@@ -22,24 +22,24 @@ import time
 class Registrator:
 
     def __init__(self):
-        self.ds ={
-          "creationTimestamp": "",
-          "kind": "Node",
-          "name": "", # private_address
-          "metadata": {
-            "name": "", #private_address,
-          },
-          "spec": {
-            "externalID": "", #private_address
-            "capacity": {
-                "mem": "",  # mem + ' K',
-                "cpu": "",  # cpus
+        self.ds = {
+            "creationTimestamp": "",
+            "kind": "Node",
+            "name": "",  # private_address
+            "metadata": {
+                "name": "",  # private_address,
+            },
+            "spec": {
+                "externalID": "",  # private_address
+                "capacity": {
+                    "mem": "",  # mem + ' K',
+                    "cpu": "",  # cpus
+                }
+            },
+            "status": {
+                "conditions": [],
+                "hostIP": "",  # private_address
             }
-          },
-          "status": {
-            "conditions": [],
-            "hostIP": "", #private_address
-          }
         }
 
     @property
@@ -51,15 +51,15 @@ class Registrator:
         ''' Contact the API Server for a new registration '''
         headers = {"Content-type": "application/json",
                    "Accept": "application/json"}
-        connection = httplib.HTTPConnection(hostname, port)
+        connection = httplib.HTTPConnection(hostname, port, timeout=12)
         print 'CONN {}'.format(connection)
         connection.request("POST", api_path, json.dumps(self.data), headers)
         response = connection.getresponse()
         body = response.read()
         print(body)
         result = json.loads(body)
-        print("Response status:%s reason:%s body:%s" % \
-             (response.status, response.reason, result))
+        print("Response status:%s reason:%s body:%s" %
+              (response.status, response.reason, result))
         return response, result
 
     def update(self):
@@ -74,19 +74,17 @@ class Registrator:
         pass
 
     def command_succeeded(self, response, result):
-        ''' Evaluate response data to determine if the command was successful '''
-        if response.status in [200, 201]:
+        ''' Evaluate response data to determine if the command successful '''
+        if response.status in [200, 201, 409]:
+            # The 409 response is when a unit is already registered. We do not
+            # have an update method above, so for now, accept whats in etcd and
+            # assume registered.
             print("Registered")
             return True
-        elif response.status in [409,]:
-            print("Status Conflict")
-            # Suggested return a PUT instead of a POST with this response
-            # code, this predicates use of the UPDATE method
-            # TODO
         elif response.status in (500,) and result.get(
-            'message', '').startswith('The requested resource does not exist'):
-            # There's something fishy in the kube api here (0.4 dev), first time we
-            # go to register a new minion, we always seem to get this error.
+            'message', '').startswith('The requested resource does not exist'):  # noqa
+            # There is something fishy in the kube api here (0.4 dev), first
+            # time to register a new node, we always seem to get this error.
             # http://issue.k8s.io/1995
             time.sleep(1)
             print("Retrying registration...")

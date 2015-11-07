@@ -71,12 +71,12 @@ func (cm *GenericCollectorManager) GetSpec() ([]v1.MetricSpec, error) {
 	return metricSpec, nil
 }
 
-func (cm *GenericCollectorManager) Collect() (time.Time, map[string]v1.MetricVal, error) {
+func (cm *GenericCollectorManager) Collect() (time.Time, map[string][]v1.MetricVal, error) {
 	var errors []error
 
 	// Collect from all collectors that are ready.
 	var next time.Time
-	metrics := map[string]v1.MetricVal{}
+	metrics := map[string][]v1.MetricVal{}
 	for _, c := range cm.Collectors {
 		if c.nextCollectionTime.Before(time.Now()) {
 			var err error

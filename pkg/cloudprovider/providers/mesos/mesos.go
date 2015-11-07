@@ -124,6 +124,11 @@ func (c *MesosCloud) ProviderName() string {
 	return ProviderName
 }
 
+// ScrubDNS filters DNS settings for pods.
+func (c *MesosCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
+}
+
 // ListClusters lists the names of the available Mesos clusters.
 func (c *MesosCloud) ListClusters() ([]string, error) {
 	// Always returns a single cluster (this one!)

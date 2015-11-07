@@ -32,7 +32,6 @@ option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
-
 // Describes a state entry, a versioned (via a UUID) key/value pair.
 message Entry {
   required string name = 1;

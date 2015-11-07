@@ -1,0 +1,21 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: spark-worker-controller
+spec:
+  replicas: 3
+  selector:
+    component: spark-worker
+  template:
+    metadata:
+      labels:
+        component: spark-worker
+    spec:
+      containers:
+        - name: spark-worker
+          image: gcr.io/google_containers/spark-worker:1.5.1_v2
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              cpu: 100m

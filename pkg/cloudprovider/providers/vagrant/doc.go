@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package vagrant_cloud is an implementation of Interface, TCPLoadBalancer
+// Package vagrant is an implementation of Interface, TCPLoadBalancer
 // and Instances for developer managed Vagrant cluster.
-package vagrant_cloud
+package vagrant

@@ -35,9 +35,10 @@ type EventNamespacer interface {
 type EventInterface interface {
 	Create(event *api.Event) (*api.Event, error)
 	Update(event *api.Event) (*api.Event, error)
+	Patch(event *api.Event, data []byte) (*api.Event, error)
 	List(label labels.Selector, field fields.Selector) (*api.EventList, error)
 	Get(name string) (*api.Event, error)
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
 	Delete(name string) error
@@ -98,6 +99,22 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 	return result, err
 }
 
+// Patch modifies an existing event. It returns the copy of the event that the server returns, or an
+// error. The namespace and name of the target event is deduced from the incompleteEvent. The
+// namespace must either match this event client's namespace, or this event client must have been
+// created with the "" namespace.
+func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, error) {
+	result := &api.Event{}
+	err := e.client.Patch(api.StrategicMergePatchType).
+		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
+		Resource("events").
+		Name(incompleteEvent.Name).
+		Body(data).
+		Do().
+		Into(result)
+	return result, err
+}
+
 // List returns a list of events matching the selectors.
 func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
@@ -124,12 +141,12 @@ func (e *events) Get(name string) (*api.Event, error) {
 }
 
 // Watch starts watching for events matching the given selectors.
-func (e *events) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (e *events) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

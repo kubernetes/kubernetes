@@ -113,6 +113,9 @@ func DecodeHeader(from, to interface{}) error {
 // RFC3339Milli describes a common time format used by some API responses.
 const RFC3339Milli = "2006-01-02T15:04:05.999999Z"
 
+// Time format used in cloud orchestration
+const STACK_TIME_FMT = "2006-01-02T15:04:05"
+
 /*
 Link is an internal type to be used in packages of collection resources that are
 paginated in a certain way.

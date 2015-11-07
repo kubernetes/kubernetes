@@ -64,18 +64,21 @@ type Context interface {
 	//
 	// Done is provided for use in select statements:
 	//
-	// 	// DoSomething calls DoSomethingSlow and returns as soon as
-	// 	// it returns or ctx.Done is closed.
-	// 	func DoSomething(ctx context.Context) (Result, error) {
-	// 		c := make(chan Result, 1)
-	// 		go func() { c <- DoSomethingSlow(ctx) }()
-	// 		select {
-	// 		case res := <-c:
-	// 			return res, nil
-	// 		case <-ctx.Done():
-	// 			return nil, ctx.Err()
-	// 		}
-	// 	}
+	//  // Stream generates values with DoSomething and sends them to out
+	//  // until DoSomething returns an error or ctx.Done is closed.
+	//  func Stream(ctx context.Context, out <-chan Value) error {
+	//  	for {
+	//  		v, err := DoSomething(ctx)
+	//  		if err != nil {
+	//  			return err
+	//  		}
+	//  		select {
+	//  		case <-ctx.Done():
+	//  			return ctx.Err()
+	//  		case out <- v:
+	//  		}
+	//  	}
+	//  }
 	//
 	// See http://blog.golang.org/pipelines for more examples of how to use
 	// a Done channel for cancelation.
@@ -202,6 +205,9 @@ type CancelFunc func()
 // WithCancel returns a copy of parent with a new Done channel. The returned
 // context's Done channel is closed when the returned cancel function is called
 // or when the parent context's Done channel is closed, whichever happens first.
+//
+// Canceling this context releases resources associated with it, so code should
+// call cancel as soon as the operations running in this Context complete.
 func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 	c := newCancelCtx(parent)
 	propagateCancel(parent, &c)
@@ -262,6 +268,19 @@ func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 	}
 }
 
+// removeChild removes a context from its parent.
+func removeChild(parent Context, child canceler) {
+	p, ok := parentCancelCtx(parent)
+	if !ok {
+		return
+	}
+	p.mu.Lock()
+	if p.children != nil {
+		delete(p.children, child)
+	}
+	p.mu.Unlock()
+}
+
 // A canceler is a context type that can be canceled directly.  The
 // implementations are *cancelCtx and *timerCtx.
 type canceler interface {
@@ -316,13 +335,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 	c.mu.Unlock()
 
 	if removeFromParent {
-		if p, ok := parentCancelCtx(c.Context); ok {
-			p.mu.Lock()
-			if p.children != nil {
-				delete(p.children, c)
-			}
-			p.mu.Unlock()
-		}
+		removeChild(c.Context, c)
 	}
 }
 
@@ -333,9 +346,8 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 // cancel function is called, or when the parent context's Done channel is
 // closed, whichever happens first.
 //
-// Canceling this context releases resources associated with the deadline
-// timer, so code should call cancel as soon as the operations running in this
-// Context complete.
+// Canceling this context releases resources associated with it, so code should
+// call cancel as soon as the operations running in this Context complete.
 func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
 	if cur, ok := parent.Deadline(); ok && cur.Before(deadline) {
 		// The current deadline is already sooner than the new one.
@@ -380,7 +392,11 @@ func (c *timerCtx) String() string {
 }
 
 func (c *timerCtx) cancel(removeFromParent bool, err error) {
-	c.cancelCtx.cancel(removeFromParent, err)
+	c.cancelCtx.cancel(false, err)
+	if removeFromParent {
+		// Remove this timerCtx from its parent cancelCtx's children.
+		removeChild(c.cancelCtx.Context, c)
+	}
 	c.mu.Lock()
 	if c.timer != nil {
 		c.timer.Stop()
@@ -391,9 +407,8 @@ func (c *timerCtx) cancel(removeFromParent bool, err error) {
 
 // WithTimeout returns WithDeadline(parent, time.Now().Add(timeout)).
 //
-// Canceling this context releases resources associated with the deadline
-// timer, so code should call cancel as soon as the operations running in this
-// Context complete:
+// Canceling this context releases resources associated with it, so code should
+// call cancel as soon as the operations running in this Context complete:
 //
 // 	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
 // 		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)

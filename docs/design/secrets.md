@@ -73,7 +73,7 @@ Goals of this design:
     2.  As a cluster operator, I want to allow a pod to access a Docker registry using credentials
         from a `.dockercfg` file, so that containers can push images
     3.  As a cluster operator, I want to allow a pod to access a git repository using SSH keys,
-        so that I can push and fetch to and from the repository
+        so that I can push to and fetch from the repository
 2.  As a user, I want to allow containers to consume supplemental information about services such
     as username and password which should be kept secret, so that I can share secrets about a
     service amongst the containers in my application securely

@@ -54,7 +54,7 @@ func (plugin *rbdPlugin) Name() string {
 }
 
 func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.RBD == nil && spec.PersistentVolumeSource.RBD == nil {
+	if (spec.Volume != nil && spec.Volume.RBD == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil) {
 		return false
 	}
 	// see if rbd is there
@@ -73,7 +73,7 @@ func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	secret := ""
 	source, _ := plugin.getRBDVolumeSource(spec)
 
@@ -95,16 +95,16 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 
 	}
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret)
+	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
 	// rbd volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// rbd volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	if spec.VolumeSource.RBD != nil {
-		return spec.VolumeSource.RBD, spec.VolumeSource.RBD.ReadOnly
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD, spec.Volume.RBD.ReadOnly
 	} else {
-		return spec.PersistentVolumeSource.RBD, spec.ReadOnly
+		return spec.PersistentVolume.Spec.RBD, spec.ReadOnly
 	}
 }
 
@@ -126,12 +126,12 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	return &rbdBuilder{
 		rbd: &rbd{
 			podUID:   podUID,
-			volName:  spec.Name,
+			volName:  spec.Name(),
 			Image:    source.RBDImage,
 			Pool:     pool,
 			ReadOnly: readOnly,
 			manager:  manager,
-			mounter:  mounter,
+			mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
 			plugin:   plugin,
 		},
 		Mon:     source.CephMonitors,
@@ -142,9 +142,9 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	}, nil
 }
 
-func (plugin *rbdPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *rbdPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &RBDUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -192,6 +192,10 @@ type rbdBuilder struct {
 
 var _ volume.Builder = &rbdBuilder{}
 
+func (_ *rbdBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
+
 func (b *rbdBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
@@ -201,18 +205,8 @@ func (b *rbdBuilder) SetUpAt(dir string) error {
 	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("rbd: failed to setup")
-		return err
 	}
-	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
-	// make mountpoint rw/ro work as expected
-	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
-	mode := "rw"
-	if b.ReadOnly {
-		mode = "ro"
-	}
-	b.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
-
-	return nil
+	return err
 }
 
 type rbdCleaner struct {
@@ -223,6 +217,10 @@ var _ volume.Cleaner = &rbdCleaner{}
 
 func (b *rbd) IsReadOnly() bool {
 	return b.ReadOnly
+}
+
+func (b *rbd) SupportsSELinux() bool {
+	return true
 }
 
 // Unmounts the bind mount, and detaches the disk only if the disk

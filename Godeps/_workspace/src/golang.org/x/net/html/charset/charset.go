@@ -5,11 +5,12 @@
 // Package charset provides common text encodings for HTML documents.
 //
 // The mapping from encoding labels to encodings is defined at
-// http://encoding.spec.whatwg.org.
+// https://encoding.spec.whatwg.org/.
 package charset
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"mime"
 	"strings"
@@ -108,6 +109,18 @@ func NewReader(r io.Reader, contentType string) (io.Reader, error) {
 		r = transform.NewReader(r, e.NewDecoder())
 	}
 	return r, nil
+}
+
+// NewReaderLabel returns a reader that converts from the specified charset to
+// UTF-8. It uses Lookup to find the encoding that corresponds to label, and
+// returns an error if Lookup returns nil. It is suitable for use as
+// encoding/xml.Decoder's CharsetReader function.
+func NewReaderLabel(label string, input io.Reader) (io.Reader, error) {
+	e, _ := Lookup(label)
+	if e == nil {
+		return nil, fmt.Errorf("unsupported charset: %q", label)
+	}
+	return transform.NewReader(input, e.NewDecoder()), nil
 }
 
 func prescan(content []byte) (e encoding.Encoding, name string) {

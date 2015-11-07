@@ -1,51 +1,51 @@
-package logrus_airbrake
+package airbrake
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/tobi/airbrake-go"
 )
 
 // AirbrakeHook to send exceptions to an exception-tracking service compatible
-// with the Airbrake API. You must set:
-// * airbrake.Endpoint
-// * airbrake.ApiKey
-// * airbrake.Environment
-//
-// Before using this hook, to send an error. Entries that trigger an Error,
-// Fatal or Panic should now include an "error" field to send to Airbrake.
-type AirbrakeHook struct{}
+// with the Airbrake API.
+type airbrakeHook struct {
+	APIKey      string
+	Endpoint    string
+	Environment string
+}
 
-func (hook *AirbrakeHook) Fire(entry *logrus.Entry) error {
-	if entry.Data["error"] == nil {
-		entry.Logger.WithFields(logrus.Fields{
-			"source":   "airbrake",
-			"endpoint": airbrake.Endpoint,
-		}).Warn("Exceptions sent to Airbrake must have an 'error' key with the error")
-		return nil
+func NewHook(endpoint, apiKey, env string) *airbrakeHook {
+	return &airbrakeHook{
+		APIKey:      apiKey,
+		Endpoint:    endpoint,
+		Environment: env,
 	}
+}
 
+func (hook *airbrakeHook) Fire(entry *logrus.Entry) error {
+	airbrake.ApiKey = hook.APIKey
+	airbrake.Endpoint = hook.Endpoint
+	airbrake.Environment = hook.Environment
+
+	var notifyErr error
 	err, ok := entry.Data["error"].(error)
-	if !ok {
-		entry.Logger.WithFields(logrus.Fields{
-			"source":   "airbrake",
-			"endpoint": airbrake.Endpoint,
-		}).Warn("Exceptions sent to Airbrake must have an `error` key of type `error`")
-		return nil
+	if ok {
+		notifyErr = err
+	} else {
+		notifyErr = errors.New(entry.Message)
 	}
 
-	airErr := airbrake.Notify(err)
+	airErr := airbrake.Notify(notifyErr)
 	if airErr != nil {
-		entry.Logger.WithFields(logrus.Fields{
-			"source":   "airbrake",
-			"endpoint": airbrake.Endpoint,
-			"error":    airErr,
-		}).Warn("Failed to send error to Airbrake")
+		return fmt.Errorf("Failed to send error to Airbrake: %s", airErr)
 	}
 
 	return nil
 }
 
-func (hook *AirbrakeHook) Levels() []logrus.Level {
+func (hook *airbrakeHook) Levels() []logrus.Level {
 	return []logrus.Level{
 		logrus.ErrorLevel,
 		logrus.FatalLevel,

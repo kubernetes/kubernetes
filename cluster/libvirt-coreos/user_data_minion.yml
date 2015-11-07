@@ -15,7 +15,7 @@ coreos:
         [Service]
         ExecStart=/opt/kubernetes/bin/kubelet \
         --address=0.0.0.0 \
-        --hostname-override=${MINION_IPS[$i]} \
+        --hostname-override=${NODE_IPS[$i]} \
         --api-servers=http://${MASTER_IP}:8080 \
         $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-dns=${DNS_SERVER_IP}" ) \
         $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-domain=${DNS_DOMAIN}" ) \

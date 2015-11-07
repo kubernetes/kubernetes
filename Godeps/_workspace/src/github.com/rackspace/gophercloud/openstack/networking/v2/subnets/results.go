@@ -55,8 +55,8 @@ type AllocationPool struct {
 // HostRoute represents a route that should be used by devices with IPs from
 // a subnet (not including local subnet route).
 type HostRoute struct {
-	DestinationCIDR string `json:"destination"`
-	NextHop         string `json:"nexthop"`
+	DestinationCIDR string `mapstructure:"destination" json:"destination"`
+	NextHop         string `mapstructure:"nexthop" json:"nexthop"`
 }
 
 // Subnet represents a subnet. See package documentation for a top-level

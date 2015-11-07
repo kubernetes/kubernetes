@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	PodInfraOomAdj       int = -999
-	KubeletOomScoreAdj   int = -999
-	KubeProxyOomScoreAdj int = -999
+	PodInfraOOMAdj       int = -999
+	KubeletOOMScoreAdj   int = -999
+	KubeProxyOOMScoreAdj int = -999
 )
 
 // isMemoryBestEffort returns true if the container's memory requirements are best-effort.
@@ -37,17 +37,17 @@ func isMemoryBestEffort(container *api.Container) bool {
 func isMemoryGuaranteed(container *api.Container) bool {
 	// A container is memory guaranteed if its memory request == memory limit.
 	// If memory request == memory limit, the user is very confident of resource consumption.
-	memoryRequestValue := container.Resources.Requests.Memory().Value()
-	memoryLimitValue := container.Resources.Limits.Memory().Value()
-	return memoryRequestValue == memoryLimitValue && memoryRequestValue != 0
+	memoryRequest := container.Resources.Requests.Memory()
+	memoryLimit := container.Resources.Limits.Memory()
+	return (*memoryRequest).Cmp(*memoryLimit) == 0 && memoryRequest.Value() != 0
 }
 
-// GetContainerOomAdjust returns the amount by which the OOM score of all processes in the
+// GetContainerOOMAdjust returns the amount by which the OOM score of all processes in the
 // container should be adjusted. The OOM score of a process is the percentage of memory it consumes
 // multiplied by 100 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
-func GetContainerOomScoreAdjust(container *api.Container, memoryCapacity int64) int {
+func GetContainerOOMScoreAdjust(container *api.Container, memoryCapacity int64) int {
 	if isMemoryGuaranteed(container) {
 		// Memory guaranteed containers should be the last to get killed.
 		return -999

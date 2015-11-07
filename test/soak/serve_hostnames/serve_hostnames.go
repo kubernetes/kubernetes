@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/fields"
@@ -264,11 +265,11 @@ func main() {
 			glog.Infof("After %v while making a proxy call got error %v", time.Since(start), err)
 			continue
 		}
-		var r api.Status
+		var r unversioned.Status
 		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
 			break
 		}
-		if r.Status == api.StatusFailure {
+		if r.Status == unversioned.StatusFailure {
 			glog.Infof("After %v got status %v", time.Since(start), string(hostname))
 			continue
 		}

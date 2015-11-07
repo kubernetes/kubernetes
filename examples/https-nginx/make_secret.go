@@ -24,10 +24,14 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"log"
+
+	// This installs the legacy v1 API
+	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 // TODO:
@@ -62,5 +66,5 @@ func main() {
 			"nginx.key": nginxKey,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(latest.Codec, secret))
+	fmt.Printf(runtime.EncodeOrDie(latest.GroupOrDie("").Codec, secret))
 }

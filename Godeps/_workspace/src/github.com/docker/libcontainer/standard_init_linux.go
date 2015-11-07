@@ -64,6 +64,13 @@ func (l *linuxStandardInit) Init() error {
 	if err := label.SetProcessLabel(l.config.Config.ProcessLabel); err != nil {
 		return err
 	}
+
+	for key, value := range l.config.Config.SystemProperties {
+		if err := writeSystemProperty(key, value); err != nil {
+			return err
+		}
+	}
+
 	for _, path := range l.config.Config.ReadonlyPaths {
 		if err := remountReadonly(path); err != nil {
 			return err
@@ -91,6 +98,9 @@ func (l *linuxStandardInit) Init() error {
 	// just kill ourself and not cause problems for someone else.
 	if syscall.Getppid() != l.parentPid {
 		return syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+	}
+	if err := finalizeSeccomp(l.config); err != nil {
+		return err
 	}
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
 }

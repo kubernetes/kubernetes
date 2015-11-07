@@ -27,10 +27,10 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
@@ -42,6 +42,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -56,6 +57,8 @@ type SchedulerServer struct {
 	Kubeconfig        string
 	BindPodsQPS       float32
 	BindPodsBurst     int
+	KubeAPIQPS        float32
+	KubeAPIBurst      int
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -64,8 +67,32 @@ func NewSchedulerServer() *SchedulerServer {
 		Port:              ports.SchedulerPort,
 		Address:           net.ParseIP("127.0.0.1"),
 		AlgorithmProvider: factory.DefaultProvider,
+		BindPodsQPS:       50.0,
+		BindPodsBurst:     100,
+		KubeAPIQPS:        50.0,
+		KubeAPIBurst:      100,
 	}
 	return &s
+}
+
+// NewSchedulerCommand creates a *cobra.Command object with default parameters
+func NewSchedulerCommand() *cobra.Command {
+	s := NewSchedulerServer()
+	s.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use: "kube-scheduler",
+		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
+workload-specific function that significantly impacts availability, performance,
+and capacity. The scheduler needs to take into account individual and collective
+resource requirements, quality of service requirements, hardware/software/policy
+constraints, affinity and anti-affinity specifications, data locality, inter-workload
+interference, deadlines, and so on. Workload-specific requirements will be exposed
+through the API as necessary.`,
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
@@ -77,8 +104,10 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", 15.0, "Number of bindings per second scheduler is allowed to continuously make")
-	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", 20, "Number of bindings per second scheduler is allowed to make during bursts")
+	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", s.BindPodsQPS, "Number of bindings per second scheduler is allowed to continuously make")
+	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", s.BindPodsBurst, "Number of bindings per second scheduler is allowed to make during bursts")
+	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -95,8 +124,10 @@ func (s *SchedulerServer) Run(_ []string) error {
 	if err != nil {
 		return err
 	}
-	kubeconfig.QPS = 20.0
-	kubeconfig.Burst = 30
+
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = s.KubeAPIQPS
+	kubeconfig.Burst = s.KubeAPIBurst
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {

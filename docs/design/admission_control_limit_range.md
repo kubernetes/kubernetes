@@ -53,7 +53,7 @@ The **LimitRange** resource is scoped to a **Namespace**.
 ### Type
 
 ```go
-// A type of object that is limited
+// LimitType is a type of object that is limited
 type LimitType string
 
 const (
@@ -63,44 +63,50 @@ const (
   LimitTypeContainer LimitType = "Container"
 )
 
-// LimitRangeItem defines a min/max usage limit for any resource that matches on kind
+// LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
 type LimitRangeItem struct {
-  // Type of resource that this limit applies to
-  Type LimitType `json:"type,omitempty" description:"type of resource that this limit applies to"`
-  // Max usage constraints on this kind by resource name
-  Max ResourceList `json:"max,omitempty" description:"max usage constraints on this kind by resource name"`
-  // Min usage constraints on this kind by resource name
-  Min ResourceList `json:"min,omitempty" description:"min usage constraints on this kind by resource name"`
-  // Default resource limits on this kind by resource name
-  Default ResourceList `json:"default,omitempty" description:"default resource limits values on this kind by resource name if omitted"`
-  // DefaultRequests resource requests on this kind by resource name
-  DefaultRequests ResourceList `json:"defaultRequests,omitempty" description:"default resource requests values on this kind by resource name if omitted"`
-  // LimitRequestRatio is the ratio of limit over request that is the maximum allowed burst for the named resource
-  LimitRequestRatio ResourceList `json:"limitRequestRatio,omitempty" description:"the ratio of limit over request that is the maximum allowed burst for the named resource. if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value"`
+  // Type of resource that this limit applies to.
+  Type LimitType `json:"type,omitempty"`
+  // Max usage constraints on this kind by resource name.
+  Max ResourceList `json:"max,omitempty"`
+  // Min usage constraints on this kind by resource name.
+  Min ResourceList `json:"min,omitempty"`
+  // Default resource requirement limit value by resource name if resource limit is omitted.
+  Default ResourceList `json:"default,omitempty"`
+  // DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
+  DefaultRequest ResourceList `json:"defaultRequest,omitempty"`
+  // MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
+  MaxLimitRequestRatio ResourceList `json:"maxLimitRequestRatio,omitempty"`
 }
 
-// LimitRangeSpec defines a min/max usage limit for resources that match on kind
+// LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 type LimitRangeSpec struct {
-  // Limits is the list of LimitRangeItem objects that are enforced
-  Limits []LimitRangeItem `json:"limits" description:"limits is the list of LimitRangeItem objects that are enforced"`
+  // Limits is the list of LimitRangeItem objects that are enforced.
+  Limits []LimitRangeItem `json:"limits"`
 }
 
-// LimitRange sets resource usage limits for each kind of resource in a Namespace
+// LimitRange sets resource usage limits for each kind of resource in a Namespace.
 type LimitRange struct {
-  TypeMeta   `json:",inline"`
-  ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+  TypeMeta `json:",inline"`
+  // Standard object's metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  ObjectMeta `json:"metadata,omitempty"`
 
-  // Spec defines the limits enforced
-  Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+  // Spec defines the limits enforced.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  Spec LimitRangeSpec `json:"spec,omitempty"`
 }
 
 // LimitRangeList is a list of LimitRange items.
 type LimitRangeList struct {
   TypeMeta `json:",inline"`
-  ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+  // Standard list metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  ListMeta `json:"metadata,omitempty"`
 
-  // Items is a list of LimitRange objects
-  Items []LimitRange `json:"items" description:"items is a list of LimitRange objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md"`
+  // Items is a list of LimitRange objects.
+  // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
+  Items []LimitRange `json:"items"`
 }
 ```
 
@@ -108,7 +114,7 @@ type LimitRangeList struct {
 
 Validation of a **LimitRange** enforces that for a given named resource the following rules apply:
 
-Min (if specified) <= DefaultRequests (if specified) <= Default (if specified) <= Max (if specified)
+Min (if specified) <= DefaultRequest (if specified) <= Default (if specified) <= Max (if specified)
 
 ### Default Value Behavior
 
@@ -121,11 +127,11 @@ if LimitRangeItem.Default[resourceName] is undefined
 ```
 
 ```
-if LimitRangeItem.DefaultRequests[resourceName] is undefined
+if LimitRangeItem.DefaultRequest[resourceName] is undefined
   if LimitRangeItem.Default[resourceName] is defined
-    LimitRangeItem.DefaultRequests[resourceName] = LimitRangeItem.Default[resourceName]
+    LimitRangeItem.DefaultRequest[resourceName] = LimitRangeItem.Default[resourceName]
   else if LimitRangeItem.Min[resourceName] is defined
-    LimitRangeItem.DefaultRequests[resourceName] = LimitRangeItem.Min[resourceName]
+    LimitRangeItem.DefaultRequest[resourceName] = LimitRangeItem.Min[resourceName]
 ```
 
 ## AdmissionControl plugin: LimitRanger

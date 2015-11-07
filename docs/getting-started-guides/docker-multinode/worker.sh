@@ -27,12 +27,11 @@ fi
 
 # Make sure k8s version env is properly set
 if [ -z ${K8S_VERSION} ]; then
-    echo "Please export K8S_VERSION in your env"
-    exit 1
+    K8S_VERSION="1.0.3"
+    echo "K8S_VERSION is not set, using default: ${K8S_VERSION}"
 else
     echo "k8s version is set to: ${K8S_VERSION}"
 fi
-
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
@@ -58,12 +57,12 @@ lsb_dist=""
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
 detect_lsb() {
     case "$(uname -m)" in
-    *64)
-        ;;
-    *)
-	echo "Error: We currently only support 64-bit platforms."	    
-	exit 1
-	;;
+        *64)
+            ;;
+        *)
+	        echo "Error: We currently only support 64-bit platforms."	    
+	        exit 1
+	        ;;
     esac
 
     if command_exists lsb_release; then
@@ -83,6 +82,15 @@ detect_lsb() {
     fi
 
     lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
+
+    case "${lsb_dist}" in
+        amzn|centos|debian|ubuntu)
+            ;;
+        *)
+            echo "Error: We currently only support ubuntu|debian|amzn|centos."
+            exit 1
+            ;;
+    esac
 }
 
 
@@ -98,7 +106,7 @@ DOCKER_CONF=""
 # Start k8s components in containers
 start_k8s() {
     # Start flannel
-    flannelCID=$(sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --restart=always --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001 -iface="eth0")
+    flannelCID=$(sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --restart=always --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001 -iface="eth0")
 
     sleep 8
 
@@ -107,34 +115,73 @@ start_k8s() {
     source subnet.env
 
     # Configure docker net settings, then restart it
-    case "$lsb_dist" in
-        fedora|centos|amzn)
+    case "${lsb_dist}" in
+        centos)
             DOCKER_CONF="/etc/sysconfig/docker"
-        ;;
-        ubuntu|debian|linuxmint)
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            if ! command_exists ifconfig; then
+                yum -y -q install net-tools
+            fi
+            ifconfig docker0 down
+            yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
+            ;;
+        amzn)
+            DOCKER_CONF="/etc/sysconfig/docker"
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            ifconfig docker0 down
+            yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
+            ;;
+        ubuntu|debian)
             DOCKER_CONF="/etc/default/docker"
-        ;;
-    esac
-
-    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-
-    ifconfig docker0 down
-
-    case "$lsb_dist" in
-        fedora|centos)
-            yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
-        ;;
-        ubuntu|debian|linuxmint)
-            apt-get install bridge-utils && brctl delbr docker0 && service docker restart
-        ;;
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            ifconfig docker0 down
+            apt-get install bridge-utils
+            brctl delbr docker0
+            service docker stop
+            while [ `ps aux | grep /usr/bin/docker | grep -v grep | wc -l` -gt 0 ]; do
+                echo "Waiting for docker to terminate"
+                sleep 1
+            done
+            service docker start
+            ;;
+        *)
+            echo "Unsupported operations system ${lsb_dist}"
+            exit 1
+            ;;
     esac
 
     # sleep a little bit
     sleep 5
     
     # Start kubelet & proxy in container
-    sudo docker run --net=host --privileged --restart=always -d -v /sys:/sys:ro -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=$(hostname -i) --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
-    sudo docker run -d --net=host --privileged --restart=always gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
+    # TODO: Use secure port for communication
+    docker run \
+        --net=host \
+        --pid=host \
+        --privileged \
+        --restart=always \
+        -d \
+        -v /sys:/sys:ro \
+        -v /var/run:/var/run:rw  \
+        -v /:/rootfs:ro \
+        -v /dev:/dev \
+        -v /var/lib/docker/:/var/lib/docker:rw \
+        -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 \
+        --v=2 --address=0.0.0.0 --enable-server \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local \
+        --containerized
+    
+    docker run \
+        -d \
+        --net=host \
+        --privileged \
+        --restart=always \
+        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+        /hyperkube proxy --master=http://${MASTER_IP}:8080 \
+        --v=2
 }
 
 echo "Detecting your OS distro ..."

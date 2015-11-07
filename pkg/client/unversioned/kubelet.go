@@ -19,6 +19,8 @@ package unversioned
 import (
 	"errors"
 	"net/http"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // KubeletClient is an interface for all kubelet functionality
@@ -48,14 +50,20 @@ func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	transport := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		return &http.Transport{
+		transport = util.SetTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
-		}, nil
-	} else {
-		return http.DefaultTransport, nil
+		})
 	}
+
+	if len(config.BearerToken) > 0 {
+		transport = NewBearerAuthRoundTripper(config.BearerToken, transport)
+	}
+
+	return transport, nil
 }
 
 // TODO: this structure is questionable, it should be using client.Config and overriding defaults.

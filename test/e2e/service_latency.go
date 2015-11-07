@@ -23,12 +23,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
@@ -43,13 +44,13 @@ func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 var _ = Describe("Service endpoints latency", func() {
 	f := NewFramework("svc-latency")
 
-	It("should not be very high", func() {
+	It("should not be very high [Conformance]", func() {
 		const (
 			// These are very generous criteria. Ideally we will
 			// get this much lower in the future. See issue
 			// #10436.
 			limitMedian = time.Second * 20
-			limitTail   = time.Second * 40
+			limitTail   = time.Second * 50
 
 			// Numbers chosen to make the test complete in a short amount
 			// of time. This sample size is not actually large enough to
@@ -70,7 +71,7 @@ var _ = Describe("Service endpoints latency", func() {
 		f.Client.RESTClient.Throttle = util.NewFakeRateLimiter()
 		defer func() { f.Client.RESTClient.Throttle = oldThrottle }()
 
-		failing := util.NewStringSet()
+		failing := sets.NewString()
 		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
 		if err != nil {
 			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
@@ -118,7 +119,7 @@ var _ = Describe("Service endpoints latency", func() {
 func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := RCConfig{
 		Client:       f.Client,
-		Image:        "gcr.io/google_containers/pause:1.0",
+		Image:        "beta.gcr.io/google_containers/pause:2.0",
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
@@ -278,10 +279,10 @@ func startEndpointWatcher(f *Framework, q *endpointQueries) {
 	_, controller := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return f.Client.Endpoints(f.Namespace.Name).List(labels.Everything())
+				return f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return f.Client.Endpoints(f.Namespace.Name).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return f.Client.Endpoints(f.Namespace.Name).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Endpoints{},

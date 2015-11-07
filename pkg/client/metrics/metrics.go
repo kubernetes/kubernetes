@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package metrics provides utilities for registering client metrics to Prometheus.
 package metrics
 
 import (
@@ -26,6 +27,8 @@ import (
 const restClientSubsystem = "rest_client"
 
 var (
+	// RequestLatency is a Prometheus Summary metric type partitioned by
+	// "verb" and "url" labels. It is used for the rest client latency metrics.
 	RequestLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: restClientSubsystem,
@@ -39,7 +42,8 @@ var (
 
 var registerMetrics sync.Once
 
-// Register all metrics.
+// Register registers all metrics to Prometheus with
+// respect to the RequestLatency.
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
@@ -47,7 +51,7 @@ func Register() {
 	})
 }
 
-// Gets the time since the specified start in microseconds.
+// Calculates the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }

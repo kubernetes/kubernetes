@@ -26,7 +26,7 @@ import (
 var _ = Describe("Variable Expansion", func() {
 	framework := NewFramework("var-expansion")
 
-	It("should allow composing env vars into new env vars", func() {
+	It("should allow composing env vars into new env vars [Conformance]", func() {
 		podName := "var-expansion-" + string(util.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -66,7 +66,7 @@ var _ = Describe("Variable Expansion", func() {
 		})
 	})
 
-	It("should allow substituting values in a container's command", func() {
+	It("should allow substituting values in a container's command [Conformance]", func() {
 		podName := "var-expansion-" + string(util.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -96,7 +96,7 @@ var _ = Describe("Variable Expansion", func() {
 		})
 	})
 
-	It("should allow substituting values in a container's args", func() {
+	It("should allow substituting values in a container's args [Conformance]", func() {
 		podName := "var-expansion-" + string(util.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{

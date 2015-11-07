@@ -45,45 +45,44 @@ var _ = Describe("Services", func() {
 	f := NewFramework("services")
 
 	var c *client.Client
-	// Use these in tests.  They're unique for each test to prevent name collisions.
-	var namespaces [2]string
+	var extraNamespaces []string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
-
-		By("Building a namespace api objects")
-		for i := range namespaces {
-			namespacePtr, err := createTestingNS(fmt.Sprintf("service-%d", i), c)
-			Expect(err).NotTo(HaveOccurred())
-			namespaces[i] = namespacePtr.Name
-		}
 	})
 
 	AfterEach(func() {
-		for _, ns := range namespaces {
-			By(fmt.Sprintf("Destroying namespace %v", ns))
-			if err := deleteNS(c, ns); err != nil {
-				Failf("Couldn't delete namespace %s: %s", ns, err)
+		if testContext.DeleteNamespace {
+			for _, ns := range extraNamespaces {
+				By(fmt.Sprintf("Destroying namespace %v", ns))
+				if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
+					Failf("Couldn't delete namespace %s: %s", ns, err)
+				}
 			}
+			extraNamespaces = nil
+		} else {
+			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 		}
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
-	It("should provide secure master service", func() {
+
+	It("should provide secure master service [Conformance]", func() {
 		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should serve a basic endpoint from pods", func() {
+	It("should serve a basic endpoint from pods [Conformance]", func() {
 		serviceName := "endpoint-test2"
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 		labels := map[string]string{
 			"foo": "bar",
 			"baz": "blah",
 		}
 
+		By("creating service " + serviceName + " in namespace " + ns)
 		defer func() {
 			err := c.Services(ns).Delete(serviceName)
 			Expect(err).NotTo(HaveOccurred())
@@ -106,43 +105,38 @@ var _ = Describe("Services", func() {
 
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 
-		var names []string
+		names := map[string]bool{}
 		defer func() {
-			for _, name := range names {
+			for name := range names {
 				err := c.Pods(ns).Delete(name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
 
-		name1 := "test1"
-		addEndpointPodOrFail(c, ns, name1, labels, []api.ContainerPort{{ContainerPort: 80}})
-		names = append(names, name1)
+		name1 := "pod1"
+		name2 := "pod2"
 
+		createPodOrFail(c, ns, name1, labels, []api.ContainerPort{{ContainerPort: 80}})
+		names[name1] = true
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}})
 
-		name2 := "test2"
-		addEndpointPodOrFail(c, ns, name2, labels, []api.ContainerPort{{ContainerPort: 80}})
-		names = append(names, name2)
-
+		createPodOrFail(c, ns, name2, labels, []api.ContainerPort{{ContainerPort: 80}})
+		names[name2] = true
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}, name2: {80}})
 
-		err = c.Pods(ns).Delete(name1, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{name2}
-
+		deletePodOrFail(c, ns, name1)
+		delete(names, name1)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name2: {80}})
 
-		err = c.Pods(ns).Delete(name2, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{}
-
+		deletePodOrFail(c, ns, name2)
+		delete(names, name2)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
-	It("should serve multiport endpoints from pods", func() {
+	It("should serve multiport endpoints from pods [Conformance]", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 
 		defer func() {
 			err := c.Services(ns).Delete(serviceName)
@@ -154,6 +148,7 @@ var _ = Describe("Services", func() {
 		svc1port := "svc1"
 		svc2port := "svc2"
 
+		By("creating service " + serviceName + " in namespace " + ns)
 		service := &api.Service{
 			ObjectMeta: api.ObjectMeta{
 				Name: serviceName,
@@ -180,9 +175,9 @@ var _ = Describe("Services", func() {
 		port2 := 101
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 
-		var names []string
+		names := map[string]bool{}
 		defer func() {
-			for _, name := range names {
+			for name := range names {
 				err := c.Pods(ns).Delete(name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -201,44 +196,30 @@ var _ = Describe("Services", func() {
 			},
 		}
 
-		podname1 := "podname1"
-		addEndpointPodOrFail(c, ns, podname1, labels, containerPorts1)
-		names = append(names, podname1)
+		podname1 := "pod1"
+		podname2 := "pod2"
+
+		createPodOrFail(c, ns, podname1, labels, containerPorts1)
+		names[podname1] = true
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}})
 
-		podname2 := "podname2"
-		addEndpointPodOrFail(c, ns, podname2, labels, containerPorts2)
-		names = append(names, podname2)
+		createPodOrFail(c, ns, podname2, labels, containerPorts2)
+		names[podname2] = true
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}})
 
-		podname3 := "podname3"
-		addEndpointPodOrFail(c, ns, podname3, labels, append(containerPorts1, containerPorts2...))
-		names = append(names, podname3)
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}, podname3: {port1, port2}})
+		deletePodOrFail(c, ns, podname1)
+		delete(names, podname1)
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname2: {port2}})
 
-		err = c.Pods(ns).Delete(podname1, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{podname2, podname3}
-
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname2: {port2}, podname3: {port1, port2}})
-
-		err = c.Pods(ns).Delete(podname2, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{podname3}
-
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname3: {port1, port2}})
-
-		err = c.Pods(ns).Delete(podname3, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{}
-
+		deletePodOrFail(c, ns, podname2)
+		delete(names, podname2)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
 	It("should be able to up and down services", func() {
 		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		SkipUnlessProviderIs("gce", "gke", "aws")
-		ns := namespaces[0]
+		SkipUnlessProviderIs(providersWithSSH...)
+		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
@@ -280,14 +261,18 @@ var _ = Describe("Services", func() {
 	It("should work after restarting kube-proxy", func() {
 		SkipUnlessProviderIs("gce", "gke")
 
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
-		defer func() { expectNoError(stopServeHostnameService(c, ns, "service1")) }()
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		svc1 := "service1"
+		svc2 := "service2"
+
+		defer func() { expectNoError(stopServeHostnameService(c, ns, svc1)) }()
+		podNames1, svc1IP, err := startServeHostnameService(c, ns, svc1, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
-		defer func() { expectNoError(stopServeHostnameService(c, ns, "service2")) }()
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+
+		defer func() { expectNoError(stopServeHostnameService(c, ns, svc2)) }()
+		podNames2, svc2IP, err := startServeHostnameService(c, ns, svc2, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -304,18 +289,18 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
 
-		// Restart kube-proxy and verify that services are still reachable (after some time).
+		By("Restarting kube-proxy")
 		if err := restartKubeProxy(host); err != nil {
 			Failf("error restarting kube-proxy: %v", err)
 		}
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
-		// Remove iptable rules and make sure they come back.
-		By("Remove iptable rules and make sure they come back")
+
+		By("Removing iptable rules")
 		_, _, code, err := SSH(`
-			sudo iptables -t nat -F KUBE-SERVICES || true;
-			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
+					sudo iptables -t nat -F KUBE-SERVICES || true;
+					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
+					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
 		if err != nil || code != 0 {
 			Failf("couldn't remove iptable rules: %v (code %v)", err, code)
 		}
@@ -327,11 +312,12 @@ var _ = Describe("Services", func() {
 		// TODO: restartApiserver doesn't work in GKE - fix it and reenable this test.
 		SkipUnlessProviderIs("gce")
 
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
 		defer func() { expectNoError(stopServeHostnameService(c, ns, "service1")) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := NodeSSHHosts(c)
 		Expect(err).NotTo(HaveOccurred())
@@ -354,6 +340,7 @@ var _ = Describe("Services", func() {
 		// Create a new service and check if it's not reusing IP.
 		defer func() { expectNoError(stopServeHostnameService(c, ns, "service2")) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
 			Failf("VIPs conflict: %v", svc1IP)
@@ -362,65 +349,9 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
 	})
 
-	It("should be able to create a functioning external load balancer", func() {
-		// requires ExternalLoadBalancer
-		SkipUnlessProviderIs("gce", "gke", "aws")
-
-		serviceName := "external-lb-test"
-		ns := namespaces[0]
-
-		t := NewWebserverTest(c, ns, serviceName)
-		defer func() {
-			defer GinkgoRecover()
-			errs := t.Cleanup()
-			if len(errs) != 0 {
-				Failf("errors in cleanup: %v", errs)
-			}
-		}()
-
-		inboundPort := 3000
-
-		service := t.BuildServiceSpec()
-		service.Spec.Type = api.ServiceTypeLoadBalancer
-		service.Spec.Ports[0].Port = inboundPort
-		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
-
-		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
-		result, err := t.CreateService(service)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Wait for the load balancer to be created asynchronously, which is
-		// currently indicated by ingress point(s) being added to the status.
-		result, err = waitForLoadBalancerIngress(c, serviceName, ns)
-		Expect(err).NotTo(HaveOccurred())
-		if len(result.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
-		}
-		ingress := result.Status.LoadBalancer.Ingress[0]
-		if len(result.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
-		}
-		port := result.Spec.Ports[0]
-		if port.NodePort == 0 {
-			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
-		}
-		if !ServiceNodePortRange.Contains(port.NodePort) {
-			Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
-		}
-
-		By("creating pod to be part of service " + serviceName)
-		t.CreateWebserverRC(1)
-
-		By("hitting the pod through the service's NodePort")
-		testReachable(pickMinionIP(c), port.NodePort)
-
-		By("hitting the pod through the service's external load balancer")
-		testLoadBalancerReachable(ingress, inboundPort)
-	})
-
 	It("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeportservice-test"
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 
 		t := NewWebserverTest(c, ns, serviceName)
 		defer func() {
@@ -459,22 +390,25 @@ var _ = Describe("Services", func() {
 		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(c)
+		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
-		hosts, err := NodeSSHHosts(c)
-		if err != nil {
-			Expect(err).NotTo(HaveOccurred())
-		}
-		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-		if code != 0 {
-			Failf("expected node port (%d) to be in use", nodePort)
+		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		if providerIs(providersWithSSH...) {
+			hosts, err := NodeSSHHosts(c)
+			if err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+			if code != 0 {
+				Failf("expected node port (%d) to be in use", nodePort)
+			}
 		}
 	})
 
 	It("should be able to change the type and nodeport settings of a service", func() {
-		// requires ExternalLoadBalancer
+		// requires cloud load-balancer support
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		serviceName := "mutability-service-test"
@@ -505,7 +439,7 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected Spec.Ports[0].nodePort for default service: %v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for default service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for default service: %v", service)
 		}
 
 		By("creating pod to be part of service " + t.ServiceName)
@@ -530,17 +464,16 @@ var _ = Describe("Services", func() {
 		if !ServiceNodePortRange.Contains(port.NodePort) {
 			Failf("got unexpected (out-of-range) port for NodePort service: %v", service)
 		}
-
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
 		}
+
 		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(f.Client)
+		ip := pickNodeIP(f.Client)
 		nodePort1 := port.NodePort // Save for later!
 		testReachable(ip, nodePort1)
 
 		By("changing service " + serviceName + " to type=LoadBalancer")
-		service.Spec.Type = api.ServiceTypeLoadBalancer
 		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeLoadBalancer
 		})
@@ -561,14 +494,15 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for LoadBalancer service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for LoadBalancer service: %v", service)
 		}
 		ingress1 := service.Status.LoadBalancer.Ingress[0]
 		if ingress1.IP == "" && ingress1.Hostname == "" {
-			Failf("got unexpected Status.LoadBalancer.Ingresss[0] for LoadBalancer service: %v", service)
+			Failf("got unexpected Status.LoadBalancer.Ingress[0] for LoadBalancer service: %v", service)
 		}
+
 		By("hitting the pod through the service's NodePort")
-		ip = pickMinionIP(f.Client)
+		ip = pickNodeIP(f.Client)
 		testReachable(ip, nodePort1)
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress1, 80)
@@ -595,24 +529,40 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected Spec.Ports[0].nodePort for NodePort service: %v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
 		}
-
-		// TODO: Make this less of a hack.  Watch for events?
-		Logf("Waiting 2 minutes to give service time to settle after changing configuration")
-		time.Sleep(time.Second * 120)
-		service, err = waitForLoadBalancerIngress(f.Client, serviceName, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
-
-		ingress2 := service.Status.LoadBalancer.Ingress[0]
-		Expect(ingress1).To(Equal(ingress2))
 
 		By("hitting the pod through the service's updated NodePort")
 		testReachable(ip, nodePort2)
-		By("hitting the pod through the service's LoadBalancer")
-		testLoadBalancerReachable(ingress2, 80)
 		By("checking the old NodePort is closed")
 		testNotReachable(ip, nodePort1)
+
+		By("hitting the pod through the service's LoadBalancer")
+		i := 1
+		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(3 * time.Second) {
+			service, err = waitForLoadBalancerIngress(f.Client, serviceName, f.Namespace.Name)
+			Expect(err).NotTo(HaveOccurred())
+
+			ingress2 := service.Status.LoadBalancer.Ingress[0]
+			if testLoadBalancerReachableInTime(ingress2, 80, 5*time.Second) {
+				break
+			}
+
+			if i%5 == 0 {
+				Logf("Waiting for load-balancer changes (%v elapsed, will retry)", time.Since(start))
+			}
+			i++
+		}
+
+		By("updating service's port " + serviceName + " and reaching it at the same IP")
+		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+			s.Spec.Ports[0].Port = 19482 // chosen arbitrarily to not conflict with port 80
+		})
+		Expect(err).NotTo(HaveOccurred())
+		port = service.Spec.Ports[0]
+		if !testLoadBalancerReachable(service.Status.LoadBalancer.Ingress[0], port.Port) {
+			Failf("Failed to reach load balancer at original ingress after updating its port: %+v", service)
+		}
 
 		By("changing service " + serviceName + " back to type=ClusterIP")
 		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
@@ -621,6 +571,9 @@ var _ = Describe("Services", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
+		if len(service.Status.LoadBalancer.Ingress) != 0 {
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+		}
 		if service.Spec.Type != api.ServiceTypeClusterIP {
 			Failf("got unexpected Spec.Type for back-to-ClusterIP service: %v", service)
 		}
@@ -637,109 +590,22 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for back-to-ClusterIP service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for back-to-ClusterIP service: %v", service)
 		}
-		By("checking the NodePort (original) is closed")
-		ip = pickMinionIP(f.Client)
-		testNotReachable(ip, nodePort1)
-		By("checking the NodePort (updated) is closed")
-		ip = pickMinionIP(f.Client)
+		By("checking the NodePort is closed")
+		ip = pickNodeIP(f.Client)
 		testNotReachable(ip, nodePort2)
 		By("checking the LoadBalancer is closed")
-		testLoadBalancerNotReachable(ingress2, 80)
-	})
-
-	It("should release the load balancer when Type goes from LoadBalancer -> NodePort", func() {
-		// requires ExternalLoadBalancer
-		SkipUnlessProviderIs("gce", "gke", "aws")
-
-		serviceName := "service-release-lb"
-		ns := namespaces[0]
-
-		t := NewWebserverTest(c, ns, serviceName)
-		defer func() {
-			defer GinkgoRecover()
-			errs := t.Cleanup()
-			if len(errs) != 0 {
-				Failf("errors in cleanup: %v", errs)
-			}
-		}()
-
-		service := t.BuildServiceSpec()
-		service.Spec.Type = api.ServiceTypeLoadBalancer
-
-		By("creating service " + serviceName + " with type LoadBalancer")
-		service, err := t.CreateService(service)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("creating pod to be part of service " + t.ServiceName)
-		t.CreateWebserverRC(1)
-
-		if service.Spec.Type != api.ServiceTypeLoadBalancer {
-			Failf("got unexpected Spec.Type for LoadBalancer service: %v", service)
-		}
-		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", service)
-		}
-		nodePort := service.Spec.Ports[0].NodePort
-		if nodePort == 0 {
-			Failf("got unexpected Spec.Ports[0].NodePort for LoadBalancer service: %v", service)
-		}
-
-		// Wait for the load balancer to be created asynchronously
-		service, err = waitForLoadBalancerIngress(c, serviceName, ns)
-		Expect(err).NotTo(HaveOccurred())
-
-		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for LoadBalancer service: %v", service)
-		}
-		ingress := service.Status.LoadBalancer.Ingress[0]
-		if ingress.IP == "" && ingress.Hostname == "" {
-			Failf("got unexpected Status.LoadBalancer.Ingresss[0] for LoadBalancer service: %v", service)
-		}
-
-		By("hitting the pod through the service's NodePort")
-		ip := pickMinionIP(c)
-		testReachable(ip, nodePort)
-		By("hitting the pod through the service's LoadBalancer")
-		testLoadBalancerReachable(ingress, 80)
-
-		By("changing service " + serviceName + " to type=NodePort")
-		service, err = updateService(c, ns, serviceName, func(s *api.Service) {
-			s.Spec.Type = api.ServiceTypeNodePort
-		})
-		Expect(err).NotTo(HaveOccurred())
-
-		if service.Spec.Type != api.ServiceTypeNodePort {
-			Failf("got unexpected Spec.Type for NodePort service: %v", service)
-		}
-		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for NodePort service: %v", service)
-		}
-		if service.Spec.Ports[0].NodePort != nodePort {
-			Failf("got unexpected Spec.Ports[0].NodePort for NodePort service: %v", service)
-		}
-
-		// Wait for the load balancer to be created asynchronously
-		service, err = waitForLoadBalancerDestroy(c, serviceName, ns)
-		Expect(err).NotTo(HaveOccurred())
-
-		if len(service.Status.LoadBalancer.Ingress) != 0 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
-		}
-
-		By("hitting the pod through the service's NodePort")
-		testReachable(ip, nodePort)
-		By("checking the LoadBalancer is closed")
-		testLoadBalancerNotReachable(ingress, 80)
+		testLoadBalancerNotReachable(ingress1, port.Port)
 	})
 
 	It("should prevent NodePort collisions", func() {
-		serviceName := "nodeport-collision"
-		serviceName2 := serviceName + "2"
-		ns := namespaces[0]
+		baseName := "nodeport-collision-"
+		serviceName1 := baseName + "1"
+		serviceName2 := baseName + "2"
+		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewWebserverTest(c, ns, serviceName1)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -748,10 +614,9 @@ var _ = Describe("Services", func() {
 			}
 		}()
 
+		By("creating service " + serviceName1 + " with type NodePort in namespace " + ns)
 		service := t.BuildServiceSpec()
 		service.Spec.Type = api.ServiceTypeNodePort
-
-		By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		result, err := t.CreateService(service)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -766,23 +631,21 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected Spec.Ports[0].nodePort for new service: %v", result)
 		}
 
-		By("creating service " + serviceName + " with conflicting NodePort")
-
+		By("creating service " + serviceName2 + " with conflicting NodePort")
 		service2 := t.BuildServiceSpec()
 		service2.Name = serviceName2
 		service2.Spec.Type = api.ServiceTypeNodePort
 		service2.Spec.Ports[0].NodePort = port.NodePort
-
-		By("creating service " + serviceName2 + " with conflicting NodePort")
 		result2, err := t.CreateService(service2)
 		if err == nil {
 			Failf("Created service with conflicting NodePort: %v", result2)
 		}
-		expectedErr := fmt.Sprintf("Service \"%s\" is invalid: spec.ports[0].nodePort: invalid value '%d', Details: provided port is already allocated", serviceName2, port.NodePort)
+		expectedErr := fmt.Sprintf("Service \"%s\" is invalid: spec.ports[0].nodePort: invalid value '%d', Details: provided port is already allocated",
+			serviceName2, port.NodePort)
 		Expect(fmt.Sprintf("%v", err)).To(Equal(expectedErr))
 
-		By("deleting original service " + serviceName + " with type NodePort in namespace " + ns)
-		err = t.DeleteService(serviceName)
+		By("deleting service " + serviceName1 + " to release NodePort")
+		err = t.DeleteService(serviceName1)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating service " + serviceName2 + " with no-longer-conflicting NodePort")
@@ -792,7 +655,7 @@ var _ = Describe("Services", func() {
 
 	It("should check NodePort out-of-range", func() {
 		serviceName := "nodeport-range-test"
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 
 		t := NewWebserverTest(c, ns, serviceName)
 		defer func() {
@@ -858,7 +721,7 @@ var _ = Describe("Services", func() {
 
 	It("should release NodePorts on delete", func() {
 		serviceName := "nodeport-reuse"
-		ns := namespaces[0]
+		ns := f.Namespace.Name
 
 		t := NewWebserverTest(c, ns, serviceName)
 		defer func() {
@@ -895,14 +758,17 @@ var _ = Describe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := NodeSSHHosts(c)
-		if err != nil {
-			Expect(err).NotTo(HaveOccurred())
-		}
-		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-		if code == 0 {
-			Failf("expected node port (%d) to not be in use", nodePort)
+		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		if providerIs(providersWithSSH...) {
+			hosts, err := NodeSSHHosts(c)
+			if err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+			if code == 0 {
+				Failf("expected node port (%d) to not be in use", nodePort)
+			}
 		}
 
 		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
@@ -913,54 +779,98 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
+	// This test hits several load-balancer cases because LB turnup is slow.
+	It("should serve identically named services in different namespaces on different load-balancers", func() {
 		// requires ExternalLoadBalancer
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
-		serviceNames := []string{"s0"} // Could add more here, but then it takes longer.
-		labels := map[string]string{
-			"key0": "value0",
-			"key1": "value1",
-		}
-		service := &api.Service{
-			ObjectMeta: api.ObjectMeta{},
-			Spec: api.ServiceSpec{
-				Selector: labels,
-				Ports: []api.ServicePort{{
-					Port:       80,
-					TargetPort: util.NewIntOrStringFromInt(80),
-				}},
-				Type: api.ServiceTypeLoadBalancer,
-			},
+		ns1 := f.Namespace.Name
+
+		By("Building a second namespace api object")
+		namespacePtr, err := createTestingNS("services", c)
+		Expect(err).NotTo(HaveOccurred())
+		ns2 := namespacePtr.Name
+		extraNamespaces = append(extraNamespaces, ns2)
+
+		serviceName := "test-svc"
+		servicePort := 9376
+
+		By("creating service " + serviceName + " with load balancer in namespace " + ns1)
+		t1 := NewWebserverTest(c, ns1, serviceName)
+		svc1 := t1.BuildServiceSpec()
+		svc1.Spec.Type = api.ServiceTypeLoadBalancer
+		svc1.Spec.Ports[0].Port = servicePort
+		svc1.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		_, err = t1.CreateService(svc1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating pod to be part of service " + serviceName + " in namespace " + ns1)
+		t1.CreateWebserverRC(1)
+
+		loadBalancerIP := ""
+		if providerIs("gce", "gke") {
+			By("creating a static IP")
+			rand.Seed(time.Now().UTC().UnixNano())
+			staticIPName := fmt.Sprintf("e2e-external-lb-test-%d", rand.Intn(65535))
+			loadBalancerIP, err = createGCEStaticIP(staticIPName)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				// Release GCE static IP - this is not kube-managed and will not be automatically released.
+				deleteGCEStaticIP(staticIPName)
+			}()
 		}
 
+		By("creating service " + serviceName + " with load balancer in namespace " + ns2)
+		t2 := NewWebserverTest(c, ns2, serviceName)
+		svc2 := t2.BuildServiceSpec()
+		svc2.Spec.Type = api.ServiceTypeLoadBalancer
+		svc2.Spec.Ports[0].Port = servicePort
+		svc2.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		svc2.Spec.LoadBalancerIP = loadBalancerIP
+		_, err = t2.CreateService(svc2)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating pod to be part of service " + serviceName + " in namespace " + ns2)
+		t2.CreateWebserverRC(2)
+
 		ingressPoints := []string{}
-		for _, namespace := range namespaces {
-			for _, serviceName := range serviceNames {
-				service.ObjectMeta.Name = serviceName
-				service.ObjectMeta.Namespace = namespace
-				By("creating service " + serviceName + " in namespace " + namespace)
-				_, err := c.Services(namespace).Create(service)
-				Expect(err).NotTo(HaveOccurred())
-				defer func(namespace, serviceName string) { // clean up when we're done
-					By("deleting service " + serviceName + " in namespace " + namespace)
-					err := c.Services(namespace).Delete(serviceName)
-					Expect(err).NotTo(HaveOccurred())
-				}(namespace, serviceName)
+		svcs := []*api.Service{svc1, svc2}
+		for _, svc := range svcs {
+			namespace := svc.Namespace
+			lbip := svc.Spec.LoadBalancerIP
+
+			// Wait for the load balancer to be created asynchronously, which is
+			// currently indicated by ingress point(s) being added to the status.
+			result, err := waitForLoadBalancerIngress(c, serviceName, namespace)
+			Expect(err).NotTo(HaveOccurred())
+			if len(result.Status.LoadBalancer.Ingress) != 1 {
+				Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
 			}
-		}
-		for _, namespace := range namespaces {
-			for _, serviceName := range serviceNames {
-				result, err := waitForLoadBalancerIngress(c, serviceName, namespace)
-				Expect(err).NotTo(HaveOccurred())
-				for i := range result.Status.LoadBalancer.Ingress {
-					ingress := result.Status.LoadBalancer.Ingress[i].IP
-					if ingress == "" {
-						ingress = result.Status.LoadBalancer.Ingress[i].Hostname
-					}
-					ingressPoints = append(ingressPoints, ingress) // Save 'em to check uniqueness
-				}
+			ingress := result.Status.LoadBalancer.Ingress[0]
+			if len(result.Spec.Ports) != 1 {
+				Failf("got unexpected len(Spec.Ports) for LoadBalancer service: %v", result)
 			}
+			if lbip != "" {
+				Expect(ingress.IP).To(Equal(lbip))
+			}
+			port := result.Spec.Ports[0]
+			if port.NodePort == 0 {
+				Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", result)
+			}
+			if !ServiceNodePortRange.Contains(port.NodePort) {
+				Failf("got unexpected (out-of-range) port for LoadBalancer service: %v", result)
+			}
+			ing := result.Status.LoadBalancer.Ingress[0].IP
+			if ing == "" {
+				ing = result.Status.LoadBalancer.Ingress[0].Hostname
+			}
+			ingressPoints = append(ingressPoints, ing) // Save 'em to check uniqueness
+
+			By("hitting the pod through the service's NodePort")
+			testReachable(pickNodeIP(c), port.NodePort)
+
+			By("hitting the pod through the service's external load balancer")
+			testLoadBalancerReachable(ingress, servicePort)
 		}
 		validateUniqueOrFail(ingressPoints)
 	})
@@ -994,7 +904,8 @@ func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string)
 	const timeout = 20 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a LoadBalancer ingress point", timeout, serviceName, namespace))
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+	i := 1
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(3 * time.Second) {
 		service, err := c.Services(namespace).Get(serviceName)
 		if err != nil {
 			Logf("Get service failed, ignoring for 5s: %v", err)
@@ -1003,13 +914,17 @@ func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string)
 		if len(service.Status.LoadBalancer.Ingress) > 0 {
 			return service, nil
 		}
-		Logf("Waiting for service %s in namespace %s to have a LoadBalancer ingress point (%v)", serviceName, namespace, time.Since(start))
+		if i%5 == 0 {
+			Logf("Waiting for service %s in namespace %s to have a LoadBalancer ingress point (%v)", serviceName, namespace, time.Since(start))
+		}
+		i++
 	}
 	return service, fmt.Errorf("service %s in namespace %s doesn't have a LoadBalancer ingress point after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
 func waitForLoadBalancerDestroy(c *client.Client, serviceName, namespace string) (*api.Service, error) {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	// TODO: this should actually test that the LB was released at the cloud provider
 	const timeout = 10 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have no LoadBalancer ingress points", timeout, serviceName, namespace))
@@ -1049,21 +964,18 @@ func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 
 				// use endpoint annotations to recover the container port in a Mesos setup
 				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
-				if providerIs("mesos/docker") {
-					key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
-					containerPortString := endpoints.Annotations[key]
-					if containerPortString == "" {
-						continue
-					}
+				key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
+				mesosContainerPortString := endpoints.Annotations[key]
+				if mesosContainerPortString != "" {
 					var err error
-					containerPort, err = strconv.Atoi(containerPortString)
+					containerPort, err = strconv.Atoi(mesosContainerPortString)
 					if err != nil {
 						continue
 					}
-					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, containerPortString)
+					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, mesosContainerPortString)
 				}
 
-				Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
+				// Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
 				if _, ok := m[addr.TargetRef.UID]; !ok {
 					m[addr.TargetRef.UID] = make([]int, 0)
 				}
@@ -1086,9 +998,8 @@ func translatePodNameToUIDOrFail(c *client.Client, ns string, expectedEndpoints 
 			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
 		portsByUID[pod.ObjectMeta.UID] = portList
-		By(fmt.Sprintf(""))
 	}
-	By(fmt.Sprintf("successfully translated pod names to UIDs: %v -> %v on namespace %s", expectedEndpoints, portsByUID, ns))
+	// Logf("successfully translated pod names to UIDs: %v -> %v on namespace %s", expectedEndpoints, portsByUID, ns)
 	return portsByUID
 }
 
@@ -1115,26 +1026,31 @@ func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUI
 }
 
 func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, expectedEndpoints PortsByPodName) {
-	By(fmt.Sprintf("Waiting up to %v for service %s in namespace %s to expose endpoints %v", serviceStartTimeout, serviceName, namespace, expectedEndpoints))
-	for start := time.Now(); time.Since(start) < serviceStartTimeout; time.Sleep(5 * time.Second) {
+	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", serviceStartTimeout, serviceName, namespace, expectedEndpoints))
+	i := 1
+	for start := time.Now(); time.Since(start) < serviceStartTimeout; time.Sleep(1 * time.Second) {
 		endpoints, err := c.Endpoints(namespace).Get(serviceName)
 		if err != nil {
 			Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
 			continue
 		}
-		Logf("Found endpoints %v", endpoints)
+		// Logf("Found endpoints %v", endpoints)
 
 		portsByPodUID := getContainerPortsByPodUID(endpoints)
-		Logf("Found port by pod UID %v", portsByPodUID)
+		// Logf("Found port by pod UID %v", portsByPodUID)
 
 		expectedPortsByPodUID := translatePodNameToUIDOrFail(c, namespace, expectedEndpoints)
 		if len(portsByPodUID) == len(expectedEndpoints) {
 			validatePortsOrFail(portsByPodUID, expectedPortsByPodUID)
-			By(fmt.Sprintf("Successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, time.Since(start)))
+			Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
+				serviceName, namespace, expectedEndpoints, time.Since(start))
 			return
 		}
 
-		Logf("Unexpected number of endpoints: found %v, expected %v (%v elapsed, ignoring for 5s)", portsByPodUID, expectedEndpoints, time.Since(start))
+		if i%5 == 0 {
+			Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
+		}
+		i++
 	}
 
 	if pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
@@ -1147,8 +1063,8 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, serviceStartTimeout)
 }
 
-func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
-	By(fmt.Sprintf("Adding pod %v in namespace %v", name, ns))
+func createPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
+	By(fmt.Sprintf("creating pod %s in namespace %s", name, ns))
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -1158,13 +1074,19 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "gcr.io/google_containers/pause",
+					Image: "beta.gcr.io/google_containers/pause:2.0",
 					Ports: containerPorts,
 				},
 			},
 		},
 	}
 	_, err := c.Pods(ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func deletePodOrFail(c *client.Client, ns, name string) {
+	By(fmt.Sprintf("deleting pod %s in namespace %s", name, ns))
+	err := c.Pods(ns).Delete(name, nil)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1182,7 +1104,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 	return ips
 }
 
-func getMinionPublicIps(c *client.Client) ([]string, error) {
+func getNodePublicIps(c *client.Client) ([]string, error) {
 	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
@@ -1195,8 +1117,8 @@ func getMinionPublicIps(c *client.Client) ([]string, error) {
 	return ips, nil
 }
 
-func pickMinionIP(c *client.Client) string {
-	publicIps, err := getMinionPublicIps(c)
+func pickNodeIP(c *client.Client) string {
+	publicIps, err := getNodePublicIps(c)
 	Expect(err).NotTo(HaveOccurred())
 	if len(publicIps) == 0 {
 		Failf("got unexpected number (%d) of public IPs", len(publicIps))
@@ -1205,13 +1127,17 @@ func pickMinionIP(c *client.Client) string {
 	return ip
 }
 
-func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) {
+func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
+	return testLoadBalancerReachableInTime(ingress, port, podStartTimeout)
+}
+
+func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
 	ip := ingress.IP
 	if ip == "" {
 		ip = ingress.Hostname
 	}
 
-	testReachable(ip, port)
+	return testReachableInTime(ip, port, timeout)
 }
 
 func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
@@ -1223,19 +1149,25 @@ func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
 	testNotReachable(ip, port)
 }
 
-func testReachable(ip string, port int) {
+func testReachable(ip string, port int) bool {
+	return testReachableInTime(ip, port, podStartTimeout)
+}
+
+func testReachableInTime(ip string, port int, timeout time.Duration) bool {
 	url := fmt.Sprintf("http://%s:%d", ip, port)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", url)
+		return false
 	}
 	if port == 0 {
 		Failf("Got port==0 for reachability check (%s)", url)
+		return false
 	}
 
 	desc := fmt.Sprintf("the url %s to be reachable", url)
-	By(fmt.Sprintf("Waiting up to %v for %s", podStartTimeout, desc))
+	By(fmt.Sprintf("Waiting up to %v for %s", timeout, desc))
 	start := time.Now()
-	err := wait.Poll(poll, podStartTimeout, func() (bool, error) {
+	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
 			Logf("Got error waiting for reachability of %s: %v (%v)", url, err, time.Since(start))
@@ -1256,7 +1188,11 @@ func testReachable(ip string, port int) {
 		Logf("Successfully reached %v", url)
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)
+		return false
+	}
+	return true
 }
 
 func testNotReachable(ip string, port int) {
@@ -1270,7 +1206,7 @@ func testNotReachable(ip string, port int) {
 
 	desc := fmt.Sprintf("the url %s to be *not* reachable", url)
 	By(fmt.Sprintf("Waiting up to %v for %s", podStartTimeout, desc))
-	err := wait.Poll(poll, podStartTimeout, func() (bool, error) {
+	err := wait.PollImmediate(poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
 			Logf("Successfully waited for %s", desc)
@@ -1292,6 +1228,7 @@ func testNotReachable(ip string, port int) {
 func startServeHostnameService(c *client.Client, ns, name string, port, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 
+	By("creating service " + name + " in namespace " + ns)
 	_, err := c.Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -1319,7 +1256,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
-		Timeout:              30 * time.Second,
+		Timeout:              podReadyBeforeTimeout,
 		Replicas:             replicas,
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,
@@ -1374,6 +1311,7 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 			command),
 	}
 
+	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
 	for _, cmd := range commands {
 		passed := false
 		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5) {
@@ -1466,7 +1404,8 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 func (t *WebserverTest) BuildServiceSpec() *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name: t.ServiceName,
+			Name:      t.ServiceName,
+			Namespace: t.Namespace,
 		},
 		Spec: api.ServiceSpec{
 			Selector: t.Labels,
@@ -1533,7 +1472,7 @@ func (t *WebserverTest) Cleanup() []error {
 		if _, err := t.Client.ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}
-		// TODO(mbforbes): Wait.
+		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
 		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {

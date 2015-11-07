@@ -23,9 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -40,7 +41,7 @@ type Result struct {
 	sources  []Visitor
 	singular bool
 
-	ignoreErrors []errors.Matcher
+	ignoreErrors []utilerrors.Matcher
 
 	// populated by a call to Infos
 	info []*Info
@@ -55,7 +56,7 @@ type Result struct {
 // err.
 func (r *Result) IgnoreErrors(fns ...ErrMatchFunc) *Result {
 	for _, fn := range fns {
-		r.ignoreErrors = append(r.ignoreErrors, errors.Matcher(fn))
+		r.ignoreErrors = append(r.ignoreErrors, utilerrors.Matcher(fn))
 	}
 	return r
 }
@@ -76,7 +77,7 @@ func (r *Result) Visit(fn VisitorFunc) error {
 		return r.err
 	}
 	err := r.visitor.Visit(fn)
-	return errors.FilterOut(err, r.ignoreErrors...)
+	return utilerrors.FilterOut(err, r.ignoreErrors...)
 }
 
 // IntoSingular sets the provided boolean pointer to true if the Builder input
@@ -105,7 +106,7 @@ func (r *Result) Infos() ([]*Info, error) {
 		infos = append(infos, info)
 		return nil
 	})
-	err = errors.FilterOut(err, r.ignoreErrors...)
+	err = utilerrors.FilterOut(err, r.ignoreErrors...)
 
 	r.info, r.err = infos, err
 	return infos, err
@@ -123,7 +124,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		return nil, err
 	}
 
-	versions := util.StringSet{}
+	versions := sets.String{}
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object != nil {
@@ -147,7 +148,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		version = versions.List()[0]
 	}
 	return &api.List{
-		ListMeta: api.ListMeta{
+		ListMeta: unversioned.ListMeta{
 			ResourceVersion: version,
 		},
 		Items: objects,
@@ -198,7 +199,7 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 			return nil, err
 		}
 		if len(info) != 1 {
-			return nil, fmt.Errorf("watch is only supported on a single resource - %d resources were found", len(info))
+			return nil, fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(info))
 		}
 		return info[0].Watch(resourceVersion)
 	}
@@ -220,7 +221,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, latest.Version)
+		converted, err := tryConvert(api.Scheme, object, version, latest.GroupOrDie("").Version)
 		if err != nil {
 			return nil, err
 		}

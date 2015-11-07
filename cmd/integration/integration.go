@@ -38,22 +38,25 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
-	"k8s.io/kubernetes/pkg/controller/endpoint"
-	"k8s.io/kubernetes/pkg/controller/node"
-	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/controller"
+	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
+	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
+	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -61,6 +64,7 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/e2e"
+	"k8s.io/kubernetes/test/integration"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -69,10 +73,12 @@ import (
 
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
-	// API version that should be used by the client to talk to the server.
-	apiVersion string
 	// Limit the number of concurrent tests.
 	maxConcurrency int
+
+	longTestTimeout = time.Second * 300
+
+	maxTestTimeout = time.Minute * 10
 )
 
 type fakeKubeletClient struct{}
@@ -93,7 +99,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (string, string) {
+func startComponents(firstManifestURL, secondManifestURL string) (string, string) {
 	// Setup
 	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -126,16 +132,26 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Default.GroupAndVersion()})
 
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
+	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
+	// We will fix this by supporting multiple group versions in Config
+	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Extensions.GroupAndVersion()})
+
+	storageVersions := make(map[string]string)
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions[""] = testapi.Default.GroupAndVersion()
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage: %v", err)
 	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
 
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
@@ -149,24 +165,24 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	publicAddress := net.ParseIP(host)
 	if publicAddress == nil {
-		glog.Fatalf("no public address for %s", host)
+		glog.Fatalf("No public address for %s", host)
 	}
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
-		ExpDatabaseStorage:    expEtcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         fakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
-		ExpAPIPrefix:          "/experimental",
+		APIGroupPrefix:        "/apis",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
 		PublicAddress:         publicAddress,
 		CacheTimeout:          2 * time.Second,
+		StorageVersions:       storageVersions,
 	})
 	handler.delegate = m.Handler
 
@@ -182,35 +198,81 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 
-	endpoints := endpointcontroller.NewEndpointController(cl)
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
-	go endpoints.Run(3, util.NeverStop)
-
-	controllerManager := replicationControllerPkg.NewReplicationManager(cl, replicationControllerPkg.BurstReplicas)
+	go endpointcontroller.NewEndpointController(cl, controller.NoResyncPeriodFunc).
+		Run(3, util.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	go controllerManager.Run(3, util.NeverStop)
+	go replicationcontroller.NewReplicationManager(cl, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
+		Run(3, util.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, nodecontroller.NewPodEvictor(util.NewFakeRateLimiter()),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)
-	testRootDir := makeTempDirOrDie("kubelet_integ_1.", "")
-	configFilePath := makeTempDirOrDie("config", testRootDir)
+	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
+	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.15"}
-	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, "localhost", testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil, kubecontainer.FakeOS{})
-	kubeletapp.RunKubelet(kcfg, nil)
+	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.20"}
+
+	kcfg := kubeletapp.SimpleKubelet(
+		cl,
+		&fakeDocker1,
+		"localhost",
+		testRootDir,
+		firstManifestURL,
+		"127.0.0.1",
+		10250, /* KubeletPort */
+		0,     /* ReadOnlyPort */
+		api.NamespaceDefault,
+		empty_dir.ProbeVolumePlugins(),
+		nil,
+		cadvisorInterface,
+		configFilePath,
+		nil,
+		kubecontainer.FakeOS{},
+		1*time.Second,  /* FileCheckFrequency */
+		1*time.Second,  /* HTTPCheckFrequency */
+		10*time.Second, /* MinimumGCAge */
+		3*time.Second,  /* NodeStatusUpdateFrequency */
+		10*time.Second, /* SyncFrequency */
+		40 /* MaxPods */)
+
+	kubeletapp.RunKubelet(kcfg)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
+	testRootDir = integration.MakeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.15"}
-	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, "127.0.0.1", testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.FakeOS{})
-	kubeletapp.RunKubelet(kcfg, nil)
+	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.20"}
+
+	kcfg = kubeletapp.SimpleKubelet(
+		cl,
+		&fakeDocker2,
+		"127.0.0.1",
+		testRootDir,
+		secondManifestURL,
+		"127.0.0.1",
+		10251, /* KubeletPort */
+		0,     /* ReadOnlyPort */
+		api.NamespaceDefault,
+		empty_dir.ProbeVolumePlugins(),
+		nil,
+		cadvisorInterface,
+		"",
+		nil,
+		kubecontainer.FakeOS{},
+		1*time.Second,  /* FileCheckFrequency */
+		1*time.Second,  /* HTTPCheckFrequency */
+		10*time.Second, /* MinimumGCAge */
+		3*time.Second,  /* NodeStatusUpdateFrequency */
+		10*time.Second, /* SyncFrequency */
+
+		40 /* MaxPods */)
+
+	kubeletapp.RunKubelet(kcfg)
 	return apiServer.URL, configFilePath
 }
 
@@ -228,8 +290,8 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 	return tempDir
 }
 
-// podsOnMinions returns true when all of the selected pods exist on a minion.
-func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
+// podsOnNodes returns true when all of the selected pods exist on a node.
+func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
 	// Wait until all pods are running on the node.
 	return func() (bool, error) {
 		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
@@ -354,8 +416,8 @@ containers:
 
 			// Wait for the mirror pod to be created.
 			podName := fmt.Sprintf("%s-localhost", desc)
-			namespace := kubelet.NamespaceDefault
-			if err := wait.Poll(time.Second, time.Minute*2,
+			namespace := kubetypes.NamespaceDefault
+			if err := wait.Poll(time.Second, longTestTimeout,
 				podRunning(c, namespace, podName)); err != nil {
 				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything()); err == nil {
 					for _, pod := range pods.Items {
@@ -366,13 +428,13 @@ containers:
 			}
 			// Delete the mirror pod, and wait for it to be recreated.
 			c.Pods(namespace).Delete(podName, nil)
-			if err = wait.Poll(time.Second, time.Minute*1,
+			if err = wait.Poll(time.Second, longTestTimeout,
 				podRunning(c, namespace, podName)); err != nil {
 				glog.Fatalf("%s FAILED: mirror pod has not been re-created or is not running: %v", desc, err)
 			}
 			// Remove the manifest file, and wait for the mirror pod to be deleted.
 			os.Remove(manifestFile.Name())
-			if err = wait.Poll(time.Second, time.Minute*1,
+			if err = wait.Poll(time.Second, longTestTimeout,
 				podNotFound(c, namespace, podName)); err != nil {
 				glog.Fatalf("%s FAILED: mirror pod has not been deleted: %v", desc, err)
 			}
@@ -401,17 +463,17 @@ func runReplicationControllerTest(c *client.Client) {
 	// In practice the controller doesn't need 60s to create a handful of pods, but network latencies on CI
 	// systems have been observed to vary unpredictably, so give the controller enough time to create pods.
 	// Our e2e scalability tests will catch controllers that are *actually* slow.
-	if err := wait.Poll(time.Second, time.Second*60, client.ControllerHasDesiredReplicas(c, updated)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, client.ControllerHasDesiredReplicas(c, updated)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
-	// Poll till we can retrieve the status of all pods matching the given label selector from their minions.
+	// Poll till we can retrieve the status of all pods matching the given label selector from their nodes.
 	// This involves 3 operations:
-	//	- The scheduler must assign all pods to a minion
+	//	- The scheduler must assign all pods to a node
 	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
-	//  - We need to be able to query the kubelet on that minion for information about the pod
+	//  - We need to be able to query the kubelet on that node for information about the pod
 	if err := wait.Poll(
-		time.Second, time.Second*30, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
+		time.Second, longTestTimeout, podsOnNodes(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 
@@ -422,7 +484,7 @@ func runAPIVersionsTest(c *client.Client) {
 	v, err := c.ServerAPIVersions()
 	clientVersion := c.APIVersion()
 	if err != nil {
-		glog.Fatalf("failed to get api versions: %v", err)
+		glog.Fatalf("Failed to get api versions: %v", err)
 	}
 	// Verify that the server supports the API version used by the client.
 	for _, version := range v.Versions {
@@ -465,7 +527,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
 
-	svcList, err := services.List(labels.Everything())
+	svcList, err := services.List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
@@ -498,7 +560,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 
 func runAtomicPutTest(c *client.Client) {
 	svcBody := api.Service{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -580,7 +642,7 @@ func runPatchTest(c *client.Client) {
 	name := "patchservice"
 	resource := "services"
 	svcBody := api.Service{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -686,12 +748,12 @@ func runPatchTest(c *client.Client) {
 
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
-	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything())
+	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
 	if err != nil {
-		glog.Fatalf("unexpected error listing services: %v", err)
+		glog.Fatalf("Unexpected error listing services: %v", err)
 	}
 	var foundRW bool
-	found := util.StringSet{}
+	found := sets.String{}
 	for i := range svcList.Items {
 		found.Insert(svcList.Items[i].Name)
 		if svcList.Items[i].Name == "kubernetes" {
@@ -701,13 +763,13 @@ func runMasterServiceTest(client *client.Client) {
 	if foundRW {
 		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes")
 		if err != nil {
-			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
+			glog.Fatalf("Unexpected error listing endpoints for kubernetes service: %v", err)
 		}
 		if countEndpoints(ep) == 0 {
-			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
+			glog.Fatalf("No endpoints for kubernetes service: %v", ep)
 		}
 	} else {
-		glog.Errorf("no RW service found: %v", found)
+		glog.Errorf("No RW service found: %v", found)
 		glog.Fatal("Kubernetes service test failed")
 	}
 	glog.Infof("Master service test passed.")
@@ -743,7 +805,7 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, podExists(client, pod.Namespace, pod.Name)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, podExists(client, pod.Namespace, pod.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	svc1 := &api.Service{
@@ -784,7 +846,7 @@ func runServiceTest(client *client.Client) {
 	}
 
 	// TODO Reduce the timeouts in this test when endpoints controller is sped up. See #6045.
-	if err := wait.Poll(time.Second, time.Second*60, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	// A second service with the same port.
@@ -805,19 +867,19 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*60, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 
-	if err := wait.Poll(time.Second, time.Second*60, endpointsSet(client, svc3.Namespace, svc3.Name, 0)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, endpointsSet(client, svc3.Namespace, svc3.Name, 0)); err != nil {
 		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
 	}
 
-	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything())
+	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Fatalf("Failed to list services across namespaces: %v", err)
 	}
-	names := util.NewStringSet()
+	names := sets.NewString()
 	for _, svc := range svcList.Items {
 		names.Insert(fmt.Sprintf("%s/%s", svc.Namespace, svc.Name))
 	}
@@ -852,7 +914,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, foo.Namespace, foo.Name)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, foo.Namespace, foo.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 
@@ -861,7 +923,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, bar.Namespace, bar.Name)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, bar.Namespace, bar.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 
@@ -877,11 +939,11 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
+	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, baz.Namespace, baz.Name)); err != nil {
 		if pod, perr := client.Pods(api.NamespaceDefault).Get("phantom.bar"); perr == nil {
-			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v", pod)
+			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v, err: %v", pod, err)
 		} else {
-			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: err: %v, perr: %v", err, perr)
 		}
 	}
 
@@ -891,7 +953,6 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&apiVersion, "api-version", latest.Version, "API version that should be used by the client for communicating with the server")
 	fs.IntVar(
 		&maxConcurrency, "max-concurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
 }
@@ -907,22 +968,25 @@ func main() {
 
 	go func() {
 		defer util.FlushLogs()
-		time.Sleep(3 * time.Minute)
+		time.Sleep(maxTestTimeout)
 		glog.Fatalf("This test has timed out.")
 	}()
 
-	glog.Infof("Running tests for APIVersion: %s", apiVersion)
+	glog.Infof("Running tests for APIVersion: %s", os.Getenv("KUBE_TEST_API"))
 
 	firstManifestURL := ServeCachedManifestFile(testPodSpecFile)
 	secondManifestURL := ServeCachedManifestFile(testPodSpecFile)
-	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL, apiVersion)
+	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: apiVersion})
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Default.GroupAndVersion()})
+	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
+	// We will fix this by supporting multiple group versions in Config
+	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, Version: testapi.Extensions.GroupAndVersion()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
@@ -962,7 +1026,7 @@ func main() {
 	// Check that kubelet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
 	// really stupid, so kubelet tries to create these multiple times.
-	createdConts := util.StringSet{}
+	createdConts := sets.String{}
 	for _, p := range fakeDocker1.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {

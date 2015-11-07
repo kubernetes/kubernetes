@@ -19,12 +19,18 @@ limitations under the License.
 package kubectl
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
+
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
-func AddJsonFilenameFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().StringSliceP("filename", "f", []string{}, usage)
-
-	annotations := []string{"json", "yaml", "yml"}
+func AddJsonFilenameFlag(cmd *cobra.Command, value *[]string, usage string) {
+	cmd.Flags().StringSliceVarP(value, "filename", "f", *value, usage)
+	annotations := []string{}
+	for _, ext := range resource.FileExtensions {
+		annotations = append(annotations, strings.TrimLeft(ext, "."))
+	}
 	cmd.Flags().SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }

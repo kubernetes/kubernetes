@@ -18,7 +18,6 @@ package podtask
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -150,124 +148,12 @@ func (t *T) BuildTaskInfo() *mesos.TaskInfo {
 	return info
 }
 
-// Fill the Spec in the T, should be called during k8s scheduling, before binding.
-func (t *T) FillFromDetails(details *mesos.Offer) error {
-	if details == nil {
-		//programming error
-		panic("offer details are nil")
-	}
-
-	// compute used resources
-	cpu := mresource.PodCPULimit(&t.Pod)
-	mem := mresource.PodMemLimit(&t.Pod)
-	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", details.Id, t.Pod.Namespace, t.Pod.Name, cpu, mem)
-
-	t.Spec = Spec{
-		SlaveID:       details.GetSlaveId().GetValue(),
-		AssignedSlave: details.GetHostname(),
-		CPU:           cpu,
-		Memory:        mem,
-	}
-
-	// fill in port mapping
-	if mapping, err := t.mapper.Generate(t, details); err != nil {
-		t.Reset()
-		return err
-	} else {
-		ports := []uint64{}
-		for _, entry := range mapping {
-			ports = append(ports, entry.OfferPort)
-		}
-		t.Spec.PortMap = mapping
-		t.Spec.Ports = ports
-	}
-
-	// hostname needs of the executor needs to match that of the offer, otherwise
-	// the kubelet node status checker/updater is very unhappy
-	const HOSTNAME_OVERRIDE_FLAG = "--hostname-override="
-	hostname := details.GetHostname() // required field, non-empty
-	hostnameOverride := HOSTNAME_OVERRIDE_FLAG + hostname
-
-	argv := t.executor.Command.Arguments
-	overwrite := false
-	for i, arg := range argv {
-		if strings.HasPrefix(arg, HOSTNAME_OVERRIDE_FLAG) {
-			overwrite = true
-			argv[i] = hostnameOverride
-			break
-		}
-	}
-	if !overwrite {
-		t.executor.Command.Arguments = append(argv, hostnameOverride)
-	}
-	return nil
-}
-
 // Clear offer-related details from the task, should be called if/when an offer
 // has already been assigned to a task but for some reason is no longer valid.
 func (t *T) Reset() {
 	log.V(3).Infof("Clearing offer(s) from pod %v", t.Pod.Name)
 	t.Offer = nil
 	t.Spec = Spec{}
-}
-
-func (t *T) AcceptOffer(offer *mesos.Offer) bool {
-	if offer == nil {
-		return false
-	}
-
-	// if the user has specified a target host, make sure this offer is for that host
-	if t.Pod.Spec.NodeName != "" && offer.GetHostname() != t.Pod.Spec.NodeName {
-		return false
-	}
-
-	// check the NodeSelector
-	if len(t.Pod.Spec.NodeSelector) > 0 {
-		slaveLabels := map[string]string{}
-		for _, a := range offer.Attributes {
-			if a.GetType() == mesos.Value_TEXT {
-				slaveLabels[a.GetName()] = a.GetText().GetValue()
-			}
-		}
-		selector := labels.SelectorFromSet(t.Pod.Spec.NodeSelector)
-		if !selector.Matches(labels.Set(slaveLabels)) {
-			return false
-		}
-	}
-
-	// check ports
-	if _, err := t.mapper.Generate(t, offer); err != nil {
-		log.V(3).Info(err)
-		return false
-	}
-
-	// find offered cpu and mem
-	var (
-		offeredCpus mresource.CPUShares
-		offeredMem  mresource.MegaBytes
-	)
-	for _, resource := range offer.Resources {
-		if resource.GetName() == "cpus" {
-			offeredCpus = mresource.CPUShares(*resource.GetScalar().Value)
-		}
-
-		if resource.GetName() == "mem" {
-			offeredMem = mresource.MegaBytes(*resource.GetScalar().Value)
-		}
-	}
-
-	// calculate cpu and mem sum over all containers of the pod
-	// TODO (@sttts): also support pod.spec.resources.limit.request
-	// TODO (@sttts): take into account the executor resources
-	cpu := mresource.PodCPULimit(&t.Pod)
-	mem := mresource.PodMemLimit(&t.Pod)
-	log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
-	if (cpu > offeredCpus) || (mem > offeredMem) {
-		log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
-		return false
-	}
-
-	return true
 }
 
 func (t *T) Set(f FlagType) {

@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -44,6 +47,31 @@ func testJSONPath(tests []jsonpathTest, t *testing.T) {
 		}
 		out := buf.String()
 		if out != test.expect {
+			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
+		}
+	}
+}
+
+// testJSONPathSortOutput test testcases related to map, the results may print in random order
+func testJSONPathSortOutput(tests []jsonpathTest, t *testing.T) {
+	for _, test := range tests {
+		j := New(test.name)
+		err := j.Parse(test.template)
+		if err != nil {
+			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
+		}
+		buf := new(bytes.Buffer)
+		err = j.Execute(buf, test.input)
+		if err != nil {
+			t.Errorf("in %s, execute error %v", test.name, err)
+		}
+		out := buf.String()
+		//since map is itereated in random order, we need to sort the results.
+		sortedOut := strings.Fields(out)
+		sort.Strings(sortedOut)
+		sortedExpect := strings.Fields(test.expect)
+		sort.Strings(sortedExpect)
+		if !reflect.DeepEqual(sortedOut, sortedExpect) {
 			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
 		}
 	}
@@ -134,7 +162,7 @@ func TestStructInput(t *testing.T) {
 	failStoreTests := []jsonpathTest{
 		{"invalid identfier", "{hello}", storeData, "unrecongnized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
-		{"invalid array", "{.Labels[0]}", storeData, "<map[string]int Value> is not array or slice"},
+		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
 		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end"},
 	}
@@ -162,8 +190,8 @@ func TestJSONInput(t *testing.T) {
 	testJSONPath(pointsTests, t)
 }
 
-// TestKubenates tests some use cases from kubenates
-func TestKubenates(t *testing.T) {
+// TestKubernetes tests some use cases from kubernetes
+func TestKubernetes(t *testing.T) {
 	var input = []byte(`{
 	  "kind": "List",
 	  "items":[
@@ -210,8 +238,6 @@ func TestKubenates(t *testing.T) {
 			`127.0.0.1 127.0.0.2 127.0.0.3`},
 		{"double range", "{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}", nodesData,
 			`127.0.0.1, 127.0.0.2, 127.0.0.3, `},
-		// TODO: fix & uncomment the case bellow (#13024)
-		// {"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},
 		{"item name", "{.items[*].metadata.name}", nodesData, `127.0.0.1 127.0.0.2`},
 		{"union nodes capacity", "{.items[*]['metadata.name', 'status.capacity']}", nodesData,
 			`127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]`},
@@ -220,4 +246,9 @@ func TestKubenates(t *testing.T) {
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
 	}
 	testJSONPath(nodesTests, t)
+
+	randomPrintOrderTests := []jsonpathTest{
+		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},
+	}
+	testJSONPathSortOutput(randomPrintOrderTests, t)
 }

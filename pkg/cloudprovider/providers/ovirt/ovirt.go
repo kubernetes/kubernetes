@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ovirt_cloud
+package ovirt
 
 import (
 	"encoding/xml"
@@ -29,7 +29,7 @@ import (
 	"sort"
 	"strings"
 
-	"code.google.com/p/gcfg"
+	"github.com/scalingdata/gcfg"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -121,6 +121,11 @@ func (aws *OVirtCloud) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (v *OVirtCloud) ProviderName() string {
 	return ProviderName
+}
+
+// ScrubDNS filters DNS settings for pods.
+func (v *OVirtCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for oVirt cloud

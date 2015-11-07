@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
@@ -11,6 +11,7 @@ import (
 // NoopHandle returns a no-op handle. It basically does nothing.
 // It is only useful for benchmarking, as it gives an idea of the
 // overhead from the codec framework.
+//
 // LIBRARY USERS: *** DO NOT USE ***
 func NoopHandle(slen int) *noopHandle {
 	h := noopHandle{}
@@ -40,7 +41,8 @@ type noopDrv struct {
 	i    int
 	S    []string
 	B    [][]byte
-	mk   bool      // are we about to read a map key?
+	mks  []bool    // stack. if map (true), else if array (false)
+	mk   bool      // top of stack. what container are we on? map or array?
 	ct   valueType // last request for IsContainerType.
 	cb   bool      // last response for IsContainerType.
 	rand *rand.Rand
@@ -54,21 +56,34 @@ func (h *noopDrv) newDecDriver(_ *Decoder) decDriver { return h }
 
 // --- encDriver
 
-func (h *noopDrv) EncodeBuiltin(rt uintptr, v interface{})    {}
-func (h *noopDrv) EncodeNil()                                 {}
-func (h *noopDrv) EncodeInt(i int64)                          {}
-func (h *noopDrv) EncodeUint(i uint64)                        {}
-func (h *noopDrv) EncodeBool(b bool)                          {}
-func (h *noopDrv) EncodeFloat32(f float32)                    {}
-func (h *noopDrv) EncodeFloat64(f float64)                    {}
-func (h *noopDrv) EncodeRawExt(re *RawExt, e *Encoder)        {}
-func (h *noopDrv) EncodeArrayStart(length int)                {}
-func (h *noopDrv) EncodeArrayEnd()                            {}
-func (h *noopDrv) EncodeArrayEntrySeparator()                 {}
-func (h *noopDrv) EncodeMapStart(length int)                  {}
-func (h *noopDrv) EncodeMapEnd()                              {}
-func (h *noopDrv) EncodeMapEntrySeparator()                   {}
-func (h *noopDrv) EncodeMapKVSeparator()                      {}
+// stack functions (for map and array)
+func (h *noopDrv) start(b bool) {
+	// println("start", len(h.mks)+1)
+	h.mks = append(h.mks, b)
+	h.mk = b
+}
+func (h *noopDrv) end() {
+	// println("end: ", len(h.mks)-1)
+	h.mks = h.mks[:len(h.mks)-1]
+	if len(h.mks) > 0 {
+		h.mk = h.mks[len(h.mks)-1]
+	} else {
+		h.mk = false
+	}
+}
+
+func (h *noopDrv) EncodeBuiltin(rt uintptr, v interface{}) {}
+func (h *noopDrv) EncodeNil()                              {}
+func (h *noopDrv) EncodeInt(i int64)                       {}
+func (h *noopDrv) EncodeUint(i uint64)                     {}
+func (h *noopDrv) EncodeBool(b bool)                       {}
+func (h *noopDrv) EncodeFloat32(f float32)                 {}
+func (h *noopDrv) EncodeFloat64(f float64)                 {}
+func (h *noopDrv) EncodeRawExt(re *RawExt, e *Encoder)     {}
+func (h *noopDrv) EncodeArrayStart(length int)             { h.start(true) }
+func (h *noopDrv) EncodeMapStart(length int)               { h.start(false) }
+func (h *noopDrv) EncodeEnd()                              { h.end() }
+
 func (h *noopDrv) EncodeString(c charEncoding, v string)      {}
 func (h *noopDrv) EncodeSymbol(v string)                      {}
 func (h *noopDrv) EncodeStringBytes(c charEncoding, v []byte) {}
@@ -90,15 +105,11 @@ func (h *noopDrv) DecodeString() (s string)                   { return h.S[h.m(8
 
 func (h *noopDrv) DecodeBytes(bs []byte, isstring, zerocopy bool) []byte { return h.B[h.m(len(h.B))] }
 
-func (h *noopDrv) ReadMapEnd()              { h.mk = false }
-func (h *noopDrv) ReadArrayEnd()            {}
-func (h *noopDrv) ReadArrayEntrySeparator() {}
-func (h *noopDrv) ReadMapEntrySeparator()   { h.mk = true }
-func (h *noopDrv) ReadMapKVSeparator()      { h.mk = false }
+func (h *noopDrv) ReadEnd() { h.end() }
 
 // toggle map/slice
-func (h *noopDrv) ReadMapStart() int   { h.mk = true; return h.m(10) }
-func (h *noopDrv) ReadArrayStart() int { return h.m(10) }
+func (h *noopDrv) ReadMapStart() int   { h.start(true); return h.m(10) }
+func (h *noopDrv) ReadArrayStart() int { h.start(false); return h.m(10) }
 
 func (h *noopDrv) IsContainerType(vt valueType) bool {
 	// return h.m(2) == 0

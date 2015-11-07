@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // APIObjectVersioner implements versioning and extracting etcd node information
@@ -37,7 +37,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Ti
 		return err
 	}
 	if expiration != nil {
-		objectMeta.DeletionTimestamp = &util.Time{Time: *expiration}
+		objectMeta.DeletionTimestamp = &unversioned.Time{Time: *expiration}
 	}
 	versionString := ""
 	if resourceVersion != 0 {

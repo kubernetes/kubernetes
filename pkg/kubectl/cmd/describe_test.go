@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
@@ -30,7 +30,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	f, tf, codec := NewTestFactory()
 	tf.Describer = d
-	tf.Client = &client.FakeRESTClient{
+	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
 	}
@@ -54,9 +54,9 @@ func TestDescribeObject(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &client.FakeRESTClient{
+	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
@@ -87,7 +87,7 @@ func TestDescribeListObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &client.FakeRESTClient{
+	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
 	}

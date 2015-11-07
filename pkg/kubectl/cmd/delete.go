@@ -31,6 +31,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
+// DeleteOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type DeleteOptions struct {
+	Filenames []string
+}
+
 const (
 	delete_long = `Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
@@ -61,8 +67,15 @@ $ kubectl delete pods --all`
 )
 
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
-	validArgs := p.HandledResources()
+	options := &DeleteOptions{}
+
+	// retrieve a list of handled resources from printer as valid args
+	validArgs := []string{}
+	p, err := f.Printer(nil, false, false, false, false, []string{})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
+	}
 
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
@@ -71,13 +84,13 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			err := RunDelete(f, out, cmd, args)
+			err := RunDelete(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: validArgs,
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to delete."
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
@@ -88,7 +101,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *DeleteOptions) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -98,7 +111,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(deleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).

@@ -77,7 +77,7 @@ func init() {
 				log.Fatal("expected to have a parent UPID in context")
 			}
 			process := process.New("sasl_authenticatee")
-			tpid := &upid.UPID{
+			tpid := upid.UPID{
 				ID:   process.Label(),
 				Host: parent.Host,
 			}
@@ -285,7 +285,7 @@ func (self *authenticateeProcess) mechanisms(ctx context.Context, from *upid.UPI
 
 	message := &mesos.AuthenticationStartMessage{
 		Mechanism: proto.String(selectedMech),
-		Data:      proto.String(string(data)), // may be nil, depends on init step
+		Data:      data, // may be nil, depends on init step
 	}
 
 	if err := self.transport.Send(ctx, from, message); err != nil {

@@ -22,8 +22,6 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -61,8 +59,8 @@ type Lister interface {
 	// NewList returns an empty object that can be used with the List call.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
-	// List selects resources in the storage which match to the selector.
-	List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error)
+	// List selects resources in the storage which match to the selector. 'options' can be nil.
+	List(ctx api.Context, options *api.ListOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.
@@ -183,7 +181,7 @@ type Watcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
 
 // StandardStorage is an interface covering the common verbs. Provided for testing whether a
@@ -202,20 +200,24 @@ type Redirector interface {
 	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
 }
 
-// ConnectHandler is a handler for HTTP connection requests. It extends the standard
-// http.Handler interface by adding a method that returns an error object if an error
-// occurred during the handling of the request.
-type ConnectHandler interface {
-	http.Handler
-
-	// RequestError returns an error if one occurred during handling of an HTTP request
-	RequestError() error
+// Responder abstracts the normal response behavior for a REST method and is passed to callers that
+// may wish to handle the response directly in some cases, but delegate to the normal error or object
+// behavior in other cases.
+type Responder interface {
+	// Object writes the provided object to the response. Invoking this method multiple times is undefined.
+	Object(statusCode int, obj runtime.Object)
+	// Error writes the provided error to the response. This method may only be invoked once.
+	Error(err error)
 }
 
-// Connecter is a storage object that responds to a connection request
+// Connecter is a storage object that responds to a connection request.
 type Connecter interface {
-	// Connect returns a ConnectHandler that will handle the request/response for a request
-	Connect(ctx api.Context, id string, options runtime.Object) (ConnectHandler, error)
+	// Connect returns an http.Handler that will handle the request/response for a given API invocation.
+	// The provided responder may be used for common API responses. The responder will write both status
+	// code and body, so the ServeHTTP method should exit after invoking the responder. The Handler will
+	// be used for a single API request and then discarded. The Responder is guaranteed to write to the
+	// same http.ResponseWriter passed to ServeHTTP.
+	Connect(ctx api.Context, id string, options runtime.Object, r Responder) (http.Handler, error)
 
 	// NewConnectOptions returns an empty options object that will be used to pass
 	// options to the Connect method. If nil, then a nil options object is passed to

@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: vtctld
+  labels:
+    component: vtctld
+    app: vitess
+spec:
+  ports:
+    - port: 15000
+      targetPort: 15000
+      nodePort: 30000
+  selector:
+    component: vtctld
+    app: vitess
+  type: NodePort
+

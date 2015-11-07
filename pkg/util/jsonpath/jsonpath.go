@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 
 	"k8s.io/kubernetes/third_party/golang/template"
 )
@@ -216,7 +217,7 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 
 		value, isNil := template.Indirect(value)
 		if isNil || (value.Kind() != reflect.Array && value.Kind() != reflect.Slice) {
-			return input, fmt.Errorf("%v is not array or slice", value)
+			return input, fmt.Errorf("%v is not array or slice", value.Type())
 		}
 		params := node.Params
 		if !params[0].Known {
@@ -258,9 +259,46 @@ func (j *JSONPath) evalUnion(input []reflect.Value, node *UnionNode) ([]reflect.
 	return result, nil
 }
 
+func (j *JSONPath) findFieldInValue(value *reflect.Value, node *FieldNode) (reflect.Value, error) {
+	t := value.Type()
+	var inlineValue *reflect.Value
+	for ix := 0; ix < t.NumField(); ix++ {
+		f := t.Field(ix)
+		jsonTag := f.Tag.Get("json")
+		parts := strings.Split(jsonTag, ",")
+		if len(parts) == 0 {
+			continue
+		}
+		if parts[0] == node.Value {
+			return value.Field(ix), nil
+		}
+		if len(parts[0]) == 0 {
+			val := value.Field(ix)
+			inlineValue = &val
+		}
+	}
+	if inlineValue != nil {
+		if inlineValue.Kind() == reflect.Struct {
+			// handle 'inline'
+			match, err := j.findFieldInValue(inlineValue, node)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			if match.IsValid() {
+				return match, nil
+			}
+		}
+	}
+	return value.FieldByName(node.Value), nil
+}
+
 // evalField evaluates filed of struct or key of map.
 func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
+	// If there's no input, there's no output
+	if len(input) == 0 {
+		return results, nil
+	}
 	for _, value := range input {
 		var result reflect.Value
 		value, isNil := template.Indirect(value)
@@ -269,7 +307,10 @@ func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.
 		}
 
 		if value.Kind() == reflect.Struct {
-			result = value.FieldByName(node.Value)
+			var err error
+			if result, err = j.findFieldInValue(&value, node); err != nil {
+				return nil, err
+			}
 		} else if value.Kind() == reflect.Map {
 			result = value.MapIndex(reflect.ValueOf(node.Value))
 		}

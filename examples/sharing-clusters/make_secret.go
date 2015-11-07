@@ -59,5 +59,5 @@ func main() {
 			"config": cfg,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(latest.Codec, secret))
+	fmt.Printf(runtime.EncodeOrDie(latest.GroupOrDie("").Codec, secret))
 }

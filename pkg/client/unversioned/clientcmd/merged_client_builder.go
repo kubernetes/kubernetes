@@ -86,7 +86,7 @@ func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error)
 	icc := inClusterClientConfig{}
 	defaultConfig, err := DefaultClientConfig.ClientConfig()
 	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
-		glog.V(2).Info("no kubeconfig could be created, falling back to service account.")
+		glog.V(2).Info("No kubeconfig could be created, falling back to service account.")
 		return icc.ClientConfig()
 	}
 

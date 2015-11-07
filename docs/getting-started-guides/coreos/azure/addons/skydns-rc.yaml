@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v8
+  name: kube-dns-v9
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v8
+    version: v9
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 3
   selector:
     k8s-app: kube-dns
-    version: v8
+    version: v9
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v8
+        version: v9
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
@@ -73,6 +73,13 @@ spec:
             port: 8080
             scheme: HTTP
           initialDelaySeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 1
           timeoutSeconds: 5
       - name: healthz
         image: gcr.io/google_containers/exechealthz:1.0

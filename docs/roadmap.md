@@ -33,9 +33,7 @@ Documentation for other releases can be found at
 
 # Kubernetes Roadmap
 
-We're in the process of prioritizing changes to be made after 1.0.
-
-Please watch the [Github milestones] (https://github.com/GoogleCloudPlatform/kubernetes/milestones) for our future plans.
+Please watch the [Github milestones] (https://github.com/kubernetes/kubernetes/milestones) for our future plans.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

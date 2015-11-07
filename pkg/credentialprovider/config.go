@@ -30,6 +30,13 @@ import (
 	"github.com/golang/glog"
 )
 
+// DockerConfigJson represents ~/.docker/config.json file info
+// see https://github.com/docker/docker/pull/12009
+type DockerConfigJson struct {
+	Auths       DockerConfig      `json:"auths"`
+	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
+}
+
 // DockerConfig represents the config file used by the docker CLI.
 // This config that represents the credentials that should be used
 // when pulling images from specific image repositories.
@@ -47,8 +54,11 @@ var (
 	workingDirPath    = ""
 	homeDirPath       = os.Getenv("HOME")
 	rootDirPath       = "/"
+	homeJsonDirPath   = filepath.Join(homeDirPath, ".docker")
+	rootJsonDirPath   = filepath.Join(rootDirPath, ".docker")
 
-	configFileName = ".dockercfg"
+	configFileName     = ".dockercfg"
+	configJsonFileName = "config.json"
 )
 
 func SetPreferredDockercfgPath(path string) {
@@ -64,6 +74,32 @@ func GetPreferredDockercfgPath() string {
 }
 
 func ReadDockerConfigFile() (cfg DockerConfig, err error) {
+	// Try happy path first - latest config file
+	dockerConfigJsonLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
+	for _, configPath := range dockerConfigJsonLocations {
+		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
+		if err != nil {
+			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			continue
+		}
+		glog.V(4).Infof("looking for .docker/config.json at %s", absDockerConfigFileLocation)
+		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			continue
+		}
+		cfg, err := readDockerConfigJsonFileFromBytes(contents)
+		if err == nil {
+			glog.V(4).Infof("found .docker/config.json at %s", absDockerConfigFileLocation)
+			return cfg, nil
+		}
+	}
+	glog.V(4).Infof("couldn't find valid .docker/config.json after checking in %v", dockerConfigJsonLocations)
+
+	// Can't find latest config file so check for the old one
 	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
 	for _, configPath := range dockerConfigFileLocations {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
@@ -144,6 +180,16 @@ func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error
 		glog.Errorf("while trying to parse blob %q: %v", contents, err)
 		return nil, err
 	}
+	return
+}
+
+func readDockerConfigJsonFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
+	var cfgJson DockerConfigJson
+	if err = json.Unmarshal(contents, &cfgJson); err != nil {
+		glog.Errorf("while trying to parse blob %q: %v", contents, err)
+		return nil, err
+	}
+	cfg = cfgJson.Auths
 	return
 }
 

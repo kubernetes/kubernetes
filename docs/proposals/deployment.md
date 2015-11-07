@@ -69,7 +69,9 @@ type DeploymentSpec struct {
   Replicas *int
 
   // Label selector for pods. Existing ReplicationControllers whose pods are
-  // selected by this will be scaled down.
+  // selected by this will be scaled down. New ReplicationControllers will be
+  // created with this selector, with a unique label as defined by UniqueLabelKey.
+  // If Selector is empty, it is defaulted to the labels present on the Pod template.
   Selector map[string]string
 
   // Describes the pods that will be created.
@@ -90,27 +92,27 @@ type DeploymentSpec struct {
 
 type DeploymentStrategy struct {
   // Type of deployment. Can be "Recreate" or "RollingUpdate".
-  Type DeploymentType
+  Type DeploymentStrategyType
 
   // TODO: Update this to follow our convention for oneOf, whatever we decide it
   // to be.
-  // Rolling update config params. Present only if DeploymentType =
+  // Rolling update config params. Present only if DeploymentStrategyType =
   // RollingUpdate.
-  RollingUpdate *RollingUpdateDeploymentSpec
+  RollingUpdate *RollingUpdateDeploymentStrategy
 }
 
-type DeploymentType string
+type DeploymentStrategyType string
 
 const (
   // Kill all existing pods before creating new ones.
-  DeploymentRecreate DeploymentType = "Recreate"
+  RecreateDeploymentStrategyType DeploymentStrategyType = "Recreate"
 
   // Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
-  DeploymentRollingUpdate DeploymentType = "RollingUpdate"
+  RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
 // Spec to control the desired behavior of rolling update.
-type RollingUpdateDeploymentSpec struct {
+type RollingUpdateDeploymentStrategy struct {
   // The maximum number of pods that can be unavailable during the update.
   // Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
   // Absolute number is calculated from percentage by rounding up.
@@ -246,7 +248,7 @@ To begin with, we will support 2 types of deployment:
   This results in a slower deployment, but there is no downtime. At all times
   during the deployment, there are a few pods available (old or new). The number
   of available pods and when is a pod considered "available" can be configured
-  using RollingUpdateDeploymentSpec.
+  using RollingUpdateDeploymentStrategy.
 
 In future, we want to support more deployment types.
 
@@ -254,13 +256,13 @@ In future, we want to support more deployment types.
 
 Apart from the above, we want to add support for the following:
 * Running the deployment process in a pod: In future, we can run the deployment process in a pod. Then users can define their own custom deployments and we can run it using the image name.
-* More DeploymentTypes: https://github.com/openshift/origin/blob/master/examples/deployment/README.md#deployment-types lists most commonly used ones.
+* More DeploymentStrategyTypes: https://github.com/openshift/origin/blob/master/examples/deployment/README.md#deployment-types lists most commonly used ones.
 * Triggers: Deployment will have a trigger field to identify what triggered the deployment. Options are: Manual/UserTriggered, Autoscaler, NewImage.
 * Automatic rollback on error: We want to support automatic rollback on error or timeout.
 
 ## References
 
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/1743 has most of the
+- https://github.com/kubernetes/kubernetes/issues/1743 has most of the
   discussion that resulted in this proposal.
 
 

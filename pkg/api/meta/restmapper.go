@@ -113,7 +113,7 @@ func NewDefaultRESTMapper(group string, versions []string, f VersionInterfacesFu
 }
 
 func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
-	plural, singular := kindToResource(kind, mixedCase)
+	plural, singular := KindToResource(kind, mixedCase)
 	m.plurals[singular] = plural
 	m.singulars[plural] = singular
 	meta := typeMeta{APIVersion: version, Kind: kind}
@@ -131,8 +131,8 @@ func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mi
 	m.scopes[meta] = scope
 }
 
-// kindToResource converts Kind to a resource name.
-func kindToResource(kind string, mixedCase bool) (plural, singular string) {
+// KindToResource converts Kind to a resource name.
+func KindToResource(kind string, mixedCase bool) (plural, singular string) {
 	if len(kind) == 0 {
 		return
 	}
@@ -142,12 +142,12 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 	} else {
 		singular = strings.ToLower(kind)
 	}
-	if strings.HasSuffix(singular, "status") {
-		plural = singular + "es"
+	if strings.HasSuffix(singular, "endpoints") {
+		plural = singular
 	} else {
 		switch string(singular[len(singular)-1]) {
 		case "s":
-			plural = singular
+			plural = singular + "es"
 		case "y":
 			plural = strings.TrimSuffix(singular, "y") + "ies"
 		default:
@@ -171,14 +171,14 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resource string) (singular stri
 func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	meta, ok := m.mapping[strings.ToLower(resource)]
 	if !ok {
-		return "", "", fmt.Errorf("no resource %q has been defined", resource)
+		return "", "", fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
 	}
 	return meta.APIVersion, meta.Kind, nil
 }
 
 func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
 	if _, ok := m.mapping[strings.ToLower(resource)]; !ok {
-		return "", fmt.Errorf("no resource %q has been defined", resource)
+		return "", fmt.Errorf("in group for resource, no resource %q has been defined", resource)
 	}
 	return m.group, nil
 }
@@ -273,6 +273,12 @@ func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
 	return nil, false
 }
 
+// ResourceIsValid takes a string (kind) and checks if it's a valid resource
+func (m *DefaultRESTMapper) ResourceIsValid(resource string) bool {
+	_, _, err := m.VersionAndKindForResource(resource)
+	return err == nil
+}
+
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
 type MultiRESTMapper []RESTMapper
 
@@ -334,4 +340,14 @@ func (m MultiRESTMapper) AliasesForResource(alias string) (aliases []string, ok 
 		}
 	}
 	return nil, false
+}
+
+// ResourceIsValid takes a string (either group/kind or kind) and checks if it's a valid resource
+func (m MultiRESTMapper) ResourceIsValid(resource string) bool {
+	for _, t := range m {
+		if t.ResourceIsValid(resource) {
+			return true
+		}
+	}
+	return false
 }

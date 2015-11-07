@@ -26,8 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -60,7 +59,8 @@ func (plugin *awsElasticBlockStorePlugin) Name() string {
 }
 
 func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.PersistentVolumeSource.AWSElasticBlockStore != nil || spec.VolumeSource.AWSElasticBlockStore != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AWSElasticBlockStore != nil) ||
+		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -69,9 +69,9 @@ func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolum
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Builder, error) {
@@ -79,11 +79,11 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 	// EBSs used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	var readOnly bool
 	var ebs *api.AWSElasticBlockStoreVolumeSource
-	if spec.VolumeSource.AWSElasticBlockStore != nil {
-		ebs = spec.VolumeSource.AWSElasticBlockStore
+	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
+		ebs = spec.Volume.AWSElasticBlockStore
 		readOnly = ebs.ReadOnly
 	} else {
-		ebs = spec.PersistentVolumeSource.AWSElasticBlockStore
+		ebs = spec.PersistentVolume.Spec.AWSElasticBlockStore
 		readOnly = spec.ReadOnly
 	}
 
@@ -97,7 +97,7 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 	return &awsElasticBlockStoreBuilder{
 		awsElasticBlockStore: &awsElasticBlockStore{
 			podUID:   podUID,
-			volName:  spec.Name,
+			volName:  spec.Name(),
 			volumeID: volumeID,
 			manager:  manager,
 			mounter:  mounter,
@@ -106,12 +106,12 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
-		diskMounter: &awsSafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{plugin.host.GetMounter(), exec.New()}}, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, mounter)
+	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -132,7 +132,7 @@ type ebsManager interface {
 	DetachDisk(c *awsElasticBlockStoreCleaner) error
 }
 
-// awsElasticBlockStore volumes are disk resources provided by Google Compute Engine
+// awsElasticBlockStore volumes are disk resources provided by Amazon Web Services
 // that are attached to the kubelet's host machine and exposed to the pod.
 type awsElasticBlockStore struct {
 	volName string
@@ -154,13 +154,9 @@ func detachDiskLogError(ebs *awsElasticBlockStore) {
 }
 
 // getVolumeProvider returns the AWS Volumes interface
-func (ebs *awsElasticBlockStore) getVolumeProvider() (aws_cloud.Volumes, error) {
-	name := "aws"
-	cloud, err := cloudprovider.GetCloudProvider(name, nil)
-	if err != nil {
-		return nil, err
-	}
-	volumes, ok := cloud.(aws_cloud.Volumes)
+func (ebs *awsElasticBlockStore) getVolumeProvider() (awscloud.Volumes, error) {
+	cloud := ebs.plugin.host.GetCloudProvider()
+	volumes, ok := cloud.(awscloud.Volumes)
 	if !ok {
 		return nil, fmt.Errorf("Cloud provider does not support volumes")
 	}
@@ -180,6 +176,10 @@ type awsElasticBlockStoreBuilder struct {
 }
 
 var _ volume.Builder = &awsElasticBlockStoreBuilder{}
+
+func (_ *awsElasticBlockStoreBuilder) SupportsOwnershipManagement() bool {
+	return true
+}
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreBuilder) SetUp() error {
@@ -248,6 +248,10 @@ func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
 
 func (b *awsElasticBlockStoreBuilder) IsReadOnly() bool {
 	return b.readOnly
+}
+
+func (b *awsElasticBlockStoreBuilder) SupportsSELinux() bool {
+	return true
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {

@@ -38,7 +38,7 @@ with a number of existing API types and with the [API
 conventions](api-conventions.md).  If creating a new API
 type/resource, we also recommend that you first send a PR containing
 just a proposal for the new API types, and that you initially target
-the experimental API (pkg/expapi).
+the extensions API (pkg/apis/extensions).
 
 The Kubernetes API has two major components - the internal structures and
 the versioned APIs.  The versioned APIs are intended to be stable, while the
@@ -157,7 +157,7 @@ type Frobber struct {
 	Height int           `json:"height"`
 	Width  int           `json:"width"`
 	Param  string        `json:"param"`  // the first param
-	ExtraParams []string `json:"params"` // additional params
+	ExtraParams []string `json:"extraParams"` // additional params
 }
 ```
 
@@ -189,17 +189,82 @@ API call might POST an object in API v7beta1 format, which uses the cleaner
 form (since v7beta1 is "beta").  When the user reads the object back in the
 v7beta1 API it would be unacceptable to have lost all but `Params[0]`.  This
 means that, even though it is ugly, a compatible change must be made to the v6
-API. However, this is very challenging to do correctly. It generally requires
+API.
+
+However, this is very challenging to do correctly. It often requires
 multiple representations of the same information in the same API resource, which
-need to be kept in sync in the event that either is changed. However, if
-the new representation is more expressive than the old, this breaks
-backward compatibility, since clients that only understood the old representation
+need to be kept in sync in the event that either is changed. For example,
+let's say you decide to rename a field within the same API version. In this case,
+you add units to `height` and `width`. You implement this by adding duplicate
+fields:
+
+```go
+type Frobber struct {
+	Height         *int          `json:"height"`
+	Width          *int          `json:"width"`
+	HeightInInches *int          `json:"heightInInches"`
+	WidthInInches  *int          `json:"widthInInches"`
+}
+```
+
+You convert all of the fields to pointers in order to distinguish between unset and
+set to 0, and then set each corresponding field from the other in the defaulting
+pass (e.g., `heightInInches` from `height`, and vice versa), which runs just prior
+to conversion. That works fine when the user creates a resource from a hand-written
+configuration -- clients can write either field and read either field, but what about
+creation or update from the output of GET, or update via PATCH (see
+[In-place updates](../user-guide/managing-deployments.md#in-place-updates-of-resources))?
+In this case, the two fields will conflict, because only one field would be updated
+in the case of an old client that was only aware of the old field (e.g., `height`).
+
+Say the client creates:
+
+```json
+{
+  "height": 10,
+  "width": 5
+}
+```
+
+and GETs:
+
+```json
+{
+  "height": 10,
+  "heightInInches": 10,
+  "width": 5,
+  "widthInInches": 5
+}
+```
+
+then PUTs back:
+
+```json
+{
+  "height": 13,
+  "heightInInches": 10,
+  "width": 5,
+  "widthInInches": 5
+}
+```
+
+The update should not fail, because it would have worked before `heightInInches` was added.
+
+Therefore, when there are duplicate fields, the old field MUST take precedence
+over the new, and the new field should be set to match by the server upon write.
+A new client would be aware of the old field as well as the new, and so can ensure
+that the old field is either unset or is set consistently with the new field. However,
+older clients would be unaware of the new field. Please avoid introducing duplicate
+fields due to the complexity they incur in the API.
+
+A new representation, even in a new API version, that is more expressive than an old one
+breaks backward compatibility, since clients that only understood the old representation
 would not be aware of the new representation nor its semantics. Examples of
 proposals that have run into this challenge include [generalized label
 selectors](http://issues.k8s.io/341) and [pod-level security
 context](http://prs.k8s.io/12823).
 
-As another interesting example, enumerated values provide a unique challenge.
+As another interesting example, enumerated values cause similar challenges.
 Adding a new value to an enumerated set is *not* a compatible change.  Clients
 which assume they know how to handle all possible values of a given field will
 not be able to handle the new values.  However, removing value from an
@@ -226,6 +291,21 @@ the change gets in. If you are unsure, ask. Also make sure that the change gets 
 the release notes for the next release by labeling the PR with the "release-note" github label.
 
 If you found that your change accidentally broke clients, it should be reverted.
+
+In short, the expected API evolution is as follows:
+* `extensions/v1alpha1` ->
+* `newapigroup/v1alpha1` -> ... -> `newapigroup/v1alphaN` ->
+* `newapigroup/v1beta1` -> ... -> `newapigroup/v1betaN` ->
+* `newapigroup/v1` ->
+* `newapigroup/v2alpha1` -> ...
+
+While in extensions we have no obligation to move forward with the API at all and may delete or break it at any time.
+
+While in alpha we expect to move forward with it, but may break it.
+
+Once in beta we will preserve forward compatibility, but may introduce new versions and delete old ones.
+
+v1 must be backward-compatible for an extended length of time.
 
 ## Changing versioned APIs
 
@@ -319,6 +399,10 @@ The conversion code resides with each versioned API. There are two files:
      functions
    - `pkg/api/<version>/conversion_generated.go` containing auto-generated
      conversion functions
+   - `pkg/apis/extensions/<version>/conversion.go` containing manually written
+     conversion functions
+   - `pkg/apis/extensions/<version>/conversion_generated.go` containing
+     auto-generated conversion functions
 
 Since auto-generated conversion functions are using manually written ones,
 those manually written should be named with a defined convention, i.e. a function
@@ -344,6 +428,56 @@ generator to create it from scratch.
 
 Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
+
+## Edit deep copy files
+
+At this point you have both the versioned API changes and the internal
+structure changes done.  You now need to generate code to handle deep copy
+of your versioned api objects.
+
+The deep copy code resides with each versioned API:
+   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
+   - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
+
+To regenerate them:
+   - run
+
+```sh
+hack/update-generated-deep-copies.sh
+```
+
+## Edit json (un)marshaling code
+
+We are auto-generating code for marshaling and unmarshaling json representation
+of api objects - this is to improve the overall system performance.
+
+The auto-generated code resides with each versioned API:
+   - `pkg/api/<version>/types.generated.go`
+   - `pkg/apis/extensions/<version>/types.generated.go`
+
+To regenerate them:
+   - run
+
+```sh
+hack/update-codecgen.sh
+```
+
+## Making a new API Group
+
+This section is under construction, as we make the tooling completely generic.
+
+At the moment, you'll have to make a new directory under pkg/apis/; copy the
+directory structure from pkg/apis/extensions. Add the new group/version to all
+of the hack/{verify,update}-generated-{deep-copy,conversions,swagger}.sh files
+in the appropriate places--it should just require adding your new group/version
+to a bash array. You will also need to make sure your new types are imported by
+the generation commands (cmd/gendeepcopy/ & cmd/genconversion). These
+instructions may not be complete and will be updated as we gain experience.
+
+Adding API groups outside of the pkg/apis/ directory is not currently supported,
+but is clearly desirable. The deep copy & conversion generators need to work by
+parsing go files instead of by reflection; then they will be easy to point at
+arbitrary directories: see issue [#13775](http://issue.k8s.io/13775).
 
 ## Update the fuzzer
 
@@ -390,8 +524,8 @@ doing!
 
 ## Write end-to-end tests
 
-This is, sadly, still sort of painful.  Talk to us and we'll try to help you
-figure out the best way to make sure your cool feature keeps working forever.
+Check out the [E2E docs](e2e-tests.md) for detailed information about how to write end-to-end
+tests for your feature.
 
 ## Examples and docs
 
@@ -417,6 +551,69 @@ The API spec changes should be in a commit separate from your other changes.
 
 TODO(smarterclayton): write this.
 
+## Alpha, Beta, and Stable Versions
+
+New feature development proceeds through a series of stages of increasing maturity:
+
+- Development level
+  - Object Versioning: no convention
+  - Availability: not commited to main kubernetes repo, and thus not available in offical releases
+  - Audience: other developers closely collaborating on a feature or proof-of-concept
+  - Upgradeability, Reliability, Completeness, and Support: no requirements or guarantees
+- Alpha level
+  - Object Versioning: API version name contains `alpha` (e.g. `v1alpha1`)
+  - Availability: committed to main kubernetes repo;  appears in an official release; feature is
+    disabled by default, but may be enabled by flag
+  - Audience: developers and expert users interested in giving early feedback on features
+  - Completeness: some API operations, CLI commands, or UI support may not be implemented;  the API
+    need not have had an *API review* (an intensive and targeted review of the API, on top of a normal
+    code review)
+  - Upgradeability: the object schema and semantics may change in a later software release, without
+    any provision for preserving objects in an existing cluster;
+    removing the upgradability concern allows developers to make rapid progress; in particular,
+    API versions can increment faster than the minor release cadence and the developer need not
+    maintain multiple versions; developers should still increment the API version when object schema
+    or semantics change in an [incompatible way](#on-compatibility)
+  - Cluster Reliability: because the feature is relatively new, and may lack complete end-to-end
+    tests, enabling the feature via a flag might expose bugs with destabilize the cluster (e.g. a
+    bug in a control loop might rapidly create excessive numbers of object, exhausting API storage).
+  - Support: there is *no commitment* from the project to complete the feature; the feature may be
+    dropped entirely in a later software release
+  - Recommended Use Cases: only in short-lived testing clusters, due to complexity of upgradeability
+    and lack of long-term support and lack of upgradability.
+- Beta level:
+  - Object Versioning: API version name contains `beta` (e.g. `v2beta3`)
+  - Availability: in official Kubernetes releases, and enabled by default
+  - Audience: users interested in providing feedback on features
+  - Completeness: all API operations, CLI commands, and UI support should be implemented; end-to-end
+    tests complete; the API has had a thorough API review and is thought to be complete, though use
+    during beta may frequently turn up API issues not thought of during review
+  - Upgradeability: the object schema and semantics may change in a later software release; when
+    this happens, an upgrade path will be documentedr; in some cases, objects will be automatically
+    converted to the new version; in other cases, a manual upgrade may be necessary;  a manual
+    upgrade may require downtime for anything relying on the new feature, and may require
+    manual conversion of objects to the new version; when manual conversion is necessary, the
+    project will provide documentation on the process (for an example, see [v1 conversion
+    tips](../api.md))
+  - Cluster Reliability: since the feature has e2e tests, enabling the feature via a flag should not
+    create new bugs in unrelated features;  because the feature is new, it may have minor bugs
+  - Support: the project commits to complete the feature, in some form, in a subsequent Stable
+    version;  typically this will happen within 3 months, but sometimes longer;  releases should
+    simultaneously support two consecutive versions (e.g. `v1beta1` and `v1beta2`; or `v1beta2` and
+    `v1`) for at least one minor release cycle (typically 3 months) so that users have enough time
+    to upgrade and migrate objects
+  - Recommended Use Cases: in short-lived testing clusters; in production clusters as part of a
+    short-lived evaluation of the feature in order to provide feedback
+- Stable level:
+  - Object Versioning: API version `vX` where `X` is an integer (e.g. `v1`)
+  - Availability: in official Kubernetes releases, and enabled by default
+  - Audience: all users
+  - Completeness: same as beta
+  - Upgradeability: only [strictly compatible](#on-compatibility) changes allowed in subsequent
+    software releases
+  - Cluster Reliability: high
+  - Support: API version will continue to be present for many subsequent software releases;
+  - Recommended Use Cases: any
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()

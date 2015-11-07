@@ -1,8 +1,8 @@
 From nobody Tue Aug 11 10:13:54 2015
-Content-Type: multipart/mixed; boundary="===============6024533374511606659=="
+Content-Type: multipart/mixed; boundary="===================================="
 MIME-Version: 1.0
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -98,7 +98,7 @@ current-context: service-account-context
 EOF
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -118,8 +118,8 @@ script
 	# Install docker and brctl if they are not in the image.
 	if ! which docker > /dev/null; then
   	echo "Do not find docker. Install it."
-		# We should install the docker that passes qualification. At present, it is version 1.7.1.
-		curl -sSL https://get.docker.com/ubuntu/ | DOCKER_VERSION=1.7.1 sh
+		# We should install the latest qualified docker, which is version 1.8.3 at present.
+		curl -sSL https://get.docker.com/ | DOCKER_VERSION=1.8.3 sh
 	fi
 	if ! which brctl > /dev/null; then
 		echo "Do not find brctl. Install it."
@@ -127,7 +127,7 @@ script
 	fi
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -158,7 +158,7 @@ script
 	fi
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -226,7 +226,7 @@ script
 	rm "/etc/saltbase/${salt_tar}"
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -244,7 +244,6 @@ script
 	set -o errexit
 	set -o nounset
 
-	# TODO(andyzheng0831): Add health check functionality.
 	. /etc/kube-env
 	ARGS="--v=2"
 	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
@@ -259,7 +258,7 @@ script
 		--enable-debugging-handlers=true \
 		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
-		--allow-privileged=false \
+		--allow-privileged=true \
 		--cluster-dns=${DNS_SERVER_IP} \
 		--cluster-domain=${DNS_DOMAIN} \
 		--configure-cbr0=true \
@@ -271,7 +270,7 @@ end script
 # Wait for 10s to start kubelet again.
 post-stop exec sleep 10
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -307,7 +306,7 @@ end script
 # Wait for 10s to start kube-proxy again.
 post-stop exec sleep 10
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -328,7 +327,11 @@ script
 
 	. /etc/kube-env
 	# Assemble docker deamon options
-	echo "DOCKER_OPTS=\"-p /var/run/docker.pid ${EXTRA_DOCKER_OPTS} --log-level=\"debug\" --bridge cbr0 --iptables=false --ip-masq=false\"" > /etc/default/docker
+	DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		DOCKER_OPTS="${DOCKER_OPTS} --log-level=debug"
+	fi
+	echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS}\"" > /etc/default/docker
 	# Make sure the network interface cbr0 is created before restarting docker daemon
 	while ! [ -L /sys/class/net/cbr0 ]; do
 		echo "Sleep 1 second to wait for cbr0"
@@ -340,7 +343,7 @@ script
 	brctl delbr docker0
 end script
 
---===============6024533374511606659==
+--====================================
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -358,14 +361,59 @@ script
 
 	# Configuration files are located at /etc/saltbase.
 	. /etc/kube-env
-	if [ "${ENABLE_NODE_LOGGING}" = "true" ]; then
-		if [ "${LOGGING_DESTINATION}" = "gcp" ]; then
+	# Fluentd
+	if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
+		if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
 			cp /etc/saltbase/kubernetes/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml /etc/kubernetes/manifests/
-		elif [ "${LOGGING_DESTINATION}" = "elasticsearch" ]; then
+		elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
 			cp /etc/saltbase/kubernetes/saltbase/salt/fluentd-es/fluentd-es.yaml /etc/kubernetes/manifests/
 		fi
 	fi
+	# Kube-registry-proxy
+	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
+		cp /etc/saltbase/kubernetes/saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml /etc/kubernetes/manifests/
+	fi
 end script
 
---===============6024533374511606659==--
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-node-health-monitoring.conf"
+
+description "Kubenetes node health monitoring"
+
+start on stopped kube-docker and started kube-proxy
+
+respawn
+
+script
+	set -o nounset
+
+	# Wait for a minute to let docker, kubelet, and kube-proxy processes finish initialization.
+	# TODO(andyzheng0831): replace it with a more reliable method if possible.
+	sleep 60
+
+	sleep_seconds=10
+	max_seconds=10
+	# We simply kill the process when there is a failure. Another upstart job will automatically
+	# restart the process.
+	while [ 1 ]; do
+		if ! timeout 10 docker version > /dev/null; then
+			echo "Docker daemon failed!"
+			pkill docker
+		fi
+		if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:10250/healthz > /dev/null; then
+			echo "Kubelet is unhealthy!"
+			pkill kubelet
+		fi
+		if ! curl -m ${max_seconds} -f -s http://127.0.0.1:10249/healthz > /dev/null; then
+			echo "Kube-proxy is unhealthy!"
+			pkill kube-proxy
+		fi
+		sleep ${sleep_seconds}
+	done
+end script
+
+--====================================--
 

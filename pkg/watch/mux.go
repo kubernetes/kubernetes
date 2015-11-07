@@ -39,10 +39,13 @@ const incomingQueueLength = 25
 // Broadcaster distributes event notifications among any number of watchers. Every event
 // is delivered to every watcher.
 type Broadcaster struct {
+	// TODO: see if this lock is needed now that new watchers go through
+	// the incoming channel.
 	lock sync.Mutex
 
-	watchers    map[int64]*broadcasterWatcher
-	nextWatcher int64
+	watchers     map[int64]*broadcasterWatcher
+	nextWatcher  int64
+	distributing sync.WaitGroup
 
 	incoming chan Event
 
@@ -58,7 +61,7 @@ type Broadcaster struct {
 }
 
 // NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
-// It is guaranteed that events will be distibuted in the order in which they ocur,
+// It is guaranteed that events will be distributed in the order in which they occur,
 // but the order in which a single event is distributed among all of the watchers is unspecified.
 func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
@@ -67,25 +70,53 @@ func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *B
 		watchQueueLength:    queueLength,
 		fullChannelBehavior: fullChannelBehavior,
 	}
+	m.distributing.Add(1)
 	go m.loop()
 	return m
+}
+
+const internalRunFunctionMarker = "internal-do-function"
+
+// a function type we can shoehorn into the queue.
+type functionFakeRuntimeObject func()
+
+func (functionFakeRuntimeObject) IsAnAPIObject() {}
+
+// Execute f, blocking the incoming queue (and waiting for it to drain first).
+// The purpose of this terrible hack is so that watchers added after an event
+// won't ever see that event, and will always see any event after they are
+// added.
+func (b *Broadcaster) blockQueue(f func()) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	b.incoming <- Event{
+		Type: internalRunFunctionMarker,
+		Object: functionFakeRuntimeObject(func() {
+			defer wg.Done()
+			f()
+		}),
+	}
+	wg.Wait()
 }
 
 // Watch adds a new watcher to the list and returns an Interface for it.
 // Note: new watchers will only receive new events. They won't get an entire history
 // of previous events.
 func (m *Broadcaster) Watch() Interface {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	id := m.nextWatcher
-	m.nextWatcher++
-	w := &broadcasterWatcher{
-		result:  make(chan Event, m.watchQueueLength),
-		stopped: make(chan struct{}),
-		id:      id,
-		m:       m,
-	}
-	m.watchers[id] = w
+	var w *broadcasterWatcher
+	m.blockQueue(func() {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		id := m.nextWatcher
+		m.nextWatcher++
+		w = &broadcasterWatcher{
+			result:  make(chan Event, m.watchQueueLength),
+			stopped: make(chan struct{}),
+			id:      id,
+			m:       m,
+		}
+		m.watchers[id] = w
+	})
 	return w
 }
 
@@ -94,24 +125,27 @@ func (m *Broadcaster) Watch() Interface {
 // The returned watch will have a queue length that is at least large enough to accommodate
 // all of the items in queuedEvents.
 func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	id := m.nextWatcher
-	m.nextWatcher++
-	length := m.watchQueueLength
-	if n := len(queuedEvents) + 1; n > length {
-		length = n
-	}
-	w := &broadcasterWatcher{
-		result:  make(chan Event, length),
-		stopped: make(chan struct{}),
-		id:      id,
-		m:       m,
-	}
-	m.watchers[id] = w
-	for _, e := range queuedEvents {
-		w.result <- e
-	}
+	var w *broadcasterWatcher
+	m.blockQueue(func() {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		id := m.nextWatcher
+		m.nextWatcher++
+		length := m.watchQueueLength
+		if n := len(queuedEvents) + 1; n > length {
+			length = n
+		}
+		w = &broadcasterWatcher{
+			result:  make(chan Event, length),
+			stopped: make(chan struct{}),
+			id:      id,
+			m:       m,
+		}
+		m.watchers[id] = w
+		for _, e := range queuedEvents {
+			w.result <- e
+		}
+	})
 	return w
 }
 
@@ -146,9 +180,14 @@ func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 }
 
 // Shutdown disconnects all watchers (but any queued events will still be distributed).
-// You must not call Action after calling Shutdown.
+// You must not call Action or Watch* after calling Shutdown. This call blocks
+// until all events have been distributed through the outbound channels. Note
+// that since they can be buffered, this means that the watchers might not
+// have received the data yet as it can remain sitting in the buffered
+// channel.
 func (m *Broadcaster) Shutdown() {
 	close(m.incoming)
+	m.distributing.Wait()
 }
 
 // loop receives from m.incoming and distributes to all watchers.
@@ -160,9 +199,14 @@ func (m *Broadcaster) loop() {
 		if !ok {
 			break
 		}
+		if event.Type == internalRunFunctionMarker {
+			event.Object.(functionFakeRuntimeObject)()
+			continue
+		}
 		m.distribute(event)
 	}
 	m.closeAll()
+	m.distributing.Done()
 }
 
 // distribute sends event to all watchers. Blocking.

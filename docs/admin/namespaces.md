@@ -122,7 +122,7 @@ See [Admission control: Limit Range](../design/admission_control_limit_range.md)
 
 A namespace can be in one of two phases:
    * `Active` the namespace is in use
-   * ```Terminating`` the namespace is being deleted, and can not be used for new objects
+   * `Terminating` the namespace is being deleted, and can not be used for new objects
 
 See the [design doc](../design/namespaces.md#phases) for more details.
 
@@ -166,8 +166,8 @@ This delete is asynchronous, so for a time you will see the namespace in the `Te
 
 ## Namespaces and DNS
 
-When you create a [Service](../../docs/user-guide/services.md), it creates a corresponding [DNS entry](dns.md)1.
-This entry is of the form `<service-name>.<namespace-name>.cluster.local`, which means
+When you create a [Service](../../docs/user-guide/services.md), it creates a corresponding [DNS entry](dns.md).
+This entry is of the form `<service-name>.<namespace-name>.svc.cluster.local`, which means
 that if a container just uses `<service-name>` it will resolve to the service which
 is local to a namespace.  This is useful for using the same configuration across
 multiple namespaces such as Development, Staging and Production.  If you want to reach

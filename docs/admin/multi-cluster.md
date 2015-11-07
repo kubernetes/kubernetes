@@ -80,8 +80,9 @@ Second, decide how many clusters should be able to be unavailable at the same ti
 the number that can be unavailable `U`.  If you are not sure, then 1 is a fine choice.
 
 If it is allowable for load-balancing to direct traffic to any region in the event of a cluster failure, then
-you need `R + U` clusters.  If it is not (e.g you want to ensure low latency for all users in the event of a
-cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
+you need at least the larger of `R` or `U + 1` clusters.  If it is not (e.g you want to ensure low latency for all
+users in the event of a cluster failure), then you need to have `R * (U + 1)` clusters
+(`U + 1` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
 Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
 you may need even more clusters.  Kubernetes v1.0 currently supports clusters up to 100 nodes in size, but we are targeting

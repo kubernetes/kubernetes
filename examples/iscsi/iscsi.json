@@ -31,8 +31,8 @@
             {
                 "name": "iscsipd-ro",
                 "iscsi": {
-                    "targetPortal": "127.0.0.1:3260",
-                    "iqn": "iqn.2014-12.world.server:www.server.world",
+                    "targetPortal": "10.0.2.15:3260",
+                    "iqn": "iqn.2001-04.com.example:storage.kube.sys1.xyz",
                     "lun": 0,
                     "fsType": "ext4",
                     "readOnly": true
@@ -41,9 +41,9 @@
             {
                 "name": "iscsipd-rw",
                 "iscsi": {
-                    "targetPortal": "127.0.0.1:3260",
-                    "iqn": "iqn.2014-12.world.server:www.server.world",
-                    "lun": 0,
+                    "targetPortal": "10.0.2.15:3260",
+                    "iqn": "iqn.2001-04.com.example:storage.kube.sys1.xyz",
+                    "lun": 1,
                     "fsType": "ext4",
                     "readOnly": false
                 }

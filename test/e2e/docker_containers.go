@@ -22,60 +22,50 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Docker Containers", func() {
+	framework := NewFramework("containers")
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("containers", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
-
-	It("should use the image defaults if command and args are blank", func() {
-		testContainerOutputInNamespace("use defaults", c, entrypointTestPod(), 0, []string{
+	It("should use the image defaults if command and args are blank [Conformance]", func() {
+		testContainerOutput("use defaults", c, entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
 		}, ns)
 	})
 
-	It("should be able to override the image's default arguments (docker cmd)", func() {
+	It("should be able to override the image's default arguments (docker cmd) [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace("override arguments", c, pod, 0, []string{
+		testContainerOutput("override arguments", c, pod, 0, []string{
 			"[/ep override arguments]",
 		}, ns)
 	})
 
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
 	// are ignored.
-	It("should be able to override the image's default commmand (docker entrypoint)", func() {
+	It("should be able to override the image's default commmand (docker entrypoint) [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		testContainerOutputInNamespace("override command", c, pod, 0, []string{
+		testContainerOutput("override command", c, pod, 0, []string{
 			"[/ep-2]",
 		}, ns)
 	})
 
-	It("should be able to override the image's default command and arguments", func() {
+	It("should be able to override the image's default command and arguments [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace("override all", c, pod, 0, []string{
+		testContainerOutput("override all", c, pod, 0, []string{
 			"[/ep-2 override arguments]",
 		}, ns)
 	})

@@ -21,6 +21,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
+    source "${KUBE_ROOT}/cluster/env.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 

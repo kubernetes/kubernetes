@@ -17,13 +17,13 @@ limitations under the License.
 package admission
 
 import (
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Handler is a base for admission control handlers that
 // support a predefined set of operations
 type Handler struct {
-	operations util.StringSet
+	operations sets.String
 }
 
 // Handles returns true for methods that this handler supports
@@ -34,7 +34,7 @@ func (h *Handler) Handles(operation Operation) bool {
 // NewHandler creates a new base handler that handles the passed
 // in operations
 func NewHandler(ops ...Operation) *Handler {
-	operations := util.NewStringSet()
+	operations := sets.NewString()
 	for _, op := range ops {
 		operations.Insert(string(op))
 	}

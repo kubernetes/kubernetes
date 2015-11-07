@@ -17,6 +17,7 @@ limitations under the License.
 package httpstream
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -24,8 +25,10 @@ import (
 )
 
 const (
-	HeaderConnection = "Connection"
-	HeaderUpgrade    = "Upgrade"
+	HeaderConnection               = "Connection"
+	HeaderUpgrade                  = "Upgrade"
+	HeaderProtocolVersion          = "X-Stream-Protocol-Version"
+	HeaderAcceptedProtocolVersions = "X-Accepted-Stream-Protocol-Versions"
 )
 
 // NewStreamHandler defines a function that is called when a new Stream is
@@ -36,6 +39,14 @@ type NewStreamHandler func(Stream) error
 // NoOpNewStreamHandler is a stream handler that accepts a new stream and
 // performs no other logic.
 func NoOpNewStreamHandler(stream Stream) error { return nil }
+
+// Dialer knows how to open a streaming connection to a server.
+type Dialer interface {
+
+	// Dial opens a streaming connection to a server using one of the protocols
+	// specified (in order of most preferred to least preferred).
+	Dial(protocols ...string) (Connection, string, error)
+}
 
 // UpgradeRoundTripper is a type of http.RoundTripper that is able to upgrade
 // HTTP requests to support multiplexed bidirectional streams. After RoundTrip()
@@ -51,7 +62,7 @@ type UpgradeRoundTripper interface {
 // add streaming support to them.
 type ResponseUpgrader interface {
 	// UpgradeResponse upgrades an HTTP response to one that supports multiplexed
-	// streams. newStreamHandler will be called synchronously whenever the
+	// streams. newStreamHandler will be called asynchronously whenever the
 	// other end of the upgraded connection creates a new stream.
 	UpgradeResponse(w http.ResponseWriter, req *http.Request, newStreamHandler NewStreamHandler) Connection
 }
@@ -78,6 +89,8 @@ type Stream interface {
 	Reset() error
 	// Headers returns the headers used to create the stream.
 	Headers() http.Header
+	// Identifier returns the stream's ID.
+	Identifier() uint32
 }
 
 // IsUpgradeRequest returns true if the given request is a connection upgrade request
@@ -88,4 +101,45 @@ func IsUpgradeRequest(req *http.Request) bool {
 		}
 	}
 	return false
+}
+
+func negotiateProtocol(clientProtocols, serverProtocols []string) string {
+	for i := range clientProtocols {
+		for j := range serverProtocols {
+			if clientProtocols[i] == serverProtocols[j] {
+				return clientProtocols[i]
+			}
+		}
+	}
+	return ""
+}
+
+// Handshake performs a subprotocol negotiation. If the client did not request
+// a specific subprotocol, defaultProtocol is used. If the client did request a
+// subprotocol, Handshake will select the first common value found in
+// serverProtocols. If a match is found, Handshake adds a response header
+// indicating the chosen subprotocol. If no match is found, HTTP forbidden is
+// returned, along with a response header containing the list of protocols the
+// server can accept.
+func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []string, defaultProtocol string) (string, error) {
+	clientProtocols := req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)]
+	if len(clientProtocols) == 0 {
+		// Kube 1.0 client that didn't support subprotocol negotiation
+		// TODO remove this defaulting logic once Kube 1.0 is no longer supported
+		w.Header().Add(HeaderProtocolVersion, defaultProtocol)
+		return defaultProtocol, nil
+	}
+
+	negotiatedProtocol := negotiateProtocol(clientProtocols, serverProtocols)
+	if len(negotiatedProtocol) == 0 {
+		w.WriteHeader(http.StatusForbidden)
+		for i := range serverProtocols {
+			w.Header().Add(HeaderAcceptedProtocolVersions, serverProtocols[i])
+		}
+		fmt.Fprintf(w, "unable to upgrade: unable to negotiate protocol: client supports %v, server accepts %v", clientProtocols, serverProtocols)
+		return "", fmt.Errorf("unable to upgrade: unable to negotiate protocol: client supports %v, server supports %v", clientProtocols, serverProtocols)
+	}
+
+	w.Header().Add(HeaderProtocolVersion, negotiatedProtocol)
+	return negotiatedProtocol, nil
 }

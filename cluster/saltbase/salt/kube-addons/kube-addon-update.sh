@@ -198,7 +198,7 @@ function run-until-success() {
 # returns a list of <namespace>/<name> pairs (nsnames)
 function get-addon-nsnames-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" get "${obj_type}" --all-namespaces -o template -t "{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
+    "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
 }
 
 # returns the characters after the last separator (including)

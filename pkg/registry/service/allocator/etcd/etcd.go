@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+
+	"golang.org/x/net/context"
 )
 
 var (
@@ -141,7 +143,7 @@ func (e *Etcd) Release(item int) error {
 
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
-	err := e.storage.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
+	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true,
 		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
@@ -171,7 +173,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 	defer e.lock.Unlock()
 
 	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(e.baseKey, existing, false); err != nil {
+	if err := e.storage.Get(context.TODO(), e.baseKey, existing, false); err != nil {
 		if etcdstorage.IsEtcdNotFound(err) {
 			return nil, nil
 		}
@@ -185,7 +187,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(e.baseKey, existing, true); err != nil {
+	if err := e.storage.Get(context.TODO(), e.baseKey, existing, true); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.kind, "")
 	}
 	return existing, nil
@@ -198,7 +200,7 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 	defer e.lock.Unlock()
 
 	last := ""
-	err := e.storage.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
+	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true,
 		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			switch {

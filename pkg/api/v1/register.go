@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -47,8 +48,6 @@ func addKnownTypes() {
 		&PodTemplateList{},
 		&ReplicationController{},
 		&ReplicationControllerList{},
-		&DaemonList{},
-		&Daemon{},
 		&Service{},
 		&ServiceList{},
 		&Endpoints{},
@@ -56,7 +55,6 @@ func addKnownTypes() {
 		&Node{},
 		&NodeList{},
 		&Binding{},
-		&Status{},
 		&Event{},
 		&EventList{},
 		&List{},
@@ -84,13 +82,10 @@ func addKnownTypes() {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&ThirdPartyResourceData{},
 	)
-	// Legacy names are supported
-	api.Scheme.AddKnownTypeWithName("v1", "Minion", &Node{})
-	api.Scheme.AddKnownTypeWithName("v1", "MinionList", &NodeList{})
+
+	// Add common types
+	api.Scheme.AddKnownTypes("v1", &unversioned.Status{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
@@ -100,8 +95,6 @@ func (*PodTemplate) IsAnAPIObject()               {}
 func (*PodTemplateList) IsAnAPIObject()           {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
-func (*Daemon) IsAnAPIObject()                    {}
-func (*DaemonList) IsAnAPIObject()                {}
 func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}
@@ -109,7 +102,6 @@ func (*EndpointsList) IsAnAPIObject()             {}
 func (*Node) IsAnAPIObject()                      {}
 func (*NodeList) IsAnAPIObject()                  {}
 func (*Binding) IsAnAPIObject()                   {}
-func (*Status) IsAnAPIObject()                    {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
 func (*List) IsAnAPIObject()                      {}
@@ -137,6 +129,3 @@ func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
 func (*SerializedReference) IsAnAPIObject()       {}
 func (*RangeAllocation) IsAnAPIObject()           {}
-func (*ThirdPartyResource) IsAnAPIObject()        {}
-func (*ThirdPartyResourceList) IsAnAPIObject()    {}
-func (*ThirdPartyResourceData) IsAnAPIObject()    {}

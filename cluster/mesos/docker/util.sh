@@ -98,8 +98,6 @@ function cluster::mesos::docker::run_in_docker_test {
       ${kube_config_mount} \
       -v "/var/run/docker.sock:/var/run/docker.sock" \
       --link docker_mesosmaster1_1:mesosmaster1 \
-      --link docker_mesosslave1_1:mesosslave1 \
-      --link docker_mesosslave2_1:mesosslave2 \
       --link docker_apiserver_1:apiserver \
       --entrypoint="${entrypoint}" \
       mesosphere/kubernetes-mesos-test \
@@ -255,16 +253,13 @@ function cluster::mesos::docker::init_auth {
 # Instantiate a kubernetes cluster.
 function kube-up {
   # Nuke old mesos-slave workspaces
-  for ((i=1; i <= NUM_MINIONS; i++)) do
-    local work_dir="${MESOS_DOCKER_WORK_DIR}/mesosslave${i}/mesos"
-    echo "Creating Mesos Work Dir: ${work_dir}" 1>&2
-    mkdir -p "${work_dir}"
-    rm -rf "${work_dir}"/*
-  done
-
-  local -r log_dir="${MESOS_DOCKER_WORK_DIR}/log"
+  local work_dir="${MESOS_DOCKER_WORK_DIR}/mesosslave"
+  echo "Creating Mesos Work Dir: ${work_dir}" 1>&2
+  mkdir -p "${work_dir}"
+  rm -rf "${work_dir}"/*
 
   # Nuke old logs
+  local -r log_dir="${MESOS_DOCKER_WORK_DIR}/log"
   mkdir -p "${log_dir}"
   rm -rf "${log_dir}"/*
 
@@ -288,6 +283,8 @@ function kube-up {
 
   echo "Starting ${KUBERNETES_PROVIDER} cluster" 1>&2
   cluster::mesos::docker::docker_compose up -d
+  echo "Scaling ${KUBERNETES_PROVIDER} cluster to ${NUM_MINIONS} slaves"
+  cluster::mesos::docker::docker_compose scale mesosslave=${NUM_MINIONS}
 
   # await-health-check requires GNU timeout
   # apiserver hostname resolved by docker

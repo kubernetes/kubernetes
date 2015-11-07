@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-ETCD_VERSION=${ETCD_VERSION:-v2.0.11}
+ETCD_VERSION=${ETCD_VERSION:-v2.2.1}
 
 full_name=etcd-${ETCD_VERSION}-linux-amd64
 archive_url=https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/${full_name}.tar.gz

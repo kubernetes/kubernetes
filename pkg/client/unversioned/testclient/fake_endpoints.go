@@ -39,8 +39,8 @@ func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
 	return obj.(*api.Endpoints), err
 }
 
-func (c *FakeEndpoints) List(label labels.Selector) (*api.EndpointsList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("endpoints", c.Namespace, label, nil), &api.EndpointsList{})
+func (c *FakeEndpoints) List(label labels.Selector, field fields.Selector) (*api.EndpointsList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("endpoints", c.Namespace, label, field), &api.EndpointsList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,7 +71,6 @@ func (c *FakeEndpoints) Delete(name string) error {
 	return err
 }
 
-func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("endpoints", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("endpoints", c.Namespace, label, field, opts))
 }

@@ -17,10 +17,8 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-	"strings"
-
-	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 type ScaleNamespacer interface {
@@ -29,17 +27,18 @@ type ScaleNamespacer interface {
 
 // ScaleInterface has methods to work with Scale (sub)resources.
 type ScaleInterface interface {
-	Get(string, string) (*expapi.Scale, error)
+	Get(string, string) (*extensions.Scale, error)
+	Update(string, *extensions.Scale) (*extensions.Scale, error)
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
 type scales struct {
-	client *ExperimentalClient
+	client *ExtensionsClient
 	ns     string
 }
 
 // newHorizontalPodAutoscalers returns a horizontalPodAutoscalers
-func newScales(c *ExperimentalClient, namespace string) *scales {
+func newScales(c *ExtensionsClient, namespace string) *scales {
 	return &scales{
 		client: c,
 		ns:     namespace,
@@ -47,13 +46,23 @@ func newScales(c *ExperimentalClient, namespace string) *scales {
 }
 
 // Get takes the reference to scale subresource and returns the subresource or error, if one occurs.
-func (c *scales) Get(kind string, name string) (result *expapi.Scale, err error) {
-	result = &expapi.Scale{}
-	if strings.ToLower(kind) == "replicationcontroller" {
-		kind = "replicationControllers"
-		err = c.client.Get().Namespace(c.ns).Resource(kind).Name(name).SubResource("scale").Do().Into(result)
-		return
-	}
-	err = fmt.Errorf("Kind not supported: %s", kind)
+func (c *scales) Get(kind string, name string) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	resource, _ := meta.KindToResource(kind, false)
+	err = c.client.Get().Namespace(c.ns).Resource(resource).Name(name).SubResource("scale").Do().Into(result)
+	return
+}
+
+func (c *scales) Update(kind string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	resource, _ := meta.KindToResource(kind, false)
+	err = c.client.Put().
+		Namespace(scale.Namespace).
+		Resource(resource).
+		Name(scale.Name).
+		SubResource("scale").
+		Body(scale).
+		Do().
+		Into(result)
 	return
 }

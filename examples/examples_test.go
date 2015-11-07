@@ -27,8 +27,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -99,6 +101,26 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
+	case *extensions.Deployment:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expvalidation.ValidateDeployment(t)
+	case *extensions.Job:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expvalidation.ValidateJob(t)
+	case *extensions.Ingress:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expvalidation.ValidateIngress(t)
+	case *extensions.DaemonSet:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = expvalidation.ValidateDaemonSet(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -194,15 +216,23 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/glusterfs": {
 			"glusterfs-pod":       &api.Pod{},
 			"glusterfs-endpoints": &api.Endpoints{},
+			"glusterfs-service":   &api.Service{},
 		},
 		"../docs/user-guide/liveness": {
 			"exec-liveness": &api.Pod{},
 			"http-liveness": &api.Pod{},
 		},
 		"../docs/user-guide": {
-			"multi-pod":   nil,
-			"pod":         &api.Pod{},
-			"replication": &api.ReplicationController{},
+			"multi-pod":            nil,
+			"pod":                  &api.Pod{},
+			"replication":          &api.ReplicationController{},
+			"job":                  &extensions.Job{},
+			"ingress":              &extensions.Ingress{},
+			"nginx-deployment":     &extensions.Deployment{},
+			"new-nginx-deployment": &extensions.Deployment{},
+		},
+		"../docs/admin": {
+			"daemon": &extensions.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config": &schedulerapi.Policy{},
@@ -236,10 +266,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../docs/user-guide/downward-api": {
 			"dapi-pod": &api.Pod{},
 		},
+		"../docs/user-guide/downward-api/volume/": {
+			"dapi-volume": &api.Pod{},
+		},
 		"../examples/elasticsearch": {
-			"mytunes-namespace": &api.Namespace{},
-			"music-rc":          &api.ReplicationController{},
-			"music-service":     &api.Service{},
+			"es-rc":           &api.ReplicationController{},
+			"es-svc":          &api.Service{},
+			"service-account": nil,
 		},
 		"../examples/explorer": {
 			"pod": &api.Pod{},
@@ -275,9 +308,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"wordpress":         &api.Pod{},
 		},
 		"../examples/nfs": {
-			"nfs-server-pod":     &api.Pod{},
+			"nfs-busybox-rc":     &api.ReplicationController{},
+			"nfs-server-rc":      &api.ReplicationController{},
 			"nfs-server-service": &api.Service{},
-			"nfs-web-pod":        &api.Pod{},
+			"nfs-pv":             &api.PersistentVolume{},
+			"nfs-pvc":            &api.PersistentVolumeClaim{},
+			"nfs-web-rc":         &api.ReplicationController{},
+			"nfs-web-service":    &api.Service{},
 		},
 		"../docs/user-guide/node-selection": {
 			"pod": &api.Pod{},
@@ -293,9 +330,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret":                     nil,
 		},
 		"../examples/phabricator": {
-			"authenticator-controller": &api.ReplicationController{},
-			"phabricator-controller":   &api.ReplicationController{},
-			"phabricator-service":      &api.Service{},
+			"phabricator-controller": &api.ReplicationController{},
+			"phabricator-service":    &api.Service{},
 		},
 		"../examples/redis": {
 			"redis-controller":          &api.ReplicationController{},
@@ -304,7 +340,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-sentinel-controller": &api.ReplicationController{},
 			"redis-sentinel-service":    &api.Service{},
 		},
-		"../docs/user-guide/resourcequota": {
+		"../docs/admin/resourcequota": {
 			"namespace": &api.Namespace{},
 			"limits":    &api.LimitRange{},
 			"quota":     &api.ResourceQuota{},
@@ -320,10 +356,17 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret":     &api.Secret{},
 		},
 		"../examples/spark": {
+			"spark-driver-controller": &api.ReplicationController{},
+			"spark-master-controller": &api.ReplicationController{},
 			"spark-master-service":    &api.Service{},
-			"spark-master":            &api.Pod{},
+			"spark-webui":             &api.Service{},
 			"spark-worker-controller": &api.ReplicationController{},
-			"spark-driver":            &api.Pod{},
+		},
+		"../examples/spark/spark-gluster": {
+			"spark-master-service":    &api.Service{},
+			"spark-master-controller": &api.ReplicationController{},
+			"spark-worker-controller": &api.ReplicationController{},
+			"glusterfs-endpoints":     &api.Endpoints{},
 		},
 		"../examples/storm": {
 			"storm-nimbus-service":    &api.Service{},
@@ -331,6 +374,20 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"storm-worker-controller": &api.ReplicationController{},
 			"zookeeper-service":       &api.Service{},
 			"zookeeper":               &api.Pod{},
+		},
+		"../examples/cephfs/": {
+			"cephfs":             &api.Pod{},
+			"cephfs-with-secret": &api.Pod{},
+		},
+		"../examples/fibre_channel": {
+			"fc": &api.Pod{},
+		},
+		"../examples/extensions": {
+			"deployment": &extensions.Deployment{},
+		},
+		"../examples/javaweb-tomcat-sidecar": {
+			"javaweb":   &api.Pod{},
+			"javaweb-2": &api.Pod{},
 		},
 	}
 
@@ -358,7 +415,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 				}
 				//TODO: Add validate method for &schedulerapi.Policy
 			} else {
-				if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
+				codec, err := testapi.GetCodecForObject(expectedType)
+				if err != nil {
+					t.Errorf("Could not get codec for %s: %s", expectedType, err)
+				}
+				if err := codec.DecodeInto(data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -444,14 +505,14 @@ func TestReadme(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
 			}
-			if err := latest.Codec.DecodeInto(json, expectedType); err != nil {
+			if err := testapi.Default.Codec().DecodeInto(json, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
 				continue
 			}
 			if errors := validateObject(expectedType); len(errors) > 0 {
 				t.Errorf("%s did not validate correctly: %v", path, errors)
 			}
-			_, err = latest.Codec.Encode(expectedType)
+			_, err = testapi.Default.Codec().Encode(expectedType)
 			if err != nil {
 				t.Errorf("Could not encode object: %v", err)
 				continue

@@ -44,23 +44,24 @@ type keyVal struct {
 }
 
 type pageData struct {
-	DisplayName        string
-	ContainerName      string
-	ParentContainers   []link
-	Subcontainers      []link
-	Spec               info.ContainerSpec
-	Stats              []*info.ContainerStats
-	MachineInfo        *info.MachineInfo
-	IsRoot             bool
-	ResourcesAvailable bool
-	CpuAvailable       bool
-	MemoryAvailable    bool
-	NetworkAvailable   bool
-	FsAvailable        bool
-	Root               string
-	DockerStatus       []keyVal
-	DockerDriverStatus []keyVal
-	DockerImages       []manager.DockerImage
+	DisplayName            string
+	ContainerName          string
+	ParentContainers       []link
+	Subcontainers          []link
+	Spec                   info.ContainerSpec
+	Stats                  []*info.ContainerStats
+	MachineInfo            *info.MachineInfo
+	IsRoot                 bool
+	ResourcesAvailable     bool
+	CpuAvailable           bool
+	MemoryAvailable        bool
+	NetworkAvailable       bool
+	FsAvailable            bool
+	CustomMetricsAvailable bool
+	Root                   string
+	DockerStatus           []keyVal
+	DockerDriverStatus     []keyVal
+	DockerImages           []manager.DockerImage
 }
 
 func init() {

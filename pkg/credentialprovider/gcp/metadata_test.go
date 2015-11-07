@@ -275,6 +275,39 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 	}
 }
 
+func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
+	const (
+		defaultEndpoint = "/computeMetadata/v1/instance/service-accounts/default/"
+		scopeEndpoint   = defaultEndpoint + "scopes"
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only serve the URL key and the value endpoint
+		if scopeEndpoint == r.URL.Path {
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `["https://www.googleapis.com/auth/compute.read_write","https://www.googleapis.com/auth/cloud-platform.read-only"]`)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	// Make a transport that reroutes all traffic to the example server
+	transport := &http.Transport{
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			return url.Parse(server.URL + req.URL.Path)
+		},
+	}
+
+	provider := &containerRegistryProvider{
+		metadataProvider{Client: &http.Client{Transport: transport}},
+	}
+
+	if !provider.Enabled() {
+		t.Errorf("Provider is unexpectedly disabled")
+	}
+}
+
 func TestAllProvidersNoMetadata(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

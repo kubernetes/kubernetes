@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import subprocess
-from path import path
+from path import Path
 
 
 class KubernetesInstaller():
@@ -49,7 +49,7 @@ class KubernetesInstaller():
             print(output)
             destination.chmod(0o755)
 
-    def install(self, install_dir=path('/usr/local/bin')):
+    def install(self, install_dir=Path('/usr/local/bin')):
         """ Create links to the binary files to the install directory. """
 
         if not install_dir.isdir():

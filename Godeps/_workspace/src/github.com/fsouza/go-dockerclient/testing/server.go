@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	mathrand "math/rand"
 	"net"
 	"net/http"
@@ -532,7 +533,7 @@ func (s *DockerServer) startContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	container.HostConfig = &hostConfig
 	if container.State.Running {
-		http.Error(w, "Container already running", http.StatusBadRequest)
+		http.Error(w, "", http.StatusNotModified)
 		return
 	}
 	container.State.Running = true
@@ -610,14 +611,34 @@ func (s *DockerServer) attachContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	wg := sync.WaitGroup{}
+	if r.URL.Query().Get("stdin") == "1" {
+		wg.Add(1)
+		go func() {
+			ioutil.ReadAll(conn)
+			wg.Done()
+		}()
+	}
 	outStream := stdcopy.NewStdWriter(conn, stdcopy.Stdout)
 	if container.State.Running {
-		fmt.Fprintf(outStream, "Container %q is running\n", container.ID)
+		fmt.Fprintf(outStream, "Container is running\n")
 	} else {
-		fmt.Fprintf(outStream, "Container %q is not running\n", container.ID)
+		fmt.Fprintf(outStream, "Container is not running\n")
 	}
 	fmt.Fprintln(outStream, "What happened?")
 	fmt.Fprintln(outStream, "Something happened")
+	wg.Wait()
+	if r.URL.Query().Get("stream") == "1" {
+		for {
+			time.Sleep(1e6)
+			s.cMut.RLock()
+			if !container.State.Running {
+				s.cMut.RUnlock()
+				break
+			}
+			s.cMut.RUnlock()
+		}
+	}
 	conn.Close()
 }
 
@@ -936,7 +957,7 @@ func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Reques
 
 func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if exec, err := s.getExec(id); err == nil {
+	if exec, err := s.getExec(id, false); err == nil {
 		s.execMut.Lock()
 		exec.Running = true
 		s.execMut.Unlock()
@@ -958,7 +979,7 @@ func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request
 
 func (s *DockerServer) resizeExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if _, err := s.getExec(id); err == nil {
+	if _, err := s.getExec(id, false); err == nil {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -967,7 +988,7 @@ func (s *DockerServer) resizeExecContainer(w http.ResponseWriter, r *http.Reques
 
 func (s *DockerServer) inspectExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if exec, err := s.getExec(id); err == nil {
+	if exec, err := s.getExec(id, true); err == nil {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(exec)
@@ -976,11 +997,15 @@ func (s *DockerServer) inspectExecContainer(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (s *DockerServer) getExec(id string) (*docker.ExecInspect, error) {
+func (s *DockerServer) getExec(id string, copy bool) (*docker.ExecInspect, error) {
 	s.execMut.RLock()
 	defer s.execMut.RUnlock()
 	for _, exec := range s.execs {
 		if exec.ID == id {
+			if copy {
+				cp := *exec
+				exec = &cp
+			}
 			return exec, nil
 		}
 	}

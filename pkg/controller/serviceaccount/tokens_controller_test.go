@@ -77,6 +77,13 @@ func serviceAccount(secretRefs []api.ObjectReference) *api.ServiceAccount {
 	}
 }
 
+// updatedServiceAccount returns a service account with the resource version modified
+func updatedServiceAccount(secretRefs []api.ObjectReference) *api.ServiceAccount {
+	sa := serviceAccount(secretRefs)
+	sa.ResourceVersion = "2"
+	return sa
+}
+
 // opaqueSecret returns a persisted non-ServiceAccountToken secret named "regular-secret-1"
 func opaqueSecret() *api.Secret {
 	return &api.Secret{
@@ -179,8 +186,8 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(emptySecretReferences()))),
 			},
 		},
@@ -191,8 +198,8 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(emptySecretReferences()))),
 			},
 		},
@@ -201,8 +208,8 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedServiceAccount: serviceAccount(missingSecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(missingSecretReferences()))),
 			},
 		},
@@ -219,8 +226,8 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedServiceAccount: serviceAccount(regularSecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(regularSecretReferences()))),
 			},
 		},
@@ -231,14 +238,22 @@ func TestTokenCreation(t *testing.T) {
 			AddedServiceAccount: serviceAccount(tokenSecretReferences()),
 			ExpectedActions:     []testclient.Action{},
 		},
+		"new serviceaccount with no secrets with resource conflict": {
+			ClientObjects: []runtime.Object{updatedServiceAccount(emptySecretReferences()), createdTokenSecret()},
+
+			AddedServiceAccount: serviceAccount(emptySecretReferences()),
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+			},
+		},
 
 		"updated serviceaccount with no secrets": {
 			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
 
 			UpdatedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(emptySecretReferences()))),
 			},
 		},
@@ -249,8 +264,8 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(emptySecretReferences()))),
 			},
 		},
@@ -259,8 +274,8 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedServiceAccount: serviceAccount(missingSecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(missingSecretReferences()))),
 			},
 		},
@@ -277,8 +292,8 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedServiceAccount: serviceAccount(regularSecretReferences()),
 			ExpectedActions: []testclient.Action{
-				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+				testclient.NewCreateAction("secrets", api.NamespaceDefault, createdTokenSecret()),
 				testclient.NewUpdateAction("serviceaccounts", api.NamespaceDefault, serviceAccount(addTokenSecretReference(regularSecretReferences()))),
 			},
 		},
@@ -287,6 +302,14 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedServiceAccount: serviceAccount(tokenSecretReferences()),
 			ExpectedActions:       []testclient.Action{},
+		},
+		"updated serviceaccount with no secrets with resource conflict": {
+			ClientObjects: []runtime.Object{updatedServiceAccount(emptySecretReferences()), createdTokenSecret()},
+
+			UpdatedServiceAccount: serviceAccount(emptySecretReferences()),
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("serviceaccounts", api.NamespaceDefault, "default"),
+			},
 		},
 
 		"deleted serviceaccount with no secrets": {

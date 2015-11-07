@@ -69,19 +69,12 @@ func (c *FakePersistentVolumeClaims) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("persistentvolumeclaims", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("persistentvolumeclaims", c.Namespace, label, field, opts))
 }
 
 func (c *FakePersistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	action := UpdateActionImpl{}
-	action.Verb = "update"
-	action.Resource = "persistentvolumeclaims"
-	action.Subresource = "status"
-	action.Object = claim
-
-	obj, err := c.Fake.Invokes(action, claim)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("persistentvolumeclaims", "status", c.Namespace, claim), claim)
 	if obj == nil {
 		return nil, err
 	}

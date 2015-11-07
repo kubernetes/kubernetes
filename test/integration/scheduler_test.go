@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,10 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -57,6 +59,19 @@ func TestUnschedulableNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create etcd storage: %v", err)
 	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -66,7 +81,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		DatabaseStorage:       etcdStorage,
+		StorageDestinations:   storageDestinations,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -75,9 +90,10 @@ func TestUnschedulableNodes(t *testing.T) {
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       storageVersions,
 	})
 
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -127,13 +143,13 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		Type:              api.NodeReady,
 		Status:            api.ConditionTrue,
 		Reason:            fmt.Sprintf("schedulable condition"),
-		LastHeartbeatTime: util.Time{time.Now()},
+		LastHeartbeatTime: unversioned.Time{time.Now()},
 	}
 	badCondition := api.NodeCondition{
 		Type:              api.NodeReady,
 		Status:            api.ConditionUnknown,
 		Reason:            fmt.Sprintf("unschedulable condition"),
-		LastHeartbeatTime: util.Time{time.Now()},
+		LastHeartbeatTime: unversioned.Time{time.Now()},
 	}
 	// Create a new schedulable node, since we're first going to apply
 	// the unschedulable condition and verify that pods aren't scheduled.
@@ -252,7 +268,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		}
 
 		// There are no schedulable nodes - the pod shouldn't be scheduled.
-		err = wait.Poll(time.Second, time.Second*10, podScheduled(restClient, myPod.Namespace, myPod.Name))
+		err = wait.Poll(time.Second, util.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
 		if err == nil {
 			t.Errorf("Pod scheduled successfully on unschedulable nodes")
 		}
@@ -270,7 +286,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		mod.makeSchedulable(t, schedNode, nodeStore, restClient)
 
 		// Wait until the pod is scheduled.
-		err = wait.Poll(time.Second, time.Second*10, podScheduled(restClient, myPod.Namespace, myPod.Name))
+		err = wait.Poll(time.Second, util.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
 		if err != nil {
 			t.Errorf("Test %d: failed to schedule a pod: %v", i, err)
 		} else {
@@ -286,4 +302,161 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			t.Errorf("Failed to delete node: %v", err)
 		}
 	}
+}
+
+func BenchmarkScheduling(b *testing.B) {
+	etcdStorage, err := framework.NewEtcdStorage()
+	if err != nil {
+		b.Fatalf("Couldn't create etcd storage: %v", err)
+	}
+	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	storageVersions := make(map[string]string)
+	storageVersions[""] = testapi.Default.Version()
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+
+	framework.DeleteAllEtcdKeys()
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		StorageDestinations:   storageDestinations,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		StorageVersions:       storageVersions,
+	})
+
+	c := client.NewOrDie(&client.Config{
+		Host:    s.URL,
+		Version: testapi.Default.Version(),
+		QPS:     5000.0,
+		Burst:   5000,
+	})
+
+	schedulerConfigFactory := factory.NewConfigFactory(c, nil)
+	schedulerConfig, err := schedulerConfigFactory.Create()
+	if err != nil {
+		b.Fatalf("Couldn't create scheduler config: %v", err)
+	}
+	eventBroadcaster := record.NewBroadcaster()
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartRecordingToSink(c.Events(""))
+	scheduler.New(schedulerConfig).Run()
+
+	defer close(schedulerConfig.StopEverything)
+
+	makeNNodes(c, 1000)
+	N := b.N
+	b.ResetTimer()
+	makeNPods(c, N)
+	for {
+		objs := schedulerConfigFactory.ScheduledPodLister.Store.List()
+		if len(objs) >= N {
+			fmt.Printf("%v pods scheduled.\n", len(objs))
+			/* // To prove that this actually works:
+			for _, o := range objs {
+				fmt.Printf("%s\n", o.(*api.Pod).Spec.NodeName)
+			}
+			*/
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	b.StopTimer()
+}
+
+func makeNNodes(c client.Interface, N int) {
+	baseNode := &api.Node{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "scheduler-test-node-",
+		},
+		Spec: api.NodeSpec{
+			ExternalID: "foobar",
+		},
+		Status: api.NodeStatus{
+			Capacity: api.ResourceList{
+				api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+				api.ResourceCPU:    resource.MustParse("4"),
+				api.ResourceMemory: resource.MustParse("32Gi"),
+			},
+			Phase: api.NodeRunning,
+			Conditions: []api.NodeCondition{
+				{Type: api.NodeReady, Status: api.ConditionTrue},
+			},
+		},
+	}
+	for i := 0; i < N; i++ {
+		if _, err := c.Nodes().Create(baseNode); err != nil {
+			panic("error creating node: " + err.Error())
+		}
+	}
+}
+
+func makeNPods(c client.Interface, N int) {
+	basePod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "scheduler-test-pod-",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{{
+				Name:  "pause",
+				Image: "gcr.io/google_containers/pause:1.0",
+				Resources: api.ResourceRequirements{
+					Limits: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("500Mi"),
+					},
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("500Mi"),
+					},
+				},
+			}},
+		},
+	}
+	wg := sync.WaitGroup{}
+	threads := 30
+	wg.Add(threads)
+	remaining := make(chan int, N)
+	go func() {
+		for i := 0; i < N; i++ {
+			remaining <- i
+		}
+		close(remaining)
+	}()
+	for i := 0; i < threads; i++ {
+		go func() {
+			defer wg.Done()
+			for {
+				_, ok := <-remaining
+				if !ok {
+					return
+				}
+				for {
+					_, err := c.Pods("default").Create(basePod)
+					if err == nil {
+						break
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }

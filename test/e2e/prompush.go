@@ -19,6 +19,7 @@ package e2e
 
 import (
 	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -38,9 +39,7 @@ var prom_registered = false
 
 // Reusable function for pushing metrics to prometheus.  Handles initialization and so on.
 func promPushRunningPending(running, pending int) error {
-
 	if testContext.PrometheusPushGateway == "" {
-		Logf("Ignoring prom push, push gateway unavailable")
 		return nil
 	} else {
 		// Register metrics if necessary

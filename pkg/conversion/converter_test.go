@@ -39,6 +39,34 @@ func TestConverter_byteSlice(t *testing.T) {
 	}
 }
 
+func TestConverter_MismatchedTypes(t *testing.T) {
+	c := NewConverter()
+
+	err := c.RegisterConversionFunc(
+		func(in *[]string, out *int, s Scope) error {
+			if str, err := strconv.Atoi((*in)[0]); err != nil {
+				return err
+			} else {
+				*out = str
+				return nil
+			}
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	src := []string{"5"}
+	var dest *int
+	err = c.Convert(&src, &dest, 0, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if e, a := 5, *dest; e != a {
+		t.Errorf("expected %#v, got %#v", e, a)
+	}
+}
+
 func TestConverter_DefaultConvert(t *testing.T) {
 	type A struct {
 		Foo string

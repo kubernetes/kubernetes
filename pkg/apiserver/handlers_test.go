@@ -29,9 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type fakeRL bool
@@ -52,24 +50,34 @@ func expectHTTP(url string, code int, t *testing.T) {
 }
 
 func getPath(resource, namespace, name string) string {
-	return testapi.ResourcePath(resource, namespace, name)
+	return testapi.Default.ResourcePath(resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
 }
 
 func TestMaxInFlight(t *testing.T) {
 	const Iterations = 3
 	block := sync.WaitGroup{}
 	block.Add(1)
+	oneFinished := sync.WaitGroup{}
+	oneFinished.Add(1)
+	var once sync.Once
 	sem := make(chan bool, Iterations)
 
 	re := regexp.MustCompile("[.*\\/watch][^\\/proxy.*]")
 
+	// Calls verifies that the server is actually blocked up before running the rest of the test
+	calls := &sync.WaitGroup{}
+	calls.Add(Iterations * 3)
+
 	server := httptest.NewServer(MaxInFlightLimit(sem, re, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "dontwait") {
 			return
+		}
+		if calls != nil {
+			calls.Done()
 		}
 		block.Wait()
 	})))
@@ -80,12 +88,15 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
+			once.Do(oneFinished.Done)
 		}()
 	}
+
 	for i := 0; i < Iterations; i++ {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL+"/proxy/foo/bar", http.StatusOK, t)
+			once.Do(oneFinished.Done)
 		}()
 	}
 	expectHTTP(server.URL+"/dontwait", http.StatusOK, t)
@@ -94,36 +105,26 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL, http.StatusOK, t)
+			once.Do(oneFinished.Done)
 		}()
 	}
-	// There's really no more elegant way to do this.  I could use a WaitGroup, but even then
-	// it'd still be racy.
-	time.Sleep(1 * time.Second)
-	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
+	calls.Wait()
+	calls = nil
 
 	// Do this multiple times to show that it rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
 		expectHTTP(server.URL, errors.StatusTooManyRequests, t)
 	}
+
+	// Validate that non-accounted URLs still work
+	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
+
 	block.Done()
 
 	// Show that we recover from being blocked up.
+	// However, we should until at least one of the requests really finishes.
+	oneFinished.Wait()
 	expectHTTP(server.URL, http.StatusOK, t)
-}
-
-func TestRateLimit(t *testing.T) {
-	for _, allow := range []bool{true, false} {
-		rl := fakeRL(allow)
-		server := httptest.NewServer(RateLimit(rl, http.HandlerFunc(
-			func(w http.ResponseWriter, req *http.Request) {
-				if !allow {
-					t.Errorf("Unexpected call")
-				}
-			},
-		)))
-		defer server.Close()
-		http.Get(server.URL)
-	}
 }
 
 func TestReadOnly(t *testing.T) {
@@ -205,55 +206,62 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		method              string
 		url                 string
 		expectedVerb        string
+		expectedAPIPrefix   string
+		expectedAPIGroup    string
 		expectedAPIVersion  string
 		expectedNamespace   string
 		expectedResource    string
 		expectedSubresource string
-		expectedKind        string
 		expectedName        string
 		expectedParts       []string
 	}{
 
 		// resource paths
-		{"GET", "/namespaces", "list", "", "", "namespaces", "", "Namespace", "", []string{"namespaces"}},
-		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
+		{"GET", "/api/v1/namespaces", "list", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{"GET", "/api/v1/namespaces/other", "get", "api", "", "v1", "other", "namespaces", "", "other", []string{"namespaces", "other"}},
 
-		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/pods", "list", "api", "", "v1", api.NamespaceAll, "pods", "", "", []string{"pods"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// special verbs
-		{"GET", "/proxy/namespaces/other/pods/foo", "proxy", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/redirect/namespaces/other/pods/foo", "redirect", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
-
-		// fully-qualified paths
-		{"GET", getPath("pods", "other", ""), "list", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "other", "foo"), "get", testapi.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", getPath("pods", "", ""), "list", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"POST", getPath("pods", "", ""), "create", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", getPath("pods", "", "foo"), "get", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("redirect", "pods", "", ""), "redirect", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", pathWithPrefix("watch", "pods", "other", ""), "watch", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/proxy/namespaces/other/pods/foo/subpath/not/a/subresource", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo", "subpath", "not", "a", "subresource"}},
+		{"GET", "/api/v1/redirect/namespaces/other/pods/foo", "redirect", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1/redirect/namespaces/other/pods/foo/subpath/not/a/subresource", "redirect", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo", "subpath", "not", "a", "subresource"}},
+		{"GET", "/api/v1/watch/pods", "watch", "api", "", "v1", api.NamespaceAll, "pods", "", "", []string{"pods"}},
+		{"GET", "/api/v1/watch/namespaces/other/pods", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// subresource identification
-		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
-		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo/status", "get", "api", "", "v1", "other", "pods", "status", "foo", []string{"pods", "foo", "status"}},
+		{"GET", "/api/v1/namespaces/other/pods/foo/proxy/subpath", "get", "api", "", "v1", "other", "pods", "proxy", "foo", []string{"pods", "foo", "proxy", "subpath"}},
+		{"PUT", "/api/v1/namespaces/other/finalize", "update", "api", "", "v1", "other", "finalize", "", "", []string{"finalize"}},
+
+		// verb identification
+		{"PATCH", "/api/v1/namespaces/other/pods/foo", "patch", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"DELETE", "/api/v1/namespaces/other/pods/foo", "delete", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"POST", "/api/v1/namespaces/other/pods", "create", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+
+		// api group identification
+		{"POST", "/apis/extensions/v1/namespaces/other/pods", "create", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
+
+		// api version identification
+		{"POST", "/apis/extensions/v1beta3/namespaces/other/pods", "create", "api", "extensions", "v1beta3", "other", "pods", "", "", []string{"pods"}},
 	}
 
-	apiRequestInfoResolver := &APIRequestInfoResolver{util.NewStringSet("api"), latest.RESTMapper}
+	requestInfoResolver := newTestRequestInfoResolver()
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
 
-		apiRequestInfo, err := apiRequestInfoResolver.GetAPIRequestInfo(req)
+		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
 		if err != nil {
 			t.Errorf("Unexpected error for url: %s %v", successCase.url, err)
+		}
+		if !apiRequestInfo.IsResourceRequest {
+			t.Errorf("Expected resource request")
 		}
 		if successCase.expectedVerb != apiRequestInfo.Verb {
 			t.Errorf("Unexpected verb for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedVerb, apiRequestInfo.Verb)
@@ -263,9 +271,6 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		}
 		if successCase.expectedNamespace != apiRequestInfo.Namespace {
 			t.Errorf("Unexpected namespace for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedNamespace, apiRequestInfo.Namespace)
-		}
-		if successCase.expectedKind != apiRequestInfo.Kind {
-			t.Errorf("Unexpected kind for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedKind, apiRequestInfo.Kind)
 		}
 		if successCase.expectedResource != apiRequestInfo.Resource {
 			t.Errorf("Unexpected resource for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedResource, apiRequestInfo.Resource)
@@ -284,16 +289,58 @@ func TestGetAPIRequestInfo(t *testing.T) {
 	errorCases := map[string]string{
 		"no resource path":            "/",
 		"just apiversion":             "/api/version/",
+		"just prefix, group, version": "/apis/group/version/",
 		"apiversion with no resource": "/api/version/",
+		"bad prefix":                  "/badprefix/version/resource",
+		"missing api group":           "/apis/version/resource",
 	}
 	for k, v := range errorCases {
 		req, err := http.NewRequest("GET", v, nil)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		_, err = apiRequestInfoResolver.GetAPIRequestInfo(req)
-		if err == nil {
-			t.Errorf("Expected error for key: %s", k)
+		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		if err != nil {
+			t.Errorf("%s: Unexpected error %v", k, err)
+		}
+		if apiRequestInfo.IsResourceRequest {
+			t.Errorf("%s: expected non-resource request", k)
+		}
+	}
+}
+
+func TestGetNonAPIRequestInfo(t *testing.T) {
+	tests := map[string]struct {
+		url      string
+		expected bool
+	}{
+		"simple groupless":  {"/api/version/resource", true},
+		"simple group":      {"/apis/group/version/resource/name/subresource", true},
+		"more steps":        {"/api/version/resource/name/subresource", true},
+		"group list":        {"/apis/extensions/v1beta1/job", true},
+		"group get":         {"/apis/extensions/v1beta1/job/foo", true},
+		"group subresource": {"/apis/extensions/v1beta1/job/foo/scale", true},
+
+		"bad root":                     {"/not-api/version/resource", false},
+		"group without enough steps":   {"/apis/extensions/v1beta1", false},
+		"group without enough steps 2": {"/apis/extensions/v1beta1/", false},
+		"not enough steps":             {"/api/version", false},
+		"one step":                     {"/api", false},
+		"zero step":                    {"/", false},
+		"empty":                        {"", false},
+	}
+
+	requestInfoResolver := newTestRequestInfoResolver()
+
+	for testName, tc := range tests {
+		req, _ := http.NewRequest("GET", tc.url, nil)
+
+		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		if err != nil {
+			t.Errorf("%s: Unexpected error %v", testName, err)
+		}
+		if e, a := tc.expected, apiRequestInfo.IsResourceRequest; e != a {
+			t.Errorf("%s: expected %v, actual %v", testName, e, a)
 		}
 	}
 }

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,12 +34,12 @@ func TestDecoder(t *testing.T) {
 
 	for _, eventType := range table {
 		out, in := io.Pipe()
-		decoder := NewDecoder(out, testapi.Codec())
+		decoder := NewDecoder(out, testapi.Default.Codec())
 
 		expect := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
-			data, err := testapi.Codec().Encode(expect)
+			data, err := testapi.Default.Codec().Encode(expect)
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
@@ -81,7 +82,7 @@ func TestDecoder(t *testing.T) {
 
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
-	decoder := NewDecoder(out, testapi.Codec())
+	decoder := NewDecoder(out, testapi.Default.Codec())
 
 	done := make(chan struct{})
 
@@ -98,7 +99,7 @@ func TestDecoder_SourceClose(t *testing.T) {
 	select {
 	case <-done:
 		break
-	case <-time.After(10 * time.Second):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Error("Timeout")
 	}
 }

@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -51,7 +49,7 @@ func (rs *REST) NewList() runtime.Object {
 
 // Returns the list of component status. Note that the label and field are both ignored.
 // Note that this call doesn't support labels or selectors.
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	// TODO: This should be parallelized.

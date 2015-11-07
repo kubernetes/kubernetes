@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/google/gofuzz"
 )
@@ -104,7 +104,7 @@ func Example() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := util.StringSet{}
+	outputSet := sets.String{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -161,7 +161,7 @@ func ExampleInformer() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := util.StringSet{}
+	outputSet := sets.String{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -235,7 +235,7 @@ func TestHammerController(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Let's add a few objects to the source.
-			currentNames := util.StringSet{}
+			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			r := rand.New(rs) // Mustn't use r and f concurrently!
@@ -311,34 +311,6 @@ func TestUpdate(t *testing.T) {
 		pair{FROM, FROM}: true,
 	}
 
-	var testDoneWG sync.WaitGroup
-
-	// Make a controller that deletes things once it observes an update.
-	// It calls Done() on the wait group on deletions so we can tell when
-	// everything we've added has been deleted.
-	_, controller := framework.NewInformer(
-		source,
-		&api.Pod{},
-		time.Millisecond*1,
-		framework.ResourceEventHandlerFuncs{
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
-				from, to := o.Labels["check"], n.Labels["check"]
-				if !allowedTransitions[pair{from, to}] {
-					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
-				}
-				source.Delete(n)
-			},
-			DeleteFunc: func(obj interface{}) {
-				testDoneWG.Done()
-			},
-		},
-	)
-
-	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	go controller.Run(stop)
-
 	pod := func(name, check string) *api.Pod {
 		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -371,11 +343,42 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	// run every test a few times, in parallel
 	const threads = 3
+
+	var testDoneWG sync.WaitGroup
+	testDoneWG.Add(threads * len(tests))
+
+	// Make a controller that deletes things once it observes an update.
+	// It calls Done() on the wait group on deletions so we can tell when
+	// everything we've added has been deleted.
+	_, controller := framework.NewInformer(
+		source,
+		&api.Pod{},
+		time.Millisecond*1,
+		framework.ResourceEventHandlerFuncs{
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
+				from, to := o.Labels["check"], n.Labels["check"]
+				if !allowedTransitions[pair{from, to}] {
+					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
+				}
+				source.Delete(n)
+			},
+			DeleteFunc: func(obj interface{}) {
+				testDoneWG.Done()
+			},
+		},
+	)
+
+	// Run the controller and run it until we close stop.
+	// Once Run() is called, calls to testDoneWG.Done() might start, so
+	// all testDoneWG.Add() calls must happen before this point
+	stop := make(chan struct{})
+	go controller.Run(stop)
+
+	// run every test a few times, in parallel
 	var wg sync.WaitGroup
 	wg.Add(threads * len(tests))
-	testDoneWG.Add(threads * len(tests))
 	for i := 0; i < threads; i++ {
 		for j, f := range tests {
 			go func(name string, f func(string)) {

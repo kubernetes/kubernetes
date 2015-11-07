@@ -17,8 +17,9 @@ limitations under the License.
 package iptables
 
 import (
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"testing"
+
+	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -32,6 +33,39 @@ func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expected
 			t.Errorf("getChainLines expected chain not present: %s", chain)
 		}
 	}
+}
+
+func TestReadLinesFromByteBuffer(t *testing.T) {
+
+	testFn := func(byteArray []byte, expected []string) {
+		index := 0
+		readIndex := 0
+		for ; readIndex < len(byteArray); index++ {
+			line, n := readLine(readIndex, byteArray)
+			readIndex = n
+			if expected[index] != line {
+				t.Errorf("expected:%q, actual:%q", expected[index], line)
+			}
+		} // for
+		if readIndex < len(byteArray) {
+			t.Errorf("Byte buffer was only partially read. Buffer length is:%d, readIndex is:%d", len(byteArray), readIndex)
+		}
+		if index < len(expected) {
+			t.Errorf("All expected strings were not compared. expected arr length:%d, matched count:%d", len(expected), index-1)
+		}
+	}
+
+	byteArray1 := []byte("\n  Line 1  \n\n\n L ine4  \nLine 5 \n \n")
+	expected1 := []string{"", "Line 1", "", "", "L ine4", "Line 5", ""}
+	testFn(byteArray1, expected1)
+
+	byteArray1 = []byte("")
+	expected1 = []string{}
+	testFn(byteArray1, expected1)
+
+	byteArray1 = []byte("\n\n")
+	expected1 = []string{"", ""}
+	testFn(byteArray1, expected1)
 }
 
 func TestgetChainLines(t *testing.T) {

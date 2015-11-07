@@ -76,11 +76,12 @@ if ! git log -n1 --format=%H "${BRANCH}" >/dev/null 2>&1; then
 fi
 
 declare -r NEWBRANCHREQ="automated-cherry-pick-of-${PULLDASH}" # "Required" portion for tools.
-declare -r NEWBRANCH="$(echo ${NEWBRANCHREQ}-${BRANCH} | sed 's/\//-/g')"
+declare -r NEWBRANCH="$(echo "${NEWBRANCHREQ}-${BRANCH}" | sed 's/\//-/g')"
 declare -r NEWBRANCHUNIQ="${NEWBRANCH}-$(date +%s)"
 echo "+++ Creating local branch ${NEWBRANCHUNIQ}"
 
 cleanbranch=""
+prtext=""
 gitamcleanup=false
 function return_to_kansas {
   echo ""
@@ -91,6 +92,9 @@ function return_to_kansas {
   git checkout -f "${STARTINGBRANCH}" >/dev/null 2>&1 || true
   if [[ -n "${cleanbranch}" ]]; then
     git branch -D "${cleanbranch}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${prtext}" ]]; then
+    rm "${prtext}"
   fi
 }
 trap return_to_kansas EXIT
@@ -134,13 +138,21 @@ done
 gitamcleanup=false
 
 function make-a-pr() {
-  local rel=$(basename ${BRANCH})
+  local rel="$(basename "${BRANCH}")"
   echo "+++ Creating a pull request on github"
-  hub pull-request -F- -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}" <<EOF
+
+  # This looks like an unnecessary use of a tmpfile, but it avoids
+  # https://github.com/github/hub/issues/976 Otherwise stdin is stolen
+  # when we shove the heredoc at hub directly, tickling the ioctl
+  # crash.
+  prtext="$(mktemp)" # cleaned in return_to_kansas
+  cat >"${prtext}" <<EOF
 Automated cherry pick of ${PULLSUBJ}
 
 Cherry pick of ${PULLSUBJ} on ${rel}.
 EOF
+
+  hub pull-request -F"${prtext}" -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}"
 }
 
 if git remote -v | grep ^origin | grep kubernetes/kubernetes.git; then

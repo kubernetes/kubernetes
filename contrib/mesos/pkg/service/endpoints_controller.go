@@ -26,14 +26,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	kservice "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -57,10 +58,10 @@ func NewEndpointController(client *client.Client) *endpointController {
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Services(api.NamespaceAll).List(labels.Everything())
+				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Service{},
@@ -79,12 +80,12 @@ func NewEndpointController(client *client.Client) *endpointController {
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return e.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return e.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
 		&api.Pod{},
-		kservice.PodRelistPeriod,
+		5*time.Minute,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    e.addPod,
 			UpdateFunc: e.updatePod,
@@ -132,8 +133,8 @@ func (e *endpointController) Run(workers int, stopCh <-chan struct{}) {
 	e.queue.ShutDown()
 }
 
-func (e *endpointController) getPodServiceMemberships(pod *api.Pod) (util.StringSet, error) {
-	set := util.StringSet{}
+func (e *endpointController) getPodServiceMemberships(pod *api.Pod) (sets.String, error) {
+	set := sets.String{}
 	services, err := e.serviceStore.GetPodServices(pod)
 	if err != nil {
 		// don't log this error because this function makes pointless
@@ -307,6 +308,11 @@ func (e *endpointController) syncService(key string) {
 				glog.V(4).Infof("Failed to find a host IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
+			if pod.DeletionTimestamp != nil {
+				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
+				continue
+			}
+
 			if !api.IsPodReady(pod) {
 				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
 				continue
@@ -344,7 +350,7 @@ func (e *endpointController) syncService(key string) {
 		}
 	}
 	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) && reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
-		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+		glog.V(5).Infof("Endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return
 	}
 	newEndpoints := currentEndpoints
@@ -378,7 +384,7 @@ func (e *endpointController) syncService(key string) {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *endpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything())
+	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err)
 		return

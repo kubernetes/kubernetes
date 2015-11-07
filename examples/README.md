@@ -33,8 +33,10 @@ Documentation for other releases can be found at
 
 # Kubernetes Examples: releases.k8s.io/HEAD
 
-This directory contains a number of different examples of how to run
-applications with Kubernetes.
+This directory contains a number of examples of how to run
+real applications with Kubernetes.
+
+Demonstrations of how to use specific Kubernetes features can be found in our [documents](../docs/).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

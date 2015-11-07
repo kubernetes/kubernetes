@@ -17,12 +17,13 @@ limitations under the License.
 package dockertools
 
 import (
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
-	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 )
@@ -30,9 +31,9 @@ import (
 func NewFakeDockerManager(
 	client DockerInterface,
 	recorder record.EventRecorder,
-	readinessManager *kubecontainer.ReadinessManager,
+	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
-	machineInfo *cadvisorApi.MachineInfo,
+	machineInfo *cadvisorapi.MachineInfo,
 	podInfraContainerImage string,
 	qps float32,
 	burst int,
@@ -40,14 +41,13 @@ func NewFakeDockerManager(
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
 	generator kubecontainer.RunContainerOptionsGenerator,
-	httpClient kubeletTypes.HttpGetter) *DockerManager {
+	httpClient kubetypes.HttpGetter, imageBackOff *util.Backoff) *DockerManager {
 
-	fakeOomAdjuster := oom.NewFakeOomAdjuster()
+	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFs()
-	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
+	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
-		fakeOomAdjuster, fakeProcFs)
+		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, true)
 	dm.dockerPuller = &FakeDockerPuller{}
-	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm
 }

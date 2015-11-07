@@ -23,17 +23,29 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
-// PodScheduleFunc implements how to schedule pods among slaves.
-// We can have different implementation for different scheduling policy.
-//
-// The Schedule function accepts a group of slaves (each contains offers from
-// that slave) and a single pod, which aligns well with the k8s scheduling
-// algorithm. It returns an offerId that is acceptable for the pod, otherwise
-// nil. The caller is responsible for filling in task state w/ relevant offer
-// details.
-//
-// See the FCFSScheduleFunc for example.
-type PodScheduleFunc func(r offers.Registry, slaves SlaveIndex, task *podtask.T) (offers.Perishable, error)
+type AllocationStrategy interface {
+	// FitPredicate returns the selector used to determine pod fitness w/ respect to a given offer
+	FitPredicate() podtask.FitPredicate
+
+	// Procurement returns a func that obtains resources for a task from resource offer
+	Procurement() podtask.Procurement
+}
+
+type PodScheduler interface {
+	AllocationStrategy
+
+	// SchedulePod implements how to schedule pods among slaves.
+	// We can have different implementation for different scheduling policy.
+	//
+	// The function accepts a group of slaves (each contains offers from
+	// that slave) and a single pod, which aligns well with the k8s scheduling
+	// algorithm. It returns an offerId that is acceptable for the pod, otherwise
+	// nil. The caller is responsible for filling in task state w/ relevant offer
+	// details.
+	//
+	// See the FCFSPodScheduler for example.
+	SchedulePod(r offers.Registry, slaves SlaveIndex, task *podtask.T) (offers.Perishable, error)
+}
 
 // A minimal placeholder
 type empty struct{}
@@ -45,5 +57,5 @@ var (
 )
 
 type SlaveIndex interface {
-	slaveFor(id string) (*Slave, bool)
+	slaveHostNameFor(id string) string
 }

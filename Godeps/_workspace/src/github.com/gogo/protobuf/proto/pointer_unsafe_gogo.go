@@ -87,16 +87,6 @@ func appendStructPointer(base structPointer, f field, typ reflect.Type) structPo
 	return structPointer(unsafe.Pointer(uintptr(unsafe.Pointer(bas)) + uintptr(uintptr(newLen-1)*size)))
 }
 
-// RefBool returns a *bool field in the struct.
-func structPointer_RefBool(p structPointer, f field) *bool {
-	return (*bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// RefString returns the address of a string field in the struct.
-func structPointer_RefString(p structPointer, f field) *string {
-	return (*string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
 func structPointer_FieldPointer(p structPointer, f field) structPointer {
 	return structPointer(unsafe.Pointer(uintptr(p) + uintptr(f)))
 }
@@ -115,52 +105,4 @@ func structPointer_Add(p structPointer, size field) structPointer {
 
 func structPointer_Len(p structPointer, f field) int {
 	return len(*(*[]interface{})(unsafe.Pointer(structPointer_GetRefStructPointer(p, f))))
-}
-
-// refWord32 is the address of a 32-bit value field.
-type refWord32 *uint32
-
-func refWord32_IsNil(p refWord32) bool {
-	return p == nil
-}
-
-func refWord32_Set(p refWord32, o *Buffer, x uint32) {
-	if len(o.uint32s) == 0 {
-		o.uint32s = make([]uint32, uint32PoolSize)
-	}
-	o.uint32s[0] = x
-	*p = o.uint32s[0]
-	o.uint32s = o.uint32s[1:]
-}
-
-func refWord32_Get(p refWord32) uint32 {
-	return *p
-}
-
-func structPointer_RefWord32(p structPointer, f field) refWord32 {
-	return refWord32((*uint32)(unsafe.Pointer(uintptr(p) + uintptr(f))))
-}
-
-// refWord64 is like refWord32 but for 32-bit values.
-type refWord64 *uint64
-
-func refWord64_Set(p refWord64, o *Buffer, x uint64) {
-	if len(o.uint64s) == 0 {
-		o.uint64s = make([]uint64, uint64PoolSize)
-	}
-	o.uint64s[0] = x
-	*p = o.uint64s[0]
-	o.uint64s = o.uint64s[1:]
-}
-
-func refWord64_IsNil(p refWord64) bool {
-	return p == nil
-}
-
-func refWord64_Get(p refWord64) uint64 {
-	return *p
-}
-
-func structPointer_RefWord64(p structPointer, f field) refWord64 {
-	return refWord64((*uint64)(unsafe.Pointer(uintptr(p) + uintptr(f))))
 }

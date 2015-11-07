@@ -17,6 +17,8 @@ limitations under the License.
 package authorizer
 
 import (
+	"net/http"
+
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -32,6 +34,10 @@ type Attributes interface {
 	// authentication occurred.
 	GetGroups() []string
 
+	// GetVerb returns the kube verb associated with API requests (this includes get, list, watch, create, update, patch, delete, and proxy),
+	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
+	GetVerb() string
+
 	// When IsReadOnly() == true, the request has no side effects, other than
 	// caching, logging, and other incidentals.
 	IsReadOnly() bool
@@ -41,6 +47,9 @@ type Attributes interface {
 
 	// The kind of object, if a request is for a REST object.
 	GetResource() string
+
+	// The group of the resource, if a request is for a REST object.
+	GetAPIGroup() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -56,11 +65,17 @@ func (f AuthorizerFunc) Authorize(a Attributes) error {
 	return f(a)
 }
 
+// RequestAttributesGetter provides a function that extracts Attributes from an http.Request
+type RequestAttributesGetter interface {
+	GetRequestAttributes(user.Info, *http.Request) Attributes
+}
+
 // AttributesRecord implements Attributes interface.
 type AttributesRecord struct {
 	User      user.Info
-	ReadOnly  bool
+	Verb      string
 	Namespace string
+	APIGroup  string
 	Resource  string
 }
 
@@ -72,8 +87,12 @@ func (a AttributesRecord) GetGroups() []string {
 	return a.User.GetGroups()
 }
 
+func (a AttributesRecord) GetVerb() string {
+	return a.Verb
+}
+
 func (a AttributesRecord) IsReadOnly() bool {
-	return a.ReadOnly
+	return a.Verb == "get" || a.Verb == "list" || a.Verb == "watch"
 }
 
 func (a AttributesRecord) GetNamespace() string {
@@ -82,4 +101,8 @@ func (a AttributesRecord) GetNamespace() string {
 
 func (a AttributesRecord) GetResource() string {
 	return a.Resource
+}
+
+func (a AttributesRecord) GetAPIGroup() string {
+	return a.APIGroup
 }

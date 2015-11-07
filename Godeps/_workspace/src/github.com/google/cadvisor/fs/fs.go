@@ -17,15 +17,10 @@
 // Provides Filesystem Stats
 package fs
 
-/*
- extern int getBytesFree(const char *path, unsigned long long *bytes);
- extern int getBytesTotal(const char *path, unsigned long long *bytes);
- extern int getBytesAvail(const char *path, unsigned long long *bytes);
-*/
-import "C"
-
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,7 +30,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"unsafe"
 
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
@@ -52,6 +46,8 @@ type partition struct {
 	mountpoint string
 	major      uint
 	minor      uint
+	fsType     string
+	blockSize  uint
 }
 
 type RealFsInfo struct {
@@ -65,6 +61,7 @@ type RealFsInfo struct {
 type Context struct {
 	// docker root directory.
 	DockerRoot string
+	DockerInfo map[string]string
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
@@ -88,7 +85,25 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		if _, ok := partitions[mount.Source]; ok {
 			continue
 		}
-		partitions[mount.Source] = partition{mount.Mountpoint, uint(mount.Major), uint(mount.Minor)}
+		partitions[mount.Source] = partition{
+			mountpoint: mount.Mountpoint,
+			major:      uint(mount.Major),
+			minor:      uint(mount.Minor),
+		}
+	}
+	if storageDriver, ok := context.DockerInfo["Driver"]; ok && storageDriver == "devicemapper" {
+		dev, major, minor, blockSize, err := dockerDMDevice(context.DockerInfo["DriverStatus"])
+		if err != nil {
+			glog.Warningf("Could not get Docker devicemapper device: %v", err)
+		} else {
+			partitions[dev] = partition{
+				fsType:    "devicemapper",
+				major:     major,
+				minor:     minor,
+				blockSize: blockSize,
+			}
+			fsInfo.labels[LabelDockerImages] = dev
+		}
 	}
 	glog.Infof("Filesystem partitions: %+v", partitions)
 	fsInfo.partitions = partitions
@@ -182,9 +197,18 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 		_, hasMount := mountSet[partition.mountpoint]
 		_, hasDevice := deviceSet[device]
 		if mountSet == nil || (hasMount && !hasDevice) {
-			total, free, avail, err := getVfsStats(partition.mountpoint)
+			var (
+				total, free, avail uint64
+				err                error
+			)
+			switch partition.fsType {
+			case "devicemapper":
+				total, free, avail, err = getDMStats(device, partition.blockSize)
+			default:
+				total, free, avail, err = getVfsStats(partition.mountpoint)
+			}
 			if err != nil {
-				glog.Errorf("Statvfs failed. Error: %v", err)
+				glog.Errorf("Stat fs failed. Error: %v", err)
 			} else {
 				deviceSet[device] = struct{}{}
 				deviceInfo := DeviceInfo{
@@ -266,8 +290,8 @@ func minor(devNumber uint64) uint {
 }
 
 func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
-	var buf syscall.Stat_t
-	err := syscall.Stat(dir, &buf)
+	buf := new(syscall.Stat_t)
+	err := syscall.Stat(dir, buf)
 	if err != nil {
 		return nil, fmt.Errorf("stat failed on %s with error: %s", dir, err)
 	}
@@ -282,7 +306,7 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 }
 
 func (self *RealFsInfo) GetDirUsage(dir string) (uint64, error) {
-	out, err := exec.Command("du", "-s", dir).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", dir).CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("du command failed on %s with output %s - %s", dir, out, err)
 	}
@@ -293,22 +317,77 @@ func (self *RealFsInfo) GetDirUsage(dir string) (uint64, error) {
 	return usageInKb * 1024, nil
 }
 
-func getVfsStats(path string) (total uint64, free uint64, avail uint64, err error) {
-	_p0, err := syscall.BytePtrFromString(path)
+func getVfsStats(path string) (uint64, uint64, uint64, error) {
+	var s syscall.Statfs_t
+	if err := syscall.Statfs(path, &s); err != nil {
+		return 0, 0, 0, err
+	}
+	total := uint64(s.Frsize) * s.Blocks
+	free := uint64(s.Frsize) * s.Bfree
+	avail := uint64(s.Frsize) * s.Bavail
+	return total, free, avail, nil
+}
+
+func dockerStatusValue(status [][]string, target string) string {
+	for _, v := range status {
+		if len(v) == 2 && strings.ToLower(v[0]) == strings.ToLower(target) {
+			return v[1]
+		}
+	}
+	return ""
+}
+
+func dockerDMDevice(driverStatus string) (string, uint, uint, uint, error) {
+	var config [][]string
+	err := json.Unmarshal([]byte(driverStatus), &config)
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+	poolName := dockerStatusValue(config, "Pool Name")
+	if len(poolName) == 0 {
+		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
+	}
+
+	dmTable, err := exec.Command("dmsetup", "table", poolName).Output()
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+
+	var (
+		major, minor, dataBlkSize, bkt uint
+		bkts                           string
+	)
+
+	_, err = fmt.Fscanf(bytes.NewReader(dmTable),
+		"%d %d %s %d:%d %d:%d %d %d %d %s",
+		&bkt, &bkt, &bkts, &bkt, &bkt, &major, &minor, &dataBlkSize, &bkt, &bkt, &bkts)
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+	return poolName, major, minor, dataBlkSize, nil
+}
+
+func getDMStats(poolName string, dataBlkSize uint) (uint64, uint64, uint64, error) {
+	dmStatus, err := exec.Command("dmsetup", "status", poolName).Output()
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	res, err := C.getBytesFree((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&free)))
-	if res != 0 {
+
+	var (
+		total, used, bkt uint64
+		bkts             string
+	)
+
+	_, err = fmt.Fscanf(bytes.NewReader(dmStatus),
+		"%d %d %s %d %d/%d %d/%d %s %s %s %s",
+		&bkt, &bkt, &bkts, &bkt, &bkt, &bkt, &used, &total, &bkts, &bkts, &bkts, &bkts)
+	if err != nil {
 		return 0, 0, 0, err
 	}
-	res, err = C.getBytesTotal((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&total)))
-	if res != 0 {
-		return 0, 0, 0, err
-	}
-	res, err = C.getBytesAvail((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&avail)))
-	if res != 0 {
-		return 0, 0, 0, err
-	}
-	return total, free, avail, nil
+
+	total *= 512 * uint64(dataBlkSize)
+	used *= 512 * uint64(dataBlkSize)
+	free := total - used
+
+	return total, free, free, nil
 }

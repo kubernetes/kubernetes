@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -40,6 +41,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 
 	tokens := make(map[string]*user.DefaultInfo)
 	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -56,6 +58,10 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 			UID:  record[2],
 		}
 		tokens[record[0]] = obj
+
+		if len(record) >= 4 {
+			obj.Groups = strings.Split(record[3], ",")
+		}
 	}
 
 	return &TokenAuthenticator{

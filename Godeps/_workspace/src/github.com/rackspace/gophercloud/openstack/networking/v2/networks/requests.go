@@ -1,6 +1,8 @@
 package networks
 
 import (
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -188,4 +190,37 @@ func Delete(c *gophercloud.ServiceClient, networkID string) DeleteResult {
 	var res DeleteResult
 	_, res.Err = c.Delete(deleteURL(c, networkID), nil)
 	return res
+}
+
+// IDFromName is a convenience function that returns a network's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	networkCount := 0
+	networkID := ""
+	if name == "" {
+		return "", fmt.Errorf("A network name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		networkList, err := ExtractNetworks(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, n := range networkList {
+			if n.Name == name {
+				networkCount++
+				networkID = n.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch networkCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find network: %s", name)
+	case 1:
+		return networkID, nil
+	default:
+		return "", fmt.Errorf("Found %d networks matching %s", networkCount, name)
+	}
 }

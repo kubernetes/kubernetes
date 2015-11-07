@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumeclaimbinder
+package persistentvolume
 
 import (
 	"testing"
@@ -216,6 +216,136 @@ func TestSort(t *testing.T) {
 	}
 }
 
+func TestAllPossibleAccessModes(t *testing.T) {
+	index := NewPersistentVolumeOrderedIndex()
+	for _, pv := range createTestVolumes() {
+		index.Add(pv)
+	}
+
+	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
+	possibleModes := index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	if len(possibleModes) != 2 {
+		t.Errorf("Expected 2 arrays of modes that match RWO, but got %v", len(possibleModes))
+	}
+	for _, m := range possibleModes {
+		if !contains(m, api.ReadWriteOnce) {
+			t.Errorf("AccessModes does not contain %s", api.ReadWriteOnce)
+		}
+	}
+
+	possibleModes = index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteMany})
+	if len(possibleModes) != 1 {
+		t.Errorf("Expected 1 array of modes that match RWX, but got %v", len(possibleModes))
+	}
+	if !contains(possibleModes[0], api.ReadWriteMany) {
+		t.Errorf("AccessModes does not contain %s", api.ReadWriteOnce)
+	}
+
+}
+
+func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
+	gce := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{UID: "001", Name: "gce"},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			PersistentVolumeSource: api.PersistentVolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}},
+			AccessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+				api.ReadOnlyMany,
+			},
+		},
+	}
+
+	ebs := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{UID: "002", Name: "ebs"},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}},
+			AccessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+		},
+	}
+
+	nfs := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{UID: "003", Name: "nfs"},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{}},
+			AccessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+				api.ReadOnlyMany,
+				api.ReadWriteMany,
+			},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1G")}},
+		},
+	}
+
+	index := NewPersistentVolumeOrderedIndex()
+	index.Add(gce)
+	index.Add(ebs)
+	index.Add(nfs)
+
+	volume, _ := index.FindBestMatchForClaim(claim)
+	if volume.Name != ebs.Name {
+		t.Errorf("Expected %s but got volume %s instead", ebs.Name, volume.Name)
+	}
+
+	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany}
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != gce.Name {
+		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
+	}
+
+	// order of the requested modes should not matter
+	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany, api.ReadWriteOnce, api.ReadOnlyMany}
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != nfs.Name {
+		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
+	}
+
+	// fewer modes requested should still match
+	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany}
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != nfs.Name {
+		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
+	}
+
+	// pretend the exact match is bound.  should get the next level up of modes.
+	ebs.Spec.ClaimRef = &api.ObjectReference{}
+	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != gce.Name {
+		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
+	}
+
+	// continue up the levels of modes.
+	gce.Spec.ClaimRef = &api.ObjectReference{}
+	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != nfs.Name {
+		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
+	}
+
+	// partial mode request
+	gce.Spec.ClaimRef = nil
+	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadOnlyMany}
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != gce.Name {
+		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
+	}
+}
+
 func createTestVolumes() []*api.PersistentVolume {
 	// these volumes are deliberately out-of-order to test indexing and sorting
 	return []*api.PersistentVolume{
@@ -352,5 +482,80 @@ func createTestVolumes() []*api.PersistentVolume {
 				},
 			},
 		},
+	}
+}
+
+func TestFindingPreboundVolumes(t *testing.T) {
+	pv1 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "pv1",
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	pv5 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "pv5",
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi")},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	pv8 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        "pv8",
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi")},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")}},
+		},
+	}
+
+	index := NewPersistentVolumeOrderedIndex()
+	index.Add(pv1)
+	index.Add(pv5)
+	index.Add(pv8)
+
+	// expected exact match on size
+	volume, _ := index.FindBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
+
+	// pretend the exact match is pre-bound.  should get the next size up.
+	pv1.Annotations[createdForKey] = "some/other/claim"
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != pv5.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
+	}
+
+	// pretend the exact match is available but the largest volume is pre-bound to the claim.
+	delete(pv1.Annotations, createdForKey)
+	pv8.Annotations[createdForKey] = "myns/claim01"
+	volume, _ = index.FindBestMatchForClaim(claim)
+	if volume.Name != pv8.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
 	}
 }

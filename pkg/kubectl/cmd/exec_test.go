@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -29,21 +30,25 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type fakeRemoteExecutor struct {
-	req     *client.Request
+	method  string
+	url     *url.URL
 	execErr error
 }
 
-func (f *fakeRemoteExecutor) Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	f.req = req
+func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+	f.method = method
+	f.url = url
 	return f.execErr
 }
 
 func TestPodAndContainer(t *testing.T) {
 	tests := []struct {
 		args              []string
+		argsLenAtDash     int
 		p                 *ExecOptions
 		name              string
 		expectError       bool
@@ -52,43 +57,65 @@ func TestPodAndContainer(t *testing.T) {
 		expectedArgs      []string
 	}{
 		{
-			p:           &ExecOptions{},
-			expectError: true,
-			name:        "empty",
+			p:             &ExecOptions{},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "empty",
 		},
 		{
-			p:           &ExecOptions{PodName: "foo"},
-			expectError: true,
-			name:        "no cmd",
+			p:             &ExecOptions{PodName: "foo"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "no cmd",
 		},
 		{
-			p:           &ExecOptions{PodName: "foo", ContainerName: "bar"},
-			expectError: true,
-			name:        "no cmd, w/ container",
+			p:             &ExecOptions{PodName: "foo", ContainerName: "bar"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "no cmd, w/ container",
 		},
 		{
-			p:            &ExecOptions{PodName: "foo"},
-			args:         []string{"cmd"},
-			expectedPod:  "foo",
-			expectedArgs: []string{"cmd"},
-			name:         "pod in flags",
+			p:             &ExecOptions{PodName: "foo"},
+			args:          []string{"cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "pod in flags",
 		},
 		{
-			p:           &ExecOptions{},
-			args:        []string{"foo"},
-			expectError: true,
-			name:        "no cmd, w/o flags",
+			p:             &ExecOptions{},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: 0,
+			expectError:   true,
+			name:          "no pod, pod name is behind dash",
 		},
 		{
-			p:            &ExecOptions{},
-			args:         []string{"foo", "cmd"},
-			expectedPod:  "foo",
-			expectedArgs: []string{"cmd"},
-			name:         "cmd, w/o flags",
+			p:             &ExecOptions{},
+			args:          []string{"foo"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "no cmd, w/o flags",
+		},
+		{
+			p:             &ExecOptions{},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "cmd, w/o flags",
+		},
+		{
+			p:             &ExecOptions{},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: 1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "cmd, cmd is behind dash",
 		},
 		{
 			p:                 &ExecOptions{ContainerName: "bar"},
 			args:              []string{"foo", "cmd"},
+			argsLenAtDash:     -1,
 			expectedPod:       "foo",
 			expectedContainer: "bar",
 			expectedArgs:      []string{"cmd"},
@@ -97,16 +124,16 @@ func TestPodAndContainer(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec := NewAPIFactory()
-		tf.Client = &client.FakeRESTClient{
+		tf.Client = &fake.RESTClient{
 			Codec:  codec,
-			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) { return nil, nil }),
+			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = &client.Config{}
 
 		cmd := &cobra.Command{}
 		options := test.p
-		err := options.Complete(f, cmd, test.args)
+		err := options.Complete(f, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("unexpected non-error (%s)", test.name)
 		}
@@ -129,7 +156,7 @@ func TestPodAndContainer(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	version := testapi.Version()
+	version := testapi.Default.Version()
 	tests := []struct {
 		name, version, podPath, execPath, container string
 		pod                                         *api.Pod
@@ -153,9 +180,9 @@ func TestExec(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec := NewAPIFactory()
-		tf.Client = &client.FakeRESTClient{
+		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
 					body := objBody(codec, test.pod)
@@ -185,7 +212,8 @@ func TestExec(t *testing.T) {
 			Executor:      ex,
 		}
 		cmd := &cobra.Command{}
-		if err := params.Complete(f, cmd, []string{"test", "command"}); err != nil {
+		args := []string{"test", "command"}
+		if err := params.Complete(f, cmd, args, -1); err != nil {
 			t.Fatal(err)
 		}
 		err := params.Run()
@@ -197,9 +225,15 @@ func TestExec(t *testing.T) {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
 			continue
 		}
-		if !test.execErr && ex.req.URL().Path != test.execPath {
+		if test.execErr {
+			continue
+		}
+		if ex.url.Path != test.execPath {
 			t.Errorf("%s: Did not get expected path for exec request", test.name)
 			continue
+		}
+		if ex.method != "POST" {
+			t.Errorf("%s: Did not get method for exec request: %s", test.name, ex.method)
 		}
 	}
 }

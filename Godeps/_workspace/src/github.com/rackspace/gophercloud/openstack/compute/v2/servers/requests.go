@@ -2,10 +2,13 @@ package servers
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/flavors"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/images"
 	"github.com/rackspace/gophercloud/pagination"
 )
 
@@ -14,6 +17,7 @@ import (
 type ListOptsBuilder interface {
 	ToServerListQuery() (string, error)
 }
+
 // ListOpts allows the filtering and sorting of paginated collections through
 // the API. Filtering is achieved by passing in struct field values that map to
 // the server attributes you want to see returned. Marker and Limit are used
@@ -45,6 +49,9 @@ type ListOpts struct {
 
 	// Integer value for the limit of values to return.
 	Limit int `q:"limit"`
+
+	// Bool to show all tenants
+	AllTenants bool `q:"all_tenants"`
 }
 
 // ToServerListQuery formats a ListOpts into a query string.
@@ -95,17 +102,53 @@ type Network struct {
 	FixedIP string
 }
 
+// Personality is an array of files that are injected into the server at launch.
+type Personality []*File
+
+// File is used within CreateOpts and RebuildOpts to inject a file into the server at launch.
+// File implements the json.Marshaler interface, so when a Create or Rebuild operation is requested,
+// json.Marshal will call File's MarshalJSON method.
+type File struct {
+	// Path of the file
+	Path string
+	// Contents of the file. Maximum content size is 255 bytes.
+	Contents []byte
+}
+
+// MarshalJSON marshals the escaped file, base64 encoding the contents.
+func (f *File) MarshalJSON() ([]byte, error) {
+	file := struct {
+		Path     string `json:"path"`
+		Contents string `json:"contents"`
+	}{
+		Path:     f.Path,
+		Contents: base64.StdEncoding.EncodeToString(f.Contents),
+	}
+	return json.Marshal(file)
+}
+
 // CreateOpts specifies server creation parameters.
 type CreateOpts struct {
 	// Name [required] is the name to assign to the newly launched server.
 	Name string
 
-	// ImageRef [required] is the ID or full URL to the image that contains the server's OS and initial state.
-	// Optional if using the boot-from-volume extension.
+	// ImageRef [optional; required if ImageName is not provided] is the ID or full
+	// URL to the image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
 	ImageRef string
 
-	// FlavorRef [required] is the ID or full URL to the flavor that describes the server's specs.
+	// ImageName [optional; required if ImageRef is not provided] is the name of the
+	// image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
+	ImageName string
+
+	// FlavorRef [optional; required if FlavorName is not provided] is the ID or
+	// full URL to the flavor that describes the server's specs.
 	FlavorRef string
+
+	// FlavorName [optional; required if FlavorRef is not provided] is the name of
+	// the flavor that describes the server's specs.
+	FlavorName string
 
 	// SecurityGroups [optional] lists the names of the security groups to which this server should belong.
 	SecurityGroups []string
@@ -124,9 +167,9 @@ type CreateOpts struct {
 	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the server.
 	Metadata map[string]string
 
-	// Personality [optional] includes the path and contents of a file to inject into the server at launch.
-	// The maximum size of the file is 255 bytes (decoded).
-	Personality []byte
+	// Personality [optional] includes files to inject into the server at launch.
+	// Create will base64-encode file contents for you.
+	Personality Personality
 
 	// ConfigDrive [optional] enables metadata injection through a configuration drive.
 	ConfigDrive bool
@@ -148,15 +191,13 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 
 	server["name"] = opts.Name
 	server["imageRef"] = opts.ImageRef
+	server["imageName"] = opts.ImageName
 	server["flavorRef"] = opts.FlavorRef
+	server["flavorName"] = opts.FlavorName
 
 	if opts.UserData != nil {
 		encoded := base64.StdEncoding.EncodeToString(opts.UserData)
 		server["user_data"] = &encoded
-	}
-	if opts.Personality != nil {
-		encoded := base64.StdEncoding.EncodeToString(opts.Personality)
-		server["personality"] = &encoded
 	}
 	if opts.ConfigDrive {
 		server["config_drive"] = "true"
@@ -202,6 +243,10 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 		server["networks"] = networks
 	}
 
+	if len(opts.Personality) > 0 {
+		server["personality"] = opts.Personality
+	}
+
 	return map[string]interface{}{"server": server}, nil
 }
 
@@ -214,6 +259,38 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		res.Err = err
 		return res
 	}
+
+	// If ImageRef isn't provided, use ImageName to ascertain the image ID.
+	if reqBody["server"].(map[string]interface{})["imageRef"].(string) == "" {
+		imageName := reqBody["server"].(map[string]interface{})["imageName"].(string)
+		if imageName == "" {
+			res.Err = errors.New("One and only one of ImageRef and ImageName must be provided.")
+			return res
+		}
+		imageID, err := images.IDFromName(client, imageName)
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		reqBody["server"].(map[string]interface{})["imageRef"] = imageID
+	}
+	delete(reqBody["server"].(map[string]interface{}), "imageName")
+
+	// If FlavorRef isn't provided, use FlavorName to ascertain the flavor ID.
+	if reqBody["server"].(map[string]interface{})["flavorRef"].(string) == "" {
+		flavorName := reqBody["server"].(map[string]interface{})["flavorName"].(string)
+		if flavorName == "" {
+			res.Err = errors.New("One and only one of FlavorRef and FlavorName must be provided.")
+			return res
+		}
+		flavorID, err := flavors.IDFromName(client, flavorName)
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		reqBody["server"].(map[string]interface{})["flavorRef"] = flavorID
+	}
+	delete(reqBody["server"].(map[string]interface{}), "flavorName")
 
 	_, res.Err = client.Post(listURL(client), reqBody, &res.Body, nil)
 	return res
@@ -391,9 +468,9 @@ type RebuildOpts struct {
 	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the server.
 	Metadata map[string]string
 
-	// Personality [optional] includes the path and contents of a file to inject into the server at launch.
-	// The maximum size of the file is 255 bytes (decoded).
-	Personality []byte
+	// Personality [optional] includes files to inject into the server at launch.
+	// Rebuild will base64-encode file contents for you.
+	Personality Personality
 }
 
 // ToServerRebuildMap formats a RebuildOpts struct into a map for use in JSON
@@ -429,9 +506,8 @@ func (opts RebuildOpts) ToServerRebuildMap() (map[string]interface{}, error) {
 		server["metadata"] = opts.Metadata
 	}
 
-	if opts.Personality != nil {
-		encoded := base64.StdEncoding.EncodeToString(opts.Personality)
-		server["personality"] = &encoded
+	if len(opts.Personality) > 0 {
+		server["personality"] = opts.Personality
 	}
 
 	return map[string]interface{}{"rebuild": server}, nil
@@ -678,9 +754,7 @@ func Metadatum(client *gophercloud.ServiceClient, id, key string) GetMetadatumRe
 // DeleteMetadatum will delete the key-value pair with the given key for the given server ID.
 func DeleteMetadatum(client *gophercloud.ServiceClient, id, key string) DeleteMetadatumResult {
 	var res DeleteMetadatumResult
-	_, res.Err = client.Delete(metadatumURL(client, id, key), &gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-	})
+	_, res.Err = client.Delete(metadatumURL(client, id, key), nil)
 	return res
 }
 
@@ -741,5 +815,38 @@ func CreateImage(client *gophercloud.ServiceClient, serverId string, opts Create
 	})
 	res.Err = err
 	res.Header = response.Header
-	return res	
+	return res
+}
+
+// IDFromName is a convienience function that returns a server's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	serverCount := 0
+	serverID := ""
+	if name == "" {
+		return "", fmt.Errorf("A server name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		serverList, err := ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range serverList {
+			if s.Name == name {
+				serverCount++
+				serverID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch serverCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find server: %s", name)
+	case 1:
+		return serverID, nil
+	default:
+		return "", fmt.Errorf("Found %d servers matching %s", serverCount, name)
+	}
 }

@@ -18,21 +18,36 @@ package portforward
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
+
+type fakeDialer struct {
+	dialed             bool
+	conn               httpstream.Connection
+	err                error
+	negotiatedProtocol string
+}
+
+func (d *fakeDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
+	d.dialed = true
+	return d.conn, d.negotiatedProtocol, d.err
+}
 
 func TestParsePortsAndNew(t *testing.T) {
 	tests := []struct {
@@ -70,10 +85,9 @@ func TestParsePortsAndNew(t *testing.T) {
 			t.Fatalf("%d: parsePorts: error expected=%t, got %t: %s", i, e, a, err)
 		}
 
-		expectedRequest := &client.Request{}
-		expectedConfig := &client.Config{}
+		dialer := &fakeDialer{}
 		expectedStopChan := make(chan struct{})
-		pf, err := New(expectedRequest, expectedConfig, test.input, expectedStopChan)
+		pf, err := New(dialer, test.input, expectedStopChan)
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
 			t.Fatalf("%d: New: error expected=%t, got %t: %s", i, e, a, err)
@@ -92,11 +106,8 @@ func TestParsePortsAndNew(t *testing.T) {
 			}
 		}
 
-		if e, a := expectedRequest, pf.req; e != a {
-			t.Fatalf("%d: req: expected %#v, got %#v", i, e, a)
-		}
-		if e, a := expectedConfig, pf.config; e != a {
-			t.Fatalf("%d: config: expected %#v, got %#v", i, e, a)
+		if dialer.dialed {
+			t.Fatalf("%d: expected not dialed", i)
 		}
 		if e, a := test.expected, pf.ports; !reflect.DeepEqual(e, a) {
 			t.Fatalf("%d: ports: expected %#v, got %#v", i, e, a)
@@ -108,109 +119,6 @@ func TestParsePortsAndNew(t *testing.T) {
 			t.Fatalf("%d: Ready should be non-nil", i)
 		}
 	}
-}
-
-type fakeUpgrader struct {
-	conn *fakeUpgradeConnection
-	err  error
-}
-
-func (u *fakeUpgrader) upgrade(req *client.Request, config *client.Config) (httpstream.Connection, error) {
-	return u.conn, u.err
-}
-
-type fakeUpgradeConnection struct {
-	closeCalled bool
-	lock        sync.Mutex
-	streams     map[string]*fakeUpgradeStream
-	portData    map[string]string
-}
-
-func newFakeUpgradeConnection() *fakeUpgradeConnection {
-	return &fakeUpgradeConnection{
-		streams:  make(map[string]*fakeUpgradeStream),
-		portData: make(map[string]string),
-	}
-}
-
-func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	stream := &fakeUpgradeStream{}
-	c.streams[headers.Get(api.PortHeader)] = stream
-	// only simulate data on the data stream for now, not the error stream
-	if headers.Get(api.StreamType) == api.StreamTypeData {
-		stream.data = c.portData[headers.Get(api.PortHeader)]
-	}
-
-	return stream, nil
-}
-
-func (c *fakeUpgradeConnection) Close() error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.closeCalled = true
-	return nil
-}
-
-func (c *fakeUpgradeConnection) CloseChan() <-chan bool {
-	return make(chan bool)
-}
-
-func (c *fakeUpgradeConnection) SetIdleTimeout(timeout time.Duration) {
-}
-
-type fakeUpgradeStream struct {
-	readCalled  bool
-	writeCalled bool
-	dataWritten []byte
-	closeCalled bool
-	resetCalled bool
-	data        string
-	lock        sync.Mutex
-}
-
-func (s *fakeUpgradeStream) Read(p []byte) (int, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.readCalled = true
-	b := []byte(s.data)
-	n := copy(p, b)
-	// Indicate we returned all the data, and have no more data (EOF)
-	// Returning an EOF here will cause the port forwarder to immediately terminate, which is correct when we have no more data to send
-	return n, io.EOF
-}
-
-func (s *fakeUpgradeStream) Write(p []byte) (int, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.writeCalled = true
-	s.dataWritten = append(s.dataWritten, p...)
-	// Indicate the stream accepted all the data, and can accept more (no err)
-	// Returning an EOF here will cause the port forwarder to immediately terminate, which is incorrect, in case someone writes more data
-	return len(p), nil
-}
-
-func (s *fakeUpgradeStream) Close() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.closeCalled = true
-	return nil
-}
-
-func (s *fakeUpgradeStream) Reset() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.resetCalled = true
-	return nil
-}
-
-func (s *fakeUpgradeStream) Headers() http.Header {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return http.Header{}
 }
 
 type GetListenerTestCase struct {
@@ -295,55 +203,118 @@ func TestGetListener(t *testing.T) {
 	}
 }
 
+// fakePortForwarder simulates port forwarding for testing. It implements
+// kubelet.PortForwarder.
+type fakePortForwarder struct {
+	lock sync.Mutex
+	// stores data received from the stream per port
+	received map[uint16]string
+	// data to be sent to the stream per port
+	send map[uint16]string
+}
+
+var _ kubelet.PortForwarder = &fakePortForwarder{}
+
+func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+	defer stream.Close()
+
+	var wg sync.WaitGroup
+
+	// client -> server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		// copy from stream into a buffer
+		received := new(bytes.Buffer)
+		io.Copy(received, stream)
+
+		// store the received content
+		pf.lock.Lock()
+		pf.received[port] = received.String()
+		pf.lock.Unlock()
+	}()
+
+	// server -> client
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		// send the hardcoded data to the stream
+		io.Copy(stream, strings.NewReader(pf.send[port]))
+	}()
+
+	wg.Wait()
+
+	return nil
+}
+
+// fakePortForwardServer creates an HTTP server that can handle port forwarding
+// requests.
+func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedFromClient map[uint16]string) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		pf := &fakePortForwarder{
+			received: make(map[uint16]string),
+			send:     serverSends,
+		}
+		kubelet.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
+
+		for port, expected := range expectedFromClient {
+			actual, ok := pf.received[port]
+			if !ok {
+				t.Errorf("%s: server didn't receive any data for port %d", testName, port)
+				continue
+			}
+
+			if expected != actual {
+				t.Errorf("%s: server expected to receive %q, got %q for port %d", testName, expected, actual, port)
+			}
+		}
+
+		for port, actual := range pf.received {
+			if _, ok := expectedFromClient[port]; !ok {
+				t.Errorf("%s: server unexpectedly received %q for port %d", testName, actual, port)
+			}
+		}
+	})
+}
+
 func TestForwardPorts(t *testing.T) {
-	testCases := []struct {
-		Upgrader *fakeUpgrader
-		Ports    []string
-		Send     map[uint16]string
-		Receive  map[uint16]string
-		Err      bool
+	tests := map[string]struct {
+		ports       []string
+		clientSends map[uint16]string
+		serverSends map[uint16]string
 	}{
-		{
-			Upgrader: &fakeUpgrader{err: errors.New("bail")},
-			Err:      true,
+		"forward 1 port with no data either direction": {
+			ports: []string{"5000"},
 		},
-		{
-			Upgrader: &fakeUpgrader{conn: newFakeUpgradeConnection()},
-			Ports:    []string{"5000"},
-		},
-		{
-			Upgrader: &fakeUpgrader{conn: newFakeUpgradeConnection()},
-			Ports:    []string{"5001", "6000"},
-			Send: map[uint16]string{
+		"forward 2 ports with bidirectional data": {
+			ports: []string{"5001", "6000"},
+			clientSends: map[uint16]string{
 				5001: "abcd",
 				6000: "ghij",
 			},
-			Receive: map[uint16]string{
+			serverSends: map[uint16]string{
 				5001: "1234",
 				6000: "5678",
 			},
 		},
 	}
 
-	for i, testCase := range testCases {
+	for testName, test := range tests {
+		server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
+
+		url, _ := url.Parse(server.URL)
+		exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		stopChan := make(chan struct{}, 1)
 
-		pf, err := New(&client.Request{}, &client.Config{}, testCase.Ports, stopChan)
-		hasErr := err != nil
-		if hasErr != testCase.Err {
-			t.Fatalf("%d: New: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
-		}
-		if pf == nil {
-			continue
-		}
-		pf.upgrader = testCase.Upgrader
-		if testCase.Upgrader.err != nil {
-			err := pf.ForwardPorts()
-			hasErr := err != nil
-			if hasErr != testCase.Err {
-				t.Fatalf("%d: ForwardPorts: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
-			}
-			continue
+		pf, err := New(exec, test.ports, stopChan)
+		if err != nil {
+			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
 
 		doneChan := make(chan error)
@@ -352,74 +323,77 @@ func TestForwardPorts(t *testing.T) {
 		}()
 		<-pf.Ready
 
-		conn := testCase.Upgrader.conn
-
-		for port, data := range testCase.Send {
-			conn.lock.Lock()
-			conn.portData[fmt.Sprintf("%d", port)] = testCase.Receive[port]
-			conn.lock.Unlock()
-
+		for port, data := range test.clientSends {
 			clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", port))
 			if err != nil {
-				t.Fatalf("%d: error dialing %d: %s", i, port, err)
+				t.Errorf("%s: error dialing %d: %s", testName, port, err)
+				server.Close()
+				continue
 			}
 			defer clientConn.Close()
 
 			n, err := clientConn.Write([]byte(data))
 			if err != nil && err != io.EOF {
-				t.Fatalf("%d: Error sending data '%s': %s", i, data, err)
+				t.Errorf("%s: Error sending data '%s': %s", testName, data, err)
+				server.Close()
+				continue
 			}
 			if n == 0 {
-				t.Fatalf("%d: unexpected write of 0 bytes", i)
+				t.Errorf("%s: unexpected write of 0 bytes", testName)
+				server.Close()
+				continue
 			}
 			b := make([]byte, 4)
 			n, err = clientConn.Read(b)
 			if err != nil && err != io.EOF {
-				t.Fatalf("%d: Error reading data: %s", i, err)
+				t.Errorf("%s: Error reading data: %s", testName, err)
+				server.Close()
+				continue
 			}
-			if !bytes.Equal([]byte(testCase.Receive[port]), b) {
-				t.Fatalf("%d: expected to read '%s', got '%s'", i, testCase.Receive[port], b)
+			if !bytes.Equal([]byte(test.serverSends[port]), b) {
+				t.Errorf("%s: expected to read '%s', got '%s'", testName, test.serverSends[port], b)
+				server.Close()
+				continue
 			}
 		}
-
 		// tell r.ForwardPorts to stop
 		close(stopChan)
 
 		// wait for r.ForwardPorts to actually return
 		err = <-doneChan
 		if err != nil {
-			t.Fatalf("%d: unexpected error: %s", i, err)
+			t.Errorf("%s: unexpected error: %s", testName, err)
 		}
-
-		if e, a := len(testCase.Send), len(conn.streams); e != a {
-			t.Fatalf("%d: expected %d streams to be created, got %d", i, e, a)
-		}
-
-		if !conn.closeCalled {
-			t.Fatalf("%d: expected conn closure", i)
-		}
+		server.Close()
 	}
 
 }
 
 func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
+	server := httptest.NewServer(fakePortForwardServer(t, "allBindsFailed", nil, nil))
+	defer server.Close()
+
+	url, _ := url.Parse(server.URL)
+	exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	stopChan1 := make(chan struct{}, 1)
 	defer close(stopChan1)
 
-	pf1, err := New(&client.Request{}, &client.Config{}, []string{"5555"}, stopChan1)
+	pf1, err := New(exec, []string{"5555"}, stopChan1)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
-	pf1.upgrader = &fakeUpgrader{conn: newFakeUpgradeConnection()}
 	go pf1.ForwardPorts()
 	<-pf1.Ready
 
 	stopChan2 := make(chan struct{}, 1)
-	pf2, err := New(&client.Request{}, &client.Config{}, []string{"5555"}, stopChan2)
+	pf2, err := New(exec, []string{"5555"}, stopChan2)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}
-	pf2.upgrader = &fakeUpgrader{conn: newFakeUpgradeConnection()}
 	if err := pf2.ForwardPorts(); err == nil {
 		t.Fatal("expected non-nil error for pf2.ForwardPorts")
 	}

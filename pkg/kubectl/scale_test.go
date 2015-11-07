@@ -21,29 +21,75 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	kerrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
 type ErrorReplicationControllers struct {
 	testclient.FakeReplicationControllers
+	invalid bool
 }
 
 func (c *ErrorReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	if c.invalid {
+		return nil, kerrors.NewInvalid(controller.Kind, controller.Name, nil)
+	}
 	return nil, errors.New("Replication controller update failure")
 }
 
 type ErrorReplicationControllerClient struct {
 	testclient.Fake
+	invalid bool
 }
 
 func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
-	return &ErrorReplicationControllers{testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
+	return &ErrorReplicationControllers{testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}, c.invalid}
+}
+
+type ErrorJobs struct {
+	testclient.FakeJobs
+	invalid bool
+}
+
+func (c *ErrorJobs) Update(job *extensions.Job) (*extensions.Job, error) {
+	if c.invalid {
+		return nil, kerrors.NewInvalid(job.Kind, job.Name, nil)
+	}
+	return nil, errors.New("Job update failure")
+}
+
+func (c *ErrorJobs) Get(name string) (*extensions.Job, error) {
+	zero := 0
+	return &extensions.Job{
+		Spec: extensions.JobSpec{
+			Parallelism: &zero,
+		},
+	}, nil
+}
+
+type ErrorJobClient struct {
+	testclient.FakeExperimental
+	invalid bool
+}
+
+func (c *ErrorJobClient) Jobs(namespace string) client.JobInterface {
+	return &ErrorJobs{testclient.FakeJobs{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
+}
+
+type ErrorExtensionsClient struct {
+	testclient.Fake
+	invalid bool
+}
+
+func (c *ErrorExtensionsClient) Extensions() client.ExtensionsInterface {
+	return &ErrorJobClient{testclient.FakeExperimental{&c.Fake}, c.invalid}
 }
 
 func TestReplicationControllerScaleRetry(t *testing.T) {
-	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}}
-	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}, invalid: false}
+	scaler := ReplicationControllerScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -51,7 +97,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 
 	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
 	pass, err := scaleFunc()
-	if pass != false {
+	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
 	if err != nil {
@@ -65,9 +111,28 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	}
 }
 
+func TestReplicationControllerScaleInvalid(t *testing.T) {
+	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}, invalid: true}
+	scaler := ReplicationControllerScaler{fake}
+	preconditions := ScalePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	namespace := "default"
+
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err := scaleFunc()
+	if pass {
+		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
+	}
+	e, ok := err.(ControllerScaleError)
+	if err == nil || !ok || e.FailureType != ControllerScaleUpdateInvalidFailure {
+		t.Errorf("Expected error on invalid update failure, got %v", err)
+	}
+}
+
 func TestReplicationControllerScale(t *testing.T) {
 	fake := &testclient.Fake{}
-	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	scaler := ReplicationControllerScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -91,7 +156,7 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 			Replicas: 10,
 		},
 	})
-	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	scaler := ReplicationControllerScaler{fake}
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"
@@ -99,14 +164,14 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 
 	actions := fake.Actions()
 	if len(actions) != 1 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
+		t.Errorf("unexpected actions: %v, expected 1 action (get)", actions)
 	}
 	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
 }
 
-func TestPreconditionValidate(t *testing.T) {
+func TestValidateReplicationController(t *testing.T) {
 	tests := []struct {
 		preconditions ScalePrecondition
 		controller    api.ReplicationController
@@ -211,7 +276,218 @@ func TestPreconditionValidate(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := test.preconditions.Validate(&test.controller)
+		err := test.preconditions.ValidateReplicationController(&test.controller)
+		if err != nil && !test.expectError {
+			t.Errorf("unexpected error: %v (%s)", err, test.test)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("unexpected non-error: %v (%s)", err, test.test)
+		}
+	}
+}
+
+func TestJobScaleRetry(t *testing.T) {
+	fake := &ErrorExtensionsClient{Fake: testclient.Fake{}, invalid: false}
+	scaler := JobScaler{fake}
+	preconditions := ScalePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	namespace := "default"
+
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err := scaleFunc()
+	if pass != false {
+		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
+	}
+	if err != nil {
+		t.Errorf("Did not expect an error on update failure, got %v", err)
+	}
+	preconditions = ScalePrecondition{3, ""}
+	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err = scaleFunc()
+	if err == nil {
+		t.Errorf("Expected error on precondition failure")
+	}
+}
+
+func TestJobScale(t *testing.T) {
+	fake := &testclient.Fake{}
+	scaler := JobScaler{fake}
+	preconditions := ScalePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	scaler.Scale("default", name, count, &preconditions, nil, nil)
+
+	actions := fake.Actions()
+	if len(actions) != 2 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
+	}
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "jobs" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
+	}
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "jobs" || *action.GetObject().(*extensions.Job).Spec.Parallelism != int(count) {
+		t.Errorf("unexpected action %v, expected update-job with parallelism = %d", actions[1], count)
+	}
+}
+
+func TestJobScaleInvalid(t *testing.T) {
+	fake := &ErrorExtensionsClient{Fake: testclient.Fake{}, invalid: true}
+	scaler := JobScaler{fake}
+	preconditions := ScalePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	namespace := "default"
+
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err := scaleFunc()
+	if pass {
+		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
+	}
+	e, ok := err.(ControllerScaleError)
+	if err == nil || !ok || e.FailureType != ControllerScaleUpdateInvalidFailure {
+		t.Errorf("Expected error on invalid update failure, got %v", err)
+	}
+}
+
+func TestJobScaleFailsPreconditions(t *testing.T) {
+	ten := 10
+	fake := testclient.NewSimpleFake(&extensions.Job{
+		Spec: extensions.JobSpec{
+			Parallelism: &ten,
+		},
+	})
+	scaler := JobScaler{fake}
+	preconditions := ScalePrecondition{2, ""}
+	count := uint(3)
+	name := "foo"
+	scaler.Scale("default", name, count, &preconditions, nil, nil)
+
+	actions := fake.Actions()
+	if len(actions) != 1 {
+		t.Errorf("unexpected actions: %v, expected 1 actions (get)", actions)
+	}
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "jobs" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-job %s", actions[0], name)
+	}
+}
+
+func TestValidateJob(t *testing.T) {
+	zero, ten, twenty := 0, 10, 20
+	tests := []struct {
+		preconditions ScalePrecondition
+		job           extensions.Job
+		expectError   bool
+		test          string
+	}{
+		{
+			preconditions: ScalePrecondition{-1, ""},
+			expectError:   false,
+			test:          "defaults",
+		},
+		{
+			preconditions: ScalePrecondition{-1, ""},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &ten,
+				},
+			},
+			expectError: false,
+			test:        "defaults 2",
+		},
+		{
+			preconditions: ScalePrecondition{0, ""},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &zero,
+				},
+			},
+			expectError: false,
+			test:        "size matches",
+		},
+		{
+			preconditions: ScalePrecondition{-1, "foo"},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &ten,
+				},
+			},
+			expectError: false,
+			test:        "resource version matches",
+		},
+		{
+			preconditions: ScalePrecondition{10, "foo"},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &ten,
+				},
+			},
+			expectError: false,
+			test:        "both match",
+		},
+		{
+			preconditions: ScalePrecondition{10, "foo"},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &twenty,
+				},
+			},
+			expectError: true,
+			test:        "size different",
+		},
+		{
+			preconditions: ScalePrecondition{10, "foo"},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+			},
+			expectError: true,
+			test:        "parallelism nil",
+		},
+		{
+			preconditions: ScalePrecondition{10, "foo"},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "bar",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &ten,
+				},
+			},
+			expectError: true,
+			test:        "version different",
+		},
+		{
+			preconditions: ScalePrecondition{10, "foo"},
+			job: extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "bar",
+				},
+				Spec: extensions.JobSpec{
+					Parallelism: &twenty,
+				},
+			},
+			expectError: true,
+			test:        "both different",
+		},
+	}
+	for _, test := range tests {
+		err := test.preconditions.ValidateJob(&test.job)
 		if err != nil && !test.expectError {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}

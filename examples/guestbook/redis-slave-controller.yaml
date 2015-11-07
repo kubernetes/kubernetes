@@ -15,6 +15,14 @@ spec:
     spec:
       containers:
       - name: worker
-        image: kubernetes/redis-slave:v2
+        image: gcr.io/google_samples/gb-redisslave:v1
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+          # If your cluster config does not include a dns service, then to
+          # instead access an environment variable to find the master
+          # service's host, comment out the 'value: dns' line above, and
+          # uncomment the line below.
+          # value: env
         ports:
         - containerPort: 6379

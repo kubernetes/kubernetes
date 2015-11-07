@@ -30,6 +30,12 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// CreateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type CreateOptions struct {
+	Filenames []string
+}
+
 const (
 	create_long = `Create a resource by filename or stdin.
 
@@ -42,6 +48,8 @@ $ cat pod.json | kubectl create -f -`
 )
 
 func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &CreateOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
 		Short:   "Create a resource by filename or stdin",
@@ -50,14 +58,14 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			cmdutil.CheckErr(RunCreate(f, cmd, out))
+			cmdutil.CheckErr(RunCreate(f, cmd, out, options))
 		},
 	}
 
 	usage := "Filename, directory, or URL to file to use to create the resource"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
-	cmdutil.AddValidateFlag(cmd)
+	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	return cmd
 }
@@ -69,8 +77,8 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateOptions) error {
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
 	}
@@ -80,13 +88,12 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, filenames...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -99,14 +106,17 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		data, err := info.Mapping.Codec.Encode(info.Object)
+
+		// Update the annotation used by kubectl apply
+		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
+		}
+
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data)
-		if err != nil {
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
-		}
+
 		count++
 		info.Refresh(obj, true)
 		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"

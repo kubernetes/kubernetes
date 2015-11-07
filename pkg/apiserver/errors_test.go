@@ -22,38 +22,38 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestErrorsToAPIStatus(t *testing.T) {
-	cases := map[error]api.Status{
+	cases := map[error]unversioned.Status{
 		errors.NewNotFound("foo", "bar"): {
-			Status:  api.StatusFailure,
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusNotFound,
-			Reason:  api.StatusReasonNotFound,
+			Reason:  unversioned.StatusReasonNotFound,
 			Message: "foo \"bar\" not found",
-			Details: &api.StatusDetails{
+			Details: &unversioned.StatusDetails{
 				Kind: "foo",
 				Name: "bar",
 			},
 		},
 		errors.NewAlreadyExists("foo", "bar"): {
-			Status:  api.StatusFailure,
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "AlreadyExists",
 			Message: "foo \"bar\" already exists",
-			Details: &api.StatusDetails{
+			Details: &unversioned.StatusDetails{
 				Kind: "foo",
 				Name: "bar",
 			},
 		},
 		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
-			Status:  api.StatusFailure,
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
 			Message: "foo \"bar\" cannot be updated: failure",
-			Details: &api.StatusDetails{
+			Details: &unversioned.StatusDetails{
 				Kind: "foo",
 				Name: "bar",
 			},

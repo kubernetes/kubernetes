@@ -303,6 +303,107 @@ func TestGenerateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			generator: ServiceGeneratorV1{},
+			params: map[string]interface{}{
+				"selector":       "foo=bar",
+				"name":           "test",
+				"ports":          "80,443",
+				"protocol":       "TCP",
+				"container-port": "foobar",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Port:       80,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+						{
+							Name:       "port-2",
+							Port:       443,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+					},
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector":    "foo=bar",
+				"name":        "test",
+				"ports":       "80,443",
+				"protocol":    "UDP",
+				"target-port": "1234",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Port:       80,
+							Protocol:   api.ProtocolUDP,
+							TargetPort: util.NewIntOrStringFromInt(1234),
+						},
+						{
+							Name:       "port-2",
+							Port:       443,
+							Protocol:   api.ProtocolUDP,
+							TargetPort: util.NewIntOrStringFromInt(1234),
+						},
+					},
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector": "foo=bar",
+				"name":     "test",
+				"ports":    "80,443",
+				"protocol": "TCP",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Port:       80,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: util.NewIntOrStringFromInt(80),
+						},
+						{
+							Name:       "port-2",
+							Port:       443,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: util.NewIntOrStringFromInt(443),
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		obj, err := test.generator.Generate(test.params)

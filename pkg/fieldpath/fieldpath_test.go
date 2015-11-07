@@ -58,6 +58,37 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			expectedValue: "object-name",
 		},
 		{
+			name:      "ok - labels",
+			fieldPath: "metadata.labels",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"key": "value"},
+				},
+			},
+			expectedValue: "key=\"value\"\n",
+		},
+		{
+			name:      "ok - labels bslash n",
+			fieldPath: "metadata.labels",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"key": "value\n"},
+				},
+			},
+			expectedValue: "key=\"value\\n\"\n",
+		},
+		{
+			name:      "ok - annotations",
+			fieldPath: "metadata.annotations",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{"builder": "john-doe"},
+				},
+			},
+			expectedValue: "builder=\"john-doe\"\n",
+		},
+
+		{
 			name:      "invalid expression",
 			fieldPath: "metadata.whoops",
 			obj: &api.Pod{

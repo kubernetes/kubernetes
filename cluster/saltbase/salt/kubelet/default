@@ -22,6 +22,8 @@
   {% set api_servers_with_port = api_servers + ":6443" -%}
 {% endif -%}
 
+{% set master_kubelet_args = "" %}
+
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
@@ -31,6 +33,7 @@
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
+      {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false --reconcile-cidr=false" -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}
@@ -50,8 +53,9 @@
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 
 {% set manifest_url = "" -%}
-{% if grains['roles'][0] == 'kubernetes-master' and grains.cloud in ['gce'] -%}
-  {% set manifest_url = "--manifest-url=http://metadata.google.internal/computeMetadata/v1/instance/attributes/google-container-manifest --manifest-url-header=Metadata-Flavor:Google" -%}
+{% set manifest_url_header = "" -%}
+{% if pillar.get('enable_manifest_url', '').lower() == 'true' %}
+  {% set manifest_url = "--manifest-url=" + pillar['manifest_url'] + " --manifest-url-header=" + pillar['manifest_url_header'] -%}
 {% endif -%}
 
 {% set hostname_override = "" -%}
@@ -97,9 +101,9 @@
   {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
 {% endif %}
 
-{% set network_plugin = "" -%}
-{% if grains.network_mode == "calico" and 'kubernetes-pool' in grains.roles -%}
-  {% set network_plugin = " --network_plugin=calico" -%}
+{% set cpu_cfs_quota = "" %}
+{% if pillar['enable_cpu_cfs_quota'] is defined -%}
+ {% set cpu_cfs_quota = "--cpu-cfs-quota=" + pillar['enable_cpu_cfs_quota'] -%}
 {% endif -%}
 
 {% set test_args = "" -%}
@@ -107,5 +111,12 @@
   {% set test_args=pillar['kubelet_test_args'] %}
 {% endif -%}
 
+{% set network_plugin = "" -%}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+  {% set network_plugin = "--network-plugin=opencontrail" %}
+{% elif pillar.get('network_provider', '').lower() == "calico" and 'kubernetes-pool' in grains.roles -%}
+  {% set network_plugin = " --network_plugin=calico" -%}
+{% endif -%}
+
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{network_plugin}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{test_args}}"

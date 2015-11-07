@@ -1,0 +1,24 @@
+syntax = "proto3";
+package etcdserverpb;
+
+import "gogoproto/gogo.proto";
+import "etcdserver.proto";
+import "rpc.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// An InternalRaftRequest is the union of all requests which can be
+// sent via raft.
+message InternalRaftRequest {
+  option (gogoproto.onlyone) = true;
+  oneof value {
+    Request v2 = 1;
+    RangeRequest range = 2;
+    PutRequest put = 3;
+    DeleteRangeRequest delete_range = 4;
+    TxnRequest txn = 5;
+  }
+}

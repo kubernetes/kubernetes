@@ -3,24 +3,30 @@ package credentials
 import (
 	"os"
 
-	"github.com/aws/aws-sdk-go/internal/apierr"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 var (
 	// ErrAccessKeyIDNotFound is returned when the AWS Access Key ID can't be
 	// found in the process's environment.
-	ErrAccessKeyIDNotFound = apierr.New("EnvAccessKeyNotFound", "AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY not found in environment", nil)
+	//
+	// @readonly
+	ErrAccessKeyIDNotFound = awserr.New("EnvAccessKeyNotFound", "AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY not found in environment", nil)
+
 	// ErrSecretAccessKeyNotFound is returned when the AWS Secret Access Key
 	// can't be found in the process's environment.
-	ErrSecretAccessKeyNotFound = apierr.New("EnvSecretNotFound", "AWS_SECRET_ACCESS_KEY or AWS_SECRET_KEY not found in environment", nil)
+	//
+	// @readonly
+	ErrSecretAccessKeyNotFound = awserr.New("EnvSecretNotFound", "AWS_SECRET_ACCESS_KEY or AWS_SECRET_KEY not found in environment", nil)
 )
 
 // A EnvProvider retrieves credentials from the environment variables of the
 // running process. Environment credentials never expire.
 //
 // Environment variables used:
-// - Access Key ID:     AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY
-// - Secret Access Key: AWS_SECRET_ACCESS_KEY or AWS_SECRET_KEY
+//
+// * Access Key ID:     AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY
+// * Secret Access Key: AWS_SECRET_ACCESS_KEY or AWS_SECRET_KEY
 type EnvProvider struct {
 	retrieved bool
 }

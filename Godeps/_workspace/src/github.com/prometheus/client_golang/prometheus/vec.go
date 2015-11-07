@@ -58,6 +58,11 @@ func (m *MetricVec) Collect(ch chan<- Metric) {
 // GetMetricWithLabelValues returns the Metric for the given slice of label
 // values (same order as the VariableLabels in Desc). If that combination of
 // label values is accessed for the first time, a new Metric is created.
+//
+// It is possible to call this method without using the returned Metric to only
+// create the new Metric but leave it at its start value (e.g. a Summary or
+// Histogram without any observations). See also the SummaryVec example.
+//
 // Keeping the Metric for later use is possible (and should be considered if
 // performance is critical), but keep in mind that Reset, DeleteLabelValues and
 // Delete can be used to delete the Metric from the MetricVec. In that case, the
@@ -87,8 +92,9 @@ func (m *MetricVec) GetMetricWithLabelValues(lvs ...string) (Metric, error) {
 
 // GetMetricWith returns the Metric for the given Labels map (the label names
 // must match those of the VariableLabels in Desc). If that label map is
-// accessed for the first time, a new Metric is created. Implications of keeping
-// the Metric are the same as for GetMetricWithLabelValues.
+// accessed for the first time, a new Metric is created. Implications of
+// creating a Metric without using it and keeping the Metric for later use are
+// the same as for GetMetricWithLabelValues.
 //
 // An error is returned if the number and names of the Labels are inconsistent
 // with those of the VariableLabels in Desc.

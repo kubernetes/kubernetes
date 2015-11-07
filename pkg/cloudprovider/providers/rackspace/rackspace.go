@@ -24,12 +24,12 @@ import (
 	"regexp"
 	"time"
 
-	"code.google.com/p/gcfg"
 	"github.com/rackspace/gophercloud"
-	os_servers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+	osservers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"
 	"github.com/rackspace/gophercloud/rackspace"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
+	"github.com/scalingdata/gcfg"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -161,7 +161,7 @@ func (os *Rackspace) Instances() (cloudprovider.Instances, bool) {
 func (i *Instances) List(name_filter string) ([]string, error) {
 	glog.V(2).Infof("rackspace List(%v) called", name_filter)
 
-	opts := os_servers.ListOpts{
+	opts := osservers.ListOpts{
 		Name:   name_filter,
 		Status: "ACTIVE",
 	}
@@ -187,7 +187,7 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 	return ret, nil
 }
 
-func serverHasAddress(srv os_servers.Server, ip string) bool {
+func serverHasAddress(srv osservers.Server, ip string) bool {
 	if ip == firstAddr(srv.Addresses["private"]) {
 		return true
 	}
@@ -203,10 +203,10 @@ func serverHasAddress(srv os_servers.Server, ip string) bool {
 	return false
 }
 
-func getServerByAddress(client *gophercloud.ServiceClient, name string) (*os_servers.Server, error) {
+func getServerByAddress(client *gophercloud.ServiceClient, name string) (*osservers.Server, error) {
 	pager := servers.List(client, nil)
 
-	serverList := make([]os_servers.Server, 0, 1)
+	serverList := make([]osservers.Server, 0, 1)
 
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		s, err := servers.ExtractServers(page)
@@ -236,19 +236,19 @@ func getServerByAddress(client *gophercloud.ServiceClient, name string) (*os_ser
 	return &serverList[0], nil
 }
 
-func getServerByName(client *gophercloud.ServiceClient, name string) (*os_servers.Server, error) {
+func getServerByName(client *gophercloud.ServiceClient, name string) (*osservers.Server, error) {
 	if net.ParseIP(name) != nil {
 		// we're an IP, so we'll have to walk the full list of servers to
 		// figure out which one we are.
 		return getServerByAddress(client, name)
 	}
-	opts := os_servers.ListOpts{
+	opts := osservers.ListOpts{
 		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
 		Status: "ACTIVE",
 	}
 	pager := servers.List(client, opts)
 
-	serverList := make([]os_servers.Server, 0, 1)
+	serverList := make([]osservers.Server, 0, 1)
 
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		s, err := servers.ExtractServers(page)
@@ -360,6 +360,11 @@ func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (os *Rackspace) ProviderName() string {
 	return ProviderName
+}
+
+// ScrubDNS filters DNS settings for pods.
+func (os *Rackspace) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
 }
 
 func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {

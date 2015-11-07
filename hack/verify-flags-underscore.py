@@ -55,6 +55,8 @@ def get_all_files(rootdir):
         # don't visit certain dirs
         if 'Godeps' in dirs:
             dirs.remove('Godeps')
+        if '_gopath' in dirs:
+            dirs.remove('_gopath')
         if 'third_party' in dirs:
             dirs.remove('third_party')
         if '.git' in dirs:
@@ -77,7 +79,7 @@ def get_all_files(rootdir):
 
 def normalize_files(rootdir, files):
     newfiles = []
-    a = ['Godeps', 'third_party', 'exceptions.txt', 'known-flags.txt']
+    a = ['Godeps', '_gopath', 'third_party', '.git', 'exceptions.txt', 'known-flags.txt']
     for f in files:
         if any(x in f for x in a):
             continue
@@ -197,7 +199,7 @@ def load_exceptions(rootdir):
     for exception in exception_file.read().splitlines():
         out = exception.split(":", 1)
         if len(out) != 2:
-            printf("Invalid line in exceptions file: %s" % exception)
+            print("Invalid line in exceptions file: %s" % exception)
             continue
         filename = out[0]
         line = out[1]
@@ -232,7 +234,7 @@ def main():
 
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
-            print("Found illegal 'flag' usage. If these are false positives you should running `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
+            print("Found illegal 'flag' usage. If these are false positives you should run `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
         bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))

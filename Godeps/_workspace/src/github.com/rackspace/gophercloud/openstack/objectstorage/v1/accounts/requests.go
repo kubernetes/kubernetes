@@ -43,7 +43,9 @@ func Get(c *gophercloud.ServiceClient, opts GetOptsBuilder) GetResult {
 		MoreHeaders: h,
 		OkCodes:     []int{204},
 	})
-	res.Header = resp.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -97,7 +99,9 @@ func Update(c *gophercloud.ServiceClient, opts UpdateOptsBuilder) UpdateResult {
 		MoreHeaders: h,
 		OkCodes:     []int{201, 202, 204},
 	})
-	res.Header = resp.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }

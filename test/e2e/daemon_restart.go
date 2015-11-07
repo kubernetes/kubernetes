@@ -22,14 +22,15 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -40,7 +41,7 @@ import (
 // This test primarily checks 2 things:
 // 1. Daemons restart automatically within some sane time (10m).
 // 2. They don't take abnormal actions when restarted in the steady state.
-//	- Controller manager sholdn't overshoot replicas
+//	- Controller manager shouldn't overshoot replicas
 //	- Kubelet shouldn't restart containers
 //	- Scheduler should continue assigning hosts to new pods
 
@@ -49,6 +50,9 @@ const (
 	restartTimeout      = 10 * time.Minute
 	numPods             = 10
 	sshPort             = 22
+	ADD                 = "ADD"
+	DEL                 = "DEL"
+	UPDATE              = "UPDATE"
 )
 
 // nodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
@@ -125,13 +129,42 @@ func (r *restartDaemonConfig) restart() {
 	r.waitUp()
 }
 
+// podTracker records a serial history of events that might've affects pods.
+type podTracker struct {
+	cache.ThreadSafeStore
+}
+
+func (p *podTracker) remember(pod *api.Pod, eventType string) {
+	if eventType == UPDATE && pod.Status.Phase == api.PodRunning {
+		return
+	}
+	p.Add(fmt.Sprintf("[%v] %v: %v", time.Now(), eventType, pod.Name), pod)
+}
+
+func (p *podTracker) String() (msg string) {
+	for _, k := range p.ListKeys() {
+		obj, exists := p.Get(k)
+		if !exists {
+			continue
+		}
+		pod := obj.(*api.Pod)
+		msg += fmt.Sprintf("%v Phase %v Host %v\n", k, pod.Status.Phase, pod.Spec.NodeName)
+	}
+	return
+}
+
+func newPodTracker() *podTracker {
+	return &podTracker{cache.NewThreadSafeStore(
+		cache.Indexers{}, cache.Indices{})}
+}
+
 // replacePods replaces content of the store with the given pods.
 func replacePods(pods []*api.Pod, store cache.Store) {
 	found := make([]interface{}, 0, len(pods))
 	for i := range pods {
 		found = append(found, pods[i])
 	}
-	expectNoError(store.Replace(found))
+	expectNoError(store.Replace(found, "0"))
 }
 
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
@@ -140,7 +173,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	pods, err := c.Pods(ns).List(labelSelector, fields.Everything())
 	expectNoError(err)
 	failedContainers := 0
-	containerRestartNodes := util.NewStringSet()
+	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
 		for _, v := range FailedContainers(&p) {
 			failedContainers = failedContainers + v.restarts
@@ -152,25 +185,21 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 
 var _ = Describe("DaemonRestart", func() {
 
-	framework := Framework{BaseName: "daemonrestart"}
+	framework := NewFramework("daemonrestart")
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config RCConfig
-	var controller *controllerFramework.Controller
+	var controller *controllerframework.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
+	var tracker *podTracker
 
 	BeforeEach(func() {
-
 		// These tests require SSH
-		// TODO: Enable on gke after testing (#11834)
-		if !providerIs("gce") {
-			By(fmt.Sprintf("Skipping test, which is not implemented for %s", testContext.Provider))
-			return
-		}
-		framework.beforeEach()
+		// TODO(11834): Enable this test in GKE once experimental API there is switched on
+		SkipUnlessProviderIs("gce", "aws")
 		ns = framework.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -179,7 +208,7 @@ var _ = Describe("DaemonRestart", func() {
 			Client:      framework.Client,
 			Name:        rcName,
 			Namespace:   ns,
-			Image:       "kubernetes/pause",
+			Image:       "beta.gcr.io/google_containers/pause:2.0",
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
@@ -187,26 +216,35 @@ var _ = Describe("DaemonRestart", func() {
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})
-		newPods, controller = controllerFramework.NewInformer(
+		tracker = newPodTracker()
+		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func() (runtime.Object, error) {
 					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
 				},
-				WatchFunc: func(rv string) (watch.Interface, error) {
-					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), rv)
+				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), options)
 				},
 			},
 			&api.Pod{},
 			0,
-			controllerFramework.ResourceEventHandlerFuncs{},
+			controllerframework.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					tracker.remember(obj.(*api.Pod), ADD)
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					tracker.remember(newObj.(*api.Pod), UPDATE)
+				},
+				DeleteFunc: func(obj interface{}) {
+					tracker.remember(obj.(*api.Pod), DEL)
+				},
+			},
 		)
 		go controller.Run(stopCh)
 	})
 
 	AfterEach(func() {
 		close(stopCh)
-		expectNoError(DeleteRC(framework.Client, ns, rcName))
-		framework.afterEach()
 	})
 
 	It("Controller Manager should not create/delete replicas across restart", func() {
@@ -224,8 +262,8 @@ var _ = Describe("DaemonRestart", func() {
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
-		existingKeys := util.NewStringSet()
-		newKeys := util.NewStringSet()
+		existingKeys := sets.NewString()
+		newKeys := sets.NewString()
 		for _, k := range existingPods.ListKeys() {
 			existingKeys.Insert(k)
 		}
@@ -234,7 +272,7 @@ var _ = Describe("DaemonRestart", func() {
 		}
 		if len(newKeys.List()) != len(existingKeys.List()) ||
 			!newKeys.IsSuperset(existingKeys) {
-			Failf("RcManager created/deleted pods after restart")
+			Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
 		}
 	})
 
@@ -255,7 +293,8 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	It("Kubelet should not restart containers across restart", func() {
-		nodeIPs, err := getMinionPublicIps(framework.Client)
+
+		nodeIPs, err := getNodePublicIps(framework.Client)
 		expectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(framework.Client, ns, labelSelector)
 		if preRestarts != 0 {
@@ -269,7 +308,7 @@ var _ = Describe("DaemonRestart", func() {
 		postRestarts, badNodes := getContainerRestarts(framework.Client, ns, labelSelector)
 		if postRestarts != preRestarts {
 			dumpNodeDebugInfo(framework.Client, badNodes)
-			Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v", preRestarts, postRestarts, badNodes)
+			Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})
 })

@@ -17,8 +17,11 @@ limitations under the License.
 package conversion
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestSimpleMetaFactoryInterpret(t *testing.T) {
@@ -69,6 +72,25 @@ func TestSimpleMetaFactoryUpdate(t *testing.T) {
 	}
 	if obj.V != "test" || obj.K != "other" {
 		t.Errorf("unexpected update: %v", obj)
+	}
+}
+
+// Test Updating objects that don't have a Kind field.
+func TestSimpleMetaFactoryUpdateNoKindField(t *testing.T) {
+	factory := SimpleMetaFactory{VersionField: "APIVersion", KindField: "Kind"}
+	// obj does not have a Kind field and is not defined in the unversioned package.
+	obj := struct {
+		SomeField string
+	}{"1"}
+	expectedError := fmt.Errorf("couldn't find %v field in %#v", factory.KindField, obj)
+	if err := factory.Update("test", "other", &obj); err == nil || expectedError.Error() != err.Error() {
+		t.Fatalf("expected error: %v, got: %v", expectedError, err)
+	}
+
+	// ListMeta does not have a Kind field, but is defined in the unversioned package.
+	listMeta := unversioned.ListMeta{}
+	if err := factory.Update("test", "other", &listMeta); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

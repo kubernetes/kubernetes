@@ -68,14 +68,14 @@ $kube_provider_boxes = {
   },
   :libvirt => {
     'fedora' => {
-      :box_name => 'kube-fedora20',
-      :box_url => 'http://citozin.com/opscode_fedora-20_chef-provisionerless_libvirt.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'https://amadeus.box.com/shared/static/93mj2fajrii6afeh8b5v5ihuk2ows2yn.box'
     }
   },
   :vmware_desktop => {
     'fedora' => {
-      :box_name => 'kube-fedora20',
-      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-20-i386_chef-provisionerless.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-21_chef-provisionerless.box'
     }
   }
 }
@@ -104,7 +104,7 @@ end
 # In Fedora VM, tmpfs device is mapped to /tmp.  tmpfs is given 50% of RAM allocation.
 # When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
 # This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
-$vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
+$vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1280).to_i
 $vm_minion_mem = (ENV['KUBERNETES_MINION_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|

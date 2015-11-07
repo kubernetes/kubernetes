@@ -63,8 +63,8 @@ function detect-project() {
 # Execute prior to running tests to build a release if required for env.
 function test-build-release() {
   echo "... in gke:test-build-release()" >&2
-  # We currently use the Kubernetes version that GKE supports (not testing
-  # bleeding-edge builds).
+  echo "... We currently use the Kubernetes version that GKE supports,"
+  echo "... not bleeding-edge builds."
 }
 
 # Verify needed binaries exist.
@@ -98,8 +98,9 @@ function verify-prereqs() {
   if [ ! -w $(dirname `which gcloud`) ]; then
     sudo_prefix="sudo"
   fi
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update "${CMD_GROUP}"|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update alpha || true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update beta || true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update ${CMD_GROUP:-} || true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update kubectl|| true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
@@ -150,7 +151,7 @@ function kube-up() {
   )
 
   # Bring up the cluster.
-  "${GCLOUD}" "${CMD_GROUP}" container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+  "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -175,14 +176,14 @@ function test-setup() {
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-http-alt" \
+    "${CLUSTER_NAME}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-nodeports" \
+    "${CLUSTER_NAME}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
@@ -200,7 +201,7 @@ function test-setup() {
 function detect-master() {
   echo "... in gke:detect-master()" >&2
   detect-project >&2
-  KUBE_MASTER_IP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
+  KUBE_MASTER_IP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
 }
@@ -242,7 +243,7 @@ function detect-minion-names {
 #   NODE_INSTANCE_GROUP
 function detect-node-instance-group {
   echo "... in gke:detect-node-instance-group()" >&2
-  NODE_INSTANCE_GROUP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
+  NODE_INSTANCE_GROUP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep instanceGroupManagers | cut -d '/' -f 11)
 }
@@ -294,15 +295,12 @@ function test-teardown() {
   echo "... in gke:test-teardown()" >&2
 
   detect-project >&2
-  detect-minions >&2
-  # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-http-alt" \
+  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-http-alt" \
     --project="${PROJECT}" || true
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-nodeports" \
+  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-nodeports" \
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.
@@ -318,6 +316,6 @@ function test-teardown() {
 function kube-down() {
   echo "... in gke:kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" "${CMD_GROUP}" container clusters delete --project="${PROJECT}" \
+  "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
 }

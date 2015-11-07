@@ -47,7 +47,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - Filters for intercepting the request &#8594; response flow on Service or Route level
 - Request-scoped variables using attributes
 - Containers for WebServices on different HTTP endpoints
-- Content encoding (gzip,deflate) of responses
+- Content encoding (gzip,deflate) of request and response payloads
 - Automatic responses on OPTIONS (using a filter)
 - Automatic CORS request handling (using a filter)
 - API declaration for Swagger UI (see swagger package)

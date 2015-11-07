@@ -23,10 +23,13 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/third_party/golang/netutil"
 )
@@ -52,21 +55,85 @@ type SpdyRoundTripper struct {
 	Dialer *net.Dialer
 }
 
-// NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
+// NewRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
 func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
 	return NewSpdyRoundTripper(tlsConfig)
 }
 
+// NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
+// the specified tlsConfig. This function is mostly meant for unit tests.
 func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 	return &SpdyRoundTripper{tlsConfig: tlsConfig}
 }
 
-// dial dials the host specified by req, using TLS if appropriate.
+// dial dials the host specified by req, using TLS if appropriate, optionally
+// using a proxy server if one is configured via environment variables.
 func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(req.URL)
+	proxyURL, err := http.ProxyFromEnvironment(req)
+	if err != nil {
+		return nil, err
+	}
 
-	if req.URL.Scheme == "http" {
+	if proxyURL == nil {
+		return s.dialWithoutProxy(req.URL)
+	}
+
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(req.URL)
+
+	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
+	proxyReq := http.Request{
+		Method: "CONNECT",
+		URL:    &url.URL{},
+		Host:   targetHost,
+	}
+
+	proxyDialConn, err := s.dialWithoutProxy(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+	_, err = proxyClientConn.Do(&proxyReq)
+	if err != nil && err != httputil.ErrPersistEOF {
+		return nil, err
+	}
+
+	rwc, _ := proxyClientConn.Hijack()
+
+	if req.URL.Scheme != "https" {
+		return rwc, nil
+	}
+
+	host, _, err := net.SplitHostPort(req.URL.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(s.tlsConfig.ServerName) == 0 {
+		s.tlsConfig.ServerName = host
+	}
+
+	tlsConn := tls.Client(rwc, s.tlsConfig)
+
+	// need to manually call Handshake() so we can call VerifyHostname() below
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
+	}
+
+	if err := tlsConn.VerifyHostname(host); err != nil {
+		return nil, err
+	}
+
+	return tlsConn, nil
+}
+
+// dialWithoutProxy dials the host specified by url, using TLS if appropriate.
+func (s *SpdyRoundTripper) dialWithoutProxy(url *url.URL) (net.Conn, error) {
+	dialAddr := netutil.CanonicalAddr(url)
+
+	if url.Scheme == "http" {
 		if s.Dialer == nil {
 			return net.Dial("tcp", dialAddr)
 		} else {
@@ -84,6 +151,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return conn, nil
 	}
 
 	host, _, err := net.SplitHostPort(dialAddr)
@@ -133,7 +205,7 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
 	connectionHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderUpgrade))
-	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
+	if (resp.StatusCode != http.StatusSwitchingProtocols) || !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
 		defer resp.Body.Close()
 		responseError := ""
 		responseErrorBytes, err := ioutil.ReadAll(resp.Body)
@@ -141,7 +213,7 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 			responseError = "unable to read error from server response"
 		} else {
 			if obj, err := api.Scheme.Decode(responseErrorBytes); err == nil {
-				if status, ok := obj.(*api.Status); ok {
+				if status, ok := obj.(*unversioned.Status); ok {
 					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}

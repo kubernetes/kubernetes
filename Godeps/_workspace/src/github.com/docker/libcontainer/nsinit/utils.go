@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+
+	"github.com/Sirupsen/logrus"
 
 	"github.com/codegangsta/cli"
 	"github.com/docker/libcontainer"
+	"github.com/docker/libcontainer/cgroups/systemd"
 	"github.com/docker/libcontainer/configs"
 )
 
@@ -29,7 +33,23 @@ func loadConfig(context *cli.Context) (*configs.Config, error) {
 }
 
 func loadFactory(context *cli.Context) (libcontainer.Factory, error) {
-	return libcontainer.New(context.GlobalString("root"), libcontainer.Cgroupfs)
+	cgm := libcontainer.Cgroupfs
+	if context.Bool("systemd") {
+		if systemd.UseSystemd() {
+			cgm = libcontainer.SystemdCgroups
+		} else {
+			logrus.Warn("systemd cgroup flag passed, but systemd support for managing cgroups is not available.")
+		}
+	}
+	root := context.GlobalString("root")
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	return libcontainer.New(abs, cgm, func(l *libcontainer.LinuxFactory) error {
+		l.CriuPath = context.GlobalString("criu")
+		return nil
+	})
 }
 
 func getContainer(context *cli.Context) (libcontainer.Container, error) {

@@ -2,7 +2,7 @@ package configs
 
 // Network defines configuration for a container's networking stack
 //
-// The network configuration can be omited from a container causing the
+// The network configuration can be omitted from a container causing the
 // container to be setup with the host's networking stack
 type Network struct {
 	// Type sets the networks type, commonly veth and loopback
@@ -53,7 +53,7 @@ type Network struct {
 // Routes can be specified to create entries in the route table as the container is started
 //
 // All of destination, source, and gateway should be either IPv4 or IPv6.
-// One of the three options must be present, and ommitted entries will use their
+// One of the three options must be present, and omitted entries will use their
 // IP family default for the route table.  For IPv4 for example, setting the
 // gateway to 1.2.3.4 and the interface to eth0 will set up a standard
 // destination of 0.0.0.0(or *) when viewed in the route table.

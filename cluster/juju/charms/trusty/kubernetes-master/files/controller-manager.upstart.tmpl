@@ -10,11 +10,4 @@ kill timeout 30 # wait 30s between SIGTERM and SIGKILL.
 exec /usr/local/bin/controller-manager \
      --address=%(bind_address)s \
      --logtostderr=true \
-     --master=%(api_server_address)s
-
-
-
-
-
-
-
+     --master=%(api_http_uri)s

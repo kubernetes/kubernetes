@@ -28,10 +28,11 @@ import (
 // LocationStreamer is a resource that streams the contents of a particular
 // location URL
 type LocationStreamer struct {
-	Location    *url.URL
-	Transport   http.RoundTripper
-	ContentType string
-	Flush       bool
+	Location        *url.URL
+	Transport       http.RoundTripper
+	ContentType     string
+	Flush           bool
+	ResponseChecker HttpResponseChecker
 }
 
 // a LocationStreamer must implement a rest.ResourceStreamer
@@ -54,8 +55,15 @@ func (s *LocationStreamer) InputStream(apiVersion, acceptHeader string) (stream 
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(s.Location.String())
 	if err != nil {
-		return
+		return nil, false, "", err
 	}
+
+	if s.ResponseChecker != nil {
+		if err = s.ResponseChecker.Check(resp); err != nil {
+			return nil, false, "", err
+		}
+	}
+
 	contentType = s.ContentType
 	if len(contentType) == 0 {
 		contentType = resp.Header.Get("Content-Type")

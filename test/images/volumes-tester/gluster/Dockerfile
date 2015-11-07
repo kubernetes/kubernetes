@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:14.04
+FROM centos
 MAINTAINER Jan Safranek, jsafrane@redhat.com
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update -qq && apt-get install -y glusterfs-server -qq
+ADD gluster.repo /etc/yum.repos.d/
+RUN yum -y install hostname glusterfs-server && yum clean all
 ADD glusterd.vol /etc/glusterfs/
 ADD run_gluster.sh /usr/local/bin/
 ADD index.html /vol/

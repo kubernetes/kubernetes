@@ -21,6 +21,8 @@ function build-kube-env {
   local master=$1
   local file=$2
 
+  build-runtime-config
+
   rm -f ${file}
   cat >$file <<EOF
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
@@ -35,6 +37,7 @@ SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
+ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
 ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
@@ -51,13 +54,25 @@ KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
+ENABLE_EXPERIMENTAL_API: $(yaml-quote ${ENABLE_EXPERIMENTAL_API})
+RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
+NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
+OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
+OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
+OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
+E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 EOF
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     cat >>$file <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
+EOF
+  fi
+  if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
+    cat >>$file <<EOF
+TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
   if [ -n "${TEST_CLUSTER:-}" ]; then
@@ -77,6 +92,10 @@ MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
 KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
 KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
 KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
+ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
+MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
+MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
+NUM_MINIONS: $(yaml-quote ${NUM_MINIONS})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
@@ -145,22 +164,17 @@ function create-master-instance {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
+    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
       "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
 
-# TODO(mbforbes): Make $1 required.
-# TODO(mbforbes): Document required vars (for this and call chain).
-# $1 version
+# $1: template name (required)
 function create-node-instance-template {
-  local suffix=""
-  if [[ -n ${1:-} ]]; then
-    suffix="-${1}"
-  fi
-  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags}" \
+  local template_name="$1"
+  create-node-template "$template_name" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
 }

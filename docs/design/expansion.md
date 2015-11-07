@@ -265,7 +265,7 @@ type ObjectEventRecorder interface {
 	Eventf(reason, messageFmt string, args ...interface{})
 
 	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
-	PastEventf(timestamp util.Time, reason, messageFmt string, args ...interface{})
+	PastEventf(timestamp unversioned.Time, reason, messageFmt string, args ...interface{})
 }
 ```
 

@@ -1,9 +1,12 @@
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
-// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
 
-import "math"
+import (
+	"math"
+	"reflect"
+)
 
 const (
 	cborMajorUint byte = iota
@@ -98,7 +101,7 @@ func (e *cborEncDriver) encUint(v uint64, bd byte) {
 	} else if v <= math.MaxUint32 {
 		e.w.writen1(bd + 0x1a)
 		bigenHelper{e.x[:4], e.w}.writeUint32(uint32(v))
-	} else if v <= math.MaxUint64 {
+	} else { // if v <= math.MaxUint64 {
 		e.w.writen1(bd + 0x1b)
 		bigenHelper{e.x[:8], e.w}.writeUint64(v)
 	}
@@ -158,7 +161,11 @@ func (e *cborEncDriver) EncodeSymbol(v string) {
 }
 
 func (e *cborEncDriver) EncodeStringBytes(c charEncoding, v []byte) {
-	e.encLen(cborBaseBytes, len(v))
+	if c == c_RAW {
+		e.encLen(cborBaseBytes, len(v))
+	} else {
+		e.encLen(cborBaseString, len(v))
+	}
 	e.w.writeb(v)
 }
 
@@ -560,6 +567,10 @@ func (h *CborHandle) newEncDriver(e *Encoder) encDriver {
 
 func (h *CborHandle) newDecDriver(d *Decoder) decDriver {
 	return &cborDecDriver{d: d, r: d.r, h: h, br: d.bytes}
+}
+
+func (h *CborHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {
+	return h.SetExt(rt, tag, &setExtWrapper{i: ext})
 }
 
 var _ decDriver = (*cborDecDriver)(nil)

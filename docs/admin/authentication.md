@@ -46,7 +46,12 @@ to apiserver.  Currently, tokens last indefinitely, and the token list cannot
 be changed without restarting apiserver.
 
 The token file format is implemented in `plugin/pkg/auth/authenticator/token/tokenfile/...`
-and is a csv file with 3 columns: token, user name, user uid.
+and is a csv file with a minimum of 3 columns: token, user name, user uid, followed by
+optional group names. Note, if you have more than one group the column must be double quoted e.g.
+
+```
+token,user,uid,"group1,group2,group3"
+```
 
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.
@@ -88,8 +93,8 @@ option to the apiserver during startup. The plugin is implemented in
 For details on how to use keystone to manage projects and users, refer to the
 [Keystone documentation](http://docs.openstack.org/developer/keystone/). Please note that
 this plugin is still experimental which means it is subject to changes.
-Please refer to the [discussion](https://github.com/GoogleCloudPlatform/kubernetes/pull/11798#issuecomment-129655212)
-and the [blueprint](https://github.com/GoogleCloudPlatform/kubernetes/issues/11626) for more details
+Please refer to the [discussion](https://github.com/kubernetes/kubernetes/pull/11798#issuecomment-129655212)
+and the [blueprint](https://github.com/kubernetes/kubernetes/issues/11626) for more details
 
 ## Plugin Development
 
@@ -118,18 +123,22 @@ Finally, add these parameters
 into apiserver start parameters.
 
 **easyrsa** can be used to manually generate certificates for your cluster.
+
 1.  Download, unpack, and initialize the patched version of easyrsa3.
-    `curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz`
-    `tar xzf easy-rsa.tar.gz`
-    `cd easy-rsa-master/easyrsa3`
-    `./easyrsa init-pki`
-1.  Generate a CA. (--batch set automatic mode. --req-cn default CN to use.)
-    `./easyrsa --batch "--req-cn=${MASTER_IP}@date +%s" build-ca nopass`
+
+          curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+          tar xzf easy-rsa.tar.gz
+          cd easy-rsa-master/easyrsa3
+          ./easyrsa init-pki
+1.  Generate a CA. (`--batch` set automatic mode. `--req-cn` default CN to use.)
+
+          ./easyrsa --batch "--req-cn=${MASTER_IP}@`date +%s`" build-ca nopass
 1.  Generate server certificate and key.
     (build-server-full [filename]: Generate a keypair and sign locally for a client or server)
-    `./easyrsa --subject-alt-name="${MASTER_IP}" build-server-full kubernetes-master nopass`
-1.  Copy /pki/ca.crt  /pki/issued/kubernetes-master.crt
-    /pki/private/kubernetes-master.key to your directory.
+
+          ./easyrsa --subject-alt-name="IP:${MASTER_IP}" build-server-full kubernetes-master nopass
+1.  Copy `pki/ca.crt`  `pki/issued/kubernetes-master.crt`
+    `pki/private/kubernetes-master.key` to your directory.
 1.  Remember fill the parameters
     `--client-ca-file=/yourdirectory/ca.crt`
     `--tls-cert-file=/yourdirectory/server.cert`
@@ -137,6 +146,7 @@ into apiserver start parameters.
     and add these into apiserver start parameters.
 
 **openssl** can also be use to manually generate certificates for your cluster.
+
 1.  Generate a ca.key with 2048bit
     `openssl genrsa -out ca.key 2048`
 1.  According to the ca.key generate a ca.crt.  (-days set the certificate effective time).

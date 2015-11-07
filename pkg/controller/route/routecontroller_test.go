@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package routecontroller
+package route
 
 import (
 	"net"
@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
 
 func TestIsResponsibleForRoute(t *testing.T) {
@@ -147,16 +147,16 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		cloud := &fake_cloud.FakeCloud{RouteMap: make(map[string]*fake_cloud.FakeRoute)}
+		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
 		for _, route := range testCase.initialRoutes {
-			fakeRoute := &fake_cloud.FakeRoute{}
+			fakeRoute := &fakecloud.FakeRoute{}
 			fakeRoute.ClusterName = cluster
 			fakeRoute.Route = *route
 			cloud.RouteMap[route.Name] = fakeRoute
 		}
 		routes, ok := cloud.Routes()
 		if !ok {
-			t.Error("Error in test: fake_cloud doesn't support Routes()")
+			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
 		rc := New(routes, nil, cluster, cidr)

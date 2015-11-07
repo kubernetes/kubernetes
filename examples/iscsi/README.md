@@ -39,8 +39,7 @@ If you use Fedora 21 on Kubernetes node, then first install iSCSI initiator on t
 
     # yum -y install iscsi-initiator-utils
 
-
-then edit */etc/iscsi/initiatorname.iscsi* and */etc/iscsi/iscsid.conf* to match your iSCSI target configuration.
+then edit */etc/iscsi/iscsid.conf* to match your iSCSI target configuration.
 
 I mostly followed these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi) to setup iSCSI target. and these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi&f=2) to setup iSCSI initiator.
 
@@ -50,7 +49,7 @@ GCE does not provide preconfigured Fedora 21 image, so I set up the iSCSI target
 
 ## Step 2. Creating the pod with iSCSI persistent storage
 
-Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on my example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean.
+Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on the example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean. No initiator information is required.
 
 **Note:** If you have followed the instructions in the links above you
 may have partitioned the device, the iSCSI volume plugin does not
@@ -77,30 +76,33 @@ NAME      READY     STATUS    RESTARTS   AGE
 iscsipd   2/2       RUNNING   0           2m
 ```
 
-On the Kubernetes node, I got these in mount output
+On the Kubernetes node, verify the mount output
 
 ```console
 # mount |grep kub
-/dev/sdb on /var/lib/kubelet/plugins/kubernetes.io/iscsi/iscsi/10.240.205.13:3260-iqn-iqn.2014-12.world.server:storage.target1-lun-0 type ext4 (ro,relatime,data=ordered)
-/dev/sdb on /var/lib/kubelet/pods/e36158ce-f8d8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-ro type ext4 (ro,relatime,data=ordered)
-/dev/sdc on /var/lib/kubelet/plugins/kubernetes.io/iscsi/iscsi/10.240.205.13:3260-iqn-iqn.2014-12.world.server:storage.target1-lun-1 type xfs (rw,relatime,attr2,inode64,noquota)
-/dev/sdc on /var/lib/kubelet/pods/e36158ce-f8d8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw type xfs (rw,relatime,attr2,inode64,noquota)
+/dev/sdb on /var/lib/kubelet/plugins/kubernetes.io/iscsi/10.0.2.15:3260-iqn.2001-04.com.example:storage.kube.sys1.xyz-lun-0 type ext4 (ro,relatime,data=ordered)
+/dev/sdb on /var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-ro type ext4 (ro,relatime,data=ordered)
+/dev/sdc on /var/lib/kubelet/plugins/kubernetes.io/iscsi/10.0.2.15:3260-iqn.2001-04.com.example:storage.kube.sys1.xyz-lun-1 type ext4 (rw,relatime,data=ordered)
+/dev/sdc on /var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-rw type ext4 (rw,relatime,data=ordered)
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod.
 
 ```console
 # docker ps
-CONTAINER ID        IMAGE                                                COMMAND                CREATED             STATUS              PORTS               NAMES
-cc051196e7af        kubernetes/pause:latest                              "/pause"               About an hour ago   Up About an hour                        k8s_iscsipd-rw.ff2d2e9f_iscsipd_default_e36158ce-f8d8-11e4-9ae7-42010af01964_26f3a457                                               
-8aa981443cf4        kubernetes/pause:latest                              "/pause"               About an hour ago   Up About an hour                        k8s_iscsipd-ro.d7752e8f_iscsipd_default_e36158ce-f8d8-11e4-9ae7-42010af01964_4939633d    
+CONTAINER ID        IMAGE                                  COMMAND             CREATED             STATUS              PORTS               NAMES
+f855336407f4        kubernetes/pause                       "/pause"            6 minutes ago       Up 6 minutes                            k8s_iscsipd-ro.d130ec3e_iscsipd_default_f527ca5b-6d87-11e5-aa7e-080027ff6387_5409a4cb
+3b8a772515d2        kubernetes/pause                       "/pause"            6 minutes ago       Up 6 minutes                            k8s_iscsipd-rw.ed58ec4e_iscsipd_default_f527ca5b-6d87-11e5-aa7e-080027ff6387_d25592c5
 ```
 
-Run *docker inspect* and I found the Containers mounted the host directory into the their */mnt/iscsipd* directory.
+Run *docker inspect* and verify the container mounted the host directory into the their */mnt/iscsipd* directory.
 
 ```console 
-# docker inspect --format '{{index .Volumes "/mnt/iscsipd"}}' cc051196e7af
-/var/lib/kubelet/pods/75e0af2b-f8e8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw
+# docker inspect --format '{{ range .Mounts }}{{ if eq .Destination "/mnt/iscsipd" }}{{ .Source }}{{ end }}{{ end }}' f855336407f4
+/var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-ro
+
+# docker inspect --format '{{ range .Mounts }}{{ if eq .Destination "/mnt/iscsipd" }}{{ .Source }}{{ end }}{{ end }}' 3b8a772515d2
+/var/lib/kubelet/pods/f527ca5b-6d87-11e5-aa7e-080027ff6387/volumes/kubernetes.io~iscsi/iscsipd-rw
 ```
 
 

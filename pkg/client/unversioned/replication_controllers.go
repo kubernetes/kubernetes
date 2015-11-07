@@ -30,12 +30,13 @@ type ReplicationControllersNamespacer interface {
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	List(selector labels.Selector) (*api.ReplicationControllerList, error)
+	List(label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error)
 	Get(name string) (*api.ReplicationController, error)
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateStatus(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 }
 
 // replicationControllers implements ReplicationControllersNamespacer interface
@@ -50,9 +51,9 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 }
 
 // List takes a selector, and returns the list of replication controllers that match that selector.
-func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(label labels.Selector, field fields.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
@@ -77,18 +78,25 @@ func (c *replicationControllers) Update(controller *api.ReplicationController) (
 	return
 }
 
+// UpdateStatus updates an existing replication controller status
+func (c *replicationControllers) UpdateStatus(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).SubResource("status").Body(controller).Do().Into(result)
+	return
+}
+
 // Delete deletes an existing replication controller.
 func (c *replicationControllers) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
-func (c *replicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *replicationControllers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationControllers").
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

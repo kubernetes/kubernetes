@@ -16,19 +16,20 @@ limitations under the License.
 
 package oom
 
-type FakeOomAdjuster struct{}
+type FakeOOMAdjuster struct{}
 
-func NewFakeOomAdjuster() *OomAdjuster {
-	return &OomAdjuster{
-		ApplyOomScoreAdj:          fakeApplyOomScoreAdj,
-		ApplyOomScoreAdjContainer: fakeApplyOomScoreAdjContainer,
+func NewFakeOOMAdjuster() *OOMAdjuster {
+	return &OOMAdjuster{
+		pidLister:                 func(cgroupName string) ([]int, error) { return make([]int, 0), nil },
+		ApplyOOMScoreAdj:          fakeApplyOOMScoreAdj,
+		ApplyOOMScoreAdjContainer: fakeApplyOOMScoreAdjContainer,
 	}
 }
 
-func fakeApplyOomScoreAdj(pid int, oomScoreAdj int) error {
+func fakeApplyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	return nil
 }
 
-func fakeApplyOomScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
+func fakeApplyOOMScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
 	return nil
 }

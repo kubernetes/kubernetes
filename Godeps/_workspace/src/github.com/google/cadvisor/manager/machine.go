@@ -21,7 +21,6 @@ import (
 	"strings"
 	"syscall"
 
-	dclient "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/fs"
@@ -122,7 +121,8 @@ func getVersionInfo() (*info.VersionInfo, error) {
 		KernelVersion:      kernel_version,
 		ContainerOsVersion: container_os,
 		DockerVersion:      docker_version,
-		CadvisorVersion:    version.VERSION,
+		CadvisorVersion:    version.Info["version"],
+		CadvisorRevision:   version.Info["revision"],
 	}, nil
 }
 
@@ -145,7 +145,7 @@ func getContainerOsVersion() string {
 
 func getDockerVersion() string {
 	docker_version := "Unknown"
-	client, err := dclient.NewClient(*docker.ArgDockerEndpoint)
+	client, err := docker.Client()
 	if err == nil {
 		version, err := client.Version()
 		if err == nil {

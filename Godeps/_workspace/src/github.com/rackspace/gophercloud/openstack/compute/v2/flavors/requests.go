@@ -1,6 +1,8 @@
 package flavors
 
 import (
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -65,4 +67,37 @@ func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
 	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
 	return res
+}
+
+// IDFromName is a convienience function that returns a flavor's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	flavorCount := 0
+	flavorID := ""
+	if name == "" {
+		return "", fmt.Errorf("A flavor name must be provided.")
+	}
+	pager := ListDetail(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		flavorList, err := ExtractFlavors(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, f := range flavorList {
+			if f.Name == name {
+				flavorCount++
+				flavorID = f.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch flavorCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find flavor: %s", name)
+	case 1:
+		return flavorID, nil
+	default:
+		return "", fmt.Errorf("Found %d flavors matching %s", flavorCount, name)
+	}
 }

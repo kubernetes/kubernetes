@@ -33,7 +33,7 @@ import (
 var _ = Describe("ReplicationController", func() {
 	framework := NewFramework("replication-controller")
 
-	It("should serve a basic image on each replica with a public image", func() {
+	It("should serve a basic image on each replica with a public image [Conformance]", func() {
 		ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
 	})
 
@@ -41,7 +41,7 @@ var _ = Describe("ReplicationController", func() {
 		// requires private images
 		SkipUnlessProviderIs("gce", "gke")
 
-		ServeImageOrFail(framework, "private", "gcr.io/_b_k8s_authenticated_test/serve_hostname:1.1")
+		ServeImageOrFail(framework, "private", "b.gcr.io/k8s_authenticated_test/serve_hostname:1.1")
 	})
 })
 

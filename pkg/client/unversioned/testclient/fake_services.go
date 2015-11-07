@@ -18,6 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -39,8 +40,8 @@ func (c *FakeServices) Get(name string) (*api.Service, error) {
 	return obj.(*api.Service), err
 }
 
-func (c *FakeServices) List(label labels.Selector) (*api.ServiceList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("services", c.Namespace, label, nil), &api.ServiceList{})
+func (c *FakeServices) List(label labels.Selector, field fields.Selector) (*api.ServiceList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("services", c.Namespace, label, field), &api.ServiceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,7 +72,10 @@ func (c *FakeServices) Delete(name string) error {
 	return err
 }
 
-func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("services", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, label, field, opts))
+}
+
+func (c *FakeServices) ProxyGet(name, path string, params map[string]string) unversioned.ResponseWrapper {
+	return c.Fake.InvokesProxy(NewProxyGetAction("services", c.Namespace, name, path, params))
 }

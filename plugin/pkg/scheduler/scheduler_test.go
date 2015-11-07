@@ -25,8 +25,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -40,7 +40,7 @@ func (fb fakeBinder) Bind(binding *api.Binding) error { return fb.b(binding) }
 
 func podWithID(id, desiredHost string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)},
+		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
 		Spec: api.PodSpec{
 			NodeName: desiredHost,
 		},
@@ -60,7 +60,7 @@ type mockScheduler struct {
 	err     error
 }
 
-func (es mockScheduler) Schedule(pod *api.Pod, ml algorithm.MinionLister) (string, error) {
+func (es mockScheduler) Schedule(pod *api.Pod, ml algorithm.NodeLister) (string, error) {
 	return es.machine, es.err
 }
 
@@ -114,7 +114,7 @@ func TestScheduler(t *testing.T) {
 					gotAssumedPod = pod
 				},
 			},
-			MinionLister: algorithm.FakeMinionLister(
+			NodeLister: algorithm.FakeNodeLister(
 				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 			),
 			Algorithm: item.algo,
@@ -188,7 +188,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 	// Create the scheduler config
 	algo := NewGenericScheduler(
-		map[string]algorithm.FitPredicate{"PodFitsPorts": predicates.PodFitsPorts},
+		map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts},
 		[]algorithm.PriorityConfig{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
@@ -196,7 +196,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	var gotBinding *api.Binding
 	c := &Config{
 		Modeler: modeler,
-		MinionLister: algorithm.FakeMinionLister(
+		NodeLister: algorithm.FakeNodeLister(
 			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 		),
 		Algorithm: algo,
@@ -329,7 +329,7 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 	fr := FakeRateLimiter{util.NewTokenBucketRateLimiter(0.02, 1), []bool{}}
 	c := &Config{
 		Modeler: modeler,
-		MinionLister: algorithm.FakeMinionLister(
+		NodeLister: algorithm.FakeNodeLister(
 			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 		),
 		Algorithm: algo,

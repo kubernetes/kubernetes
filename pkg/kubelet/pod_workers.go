@@ -22,19 +22,22 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
-	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func())
+	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubetypes.SyncPodType, updateComplete func())
 	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
+	ForgetWorker(uid types.UID)
 }
 
-type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, SyncPodType) error
+type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, kubetypes.SyncPodType) error
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -53,6 +56,8 @@ type podWorkers struct {
 	// runtimeCache is used for listing running containers.
 	runtimeCache kubecontainer.RuntimeCache
 
+	workQueue queue.WorkQueue
+
 	// This function is run to sync the desired stated of pod.
 	// NOTE: This function has to be thread-safe - it can be called for
 	// different pods at the same time.
@@ -60,6 +65,12 @@ type podWorkers struct {
 
 	// The EventRecorder to use
 	recorder record.EventRecorder
+
+	// backOffPeriod is the duration to back off when there is a sync error.
+	backOffPeriod time.Duration
+
+	// resyncInterval is the duration to wait until the next sync.
+	resyncInterval time.Duration
 }
 
 type workUpdate struct {
@@ -73,11 +84,11 @@ type workUpdate struct {
 	updateCompleteFn func()
 
 	// A string describing the type of this update, eg: create
-	updateType SyncPodType
+	updateType kubetypes.SyncPodType
 }
 
 func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnType,
-	recorder record.EventRecorder) *podWorkers {
+	recorder record.EventRecorder, workQueue queue.WorkQueue, resyncInterval, backOffPeriod time.Duration) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
@@ -85,53 +96,48 @@ func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnT
 		runtimeCache:              runtimeCache,
 		syncPodFn:                 syncPodFn,
 		recorder:                  recorder,
+		workQueue:                 workQueue,
+		resyncInterval:            resyncInterval,
+		backOffPeriod:             backOffPeriod,
 	}
 }
 
 func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 	var minRuntimeCacheTime time.Time
 	for newWork := range podUpdates {
-		func() {
-			defer p.checkForUpdates(newWork.pod.UID, newWork.updateCompleteFn)
+		err := func() (err error) {
 			// We would like to have the state of the containers from at least
 			// the moment when we finished the previous processing of that pod.
 			if err := p.runtimeCache.ForceUpdateIfOlder(minRuntimeCacheTime); err != nil {
 				glog.Errorf("Error updating the container runtime cache: %v", err)
-				return
+				return err
 			}
 			pods, err := p.runtimeCache.GetPods()
 			if err != nil {
 				glog.Errorf("Error getting pods while syncing pod: %v", err)
-				return
+				return err
 			}
 
 			err = p.syncPodFn(newWork.pod, newWork.mirrorPod,
 				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID), newWork.updateType)
+			minRuntimeCacheTime = time.Now()
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "FailedSync", "Error syncing pod, skipping: %v", err)
-				return
+				return err
 			}
-			minRuntimeCacheTime = time.Now()
-
 			newWork.updateCompleteFn()
+			return nil
 		}()
+		p.wrapUp(newWork.pod.UID, err)
 	}
 }
 
 // Apply the new setting to the specified pod. updateComplete is called when the update is completed.
-func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func()) {
+func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubetypes.SyncPodType, updateComplete func()) {
 	uid := pod.UID
 	var podUpdates chan workUpdate
 	var exists bool
-
-	// TODO: Pipe this through from the kubelet. Currently kubelets operating with
-	// snapshot updates (PodConfigNotificationSnapshot) will send updates, creates
-	// and deletes as SET operations, which makes updates indistinguishable from
-	// creates. The intent here is to communicate to the pod worker that it can take
-	// certain liberties, like skipping status generation, when it receives a create
-	// event for a pod.
-	updateType := SyncPodUpdate
 
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
@@ -147,7 +153,6 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 		// kubelet just restarted. In either case the kubelet is willing to believe
 		// the status of the pod for the first pod worker sync. See corresponding
 		// comment in syncPod.
-		updateType = SyncPodCreate
 		go func() {
 			defer util.HandleCrash()
 			p.managePodLoop(podUpdates)
@@ -171,24 +176,45 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 	}
 }
 
+func (p *podWorkers) removeWorker(uid types.UID) {
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+		delete(p.podUpdates, uid)
+		// If there is an undelivered work update for this pod we need to remove it
+		// since per-pod goroutine won't be able to put it to the already closed
+		// channel when it finish processing the current work update.
+		if _, cached := p.lastUndeliveredWorkUpdate[uid]; cached {
+			delete(p.lastUndeliveredWorkUpdate, uid)
+		}
+	}
+}
+func (p *podWorkers) ForgetWorker(uid types.UID) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	p.removeWorker(uid)
+}
+
 func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	for key, channel := range p.podUpdates {
+	for key := range p.podUpdates {
 		if _, exists := desiredPods[key]; !exists {
-			close(channel)
-			delete(p.podUpdates, key)
-			// If there is an undelivered work update for this pod we need to remove it
-			// since per-pod goroutine won't be able to put it to the already closed
-			// channel when it finish processing the current work update.
-			if _, cached := p.lastUndeliveredWorkUpdate[key]; cached {
-				delete(p.lastUndeliveredWorkUpdate, key)
-			}
+			p.removeWorker(key)
 		}
 	}
 }
 
-func (p *podWorkers) checkForUpdates(uid types.UID, updateComplete func()) {
+func (p *podWorkers) wrapUp(uid types.UID, syncErr error) {
+	// Requeue the last update if the last sync returned error.
+	if syncErr != nil {
+		p.workQueue.Enqueue(uid, p.backOffPeriod)
+	} else {
+		p.workQueue.Enqueue(uid, p.resyncInterval)
+	}
+	p.checkForUpdates(uid)
+}
+
+func (p *podWorkers) checkForUpdates(uid types.UID) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	if workUpdate, exists := p.lastUndeliveredWorkUpdate[uid]; exists {

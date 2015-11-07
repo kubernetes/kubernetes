@@ -31,7 +31,7 @@ kube::test::get_object_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o template -t \"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o go-template=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -56,7 +56,7 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath -t \"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -131,4 +131,22 @@ kube::test::describe_resource_assert() {
   echo "$result"
   echo -n ${reset}
   return 0
+}
+
+kube::test::if_has_string() {
+  local message=$1
+  local match=$2
+
+  if [[ $(echo "$message" | grep "$match") ]]; then
+    echo "Successful"
+    echo "message:$message"
+    echo "has:$match"
+    return 0
+  else
+    echo "FAIL!"
+    echo "message:$message"
+    echo "has not:$match"
+    caller
+    return 1
+  fi
 }

@@ -19,6 +19,7 @@ package rest
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
@@ -44,6 +45,22 @@ type RESTUpdateStrategy interface {
 	AllowUnconditionalUpdate() bool
 }
 
+// TODO: add other common fields that require global validation.
+func validateCommonFields(obj, old runtime.Object) fielderrors.ValidationErrorList {
+	allErrs := fielderrors.ValidationErrorList{}
+	objectMeta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return append(allErrs, errors.NewInternalError(err))
+	}
+	oldObjectMeta, err := api.ObjectMetaFor(old)
+	if err != nil {
+		return append(allErrs, errors.NewInternalError(err))
+	}
+	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(objectMeta, oldObjectMeta)...)
+
+	return allErrs
+}
+
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
@@ -59,8 +76,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	} else {
 		objectMeta.Namespace = api.NamespaceNone
 	}
+
 	strategy.PrepareForUpdate(obj, old)
-	if errs := strategy.ValidateUpdate(ctx, obj, old); len(errs) > 0 {
+
+	// Ensure some common fields, like UID, are validated for all resources.
+	errs := validateCommonFields(obj, old)
+
+	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
+	if len(errs) > 0 {
 		return errors.NewInvalid(kind, objectMeta.Name, errs)
 	}
 	return nil

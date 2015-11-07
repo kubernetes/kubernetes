@@ -71,7 +71,6 @@ func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error
 	return err
 }
 
-func (c *FakePodTemplates) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("podtemplates", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakePodTemplates) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("podtemplates", c.Namespace, label, field, opts))
 }

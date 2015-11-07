@@ -1,6 +1,0 @@
-kind: Namespace
-apiVersion: v1
-metadata:
-  name: mytunes
-  labels:
-    name: mytunes

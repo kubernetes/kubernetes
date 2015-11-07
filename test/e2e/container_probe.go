@@ -29,18 +29,15 @@ import (
 )
 
 var _ = Describe("Probing container", func() {
-	framework := Framework{BaseName: "container-probe"}
+	framework := NewFramework("container-probe")
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		podClient = framework.Client.Pods(framework.Namespace.Name)
 	})
 
-	AfterEach(framework.afterEach)
-
-	It("with readiness probe should not be ready before initial delay and never restart", func() {
+	It("with readiness probe should not be ready before initial delay and never restart [Conformance]", func() {
 		p, err := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		expectNoError(err)
 		startTime := time.Now()
@@ -73,7 +70,7 @@ var _ = Describe("Probing container", func() {
 		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
-	It("with readiness probe that fails should never be ready and never restart", func() {
+	It("with readiness probe that fails should never be ready and never restart [Conformance]", func() {
 		p, err := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		expectNoError(err)
 
@@ -118,6 +115,9 @@ func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 					Image:          "gcr.io/google_containers/test-webserver",
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
+				}, {
+					Name:  "test-noprobe",
+					Image: "beta.gcr.io/google_containers/pause:2.0",
 				},
 			},
 		},

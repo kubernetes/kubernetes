@@ -1,4 +1,4 @@
-{% if grains.network_mode is defined and grains.network_mode == 'calico' %}
+{% if pillar.get('network_provider', '').lower() == 'calico' %}
 
 calicoctl:
   file.managed:

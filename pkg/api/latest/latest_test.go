@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,93 +16,44 @@ limitations under the License.
 
 package latest
 
-import (
-	"encoding/json"
-	"testing"
+import "testing"
 
-	internal "k8s.io/kubernetes/pkg/api"
-)
-
-func TestResourceVersioner(t *testing.T) {
-	pod := internal.Pod{ObjectMeta: internal.ObjectMeta{ResourceVersion: "10"}}
-	version, err := accessor.ResourceVersion(&pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestAllPreferredGroupVersions(t *testing.T) {
+	testCases := []struct {
+		groupMetaMap GroupMetaMap
+		expect       string
+	}{
+		{
+			groupMetaMap: GroupMetaMap{
+				"group1": &GroupMeta{
+					GroupVersion: "group1/v1",
+				},
+				"group2": &GroupMeta{
+					GroupVersion: "group2/v2",
+				},
+				"": &GroupMeta{
+					GroupVersion: "v1",
+				},
+			},
+			expect: "group1/v1,group2/v2,v1",
+		},
+		{
+			groupMetaMap: GroupMetaMap{
+				"": &GroupMeta{
+					GroupVersion: "v1",
+				},
+			},
+			expect: "v1",
+		},
+		{
+			groupMetaMap: GroupMetaMap{},
+			expect:       "",
+		},
 	}
-	if version != "10" {
-		t.Errorf("unexpected version %v", version)
-	}
-
-	podList := internal.PodList{ListMeta: internal.ListMeta{ResourceVersion: "10"}}
-	version, err = accessor.ResourceVersion(&podList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if version != "10" {
-		t.Errorf("unexpected version %v", version)
-	}
-}
-
-func TestCodec(t *testing.T) {
-	pod := internal.Pod{}
-	data, err := Codec.Encode(&pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	other := internal.Pod{}
-	if err := json.Unmarshal(data, &other); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if other.APIVersion != Version || other.Kind != "Pod" {
-		t.Errorf("unexpected unmarshalled object %#v", other)
-	}
-}
-
-func TestInterfacesFor(t *testing.T) {
-	if _, err := InterfacesFor(""); err == nil {
-		t.Fatalf("unexpected non-error: %v", err)
-	}
-	for i, version := range append([]string{Version, OldestVersion}, Versions...) {
-		if vi, err := InterfacesFor(version); err != nil || vi == nil {
-			t.Fatalf("%d: unexpected result: %v", i, err)
-		}
-	}
-}
-
-func TestRESTMapper(t *testing.T) {
-	if v, k, err := RESTMapper.VersionAndKindForResource("replicationcontrollers"); err != nil || v != "v1" || k != "ReplicationController" {
-		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
-	}
-
-	if m, err := RESTMapper.RESTMapping("PodTemplate", ""); err != nil || m.APIVersion != "v1" || m.Resource != "podtemplates" {
-		t.Errorf("unexpected version mapping: %#v %v", m, err)
-	}
-
-	for _, version := range Versions {
-		mapping, err := RESTMapper.RESTMapping("ReplicationController", version)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if mapping.Resource != "replicationControllers" && mapping.Resource != "replicationcontrollers" {
-			t.Errorf("incorrect resource name: %#v", mapping)
-		}
-		if mapping.APIVersion != version {
-			t.Errorf("incorrect version: %v", mapping)
-		}
-
-		interfaces, _ := InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
-		}
-
-		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}
-		name, err := mapping.MetadataAccessor.Name(rc)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if name != "foo" {
-			t.Errorf("unable to retrieve object meta with: %v", mapping.MetadataAccessor)
+	for _, testCase := range testCases {
+		output := testCase.groupMetaMap.AllPreferredGroupVersions()
+		if testCase.expect != output {
+			t.Errorf("Error. expect: %s, got: %s", testCase.expect, output)
 		}
 	}
 }

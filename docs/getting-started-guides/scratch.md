@@ -77,9 +77,7 @@ steps that existing cluster setup scripts are making.
       - [Scheduler pod template](#scheduler-pod-template)
       - [Controller Manager Template](#controller-manager-template)
       - [Starting and Verifying Apiserver, Scheduler, and Controller Manager](#starting-and-verifying-apiserver-scheduler-and-controller-manager)
-    - [Logging](#logging)
-    - [Monitoring](#monitoring)
-    - [DNS](#dns)
+    - [Starting Cluster Services](#starting-cluster-services)
   - [Troubleshooting](#troubleshooting)
     - [Running validate-cluster](#running-validate-cluster)
     - [Inspect pods and services](#inspect-pods-and-services)
@@ -212,7 +210,7 @@ A Kubernetes binary release includes all the Kubernetes binaries as well as the 
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
 [Developer Documentation](../devel/README.md).  Only using a binary release is covered in this guide.
 
-Download the [latest binary release](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest) and unzip it.
+Download the [latest binary release](https://github.com/kubernetes/kubernetes/releases/latest) and unzip it.
 Then locate `./kubernetes/server/kubernetes-server-linux-amd64.tar.gz` and unzip *that*.
 Then, within the second set of unzipped files, locate `./kubernetes/server/bin`, which contains
 all the necessary binaries.
@@ -226,7 +224,7 @@ we recommend that you run these as containers, so you need an image to be built.
 You have several choices for Kubernetes images:
 - Use images hosted on Google Container Registry (GCR):
   - e.g `gcr.io/google_containers/hyperkube:$TAG`, where `TAG` is the latest
-    release tag, which can be found on the [latest releases page](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest).
+    release tag, which can be found on the [latest releases page](https://github.com/kubernetes/kubernetes/releases/latest).
   - Ensure $TAG is the same tag as the release tag you are using for kubelet and kube-proxy.
   - The [hyperkube](../../cmd/hyperkube/) binary is an all in one binary
     - `hyperkube kubelet ...` runs the kublet, `hyperkube apiserver ...` runs an apiserver, etc.
@@ -239,8 +237,8 @@ You have several choices for Kubernetes images:
     command like `docker images`
 
 For etcd, you can:
-- Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
-- Use images hosted on [Docker Hub](https://registry.hub.docker.com/u/coreos/etcd/) or [quay.io](https://registry.hub.docker.com/u/coreos/etcd/)
+- Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.2.1`
+- Use images hosted on [Docker Hub](https://hub.docker.com/search/?q=etcd) or [Quay.io](https://quay.io/repository/coreos/etcd), such as `quay.io/coreos/etcd:v2.2.1`
 - Use etcd binary included in your OS distro.
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
@@ -378,7 +376,7 @@ options, you may have a Docker-created bridge and iptables rules.  You may want 
 as follows before proceeding to configure Docker for Kubernetes.
 
 ```sh
-iptables -t nat -F 
+iptables -t nat -F
 ifconfig docker0 down
 brctl delbr docker0
 ```
@@ -433,7 +431,7 @@ Arguments to consider:
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
   - `--config=/etc/kubernetes/manifests`
-  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](#starting-addons).)
+  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Cluster Services](#starting-cluster-services).)
   - `--cluster-domain=` to the dns domain prefix to use for cluster DNS addresses.
   - `--docker-root=`
   - `--root-dir=`
@@ -476,7 +474,7 @@ because of how this is used later.
   1. Set appropriate MTU
   - `ip link set dev cbr0 mtu 1460` (NOTE: the actual value of MTU will depend on your network environment)
   1. Add the clusters network to the bridge (docker will go on other side of bridge).
-  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev eth0`
+  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev cbr0`
   1. Turn it on
   - e.g. `ip link set dev cbr0 up`
 
@@ -485,7 +483,7 @@ other, then you may need to do masquerading just for destination IPs outside
 the cluster network.  For example:
 
 ```sh
-iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CLUSTER_SUBNET}
+iptables -t nat -A POSTROUTING ! -d ${CLUSTER_SUBNET} -m addrtype ! --dst-type LOCAL -j MASQUERADE
 ```
 
 This will rewrite the source address from
@@ -502,7 +500,7 @@ traffic to the internet, but have no problem with them inside your GCE Project.
 
 - Enable auto-upgrades for your OS package manager, if desired.
 - Configure log rotation for all node components (e.g. using [logrotate](http://linux.die.net/man/8/logrotate)).
-- Setup liveness-monitoring (e.g. using [monit](http://linux.die.net/man/1/monit)).
+- Setup liveness-monitoring (e.g. using [supervisord](http://supervisord.org/)).
 - Setup volume plugin support (optional)
   - Install any client binaries for optional volume types, such as `glusterfs-client` for GlusterFS
     volumes.
@@ -535,6 +533,7 @@ You will need to run one or more instances of etcd.
 availability.
 
 To run an etcd instance:
+
 1. copy `cluster/saltbase/salt/etcd/etcd.manifest`
 1. make any modifications needed
 1. start the pod by putting it into the kubelet manifest directory
@@ -709,6 +708,7 @@ Complete this template for the scheduler pod:
         ],
         "livenessProbe": {
           "httpGet": {
+            "host" : "127.0.0.1",
             "path": "/healthz",
             "port": 10251
           },
@@ -765,6 +765,7 @@ Template for controller manager pod:
         ],
         "livenessProbe": {
           "httpGet": {
+            "host": "127.0.0.1",
             "path": "/healthz",
             "port": 10252
           },
@@ -830,20 +831,33 @@ $ curl -s http://localhost:8080/api
 ```
 
 If you have selected the `--register-node=true` option for kubelets, they will now begin self-registering with the apiserver.
-You should soon be able to see all your nodes by running the `kubect get nodes` command.
+You should soon be able to see all your nodes by running the `kubectl get nodes` command.
 Otherwise, you will need to manually create node objects.
 
-### Logging
+### Starting Cluster Services
 
-**TODO** talk about starting Logging.
+You will want to complete your Kubernetes clusters by adding cluster-wide
+services.  These are sometimes called *addons*, and [an overview
+of their purpose is in the admin guide](
+../../docs/admin/cluster-components.md#addons).
 
-### Monitoring
+Notes for setting up each cluster service are given below:
 
-**TODO** talk about starting Logging.
-
-### DNS
-
-**TODO** talk about starting DNS.
+* Cluster DNS:
+  * required for many kubernetes examples
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/dns/)
+  * [Admin Guide](../admin/dns.md)
+* Cluster-level Logging
+  * Multiple implementations with different storage backends and UIs.
+  * [Elasticsearch Backend Setup Instructions](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/)
+  * [Google Cloud Logging Backend Setup Instructions](http://releases.k8s.io/HEAD/cluster/addons/fluentd-gcp/).
+  * Both require running fluentd on each node.
+  * [User Guide](../user-guide/logging.md)
+* Container Resource Monitoring
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/)
+* GUI
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/kube-ui/)
+  cluster.
 
 ## Troubleshooting
 
@@ -872,7 +886,7 @@ pinging or SSH-ing from one node to another.
 ### Getting Help
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
-[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on [Slack](../troubleshooting.md#slack).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

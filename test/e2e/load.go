@@ -26,7 +26,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -54,10 +53,23 @@ var _ = Describe("Load capacity", func() {
 	var ns string
 	var configs []*RCConfig
 
+	// Gathers metrics before teardown
+	// TODO add flag that allows to skip cleanup on failure
+	AfterEach(func() {
+		deleteAllRC(configs)
+
+		// Verify latency metrics
+		highLatencyRequests, err := HighLatencyRequests(c)
+		expectNoError(err, "Too many instances metrics above the threshold")
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+	})
+
+	framework := NewFramework("load")
+	framework.NamespaceDeletionTimeout = time.Hour
+
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
+		c = framework.Client
+		ns = framework.Namespace.Name
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
@@ -66,29 +78,10 @@ var _ = Describe("Load capacity", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = deleteTestingNS(c)
-		expectNoError(err)
-
-		nsForTesting, err := createTestingNS("load", c)
-		ns = nsForTesting.Name
+		err = checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
-	})
-
-	// TODO add flag that allows to skip cleanup on failure
-	AfterEach(func() {
-		deleteAllRC(configs)
-
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-
-		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
-		expectNoError(err, "Too many instances metrics above the threshold")
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	type Load struct {
