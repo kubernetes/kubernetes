@@ -88,7 +88,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 func testComponentStatusData() *api.ComponentStatusList {
 	good := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
-			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
+			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok"},
 		},
 		ObjectMeta: api.ObjectMeta{Name: "servergood"},
 	}
