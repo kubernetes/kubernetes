@@ -144,6 +144,7 @@ In order to fix that issue, you have several possibilities:
   * writable by your user;
   * accessible by the qemu user.
 * Grant the qemu user access to the storage pool.
+* Edit `/etc/libvirt/qemu.conf` to run under that user, that have access to the storage pool (not recommended for production usage).
 
 On Arch:
 
