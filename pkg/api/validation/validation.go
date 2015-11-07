@@ -1228,7 +1228,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName).Prefix("metadata")...)
 
-	if len(service.Spec.Ports) == 0 {
+	if len(service.Spec.Ports) == 0 && service.Spec.ClusterIP != api.ClusterIPNone {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.ports"))
 	}
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
