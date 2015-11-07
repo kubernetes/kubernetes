@@ -18,7 +18,6 @@ package prober
 
 import (
 	"sync"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -71,13 +70,9 @@ type manager struct {
 
 	// prober executes the probe actions.
 	prober *prober
-
-	// Default period for workers to execute a probe.
-	defaultProbePeriod time.Duration
 }
 
 func NewManager(
-	defaultProbePeriod time.Duration,
 	statusManager status.Manager,
 	readinessManager results.Manager,
 	livenessManager results.Manager,
@@ -86,12 +81,11 @@ func NewManager(
 	recorder record.EventRecorder) Manager {
 	prober := newProber(runner, refManager, recorder)
 	return &manager{
-		defaultProbePeriod: defaultProbePeriod,
-		statusManager:      statusManager,
-		prober:             prober,
-		readinessManager:   readinessManager,
-		livenessManager:    livenessManager,
-		workers:            make(map[probeKey]*worker),
+		statusManager:    statusManager,
+		prober:           prober,
+		readinessManager: readinessManager,
+		livenessManager:  livenessManager,
+		workers:          make(map[probeKey]*worker),
 	}
 }
 

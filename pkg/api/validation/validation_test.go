@@ -18,6 +18,7 @@ package validation
 
 import (
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -807,22 +808,26 @@ func TestValidateVolumeMounts(t *testing.T) {
 
 func TestValidateProbe(t *testing.T) {
 	handler := api.Handler{Exec: &api.ExecAction{Command: []string{"echo"}}}
-	successCases := []*api.Probe{
-		nil,
-		{TimeoutSeconds: 10, InitialDelaySeconds: 0, Handler: handler},
-		{TimeoutSeconds: 0, InitialDelaySeconds: 10, Handler: handler},
+	// These fields must be positive.
+	positiveFields := [...]string{"InitialDelaySeconds", "TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
+	successCases := []*api.Probe{nil}
+	for _, field := range positiveFields {
+		probe := &api.Probe{Handler: handler}
+		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(10)
+		successCases = append(successCases, probe)
 	}
+
 	for _, p := range successCases {
 		if errs := validateProbe(p); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := []*api.Probe{
-		{TimeoutSeconds: 10, InitialDelaySeconds: 10},
-		{TimeoutSeconds: 10, InitialDelaySeconds: -10, Handler: handler},
-		{TimeoutSeconds: -10, InitialDelaySeconds: 10, Handler: handler},
-		{TimeoutSeconds: -10, InitialDelaySeconds: -10, Handler: handler},
+	errorCases := []*api.Probe{{TimeoutSeconds: 10, InitialDelaySeconds: 10}}
+	for _, field := range positiveFields {
+		probe := &api.Probe{Handler: handler}
+		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(-10)
+		errorCases = append(errorCases, probe)
 	}
 	for _, p := range errorCases {
 		if errs := validateProbe(p); len(errs) == 0 {

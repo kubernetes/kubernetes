@@ -418,7 +418,6 @@ func NewMainKubelet(
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
-		klet.resyncInterval,
 		klet.statusManager,
 		readinessManager,
 		klet.livenessManager,
