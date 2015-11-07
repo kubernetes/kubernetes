@@ -145,7 +145,7 @@ export VER="vX.Y.0-alpha.W"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
@@ -157,7 +157,7 @@ This will do a dry run of:
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -173,7 +173,7 @@ export VER="vX.Y.Z-beta.W"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
@@ -186,7 +186,7 @@ This will do a dry run of:
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -202,7 +202,7 @@ export VER="vX.Y.Z"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
@@ -218,7 +218,7 @@ This will do a dry run of:
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -238,7 +238,7 @@ export VER="vX.Y"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
@@ -253,7 +253,7 @@ This will do a dry run of:
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
