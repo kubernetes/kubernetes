@@ -118,6 +118,7 @@ func NewCacher(config CacherConfig) *Cacher {
 		versioner:  config.Versioner,
 		keyFunc:    config.KeyFunc,
 	}
+	util.DeadlockWatchdogReadLock(&watchCache.RWMutex, fmt.Sprintf("watchCache rw lock on %s", config.ResourcePrefix), 2*time.Minute)
 	cacher.usable.Lock()
 	// See startCaching method for why explanation on it.
 	watchCache.SetOnReplace(func() { cacher.usable.Unlock() })
