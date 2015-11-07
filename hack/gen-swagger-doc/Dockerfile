@@ -7,6 +7,9 @@ RUN wget https://services.gradle.org/distributions/gradle-2.5-bin.zip
 RUN mkdir build/
 RUN unzip gradle-2.5-bin.zip -d build/
 
+RUN mkdir gradle-cache/
+ENV GRADLE_USER_HOME=/gradle-cache
+
 COPY build.gradle build/
 COPY gen-swagger-docs.sh build/
 
@@ -17,5 +20,7 @@ RUN wget https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swag
 RUN build/gen-swagger-docs.sh v1 https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/pkg/api/v1/register.go
 RUN rm /output/*
 RUN rm /swagger-source/*
+RUN chmod -R 777 build/
+RUN chmod -R 777 gradle-cache/
 
 ENTRYPOINT ["build/gen-swagger-docs.sh"]
