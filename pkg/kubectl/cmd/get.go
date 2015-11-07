@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -217,25 +218,51 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return printer.PrintObj(obj, out)
 	}
 
+	infos, err := b.Flatten().Do().Infos()
+	if err != nil {
+		return err
+	}
+	objs := make([]runtime.Object, len(infos))
+	for ix := range infos {
+		objs[ix] = infos[ix].Object
+	}
+
+	sorting, err := cmd.Flags().GetString("sort-by")
+	var sorter *kubectl.RuntimeSort
+	if err == nil && len(sorting) > 0 {
+		if sorter, err = kubectl.SortObjects(objs, sorting); err != nil {
+			return err
+		}
+	}
+
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
-	return b.Flatten().Do().Visit(func(r *resource.Info, err error) error {
-		if err != nil {
-			return err
+
+	for ix := range objs {
+		var mapping *meta.RESTMapping
+		if sorter != nil {
+			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+		} else {
+			mapping = infos[ix].Mapping
 		}
-		if printer == nil || lastMapping == nil || r.Mapping == nil || r.Mapping.Resource != lastMapping.Resource {
-			printer, err = f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
+		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
+			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
 				return err
 			}
-			lastMapping = r.Mapping
+			lastMapping = mapping
 		}
 		if _, found := printer.(*kubectl.HumanReadablePrinter); found {
-			return printer.PrintObj(r.Object, w)
+			if err := printer.PrintObj(objs[ix], w); err != nil {
+				return err
+			}
 		}
-		return printer.PrintObj(r.Object, out)
-	})
+		if err := printer.PrintObj(objs[ix], out); err != nil {
+			return err
+		}
+	}
+	return nil
 }
