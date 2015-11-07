@@ -587,6 +587,10 @@ function upload-server-tars() {
   local salt_tar_path="${staging_path}/${SALT_TAR##*/}"
   aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${salt_tar_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
   SALT_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${salt_tar_path}"
+
+  echo "Uploaded server tars:"
+  echo "  SERVER_BINARY_TAR_URL: ${SERVER_BINARY_TAR_URL}"
+  echo "  SALT_TAR_URL: ${SALT_TAR_URL}"
 }
 
 # Adds a tag to an AWS resource
