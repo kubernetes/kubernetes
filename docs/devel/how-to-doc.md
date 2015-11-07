@@ -31,8 +31,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Document Conventions
-====================
+# Document Conventions
 
 Updated: 11/3/2015
 
@@ -41,10 +40,16 @@ Updated: 11/3/2015
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
+- [Document Conventions](#document-conventions)
+  - [General Concepts](#general-concepts)
+  - [How to Get a Table of Contents](#how-to-get-a-table-of-contents)
+  - [How to Write Links](#how-to-write-links)
+  - [How to Include an Example](#how-to-include-an-example)
+  - [Misc.](#misc)
+    - [Code formatting](#code-formatting)
+    - [Syntax Highlighting](#syntax-highlighting)
+    - [Headings](#headings)
   - [What Are Mungers?](#what-are-mungers)
-  - [Table of Contents](#table-of-contents)
-  - [Writing Examples](#writing-examples)
-  - [Adding Links](#adding-links)
   - [Auto-added Mungers](#auto-added-mungers)
     - [Unversioned Warning](#unversioned-warning)
     - [Is Versioned](#is-versioned)
@@ -52,46 +57,63 @@ Updated: 11/3/2015
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-## What Are Mungers?
+## General Concepts
 
-Mungers are like gofmt for md docs which we use to format documents. To use it, simply place
+Each document needs to be munged to ensure its format is correct, links are valid, etc. To munge a document, simply run `hack/update-generated-docs.sh`. We verify that all documents have been munged using `hack/verify-generated-docs.sh`. The scripts for munging documents are called mungers, see the [mungers section](#what-are-mungers) below if you're curious about how mungers are implemented or if you want to write one.
 
-```
-<!-- BEGIN MUNGE: xxxx -->
-<!-- END MUNGE: xxxx -->
-```
+## How to Get a Table of Contents
 
-in your md files. Note that xxxx is the placeholder for a specific munger. Appropriate content will be generated and inserted between two brackets after you run `hack/update-generated-docs.sh`. See [munger document](../../cmd/mungedocs/) for more details.
-
-
-## Table of Contents
-
-Instead of writing table of contents by hand, use the TOC munger:
+Instead of writing table of contents by hand, insert the following code in your md file:
 
 ```
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 <!-- END MUNGE: GENERATED_TOC -->
 ```
 
-## Writing Examples
+After running `hack/update-generated-docs.sh`, you'll see a table of contents generated for you, layered based on the headings.
 
-Sometimes you may want to show the content of certain example files. Use EXAMPLE munger whenever possible:
+## How to Write Links
+
+It's important to follow the rules when writing links. It helps us correctly versionize documents for each release.
+
+Use inline links instead of urls at all times. When you add internal links to `docs/` or `examples/`, use relative links; otherwise, use `http://releases.k8s.io/HEAD/<path/to/link>`. For example, avoid using:
+
+```
+[GCE](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/gce.md)  # note that it's under docs/
+[Kubernetes package](../../pkg/)                                                                # note that it's under pkg/
+http://kubernetes.io/                                                                           # external link
+```
+
+Instead, use:
+
+```
+[GCE](../getting-started-guides/gce.md)                 # note that it's under docs/
+[Kubernetes package](http://releases.k8s.io/HEAD/pkg/)  # note that it's under pkg/
+[Kubernetes](http://kubernetes.io/)                     # external link
+```
+
+The above example generates the following links: [GCE](../getting-started-guides/gce.md), [Kubernetes package](http://releases.k8s.io/HEAD/pkg/), and [Kubernetes](http://kubernetes.io/).
+
+## How to Include an Example
+
+While writing examples, you may want to show the content of certain example files (e.g. [pod.yaml](../user-guide/pod.yaml)). In this case, insert the following code in the md file:
 
 ```
 <!-- BEGIN MUNGE: EXAMPLE path/to/file -->
 <!-- END MUNGE: EXAMPLE path/to/file -->
 ```
 
-This way, you save the time to do the copy-and-paste; what's better, the content won't become out-of-date everytime you update the example file.
+Note that you should replace `path/to/file` with the relative path to the example file. Then `hack/update-generated-docs.sh` will generate a code block with the content of the specified file, and a link to download it. This way, you save the time to do the copy-and-paste; what's better, the content won't become out-of-date every time you update the example file.
 
-For example, the following munger:
+For example, the following:
 
 ```
 <!-- BEGIN MUNGE: EXAMPLE ../user-guide/pod.yaml -->
 <!-- END MUNGE: EXAMPLE ../user-guide/pod.yaml -->
 ```
 
-generates
+generates the following after `hack/update-generated-docs.sh`:
+
 <!-- BEGIN MUNGE: EXAMPLE ../user-guide/pod.yaml -->
 
 ```yaml
@@ -112,27 +134,50 @@ spec:
 [Download example](../user-guide/pod.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE ../user-guide/pod.yaml -->
 
-## Adding Links
+## Misc.
 
-Use inline link instead of url at all times. When you add internal links from `docs/` to `docs/` or `examples/`, use relative links; otherwise, use `http://releases.k8s.io/HEAD/<path/to/link>`. For example, use:
+### Code formatting
 
-```
-[GCE](../getting-started-guides/gce.md)                 # note that it's under docs/
-[Kubernetes package](http://releases.k8s.io/HEAD/pkg/)  # note that it's under pkg/
-[Kubernetes](http://kubernetes.io/)
-```
+Wrap a span of code with single backticks (`` ` ``). To format multiple lines of code as its own code block, use triple backticks (```` ``` ````).
 
-and avoid using:
+### Syntax Highlighting
+
+Adding syntax highlighting to code blocks improves readability. To do so, in your fenced block, add an optional language identifier. Some useful identifier includes `yaml`, `console` (for console output), and `sh` (for shell quote format). Note that in a console output, put `$ ` at the beginning of each command and put nothing at the beginning of the output. Here's an example of console code block:
 
 ```
-[GCE](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/gce.md)
-[Kubernetes package](../../pkg/)
-http://kubernetes.io/
+```console
+
+$ kubectl create -f docs/user-guide/pod.yaml
+pod "foo" created
+
+```　
 ```
+
+which renders as:
+
+```console
+$ kubectl create -f docs/user-guide/pod.yaml
+pod "foo" created
+```
+
+### Headings
+
+Add a single `#` before the document title to create a title heading, and add `##` to the next level of section title, and so on. Note that the number of `#` will determine the size of the heading.
+
+## What Are Mungers?
+
+Mungers are like gofmt for md docs which we use to format documents. To use it, simply place
+
+```
+<!-- BEGIN MUNGE: xxxx -->
+<!-- END MUNGE: xxxx -->
+```
+
+in your md files. Note that xxxx is the placeholder for a specific munger. Appropriate content will be generated and inserted between two brackets after you run `hack/update-generated-docs.sh`. See [munger document](http://releases.k8s.io/HEAD/cmd/mungedocs/) for more details.
 
 ## Auto-added Mungers
 
-Some mungers are auto-added. You don't have to add them manually, and `hack/update-generated-docs.sh` does that for you. It's recommended to just read this section as a reference instead of messing up with the following mungers.
+After running `hack/update-generated-docs.sh`, you may see some code / mungers in your md file that are auto-added. You don't have to add them manually. It's recommended to just read this section as a reference instead of messing up with the following mungers.
 
 ### Unversioned Warning
 
