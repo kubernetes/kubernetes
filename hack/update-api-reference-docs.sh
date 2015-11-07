@@ -84,7 +84,7 @@ while read file; do
   fi
 done <"${OUTPUT_TMP}/.generated_html"
 
-echo "Moving api reference docs from ${OUT_TMP} to ${OUTPUT}"
+echo "Moving api reference docs from ${OUTPUT_TMP} to ${OUTPUT}"
 
 cp -af "${OUTPUT_TMP}"/* "${OUTPUT}"
 rm -r ${OUTPUT_TMP}
