@@ -1798,6 +1798,14 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "missing ports but headless",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports = nil
+				s.Spec.ClusterIP = api.ClusterIPNone
+			},
+			numErrs: 0,
+		},
+		{
 			name: "empty port[0] name",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Name = ""
