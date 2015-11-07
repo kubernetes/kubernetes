@@ -284,6 +284,26 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
 	}
 
+	// If a port *number* was specified, find the corresponding service port name
+	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
+		svc, err := rs.registry.GetService(ctx, svcName)
+		if err != nil {
+			return nil, nil, err
+		}
+		found := false
+		for _, svcPort := range svc.Spec.Ports {
+			if svcPort.Port == int(portNum) {
+				// use the declared port's name
+				portStr = svcPort.Name
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", portNum, svcName))
+		}
+	}
+
 	eps, err := rs.endpoints.GetEndpoints(ctx, svcName)
 	if err != nil {
 		return nil, nil, err
@@ -308,15 +328,6 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 					Scheme: svcScheme,
 					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
 				}, rs.proxyTransport, nil
-			} else {
-				port, err := strconv.ParseInt(portStr, 10, 64)
-				if err == nil && int(port) == ss.Ports[i].Port {
-					ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
-					return &url.URL{
-						Scheme: svcScheme,
-						Host:   net.JoinHostPort(ip, portStr),
-					}, rs.proxyTransport, nil
-				}
 			}
 		}
 	}
