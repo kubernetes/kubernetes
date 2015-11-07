@@ -577,6 +577,14 @@ func deepCopy_v1_PodSpec(in v1.PodSpec, out *v1.PodSpec, c *conversion.Cloner) e
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AffinitySelector != nil {
+		out.AffinitySelector = make(map[string]string)
+		for key, val := range in.AffinitySelector {
+			out.AffinitySelector[key] = val
+		}
+	} else {
+		out.AffinitySelector = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
 	out.NodeName = in.NodeName
