@@ -400,7 +400,7 @@ func TestGetServerResources(t *testing.T) {
 			list = &unversioned.APIGroupList{
 				Groups: []unversioned.APIGroup{
 					{
-						Versions: []unversioned.GroupVersion{
+						Versions: []unversioned.GroupVersionForDiscovery{
 							{GroupVersion: "extensions/v1beta1"},
 						},
 					},
