@@ -78,6 +78,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	addRunFlags(cmd)
+	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
 }
 
@@ -371,8 +372,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			return nil, "", nil, nil, err
 		}
 
-		// Serialize the configuration into an annotation.
-		if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info); err != nil {
 			return nil, "", nil, nil, err
 		}
 

@@ -235,6 +235,7 @@ func TestGenerateService(t *testing.T) {
 		}
 		cmd := &cobra.Command{}
 		cmd.Flags().String("output", "", "")
+		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 		addRunFlags(cmd)
 
 		if !test.expectPOST {

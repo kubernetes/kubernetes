@@ -266,6 +266,7 @@ root-ca-file
 root-dir
 run-proxy
 runtime-config
+save-config
 scheduler-config
 schema-cache-dir
 secure-port
