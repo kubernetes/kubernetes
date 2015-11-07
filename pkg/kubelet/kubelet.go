@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -143,7 +144,8 @@ func waitUntilRuntimeIsUp(cr kubecontainer.Runtime, timeout time.Duration) error
 	return err
 }
 
-// New creates a new Kubelet for use in main
+// New instantiates a new Kubelet object along with all the required internal modules.
+// No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(
 	hostname string,
 	nodeName string,
@@ -280,7 +282,6 @@ func NewMainKubelet(
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
-		runtimeState:                   newRuntimeState(maxWaitForContainerRuntime, configureCBR0, podCIDR),
 		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
@@ -377,6 +378,8 @@ func NewMainKubelet(
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
+
+	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0, podCIDR, klet.isContainerRuntimeVersionCompatible)
 
 	// setup containerGC
 	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
@@ -614,6 +617,9 @@ type Kubelet struct {
 
 	// A queue used to trigger pod workers.
 	workQueue queue.WorkQueue
+
+	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
+	oneTimeInitializer sync.Once
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -786,20 +792,25 @@ func (kl *Kubelet) StartGarbageCollection() {
 	}, 5*time.Minute, util.NeverStop)
 }
 
-func (kl *Kubelet) preRun() error {
+// initializeModules will initialize internal modules that do not require the container runtime to be up.
+// Note that the modules here must not depend on modules that are not initialized here.
+func (kl *Kubelet) initializeModules() error {
+	// Promethues metrics.
 	metrics.Register(kl.runtimeCache)
 
+	// Step 1: Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return err
 	}
-	// If the container logs directory does not exist, create it.
+
+	// Step 2: If the container logs directory does not exist, create it.
 	if _, err := os.Stat(containerLogsDir); err != nil {
 		if err := kl.os.Mkdir(containerLogsDir, 0755); err != nil {
 			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
 		}
 	}
 
-	// Move Kubelet to a container.
+	// Step 3: Move Kubelet to a container, if required.
 	if kl.resourceContainer != "" {
 		// Fixme: I need to reside inside ContainerManager interface.
 		err := util.RunInResourceContainer(kl.resourceContainer)
@@ -809,22 +820,28 @@ func (kl *Kubelet) preRun() error {
 		glog.Infof("Running in container %q", kl.resourceContainer)
 	}
 
+	// Step 4: Start the image manager.
 	if err := kl.imageManager.Start(); err != nil {
 		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
-	if err := kl.cadvisor.Start(); err != nil {
-		return fmt.Errorf("Failed to start CAdvisor %v", err)
-	}
-
+	// Step 5: Start container manager.
 	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
+	// Step 6: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 	return nil
+}
+
+// initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
+func (kl *Kubelet) initializeRuntimeDependentModules() {
+	if err := kl.cadvisor.Start(); err != nil {
+		kl.runtimeState.setInternalError(fmt.Errorf("Failed to start cAdvisor %v", err))
+	}
 }
 
 // Run starts the kubelet reacting to config updates
@@ -835,7 +852,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
-	if err := kl.preRun(); err != nil {
+	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, kubecontainer.KubeletSetupFailed, err.Error())
 		glog.Error(err)
 		kl.runtimeState.setInitError(err)
@@ -2362,6 +2379,8 @@ func (kl *Kubelet) updateRuntimeUp() {
 	start := time.Now()
 	err := waitUntilRuntimeIsUp(kl.containerRuntime, 100*time.Millisecond)
 	if err == nil {
+		// Errors in initialization will be synchronized internally.
+		kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 		kl.runtimeState.setRuntimeSync(time.Now())
 	} else {
 		glog.Errorf("Container runtime sanity check failed after %v, err: %v", time.Since(start), err)
@@ -2538,9 +2557,6 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 
 	node.Status.DaemonEndpoints = *kl.daemonEndpoints
 
-	// FIXME: Check whether runtime version meets the minimal requirements
-	_ = kl.containerRuntimeVersionRequirementMet()
-
 	currentTime := unversioned.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
@@ -2653,27 +2669,24 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	return nil
 }
 
-func (kl *Kubelet) containerRuntimeVersionRequirementMet() bool {
+// FIXME: Why not combine this with container runtime health check?
+func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
 	switch kl.GetRuntime().Type() {
 	case "docker":
 		version, err := kl.GetContainerRuntimeVersion()
 		if err != nil {
-			return true
+			return nil
 		}
 		// Verify the docker version.
 		result, err := version.Compare(dockertools.MinimumDockerAPIVersion)
 		if err != nil {
-			glog.Errorf("Cannot compare current docker version %v with minimum support Docker version %q", version, dockertools.MinimumDockerAPIVersion)
-			return false
+			return fmt.Errorf("failed to compare current docker version %v with minimum support Docker version %q - %v", version, dockertools.MinimumDockerAPIVersion, err)
 		}
-		return (result >= 0)
-	case "rkt":
-		// TODO(dawnchen): Rkt support here
-		return true
-	default:
-		glog.Errorf("unsupported container runtime %s specified", kl.GetRuntime().Type())
-		return true
+		if result < 0 {
+			return fmt.Errorf("container runtime version is older than %s", dockertools.MinimumDockerAPIVersion)
+		}
 	}
+	return nil
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0

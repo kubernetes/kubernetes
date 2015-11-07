@@ -27,14 +27,22 @@ type runtimeState struct {
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
+	internalError            error
 	cidr                     string
 	initError                error
+	runtimeCompatibility     func() error
 }
 
 func (s *runtimeState) setRuntimeSync(t time.Time) {
 	s.Lock()
 	defer s.Unlock()
 	s.lastBaseRuntimeSync = t
+}
+
+func (s *runtimeState) setInternalError(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.internalError = err
 }
 
 func (s *runtimeState) setNetworkState(err error) {
@@ -74,10 +82,21 @@ func (s *runtimeState) errors() []string {
 	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
 		ret = append(ret, "container runtime is down")
 	}
+	if s.internalError != nil {
+		ret = append(ret, s.internalError.Error())
+	}
+	if err := s.runtimeCompatibility(); err != nil {
+		ret = append(ret, err.Error())
+	}
 	return ret
 }
 
-func newRuntimeState(runtimeSyncThreshold time.Duration, configureNetwork bool, cidr string) *runtimeState {
+func newRuntimeState(
+	runtimeSyncThreshold time.Duration,
+	configureNetwork bool,
+	cidr string,
+	runtimeCompatibility func() error,
+) *runtimeState {
 	var networkError error = nil
 	if configureNetwork {
 		networkError = fmt.Errorf("network state unknown")
@@ -87,5 +106,7 @@ func newRuntimeState(runtimeSyncThreshold time.Duration, configureNetwork bool, 
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
 		networkError:             networkError,
 		cidr:                     cidr,
+		internalError:            nil,
+		runtimeCompatibility:     runtimeCompatibility,
 	}
 }
