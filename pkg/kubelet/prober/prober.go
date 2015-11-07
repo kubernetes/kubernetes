@@ -118,8 +118,8 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 	var output string
 	for i := 0; i < retries; i++ {
 		result, output, err = pb.runProbe(p, pod, status, container, containerID)
-		if result == probe.Success {
-			return probe.Success, output, nil
+		if err == nil {
+			return result, output, nil
 		}
 	}
 	return result, output, err

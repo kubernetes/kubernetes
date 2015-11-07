@@ -13524,7 +13524,7 @@
    },
    "v1.Probe": {
     "id": "v1.Probe",
-    "description": "Probe describes a liveness probe to be examined to the container.",
+    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to recieve traffic.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -13546,7 +13546,22 @@
      "timeoutSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+     },
+     "periodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1."
+     },
+     "successThreshold": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness. Minimum value is 1."
+     },
+     "failureThreshold": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1."
      }
     }
    },

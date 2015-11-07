@@ -283,6 +283,18 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 		},
+		func(p *api.Probe, c fuzz.Continue) {
+			c.FuzzNoCustom(p)
+			// These fields have default values.
+			intFieldsWithDefaults := [...]string{"TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
+			v := reflect.ValueOf(p).Elem()
+			for _, field := range intFieldsWithDefaults {
+				f := v.FieldByName(field)
+				if f.Int() == 0 {
+					f.SetInt(1)
+				}
+			}
+		},
 		func(ev *api.EnvVar, c fuzz.Continue) {
 			ev.Name = c.RandString()
 			if c.RandBool() {

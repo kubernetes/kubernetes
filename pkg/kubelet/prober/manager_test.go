@@ -34,6 +34,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+var defaultProbe *api.Probe = &api.Probe{
+	Handler: api.Handler{
+		Exec: &api.ExecAction{},
+	},
+	TimeoutSeconds:   1,
+	PeriodSeconds:    1,
+	SuccessThreshold: 1,
+	FailureThreshold: 3,
+}
+
 func TestAddRemovePods(t *testing.T) {
 	noProbePod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -57,12 +67,12 @@ func TestAddRemovePods(t *testing.T) {
 				Name: "no_probe1",
 			}, {
 				Name:           "readiness",
-				ReadinessProbe: &api.Probe{},
+				ReadinessProbe: defaultProbe,
 			}, {
 				Name: "no_probe2",
 			}, {
 				Name:          "liveness",
-				LivenessProbe: &api.Probe{},
+				LivenessProbe: defaultProbe,
 			}},
 		},
 	}
@@ -119,10 +129,10 @@ func TestCleanupPods(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{{
 				Name:           "prober1",
-				ReadinessProbe: &api.Probe{},
+				ReadinessProbe: defaultProbe,
 			}, {
 				Name:          "prober2",
-				LivenessProbe: &api.Probe{},
+				LivenessProbe: defaultProbe,
 			}},
 		},
 	}
@@ -133,10 +143,10 @@ func TestCleanupPods(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{{
 				Name:           "prober1",
-				ReadinessProbe: &api.Probe{},
+				ReadinessProbe: defaultProbe,
 			}, {
 				Name:          "prober2",
-				LivenessProbe: &api.Probe{},
+				LivenessProbe: defaultProbe,
 			}},
 		},
 	}
@@ -266,9 +276,7 @@ outer:
 }
 
 func newTestManager() *manager {
-	const probePeriod = 1
 	m := NewManager(
-		probePeriod,
 		status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil)),
 		results.NewManager(),
 		results.NewManager(),
