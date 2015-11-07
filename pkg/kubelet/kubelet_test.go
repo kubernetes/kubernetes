@@ -97,7 +97,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname
-	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, "" /* Pod CIDR */)
+	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false, "" /* Pod CIDR */, func() error { return nil })
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -2529,6 +2529,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
@@ -2802,6 +2803,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		},
 	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -2922,6 +2924,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -2996,7 +2999,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			},
 		},
 	}
-	kubelet.runtimeState = newRuntimeState(time.Duration(0), false, "" /* Pod CIDR */)
+	kubelet.runtimeState = newRuntimeState(time.Duration(0), false, "" /* Pod CIDR */, func() error { return nil })
 	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3076,9 +3079,11 @@ func TestCreateMirrorPod(t *testing.T) {
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
 	kl := testKubelet.kubelet
 	manager := testKubelet.fakeMirrorClient
 	pod := &api.Pod{
@@ -3129,9 +3134,11 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("Start").Return(nil)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
 	kl := testKubelet.kubelet
 	manager := testKubelet.fakeMirrorClient
 	orphanPods := []*api.Pod{
