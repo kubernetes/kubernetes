@@ -19,7 +19,6 @@ package unversioned
 import (
 	"net/url"
 	"strings"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,8 +44,6 @@ type RESTClient struct {
 	// Set specific behavior of the client.  If not set http.DefaultClient will be
 	// used.
 	Client HTTPClient
-
-	Timeout time.Duration
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
 	Throttle util.RateLimiter
@@ -91,7 +88,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
