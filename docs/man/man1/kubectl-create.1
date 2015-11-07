@@ -29,6 +29,10 @@ JSON and YAML formats are accepted.
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
+\fB\-\-save\-config\fP=false
+    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
+
+.PP
 \fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
     If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
 
