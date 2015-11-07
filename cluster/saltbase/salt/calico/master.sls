@@ -2,15 +2,15 @@
 
 calicoctl:
   file.managed:
-    - name: /home/vagrant/calicoctl
-    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.8/calicoctl
-    - source_hash: sha512=814fd7369ba395c67e35245115a5885d1722300301d32585f9003f63e94cd26f77e325ae765ba2f6cba2fddec5ffdb8e4f7bc1b326f9dc343cf03e96b77a679e
+    - name: /usr/local/bin/calicoctl
+    - source: https://github.com/projectcalico/calico-docker/releases/download/v0.10.0/calicoctl
+    - source_hash: sha512=5dd8110cebfc00622d49adddcccda9d4906e6bca8a777297e6c0ffbcf0f7e40b42b0d6955f2e04b457b0919cb2d5ce39d2a3255d34e6ba36e8350f50319b3896
     - makedirs: True
     - mode: 744
 
 calico-node:
   cmd.run:
-    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }} --node-image=calico/node:v0.4.8
+    - name: /home/vagrant/calicoctl node
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
