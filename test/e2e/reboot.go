@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -43,15 +45,32 @@ const (
 )
 
 var _ = Describe("Reboot", func() {
-	f := NewFramework("reboot")
+	var f *Framework
 
 	BeforeEach(func() {
 		// These tests requires SSH to nodes, so the provider check should be identical to there
 		// (the limiting factor is the implementation of util.go's getSigner(...)).
 
 		// Cluster must support node reboot
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		SkipUnlessProviderIs(providersWithSSH...)
 	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			// Most of the reboot tests just make sure that addon/system pods are running, so dump
+			// events for the kube-system namespace on failures
+			namespaceName := api.NamespaceSystem
+			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
+			events, err := f.Client.Events(namespaceName).List(labels.Everything(), fields.Everything())
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, e := range events.Items {
+				Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+			}
+		}
+	})
+
+	f = NewFramework("reboot")
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
@@ -100,22 +119,32 @@ func testReboot(c *client.Client, rebootCmd string) {
 	if err != nil {
 		Failf("Error getting nodes: %v", err)
 	}
-	result := make(chan bool, len(nodelist.Items))
-	for _, n := range nodelist.Items {
-		go rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd, result)
+	result := make([]bool, len(nodelist.Items))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodelist.Items))
+
+	failed := false
+	for ix := range nodelist.Items {
+		go func(ix int) {
+			defer wg.Done()
+			n := nodelist.Items[ix]
+			result[ix] = rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			if !result[ix] {
+				failed = true
+			}
+		}(ix)
 	}
 
 	// Wait for all to finish and check the final result.
-	failed := false
-	// TODO(a-robinson): Change to `for range` syntax and remove logging once
-	// we support only Go >= 1.4.
-	for _, n := range nodelist.Items {
-		if !<-result {
-			Failf("Node %s failed reboot test.", n.ObjectMeta.Name)
-			failed = true
-		}
-	}
+	wg.Wait()
+
 	if failed {
+		for ix := range nodelist.Items {
+			n := nodelist.Items[ix]
+			if !result[ix] {
+				Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
+			}
+		}
 		Failf("Test failed; at least one node failed to reboot in the time given.")
 	}
 }
@@ -149,7 +178,7 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
-func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
+func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
 	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
@@ -160,14 +189,12 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 	node, err := c.Nodes().Get(name)
 	if err != nil {
 		Logf("Couldn't get node %s", name)
-		result <- false
-		return
+		return false
 	}
 
 	// Node sanity check: ensure it is "ready".
 	if !waitForNodeToBeReady(c, name, nodeReadyInitialTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Get all the pods on the node that don't have liveness probe set.
@@ -191,36 +218,31 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// now, as that's what we'll be checking later.
 	if !checkPodsRunningReady(c, ns, podNames, podReadyBeforeTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Reboot the node.
 	if err = issueSSHCommand(node, provider, rebootCmd); err != nil {
 		Logf("Error while issuing ssh command: %v", err)
-		result <- false
-		return
+		return false
 	}
 
 	// Wait for some kind of "not ready" status.
 	if !waitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Wait for some kind of "ready" status.
 	if !waitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy.
 	if !checkPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	Logf("Reboot successful on node %s", name)
-	result <- true
+	return true
 }
