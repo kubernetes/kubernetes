@@ -87,8 +87,10 @@ const (
 	nodeReadyInitialTimeout = 20 * time.Second
 
 	// How long pods have to be "ready" when a test begins. They should already
-	// be "ready" before the test starts, so this is small.
-	podReadyBeforeTimeout = 20 * time.Second
+	// be "ready" before the test starts.
+	// Some tests (Nodes Resize, I'm looking at you) mess around with the cluster
+	// state.  Make this 5 minutes to give the cluster a chance to heal.
+	podReadyBeforeTimeout = 5 * time.Minute
 
 	podRespondingTimeout     = 2 * time.Minute
 	serviceRespondingTimeout = 2 * time.Minute
