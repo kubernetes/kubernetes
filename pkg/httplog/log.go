@@ -53,10 +53,12 @@ type logger interface {
 // the http.ResponseWriter. We can recover panics from go-restful, and
 // the logging value is questionable.
 type respLogger struct {
-	status      int
-	statusStack string
-	addedInfo   string
-	startTime   time.Time
+	hijacked       bool
+	statusRecorded bool
+	status         int
+	statusStack    string
+	addedInfo      string
+	startTime      time.Time
 
 	req *http.Request
 	w   http.ResponseWriter
@@ -155,7 +157,11 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
 	if glog.V(2) {
-		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		if !rl.hijacked {
+			glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		} else {
+			glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		}
 	}
 }
 
@@ -166,6 +172,9 @@ func (rl *respLogger) Header() http.Header {
 
 // Write implements http.ResponseWriter.
 func (rl *respLogger) Write(b []byte) (int, error) {
+	if !rl.statusRecorded {
+		rl.recordStatus(http.StatusOK) // Default if WriteHeader hasn't been called
+	}
 	return rl.w.Write(b)
 }
 
@@ -181,7 +190,19 @@ func (rl *respLogger) Flush() {
 
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
+	rl.recordStatus(status)
+	rl.w.WriteHeader(status)
+}
+
+// Hijack implements http.Hijacker.
+func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	rl.hijacked = true
+	return rl.w.(http.Hijacker).Hijack()
+}
+
+func (rl *respLogger) recordStatus(status int) {
 	rl.status = status
+	rl.statusRecorded = true
 	if rl.logStacktracePred(status) {
 		// Only log stacks for errors
 		stack := make([]byte, 2048)
@@ -190,10 +211,4 @@ func (rl *respLogger) WriteHeader(status int) {
 	} else {
 		rl.statusStack = ""
 	}
-	rl.w.WriteHeader(status)
-}
-
-// Hijack implements http.Hijacker.
-func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return rl.w.(http.Hijacker).Hijack()
 }
