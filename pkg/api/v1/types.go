@@ -2462,7 +2462,9 @@ type SecretList struct {
 // GenerateSecretRequest is used to request a generated secret.
 type GenerateSecretRequest struct {
 	unversioned.TypeMeta `json:",inline"`
-	ObjectMeta           `json:"metadata,omitempty"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	ObjectMeta `json:"metadata,omitempty"`
 
 	// Used to specify the type of secret to generate.
 	Type SecretType `json:"type"`
