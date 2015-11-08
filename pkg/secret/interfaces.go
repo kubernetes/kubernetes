@@ -20,6 +20,6 @@ import "k8s.io/kubernetes/pkg/api"
 
 // Interface is an abstract, pluggable interface for secret generation.
 type Interface interface {
-  // GenerateValues generates secret values.
-  GenerateValues(*api.GenerateSecretRequest) (map[string][]byte, error)
+	// GenerateValues generates secret values.
+	GenerateValues(*api.GenerateSecretRequest) (map[string][]byte, error)
 }
