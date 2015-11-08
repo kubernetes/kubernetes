@@ -85,7 +85,7 @@ var _ = Describe("Examples e2e", func() {
 			expectedOnSentinel := "+monitor master"
 
 			By("starting redis bootstrap")
-			runKubectl("create", "-f", bootstrapYaml, nsFlag)
+			runKubectlOrDie("create", "-f", bootstrapYaml, nsFlag)
 			err := waitForPodRunningInNamespace(c, bootstrapPodName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -95,13 +95,13 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("setting up services and controllers")
-			runKubectl("create", "-f", sentinelServiceYaml, nsFlag)
-			runKubectl("create", "-f", sentinelControllerYaml, nsFlag)
-			runKubectl("create", "-f", controllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", sentinelServiceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", sentinelControllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", controllerYaml, nsFlag)
 
 			By("scaling up the deployment")
-			runKubectl("scale", "rc", redisRC, "--replicas=3", nsFlag)
-			runKubectl("scale", "rc", sentinelRC, "--replicas=3", nsFlag)
+			runKubectlOrDie("scale", "rc", redisRC, "--replicas=3", nsFlag)
+			runKubectlOrDie("scale", "rc", sentinelRC, "--replicas=3", nsFlag)
 
 			By("checking up the services")
 			checkAllLogs := func() {
@@ -121,7 +121,7 @@ var _ = Describe("Examples e2e", func() {
 			checkAllLogs()
 
 			By("turning down bootstrap")
-			runKubectl("delete", "-f", bootstrapYaml, nsFlag)
+			runKubectlOrDie("delete", "-f", bootstrapYaml, nsFlag)
 			err = waitForRCPodToDisappear(c, ns, redisRC, bootstrapPodName)
 			Expect(err).NotTo(HaveOccurred())
 			By("waiting for the new master election")
@@ -142,8 +142,8 @@ var _ = Describe("Examples e2e", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting rabbitmq")
-			runKubectl("create", "-f", rabbitmqServiceYaml, nsFlag)
-			runKubectl("create", "-f", rabbitmqControllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", rabbitmqServiceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", rabbitmqControllerYaml, nsFlag)
 			forEachPod(c, ns, "component", "rabbitmq", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "rabbitmq", "Server startup complete", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -152,15 +152,15 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("starting celery")
-			runKubectl("create", "-f", celeryControllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", celeryControllerYaml, nsFlag)
 			forEachPod(c, ns, "component", "celery", func(pod api.Pod) {
 				_, err := lookForStringInFile(ns, pod.Name, "celery", "/data/celery.log", " ready.", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			By("starting flower")
-			runKubectl("create", "-f", flowerServiceYaml, nsFlag)
-			runKubectl("create", "-f", flowerControllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", flowerServiceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", flowerControllerYaml, nsFlag)
 			forEachPod(c, ns, "component", "flower", func(pod api.Pod) {
 				// Do nothing. just wait for it to be up and running.
 			})
@@ -184,9 +184,9 @@ var _ = Describe("Examples e2e", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting master")
-			runKubectl("create", "-f", serviceJson, nsFlag)
-			runKubectl("create", "-f", masterJson, nsFlag)
-			runKubectl("create", "-f", driverJson, nsFlag)
+			runKubectlOrDie("create", "-f", serviceJson, nsFlag)
+			runKubectlOrDie("create", "-f", masterJson, nsFlag)
+			runKubectlOrDie("create", "-f", driverJson, nsFlag)
 			err := waitForPodRunningInNamespace(c, "spark-master", ns)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = lookForStringInLog(ns, "spark-master", "spark-master", "Starting Spark master at", serverStartTimeout)
@@ -199,7 +199,7 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("starting workers")
-			runKubectl("create", "-f", workerControllerJson, nsFlag)
+			runKubectlOrDie("create", "-f", workerControllerJson, nsFlag)
 			ScaleRC(c, ns, "spark-worker-controller", 2, true)
 			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
@@ -219,8 +219,8 @@ var _ = Describe("Examples e2e", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting service and pod")
-			runKubectl("create", "-f", serviceYaml, nsFlag)
-			runKubectl("create", "-f", podYaml, nsFlag)
+			runKubectlOrDie("create", "-f", serviceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", podYaml, nsFlag)
 			err := waitForPodRunningInNamespace(c, "cassandra", ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -231,7 +231,7 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("create and scale rc")
-			runKubectl("create", "-f", controllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", controllerYaml, nsFlag)
 			err = ScaleRC(c, ns, "cassandra", 2, true)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
@@ -241,7 +241,7 @@ var _ = Describe("Examples e2e", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			output := runKubectl("exec", "cassandra", nsFlag, "--", "nodetool", "status")
+			output := runKubectlOrDie("exec", "cassandra", nsFlag, "--", "nodetool", "status")
 			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
 				if !strings.Contains(output, pod.Status.PodIP) {
 					Failf("Pod ip %s not found in nodetool status", pod.Status.PodIP)
@@ -264,8 +264,8 @@ var _ = Describe("Examples e2e", func() {
 			zookeeperPod := "zookeeper"
 
 			By("starting Zookeeper")
-			runKubectl("create", "-f", zookeeperPodJson, nsFlag)
-			runKubectl("create", "-f", zookeeperServiceJson, nsFlag)
+			runKubectlOrDie("create", "-f", zookeeperPodJson, nsFlag)
+			runKubectlOrDie("create", "-f", zookeeperServiceJson, nsFlag)
 			err := waitForPodRunningInNamespace(c, zookeeperPod, ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -276,8 +276,8 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("starting Nimbus")
-			runKubectl("create", "-f", nimbusPodJson, nsFlag)
-			runKubectl("create", "-f", nimbusServiceJson, nsFlag)
+			runKubectlOrDie("create", "-f", nimbusPodJson, nsFlag)
+			runKubectlOrDie("create", "-f", nimbusServiceJson, nsFlag)
 			err = waitForPodRunningInNamespace(c, "nimbus", ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -285,7 +285,7 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("starting workers")
-			runKubectl("create", "-f", workerControllerJson, nsFlag)
+			runKubectlOrDie("create", "-f", workerControllerJson, nsFlag)
 			forEachPod(c, ns, "name", "storm-worker", func(pod api.Pod) {
 				//do nothing, just wait for the pod to be running
 			})
@@ -299,7 +299,7 @@ var _ = Describe("Examples e2e", func() {
 
 			By("checking if Nimbus responds to requests")
 			lookForString("No topologies running.", time.Minute, func() string {
-				return runKubectl("exec", "nimbus", nsFlag, "--", "bin/storm", "list")
+				return runKubectlOrDie("exec", "nimbus", nsFlag, "--", "bin/storm", "list")
 			})
 		})
 	})
@@ -313,8 +313,8 @@ var _ = Describe("Examples e2e", func() {
 			httpYaml := mkpath("http-liveness.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			runKubectl("create", "-f", execYaml, nsFlag)
-			runKubectl("create", "-f", httpYaml, nsFlag)
+			runKubectlOrDie("create", "-f", execYaml, nsFlag)
+			runKubectlOrDie("create", "-f", httpYaml, nsFlag)
 			checkRestart := func(podName string, timeout time.Duration) {
 				err := waitForPodRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
@@ -346,8 +346,8 @@ var _ = Describe("Examples e2e", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("creating secret and pod")
-			runKubectl("create", "-f", secretYaml, nsFlag)
-			runKubectl("create", "-f", podYaml, nsFlag)
+			runKubectlOrDie("create", "-f", secretYaml, nsFlag)
+			runKubectlOrDie("create", "-f", podYaml, nsFlag)
 
 			By("checking if secret was read correctly")
 			_, err := lookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
@@ -365,7 +365,7 @@ var _ = Describe("Examples e2e", func() {
 			podName := "dapi-test-pod"
 
 			By("creating the pod")
-			runKubectl("create", "-f", podYaml, nsFlag)
+			runKubectlOrDie("create", "-f", podYaml, nsFlag)
 
 			By("checking if name and namespace were passed correctly")
 			_, err := lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAMESPACE=%v", ns), serverStartTimeout)
@@ -387,8 +387,8 @@ var _ = Describe("Examples e2e", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting rethinkdb")
-			runKubectl("create", "-f", driverServiceYaml, nsFlag)
-			runKubectl("create", "-f", rethinkDbControllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", driverServiceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", rethinkDbControllerYaml, nsFlag)
 			checkDbInstances := func() {
 				forEachPod(c, ns, "db", "rethinkdb", func(pod api.Pod) {
 					_, err := lookForStringInLog(ns, pod.Name, "rethinkdb", "Server ready", serverStartTimeout)
@@ -404,8 +404,8 @@ var _ = Describe("Examples e2e", func() {
 			checkDbInstances()
 
 			By("starting admin")
-			runKubectl("create", "-f", adminServiceYaml, nsFlag)
-			runKubectl("create", "-f", adminPodYaml, nsFlag)
+			runKubectlOrDie("create", "-f", adminServiceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", adminPodYaml, nsFlag)
 			err = waitForPodRunningInNamespace(c, "rethinkdb-admin", ns)
 			Expect(err).NotTo(HaveOccurred())
 			checkDbInstances()
@@ -427,8 +427,8 @@ var _ = Describe("Examples e2e", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting hazelcast")
-			runKubectl("create", "-f", serviceYaml, nsFlag)
-			runKubectl("create", "-f", controllerYaml, nsFlag)
+			runKubectlOrDie("create", "-f", serviceYaml, nsFlag)
+			runKubectlOrDie("create", "-f", controllerYaml, nsFlag)
 			forEachPod(c, ns, "name", "hazelcast", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "hazelcast", "Members [1]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -483,11 +483,11 @@ var _ = Describe("Examples e2e", func() {
 			}
 
 			for _, ns := range namespaces {
-				runKubectl("create", "-f", backendRcYaml, getNsCmdFlag(ns))
+				runKubectlOrDie("create", "-f", backendRcYaml, getNsCmdFlag(ns))
 			}
 
 			for _, ns := range namespaces {
-				runKubectl("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+				runKubectlOrDie("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
 			}
 
 			// wait for objects
@@ -533,7 +533,7 @@ var _ = Describe("Examples e2e", func() {
 
 			// create a pod in each namespace
 			for _, ns := range namespaces {
-				newKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).withStdinData(updatedPodYaml).exec()
+				newKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).withStdinData(updatedPodYaml).execOrDie()
 			}
 
 			// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
@@ -608,13 +608,13 @@ func forEachPod(c *client.Client, ns, selectorKey, selectorValue string, fn func
 
 func lookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
-		return runKubectl("log", podName, container, fmt.Sprintf("--namespace=%v", ns))
+		return runKubectlOrDie("log", podName, container, fmt.Sprintf("--namespace=%v", ns))
 	})
 }
 
 func lookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
-		return runKubectl("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
+		return runKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
 	})
 }
 
@@ -623,7 +623,7 @@ func lookForStringInPodExec(ns, podName string, command []string, expectedString
 		// use the first container
 		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
 		args = append(args, command...)
-		return runKubectl(args...)
+		return runKubectlOrDie(args...)
 	})
 }
 
