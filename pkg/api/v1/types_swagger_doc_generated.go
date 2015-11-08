@@ -411,6 +411,16 @@ func (GCEPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
 	return map_GCEPersistentDiskVolumeSource
 }
 
+var map_GenerateSecretRequest = map[string]string{
+	"":         "GenerateSecretRequest is used to request a generated secret.",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"type":     "Used to specify the type of secret to generate.",
+}
+
+func (GenerateSecretRequest) SwaggerDoc() map[string]string {
+	return map_GenerateSecretRequest
+}
+
 var map_GitRepoVolumeSource = map[string]string{
 	"":           "GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.",
 	"repository": "Repository URL",
