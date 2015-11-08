@@ -9748,6 +9748,65 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{namespace}/secrets/{name}/generate",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.GenerateSecretRequest",
+      "method": "POST",
+      "summary": "create generate of a GenerateSecretRequest",
+      "nickname": "createNamespacedGenerateSecretRequestGenerate",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.GenerateSecretRequest",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the GenerateSecretRequest",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.GenerateSecretRequest"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/serviceaccounts",
     "description": "API at /api/v1",
     "operations": [
@@ -14246,6 +14305,28 @@
      "type": {
       "type": "string",
       "description": "Used to facilitate programmatic handling of secret data."
+     }
+    }
+   },
+   "v1.GenerateSecretRequest": {
+    "id": "v1.GenerateSecretRequest",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "type": {
+      "type": "string"
      }
     }
    },
