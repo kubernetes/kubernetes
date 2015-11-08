@@ -65,6 +65,10 @@ var (
 	// Name of the loadbalancer controller within the cluster addon
 	lbContainerName = "l7-lb-controller"
 
+	// If set, the test tries to perform an HTTP GET on each url endpoint of
+	// the Ingress. Only set to false to short-circuit test runs in debugging.
+	verifyHTTPGET = true
+
 	// On average it takes ~6 minutes for a single backend to come online.
 	// We *don't* expect this poll to consistently take 15 minutes for every
 	// Ingress as GCE is creating/checking backends in parallel, but at the
@@ -173,7 +177,9 @@ func createApp(c *client.Client, ns string, i int) {
 // gcloudUnmarshal unmarshals json output of gcloud into given out interface.
 func gcloudUnmarshal(resource, regex string, out interface{}) {
 	output, err := exec.Command("gcloud", "compute", resource, "list",
-		fmt.Sprintf("--regex=%v", regex), "-q", "--format=json").CombinedOutput()
+		fmt.Sprintf("--regex=%v", regex),
+		fmt.Sprintf("--project=%v", testContext.CloudConfig.ProjectID),
+		"-q", "--format=json").CombinedOutput()
 	if err != nil {
 		Failf("Error unmarshalling gcloud output: %v", err)
 	}
@@ -204,7 +210,7 @@ func checkLeakedResources() error {
 	return nil
 }
 
-// run kubectl log on the L7 controller pod.
+// kubectlLogLBController logs kubectl debug output for the L7 controller pod.
 func kubectlLogLBController(c *client.Client) {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": "glbc"}))
 	podList, err := c.Pods(api.NamespaceAll).List(selector, fields.Everything())
@@ -218,19 +224,9 @@ func kubectlLogLBController(c *client.Client) {
 	}
 	for _, p := range podList.Items {
 		Logf("\nLast 100 log lines of %v\n", p.Name)
-		Logf(runKubectl("logs", p.Name, "--namespace=kube-system", "-c", lbContainerName, "--tail=100"))
+		l, _ := runKubectl("logs", p.Name, fmt.Sprintf("--namespace=%v", api.NamespaceSystem), "-c", lbContainerName, "--tail=100")
+		Logf(l)
 	}
-}
-
-// dumpDebugAndFail dumps verbose debug output before failing.
-func dumpDebugAndFail(err string, ns string, c *client.Client) {
-	kubectlLogLBController(c)
-	Logf("\nOutput of kubectl describe ing:\n")
-
-	// TODO: runKubectl will hard fail if kubectl fails, swap it out for
-	// something more befitting for a debug dumper.
-	Logf(runKubectl("describe", "ing", fmt.Sprintf("--namespace=%v", ns)))
-	Failf(err)
 }
 
 var _ = Describe("GCE L7 LoadBalancer Controller", func() {
@@ -254,6 +250,12 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 	})
 
 	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			kubectlLogLBController(client)
+			Logf("\nOutput of kubectl describe ing:\n")
+			desc, _ := runKubectl("describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+			Logf(desc)
+		}
 		framework.afterEach()
 		err := wait.Poll(lbPollInterval, lbPollTimeout, func() (bool, error) {
 			if err := checkLeakedResources(); err != nil {
@@ -301,12 +303,16 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			start := time.Now()
 			address, err := waitForIngressAddress(client, ing.Namespace, ing.Name, lbPollTimeout)
 			if err != nil {
-				dumpDebugAndFail(fmt.Sprintf("Ingress failed to acquire an IP address within %v", lbPollTimeout), ns, client)
+				Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
 			}
 			Expect(err).NotTo(HaveOccurred())
 			By(fmt.Sprintf("Found address %v for ingress %v, took %v to come online",
 				address, ing.Name, time.Since(start)))
 			creationTimes = append(creationTimes, time.Since(start))
+
+			if !verifyHTTPGET {
+				continue
+			}
 
 			// Check that all rules respond to a simple GET.
 			for _, rules := range ing.Spec.Rules {
@@ -330,8 +336,8 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 						return true, nil
 					})
 					if pollErr != nil {
-						dumpDebugAndFail(fmt.Sprintf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
-							lbPollTimeout, route, rules.Host, lastBody, pollErr), ns, client)
+						Failf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
+							lbPollTimeout, route, rules.Host, lastBody, pollErr)
 					}
 					rt := time.Since(GETStart)
 					By(fmt.Sprintf("Route %v host %v took %v to respond", route, rules.Host, rt))
@@ -345,12 +351,15 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 		sort.Sort(timeSlice(creationTimes))
 		perc50 := creationTimes[len(creationTimes)/2]
 		if perc50 > expectedLBCreationTime {
-			dumpDebugAndFail(fmt.Sprintf("Average creation time is too high: %+v", creationTimes), ns, client)
+			Failf("Average creation time is too high: %+v", creationTimes)
+		}
+		if !verifyHTTPGET {
+			return
 		}
 		sort.Sort(timeSlice(responseTimes))
 		perc50 = responseTimes[len(responseTimes)/2]
 		if perc50 > expectedLBHealthCheckTime {
-			dumpDebugAndFail(fmt.Sprintf("Average startup time is too high: %+v", responseTimes), ns, client)
+			Failf("Average startup time is too high: %+v", responseTimes)
 		}
 	})
 })
