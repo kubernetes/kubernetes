@@ -213,7 +213,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 
 	cmds.AddCommand(NewCmdAttach(f, in, out, err))
 	cmds.AddCommand(NewCmdExec(f, in, out, err))
-	cmds.AddCommand(NewCmdPortForward(f))
+	cmds.AddCommand(NewCmdPortForward(f, out, err))
 	cmds.AddCommand(NewCmdProxy(f, out))
 
 	cmds.AddCommand(NewCmdRun(f, in, out, err))

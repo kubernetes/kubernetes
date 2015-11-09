@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -87,7 +88,7 @@ func TestParsePortsAndNew(t *testing.T) {
 
 		dialer := &fakeDialer{}
 		expectedStopChan := make(chan struct{})
-		pf, err := New(dialer, test.input, expectedStopChan)
+		pf, err := New(dialer, test.input, expectedStopChan, os.Stdout, os.Stderr)
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
 			t.Fatalf("%d: New: error expected=%t, got %t: %s", i, e, a, err)
@@ -305,7 +306,7 @@ func TestForwardPorts(t *testing.T) {
 
 		stopChan := make(chan struct{}, 1)
 
-		pf, err := New(exec, test.ports, stopChan)
+		pf, err := New(exec, test.ports, stopChan, os.Stdout, os.Stderr)
 		if err != nil {
 			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
@@ -382,7 +383,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	stopChan1 := make(chan struct{}, 1)
 	defer close(stopChan1)
 
-	pf1, err := New(exec, []string{"5555"}, stopChan1)
+	pf1, err := New(exec, []string{"5555"}, stopChan1, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
@@ -390,7 +391,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	<-pf1.Ready
 
 	stopChan2 := make(chan struct{}, 1)
-	pf2, err := New(exec, []string{"5555"}, stopChan2)
+	pf2, err := New(exec, []string{"5555"}, stopChan2, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}
