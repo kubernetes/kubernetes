@@ -101,6 +101,7 @@ framework-name
 framework-weburi
 func-dest
 fuzz-iters
+gather-resource-usage
 gce-project
 gce-zone
 gke-cluster
