@@ -1666,7 +1666,6 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 	return kubetypes.DockerID(id.ID), nil
 }
 
-// TODO(vmarmol): This will soon be made non-public when its only use is internal.
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
 // - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
 //   Additionally if it is true then containersToKeep have to be empty
@@ -1678,14 +1677,14 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 //   Infra Container should be killed, hence it's removed from this map.
 // - all running containers which are NOT contained in containersToKeep should be killed.
 type empty struct{}
-type PodContainerChangesSpec struct {
-	StartInfraContainer bool
-	InfraContainerId    kubetypes.DockerID
-	ContainersToStart   map[int]empty
-	ContainersToKeep    map[kubetypes.DockerID]int
+type podContainerChangesSpec struct {
+	startInfraContainer bool
+	infraContainerId    kubetypes.DockerID
+	containersToStart   map[int]empty
+	containersToKeep    map[kubetypes.DockerID]int
 }
 
-func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (PodContainerChangesSpec, error) {
+func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (podContainerChangesSpec, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))
@@ -1706,7 +1705,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 		glog.V(4).Infof("Found pod infra container for %q", podFullName)
 		changed, err = dm.podInfraContainerChanged(pod, podInfraContainer)
 		if err != nil {
-			return PodContainerChangesSpec{}, err
+			return podContainerChangesSpec{}, err
 		}
 	}
 
@@ -1783,11 +1782,11 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 		containersToKeep = make(map[kubetypes.DockerID]int)
 	}
 
-	return PodContainerChangesSpec{
-		StartInfraContainer: createPodInfraContainer,
-		InfraContainerId:    podInfraContainerID,
-		ContainersToStart:   containersToStart,
-		ContainersToKeep:    containersToKeep,
+	return podContainerChangesSpec{
+		startInfraContainer: createPodInfraContainer,
+		infraContainerId:    podInfraContainerID,
+		containersToStart:   containersToStart,
+		containersToKeep:    containersToKeep,
 	}, nil
 }
 
@@ -1819,8 +1818,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 
-	if containerChanges.StartInfraContainer || (len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0) {
-		if len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0 {
+	if containerChanges.startInfraContainer || (len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0) {
+		if len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0 {
 			glog.V(4).Infof("Killing Infra Container for %q because all other containers are dead.", podFullName)
 		} else {
 			glog.V(4).Infof("Killing Infra Container for %q, will start new one", podFullName)
@@ -1833,7 +1832,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	} else {
 		// Otherwise kill any containers in this pod which are not specified as ones to keep.
 		for _, container := range runningPod.Containers {
-			_, keep := containerChanges.ContainersToKeep[kubetypes.DockerID(container.ID.ID)]
+			_, keep := containerChanges.containersToKeep[kubetypes.DockerID(container.ID.ID)]
 			if !keep {
 				glog.V(3).Infof("Killing unwanted container %+v", container)
 				// attempt to find the appropriate container policy
@@ -1853,8 +1852,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 
 	// If we should create infra container then we do it first.
-	podInfraContainerID := containerChanges.InfraContainerId
-	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
+	podInfraContainerID := containerChanges.infraContainerId
+	if containerChanges.startInfraContainer && (len(containerChanges.containersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = dm.createPodInfraContainer(pod)
 		if err != nil {
@@ -1894,12 +1893,12 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 	containersStarted := 0
 	// Start everything
-	for idx := range containerChanges.ContainersToStart {
+	for idx := range containerChanges.containersToStart {
 		container := &pod.Spec.Containers[idx]
 
-		// containerChanges.StartInfraContainer causes the containers to be restarted for config reasons
+		// containerChanges.startInfraContainer causes the containers to be restarted for config reasons
 		// ignore backoff
-		if !containerChanges.StartInfraContainer && dm.doBackOff(pod, container, podStatus, backOff) {
+		if !containerChanges.startInfraContainer && dm.doBackOff(pod, container, podStatus, backOff) {
 			glog.V(4).Infof("Backing Off restarting container %+v in pod %v", container, podFullName)
 			continue
 		}
