@@ -132,7 +132,7 @@ func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 		if s.predicate(node) {
 			nodes.Items = append(nodes.Items, node)
 		} else {
-			glog.V(2).Infof("Node %s matches none of the conditions", node.Name)
+			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
 		}
 	}
 	return
