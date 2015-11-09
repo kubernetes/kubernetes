@@ -35,11 +35,11 @@ type ErrorHandler interface {
 type errorHandler struct {
 	sched        scheduler.Scheduler
 	backoff      *backoff.Backoff
-	qr           *queuer.Queuer
+	qr           queuer.Queuer
 	newBreakChan func(podKey string) queue.BreakChan
 }
 
-func New(sched scheduler.Scheduler, backoff *backoff.Backoff, qr *queuer.Queuer, newBC func(podKey string) queue.BreakChan) ErrorHandler {
+func New(sched scheduler.Scheduler, backoff *backoff.Backoff, qr queuer.Queuer, newBC func(podKey string) queue.BreakChan) ErrorHandler {
 	return &errorHandler{
 		sched:        sched,
 		backoff:      backoff,

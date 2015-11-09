@@ -36,10 +36,10 @@ type Deleter interface {
 
 type deleter struct {
 	sched scheduler.Scheduler
-	qr    *queuer.Queuer
+	qr    queuer.Queuer
 }
 
-func New(sched scheduler.Scheduler, qr *queuer.Queuer) Deleter {
+func New(sched scheduler.Scheduler, qr queuer.Queuer) Deleter {
 	return &deleter{
 		sched: sched,
 		qr:    qr,
