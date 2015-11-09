@@ -187,3 +187,29 @@ func TestUpdatePod(t *testing.T) {
 	receivedPod, err := c.Setup(t).Pods(ns).Update(requestPod)
 	c.Validate(t, receivedPod, err)
 }
+
+func TestPodGetLogs(t *testing.T) {
+	ns := api.NamespaceDefault
+	opts := &api.PodLogOptions{
+		Follow:     true,
+		Timestamps: true,
+	}
+	c := &testClient{}
+
+	request := c.Setup(t).Pods(ns).GetLogs("podName", opts)
+	if request.verb != "GET" {
+		t.Fatalf("unexpected verb %q, expected %q", request.verb, "GET")
+	}
+	if request.resource != "pods" {
+		t.Fatalf("unexpected resource %q, expected %q", request.subresource, "pods")
+	}
+	if request.subresource != "log" {
+		t.Fatalf("unexpected subresource %q, expected %q", request.subresource, "log")
+	}
+	expected := map[string]string{"container": "", "follow": "true", "previous": "false", "timestamps": "true"}
+	for gotKey, gotValue := range request.params {
+		if gotValue[0] != expected[gotKey] {
+			t.Fatalf("unexpected key-value %s=%s, expected %s=%s", gotKey, gotValue[0], gotKey, expected[gotKey])
+		}
+	}
+}
