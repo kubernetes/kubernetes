@@ -19,12 +19,11 @@ package scheduler
 
 // Created from contrib/mesos/docs/scheduler.monopic:
 //
-//
 //                     ┌───────────────────────────────────────────────────────────────────────┐
 //                     │                ┌───────────────────────────────────────┐            ┌─┴──────────────────────┐             ┌───────────────┐
-//               ┌─────▼─────┐          │Queuer                                 │  Await()   │       podUpdates       │             │               │
-//               │  updates  │          │- Yield() *api.Pod                     ├──pod CRUD ─▶ (queue.HistoricalFIFO) ◀──reflector──▶pods ListWatch ├──apiserver──▶
-//               └─────▲─────┘          │- Requeue(pod)/Dequeue(id)/Reoffer(pod)│   events   │                        │             │               │
+//            ┌────────▼─────────┐      │Queuer                                 │  Await()   │       podUpdates       │             │               │
+//            │ podUpdatesBypass │      │- Yield() *api.Pod                     ├──pod CRUD ─▶ (queue.HistoricalFIFO) ◀──reflector──▶pods ListWatch ├──apiserver──▶
+//            └────────▲─────────┘      │- Requeue(pod)/Dequeue(id)/Reoffer(pod)│   events   │                        │             │               │
 //                     │                └───────────────────▲───────────────────┘            └───────────┬────────────┘             └───────────────┘
 //                     │                                    │                                            │
 //                     │                                    │                                            │
