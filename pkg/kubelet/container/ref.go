@@ -22,6 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+var ImplicitContainerPrefix string = "implicitly required container "
+
 // GenerateContainerRef returns an *api.ObjectReference which references the given container
 // within the given pod. Returns an error if the reference can't be constructed or the
 // container doesn't actually belong to the pod.
@@ -33,7 +35,7 @@ func GenerateContainerRef(pod *api.Pod, container *api.Container) (*api.ObjectRe
 	if err != nil {
 		// TODO: figure out intelligent way to refer to containers that we implicitly
 		// start (like the pod infra container). This is not a good way, ugh.
-		fieldPath = "implicitly required container " + container.Name
+		fieldPath = ImplicitContainerPrefix + container.Name
 	}
 	ref, err := api.GetPartialReference(pod, fieldPath)
 	if err != nil {
