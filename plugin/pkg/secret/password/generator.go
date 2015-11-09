@@ -31,6 +31,8 @@ const (
 	// GeneratorName is the name of the password generator
 	GeneratorName = "kubernetes.io/password"
 
+	GeneratedPasswordKey = "password"
+
 	// LengthAnnotation is the name of the annotation for password length
 	LengthAnnotation = GeneratorName + "-length"
 
@@ -64,8 +66,8 @@ func (s *password) GenerateValues(req *api.GenerateSecretRequest) (map[string][]
 	l := DefaultLength
 	if req.Annotations[LengthAnnotation] != "" {
 		reql, err := strconv.Atoi(req.Annotations[LengthAnnotation])
-		if err != nil {
-			return nil, fmt.Errorf("invalid password length '%s': %v", req.Annotations[LengthAnnotation], err)
+		if err != nil && reql <= 0 {
+			return nil, fmt.Errorf("invalid password length '%s'", req.Annotations[LengthAnnotation])
 		}
 		l = reql
 	}
@@ -76,7 +78,7 @@ func (s *password) GenerateValues(req *api.GenerateSecretRequest) (map[string][]
 	}
 
 	return map[string][]byte{
-		"password": randString(l, chars),
+		GeneratedPasswordKey: randString(l, chars),
 	}, nil
 }
 
