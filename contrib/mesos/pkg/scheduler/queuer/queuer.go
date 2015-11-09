@@ -38,7 +38,19 @@ const (
 	yieldWaitTimeout   = 1 * time.Second
 )
 
-type Queuer struct {
+type Queuer interface {
+	InstallDebugHandlers(mux *http.ServeMux)
+	UpdatesAvailable()
+	Dequeue(id string)
+	Requeue(pod *Pod)
+	Reoffer(pod *Pod)
+
+	Yield() *api.Pod
+
+	Run(done <-chan struct{})
+}
+
+type queuer struct {
 	lock            sync.Mutex       // shared by condition variables of this struct
 	updates         queue.FIFO       // queue of pod updates to be processed
 	queue           *queue.DelayFIFO // queue of pods to be scheduled
@@ -46,9 +58,9 @@ type Queuer struct {
 	unscheduledCond sync.Cond        // there are unscheduled pods for processing
 }
 
-func New(updates queue.FIFO) *Queuer {
-	q := &Queuer{
-		queue:   queue.NewDelayFIFO(),
+func New(queue *queue.DelayFIFO, updates queue.FIFO) Queuer {
+	q := &queuer{
+		queue:   queue,
 		updates: updates,
 	}
 	q.deltaCond.L = &q.lock
@@ -56,7 +68,7 @@ func New(updates queue.FIFO) *Queuer {
 	return q
 }
 
-func (q *Queuer) InstallDebugHandlers(mux *http.ServeMux) {
+func (q *queuer) InstallDebugHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/debug/scheduler/podqueue", func(w http.ResponseWriter, r *http.Request) {
 		for _, x := range q.queue.List() {
 			if _, err := io.WriteString(w, fmt.Sprintf("%+v\n", x)); err != nil {
@@ -74,18 +86,18 @@ func (q *Queuer) InstallDebugHandlers(mux *http.ServeMux) {
 }
 
 // signal that there are probably pod updates waiting to be processed
-func (q *Queuer) UpdatesAvailable() {
+func (q *queuer) UpdatesAvailable() {
 	q.deltaCond.Broadcast()
 }
 
 // delete a pod from the to-be-scheduled queue
-func (q *Queuer) Dequeue(id string) {
+func (q *queuer) Dequeue(id string) {
 	q.queue.Delete(id)
 }
 
 // re-add a pod to the to-be-scheduled queue, will not overwrite existing pod data (that
 // may have already changed).
-func (q *Queuer) Requeue(pod *Pod) {
+func (q *queuer) Requeue(pod *Pod) {
 	// use KeepExisting in case the pod has already been updated (can happen if binding fails
 	// due to constraint voilations); we don't want to overwrite a newer entry with stale data.
 	q.queue.Add(pod, queue.KeepExisting)
@@ -93,7 +105,7 @@ func (q *Queuer) Requeue(pod *Pod) {
 }
 
 // same as Requeue but calls podQueue.Offer instead of podQueue.Add
-func (q *Queuer) Reoffer(pod *Pod) {
+func (q *queuer) Reoffer(pod *Pod) {
 	// use KeepExisting in case the pod has already been updated (can happen if binding fails
 	// due to constraint voilations); we don't want to overwrite a newer entry with stale data.
 	if q.queue.Offer(pod, queue.KeepExisting) {
@@ -103,7 +115,7 @@ func (q *Queuer) Reoffer(pod *Pod) {
 
 // spawns a go-routine to watch for unscheduled pods and queue them up
 // for scheduling. returns immediately.
-func (q *Queuer) Run(done <-chan struct{}) {
+func (q *queuer) Run(done <-chan struct{}) {
 	go runtime.Until(func() {
 		log.Info("Watching for newly created pods")
 		q.lock.Lock()
@@ -148,7 +160,7 @@ func (q *Queuer) Run(done <-chan struct{}) {
 }
 
 // implementation of scheduling plugin's NextPod func; see k8s plugin/pkg/scheduler
-func (q *Queuer) Yield() *api.Pod {
+func (q *queuer) Yield() *api.Pod {
 	log.V(2).Info("attempting to yield a pod")
 	q.lock.Lock()
 	defer q.lock.Unlock()

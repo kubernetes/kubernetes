@@ -67,7 +67,7 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
 	reflector := cache.NewReflector(lw, &api.Pod{}, podUpdates, 0)
 
-	q := queuer.New(podUpdates)
+	q := queuer.New(queue.NewDelayFIFO(), podUpdates)
 
 	algorithm := algorithm.New(core, podUpdates, ps)
 

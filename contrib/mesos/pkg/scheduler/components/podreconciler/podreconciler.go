@@ -38,11 +38,11 @@ type PodReconciler interface {
 type podReconciler struct {
 	sched   scheduler.Scheduler
 	client  *client.Client
-	qr      *queuer.Queuer
+	qr      queuer.Queuer
 	deleter deleter.Deleter
 }
 
-func New(sched scheduler.Scheduler, client *client.Client, qr *queuer.Queuer, deleter deleter.Deleter) PodReconciler {
+func New(sched scheduler.Scheduler, client *client.Client, qr queuer.Queuer, deleter deleter.Deleter) PodReconciler {
 	return &podReconciler{
 		sched:   sched,
 		client:  client,
