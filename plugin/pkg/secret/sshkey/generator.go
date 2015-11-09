@@ -45,13 +45,18 @@ const (
 	// KeyTypeAnnotation is the name of the annotation for key type
 	KeyTypeAnnotation = GeneratorName + "-type"
 
-	DefaultKeyType = "rsa"
+	DefaultKeyType        = "rsa"
+	DefaultRSAKeyLength   = 2048
+	DefaultECDSAKeyLength = 384
+
+	PrivateKeyAnnotation = "private"
+	PublicKeyAnnotation  = "public"
 )
 
 var (
 	defaultKeySize = map[string]int{
-		"rsa":   2048,
-		"ecdsa": 384,
+		"rsa":   DefaultRSAKeyLength,
+		"ecdsa": DefaultECDSAKeyLength,
 	}
 
 	curves = map[int]elliptic.Curve{
@@ -145,7 +150,7 @@ func (s *sshkey) GenerateValues(req *api.GenerateSecretRequest) (map[string][]by
 	pubBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
 
 	return map[string][]byte{
-		"private": privPem,
-		"public":  pubBytes,
+		PrivateKeyAnnotation: privPem,
+		PublicKeyAnnotation:  pubBytes,
 	}, nil
 }
