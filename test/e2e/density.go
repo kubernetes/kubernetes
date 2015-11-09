@@ -112,7 +112,7 @@ var _ = Describe("Density", func() {
 
 	framework := NewFramework("density")
 	framework.NamespaceDeletionTimeout = time.Hour
-	framework.GatherKubeSystemResourceUsageData = true
+	framework.GatherKubeSystemResourceUsageData = testContext.GatherKubeSystemResourceUsageData
 
 	BeforeEach(func() {
 		c = framework.Client
