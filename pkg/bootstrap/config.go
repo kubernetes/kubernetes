@@ -25,7 +25,8 @@ type Configuration struct {
 	CloudProvider       string
 	CloudProviderConfig string
 
-	MasterCIDR string
+	MasterPublicIP string
+	MasterCIDR     string
 
 	ClusterID string
 

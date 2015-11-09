@@ -19,13 +19,14 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"os"
+	"strings"
+
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"os"
-	"strings"
 )
 
 // Bootstrapper is the main bootstrapping manager class
@@ -54,9 +55,15 @@ func (b *Bootstrapper) RunOnce() error {
 		return fmt.Errorf("unable to build cloud provider: %v", err)
 	}
 
+	// The master volume acts as a mutex, so we always mount it first
 	err = b.mountMasterVolume()
 	if err != nil {
 		return fmt.Errorf("unable to mount master volume: %v", err)
+	}
+
+	err = b.configureMasterPublicIP()
+	if err != nil {
+		return fmt.Errorf("unable to associate master IP: %v", err)
 	}
 
 	err = b.configureMasterRoute()
@@ -98,6 +105,18 @@ func (b *Bootstrapper) buildCloudProvider() error {
 	}
 	b.cloudProvider = cloudProvider
 	b.masterBootstrap = masterBootstrap
+
+	return nil
+}
+
+func (b *Bootstrapper) configureMasterPublicIP() error {
+	ip := b.config.MasterPublicIP
+
+	err := b.masterBootstrap.AttachPublicIP(ip)
+	if err != nil {
+		// TODO: This is retryable
+		return fmt.Errorf("error attaching public IP (%s): %v", ip, err)
+	}
 
 	return nil
 }

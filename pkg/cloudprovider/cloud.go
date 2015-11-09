@@ -166,4 +166,7 @@ type MasterBootstrap interface {
 	// The volume id will typically be an ID for the default volume type for that cloud,
 	// but is an opaque token typically provided to the bootstrapper in a config file.
 	AttachMasterVolume(volumeID string) (string, error)
+
+	// Attaches the specified public IP to the master
+	AttachPublicIP(ip string) error
 }

@@ -101,6 +101,9 @@ type EC2 interface {
 	DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
 
 	ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error)
+
+	DescribeAddresses(*ec2.DescribeAddressesInput) ([]*ec2.Address, error)
+	AssociateAddress(*ec2.AssociateAddressInput) (*ec2.AssociateAddressOutput, error)
 }
 
 // This is a simple pass-through of the ELB client interface, which allows for testing
@@ -441,6 +444,19 @@ func (s *awsSdkEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRoute
 
 func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
 	return s.ec2.ModifyInstanceAttribute(request)
+}
+
+func (s *awsSdkEC2) DescribeAddresses(request *ec2.DescribeAddressesInput) ([]*ec2.Address, error) {
+	// Not paged
+	response, err := s.ec2.DescribeAddresses(request)
+	if err != nil {
+		return nil, fmt.Errorf("error listing AWS addresses: %v", err)
+	}
+	return response.Addresses, nil
+}
+
+func (s *awsSdkEC2) AssociateAddress(request *ec2.AssociateAddressInput) (*ec2.AssociateAddressOutput, error) {
+	return s.ec2.AssociateAddress(request)
 }
 
 func init() {
@@ -1207,6 +1223,41 @@ func (c *AWSCloud) AttachMasterVolume(volumeID string) (string, error) {
 	}
 
 	return c.attachVolumeAt(awsInstance, disk, mountDevice, alreadyAttached)
+}
+
+// Implements MasterBootstrap.AttachPublicIP
+func (c *AWSCloud) AttachPublicIP(ip string) error {
+	instanceName := "" // self
+	awsInstance, err := c.getAwsInstance(instanceName)
+	if err != nil {
+		return err
+	}
+
+	addresses, err := c.ec2.DescribeAddresses(&ec2.DescribeAddressesInput{
+		PublicIps: []*string{aws.String(ip)},
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(addresses) != 1 {
+		return fmt.Errorf("unexpectedly found multiple public addresses matching IP: %q", ip)
+	}
+
+	request := &ec2.AssociateAddressInput{
+		AllocationId:       addresses[0].AllocationId,
+		AllowReassociation: aws.Bool(false), // Seems safer
+		InstanceId:         &awsInstance.awsID,
+	}
+
+	response, err := c.ec2.AssociateAddress(request)
+	if err != nil {
+		return fmt.Errorf("error associating public IP %q with instance %q: %v", ip, awsInstance.awsID, err)
+	}
+
+	glog.V(2).Info("associated public IP %q with instance %q, reservation id=%q", ip, awsInstance.awsID, aws.StringValue(response.AssociationId))
+
+	return nil
 }
 
 // Implements Volumes.DetachDisk
