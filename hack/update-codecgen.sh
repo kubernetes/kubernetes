@@ -48,6 +48,8 @@ for (( i=0; i<number; i++ )); do
 done
 result=""
 
+# NOTE: depends function assumes that the whole repository is under
+# */k8s.io/kubernetes directory - it will NOT work if that is not true.
 function depends {
   file=${generated_files[$1]//\.generated\.go/.go}
   deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
