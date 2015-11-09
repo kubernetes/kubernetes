@@ -25,7 +25,7 @@ function detect-master () {
   echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 function detect-nodes {
   echo "Nodes already detected" 1>&2
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
@@ -114,7 +114,7 @@ function ensure-temp-dir {
   fi
 }
 
-# Create a set of provision scripts for the master and each of the minions
+# Create a set of provision scripts for the master and each of the nodes
 function create-provision-scripts {
   ensure-temp-dir
 
@@ -139,9 +139,9 @@ function create-provision-scripts {
       echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
       echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-node.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-node.sh"
+    ) > "${KUBE_TEMP}/node-start-${i}.sh"
   done
 }
 
@@ -211,7 +211,7 @@ function verify-cluster {
     done
   done
 
-  # verify each minion has all required daemons
+  # verify each node has all required daemons
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     echo "Validating ${VAGRANT_NODE_NAMES[$i]}"
@@ -231,12 +231,12 @@ function verify-cluster {
   done
 
   echo
-  echo "Waiting for each minion to be registered with cloud provider"
+  echo "Waiting for each node to be registered with cloud provider"
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local validated="0"
     until [[ "$validated" == "1" ]]; do
-      local minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
-      validated=$(echo $minions | grep -c "${NODE_NAMES[i]}") || {
+      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+      validated=$(echo $nodes | grep -c "${NODE_NAMES[i]}") || {
         printf "."
         sleep 2
         validated="0"
@@ -324,34 +324,34 @@ function test-teardown {
   kube-down
 }
 
-# Find the minion name based on the IP address
+# Find the node name based on the IP address
 function find-vagrant-name-by-ip {
   local ip="$1"
   local ip_pattern="${NODE_IP_BASE}(.*)"
 
-  # This is subtle.  We map 10.245.2.2 -> minion-1.  We do this by matching a
+  # This is subtle.  We map 10.245.2.2 -> node-1.  We do this by matching a
   # regexp and using the capture to construct the name.
   [[ $ip =~ $ip_pattern ]] || {
     return 1
   }
 
-  echo "minion-$((${BASH_REMATCH[1]} - 1))"
+  echo "node-$((${BASH_REMATCH[1]} - 1))"
 }
 
-# Find the vagrant machine name based on the host name of the minion
-function find-vagrant-name-by-minion-name {
+# Find the vagrant machine name based on the host name of the node
+function find-vagrant-name-by-node-name {
   local ip="$1"
   if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
     echo "master"
     return $?
   fi
-  local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
+  local ip_pattern="${INSTANCE_PREFIX}-node-(.*)"
 
   [[ $ip =~ $ip_pattern ]] || {
     return 1
   }
 
-  echo "minion-${BASH_REMATCH[1]}"
+  echo "node-${BASH_REMATCH[1]}"
 }
 
 
@@ -362,7 +362,7 @@ function ssh-to-node {
   local machine
 
   machine=$(find-vagrant-name-by-ip $node) || true
-  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-minion-name $node) || true
+  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-node-name $node) || true
   [[ -n ${machine-} ]] || {
     echo "Cannot find machine to ssh to: $1"
     return 1

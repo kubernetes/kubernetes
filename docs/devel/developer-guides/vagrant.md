@@ -47,7 +47,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 ### Setup
 
-By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-minion-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
+By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-node-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
 ```sh
 cd kubernetes
@@ -74,14 +74,14 @@ To access the master or any node:
 
 ```sh
 vagrant ssh master
-vagrant ssh minion-1
+vagrant ssh node-1
 ```
 
 If you are running more than one nodes, you can access the others by:
 
 ```sh
-vagrant ssh minion-2
-vagrant ssh minion-3
+vagrant ssh node-2
+vagrant ssh node-3
 ```
 
 To view the service status and/or logs on the kubernetes-master:
@@ -101,11 +101,11 @@ $ vagrant ssh master
 To view the services on any of the nodes:
 
 ```console
-$ vagrant ssh minion-1
-[vagrant@kubernetes-minion-1] $ sudo systemctl status docker
-[vagrant@kubernetes-minion-1] $ sudo journalctl -r -u docker
-[vagrant@kubernetes-minion-1] $ sudo systemctl status kubelet
-[vagrant@kubernetes-minion-1] $ sudo journalctl -r -u kubelet
+$ vagrant ssh node-1
+[vagrant@kubernetes-node-1] $ sudo systemctl status docker
+[vagrant@kubernetes-node-1] $ sudo journalctl -r -u docker
+[vagrant@kubernetes-node-1] $ sudo systemctl status kubelet
+[vagrant@kubernetes-node-1] $ sudo journalctl -r -u kubelet
 ```
 
 ### Interacting with your Kubernetes cluster with Vagrant.
@@ -139,9 +139,9 @@ You may need to build the binaries first, you can do this with `make`
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
-kubernetes-minion-0whl   kubernetes.io/hostname=kubernetes-minion-0whl   Ready
-kubernetes-minion-4jdf   kubernetes.io/hostname=kubernetes-minion-4jdf   Ready
-kubernetes-minion-epbe   kubernetes.io/hostname=kubernetes-minion-epbe   Ready
+kubernetes-node-0whl   kubernetes.io/hostname=kubernetes-node-0whl   Ready
+kubernetes-node-4jdf   kubernetes.io/hostname=kubernetes-node-4jdf   Ready
+kubernetes-node-epbe   kubernetes.io/hostname=kubernetes-node-epbe   Ready
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -206,9 +206,9 @@ Your cluster is running, you can list the nodes in your cluster:
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
-kubernetes-minion-0whl   kubernetes.io/hostname=kubernetes-minion-0whl   Ready
-kubernetes-minion-4jdf   kubernetes.io/hostname=kubernetes-minion-4jdf   Ready
-kubernetes-minion-epbe   kubernetes.io/hostname=kubernetes-minion-epbe   Ready
+kubernetes-node-0whl   kubernetes.io/hostname=kubernetes-node-0whl   Ready
+kubernetes-node-4jdf   kubernetes.io/hostname=kubernetes-node-4jdf   Ready
+kubernetes-node-epbe   kubernetes.io/hostname=kubernetes-node-epbe   Ready
 ```
 
 Now start running some containers!
@@ -245,11 +245,11 @@ my-nginx-kqdjk    1/1       Waiting   0          33s
 my-nginx-nyj3x    1/1       Waiting   0          33s
 ```
 
-You need to wait for the provisioning to complete, you can monitor the minions by doing:
+You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
 ```console
-$ sudo salt '*minion-1' cmd.run 'docker images'
-kubernetes-minion-1:
+$ sudo salt '*node-1' cmd.run 'docker images'
+kubernetes-node-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
     <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
     kubernetes/pause    latest              6c4579af347b        8 weeks ago         239.8 kB
@@ -258,8 +258,8 @@ kubernetes-minion-1:
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
 ```console
-$ sudo salt '*minion-1' cmd.run 'docker ps'
-kubernetes-minion-1:
+$ sudo salt '*node-1' cmd.run 'docker ps'
+kubernetes-node-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
     dbe79bf6e25b        nginx:latest              "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
     fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
@@ -346,7 +346,7 @@ It's very likely you see a build error due to an error in your source files!
 
 #### I have brought Vagrant up but the nodes won't validate!
 
-Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the nodes (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the nodes (`vagrant ssh node-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
 #### I want to change the number of nodes!
 
