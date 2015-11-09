@@ -1953,7 +1953,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 
 	if containersStarted != len(containerChanges.ContainersToStart) {
-		return fmt.Errorf("not all containers have started: %d != %d", containersStarted, containerChanges.ContainersToStart)
+		return fmt.Errorf("not all containers have started: %d != %d", containersStarted, len(containerChanges.ContainersToStart))
 	}
 	return nil
 }
