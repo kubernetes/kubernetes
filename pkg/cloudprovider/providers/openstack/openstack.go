@@ -764,10 +764,10 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for Openstack.
+// MasterBootstrap returns an implementation of MasterBootstrap for Openstack.
 // However the driver does not currently support master volumes,
 // so this implementation always returns (nil, false).
-func (os *OpenStack) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+func (os *OpenStack) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return nil, false
 }
 

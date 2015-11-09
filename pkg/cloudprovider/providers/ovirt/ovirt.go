@@ -143,10 +143,10 @@ func (v *OVirtCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for oVirt cloud.
+// MasterBootstrap returns an implementation of MasterBootstrap for oVirt cloud.
 // However the driver does not currently support master volumes,
 // so this implementation always returns (nil, false).
-func (v *OVirtCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+func (v *OVirtCloud) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return nil, false
 }
 

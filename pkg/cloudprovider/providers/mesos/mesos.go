@@ -108,10 +108,10 @@ func (c *MesosCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for Mesos.
+// MasterBootstrap returns an implementation of MasterBootstrap for Mesos.
 // However the driver does not currently support master volumes,
 // so this implementation always returns (nil, false).
-func (c *MesosCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+func (c *MesosCloud) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return nil, false
 }
 

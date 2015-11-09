@@ -111,10 +111,10 @@ func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for Vagrant cloud.
+// MasterBootstrap returns an implementation of MasterBootstrap for Vagrant cloud.
 // However the driver does not currently support master volumes,
 // so this implementation always returns (nil, false).
-func (v *VagrantCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+func (v *VagrantCloud) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return nil, false
 }
 

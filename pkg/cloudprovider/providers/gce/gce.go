@@ -234,10 +234,10 @@ func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
 	return gce, true
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for Google Compute Engine.
+// MasterBootstrap returns an implementation of MasterBootstrap for Google Compute Engine.
 // However the driver does not currently support master volumes,
 // so this implementation always returns (nil, false).
-func (gce *GCECloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+func (gce *GCECloud) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return nil, false
 }
 

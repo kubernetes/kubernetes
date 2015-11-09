@@ -617,8 +617,8 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 	return aws, true
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for Amazon Web Services.
-func (c *AWSCloud) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+// MasterBootstrap returns an implementation of MasterBootstrap for Amazon Web Services.
+func (c *AWSCloud) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return c, true
 }
 
@@ -1186,7 +1186,7 @@ func (c *AWSCloud) attachVolumeAt(awsInstance *awsInstance, disk *awsDisk, mount
 	return hostDevice, nil
 }
 
-// Implements MasterVolumes.AttachMasterVolume
+// Implements MasterBootstrap.AttachMasterVolume
 func (c *AWSCloud) AttachMasterVolume(volumeID string) (string, error) {
 	disk, err := newAWSDisk(c, volumeID)
 	if err != nil {

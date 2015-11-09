@@ -30,9 +30,10 @@ import (
 
 // Bootstrapper is the main bootstrapping manager class
 type Bootstrapper struct {
-	ConfigFile    string
-	config        Configuration
-	cloudProvider cloudprovider.Interface
+	ConfigFile      string
+	config          Configuration
+	cloudProvider   cloudprovider.Interface
+	masterBootstrap cloudprovider.MasterBootstrap
 }
 
 // NewBootstrapper creates a Bootstrapper instance.
@@ -90,7 +91,14 @@ func (b *Bootstrapper) buildCloudProvider() error {
 	if cloudProvider == nil {
 		return fmt.Errorf("cloud provider not found (%s)", b.config.CloudProvider)
 	}
+
+	masterBootstrap, ok := b.cloudProvider.MasterBootstrap()
+	if !ok {
+		return fmt.Errorf("cloud provider does not support master bootstrap (%s)", b.config.CloudProvider)
+	}
 	b.cloudProvider = cloudProvider
+	b.masterBootstrap = masterBootstrap
+
 	return nil
 }
 
@@ -99,12 +107,7 @@ func (b *Bootstrapper) mountMasterVolume() error {
 	// but it is probably easier just to rely on it being present in config
 	volumeID := b.config.MasterVolume
 
-	masterVolumes, ok := b.cloudProvider.MasterVolumes()
-	if !ok {
-		return fmt.Errorf("cloud provider does not support master volumes (%s)", b.config.CloudProvider)
-	}
-
-	device, err := masterVolumes.AttachMasterVolume(volumeID)
+	device, err := b.masterBootstrap.AttachMasterVolume(volumeID)
 	if err != nil {
 		// TODO: This is retryable
 		return fmt.Errorf("error attaching volume (%s): %v", volumeID, err)

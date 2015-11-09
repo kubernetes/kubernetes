@@ -377,10 +377,10 @@ func (os *Rackspace) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 
-// MasterVolumes returns an implementation of MasterVolumes for Rackspace cloud.
+// MasterBootstrap returns an implementation of MasterBootstrap for Rackspace cloud.
 // However the driver does not currently support master volumes,
 // so this implementation always returns (nil, false).
-func (r *Rackspace) MasterVolumes() (cloudprovider.MasterVolumes, bool) {
+func (r *Rackspace) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
 	return nil, false
 }
 
