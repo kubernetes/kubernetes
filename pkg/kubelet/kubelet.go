@@ -117,10 +117,14 @@ const (
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity = 1000
 
-	// Relisting is used to discover missing container events.
-	// Use a shorter period because generic PLEG relies on relisting for
-	// container events.
+	// Generic PLEG relies on relisting for discovering container events.
+	// The period directly affects the response time of kubelet.
 	plegRelistPeriod = time.Second * 3
+
+	// backOffPeriod is the period to back off when pod syncing resulting in an
+	// error. It is also used as the base period for the exponential backoff
+	// container restarts and image pulls.
+	backOffPeriod = time.Second * 10
 )
 
 var (
@@ -437,11 +441,9 @@ func NewMainKubelet(
 	}
 	klet.runtimeCache = runtimeCache
 	klet.workQueue = queue.NewBasicWorkQueue()
-	// TODO(yujuhong): backoff and resync interval should be set differently
-	// once we switch to using pod event generator.
-	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, klet.resyncInterval)
+	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod)
 
-	klet.backOff = util.NewBackOff(resyncInterval, MaxContainerBackOff)
+	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
 	return klet, nil
