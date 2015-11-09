@@ -168,7 +168,7 @@ function test-setup() {
   echo "... in gke:test-setup()" >&2
   # Detect the project into $PROJECT if it isn't set
   detect-project >&2
-  detect-minions >&2
+  detect-nodes >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
   NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
@@ -210,9 +210,9 @@ function detect-master() {
 #   none
 # Vars set:
 #   NODE_NAMES
-function detect-minions() {
-  echo "... in gke:detect-minions()" >&2
-  detect-minion-names
+function detect-nodes() {
+  echo "... in gke:detect-nodes()" >&2
+  detect-node-names
 }
 
 # Detect minions created in the minion group
@@ -221,8 +221,8 @@ function detect-minions() {
 #   none
 # Vars set:
 #   NODE_NAMES
-function detect-minion-names {
-  echo "... in gke:detect-minion-names()" >&2
+function detect-node-names {
+  echo "... in gke:detect-node-names()" >&2
   detect-project
   detect-node-instance-group
   NODE_NAMES=($(gcloud compute instance-groups managed list-instances \

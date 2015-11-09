@@ -215,7 +215,7 @@ function upload-server-tars() {
 #   NODE_INSTANCE_PREFIX
 # Vars set:
 #   NODE_NAMES
-function detect-minion-names {
+function detect-node-names {
   detect-project
   NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
     "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
@@ -230,9 +230,9 @@ function detect-minion-names {
 # Vars set:
 #   NODE_NAMES
 #   KUBE_NODE_IP_ADDRESSES (array)
-function detect-minions () {
+function detect-nodes () {
   detect-project
-  detect-minion-names
+  detect-node-names
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -686,7 +686,7 @@ function kube-up {
       "${NODE_INSTANCE_PREFIX}-group" \
 			--zone "${ZONE}" \
 			--project "${PROJECT}" || true;
-  detect-minion-names
+  detect-node-names
   detect-master
 
   # Create autoscaler for nodes if requested
@@ -1027,7 +1027,7 @@ function prepare-push() {
   ensure-temp-dir
   detect-project
   detect-master
-  detect-minion-names
+  detect-node-names
   get-kubeconfig-basicauth
   get-kubeconfig-bearertoken
 

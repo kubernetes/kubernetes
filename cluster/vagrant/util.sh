@@ -26,8 +26,8 @@ function detect-master () {
 }
 
 # Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
-function detect-minions {
-  echo "Minions already detected" 1>&2
+function detect-nodes {
+  echo "Nodes already detected" 1>&2
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
 
@@ -277,7 +277,7 @@ function verify-cluster {
     echo "  https://${MASTER_IP}:9090"
     echo
     echo "For more information on Cockpit, visit http://cockpit-project.org"
-    echo 
+    echo
     echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
   )
