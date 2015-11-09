@@ -63,8 +63,8 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 	}
 
 	// Watch and queue pods that need scheduling.
-	updates := make(chan queue.Entry, c.UpdatesBacklog)
-	podUpdates := &podStoreAdapter{queue.NewHistorical(updates)}
+	podUpdatesBypass := make(chan queue.Entry, c.UpdatesBacklog)
+	podUpdates := &podStoreAdapter{queue.NewHistorical(podUpdatesBypass)}
 	reflector := cache.NewReflector(lw, &api.Pod{}, podUpdates, 0)
 
 	q := queuer.New(queue.NewDelayFIFO(), podUpdates)
@@ -101,7 +101,7 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 
 	runtime.On(startLatch, func() {
 		reflector.Run() // TODO(jdef) should listen for termination
-		podDeleter.Run(updates, terminate)
+		podDeleter.Run(podUpdatesBypass, terminate)
 		q.Run(terminate)
 
 		q.InstallDebugHandlers(mux)
