@@ -110,21 +110,22 @@ type CloudConfig struct {
 }
 
 type TestContextType struct {
-	KubeConfig            string
-	KubeContext           string
-	CertDir               string
-	Host                  string
-	RepoRoot              string
-	Provider              string
-	CloudConfig           CloudConfig
-	KubectlPath           string
-	OutputDir             string
-	prefix                string
-	MinStartupPods        int
-	UpgradeTarget         string
-	PrometheusPushGateway string
-	VerifyServiceAccount  bool
-	DeleteNamespace       bool
+	KubeConfig                        string
+	KubeContext                       string
+	CertDir                           string
+	Host                              string
+	RepoRoot                          string
+	Provider                          string
+	CloudConfig                       CloudConfig
+	KubectlPath                       string
+	OutputDir                         string
+	prefix                            string
+	MinStartupPods                    int
+	UpgradeTarget                     string
+	PrometheusPushGateway             string
+	VerifyServiceAccount              bool
+	DeleteNamespace                   bool
+	GatherKubeSystemResourceUsageData bool
 }
 
 var testContext TestContextType
