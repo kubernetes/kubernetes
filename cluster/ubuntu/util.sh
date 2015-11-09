@@ -38,7 +38,7 @@ function setClusterInfo() {
   # Such as, you will have NODE_IPS=192.168.0.2,192.168.0.3,192.168.0.2,192.168.0.3 which is obviously wrong
   NODE_IPS=""
   
-  ii=0
+  local ii=0
   for i in $nodes; do
     nodeIP=${i#*@}
 
@@ -108,7 +108,7 @@ function trap-add {
 }
 
 function verify-cluster {
-  ii=0
+  local ii=0
 
   for i in ${nodes}
   do
@@ -283,7 +283,7 @@ function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=()
   setClusterInfo
 
-  ii=0
+  local ii=0
   for i in ${nodes}
   do
     if [ "${roles[${ii}]}" == "i" ] || [ "${roles[${ii}]}" == "ai" ]; then
@@ -310,7 +310,7 @@ function kube-up() {
   fi
 
   setClusterInfo
-  ii=0
+  local ii=0
 
   for i in ${nodes}
   do
@@ -420,7 +420,7 @@ function kube-down {
   source "${KUBE_ROOT}/cluster/common.sh"
   tear_down_alive_resources
 
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     {
       echo "Cleaning on node ${i#*@}"
@@ -473,7 +473,7 @@ function push-master {
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   
   setClusterInfo
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "a" ]]; then
       echo "Cleaning master ${i#*@}"
@@ -515,10 +515,13 @@ function push-node() {
   fi
 
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
-  node_ip=${1}
+  local node_ip=${1}
+
   setClusterInfo
-  ii=0
-  existing=false
+
+  local ii=0
+  local localexisting=false
+
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "i" && ${i#*@} == $node_ip ]]; then
       echo "Cleaning node ${i#*@}"
@@ -561,7 +564,7 @@ function kube-push {
   
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   #stop all the kube's process & etcd 
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     {
       echo "Cleaning on node ${i#*@}"
@@ -584,7 +587,7 @@ function kube-push {
 
   #provision all nodes,including master & nodes
   setClusterInfo
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "a" ]]; then
       provision-master
