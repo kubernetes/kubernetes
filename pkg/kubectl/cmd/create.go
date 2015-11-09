@@ -111,13 +111,11 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
-		if err != nil {
+		if err := createAndRefresh(info); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
 		count++
-		info.Refresh(obj, true)
 		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 		if !shortOutput {
 			printObjectSpecificMessage(info.Object, out)
@@ -163,4 +161,14 @@ func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
 	}
 	return strings.Join(pieces, ",")
+}
+
+// createAndRefresh creates an object from input info and refreshes info with that object
+func createAndRefresh(info *resource.Info) error {
+	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	if err != nil {
+		return err
+	}
+	info.Refresh(obj, true)
+	return nil
 }
