@@ -196,7 +196,7 @@ function find-running-minions () {
   done
 }
 
-function detect-minions () {
+function detect-nodes () {
   find-running-minions
 
   # This is inefficient, but we want NODE_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
@@ -1105,7 +1105,7 @@ function check-cluster() {
 
   sleep 5
 
-  detect-minions > $LOG
+  detect-nodes > $LOG
 
   # Don't bail on errors, we want to be able to print some info.
   set +e

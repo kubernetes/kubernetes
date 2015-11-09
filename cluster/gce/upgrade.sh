@@ -184,7 +184,7 @@ function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
   SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
 
-  detect-minion-names
+  detect-node-names
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
