@@ -59,7 +59,7 @@ func TestNameStrategy(t *testing.T) {
 		t.Errorf("Wanted %#v, got %#v", e, a)
 	}
 
-	o = Orderer{NewRawNamer(nil)}
+	o = Orderer{NewRawNamer("my/package", nil)}
 	order = o.Order(u)
 	orderedNames = make([]string, len(order))
 	for i, t := range order {
@@ -67,6 +67,18 @@ func TestNameStrategy(t *testing.T) {
 	}
 
 	expect = []string{"[]bar.Baz", "bar.Baz", "map[string]bar.Baz", "other.Baz", "string"}
+	if e, a := expect, orderedNames; !reflect.DeepEqual(e, a) {
+		t.Errorf("Wanted %#v, got %#v", e, a)
+	}
+
+	o = Orderer{NewRawNamer("foo/bar", nil)}
+	order = o.Order(u)
+	orderedNames = make([]string, len(order))
+	for i, t := range order {
+		orderedNames[i] = o.Name(t)
+	}
+
+	expect = []string{"Baz", "[]Baz", "map[string]Baz", "other.Baz", "string"}
 	if e, a := expect, orderedNames; !reflect.DeepEqual(e, a) {
 		t.Errorf("Wanted %#v, got %#v", e, a)
 	}
