@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -53,19 +55,19 @@ type RESTUpdateStrategy interface {
 }
 
 // TODO: add other common fields that require global validation.
-func validateCommonFields(obj, old runtime.Object) field.ErrorList {
+func validateCommonFields(obj, old runtime.Object) (field.ErrorList, error) {
 	allErrs := field.ErrorList{}
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return append(allErrs, field.InternalError(field.NewPath("metadata"), err))
+		return nil, fmt.Errorf("failed to get new object metadata: %v", err)
 	}
 	oldObjectMeta, err := api.ObjectMetaFor(old)
 	if err != nil {
-		return append(allErrs, field.InternalError(field.NewPath("metadata"), err))
+		return nil, fmt.Errorf("failed to get old object metadata: %v", err)
 	}
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(objectMeta, oldObjectMeta, field.NewPath("metadata"))...)
 
-	return allErrs
+	return allErrs, nil
 }
 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
@@ -87,7 +89,10 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	strategy.PrepareForUpdate(obj, old)
 
 	// Ensure some common fields, like UID, are validated for all resources.
-	errs := validateCommonFields(obj, old)
+	errs, err := validateCommonFields(obj, old)
+	if err != nil {
+		return errors.NewInternalError(err)
+	}
 
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
