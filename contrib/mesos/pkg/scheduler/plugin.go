@@ -321,7 +321,10 @@ func (k *kubeScheduler) doSchedule(task *podtask.T) (string, error) {
 
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table
-		if offer, ok := k.api.offers().Get(task.GetOfferId()); !ok || offer.HasExpired() {
+		var ok bool
+		offer, ok = k.api.offers().Get(task.GetOfferId())
+
+		if !ok || offer.HasExpired() {
 			task.Offer.Release()
 			task.Reset()
 			if err = k.api.tasks().Update(task); err != nil {
