@@ -70,7 +70,7 @@ func (deploymentStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (deploymentStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
-	return validation.ValidateDeploymentUpdate(old.(*extensions.Deployment), obj.(*extensions.Deployment))
+	return validation.ValidateDeploymentUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
 }
 
 func (deploymentStrategy) AllowUnconditionalUpdate() bool {
@@ -92,7 +92,7 @@ func (deploymentStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (deploymentStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
-	return validation.ValidateDeploymentUpdate(old.(*extensions.Deployment), obj.(*extensions.Deployment))
+	return validation.ValidateDeploymentUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
 }
 
 // DeploymentToSelectableFields returns a field set that represents the object.

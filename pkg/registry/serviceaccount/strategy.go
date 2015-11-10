@@ -65,7 +65,7 @@ func cleanSecretReferences(serviceAccount *api.ServiceAccount) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateServiceAccountUpdate(old.(*api.ServiceAccount), obj.(*api.ServiceAccount))
+	return validation.ValidateServiceAccountUpdate(obj.(*api.ServiceAccount), old.(*api.ServiceAccount))
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
