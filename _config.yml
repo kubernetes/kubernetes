@@ -89,6 +89,8 @@ collections:
       output: true
    v1.0:
       output: true
+   docs:
+      output: true
 
 # Page default settings
 defaults:
