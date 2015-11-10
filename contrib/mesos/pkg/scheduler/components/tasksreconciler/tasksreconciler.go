@@ -17,6 +17,7 @@ limitations under the License.
 package taskreconciler
 
 import (
+	"fmt"
 	"time"
 
 	log "github.com/golang/glog"
@@ -179,4 +180,56 @@ requestLoop:
 		case <-time.After(r.cooldown): // noop
 		}
 	} // for
+}
+
+// MakeComposite invokes the given ReconcilerAction funcs in sequence, aborting the sequence if reconciliation
+// is cancelled. if any other errors occur the composite reconciler will attempt to complete the
+// sequence, reporting only the last generated error.
+func MakeComposite(done <-chan struct{}, actions ...Action) Action {
+	if x := len(actions); x == 0 {
+		// programming error
+		panic("no actions specified for composite reconciler")
+	} else if x == 1 {
+		return actions[0]
+	}
+	chained := func(d bindings.SchedulerDriver, c <-chan struct{}, a, b Action) <-chan error {
+		ech := a(d, c)
+		ch := make(chan error, 1)
+		go func() {
+			select {
+			case <-done:
+			case <-c:
+			case e := <-ech:
+				if e != nil {
+					ch <- e
+					return
+				}
+				ech = b(d, c)
+				select {
+				case <-done:
+				case <-c:
+				case e := <-ech:
+					if e != nil {
+						ch <- e
+						return
+					}
+					close(ch)
+					return
+				}
+			}
+			ch <- fmt.Errorf("aborting composite reconciler action")
+		}()
+		return ch
+	}
+	result := func(d bindings.SchedulerDriver, c <-chan struct{}) <-chan error {
+		return chained(d, c, actions[0], actions[1])
+	}
+	for i := 2; i < len(actions); i++ {
+		i := i
+		next := func(d bindings.SchedulerDriver, c <-chan struct{}) <-chan error {
+			return chained(d, c, Action(result), actions[i])
+		}
+		result = next
+	}
+	return Action(result)
 }
