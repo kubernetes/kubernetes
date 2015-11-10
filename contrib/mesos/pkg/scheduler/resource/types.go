@@ -19,6 +19,8 @@ package resource
 import (
 	"fmt"
 	"strconv"
+
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 type MegaBytes float64
@@ -30,11 +32,11 @@ func (f *CPUShares) Set(s string) error {
 	return err
 }
 
-func (f *CPUShares) Type() string {
+func (f CPUShares) Type() string {
 	return "float64"
 }
 
-func (f *CPUShares) String() string { return fmt.Sprintf("%v", *f) }
+func (f CPUShares) String() string { return fmt.Sprintf("%v", float64(f)) }
 
 func (f *MegaBytes) Set(s string) error {
 	v, err := strconv.ParseFloat(s, 64)
@@ -42,8 +44,24 @@ func (f *MegaBytes) Set(s string) error {
 	return err
 }
 
-func (f *MegaBytes) Type() string {
+func (f MegaBytes) Type() string {
 	return "float64"
 }
 
-func (f *MegaBytes) String() string { return fmt.Sprintf("%v", *f) }
+func (f MegaBytes) String() string { return fmt.Sprintf("%v", float64(f)) }
+
+func (f MegaBytes) Quantity() *resource.Quantity {
+	return resource.NewQuantity(int64(float64(f)*1024.0*1024.0), resource.BinarySI)
+}
+
+func (f CPUShares) Quantity() *resource.Quantity {
+	return resource.NewMilliQuantity(int64(float64(f)*1000.0), resource.DecimalSI)
+}
+
+func NewCPUShares(q resource.Quantity) CPUShares {
+	return CPUShares(float64(q.MilliValue()) / 1000.0)
+}
+
+func NewMegaBytes(q resource.Quantity) MegaBytes {
+	return MegaBytes(float64(q.Value()) / 1024.0 / 1024.0)
+}

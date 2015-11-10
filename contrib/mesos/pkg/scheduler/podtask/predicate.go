@@ -100,8 +100,15 @@ func NewPodFitsResourcesPredicate(c mresource.CPUShares, m mresource.MegaBytes) 
 		// calculate cpu and mem sum over all containers of the pod
 		// TODO (@sttts): also support pod.spec.resources.limit.request
 		// TODO (@sttts): take into account the executor resources
-		cpu := mresource.CPUForPod(&t.Pod, c)
-		mem := mresource.MemForPod(&t.Pod, m)
+		_, cpu, _, err := mresource.CPUForPod(&t.Pod, c)
+		if err != nil {
+			return false
+		}
+		_, mem, _, err := mresource.MemForPod(&t.Pod, m)
+		if err != nil {
+			return false
+		}
+
 		log.V(4).Infof("trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)
 		if (cpu > offeredCpus) || (mem > offeredMem) {
 			log.V(3).Infof("not enough resources for pod %v/%v: cpus: %.2f mem: %.2f MB", t.Pod.Namespace, t.Pod.Name, cpu, mem)

@@ -190,7 +190,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 			}},
 		}},
 	}
-	task, err = New(api.NewDefaultContext(), "", *pod, &mesos.ExecutorInfo{})
+	task, err = New(api.NewDefaultContext(), "", pod)
 	if err != nil {
 		t.Fatal(err)
 	}
