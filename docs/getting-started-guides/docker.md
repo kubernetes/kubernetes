@@ -112,6 +112,8 @@ docker run \
 
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
 
+Be advised that the API server will listen on 0.0.0.0 - as specified in the manifest - so it can be reached from outside the host. You should set up authentication or firewall accordingly.
+
 ### Step Three: Run the service proxy
 
 ```sh
