@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -133,10 +132,6 @@ func getAllNodesInCluster(c *client.Client) ([]string, error) {
 }
 
 func getInfluxdbClient(c *client.Client) (*influxdb.Client, error) {
-	kubeMasterHttpClient, ok := c.Client.(*http.Client)
-	if !ok {
-		Failf("failed to get master http client")
-	}
 	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/%s/services/%s:api/", getMasterHost(), api.NamespaceSystem, influxdbService)
 	config := &influxdb.ClientConfig{
 		Host: proxyUrl,
@@ -144,7 +139,7 @@ func getInfluxdbClient(c *client.Client) (*influxdb.Client, error) {
 		Username:   influxdbUser,
 		Password:   influxdbPW,
 		Database:   influxdbDatabaseName,
-		HttpClient: kubeMasterHttpClient,
+		HttpClient: c.Client,
 		IsSecure:   true,
 	}
 	return influxdb.NewClient(config)
