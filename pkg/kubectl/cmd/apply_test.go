@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -220,7 +219,7 @@ func TestApplyNonExistObject(t *testing.T) {
 		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathNameRC && m == "GET":
-				return &http.Response{StatusCode: 404}, errors.NewNotFound("ReplicationController", "")
+				return &http.Response{StatusCode: 404, Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathRC && m == "POST":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 201, Body: bodyRC}, nil
