@@ -385,7 +385,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 	APIGroupList := unversioned.APIGroupList{
 		Groups: []unversioned.APIGroup{
 			{
-				Versions: []unversioned.GroupVersion{
+				Versions: []unversioned.GroupVersionForDiscovery{
 					{
 						GroupVersion: "group1/v1",
 					},
@@ -395,7 +395,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 				},
 			},
 			{
-				Versions: []unversioned.GroupVersion{
+				Versions: []unversioned.GroupVersionForDiscovery{
 					{
 						GroupVersion: "group2/v1",
 					},

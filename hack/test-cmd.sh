@@ -570,6 +570,82 @@ runTests() {
   ! [[ $(diff -q "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced > /dev/null) ]]
   # Clean up
   rm "${KUBE_TEMP}"/test-pod-replace.yaml "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced
+  kubectl delete pods test-pod "${kube_flags[@]}"
+
+  ## Configuration annotations should be set when --save-config is enabled
+  ## 1. kubectl create --save-config should generate configuration annotation
+  # Pre-Condition: no POD is running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create a pod "test-pod"
+  kubectl create -f hack/testdata/pod.yaml --save-config "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  ## 2. kubectl edit --save-config should generate configuration annotation
+  # Pre-Condition: no POD is running, then create pod "test-pod", which shouldn't have configuration annotation
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Command: edit the pod "test-pod"
+  temp_editor="${KUBE_TEMP}/tmp-editor.sh"
+  echo -e '#!/bin/bash\nsed -i "s/test-pod-label/test-pod-label-edited/g" $@' > "${temp_editor}"
+  chmod +x "${temp_editor}"
+  EDITOR=${temp_editor} kubectl edit pod test-pod --save-config "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  ## 3. kubectl replace --save-config should generate configuration annotation
+  # Pre-Condition: no POD is running, then create pod "test-pod", which shouldn't have configuration annotation
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Command: replace the pod "test-pod"
+  kubectl replace -f hack/testdata/pod.yaml --save-config "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  ## 4. kubectl run --save-config should generate configuration annotation
+  # Pre-Condition: no RC is running
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create the rc "nginx" with image nginx
+  kubectl run nginx --image=nginx --save-config "${kube_flags[@]}"
+  # Post-Condition: rc "nginx" has configuration annotation
+  [[ "$(kubectl get rc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  ## 5. kubectl expose --save-config should generate configuration annotation
+  # Pre-Condition: no service is running
+  kube::test::get_object_assert svc "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  # Command: expose the rc "nginx"
+  kubectl expose rc nginx --save-config --port=80 --target-port=8000 "${kube_flags[@]}"
+  # Post-Condition: service "nginx" has configuration annotation
+  [[ "$(kubectl get svc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up
+  kubectl delete rc,svc nginx 
+  ## 6. kubectl autoscale --save-config should generate configuration annotation
+  # Pre-Condition: no RC is running, then create the rc "frontend", which shouldn't have configuration annotation
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  ! [[ "$(kubectl get rc frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Command: autoscale rc "frontend" 
+  kubectl autoscale -f examples/guestbook/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
+  # Post-Condition: hpa "frontend" has configuration annotation
+  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up
+  kubectl delete rc,hpa frontend
+
+  ## kubectl apply should create the resource that doesn't exist yet
+  # Pre-Condition: no POD is running 
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a pod "test-pod" (doesn't exist) should create this pod 
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is running
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up 
+  kubectl delete pods test-pod "${kube_flags[@]}"
 
   ##############
   # Namespaces #

@@ -2,20 +2,36 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: redis-slave
+  # these labels can be applied automatically
+  # from the labels in the pod template if not set
   labels:
-    name: redis-slave
+    app: redis
+    role: slave
+    tier: backend
 spec:
+  # this replicas value is default
+  # modify it according to your case
   replicas: 2
-  selector:
-    name: redis-slave
+  # selector can be applied automatically
+  # from the labels in the pod template if not set
+  # selector:
+  #   app: guestbook
+  #   role: slave
+  #   tier: backend
   template:
     metadata:
       labels:
-        name: redis-slave
+        app: redis
+        role: slave
+        tier: backend
     spec:
       containers:
-      - name: worker
+      - name: slave
         image: gcr.io/google_samples/gb-redisslave:v1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
         env:
         - name: GET_HOSTS_FROM
           value: dns

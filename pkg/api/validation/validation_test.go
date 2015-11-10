@@ -18,6 +18,7 @@ package validation
 
 import (
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -807,22 +808,26 @@ func TestValidateVolumeMounts(t *testing.T) {
 
 func TestValidateProbe(t *testing.T) {
 	handler := api.Handler{Exec: &api.ExecAction{Command: []string{"echo"}}}
-	successCases := []*api.Probe{
-		nil,
-		{TimeoutSeconds: 10, InitialDelaySeconds: 0, Handler: handler},
-		{TimeoutSeconds: 0, InitialDelaySeconds: 10, Handler: handler},
+	// These fields must be positive.
+	positiveFields := [...]string{"InitialDelaySeconds", "TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
+	successCases := []*api.Probe{nil}
+	for _, field := range positiveFields {
+		probe := &api.Probe{Handler: handler}
+		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(10)
+		successCases = append(successCases, probe)
 	}
+
 	for _, p := range successCases {
 		if errs := validateProbe(p); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := []*api.Probe{
-		{TimeoutSeconds: 10, InitialDelaySeconds: 10},
-		{TimeoutSeconds: 10, InitialDelaySeconds: -10, Handler: handler},
-		{TimeoutSeconds: -10, InitialDelaySeconds: 10, Handler: handler},
-		{TimeoutSeconds: -10, InitialDelaySeconds: -10, Handler: handler},
+	errorCases := []*api.Probe{{TimeoutSeconds: 10, InitialDelaySeconds: 10}}
+	for _, field := range positiveFields {
+		probe := &api.Probe{Handler: handler}
+		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(-10)
+		errorCases = append(errorCases, probe)
 	}
 	for _, p := range errorCases {
 		if errs := validateProbe(p); len(errs) == 0 {
@@ -1793,6 +1798,14 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "missing ports but headless",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports = nil
+				s.Spec.ClusterIP = api.ClusterIPNone
+			},
+			numErrs: 0,
+		},
+		{
 			name: "empty port[0] name",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Name = ""
@@ -2147,7 +2160,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerStatusUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
+		if errs := ValidateReplicationControllerStatusUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2177,7 +2190,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerStatusUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
+		if errs := ValidateReplicationControllerStatusUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -2266,7 +2279,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
+		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2341,7 +2354,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerUpdate(&errorCase.old, &errorCase.update); len(errs) == 0 {
+		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -2851,7 +2864,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
 		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.oldNode, &test.node)
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
@@ -2960,7 +2973,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 		oldSvc := makeValidService()
 		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
-		errs := ValidateServiceUpdate(&oldSvc, &newSvc)
+		errs := ValidateServiceUpdate(&newSvc, &oldSvc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, utilerrors.NewAggregate(errs))
 		}

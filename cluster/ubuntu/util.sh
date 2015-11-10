@@ -38,7 +38,7 @@ function setClusterInfo() {
   # Such as, you will have NODE_IPS=192.168.0.2,192.168.0.3,192.168.0.2,192.168.0.3 which is obviously wrong
   NODE_IPS=""
   
-  ii=0
+  local ii=0
   for i in $nodes; do
     nodeIP=${i#*@}
 
@@ -108,7 +108,7 @@ function trap-add {
 }
 
 function verify-cluster {
-  ii=0
+  local ii=0
 
   for i in ${nodes}
   do
@@ -283,7 +283,7 @@ function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=()
   setClusterInfo
 
-  ii=0
+  local ii=0
   for i in ${nodes}
   do
     if [ "${roles[${ii}]}" == "i" ] || [ "${roles[${ii}]}" == "ai" ]; then
@@ -310,7 +310,7 @@ function kube-up() {
   fi
 
   setClusterInfo
-  ii=0
+  local ii=0
 
   for i in ${nodes}
   do
@@ -331,6 +331,7 @@ function kube-up() {
   done
   wait
 
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   verify-cluster
   detect-master
   export CONTEXT="ubuntu"
@@ -414,25 +415,25 @@ function provision-masterandnode() {
 
 # Delete a kubernetes cluster
 function kube-down {
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
-  
   source "${KUBE_ROOT}/cluster/common.sh"
   tear_down_alive_resources
 
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     {
       echo "Cleaning on node ${i#*@}"
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
-        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop && sudo rm -rf /infra*; 
+        ssh $SSH_OPTS -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop && sudo rm -rf /infra*; 
           sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd'
       elif [[ "${roles[${ii}]}" == "i" ]]; then
-        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop'
+        ssh $SSH_OPTS -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop'
       else
         echo "unsupported role for ${i}"
       fi
       # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
-      ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
+      ssh $SSH_OPTS -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube /var/lib/kubelet;
@@ -464,18 +465,19 @@ function prepare-push() {
 # Update a kubernetes master with expected release
 function push-master {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
-
+  
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
     exit 1
   fi
-
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
+  
   setClusterInfo
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "a" ]]; then
       echo "Cleaning master ${i#*@}"
-      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
+      ssh $SSH_OPTS -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
       sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd;
       sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
@@ -484,7 +486,7 @@ function push-master {
       provision-master
     elif [[ "${roles[${ii}]}" == "ai" ]]; then 
       echo "Cleaning master ${i#*@}"
-      ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
+      ssh $SSH_OPTS -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
       sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd;
       sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
@@ -512,14 +514,18 @@ function push-node() {
     exit 1
   fi
 
-  node_ip=${1}
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
+  local node_ip=${1}
+
   setClusterInfo
-  ii=0
-  existing=false
+
+  local ii=0
+  local localexisting=false
+
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "i" && ${i#*@} == $node_ip ]]; then
       echo "Cleaning node ${i#*@}"
-      ssh -t $i 'sudo -p "[sudo] stop the all process: " service flanneld stop;
+      ssh $SSH_OPTS -t $i 'sudo -p "[sudo] stop the all process: " service flanneld stop;
       sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
@@ -555,22 +561,23 @@ function kube-push {
     echo "There is no required release of kubernetes, please check first"
     exit 1
   fi
-
+  
+  export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
   #stop all the kube's process & etcd 
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     {
       echo "Cleaning on node ${i#*@}"
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
-        ssh -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop; 
+        ssh $SSH_OPTS -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop; 
         sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd' || true
       elif [[ "${roles[${ii}]}" == "i" ]]; then
-        ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop' || true
+        ssh $SSH_OPTS -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop' || true
       else
         echo "unsupported role for ${i}"
       fi
 
-      ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
+      ssh $SSH_OPTS -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
       sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube' || true
@@ -580,7 +587,7 @@ function kube-push {
 
   #provision all nodes,including master & nodes
   setClusterInfo
-  ii=0
+  local ii=0
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "a" ]]; then
       provision-master

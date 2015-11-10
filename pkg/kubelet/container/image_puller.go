@@ -65,7 +65,7 @@ func shouldPullImage(container *api.Container, imagePresent bool) bool {
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
 func (puller *imagePuller) logIt(ref *api.ObjectReference, event, prefix, msg string, logFn func(args ...interface{})) {
 	if ref != nil {
-		puller.recorder.Eventf(ref, event, msg)
+		puller.recorder.Event(ref, event, msg)
 	} else {
 		logFn(fmt.Sprint(prefix, " ", msg))
 	}

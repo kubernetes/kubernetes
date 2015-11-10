@@ -33,7 +33,9 @@ Documentation for other releases can be found at
 
 ## Installing a Kubernetes Master Node via Docker
 
-We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is `${MASTER_IP}`
+We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine
+is `${MASTER_IP}`.  We'll need to run several versioned Kubernetes components, so we'll assume that the version we want
+to run is `${K8S_VERSION}`, which should hold a value such as "1.0.7".
 
 There are two main phases to installing the master:
    * [Setting up `flanneld` and `etcd`](#setting-up-flanneld-and-etcd)
@@ -44,7 +46,7 @@ There are two main phases to installing the master:
 
 _Note_:
 There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
-Please install Docker 1.6.2 or Docker 1.7.1.
+Please install Docker 1.6.2 or Docker 1.7.1 or Docker 1.8.3.
 
 ### Setup Docker-Bootstrap
 
@@ -171,7 +173,7 @@ sudo docker run \
     --privileged=true \
     --pid=host \ 
     -d \
-    gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
 ```
 
 > Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
@@ -179,24 +181,40 @@ sudo docker run \
 ### Also run the service proxy
 
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
-Download the kubectl binary and make it available by editing your PATH ENV.
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
+Download the kubectl binary for `${K8S_VERSION}` (look at the URL in the following links) and make it available by editing your PATH environment variable.
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/linux/amd64/kubectl))
 
-List the nodes
+For example, OS X:
+
+```console
+$ wget http://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/darwin/amd64/kubectl
+$ chmod 755 kubectl
+$ PATH=$PATH:`pwd`
+```
+
+Linux:
+
+```console
+$ wget http://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
+$ chmod 755 kubectl
+$ PATH=$PATH:`pwd`
+```
+
+Now you can list the nodes:
 
 ```sh
 kubectl get nodes
 ```
 
-This should print:
+This should print something like:
 
 ```console
 NAME        LABELS                             STATUS

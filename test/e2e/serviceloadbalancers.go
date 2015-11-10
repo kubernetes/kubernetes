@@ -88,7 +88,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Create a replication controller with the given configuration.
 	rc := rcFromManifest(h.cfg)
 	rc.Namespace = namespace
-	rc.Spec.Template.Labels["rcName"] = rc.Name
+	rc.Spec.Template.Labels["name"] = rc.Name
 
 	// Add the --namespace arg.
 	// TODO: Remove this when we have proper namespace support.
@@ -102,7 +102,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	if err != nil {
 		return
 	}
-	if err = waitForRCPodsRunning(h.client, namespace, h.rcName); err != nil {
+	if err = waitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -110,7 +110,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
-		labels.Set(map[string]string{"rcName": h.rcName}))
+		labels.Set(map[string]string{"name": h.rcName}))
 	pods, err := h.client.Pods(h.rcNamespace).List(
 		labelSelector, fields.Everything())
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *ingManager) start(namespace string) (err error) {
 	for _, rcPath := range s.rcCfgPaths {
 		rc := rcFromManifest(rcPath)
 		rc.Namespace = namespace
-		rc.Spec.Template.Labels["rcName"] = rc.Name
+		rc.Spec.Template.Labels["name"] = rc.Name
 		rc, err = s.client.ReplicationControllers(rc.Namespace).Create(rc)
 		if err != nil {
 			return

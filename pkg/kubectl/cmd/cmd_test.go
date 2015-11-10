@@ -232,6 +232,26 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 			generator, ok := generators[name]
 			return generator, ok
 		},
+		LogsForObject: func(object, options runtime.Object) (*client.Request, error) {
+			fakeClient := t.Client.(*fake.RESTClient)
+			c := client.NewOrDie(t.ClientConfig)
+			c.Client = fakeClient.Client
+
+			switch t := object.(type) {
+			case *api.Pod:
+				opts, ok := options.(*api.PodLogOptions)
+				if !ok {
+					return nil, errors.New("provided options object is not a PodLogOptions")
+				}
+				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
+			default:
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("cannot get the logs from %s", kind)
+			}
+		},
 	}
 	rf := cmdutil.NewFactory(nil)
 	f.PodSelectorForObject = rf.PodSelectorForObject

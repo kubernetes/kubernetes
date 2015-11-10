@@ -85,11 +85,9 @@ func ToConditionStatus(s probe.Result) api.ConditionStatus {
 func (rs *REST) getComponentStatus(name string, server apiserver.Server) *api.ComponentStatus {
 	transport := rs.rt
 	status, msg, err := server.DoServerCheck(transport)
-	var errorMsg string
+	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()
-	} else {
-		errorMsg = "nil"
 	}
 
 	c := &api.ComponentCondition{

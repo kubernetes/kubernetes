@@ -43,8 +43,8 @@ import (
 //       expressing any API object.
 //  * Only versioned objects should be encoded. This means that, if you pass
 //    a native object, Encode will convert it to a versioned object. For
-//    example, an api.Pod will get converted to a v1beta1.Pod. However, if
-//    you pass in an object that's already versioned (v1beta1.Pod), Encode
+//    example, an api.Pod will get converted to a v1.Pod. However, if
+//    you pass in an object that's already versioned (v1.Pod), Encode
 //    will not modify it.
 //
 // The purpose of the above complex conversion behavior is to allow us to

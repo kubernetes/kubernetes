@@ -26,23 +26,16 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 API_REFERENCE_DOCS_ROOT="${KUBE_ROOT}/docs/api-reference"
-# Use REPO_DIR if provided so we can set it to the host-resolvable path
-# to the repo root if we are running this script from a container with
-# docker mounted in as a volume.
-# We pass the host output dir to update-api-reference-docs.sh, but use
-# the regular one to compute diff (they will be the same if running this
-# test on the host, potentially different if running in a container).
-REPO_DIR=${REPO_DIR:-"${KUBE_ROOT}"}
-HOST_OUTPUT_DIR="${REPO_DIR}/_tmp/api-reference"
-TMP_OUTPUT_DIR="${KUBE_ROOT}/_tmp/api-reference"
+OUTPUT_DIR="${KUBE_ROOT}/_tmp/api-reference"
+mkdir -p ${OUTPUT_DIR}
 TMP_ROOT="${KUBE_ROOT}/_tmp"
 
 # Generate API reference docs in tmp.
-"./hack/update-api-reference-docs.sh" "${HOST_OUTPUT_DIR}"
+"./hack/update-api-reference-docs.sh" "${OUTPUT_DIR}"
 
 echo "diffing ${API_REFERENCE_DOCS_ROOT} against freshly generated docs"
 ret=0
-diff -Naupr -I 'Last update' --exclude=*.md "${API_REFERENCE_DOCS_ROOT}" "${TMP_OUTPUT_DIR}" || ret=$?
+diff -Naupr -I 'Last update' --exclude=*.md "${API_REFERENCE_DOCS_ROOT}" "${OUTPUT_DIR}" || ret=$?
 rm -rf "${TMP_ROOT}"
 if [[ $ret -eq 0 ]]
 then

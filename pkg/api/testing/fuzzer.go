@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/google/gofuzz"
-	"speter.net/go/exp/math/dec/inf"
 )
 
 // FuzzerFor can randomly populate api objects that are destined for version.
@@ -111,15 +110,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
 		},
-		func(j *api.PodTemplateSpec, c fuzz.Continue) {
-			// TODO: v1beta1/2 can't round trip a nil template correctly, fix by having v1beta1/2
-			// conversion compare converted object to nil via DeepEqual
-			j.ObjectMeta = api.ObjectMeta{}
-			c.Fuzz(&j.ObjectMeta)
-			j.ObjectMeta = api.ObjectMeta{Labels: j.ObjectMeta.Labels}
-			j.Spec = api.PodSpec{}
-			c.Fuzz(&j.Spec)
-		},
 		func(j *api.Binding, c fuzz.Continue) {
 			c.Fuzz(&j.ObjectMeta)
 			j.Target.Name = c.RandString()
@@ -188,15 +178,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			pm[c.RandString()] = docker.PortMapping{
 				c.RandString(): c.RandString(),
 			}
-		},
-		func(q *resource.Quantity, c fuzz.Continue) {
-			// Real Quantity fuzz testing is done elsewhere;
-			// this limited subset of functionality survives
-			// round-tripping to v1beta1/2.
-			q.Amount = &inf.Dec{}
-			q.Format = resource.DecimalExponent
-			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
-			q.Amount.SetUnscaled(c.Int63n(1000))
 		},
 		func(q *api.ResourceRequirements, c fuzz.Continue) {
 			randomQuantity := func() resource.Quantity {
@@ -283,6 +264,18 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 		},
+		func(p *api.Probe, c fuzz.Continue) {
+			c.FuzzNoCustom(p)
+			// These fields have default values.
+			intFieldsWithDefaults := [...]string{"TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
+			v := reflect.ValueOf(p).Elem()
+			for _, field := range intFieldsWithDefaults {
+				f := v.FieldByName(field)
+				if f.Int() == 0 {
+					f.SetInt(1)
+				}
+			}
+		},
 		func(ev *api.EnvVar, c fuzz.Continue) {
 			ev.Name = c.RandString()
 			if c.RandBool() {
@@ -311,15 +304,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				}
 				c.Fuzz(&sc.Capabilities.Add)
 				c.Fuzz(&sc.Capabilities.Drop)
-			}
-		},
-		func(e *api.Event, c fuzz.Continue) {
-			c.FuzzNoCustom(e) // fuzz self without calling this function again
-			// Fix event count to 1, otherwise, if a v1beta1 or v1beta2 event has a count set arbitrarily, it's count is ignored
-			if e.FirstTimestamp.IsZero() {
-				e.Count = 1
-			} else {
-				c.Fuzz(&e.Count)
 			}
 		},
 		func(s *api.Secret, c fuzz.Continue) {

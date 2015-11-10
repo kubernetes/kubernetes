@@ -97,6 +97,10 @@ Creates a replication controller to manage the created container(s).
     The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and \-\-replicas must be 1.  Default 'Always'
 
 .PP
+\fB\-\-save\-config\fP=false
+    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
+
+.PP
 \fB\-\-service\-generator\fP="service/v2"
     The name of the generator to use for creating a service.  Only used if \-\-expose is true
 

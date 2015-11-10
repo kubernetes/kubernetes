@@ -235,7 +235,7 @@ func ValidatePositiveQuantity(value resource.Quantity, fieldName string) errs.Va
 	return allErrs
 }
 
-func ValidateImmutableField(old, new interface{}, fieldName string) errs.ValidationErrorList {
+func ValidateImmutableField(new, old interface{}, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if !api.Semantic.DeepEqual(old, new) {
 		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, new, fieldImmutableErrorMsg))
@@ -324,10 +324,10 @@ func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList
 		allErrs = append(allErrs, errs.NewFieldInvalid("resourceVersion", new.ResourceVersion, "resourceVersion must be specified for an update"))
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(old.Name, new.Name, "name")...)
-	allErrs = append(allErrs, ValidateImmutableField(old.Namespace, new.Namespace, "namespace")...)
-	allErrs = append(allErrs, ValidateImmutableField(old.UID, new.UID, "uid")...)
-	allErrs = append(allErrs, ValidateImmutableField(old.CreationTimestamp, new.CreationTimestamp, "creationTimestamp")...)
+	allErrs = append(allErrs, ValidateImmutableField(new.Name, old.Name, "name")...)
+	allErrs = append(allErrs, ValidateImmutableField(new.Namespace, old.Namespace, "namespace")...)
+	allErrs = append(allErrs, ValidateImmutableField(new.UID, old.UID, "uid")...)
+	allErrs = append(allErrs, ValidateImmutableField(new.CreationTimestamp, old.CreationTimestamp, "creationTimestamp")...)
 
 	allErrs = append(allErrs, ValidateLabels(new.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateAnnotations(new.Annotations, "annotations")...)
@@ -881,12 +881,11 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 		return allErrs
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler)...)
-	if probe.InitialDelaySeconds < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("initialDelay", probe.InitialDelaySeconds, "may not be less than zero"))
-	}
-	if probe.TimeoutSeconds < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("timeout", probe.TimeoutSeconds, "may not be less than zero"))
-	}
+	allErrs = append(allErrs, ValidatePositiveField(probe.InitialDelaySeconds, "initialDelaySeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(probe.TimeoutSeconds, "timeoutSeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.PeriodSeconds), "periodSeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.SuccessThreshold), "successThreshold")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.FailureThreshold), "failureThreshold")...)
 	return allErrs
 }
 
@@ -1030,6 +1029,11 @@ func validateContainers(containers []api.Container, volumes sets.String) errs.Va
 			cErrs = append(cErrs, validateLifecycle(ctr.Lifecycle).Prefix("lifecycle")...)
 		}
 		cErrs = append(cErrs, validateProbe(ctr.LivenessProbe).Prefix("livenessProbe")...)
+		// Liveness-specific validation
+		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
+			allErrs = append(allErrs, errs.NewFieldForbidden("livenessProbe.successThreshold", "must be 1"))
+		}
+
 		cErrs = append(cErrs, validateProbe(ctr.ReadinessProbe).Prefix("readinessProbe")...)
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
@@ -1224,7 +1228,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName).Prefix("metadata")...)
 
-	if len(service.Spec.Ports) == 0 {
+	if len(service.Spec.Ports) == 0 && service.Spec.ClusterIP != api.ClusterIPNone {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.ports"))
 	}
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
@@ -1341,12 +1345,12 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
-func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErrorList {
+func ValidateServiceUpdate(service, oldService *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta).Prefix("metadata")...)
 
 	if api.IsServiceIPSet(oldService) {
-		allErrs = append(allErrs, ValidateImmutableField(oldService.Spec.ClusterIP, service.Spec.ClusterIP, "spec.clusterIP")...)
+		allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, "spec.clusterIP")...)
 	}
 
 	allErrs = append(allErrs, ValidateService(service)...)
@@ -1362,7 +1366,7 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.V
 }
 
 // ValidateReplicationControllerUpdate tests if required fields in the replication controller are set.
-func ValidateReplicationControllerUpdate(oldController, controller *api.ReplicationController) errs.ValidationErrorList {
+func ValidateReplicationControllerUpdate(controller, oldController *api.ReplicationController) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
@@ -1370,7 +1374,7 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 }
 
 // ValidateReplicationControllerStatusUpdate tests if required fields in the replication controller are set.
-func ValidateReplicationControllerStatusUpdate(oldController, controller *api.ReplicationController) errs.ValidationErrorList {
+func ValidateReplicationControllerStatusUpdate(controller, oldController *api.ReplicationController) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(controller.Status.Replicas), "status.replicas")...)
@@ -1463,7 +1467,7 @@ func ValidateNode(node *api.Node) errs.ValidationErrorList {
 }
 
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
-func ValidateNodeUpdate(oldNode *api.Node, node *api.Node) errs.ValidationErrorList {
+func ValidateNodeUpdate(node *api.Node, oldNode *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta).Prefix("metadata")...)
 
@@ -1640,7 +1644,7 @@ func ValidateServiceAccount(serviceAccount *api.ServiceAccount) errs.ValidationE
 }
 
 // ValidateServiceAccountUpdate tests if required fields in the ServiceAccount are set.
-func ValidateServiceAccountUpdate(oldServiceAccount, newServiceAccount *api.ServiceAccount) errs.ValidationErrorList {
+func ValidateServiceAccountUpdate(newServiceAccount, oldServiceAccount *api.ServiceAccount) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newServiceAccount.ObjectMeta, &oldServiceAccount.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateServiceAccount(newServiceAccount)...)
@@ -1704,7 +1708,7 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 }
 
 // ValidateSecretUpdate tests if required fields in the Secret are set.
-func ValidateSecretUpdate(oldSecret, newSecret *api.Secret) errs.ValidationErrorList {
+func ValidateSecretUpdate(newSecret, oldSecret *api.Secret) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newSecret.ObjectMeta, &oldSecret.ObjectMeta).Prefix("metadata")...)
 
@@ -1712,7 +1716,7 @@ func ValidateSecretUpdate(oldSecret, newSecret *api.Secret) errs.ValidationError
 		newSecret.Type = oldSecret.Type
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(oldSecret.Type, newSecret.Type, "type")...)
+	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, "type")...)
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
 	return allErrs
@@ -1977,7 +1981,7 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool) errs.Validat
 }
 
 // ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
-func ValidateEndpointsUpdate(oldEndpoints, newEndpoints *api.Endpoints) errs.ValidationErrorList {
+func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *api.Endpoints) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets).Prefix("subsets")...)

@@ -101,6 +101,7 @@ framework-name
 framework-weburi
 func-dest
 fuzz-iters
+gather-resource-usage
 gce-project
 gce-zone
 gke-cluster
@@ -266,6 +267,7 @@ root-ca-file
 root-dir
 run-proxy
 runtime-config
+save-config
 scheduler-config
 schema-cache-dir
 secure-port

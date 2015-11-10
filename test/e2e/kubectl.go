@@ -56,9 +56,9 @@ const (
 	kittenImage              = "gcr.io/google_containers/update-demo:kitten"
 	updateDemoSelector       = "name=update-demo"
 	updateDemoContainer      = "update-demo"
-	frontendSelector         = "name=frontend"
-	redisMasterSelector      = "name=redis-master"
-	redisSlaveSelector       = "name=redis-slave"
+	frontendSelector         = "app=guestbook,tier=frontend"
+	redisMasterSelector      = "app=redis,role=master"
+	redisSlaveSelector       = "app=redis,role=slave"
 	goproxyContainer         = "goproxy"
 	goproxyPodSelector       = "name=goproxy"
 	netexecContainer         = "netexec"
@@ -211,10 +211,9 @@ var _ = Describe("Kubectl client", func() {
 
 			// Build the static kubectl
 			By("Finding a static kubectl for upload")
-			testStaticKubectlPath := path.Join(testContext.RepoRoot, "platforms/linux/386/kubectl")
-			_, err = os.Stat(testStaticKubectlPath)
+			testStaticKubectlPath, err := findBinary("kubectl", "linux/386")
 			if err != nil {
-				Logf("No kubectl in %s. Attempting a local build...", testStaticKubectlPath)
+				Logf("No kubectl found: %v.\nAttempting a local build...", err)
 				// Fall back to trying to build a local static kubectl
 				kubectlContainerPath := path.Join(testContext.RepoRoot, "/examples/kubectl-container/")
 				if _, err := os.Stat(path.Join(testContext.RepoRoot, "hack/build-go.sh")); err != nil {
@@ -260,10 +259,10 @@ var _ = Describe("Kubectl client", func() {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
 			resp, err := c.Post().
-				Prefix("proxy").
 				Namespace(ns).
 				Name("netexec").
 				Resource("pods").
+				SubResource("proxy").
 				Suffix("upload").
 				SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
 				Body(pipeConfigReader).
@@ -287,10 +286,10 @@ var _ = Describe("Kubectl client", func() {
 			var uploadOutput NetexecOutput
 			// Upload the kubectl binary
 			resp, err = c.Post().
-				Prefix("proxy").
 				Namespace(ns).
 				Name("netexec").
 				Resource("pods").
+				SubResource("proxy").
 				Suffix("upload").
 				SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
 				Body(pipeReader).
@@ -325,10 +324,10 @@ var _ = Describe("Kubectl client", func() {
 				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
 				// Execute kubectl on remote exec server.
 				netexecShellOutput, err := c.Post().
-					Prefix("proxy").
 					Namespace(ns).
 					Name("netexec").
 					Resource("pods").
+					SubResource("proxy").
 					Suffix("shell").
 					Param("shellCommand", shellCommand).
 					Do().Raw()
@@ -1121,9 +1120,9 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
 		body, err := c.Get().
-			Prefix("proxy").
 			Namespace(ns).
 			Resource("pods").
+			SubResource("proxy").
 			Name(podID).
 			Suffix("data.json").
 			Do().
@@ -1200,4 +1199,35 @@ func streamingUpload(file *os.File, fileName string, postBodyWriter *multipart.W
 	if err := postBodyWriter.Close(); err != nil {
 		Failf("Unable to close the writer for file upload. Error: %s", err)
 	}
+}
+
+var binPrefixes = []string{
+	"_output/dockerized/bin",
+	"_output/local/bin",
+	"platforms",
+}
+
+// findBinary searches through likely paths to find the specified binary.  It
+// takes the one that has been built most recently.  Platform should be
+// specified as '<os>/<arch>'.  For example: 'linux/amd64'.
+func findBinary(binName string, platform string) (string, error) {
+	var binTime time.Time
+	var binPath string
+
+	for _, pre := range binPrefixes {
+		tryPath := path.Join(testContext.RepoRoot, pre, platform, binName)
+		fi, err := os.Stat(tryPath)
+		if err != nil {
+			continue
+		}
+		if fi.ModTime().After(binTime) {
+			binPath = tryPath
+			binTime = fi.ModTime()
+		}
+	}
+
+	if len(binPath) > 0 {
+		return binPath, nil
+	}
+	return binPath, fmt.Errorf("Could not find %v for %v", binName, platform)
 }

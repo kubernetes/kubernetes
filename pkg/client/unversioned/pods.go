@@ -38,6 +38,7 @@ type PodInterface interface {
 	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
 	Bind(binding *api.Binding) error
 	UpdateStatus(pod *api.Pod) (*api.Pod, error)
+	GetLogs(name string, opts *api.PodLogOptions) *Request
 }
 
 // pods implements PodsNamespacer interface
@@ -117,4 +118,9 @@ func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
 	return
+}
+
+// Get constructs a request for getting the logs for a pod
+func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *Request {
+	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.Scheme)
 }

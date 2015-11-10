@@ -18,8 +18,12 @@ package container
 
 import (
 	"hash/adler32"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/third_party/golang/expansion"
 
@@ -103,4 +107,46 @@ func ExpandContainerCommandAndArgs(container *api.Container, envs []EnvVar) (com
 	}
 
 	return command, args
+}
+
+// Create an event recorder to record object's event except implicitly required container's, like infra container.
+func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
+	return &innerEventRecorder{
+		recorder: recorder,
+	}
+}
+
+type innerEventRecorder struct {
+	recorder record.EventRecorder
+}
+
+func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*api.ObjectReference, bool) {
+	if object == nil {
+		return nil, false
+	}
+	if ref, ok := object.(*api.ObjectReference); ok {
+		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
+			return ref, true
+		}
+	}
+	return nil, false
+}
+
+func (irecorder *innerEventRecorder) Event(object runtime.Object, reason, message string) {
+	if ref, ok := irecorder.shouldRecordEvent(object); ok {
+		irecorder.recorder.Event(ref, reason, message)
+	}
+}
+
+func (irecorder *innerEventRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
+	if ref, ok := irecorder.shouldRecordEvent(object); ok {
+		irecorder.recorder.Eventf(ref, reason, messageFmt, args...)
+	}
+
+}
+
+func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
+	if ref, ok := irecorder.shouldRecordEvent(object); ok {
+		irecorder.recorder.PastEventf(ref, timestamp, reason, messageFmt, args...)
+	}
 }

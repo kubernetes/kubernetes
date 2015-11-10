@@ -91,7 +91,7 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (daemonSetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	validationErrorList := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
-	updateErrorList := validation.ValidateDaemonSetUpdate(old.(*extensions.DaemonSet), obj.(*extensions.DaemonSet))
+	updateErrorList := validation.ValidateDaemonSetUpdate(obj.(*extensions.DaemonSet), old.(*extensions.DaemonSet))
 	return append(validationErrorList, updateErrorList...)
 }
 

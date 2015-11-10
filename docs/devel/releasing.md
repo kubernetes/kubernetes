@@ -145,7 +145,7 @@ export VER="vX.Y.0-alpha.W"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
@@ -157,7 +157,7 @@ This will do a dry run of:
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -173,20 +173,20 @@ export VER="vX.Y.Z-beta.W"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
 
-1. do a series of commits on the release branch for `vX.Y.Z-beta`;
-1. mark the `vX.Y.Z-beta` tag at the beta version commit;
+1. do a series of commits on the release branch for `vX.Y.Z-beta.W`;
+1. mark the `vX.Y.Z-beta.W` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -202,23 +202,23 @@ export VER="vX.Y.Z"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
 
 1. do a series of commits on the branch for `vX.Y.Z`;
 1. mark the `vX.Y.Z` tag at the release version commit;
-1. do a series of commits on the branch for `vX.Y.(Z+1)-beta` on top of the
+1. do a series of commits on the branch for `vX.Y.(Z+1)-beta.0` on top of the
    previous commits;
-1. mark the `vX.Y.(Z+1)-beta` tag at the beta version commit;
+1. mark the `vX.Y.(Z+1)-beta.0` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -238,22 +238,22 @@ export VER="vX.Y"
 then, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
 This will do a dry run of:
 
 1. mark the `vX.(Y+1).0-alpha.0` tag at the given git hash on `master`;
 1. fork a new branch `release-X.Y` off of `master` at the given git hash;
-1. do a series of commits on the branch for `vX.Y.0-beta`;
-1. mark the `vX.Y.0-beta` tag at the beta version commit;
+1. do a series of commits on the branch for `vX.Y.0-beta.0`;
+1. mark the `vX.Y.0-beta.0` tag at the beta version commit;
 1. prompt you to do the remainder of the work, including building the
    appropriate binaries and pushing them to the appropriate places.
 
 If you're satisfied with the result, run
 
 ```console
-release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
 ```
 
 and follow the instructions.
