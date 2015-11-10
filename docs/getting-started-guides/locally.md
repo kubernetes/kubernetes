@@ -157,7 +157,7 @@ hack/local-up-cluster.sh
 
 #### kubectl claims to start a container but `get pods` and `docker ps` don't show it.
 
-One or more of the KUbernetes daemons might've crashed. Tail the logs of each in /tmp.
+One or more of the Kubernetes daemons might've crashed. Tail the logs of each in /tmp.
 
 #### The pods fail to connect to the services by host names
 
