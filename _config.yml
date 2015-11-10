@@ -89,6 +89,7 @@ collections:
       output: true
    v1.0:
       output: true
+# We have to make docs a collection, otherwise the `redirect_to` tag in _docs/index.md does not work.
    docs:
       output: true
 
