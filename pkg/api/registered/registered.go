@@ -30,8 +30,7 @@ import (
 var RegisteredVersions []string
 
 func init() {
-	// TODO: caesarxuchao: rename this variable to validGroupVersions
-	validAPIVersions := map[string]bool{
+	validGroupVersions := map[string]bool{
 		"v1":                       true,
 		"extensions/v1beta1":       true,
 		"componentconfig/v1alpha1": true,
@@ -49,11 +48,11 @@ func init() {
 	versions := strings.Split(supportedVersions, ",")
 	for _, version := range versions {
 		// Verify that the version is valid.
-		valid, ok := validAPIVersions[version]
+		valid, ok := validGroupVersions[version]
 		if !ok || !valid {
 			// Not a valid API version.
 			glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
-				version, os.Getenv("KUBE_API_VERSIONS"), validAPIVersions)
+				version, os.Getenv("KUBE_API_VERSIONS"), validGroupVersions)
 		}
 		RegisteredVersions = append(RegisteredVersions, version)
 	}
