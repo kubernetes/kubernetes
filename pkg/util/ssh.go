@@ -184,7 +184,7 @@ func newSession(dialer sshDialer, user, host string, signer ssh.Signer) (*ssh.Se
 func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
 	session, err := newSession(dialer, user, host, signer)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
+		return "", "", 0, err
 	}
 	defer session.Close()
 

@@ -23,9 +23,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -196,7 +199,7 @@ func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec
 		Param("millicores", strconv.Itoa(millicores)).
 		Param("durationSec", strconv.Itoa(durationSec)).
 		DoRaw()
-	expectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 // sendOneConsumeMemRequest sends POST request for memory consumption
@@ -211,21 +214,21 @@ func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec 
 		Param("megabytes", strconv.Itoa(megabytes)).
 		Param("durationSec", strconv.Itoa(durationSec)).
 		DoRaw()
-	expectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func (rc *ResourceConsumer) GetReplicas() int {
 	switch rc.kind {
 	case kindRC:
 		replicationController, err := rc.framework.Client.ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name)
-		expectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		if replicationController == nil {
 			Failf(rcIsNil)
 		}
 		return replicationController.Status.Replicas
 	case kindDeployment:
 		deployment, err := rc.framework.Client.Deployments(rc.framework.Namespace.Name).Get(rc.name)
-		expectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		if deployment == nil {
 			Failf(deploymentIsNil)
 		}
@@ -287,7 +290,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 			},
 		},
 	})
-	expectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	rcConfig := RCConfig{
 		Client:     c,
@@ -302,21 +305,38 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		MemLimit:   memLimitMb * 1024 * 1024,
 	}
 
+	// Make sure endpoints are propagated.
+	watch, err := c.Endpoints(ns).Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
 	switch kind {
 	case kindRC:
-		expectNoError(RunRC(rcConfig))
+		Expect(RunRC(rcConfig)).NotTo(HaveOccurred())
 		break
 	case kindDeployment:
 		dpConfig := DeploymentConfig{
 			rcConfig,
 		}
-		expectNoError(RunDeployment(dpConfig))
+		Expect(RunDeployment(dpConfig)).NotTo(HaveOccurred())
 		break
 	default:
 		Failf(invalidKind)
 	}
 
-	// Make sure endpoints are propagated.
-	// TODO(piosz): replace sleep with endpoints watch.
-	time.Sleep(10 * time.Second)
+	ch := watch.ResultChan()
+	for {
+		event := <-ch
+		if event.Object == nil {
+			Logf("nil event: %v", event)
+			continue
+		}
+		endpoints, ok := event.Object.(*api.Endpoints)
+		if !ok {
+			Failf("unexpected object for endpoints watch: %v", event)
+			break
+		}
+		if len(endpoints.Subsets) == replicas {
+			watch.Stop()
+			break
+		}
+		Logf("Waiting for %d endpoints, saw %d", replicas, len(endpoints.Subsets))
+	}
 }
