@@ -167,7 +167,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -224,7 +224,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -299,7 +299,7 @@ func stringBody(body string) io.ReadCloser {
 
 func ExamplePrintReplicationControllerWithNamespace() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -341,7 +341,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 
 func ExamplePrintPodWithWideFormat() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -468,7 +468,7 @@ func newAllPhasePodList() *api.PodList {
 
 func ExamplePrintPodHideTerminated() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -488,7 +488,7 @@ func ExamplePrintPodHideTerminated() {
 
 func ExamplePrintPodShowAll() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -510,7 +510,7 @@ func ExamplePrintPodShowAll() {
 
 func ExamplePrintServiceWithNamespacesAndLabels() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, []string{"l1"})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, []string{"l1"})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
