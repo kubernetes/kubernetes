@@ -22,6 +22,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -88,9 +89,23 @@ type Runtime interface {
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	KillPod(pod *api.Pod, runningPod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
-	// all containers in the pod. Clients of this interface assume the containers
-	// statuses in a pod always have a deterministic ordering (eg: sorted by name).
+	// all containers in the pod. Clients of this interface assume the
+	// containers' statuses in a pod always have a deterministic ordering
+	// (e.g., sorted by name).
+	// TODO: Rename this to GetAPIPodStatus, and eventually deprecate the
+	// function in favor of GetRawPodStatus.
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
+	// GetRawPodStatus retrieves the status of the pod, including the
+	// information of all containers in the pod that are visble in Runtime.
+	// TODO: Rename this to GetPodStatus to replace the original function.
+	GetRawPodStatus(uid types.UID, name, namespace string) (*RawPodStatus, error)
+	// ConvertRawToPodStatus converts the RawPodStatus object to api.PodStatus.
+	// This function is needed because Docker generates some high-level and/or
+	// pod-level information for api.PodStatus (e.g., check whether the image
+	// exists to determine the reason).
+	// TODO: Deprecate this function once we generalize the logic for all
+	// container runtimes in kubelet.
+	ConvertRawToPodStatus(*api.Pod, *RawPodStatus) (*api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
@@ -136,7 +151,7 @@ type ImagePuller interface {
 	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 }
 
-// Pod is a group of containers, with the status of the pod.
+// Pod is a group of containers.
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod
 	// from the pod list returned by GetPods().
@@ -226,6 +241,52 @@ type Container struct {
 	Created int64
 	// Status is the status of the container.
 	Status ContainerStatus
+}
+
+// RawPodStatus represents the status of the pod and its containers.
+// api.PodStatus can be derived from examining RawPodStatus and api.Pod.
+type RawPodStatus struct {
+	// ID of the pod.
+	ID types.UID
+	// Name of the pod.
+	Name string
+	// Namspace of the pod.
+	Namespace string
+	// IP of the pod.
+	IP string
+	// Status of containers in the pod.
+	ContainerStatuses []*RawContainerStatus
+}
+
+// RawPodContainer represents the status of a container.
+type RawContainerStatus struct {
+	// ID of the container.
+	ID ContainerID
+	// Name of the container.
+	Name string
+	// Status of the container.
+	Status ContainerStatus
+	// Creation time of the container.
+	CreatedAt time.Time
+	// Start time of the container.
+	StartedAt time.Time
+	// Finish time of the container.
+	FinishedAt time.Time
+	// Exit code of the container.
+	ExitCode int
+	// Name of the image.
+	Image string
+	// ID of the image.
+	ImageID string
+	// Hash of the container, used for comparison.
+	Hash string
+	// Number of times that the container has been restarted.
+	RestartCount int
+	// A string explains why container is in such a status.
+	Reason string
+	// Message written by the container before exiting (stored in
+	// TerminationMessagePath).
+	Message string
 }
 
 // Basic information about a container image.
