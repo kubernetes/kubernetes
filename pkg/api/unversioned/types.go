@@ -17,7 +17,9 @@ limitations under the License.
 // Package unversioned contains API types that are common to all versions.
 package unversioned
 
-import "strings"
+import (
+	"strings"
+)
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -52,6 +54,27 @@ type ListMeta struct {
 	// Read-only.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
 	ResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
+// ListOptions is the query options to a standard REST list/watch calls.
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	LabelSelector LabelSelector `json:"labelSelector,omitempty"`
+	// A selector to restrict the list of returned objects by their fields.
+	// Defaults to everything.
+	FieldSelector FieldSelector `json:"fieldSelector,omitempty"`
+
+	// Watch for changes to the described resources and return them as a stream of
+	// add, update, and remove notifications. Specify resourceVersion.
+	Watch bool `json:"watch,omitempty"`
+	// When specified with a watch call, shows changes that occur after that particular version of a resource.
+	// Defaults to changes from the beginning of history.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+	// Timeout for the list/watch call.
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
 }
 
 // Status is a return value for calls that don't return other objects.
@@ -276,6 +299,7 @@ const (
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
 
+func (*ListOptions) IsAnAPIObject()     {}
 func (*Status) IsAnAPIObject()          {}
 func (*APIVersions) IsAnAPIObject()     {}
 func (*APIGroupList) IsAnAPIObject()    {}
