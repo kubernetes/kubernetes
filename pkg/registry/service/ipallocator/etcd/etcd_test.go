@@ -28,8 +28,8 @@ import (
 	allocatoretcd "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 func newStorage(t *testing.T) (*tools.FakeEtcdClient, ipallocator.Interface, allocator.Interface) {
