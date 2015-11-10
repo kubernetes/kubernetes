@@ -18,12 +18,11 @@ package errors
 
 import (
 	"errors"
-	"fmt"
 )
 
 var (
 	NoSuchPodErr               = errors.New("No such pod exists")
 	NoSuchTaskErr              = errors.New("No such task exists")
-	ReconciliationCancelledErr = fmt.Errorf("explicit task reconciliation cancelled")
+	ReconciliationCancelledErr = errors.New("explicit task reconciliation cancelled")
 	NoSuitableOffersErr        = errors.New("No suitable offers for pod/task")
 )
