@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -498,4 +499,38 @@ func TestStaticPodStatus(t *testing.T) {
 	})
 	_, found := m.GetPodStatus(otherPod.UID)
 	assert.False(t, found, "otherPod status should have been deleted")
+}
+
+func TestSetContainerReadiness(t *testing.T) {
+	containerID := kubecontainer.ContainerID{"test", "cOnTaInEr_Id"}
+	containerStatus := api.ContainerStatus{
+		Name:        "cOnTaInEr_NaMe",
+		ContainerID: containerID.String(),
+		Ready:       false,
+	}
+	status := api.PodStatus{
+		ContainerStatuses: []api.ContainerStatus{containerStatus},
+	}
+
+	m := newTestManager(&testclient.Fake{})
+
+	t.Log("Setting readiness before status should fail.")
+	m.SetContainerReadiness(testPod, containerID, true)
+	verifyUpdates(t, m, 0)
+
+	t.Log("Setting initial status.")
+	m.SetPodStatus(testPod, status)
+	verifyUpdates(t, m, 1)
+
+	t.Log("Setting unchanged readiness should do nothing.")
+	m.SetContainerReadiness(testPod, containerID, false)
+	verifyUpdates(t, m, 0)
+
+	t.Log("Setting different readiness should generate update.")
+	m.SetContainerReadiness(testPod, containerID, true)
+	verifyUpdates(t, m, 1)
+
+	t.Log("Setting non-existant container readiness should fail.")
+	m.SetContainerReadiness(testPod, kubecontainer.ContainerID{"test", "foo"}, true)
+	verifyUpdates(t, m, 0)
 }

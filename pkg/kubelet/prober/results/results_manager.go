@@ -70,7 +70,7 @@ type manager struct {
 	sync.RWMutex
 	// map of container ID -> probe Result
 	cache map[kubecontainer.ContainerID]Result
-	// channel of updates (may be nil)
+	// channel of updates
 	updates chan Update
 }
 
@@ -78,15 +78,10 @@ var _ Manager = &manager{}
 
 // NewManager creates ane returns an empty results manager.
 func NewManager() Manager {
-	m := &manager{cache: make(map[kubecontainer.ContainerID]Result)}
-	return m
-}
-
-// NewManager creates ane returns an empty results manager.
-func NewManagerWithUpdates() Manager {
-	m := NewManager().(*manager)
-	m.updates = make(chan Update, 20)
-	return m
+	return &manager{
+		cache:   make(map[kubecontainer.ContainerID]Result),
+		updates: make(chan Update, 20),
+	}
 }
 
 func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
@@ -98,7 +93,7 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 
 func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *api.Pod) {
 	if m.setInternal(id, result) {
-		m.pushUpdate(Update{id, result, pod})
+		m.updates <- Update{id, result, pod}
 	}
 }
 
@@ -122,11 +117,4 @@ func (m *manager) Remove(id kubecontainer.ContainerID) {
 
 func (m *manager) Updates() <-chan Update {
 	return m.updates
-}
-
-// pushUpdates sends an update on the updates channel if it is initialized.
-func (m *manager) pushUpdate(update Update) {
-	if m.updates != nil {
-		m.updates <- update
-	}
 }
