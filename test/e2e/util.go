@@ -802,9 +802,9 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
 		}
 		body, err := r.c.Get().
-			Prefix("proxy").
 			Namespace(r.ns).
 			Resource("pods").
+			SubResource("proxy").
 			Name(string(pod.Name)).
 			Do().
 			Raw()

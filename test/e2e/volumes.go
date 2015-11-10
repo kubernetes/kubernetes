@@ -227,8 +227,8 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	By("reading a web page from the client")
 	body, err := client.Get().
 		Namespace(config.namespace).
-		Prefix("proxy").
 		Resource("pods").
+		SubResource("proxy").
 		Name(clientPod.Name).
 		DoRaw()
 	expectNoError(err, "Cannot read web page: %v", err)
