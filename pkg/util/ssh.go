@@ -29,6 +29,7 @@ import (
 	mathrand "math/rand"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -163,8 +164,7 @@ func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 	return runSSHCommand(&realSSHDialer{}, cmd, user, host, signer)
 }
 
-// Internal implementation of runSSHCommand, for testing
-func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+func newSession(dialer sshDialer, user, host string, signer ssh.Signer) (*ssh.Session, error) {
 	if user == "" {
 		user = os.Getenv("USER")
 	}
@@ -175,9 +175,14 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) 
 	}
 	client, err := dialer.Dial("tcp", host, config)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
+		return nil, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
 	}
-	session, err := client.NewSession()
+	return client.NewSession()
+}
+
+// Internal implementation of runSSHCommand, for testing
+func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+	session, err := newSession(dialer, user, host, signer)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
 	}
@@ -203,6 +208,28 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) 
 		}
 	}
 	return bout.String(), berr.String(), code, err
+}
+
+func RunSCP(user, host, data, destDir, destFileName string, mode os.FileMode, signer ssh.Signer) error {
+	session, err := newSession(&realSSHDialer{}, user, host, signer)
+	if err != nil {
+		return fmt.Errorf("error creating session to host %s: '%v'", host, err)
+	}
+	defer session.Close()
+
+	fileSize := len(data)
+	go func() {
+		// ignore errors here. scp whould return errors if something goes wrong.
+		pipe, _ := session.StdinPipe()
+		defer pipe.Close()
+		fmt.Fprintf(pipe, "C%#o %d %s\n", mode, fileSize, destFileName)
+		io.Copy(pipe, strings.NewReader(data))
+		fmt.Fprint(pipe, "\x00")
+	}()
+	if err := session.Run(fmt.Sprintf("scp -t %s", destDir)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
