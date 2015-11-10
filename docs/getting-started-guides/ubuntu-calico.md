@@ -75,7 +75,7 @@ We'll use the `kubelet` to bootstrap the Kubernetes master processes as containe
 
 ```
 # Get the Kubernetes Release.
-wget https://github.com/kubernetes/kubernetes/releases/download/v1.1.0/kubernetes.tar.gz
+wget https://github.com/kubernetes/kubernetes/releases/download/v1.1.1/kubernetes.tar.gz
 
 # Extract the Kubernetes binaries.
 tar -xf kubernetes.tar.gz
