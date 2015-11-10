@@ -147,7 +147,20 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 		newQuery[subpathKey] = []string{req.PathParameter("path")}
 		query = newQuery
 	}
-	return queryToObject(query, scope, kind)
+	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	if err := scope.Codec.DecodeParametersInto(query, versioned); err != nil {
+		return nil, errors.NewBadRequest(err.Error())
+	}
+	out, err := scope.Convertor.ConvertToVersion(versioned, "")
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	return out, nil
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
@@ -226,15 +239,23 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		out, err := queryToObject(req.Request.URL.Query(), scope, "ListOptions")
+		versioned, err := scope.Creater.New(scope.ServerAPIVersion, "ListOptions")
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		opts := *out.(*api.ListOptions)
+		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), versioned); err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		opts := api.ListOptions{}
+		if err := scope.Convertor.Convert(versioned, &opts); err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
 
 		// transform fields
-		// TODO: queryToObject should do this.
+		// TODO: Should this be done as part of convertion?
 		fn := func(label, value string) (newLabel, newValue string, err error) {
 			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
 		}
@@ -677,27 +698,6 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		}
 		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
 	}
-}
-
-// queryToObject converts query parameters into a structured internal object by
-// kind. The caller must cast the returned object to the matching internal Kind
-// to use it.
-// TODO: add appropriate structured error responses
-func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
-	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
-	if err != nil {
-		// programmer error
-		return nil, err
-	}
-	if err := scope.Convertor.Convert(&query, versioned); err != nil {
-		return nil, errors.NewBadRequest(err.Error())
-	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, "")
-	if err != nil {
-		// programmer error
-		return nil, err
-	}
-	return out, nil
 }
 
 // resultFunc is a function that returns a rest result and can be run in a goroutine

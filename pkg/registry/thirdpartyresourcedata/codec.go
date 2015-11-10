@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -219,6 +220,10 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 		return err
 	}
 	return nil
+}
+
+func (t *thirdPartyResourceDataCodec) DecodeParametersInto(parameters url.Values, obj runtime.Object) error {
+	return t.delegate.DecodeParametersInto(parameters, obj)
 }
 
 const template = `{
