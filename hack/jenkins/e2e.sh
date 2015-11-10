@@ -47,6 +47,18 @@ function join_regex_no_empty() {
     fi
 }
 
+# GCP Project to fetch Trusty images.
+TRUSTY_IMAGE_PROJECT="${TRUSTY_IMAGE_PROJECT:-}"
+
+# Get the latest Trusty image for a Jenkins job.
+function get_latest_trusty_image() {
+    local image_index="${1:-${JOB_NAME}}"
+    gsutil cat "gs://${TRUSTY_IMAGE_PROJECT}/image-indices/latest-test-image-${image_index}"
+    # Clean up gsutil artifacts otherwise the later test stage will complain.
+    rm -rf .config &> /dev/null
+    rm -rf .gsutil &> /dev/null
+}
+
 echo "--------------------------------------------------------------------------------"
 echo "Initial Environment:"
 printenv | sort
@@ -211,6 +223,12 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
 
 GCE_RELEASE_SKIP_TESTS=(
     )
+
+# TODO(wonderfly): Delete this once
+# https://github.com/kubernetes/kubernetes/issues/12689 is fixed.
+TRUSTY_SKIP_TESTS=(
+    "Services.*should\swork\safter\srestarting\skube-proxy"
+)
 
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
@@ -466,6 +484,50 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-1-0"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.0"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
+    ;;
+
+  # Runs non-flaky tests on GCE with Trusty as base image for minions,
+  # sequentially.
+  kubernetes-e2e-gce-trusty-release)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-release"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-release"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+    : ${PROJECT:="kubekins-e2e-gce-trusty-rls"}
+    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_OS_DISTRIBUTION:="trusty"}
+    : ${ENABLE_CLUSTER_REGISTRY:=false}
+    # Ideally we would pin to the latest release version but since 1.1 is not
+    # out, we use the latest build number from the CI job.
+    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.1-beta.535+b59eb94b3bf0ee"}
+    ;;
+
+  # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
+  # sequentially.
+  kubernetes-e2e-gce-trusty-release-beta)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-release-beta"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-release-beta"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+    : ${PROJECT:="k8s-e2e-gce-trusty-beta"}
+    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_OS_DISTRIBUTION:="trusty"}
+    : ${ENABLE_CLUSTER_REGISTRY:=false}
+    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.1-beta.535+b59eb94b3bf0ee"}
     ;;
 
   # Runs non-flaky tests on GCE on the release candidate branch,
@@ -1274,6 +1336,9 @@ export KUBE_GCE_ZONE=${E2E_ZONE}
 export KUBE_GCE_NETWORK=${E2E_NETWORK}
 export KUBE_GCE_INSTANCE_PREFIX=${KUBE_GCE_INSTANCE_PREFIX:-}
 export KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX:-}
+export KUBE_GCE_MINION_PROJECT=${KUBE_GCE_MINION_PROJECT:-}
+export KUBE_GCE_MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-}
+export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
@@ -1290,6 +1355,8 @@ fi
 # Shared cluster variables
 export E2E_MIN_STARTUP_PODS=${E2E_MIN_STARTUP_PODS:-}
 export KUBE_ENABLE_CLUSTER_MONITORING=${ENABLE_CLUSTER_MONITORING:-}
+export KUBE_ENABLE_CLUSTER_REGISTRY=${ENABLE_CLUSTER_REGISTRY:-}
+export KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER=${ENABLE_HORIZONTAL_POD_AUTOSCALER:-}
 export KUBE_ENABLE_DEPLOYMENTS=${ENABLE_DEPLOYMENTS:-}
 export KUBE_ENABLE_EXPERIMENTAL_API=${ENABLE_EXPERIMENTAL_API:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
@@ -1299,6 +1366,7 @@ export NUM_MINIONS=${NUM_MINIONS:-}
 export TEST_CLUSTER_LOG_LEVEL=${TEST_CLUSTER_LOG_LEVEL:-}
 export TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:-}
 export PROJECT=${PROJECT:-}
+export JENKINS_EXPLICIT_VERSION=${JENKINS_EXPLICIT_VERSION:-}
 export JENKINS_PUBLISHED_VERSION=${JENKINS_PUBLISHED_VERSION:-'ci/latest'}
 
 export KUBE_ADMISSION_CONTROL=${ADMISSION_CONTROL:-}
