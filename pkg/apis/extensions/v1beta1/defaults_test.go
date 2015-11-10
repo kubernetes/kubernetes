@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestSetDefaultDaemonSet(t *testing.T) {
@@ -85,8 +85,8 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 }
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := util.NewIntOrStringFromInt(1)
-	differentIntOrString := util.NewIntOrStringFromInt(5)
+	defaultIntOrString := intstr.FromInt(1)
+	differentIntOrString := intstr.FromInt(5)
 	deploymentLabelKey := "deployment.kubernetes.io/podTemplateHash"
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{

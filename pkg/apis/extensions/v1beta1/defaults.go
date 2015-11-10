@@ -18,7 +18,7 @@ package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addDefaultingFuncs() {
@@ -74,12 +74,12 @@ func addDefaultingFuncs() {
 				}
 				if strategy.RollingUpdate.MaxUnavailable == nil {
 					// Set default MaxUnavailable as 1 by default.
-					maxUnavailable := util.NewIntOrStringFromInt(1)
+					maxUnavailable := intstr.FromInt(1)
 					strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 				}
 				if strategy.RollingUpdate.MaxSurge == nil {
 					// Set default MaxSurge as 1 by default.
-					maxSurge := util.NewIntOrStringFromInt(1)
+					maxSurge := intstr.FromInt(1)
 					strategy.RollingUpdate.MaxSurge = &maxSurge
 				}
 			}

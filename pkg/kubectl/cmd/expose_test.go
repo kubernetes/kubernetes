@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestRunExposeService(t *testing.T) {
@@ -63,7 +63,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"app": "go"},
@@ -94,7 +94,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -126,7 +126,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       80,
-							TargetPort: util.NewIntOrStringFromInt(80),
+							TargetPort: intstr.FromInt(80),
 						},
 					},
 					Selector: map[string]string{"run": "this"},
@@ -157,7 +157,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -188,7 +188,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector:        map[string]string{"func": "stream"},
@@ -221,7 +221,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       90,
-							TargetPort: util.NewIntOrStringFromInt(90),
+							TargetPort: intstr.FromInt(90),
 						},
 					},
 				},
@@ -250,7 +250,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -277,7 +277,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       90,
-							TargetPort: util.NewIntOrStringFromInt(90),
+							TargetPort: intstr.FromInt(90),
 						},
 					},
 					Selector: map[string]string{"svc": "frompod"},
@@ -301,12 +301,12 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       80,
-							TargetPort: util.NewIntOrStringFromInt(80),
+							TargetPort: intstr.FromInt(80),
 						},
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       443,
-							TargetPort: util.NewIntOrStringFromInt(443),
+							TargetPort: intstr.FromInt(443),
 						},
 					},
 				},
@@ -320,13 +320,13 @@ func TestRunExposeService(t *testing.T) {
 							Name:       "port-1",
 							Protocol:   api.ProtocolTCP,
 							Port:       80,
-							TargetPort: util.NewIntOrStringFromInt(80),
+							TargetPort: intstr.FromInt(80),
 						},
 						{
 							Name:       "port-2",
 							Protocol:   api.ProtocolTCP,
 							Port:       443,
-							TargetPort: util.NewIntOrStringFromInt(443),
+							TargetPort: intstr.FromInt(443),
 						},
 					},
 					Selector: map[string]string{"svc": "fromfoo"},

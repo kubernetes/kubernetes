@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
@@ -71,13 +72,13 @@ func TestFindPort(t *testing.T) {
 	testCases := []struct {
 		name       string
 		containers []api.Container
-		port       util.IntOrString
+		port       intstr.IntOrString
 		expected   int
 		pass       bool
 	}{{
 		name:       "valid int, no ports",
 		containers: []api.Container{{}},
-		port:       util.NewIntOrStringFromInt(93),
+		port:       intstr.FromInt(93),
 		expected:   93,
 		pass:       true,
 	}, {
@@ -91,13 +92,13 @@ func TestFindPort(t *testing.T) {
 			ContainerPort: 22,
 			Protocol:      "TCP",
 		}}}},
-		port:     util.NewIntOrStringFromInt(93),
+		port:     intstr.FromInt(93),
 		expected: 93,
 		pass:     true,
 	}, {
 		name:       "valid str, no ports",
 		containers: []api.Container{{}},
-		port:       util.NewIntOrStringFromString("p"),
+		port:       intstr.FromString("p"),
 		expected:   0,
 		pass:       false,
 	}, {
@@ -115,7 +116,7 @@ func TestFindPort(t *testing.T) {
 			ContainerPort: 33,
 			Protocol:      "TCP",
 		}}}},
-		port:     util.NewIntOrStringFromString("q"),
+		port:     intstr.FromString("q"),
 		expected: 33,
 		pass:     true,
 	}, {
@@ -133,7 +134,7 @@ func TestFindPort(t *testing.T) {
 			ContainerPort: 33,
 			Protocol:      "TCP",
 		}}}},
-		port:     util.NewIntOrStringFromString("q"),
+		port:     intstr.FromString("q"),
 		expected: 33,
 		pass:     true,
 	}}
@@ -308,7 +309,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
@@ -345,7 +346,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
@@ -382,7 +383,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
@@ -423,7 +424,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
@@ -463,7 +464,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
@@ -484,8 +485,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
-				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(8088)},
 			},
 		},
 	})
@@ -530,8 +531,8 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
-				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(8088)},
 			},
 		},
 	})
@@ -589,7 +590,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 		},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")

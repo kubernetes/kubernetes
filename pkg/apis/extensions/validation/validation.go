@@ -27,8 +27,8 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
 	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
@@ -220,27 +220,27 @@ func ValidateDeploymentName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
-func ValidatePositiveIntOrPercent(intOrPercent util.IntOrString, fieldName string) errs.ValidationErrorList {
+func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if intOrPercent.Kind == util.IntstrString {
+	if intOrPercent.Type == intstr.String {
 		if !validation.IsValidPercent(intOrPercent.StrVal) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
 		}
-	} else if intOrPercent.Kind == util.IntstrInt {
+	} else if intOrPercent.Type == intstr.Int {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(intOrPercent.IntVal), fieldName)...)
 	}
 	return allErrs
 }
 
-func getPercentValue(intOrStringValue util.IntOrString) (int, bool) {
-	if intOrStringValue.Kind != util.IntstrString || !validation.IsValidPercent(intOrStringValue.StrVal) {
+func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
+	if intOrStringValue.Type != intstr.String || !validation.IsValidPercent(intOrStringValue.StrVal) {
 		return 0, false
 	}
 	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
 	return value, true
 }
 
-func getIntOrPercentValue(intOrStringValue util.IntOrString) int {
+func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
 	value, isPercent := getPercentValue(intOrStringValue)
 	if isPercent {
 		return value
@@ -248,7 +248,7 @@ func getIntOrPercentValue(intOrStringValue util.IntOrString) int {
 	return intOrStringValue.IntVal
 }
 
-func IsNotMoreThan100Percent(intOrStringValue util.IntOrString, fieldName string) errs.ValidationErrorList {
+func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	value, isPercent := getPercentValue(intOrStringValue)
 	if !isPercent || value <= 100 {
@@ -511,7 +511,7 @@ func validateIngressBackend(backend *extensions.IngressBackend) errs.ValidationE
 	} else if ok, errMsg := apivalidation.ValidateServiceName(backend.ServiceName, false); !ok {
 		allErrs = append(allErrs, errs.NewFieldInvalid("serviceName", backend.ServiceName, errMsg))
 	}
-	if backend.ServicePort.Kind == util.IntstrString {
+	if backend.ServicePort.Type == intstr.String {
 		if !utilvalidation.IsDNS1123Label(backend.ServicePort.StrVal) {
 			allErrs = append(allErrs, errs.NewFieldInvalid("servicePort", backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
 		}

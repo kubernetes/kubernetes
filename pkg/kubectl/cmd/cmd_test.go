@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 type internalType struct {
@@ -671,12 +672,12 @@ func (testServiceGenerator) Generate(genericParams map[string]interface{}) (runt
 	}
 	if found && len(targetPort) > 0 {
 		if portNum, err := strconv.Atoi(targetPort); err != nil {
-			service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString(targetPort)
+			service.Spec.Ports[0].TargetPort = intstr.FromString(targetPort)
 		} else {
-			service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(portNum)
+			service.Spec.Ports[0].TargetPort = intstr.FromInt(portNum)
 		}
 	} else {
-		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(port)
+		service.Spec.Ports[0].TargetPort = intstr.FromInt(port)
 	}
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.Type = api.ServiceTypeLoadBalancer

@@ -29,7 +29,7 @@ import (
 	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg2_v1 "k8s.io/kubernetes/pkg/api/v1"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
-	pkg6_util "k8s.io/kubernetes/pkg/util"
+	pkg6_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	pkg5_inf "speter.net/go/exp/math/dec/inf"
@@ -62,7 +62,7 @@ func init() {
 		var v1 pkg1_unversioned.TypeMeta
 		var v2 pkg2_v1.ObjectMeta
 		var v3 pkg3_types.UID
-		var v4 pkg6_util.IntOrString
+		var v4 pkg6_intstr.IntOrString
 		var v5 pkg5_inf.Dec
 		var v6 time.Time
 		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
@@ -5091,7 +5091,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.MaxUnavailable == nil {
-					x.MaxUnavailable = new(pkg6_util.IntOrString)
+					x.MaxUnavailable = new(pkg6_intstr.IntOrString)
 				}
 				yym456 := z.DecBinary()
 				_ = yym456
@@ -5110,7 +5110,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.MaxSurge == nil {
-					x.MaxSurge = new(pkg6_util.IntOrString)
+					x.MaxSurge = new(pkg6_intstr.IntOrString)
 				}
 				yym458 := z.DecBinary()
 				_ = yym458
@@ -5160,7 +5160,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.MaxUnavailable == nil {
-			x.MaxUnavailable = new(pkg6_util.IntOrString)
+			x.MaxUnavailable = new(pkg6_intstr.IntOrString)
 		}
 		yym462 := z.DecBinary()
 		_ = yym462
@@ -5188,7 +5188,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.MaxSurge == nil {
-			x.MaxSurge = new(pkg6_util.IntOrString)
+			x.MaxSurge = new(pkg6_intstr.IntOrString)
 		}
 		yym464 := z.DecBinary()
 		_ = yym464
@@ -11004,7 +11004,7 @@ func (x *IngressBackend) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "servicePort":
 			if r.TryDecodeAsNil() {
-				x.ServicePort = pkg6_util.IntOrString{}
+				x.ServicePort = pkg6_intstr.IntOrString{}
 			} else {
 				yyv979 := &x.ServicePort
 				yym980 := z.DecBinary()
@@ -11059,7 +11059,7 @@ func (x *IngressBackend) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		return
 	}
 	if r.TryDecodeAsNil() {
-		x.ServicePort = pkg6_util.IntOrString{}
+		x.ServicePort = pkg6_intstr.IntOrString{}
 	} else {
 		yyv983 := &x.ServicePort
 		yym984 := z.DecBinary()

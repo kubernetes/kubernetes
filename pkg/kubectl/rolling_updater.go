@@ -30,7 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -70,7 +70,7 @@ type RollingUpdaterConfig struct {
 	// can be scaled down further, followed by scaling up the new RC, ensuring
 	// that the total number of pods available at all times during the update is at
 	// least 70% of desired pods.
-	MaxUnavailable util.IntOrString
+	MaxUnavailable intstr.IntOrString
 	// MaxSurge is the maximum number of pods that can be scheduled above the desired number of pods.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// This can not be 0 if MaxUnavailable is 0.
@@ -81,7 +81,7 @@ type RollingUpdaterConfig struct {
 	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
 	// the update is atmost 130% of desired pods.
-	MaxSurge util.IntOrString
+	MaxSurge intstr.IntOrString
 }
 
 // RollingUpdaterCleanupPolicy is a cleanup action to take after the
@@ -483,14 +483,14 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 
 // func extractMaxValue is a helper to extract config max values as either
 // absolute numbers or based on percentages of the given value.
-func extractMaxValue(field util.IntOrString, name string, value int) (int, error) {
-	switch field.Kind {
-	case util.IntstrInt:
+func extractMaxValue(field intstr.IntOrString, name string, value int) (int, error) {
+	switch field.Type {
+	case intstr.Int:
 		if field.IntVal < 0 {
 			return 0, fmt.Errorf("%s must be >= 0", name)
 		}
 		return field.IntVal, nil
-	case util.IntstrString:
+	case intstr.String:
 		s := strings.Replace(field.StrVal, "%", "", -1)
 		v, err := strconv.Atoi(s)
 		if err != nil {
@@ -501,7 +501,7 @@ func extractMaxValue(field util.IntOrString, name string, value int) (int, error
 		}
 		return int(math.Ceil(float64(value) * (float64(v)) / 100)), nil
 	}
-	return 0, fmt.Errorf("invalid kind %q for %s", field.Kind, name)
+	return 0, fmt.Errorf("invalid kind %q for %s", field.Type, name)
 }
 
 func Rename(c client.ReplicationControllersNamespacer, rc *api.ReplicationController, newName string) error {

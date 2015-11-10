@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -279,7 +279,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
 				Port:       port,
-				TargetPort: util.NewIntOrStringFromInt(targetPort),
+				TargetPort: intstr.FromInt(targetPort),
 			}},
 
 			Selector: map[string]string{

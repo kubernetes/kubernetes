@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/google/gofuzz"
 )
@@ -128,10 +128,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			} else {
 				rollingUpdate := extensions.RollingUpdateDeployment{}
 				if c.RandBool() {
-					rollingUpdate.MaxUnavailable = util.NewIntOrStringFromInt(int(c.RandUint64()))
-					rollingUpdate.MaxSurge = util.NewIntOrStringFromInt(int(c.RandUint64()))
+					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.RandUint64()))
+					rollingUpdate.MaxSurge = intstr.FromInt(int(c.RandUint64()))
 				} else {
-					rollingUpdate.MaxSurge = util.NewIntOrStringFromString(fmt.Sprintf("%d%%", c.RandUint64()))
+					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.RandUint64()))
 				}
 				j.RollingUpdate = &rollingUpdate
 			}
@@ -342,10 +342,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				c.Fuzz(&ss.Ports[0])
 			}
 			for i := range ss.Ports {
-				switch ss.Ports[i].TargetPort.Kind {
-				case util.IntstrInt:
+				switch ss.Ports[i].TargetPort.Type {
+				case intstr.Int:
 					ss.Ports[i].TargetPort.IntVal = 1 + ss.Ports[i].TargetPort.IntVal%65535 // non-zero
-				case util.IntstrString:
+				case intstr.String:
 					ss.Ports[i].TargetPort.StrVal = "x" + ss.Ports[i].TargetPort.StrVal // non-empty
 				}
 			}

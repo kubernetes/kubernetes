@@ -33,6 +33,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -343,8 +344,8 @@ func (config *KubeProxyTestConfig) createNodePortService(selector map[string]str
 		Spec: api.ServiceSpec{
 			Type: api.ServiceTypeNodePort,
 			Ports: []api.ServicePort{
-				{Port: clusterHttpPort, Name: "http", Protocol: "TCP", NodePort: nodeHttpPort, TargetPort: util.NewIntOrStringFromInt(endpointHttpPort)},
-				{Port: clusterUdpPort, Name: "udp", Protocol: "UDP", NodePort: nodeUdpPort, TargetPort: util.NewIntOrStringFromInt(endpointUdpPort)},
+				{Port: clusterHttpPort, Name: "http", Protocol: "TCP", NodePort: nodeHttpPort, TargetPort: intstr.FromInt(endpointHttpPort)},
+				{Port: clusterUdpPort, Name: "udp", Protocol: "UDP", NodePort: nodeUdpPort, TargetPort: intstr.FromInt(endpointUdpPort)},
 			},
 			Selector: selector,
 		},
@@ -366,7 +367,7 @@ func (config *KubeProxyTestConfig) createLoadBalancerService(selector map[string
 		Spec: api.ServiceSpec{
 			Type: api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{
-				{Port: loadBalancerHttpPort, Name: "http", Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(endpointHttpPort)},
+				{Port: loadBalancerHttpPort, Name: "http", Protocol: "TCP", TargetPort: intstr.FromInt(endpointHttpPort)},
 			},
 			Selector: selector,
 		},

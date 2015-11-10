@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -144,7 +145,7 @@ func (b webserverProbeBuilder) build() *api.Probe {
 	probe := &api.Probe{
 		Handler: api.Handler{
 			HTTPGet: &api.HTTPGetAction{
-				Port: util.NewIntOrStringFromInt(80),
+				Port: intstr.FromInt(80),
 				Path: "/",
 			},
 		},
@@ -153,7 +154,7 @@ func (b webserverProbeBuilder) build() *api.Probe {
 		probe.InitialDelaySeconds = 30
 	}
 	if b.failing {
-		probe.HTTPGet.Port = util.NewIntOrStringFromInt(81)
+		probe.HTTPGet.Port = intstr.FromInt(81)
 	}
 	return probe
 }

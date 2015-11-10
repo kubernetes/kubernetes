@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // describes the attributes of a scale subresource
@@ -250,7 +250,7 @@ type RollingUpdateDeployment struct {
 	// can be scaled down further, followed by scaling up the new RC, ensuring
 	// that the total number of pods available at all times during the update is at
 	// least 70% of desired pods.
-	MaxUnavailable *util.IntOrString `json:"maxUnavailable,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// The maximum number of pods that can be scheduled above the desired number of
 	// pods.
@@ -263,7 +263,7 @@ type RollingUpdateDeployment struct {
 	// 130% of desired pods. Once old pods have been killed,
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of desired pods.
-	MaxSurge *util.IntOrString `json:"maxSurge,omitempty"`
+	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
@@ -591,7 +591,7 @@ type IngressBackend struct {
 	ServiceName string `json:"serviceName"`
 
 	// Specifies the port of the referenced service.
-	ServicePort util.IntOrString `json:"servicePort"`
+	ServicePort intstr.IntOrString `json:"servicePort"`
 }
 
 type NodeResource string

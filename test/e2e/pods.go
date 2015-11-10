@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -287,7 +288,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/index.html",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 30,
@@ -396,7 +397,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/index.html",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 30,
@@ -498,7 +499,7 @@ var _ = Describe("Pods", func() {
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{
 					Port:       8765,
-					TargetPort: util.NewIntOrStringFromInt(8080),
+					TargetPort: intstr.FromInt(8080),
 				}},
 				Selector: map[string]string{
 					"name": serverName,
@@ -611,7 +612,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/healthz",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 15,
@@ -639,7 +640,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/healthz",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 5,
@@ -673,7 +674,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/read",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 15,
