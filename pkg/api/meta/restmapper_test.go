@@ -19,6 +19,7 @@ package meta
 import (
 	"errors"
 	"io"
+	"net/url"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -48,6 +49,10 @@ func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
 }
 
 func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, string, string) error {
+	return nil
+}
+
+func (fakeCodec) DecodeParametersInto(parameters url.Values, obj runtime.Object) error {
 	return nil
 }
 

@@ -19,6 +19,7 @@ package runtime
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/conversion"
@@ -80,6 +81,10 @@ func (unstructuredJSONScheme) DecodeIntoWithSpecifiedVersionKind(data []byte, ob
 
 func (unstructuredJSONScheme) DecodeToVersion(data []byte, version string) (Object, error) {
 	return nil, nil
+}
+
+func (unstructuredJSONScheme) DecodeParametersInto(paramaters url.Values, obj Object) error {
+	return nil
 }
 
 func (unstructuredJSONScheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
