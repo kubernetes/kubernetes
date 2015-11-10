@@ -95,7 +95,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		// Try to respect the requested IP.
 		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
 			// TODO: when validation becomes versioned, this gets more complicated.
-			el := field.ErrorList{field.NewInvalidError(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
+			el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 		releaseServiceIP = true
@@ -108,7 +108,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 			err := nodePortOp.Allocate(servicePort.NodePort)
 			if err != nil {
 				// TODO: when validation becomes versioned, this gets more complicated.
-				el := field.ErrorList{field.NewInvalidError(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+				el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
 				return nil, errors.NewInvalid("Service", service.Name, el)
 			}
 		} else if assignNodePorts {
@@ -229,7 +229,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 				if !contains(oldNodePorts, nodePort) {
 					err := nodePortOp.Allocate(nodePort)
 					if err != nil {
-						el := field.ErrorList{field.NewInvalidError(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
+						el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
 						return nil, false, errors.NewInvalid("Service", service.Name, el)
 					}
 				}

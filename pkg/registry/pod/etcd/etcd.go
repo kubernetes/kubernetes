@@ -135,11 +135,11 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 	// TODO: move me to a binding strategy
 	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
 		// TODO: When validation becomes versioned, this gets more complicated.
-		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.NewNotSupportedError(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", ""})})
+		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.NotSupported(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", ""})})
 	}
 	if len(binding.Target.Name) == 0 {
 		// TODO: When validation becomes versioned, this gets more complicated.
-		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.NewRequiredError(field.NewPath("target", "name"))})
+		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.Required(field.NewPath("target", "name"))})
 	}
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &unversioned.Status{Status: unversioned.StatusSuccess}
