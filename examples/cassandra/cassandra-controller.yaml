@@ -2,16 +2,14 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: cassandra
+    app: cassandra
   name: cassandra
 spec:
   replicas: 1
-  selector:
-    name: cassandra
   template:
     metadata:
       labels:
-        name: cassandra
+        app: cassandra
     spec:
       containers:
         - command:
