@@ -168,6 +168,12 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 // Return true if the usage must be recorded prior to admitting the new resource
 // Return an error if the operation should not pass admission control
 func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
+	// on update, the only resource that can modify the value of a quota is pods
+	// so if your not a pod, we exit quickly
+	if a.GetOperation() == admission.Update && a.GetResource() != "pods" {
+		return false, nil
+	}
+
 	var errs []error
 	dirty := true
 	set := map[api.ResourceName]bool{}
