@@ -319,7 +319,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 			if names.Has(name) {
 				// TODO: when validation becomes versioned, this gets a bit
 				// more complicated.
-				errlist = append(errlist, field.NewDuplicateError(field.NewPath("metadata", "name"), pod.Name))
+				errlist = append(errlist, field.Duplicate(field.NewPath("metadata", "name"), pod.Name))
 			} else {
 				names.Insert(name)
 			}
