@@ -107,7 +107,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 done
 
 # Configure the openvswitch network
-if [ $NETWORK_PROVIDER == "calico" ]; then
+if [ "${NETWORK_PROVIDER}" == "calico" ]; then
   echo "Provisioning Calico network on minion"
   provision-network-calico
 else

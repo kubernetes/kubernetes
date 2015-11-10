@@ -79,7 +79,7 @@ done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
-if [ $NETWORK_PROVIDER == "calico" ]; then
+if [ "${NETWORK_PROVIDER}" == "calico" ]; then
   # Configure the cbr for Calico networking.
   echo "Provisioning Calico network on master"
   provision-network-calico

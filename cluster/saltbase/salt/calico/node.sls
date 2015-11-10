@@ -13,7 +13,8 @@ calicoctl:
 
 calico-node:
   cmd.run:
-    - name: /home/vagrant/calicoctl node --kubernetes
+    - name: /usr/local/bin/calicoctl node --kubernetes
+    - unless: docker ps | grep calico-node
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
@@ -24,7 +25,7 @@ calico-node:
 
 calico-ip-pool-reset:
   cmd.run:
-    - name: /home/vagrant/calicoctl pool remove 192.168.0.0/16
+    - name: /usr/local/bin/calicoctl pool remove 192.168.0.0/16
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
@@ -34,7 +35,7 @@ calico-ip-pool-reset:
 
 calico-ip-pool:
   cmd.run:
-    - name: /home/vagrant/calicoctl pool add {{ grains['cbr-cidr'] }}
+    - name: /usr/local/bin/calicoctl pool add {{ grains['cbr-cidr'] }}
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:

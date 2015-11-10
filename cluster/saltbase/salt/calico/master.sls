@@ -10,7 +10,8 @@ calicoctl:
 
 calico-node:
   cmd.run:
-    - name: /home/vagrant/calicoctl node
+    - name: /usr/local/bin/calicoctl node
+    - unless: docker ps | grep calico-node
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
@@ -22,6 +23,7 @@ calico-node:
 
 etcd:
   cmd.run:
+    - unless: docker ps | grep calico-etcd
     - name: >
                docker run --name calico-etcd -d --restart=always -p 6666:6666
                -v /varetcd:/var/etcd
