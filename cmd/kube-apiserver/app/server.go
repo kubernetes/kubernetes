@@ -151,8 +151,6 @@ func NewAPIServer() *APIServer {
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := NewAPIServer()
-	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
 		Long: `The Kubernetes API server validates and configures data

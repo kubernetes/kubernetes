@@ -223,8 +223,6 @@ func NewKubeletServer() *KubeletServer {
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
-	s := NewKubeletServer()
-	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kubelet",
 		Long: `The kubelet is the primary "node agent" that runs on each
