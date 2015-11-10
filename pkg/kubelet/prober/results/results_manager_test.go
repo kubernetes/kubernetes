@@ -46,7 +46,7 @@ func TestCacheOperations(t *testing.T) {
 }
 
 func TestUpdates(t *testing.T) {
-	m := NewManagerWithUpdates()
+	m := NewManager()
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "test-pod"}}
 	fooID := kubecontainer.ContainerID{"test", "foo"}
