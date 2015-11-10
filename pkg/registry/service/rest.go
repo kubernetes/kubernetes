@@ -202,7 +202,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 
 	// Copy over non-user fields
 	// TODO: make this a merge function
-	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
+	if errs := validation.ValidateServiceUpdate(service, oldService); len(errs) > 0 {
 		return nil, false, errors.NewInvalid("service", service.Name, errs)
 	}
 

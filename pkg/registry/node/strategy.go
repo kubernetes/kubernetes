@@ -79,7 +79,7 @@ func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Va
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	errorList := validation.ValidateNode(obj.(*api.Node))
-	return append(errorList, validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))...)
+	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -104,7 +104,7 @@ func (nodeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))
+	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
