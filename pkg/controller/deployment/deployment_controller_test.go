@@ -25,13 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestDeploymentController_reconcileNewRC(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
-		maxSurge            util.IntOrString
+		maxSurge            intstr.IntOrString
 		oldReplicas         int
 		newReplicas         int
 		scaleExpected       bool
@@ -40,14 +40,14 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 		{
 			// Should not scale up.
 			deploymentReplicas: 10,
-			maxSurge:           util.NewIntOrStringFromInt(0),
+			maxSurge:           intstr.FromInt(0),
 			oldReplicas:        10,
 			newReplicas:        0,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas:  10,
-			maxSurge:            util.NewIntOrStringFromInt(2),
+			maxSurge:            intstr.FromInt(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			scaleExpected:       true,
@@ -55,7 +55,7 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 		},
 		{
 			deploymentReplicas:  10,
-			maxSurge:            util.NewIntOrStringFromInt(2),
+			maxSurge:            intstr.FromInt(2),
 			oldReplicas:         5,
 			newReplicas:         0,
 			scaleExpected:       true,
@@ -63,7 +63,7 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 		},
 		{
 			deploymentReplicas: 10,
-			maxSurge:           util.NewIntOrStringFromInt(2),
+			maxSurge:           intstr.FromInt(2),
 			oldReplicas:        10,
 			newReplicas:        2,
 			scaleExpected:      false,
@@ -71,7 +71,7 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 		{
 			// Should scale down.
 			deploymentReplicas:  10,
-			maxSurge:            util.NewIntOrStringFromInt(2),
+			maxSurge:            intstr.FromInt(2),
 			oldReplicas:         2,
 			newReplicas:         11,
 			scaleExpected:       true,
@@ -84,7 +84,7 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 		newRc := rc("foo-v2", test.newReplicas)
 		oldRc := rc("foo-v2", test.oldReplicas)
 		allRcs := []*api.ReplicationController{newRc, oldRc}
-		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, util.NewIntOrStringFromInt(0))
+		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
 		fake := &testclient.Fake{}
 		controller := &DeploymentController{
 			client:        fake,
@@ -119,7 +119,7 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
-		maxUnavailable      util.IntOrString
+		maxUnavailable      intstr.IntOrString
 		readyPods           int
 		oldReplicas         int
 		scaleExpected       bool
@@ -127,14 +127,14 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 	}{
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     util.NewIntOrStringFromInt(0),
+			maxUnavailable:     intstr.FromInt(0),
 			readyPods:          10,
 			oldReplicas:        10,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      util.NewIntOrStringFromInt(2),
+			maxUnavailable:      intstr.FromInt(2),
 			readyPods:           10,
 			oldReplicas:         10,
 			scaleExpected:       true,
@@ -142,14 +142,14 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     util.NewIntOrStringFromInt(2),
+			maxUnavailable:     intstr.FromInt(2),
 			readyPods:          8,
 			oldReplicas:        10,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     util.NewIntOrStringFromInt(2),
+			maxUnavailable:     intstr.FromInt(2),
 			readyPods:          10,
 			oldReplicas:        0,
 			scaleExpected:      false,
@@ -161,7 +161,7 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 		oldRc := rc("foo-v2", test.oldReplicas)
 		allRcs := []*api.ReplicationController{oldRc}
 		oldRcs := []*api.ReplicationController{oldRc}
-		deployment := deployment("foo", test.deploymentReplicas, util.NewIntOrStringFromInt(0), test.maxUnavailable)
+		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
 		fake := &testclient.Fake{}
 		fake.AddReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -241,7 +241,7 @@ func rc(name string, replicas int) *api.ReplicationController {
 	}
 }
 
-func deployment(name string, replicas int, maxSurge, maxUnavailable util.IntOrString) exp.Deployment {
+func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString) exp.Deployment {
 	return exp.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,

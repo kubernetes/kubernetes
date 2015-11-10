@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // The comments for the structs and fields can be used from go-resful to
@@ -810,7 +810,7 @@ type HTTPGetAction struct {
 	// Name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
-	Port util.IntOrString `json:"port"`
+	Port intstr.IntOrString `json:"port"`
 	// Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty"`
 	// Scheme to use for connecting to the host.
@@ -833,7 +833,7 @@ type TCPSocketAction struct {
 	// Number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
-	Port util.IntOrString `json:"port"`
+	Port intstr.IntOrString `json:"port"`
 }
 
 // ExecAction describes a "run in container" action.
@@ -1621,7 +1621,7 @@ type ServicePort struct {
 	// of Port is used (an identity map).
 	// Defaults to the service port.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service
-	TargetPort util.IntOrString `json:"targetPort,omitempty"`
+	TargetPort intstr.IntOrString `json:"targetPort,omitempty"`
 
 	// The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
 	// Usually assigned by the system. If specified, it will be allocated to the service

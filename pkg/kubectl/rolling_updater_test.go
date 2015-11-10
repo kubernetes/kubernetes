@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -114,8 +114,8 @@ func TestUpdate(t *testing.T) {
 		newRc *api.ReplicationController
 		// whether newRc existed (false means it was created)
 		newRcExists bool
-		maxUnavail  util.IntOrString
-		maxSurge    util.IntOrString
+		maxUnavail  intstr.IntOrString
+		maxSurge    intstr.IntOrString
 		// expected is the sequence of up/down events that will be simulated and
 		// verified
 		expected []interface{}
@@ -127,8 +127,8 @@ func TestUpdate(t *testing.T) {
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("30%"),
-			maxSurge:    util.NewIntOrStringFromString("0%"),
+			maxUnavail:  intstr.FromString("30%"),
+			maxSurge:    intstr.FromString("0%"),
 			expected: []interface{}{
 				down{oldReady: 10, newReady: 0, to: 7},
 				up{3},
@@ -156,8 +156,8 @@ Scaling foo-v2 up to 10
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("30%"),
-			maxSurge:    util.NewIntOrStringFromString("0%"),
+			maxUnavail:  intstr.FromString("30%"),
+			maxSurge:    intstr.FromString("0%"),
 			expected: []interface{}{
 				down{oldReady: 10, newReady: 0, to: 7},
 				up{3},
@@ -185,8 +185,8 @@ Scaling foo-v2 up to 10
 			oldRc:       oldRc(7, 10),
 			newRc:       newRc(3, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("30%"),
-			maxSurge:    util.NewIntOrStringFromString("0%"),
+			maxUnavail:  intstr.FromString("30%"),
+			maxSurge:    intstr.FromString("0%"),
 			expected: []interface{}{
 				down{oldReady: 7, newReady: 3, to: 4},
 				up{6},
@@ -209,8 +209,8 @@ Scaling foo-v2 up to 10
 			oldRc:       oldRc(7, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("30%"),
-			maxSurge:    util.NewIntOrStringFromString("0%"),
+			maxUnavail:  intstr.FromString("30%"),
+			maxSurge:    intstr.FromString("0%"),
 			expected: []interface{}{
 				down{oldReady: 7, newReady: 0, noop: true},
 				up{3},
@@ -236,8 +236,8 @@ Scaling foo-v2 up to 10
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("30%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("30%"),
 			expected: []interface{}{
 				up{3},
 				down{oldReady: 10, newReady: 3, to: 7},
@@ -264,8 +264,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("30%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("30%"),
 			expected: []interface{}{
 				up{3},
 				down{oldReady: 10, newReady: 0, noop: true},
@@ -298,8 +298,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("10%"),
-			maxSurge:    util.NewIntOrStringFromString("20%"),
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("20%"),
 			expected: []interface{}{
 				up{2},
 				down{oldReady: 10, newReady: 2, to: 7},
@@ -326,8 +326,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("10%"),
-			maxSurge:    util.NewIntOrStringFromString("20%"),
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("20%"),
 			expected: []interface{}{
 				up{2},
 				down{oldReady: 10, newReady: 2, to: 7},
@@ -355,8 +355,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(2, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("10%"),
-			maxSurge:    util.NewIntOrStringFromString("20%"),
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("20%"),
 			expected: []interface{}{
 				down{oldReady: 10, newReady: 2, to: 7},
 				up{5},
@@ -381,8 +381,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("100%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("100%"),
 			expected: []interface{}{
 				up{10},
 				down{oldReady: 10, newReady: 10, to: 0},
@@ -397,8 +397,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("100%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("100%"),
 			expected: []interface{}{
 				up{10},
 				down{oldReady: 10, newReady: 0, noop: true},
@@ -418,8 +418,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("100%"),
-			maxSurge:    util.NewIntOrStringFromString("0%"),
+			maxUnavail:  intstr.FromString("100%"),
+			maxSurge:    intstr.FromString("0%"),
 			expected: []interface{}{
 				down{oldReady: 10, newReady: 0, to: 0},
 				up{10},
@@ -434,8 +434,8 @@ Scaling foo-v2 up to 10
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 1),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("10%"),
-			maxSurge:    util.NewIntOrStringFromString("0%"),
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("0%"),
 			expected: []interface{}{
 				down{oldReady: 1, newReady: 0, to: 0},
 				up{1},
@@ -450,8 +450,8 @@ Scaling foo-v2 up to 1
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 1),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("10%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("10%"),
 			expected: []interface{}{
 				up{1},
 				down{oldReady: 1, newReady: 0, noop: true},
@@ -467,8 +467,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 1),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("10%"),
-			maxSurge:    util.NewIntOrStringFromString("10%"),
+			maxUnavail:  intstr.FromString("10%"),
+			maxSurge:    intstr.FromString("10%"),
 			expected: []interface{}{
 				up{1},
 				down{oldReady: 1, newReady: 0, noop: true},
@@ -484,8 +484,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(3, 3),
 			newRc:       newRc(0, 3),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromInt(0),
-			maxSurge:    util.NewIntOrStringFromInt(1),
+			maxUnavail:  intstr.FromInt(0),
+			maxSurge:    intstr.FromInt(1),
 			expected: []interface{}{
 				up{1},
 				down{oldReady: 3, newReady: 1, to: 2},
@@ -508,8 +508,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(6, 10),
 			newRc:       newRc(5, 10),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("20%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("20%"),
 			expected: []interface{}{
 				up{6},
 				down{oldReady: 6, newReady: 6, to: 4},
@@ -532,8 +532,8 @@ Scaling foo-v1 down to 0
 			oldRc:       oldRc(10, 10),
 			newRc:       newRc(0, 20),
 			newRcExists: false,
-			maxUnavail:  util.NewIntOrStringFromString("0%"),
-			maxSurge:    util.NewIntOrStringFromString("300%"),
+			maxUnavail:  intstr.FromString("0%"),
+			maxSurge:    intstr.FromString("300%"),
 			expected: []interface{}{
 				up{20},
 				down{oldReady: 10, newReady: 20, to: 0},
@@ -680,8 +680,8 @@ func TestUpdate_progressTimeout(t *testing.T) {
 		Interval:       time.Millisecond,
 		Timeout:        time.Millisecond,
 		CleanupPolicy:  DeleteRollingUpdateCleanupPolicy,
-		MaxUnavailable: util.NewIntOrStringFromInt(0),
-		MaxSurge:       util.NewIntOrStringFromInt(1),
+		MaxUnavailable: intstr.FromInt(0),
+		MaxSurge:       intstr.FromInt(1),
 	}
 	err := updater.Update(config)
 	if err == nil {
@@ -733,7 +733,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		Interval:       time.Millisecond,
 		Timeout:        time.Millisecond,
 		CleanupPolicy:  DeleteRollingUpdateCleanupPolicy,
-		MaxUnavailable: util.NewIntOrStringFromString("100%"),
+		MaxUnavailable: intstr.FromString("100%"),
 	}
 	err := updater.Update(config)
 	if err != nil {
@@ -1301,54 +1301,54 @@ func TestRollingUpdater_pollForReadyPods(t *testing.T) {
 
 func TestRollingUpdater_extractMaxValue(t *testing.T) {
 	tests := []struct {
-		field    util.IntOrString
+		field    intstr.IntOrString
 		original int
 		expected int
 		valid    bool
 	}{
 		{
-			field:    util.NewIntOrStringFromInt(1),
+			field:    intstr.FromInt(1),
 			original: 100,
 			expected: 1,
 			valid:    true,
 		},
 		{
-			field:    util.NewIntOrStringFromInt(0),
+			field:    intstr.FromInt(0),
 			original: 100,
 			expected: 0,
 			valid:    true,
 		},
 		{
-			field:    util.NewIntOrStringFromInt(-1),
+			field:    intstr.FromInt(-1),
 			original: 100,
 			valid:    false,
 		},
 		{
-			field:    util.NewIntOrStringFromString("10%"),
+			field:    intstr.FromString("10%"),
 			original: 100,
 			expected: 10,
 			valid:    true,
 		},
 		{
-			field:    util.NewIntOrStringFromString("100%"),
+			field:    intstr.FromString("100%"),
 			original: 100,
 			expected: 100,
 			valid:    true,
 		},
 		{
-			field:    util.NewIntOrStringFromString("200%"),
+			field:    intstr.FromString("200%"),
 			original: 100,
 			expected: 200,
 			valid:    true,
 		},
 		{
-			field:    util.NewIntOrStringFromString("0%"),
+			field:    intstr.FromString("0%"),
 			original: 100,
 			expected: 0,
 			valid:    true,
 		},
 		{
-			field:    util.NewIntOrStringFromString("-1%"),
+			field:    intstr.FromString("-1%"),
 			original: 100,
 			valid:    false,
 		},

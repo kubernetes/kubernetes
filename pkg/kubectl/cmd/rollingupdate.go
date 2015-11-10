@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // RollingUpdateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -329,8 +329,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		Interval:       interval,
 		Timeout:        timeout,
 		CleanupPolicy:  updateCleanupPolicy,
-		MaxUnavailable: util.NewIntOrStringFromInt(0),
-		MaxSurge:       util.NewIntOrStringFromInt(1),
+		MaxUnavailable: intstr.FromInt(0),
+		MaxSurge:       intstr.FromInt(1),
 	}
 	if rollback {
 		err = kubectl.AbortRollingUpdate(config)

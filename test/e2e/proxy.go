@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -71,22 +72,22 @@ func proxyContext(version string) {
 					{
 						Name:       "portname1",
 						Port:       80,
-						TargetPort: util.NewIntOrStringFromString("dest1"),
+						TargetPort: intstr.FromString("dest1"),
 					},
 					{
 						Name:       "portname2",
 						Port:       81,
-						TargetPort: util.NewIntOrStringFromInt(162),
+						TargetPort: intstr.FromInt(162),
 					},
 					{
 						Name:       "tlsportname1",
 						Port:       443,
-						TargetPort: util.NewIntOrStringFromString("tlsdest1"),
+						TargetPort: intstr.FromString("tlsdest1"),
 					},
 					{
 						Name:       "tlsportname2",
 						Port:       444,
-						TargetPort: util.NewIntOrStringFromInt(462),
+						TargetPort: intstr.FromInt(462),
 					},
 				},
 			},
