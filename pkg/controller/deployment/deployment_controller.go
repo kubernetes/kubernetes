@@ -138,15 +138,14 @@ func (d *DeploymentController) getNewRC(deployment extensions.Deployment) (*api.
 	// new RC does not exist, create one.
 	namespace := deployment.ObjectMeta.Namespace
 	podTemplateSpecHash := deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template)
-	rcName := fmt.Sprintf("deploymentrc-%d", podTemplateSpecHash)
 	newRCTemplate := deploymentutil.GetNewRCTemplate(deployment)
 	// Add podTemplateHash label to selector.
 	newRCSelector := deploymentutil.CloneAndAddLabel(deployment.Spec.Selector, deployment.Spec.UniqueLabelKey, podTemplateSpecHash)
 
 	newRC := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name:      rcName,
-			Namespace: namespace,
+			GenerateName: deployment.Name + "-",
+			Namespace:    namespace,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 0,
