@@ -278,10 +278,17 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
 			return "", noSuchPodErr
 		}
-		task, err := k.api.tasks().Register(k.api.createPodTask(ctx, pod))
+
+		task, err := k.api.createPodTask(ctx, pod)
 		if err != nil {
 			return "", err
 		}
+
+		task, err = k.api.tasks().Register(task)
+		if err != nil {
+			return "", err
+		}
+
 		return k.doSchedule(task)
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
