@@ -386,31 +386,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 }
 
 var _ = Describe("Nodes", func() {
-	var c *client.Client
-	var ns string
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		testingNs, err := createTestingNS("resize-nodes", c)
-		ns = testingNs.Name
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		By("checking whether all nodes are healthy")
-		if err := allNodesReady(c, time.Minute); err != nil {
-			Failf("Not all nodes are ready: %v", err)
-		}
-		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-			Failf("Couldn't delete namespace '%s', %v", ns, err)
-		}
-		if err := checkTestingNSDeletedExcept(c, ""); err != nil {
-			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
-		}
-	})
+	framework := NewFramework("resize-nodes")
 
 	Describe("Resize", func() {
 		var skipped bool
@@ -434,9 +410,17 @@ var _ = Describe("Nodes", func() {
 			if err := waitForGroupSize(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+			if err := waitForClusterSize(framework.Client, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				Failf("Couldn't restore the original cluster size: %v", err)
 			}
+			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
+			// the cluster is restored to health
+			By("waiting for system pods to successfully restart")
+			pods, err := framework.Client.Pods("kube-system").List(labels.Everything(), fields.Everything())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = waitForPodsRunningReady("kube-system", len(pods.Items), podReadyBeforeTimeout)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should be able to delete nodes", func() {
@@ -444,8 +428,8 @@ var _ = Describe("Nodes", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			replicas := testContext.CloudConfig.NumNodes
-			newRCByName(c, ns, name, replicas)
-			err := verifyPods(c, ns, name, true, replicas)
+			newRCByName(framework.Client, framework.Namespace.Name, name, replicas)
+			err := verifyPods(framework.Client, framework.Namespace.Name, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
@@ -453,11 +437,11 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas-1, 10*time.Minute)
+			err = waitForClusterSize(framework.Client, replicas-1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying whether the pods from the removed node are recreated")
-			err = verifyPods(c, ns, name, true, replicas)
+			err = verifyPods(framework.Client, framework.Namespace.Name, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -466,10 +450,10 @@ var _ = Describe("Nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
-			newSVCByName(c, ns, name)
+			newSVCByName(framework.Client, framework.Namespace.Name, name)
 			replicas := testContext.CloudConfig.NumNodes
-			newRCByName(c, ns, name, replicas)
-			err := verifyPods(c, ns, name, true, replicas)
+			newRCByName(framework.Client, framework.Namespace.Name, name, replicas)
+			err := verifyPods(framework.Client, framework.Namespace.Name, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
@@ -477,13 +461,13 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas+1, 10*time.Minute)
+			err = waitForClusterSize(framework.Client, replicas+1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
-			err = resizeRC(c, ns, name, replicas+1)
+			err = resizeRC(framework.Client, framework.Namespace.Name, name, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
-			err = verifyPods(c, ns, name, true, replicas+1)
+			err = verifyPods(framework.Client, framework.Namespace.Name, name, true, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -507,25 +491,25 @@ var _ = Describe("Nodes", func() {
 				// Create a replication controller for a service that serves its hostname.
 				// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 				name := "my-hostname-net"
-				newSVCByName(c, ns, name)
+				newSVCByName(framework.Client, framework.Namespace.Name, name)
 				replicas := testContext.CloudConfig.NumNodes
-				newRCByName(c, ns, name, replicas)
-				err := verifyPods(c, ns, name, true, replicas)
+				newRCByName(framework.Client, framework.Namespace.Name, name, replicas)
+				err := verifyPods(framework.Client, framework.Namespace.Name, name, true, replicas)
 				Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 				By("choose a node with at least one pod - we will block some network traffic on this node")
 				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-				pods, err := c.Pods(ns).List(label, fields.Everything()) // list pods after all have been scheduled
+				pods, err := framework.Client.Pods(framework.Namespace.Name).List(label, fields.Everything()) // list pods after all have been scheduled
 				Expect(err).NotTo(HaveOccurred())
 				nodeName := pods.Items[0].Spec.NodeName
 
-				node, err := c.Nodes().Get(nodeName)
+				node, err := framework.Client.Nodes().Get(nodeName)
 				Expect(err).NotTo(HaveOccurred())
 
 				By(fmt.Sprintf("block network traffic from node %s", node.Name))
-				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
+				performTemporaryNetworkFailure(framework.Client, framework.Namespace.Name, name, replicas, pods.Items[0].Name, node)
 				Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-				if !waitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+				if !waitForNodeToBeReady(framework.Client, node.Name, resizeNodeReadyTimeout) {
 					Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 				}
 
@@ -536,14 +520,14 @@ var _ = Describe("Nodes", func() {
 				// increasing the RC size is not a valid way to test this
 				// since we have no guarantees the pod will be scheduled on our node.
 				additionalPod := "additionalpod"
-				err = newPodOnNode(c, ns, additionalPod, node.Name)
+				err = newPodOnNode(framework.Client, framework.Namespace.Name, additionalPod, node.Name)
 				Expect(err).NotTo(HaveOccurred())
-				err = verifyPods(c, ns, additionalPod, true, 1)
+				err = verifyPods(framework.Client, framework.Namespace.Name, additionalPod, true, 1)
 				Expect(err).NotTo(HaveOccurred())
 
 				// verify that it is really on the requested node
 				{
-					pod, err := c.Pods(ns).Get(additionalPod)
+					pod, err := framework.Client.Pods(framework.Namespace.Name).Get(additionalPod)
 					Expect(err).NotTo(HaveOccurred())
 					if pod.Spec.NodeName != node.Name {
 						Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
