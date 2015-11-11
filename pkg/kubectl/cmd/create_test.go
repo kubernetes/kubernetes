@@ -44,7 +44,7 @@ func TestCreateObject(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
@@ -75,7 +75,7 @@ func TestCreateMultipleObject(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
@@ -110,7 +110,7 @@ func TestCreateDirectory(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil

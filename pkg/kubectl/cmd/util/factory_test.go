@@ -230,7 +230,7 @@ func TestValidateCachesSchema(t *testing.T) {
 
 	c := &fake.RESTClient{
 		Codec: testapi.Default.Codec(),
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1

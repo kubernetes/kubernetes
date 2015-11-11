@@ -56,7 +56,7 @@ func TestDescribeObject(t *testing.T) {
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil

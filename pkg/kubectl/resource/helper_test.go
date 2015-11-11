@@ -417,7 +417,7 @@ func TestHelperReplace(t *testing.T) {
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			Overwrite: true,
-			HTTPClient: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			HTTPClient: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.Method == "PUT" {
 					return &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})}, nil
 				}

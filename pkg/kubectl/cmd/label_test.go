@@ -329,7 +329,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
@@ -376,7 +376,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {

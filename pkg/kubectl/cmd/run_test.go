@@ -203,7 +203,7 @@ func TestGenerateService(t *testing.T) {
 		tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
 					sawPOST = true
