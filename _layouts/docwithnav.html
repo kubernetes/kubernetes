@@ -154,7 +154,7 @@
 				//perform an action base on the type of 'a' element clicked
 				if(this.host != location.host) {//open external links in new tab/window
 					window.open(href, '_blank');
-				} else if(clickedon.is('.versionselector .dropdown-menu a')) {//perform a full page load when clicking on a doc version from the drop-down menu
+				} else if(clickedon.is('.versionselector .dropdown-menu a') || clickedon.is('#archivednotice')) {//perform a full page load when clicking on a doc version from the drop-down menu
 					window.location=href;
 				} else if(href != "#" && !clickedon.parents('header').is('#nav') && !clickedon.parents('div').is('#mobile-nav-container')) {//skip empty nav menu containers and any clicks in the banner and banner menu
 					//track all history but exclude clicks that only toggle open/closed container menus
