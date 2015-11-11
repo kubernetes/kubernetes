@@ -322,8 +322,7 @@ func NewMainKubelet(
 	procFs := procfs.NewProcFs()
 	imageBackOff := util.NewBackOff(resyncInterval, MaxContainerBackOff)
 
-	readinessManager := proberesults.NewManager()
-	klet.livenessManager = proberesults.NewManagerWithUpdates()
+	klet.livenessManager = proberesults.NewManager()
 
 	// Initialize the runtime.
 	switch containerRuntime {
@@ -419,7 +418,6 @@ func NewMainKubelet(
 
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
-		readinessManager,
 		klet.livenessManager,
 		klet.runner,
 		containerRefManager,

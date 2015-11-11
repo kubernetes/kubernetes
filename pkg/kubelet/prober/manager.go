@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -74,19 +75,24 @@ type manager struct {
 
 func NewManager(
 	statusManager status.Manager,
-	readinessManager results.Manager,
 	livenessManager results.Manager,
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Manager {
 	prober := newProber(runner, refManager, recorder)
-	return &manager{
+	readinessManager := results.NewManager()
+	m := &manager{
 		statusManager:    statusManager,
 		prober:           prober,
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
 		workers:          make(map[probeKey]*worker),
 	}
+
+	// Start syncing readiness.
+	go util.Forever(m.updateReadiness, 0)
+
+	return m
 }
 
 // Key uniquely identifying container probes
@@ -210,4 +216,11 @@ func (m *manager) removeWorker(podUID types.UID, containerName string, probeType
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 	delete(m.workers, probeKey{podUID, containerName, probeType})
+}
+
+func (m *manager) updateReadiness() {
+	update := <-m.readinessManager.Updates()
+
+	ready := update.Result == results.Success
+	m.statusManager.SetContainerReadiness(update.Pod, update.ContainerID, ready)
 }

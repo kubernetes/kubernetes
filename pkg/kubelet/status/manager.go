@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -76,6 +77,10 @@ type Manager interface {
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
 	SetPodStatus(pod *api.Pod, status api.PodStatus)
+
+	// SetContainerReadiness updates the cached container status with the given readiness, and
+	// triggers a status update.
+	SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool)
 
 	// TerminatePods resets the container status for the provided pods to terminated and triggers
 	// a status update. This function may not enqueue all the provided pods, in which case it will
@@ -171,19 +176,50 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 		status.StartTime = &now
 	}
 
-	newStatus := m.updateStatusInternal(pod, status)
-	if newStatus != nil {
-		select {
-		case m.podStatusChannel <- podStatusSyncRequest{pod.UID, *newStatus}:
-		default:
-			// Let the periodic syncBatch handle the update if the channel is full.
-			// We can't block, since we hold the mutex lock.
+	m.updateStatusInternal(pod, status)
+}
+
+func (m *manager) SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		glog.Warningf("Container readiness changed before pod has synced: %q - %q",
+			kubeletutil.FormatPodName(pod), containerID.String())
+		return
+	}
+	status := oldStatus.status
+
+	// Find the container to update.
+	containerIndex := -1
+	for i, c := range status.ContainerStatuses {
+		if c.ContainerID == containerID.String() {
+			containerIndex = i
+			break
 		}
 	}
+	if containerIndex == -1 {
+		glog.Warningf("Container readiness changed for unknown container: %q - %q",
+			kubeletutil.FormatPodName(pod), containerID.String())
+		return
+	}
+
+	if status.ContainerStatuses[containerIndex].Ready == ready {
+		glog.V(4).Infof("Container readiness unchanged (%v): %q - %q", ready,
+			kubeletutil.FormatPodName(pod), containerID.String())
+		return
+	}
+
+	// Make sure we're not updating the cached version.
+	status.ContainerStatuses = make([]api.ContainerStatus, len(status.ContainerStatuses))
+	copy(status.ContainerStatuses, oldStatus.status.ContainerStatuses)
+	status.ContainerStatuses[containerIndex].Ready = ready
+	m.updateStatusInternal(pod, status)
 }
 
 func (m *manager) TerminatePods(pods []*api.Pod) bool {
-	sent := true
+	allSent := true
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	for _, pod := range pods {
@@ -192,39 +228,41 @@ func (m *manager) TerminatePods(pods []*api.Pod) bool {
 				Terminated: &api.ContainerStateTerminated{},
 			}
 		}
-		newStatus := m.updateStatusInternal(pod, pod.Status)
-		if newStatus != nil {
-			select {
-			case m.podStatusChannel <- podStatusSyncRequest{pod.UID, *newStatus}:
-			default:
-				sent = false
-				glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", kubeletutil.FormatPodName(pod))
-			}
-		} else {
-			sent = false
+		if sent := m.updateStatusInternal(pod, pod.Status); !sent {
+			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", kubeletutil.FormatPodName(pod))
+			allSent = false
 		}
 	}
-	return sent
+	return allSent
 }
 
-// updateStatusInternal updates the internal status cache, and returns a versioned status if an
-// update is necessary. This method IS NOT THREAD SAFE and must be called from a locked function.
-func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus) *versionedPodStatus {
+// updateStatusInternal updates the internal status cache, and queues an update to the api server if
+// necessary. Returns whether an update was triggered.
+// This method IS NOT THREAD SAFE and must be called from a locked function.
+func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus) bool {
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
 	oldStatus, found := m.podStatuses[pod.UID]
-	if !found || !isStatusEqual(&oldStatus.status, &status) || pod.DeletionTimestamp != nil {
-		newStatus := versionedPodStatus{
-			status:       status,
-			version:      oldStatus.version + 1,
-			podName:      pod.Name,
-			podNamespace: pod.Namespace,
-		}
-		m.podStatuses[pod.UID] = newStatus
-		return &newStatus
-	} else {
+	if found && isStatusEqual(&oldStatus.status, &status) && pod.DeletionTimestamp == nil {
 		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletutil.FormatPodName(pod), status)
-		return nil // No new status.
+		return false // No new status.
+	}
+
+	newStatus := versionedPodStatus{
+		status:       status,
+		version:      oldStatus.version + 1,
+		podName:      pod.Name,
+		podNamespace: pod.Namespace,
+	}
+	m.podStatuses[pod.UID] = newStatus
+
+	select {
+	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
+		return true
+	default:
+		// Let the periodic syncBatch handle the update if the channel is full.
+		// We can't block, since we hold the mutex lock.
+		return false
 	}
 }
 
