@@ -8,966 +8,1174 @@
 
 <url>
   <loc>http://kubernetes.io/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
   <loc>http://kubernetes.io/gettingstarted/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
   <loc>http://kubernetes.io/community/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
   <loc>http://kubernetes.io/events/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/gce.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/media/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/vagrant.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/gce.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/fedora/fedora_ansible_config.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/vagrant.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/fedora/fedora_manual_config.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/fedora/fedora_ansible_config.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/locally.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/fedora/fedora_manual_config.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/azure.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/locally.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/rackspace.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/azure.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/coreos.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/rackspace.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/vsphere.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/coreos.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/aws.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/vsphere.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/mesos.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/aws.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/guestbook/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/mesos.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/design/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/guestbook/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/design/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/api-reference/v1/operations.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl-overview.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/index.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/whatisk8s.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/overview.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/gs-localmachine.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/docker.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/gs-turnkey.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/coreos/azure/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/gs-custom.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/scratch.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/juju.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/cloudstack.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/libvirt-coreos.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/ovirt.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/fedora/flannel_multi_node_cluster.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/coreos/bare_metal_offline.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/centos/centos_manual_config.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/ubuntu.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/docker-multinode.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/container-environment.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/images.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/downward-api.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/pods.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/labels.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/replication-controller.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/services.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/volumes.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/persistent-volumes.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/secrets.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/identifiers.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/namespaces.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/service-accounts.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/annotations.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/daemons.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/deployments.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/ingress.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/horizontal-pod-autoscaler.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/jobs.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/prereqs.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/quick-start.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/basicstutorials.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/walkthrough/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/walkthrough/k8s201.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/app-admin-detailed.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/configuring-containers.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/compute-resources.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/deploying-applications.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/connecting-applications.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/production-pods.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/managing-deployments.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/introspection-and-debugging.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/ui.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/logging.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/monitoring.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/getting-into-containers.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/connecting-to-applications-proxy.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/connecting-to-applications-port-forward.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/introduction.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/design/architecture.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/design/security.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/design/security_context.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/design/access.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/namespaces.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/cluster-components.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/accessing-the-cluster.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/kube-apiserver.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/authorization.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/authentication.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/accessing-the-api.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/admission-controllers.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/service-accounts-admin.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/kube-scheduler.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/etcd.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/node.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/kubelet.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/kube-proxy.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/networking.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/dns.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/ovs-networking.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/cluster-management.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/multi-cluster.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/cluster-large.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/high-availability.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/resource-quota.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/salt.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/garbage-collection.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/cluster-troubleshooting.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/logging.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/config-best-practices.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/deploy-clusters.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/cassandra/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/spark/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/storm/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/celery-rabbitmq/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/hazelcast/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/meteor/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/redis/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/rethinkdb/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/mysql-wordpress-pd/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/multi-tier.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/guestbook-go/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/phabricator/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/setup-config.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/simple-yaml.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/environment-guide/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/downward-api/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/node-selection/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/resourcequota/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/limitrange/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/namespaces/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/simple-nginx.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/cluster-dns/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/logging-demo/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/elasticsearch/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/openshift-origin/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/secrets/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/persistent-volumes/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/rbd/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/glusterfs/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/iscsi/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/nfs/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/k8petstore/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/liveness/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/explorer/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/update-demo/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/api.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/working-with-resources.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/api-ref.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/api-reference/v1/definitions.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/api-reference/extensions/v1beta1/operations.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/api-reference/extensions/v1beta1/definitions.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_annotate.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_api-versions.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_apply.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_attach.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_cluster-info.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_set-cluster.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_set-context.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_set-credentials.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_set.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_unset.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_use-context.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_config_view.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_create.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_delete.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_describe.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_edit.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_exec.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_expose.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_get.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_label.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_logs.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_patch.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_port-forward.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_proxy.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_replace.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_rolling-update.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_run.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_scale.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_version.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/jsonpath.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/docker-cli-to-kubectl.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/troubleshooting.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/known-issues.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/application-troubleshooting.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/reporting-security-issues.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/roadmap.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/simple-nginx.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/guestbook/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/devel/developer-guides/vagrant.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/containers.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/coreos/coreos_multinode_cluster.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/binary_release.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/proposals/federation.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/devel/writing-a-getting-started-guide.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/fedora/fedora-calico.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/mesos-docker.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/coreos/bare_metal_calico.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/ubuntu-calico.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/devel/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/examples/k8petstore/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/docker-multinode/master.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/docker-multinode/worker.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/docker-multinode/deployDNS.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/docker-multinode/testing.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/admin/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/pod-states.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/node-selection/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/update-demo/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/environment-guide/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
+</url>
+<url>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/downward-api/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
   <loc>http://kubernetes.io/third_party/swagger-ui/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/nfs/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/index.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/iscsi/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/whatisk8s.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/flocker/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/glusterfs/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/overview.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/rbd/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/design/architecture.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/persistent-volumes/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/pods.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/downward-api/volume/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/labels.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/resources.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/replication-controller.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/secrets.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/services.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/identifiers.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/volumes.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/secrets/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/secrets.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/api-conventions.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/identifiers.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/admin/static-pods.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/namespaces.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/horizontal-pod-autoscaler.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/annotations.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_autoscale.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/horizontal-pod-autoscaling/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/walkthrough/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/sharing-clusters.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/walkthrough/k8s201.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/services-firewalls.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/quick-start.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/liveness/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/configuring-containers.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/expansion.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/deploying-applications.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/proposals/resource-qos.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/connecting-applications.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/https-nginx/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/production-pods.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/admin/limitrange/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/managing-deployments.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/simple-rolling-update.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/introspection-and-debugging.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/logging.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/ui.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/logging-demo/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/logging.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/getting-started-guides/logging-elasticsearch.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/monitoring.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/service_accounts.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/getting-into-containers.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/namespaces.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/connecting-to-applications-proxy.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/admin/namespaces/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/connecting-to-applications-port-forward.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/admission_control_limit_range.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/index.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/admin/kube-controller-manager.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/design/security.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/client-libraries.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/design/access.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/kubectl-container/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/admission-controllers.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/security-context.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/authentication.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/admission_control_resource_quota.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/design/namespaces.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/admin/resourcequota/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/networking.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/networking.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/high-availability.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/proposals/high-availability.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/cluster-management.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/environment-guide/containers/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/resource-quota.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/elasticsearch/production_cluster/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/logging.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/persistent-storage.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/salt.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/guestbook-go/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/cassandra/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/api_changes.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/spark/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/versioning.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/storm/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/proposals/api-group.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/celery-rabbitmq/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/cephfs/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/hazelcast/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/examples/mysql-cinder-pd/README.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/meteor/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_namespace.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/redis/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/kubectl/kubectl_stop.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/rethinkdb/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/debugging-services.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/mysql-wordpress-pd/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/guestbook-go/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/proposals/deployment.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/phabricator/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/development.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/simple-yaml.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/user-guide/walkthrough/</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/environment-guide/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/collab.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/downward-api/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/issues.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/node-selection/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/pull-requests.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/simple-nginx.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/faster_reviews.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/cluster-dns/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/getting-builds.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/logging-demo/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/automation.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/elasticsearch/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/flaky-tests.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/openshift-origin/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/profiling.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/secrets/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/instrumentation.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/persistent-volumes/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/coding-conventions.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/rbd/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/admission_control.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/glusterfs/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/making-release-notes.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/iscsi/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/releasing.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/nfs/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/principles.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/k8petstore/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/e2e-tests.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/liveness/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/design/extending-api.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/examples/explorer/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/kubectl-conventions.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 <url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/update-demo/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/api.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/authorization.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/accessing-the-api.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/working-with-resources.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_api-versions.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_cluster-info.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_set-cluster.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_set-context.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_set-credentials.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_set.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_unset.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_use-context.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_config_view.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_create.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_delete.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_describe.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_exec.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_expose.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_get.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_label.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_logs.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_namespace.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_port-forward.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_patch.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_proxy.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_replace.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_rolling-update.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_run.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_scale.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_stop.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubectl/kubectl_version.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/troubleshooting.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/application-troubleshooting.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/cluster-troubleshooting.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/simple-nginx.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/guestbook/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/developer-guides/vagrant.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/containers.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/binary_release.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/coreos/coreos_multinode_cluster.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/coreos/azure/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/aws-coreos.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/kubeconfig-file.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/multi-cluster.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/proposals/federation.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/docker.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/scratch.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/writing-a-getting-started-guide.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/juju.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/cloudstack.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/libvirt-coreos.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/ovirt.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/fedora/flannel_multi_node_cluster.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/coreos/bare_metal_offline.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/centos/centos_manual_config.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/ubuntu.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/docker-multinode.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/ubuntu-calico.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/dns.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/pod-states.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/nfs/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/iscsi/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/glusterfs/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/rbd/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/persistent-volumes.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/persistent-volumes/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/compute-resources.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/secrets.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/service-accounts.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/identifiers.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/secrets/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/images.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/api-conventions.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/node.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/prereqs.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/container-environment.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/downward-api.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/docker-cli-to-kubectl.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/config-best-practices.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/node-selection/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/update-demo/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/liveness/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/services-firewalls.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/expansion.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/https-nginx/README.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/limitrange/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/simple-rolling-update.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/logging.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/logging-demo/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/logging-elasticsearch.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/accessing-the-cluster.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/introduction.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/cluster-components.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/kube-apiserver.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/service-accounts-admin.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/kube-scheduler.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/kube-controller-manager.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/kubelet.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/kube-proxy.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/ovs-networking.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/cluster-large.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/service_accounts.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/security_context.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/resources.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/security-context.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/admission_control_resource_quota.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/resourcequota/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/admission_control_limit_range.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/networking.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/proposals/high-availability.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/environment-guide/containers/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/persistent-storage.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/guestbook-go/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/api_changes.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/versioning.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/known-issues.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/debugging-services.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/aws/kubectl.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/development.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/k8petstore/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/docker-multinode/master.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/docker-multinode/worker.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/getting-started-guides/docker-multinode/testing.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/collab.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/issues.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/pull-requests.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/faster_reviews.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/getting-builds.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/flaky-tests.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/profiling.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/instrumentation.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/coding-conventions.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/client-libraries.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/design/admission_control.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/making-release-notes.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/releasing.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/sharing-clusters.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/environment-guide/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/user-guide/downward-api/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/examples/kubectl-container/</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/admin/etcd.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
-</url>
-<url>
-  <loc>http://kubernetes.io/v1.0/docs/devel/cherry-picks.html</loc>
-  <lastmod>2015-07-21T04:59:33+00:00</lastmod>
+  <loc>http://kubernetes.io/v1.1/docs/devel/cherry-picks.html</loc>
+  <lastmod>2015-11-11T19:13:34+00:00</lastmod>
 </url>
 </urlset>
