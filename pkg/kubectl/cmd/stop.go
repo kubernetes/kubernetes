@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -56,10 +57,11 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &StopOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "stop (-f FILENAME | TYPE (NAME | -l label | --all))",
-		Short:   "Deprecated: Gracefully shut down a resource by name or filename.",
-		Long:    stop_long,
-		Example: stop_example,
+		Use:        "stop (-f FILENAME | TYPE (NAME | -l label | --all))",
+		Short:      "Deprecated: Gracefully shut down a resource by name or filename.",
+		Long:       stop_long,
+		Example:    stop_example,
+		Deprecated: fmt.Sprintf("use %q instead.", "delete"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			cmdutil.CheckErr(RunStop(f, cmd, args, out, options))
