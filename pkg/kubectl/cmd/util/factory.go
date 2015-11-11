@@ -101,6 +101,10 @@ type Factory struct {
 	CanBeAutoscaled func(kind string) error
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject func(object runtime.Object) (*api.Pod, error)
+	// EditorEnvs returns a group of environment variables that the edit command
+	// can range over in order to determine if the user has specified an editor
+	// of their choice.
+	EditorEnvs func() []string
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -330,6 +334,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return nil, fmt.Errorf("cannot attach to %s: not implemented", kind)
 			}
+		},
+		EditorEnvs: func() []string {
+			return []string{"KUBE_EDITOR", "EDITOR"}
 		},
 	}
 }
