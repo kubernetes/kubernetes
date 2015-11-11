@@ -83,7 +83,7 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (fakeKubeletClient) GetConnectionInfo() (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
 

@@ -156,7 +156,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 
 	if portReq == "" || strconv.Itoa(ports.KubeletPort) == portReq {
 		// Ignore requested scheme, use scheme provided by GetConnectionInfo
-		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(host)
+		scheme, port, kubeletTransport, err := connection.GetConnectionInfo()
 		if err != nil {
 			return nil, nil, err
 		}
