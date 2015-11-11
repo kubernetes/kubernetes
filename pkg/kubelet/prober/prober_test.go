@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 func TestFormatURL(t *testing.T) {
@@ -245,13 +244,4 @@ func TestProbe(t *testing.T) {
 			}
 		}
 	}
-}
-
-type fakeExecProber struct {
-	result probe.Result
-	err    error
-}
-
-func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
-	return p.result, "", p.err
 }
