@@ -2605,6 +2605,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			}
 			node.Status.Conditions[i] = newNodeReadyCondition
 			updated = true
+			break
 		}
 	}
 	if !updated {
