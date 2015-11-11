@@ -502,7 +502,7 @@ func (k *KubernetesScheduler) reconcileNonTerminalTask(driver bindings.Scheduler
 	} else if pod, err := k.client.Pods(namespace).Get(name); err == nil {
 		if t, ok, err := podtask.RecoverFrom(*pod); ok {
 			log.Infof("recovered task %v from metadata in pod %v/%v", taskId, namespace, name)
-			_, err := k.taskRegistry.Register(t)
+			_, err := k.taskRegistry.Register(t, nil)
 			if err != nil {
 				// someone beat us to it?!
 				log.Warningf("failed to register recovered task: %v", err)
@@ -912,7 +912,7 @@ func (ks *KubernetesScheduler) recoverTasks() error {
 				log.Errorf("failed to delete pod '%v/%v': %v", pod.Namespace, pod.Name, err)
 			}
 		} else if ok {
-			ks.taskRegistry.Register(t)
+			ks.taskRegistry.Register(t, nil)
 			recoverSlave(t)
 			log.Infof("recovered task %v from pod %v/%v", t.ID, pod.Namespace, pod.Name)
 		}
