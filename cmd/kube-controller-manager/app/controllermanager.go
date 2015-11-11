@@ -307,8 +307,11 @@ func (s *CMServer) Run(_ []string) error {
 	// important when we start apiserver and controller manager at the same time.
 	var versionStrings []string
 	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		versionStrings, err = client.ServerAPIVersions(kubeconfig)
-		return err == nil, err
+		if versionStrings, err = client.ServerAPIVersions(kubeconfig); err == nil {
+			return true, nil
+		}
+		glog.Errorf("Failed to get api versions from server: %v", err)
+		return false, nil
 	})
 	if err != nil {
 		glog.Fatalf("Failed to get api versions from server: %v", err)
