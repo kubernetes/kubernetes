@@ -317,7 +317,7 @@ function validate-cluster {
 
 # Delete a kubernetes cluster
 function kube-down {
-  if [ "${MESOS_DOCKER_DUMP_LOGS:-false}" == "true" ]; then
+  if [ "${MESOS_DOCKER_DUMP_LOGS}" == "true" ]; then
     cluster::mesos::docker::dump_logs "${MESOS_DOCKER_WORK_DIR}/log"
   fi
   echo "Stopping ${KUBERNETES_PROVIDER} cluster" 1>&2
