@@ -278,7 +278,18 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
 			return "", noSuchPodErr
 		}
-		return k.doSchedule(k.api.tasks().Register(k.api.createPodTask(ctx, pod)))
+
+		task, err := k.api.createPodTask(ctx, pod)
+		if err != nil {
+			return "", err
+		}
+
+		task, err = k.api.tasks().Register(task)
+		if err != nil {
+			return "", err
+		}
+
+		return k.doSchedule(task)
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
 	//we knew previously, we should probably update the task.Pod state here
@@ -294,7 +305,7 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 			// but we're going to let someone else handle it, probably the mesos task error handler
 			return "", fmt.Errorf("task %s has already been launched, aborting schedule", task.ID)
 		} else {
-			return k.doSchedule(task, nil)
+			return k.doSchedule(task)
 		}
 
 	default:
@@ -302,16 +313,18 @@ func (k *kubeScheduler) Schedule(pod *api.Pod, unused algorithm.NodeLister) (str
 	}
 }
 
-// Call ScheduleFunc and subtract some resources, returning the name of the machine the task is scheduled on
-func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
+// doSchedule schedules the given task and returns the machine the task is scheduled on
+// or an error if the scheduling failed.
+func (k *kubeScheduler) doSchedule(task *podtask.T) (string, error) {
 	var offer offers.Perishable
+	var err error
+
 	if task.HasAcceptedOffer() {
 		// verify that the offer is still on the table
-		offerId := task.GetOfferId()
-		if offer, ok := k.api.offers().Get(offerId); ok && !offer.HasExpired() {
-			// skip tasks that have already have assigned offers
-			offer = task.Offer
-		} else {
+		var ok bool
+		offer, ok = k.api.offers().Get(task.GetOfferId())
+
+		if !ok || offer.HasExpired() {
 			task.Offer.Release()
 			task.Reset()
 			if err = k.api.tasks().Update(task); err != nil {
@@ -319,36 +332,46 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			}
 		}
 	}
-	if err == nil && offer == nil {
+
+	if offer == nil {
 		offer, err = k.api.algorithm().SchedulePod(k.api.offers(), k.api, task)
 	}
+
 	if err != nil {
 		return "", err
 	}
+
 	details := offer.Details()
 	if details == nil {
 		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
 	}
+
 	slaveId := details.GetSlaveId().GetValue()
-	if slaveHostName := k.api.slaveHostNameFor(slaveId); slaveHostName == "" {
+	slaveHostName := k.api.slaveHostNameFor(slaveId)
+	if slaveHostName == "" {
 		// not much sense in Release()ing the offer here since its owner died
 		offer.Release()
 		k.api.offers().Invalidate(details.Id.GetValue())
 		return "", fmt.Errorf("Slave disappeared (%v) while scheduling task %v", slaveId, task.ID)
-	} else {
-		if task.Offer != nil && task.Offer != offer {
-			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
-		}
-
-		task.Offer = offer
-		k.api.algorithm().Procurement()(task, details) // TODO(jdef) why is nothing checking the error returned here?
-
-		if err := k.api.tasks().Update(task); err != nil {
-			offer.Release()
-			return "", err
-		}
-		return slaveHostName, nil
 	}
+
+	if task.Offer != nil && task.Offer != offer {
+		return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
+	}
+
+	task.Offer = offer
+	if err := k.api.algorithm().Procurement()(task, details); err != nil {
+		offer.Release()
+		task.Reset()
+		return "", err
+	}
+
+	if err := k.api.tasks().Update(task); err != nil {
+		offer.Release()
+		return "", err
+	}
+
+	return slaveHostName, nil
 }
 
 type queuer struct {
