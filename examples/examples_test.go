@@ -165,7 +165,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../cmd/integration": {
 			"v1-controller": &api.ReplicationController{},
 		},
-		"../examples/guestbook": {
+		"../examples/guestbook/test-data": {
 			"frontend-controller":     &api.ReplicationController{},
 			"redis-slave-controller":  &api.ReplicationController{},
 			"redis-master-controller": &api.ReplicationController{},

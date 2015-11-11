@@ -53,8 +53,8 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC  = "../../../examples/guestbook/redis-master-controller.yaml"
-	filenameSVC = "../../../examples/guestbook/frontend-service.yaml"
+	filenameRC  = "../../../hack/testdata/guestbook/redis-master-controller.yaml"
+	filenameSVC = "../../../hack/testdata/guestbook/frontend-service.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {

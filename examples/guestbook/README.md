@@ -366,9 +366,9 @@ In Kubernetes, a replication controller is responsible for managing multiple ins
 Just like the master, we want to have a service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave service will provide transparent load balancing to web app clients.
 
 This time we put the service and RC into one [file](../../docs/user-guide/managing-deployments.md#organizing-resource-configurations). Group related objects together in a single file. This is often better than separate files.
-The specification for the slaves is in `examples/guestbook/all-in-one/redis-slave.yaml`:
+The specification for the slaves is in `examples/guestbook/redis-slave.yaml`:
 
-<!-- BEGIN MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE redis-slave.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -434,15 +434,15 @@ spec:
         - containerPort: 6379
 ```
 
-[Download example](all-in-one/redis-slave.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
+[Download example](redis-slave.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE redis-slave.yaml -->
 
 This time the selector for the service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. More lables usage, see [using-labels-effectively](../../docs/user-guide/managing-deployments.md#using-labels-effectively).
 
 Now that you have created the specification, create it in your cluster by running:
 
 ```console
-$ kubectl create -f examples/guestbook/all-in-one/redis-slave.yaml
+$ kubectl create -f examples/guestbook/redis-slave.yaml
 service "redis-slave" created
 replicationcontroller "redis-slave" created
 
@@ -478,7 +478,7 @@ Again we'll create a set of replicated frontend pods instantiated by a replicati
 As with the other pods, we now want to create a service to group the frontend pods.
 The RC and service are described in the file `frontend.yaml`:
 
-<!-- BEGIN MUNGE: EXAMPLE all-in-one/frontend.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE frontend.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -542,8 +542,8 @@ spec:
         - containerPort: 80
 ```
 
-[Download example](all-in-one/frontend.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE all-in-one/frontend.yaml -->
+[Download example](frontend.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE frontend.yaml -->
 
 #### Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)
 
@@ -556,7 +556,7 @@ To do this, uncomment the `type: LoadBalancer` line in the `frontend.yaml` file 
 Create the service and replication controller like this:
 
 ```console
-$ kubectl create -f examples/guestbook/all-in-one/frontend.yaml
+$ kubectl create -f examples/guestbook/frontend.yaml
 service "frontend" created
 replicationcontroller "frontend" created
 ```

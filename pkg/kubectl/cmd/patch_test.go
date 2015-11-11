@@ -80,7 +80,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../hack/testdata/guestbook/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
