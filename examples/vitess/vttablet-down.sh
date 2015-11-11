@@ -41,12 +41,6 @@ for shard in `seq 1 $num_shards`; do
       uid=$[$uid_base + $uid_index + $cell_index]
       printf -v alias '%s-%010d' $cell $uid
 
-      if [ -n "$server" ]; then
-        echo "Removing tablet $alias from Vitess topology..."
-        vtctlclient -server $server ScrapTablet -force $alias
-        vtctlclient -server $server DeleteTablet $alias
-      fi
-
       echo "Deleting pod for tablet $alias..."
       $KUBECTL delete pod vttablet-$uid
     done
@@ -54,3 +48,4 @@ for shard in `seq 1 $num_shards`; do
   done
   let uid_base=uid_base+100
 done
+

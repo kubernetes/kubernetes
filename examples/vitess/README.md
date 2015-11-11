@@ -61,10 +61,35 @@ tune these requirements in the
 [resource limits](../../docs/user-guide/compute-resources.md)
 section of each YAML file.
 
-Lastly, you need to open ports 30000 (for the Vitess admin daemon) and 80 (for
+Lastly, you need to open ports 30000-30001 (for the Vitess admin daemon) and 80 (for
 the guestbook app) in your firewall. See the
 [Services and Firewalls](../../docs/user-guide/services-firewalls.md)
 guide for examples of how to do that.
+
+### Configure site-local settings
+
+Run the `configure.sh` script to generate a `config.sh` file, which will be used
+to customize your cluster settings.
+
+``` console
+./configure.sh
+```
+
+Currently, we have out-of-the-box support for storing
+[backups](http://vitess.io/user-guide/backup-and-restore.html) in
+[Google Cloud Storage](https://cloud.google.com/storage/).
+If you're using GCS, fill in the fields requested by the configure script.
+Note that your Kubernetes cluster must be running on instances with the
+`storage-rw` scope for this to work. With Container Engine, you can do this by
+passing `--scopes storage-rw` to the `glcoud container clusters create` command.
+
+For other platforms, you'll need to choose the `file` backup storage plugin,
+and mount a read-write network volume into the `vttablet` and `vtctld` pods.
+For example, you can mount any storage service accessible through NFS into a
+Kubernetes volume. Then provide the mount path to the configure script here.
+
+If you prefer to skip setting up a backup volume for the purpose of this example,
+you can choose `file` mode and set the path to `/tmp`.
 
 ### Start Vitess
 
@@ -79,7 +104,7 @@ something like this:
 ****************************
 * Complete!
 * Use the following line to make an alias to kvtctl:
-* alias kvtctl='$GOPATH/bin/vtctlclient -server 104.197.47.173:30000'
+* alias kvtctl='$GOPATH/bin/vtctlclient -server 104.197.47.173:30001'
 * See the vtctld UI at: http://104.197.47.173:30000
 ****************************
 ```
@@ -114,18 +139,6 @@ in Vitess. Each page number is assigned to one of the shards using a
 ```
 
 You may also want to remove any firewall rules you created.
-
-### Limitations
-
-Currently this example cluster is not configured to use the built-in
-[Backup/Restore](http://vitess.io/user-guide/backup-and-restore.html) feature of
-Vitess, because as of
-[Vitess v2.0.0-alpha2](https://github.com/youtube/vitess/releases) that feature
-requires a network-mounted directory. Usually this system is used to restore
-from the latest backup when a pod is moved or added in an existing deployment.
-As part of the final Vitess v2.0.0 release, we plan to provide support for
-saving backups in a cloud-based blob store (such as Google Cloud Storage or
-Amazon S3), which we believe will be better suited to running in Kubernetes.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
