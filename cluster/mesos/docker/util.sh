@@ -267,7 +267,7 @@ function kube-up {
   echo "Pulling Docker images" 1>&2
   cluster::mesos::docker::docker_compose_lazy_pull
 
-  if [ "${MESOS_DOCKER_SKIP_BUILD:-false}" != "true" ]; then
+  if [ "${MESOS_DOCKER_SKIP_BUILD}" != "true" ]; then
     echo "Building Docker images" 1>&2
     # TODO: version images (k8s version, git sha, and dirty state) to avoid re-building them every time.
     "${provider_root}/km/build.sh"
