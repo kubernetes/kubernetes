@@ -340,6 +340,7 @@ var localAnnotations = []string{
 	kubetypes.ConfigSourceAnnotationKey,
 	kubetypes.ConfigMirrorAnnotationKey,
 	kubetypes.ConfigFirstSeenAnnotationKey,
+	kubetypes.StatusLocalAddressAnnotationKey,
 }
 
 func isLocalAnnotationKey(key string) bool {

@@ -65,6 +65,11 @@ type PodNetworkStatus struct {
 	//   - service endpoints are constructed with
 	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
+
+	// LocalIP is an optional alternative ipv4/ipv6 address of the pod that is used by the prober
+	// for readyness/liveness checks. This is used in solutions where nodes have access to local
+	// pods (e.g. using a linklocal address or an address that is local to the node)
+	LocalIP net.IP `json:"localIP,omitempty" description:"Alternative address of the pod used for probes"`
 }
 
 // Host is an interface that plugins can use to access the kubelet.
