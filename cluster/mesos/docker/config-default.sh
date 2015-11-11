@@ -66,3 +66,6 @@ DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:---log-level=error}"
 # Force a dump of the logs into ${MESOS_DOCKER_WORK_DIR}/log on kube-down.sh. By
 # default this only happens when kube-up.sh fails.
 MESOS_DOCKER_DUMP_LOGS="${MESOS_DOCKER_DUMP_LOGS:-false}"
+
+# Skip rebuilding the involved docker containers on kube-up.sh.
+MESOS_DOCKER_SKIP_BUILD="${MESOS_DOCKER_SKIP_BUILD:-false}"
