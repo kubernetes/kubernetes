@@ -1261,7 +1261,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 
 	for _, ip := range service.Spec.ExternalIPs {
-		if ip == "0.0.0.0" {
+		if ip == "0.0.0.0" || ip == "::/0" {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.externalIPs", ip, "is not an IP address"))
 		}
 		allErrs = append(allErrs, validateIpIsNotLinkLocalOrLoopback(ip, "spec.externalIPs")...)
@@ -1932,8 +1932,8 @@ func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorL
 
 func validateEndpointAddress(address *api.EndpointAddress) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if !validation.IsValidIPv4(address.IP) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "invalid IPv4 address"))
+	if !validation.IsValidIP(address.IP) && !validation.IsV{
+		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "invalid IP address"))
 		return allErrs
 	}
 	return validateIpIsNotLinkLocalOrLoopback(address.IP, "ip")
