@@ -212,6 +212,7 @@ GCE_PARALLEL_FLAKY_TESTS=(
 
 # Tests that should not run on soak cluster.
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
+    "GCE\sL7\sLoadBalancer\sController" # issue: #17119
     "Density.*30\spods"
     "Elasticsearch"
     "external\sload\sbalancer"
