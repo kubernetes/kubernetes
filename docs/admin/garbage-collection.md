@@ -53,7 +53,7 @@ with the docker leaking issues would be appreciated.
 kubernetes manages lifecycle of all images through imageManager, with the cooperation
 of cadvisor.
 The policy for garbage collecting images we apply takes two factors into consideration,
-`HighThresholdPercent` and `LowThresholdPercent`. Disk usage above the the high threshold
+`HighThresholdPercent` and `LowThresholdPercent`. Disk usage above the high threshold
 will trigger garbage collection, which attempts to delete unused images until the low
 threshold is met. Least recently used images are deleted first.
 
