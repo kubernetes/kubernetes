@@ -53,8 +53,8 @@ type Editor struct {
 // the proper command line. If the provided editor has no spaces, or no quotes,
 // it is treated as a bare command to be loaded. Otherwise, the string will
 // be passed to the user's shell for execution.
-func NewDefaultEditor() Editor {
-	args, shell := defaultEnvEditor()
+func NewDefaultEditor(envs []string) Editor {
+	args, shell := defaultEnvEditor(envs)
 	return Editor{
 		Args:  args,
 		Shell: shell,
@@ -73,8 +73,16 @@ func defaultEnvShell() []string {
 	return []string{shell, flag}
 }
 
-func defaultEnvEditor() ([]string, bool) {
-	editor := os.Getenv("EDITOR")
+func defaultEnvEditor(envs []string) ([]string, bool) {
+	var editor string
+	for _, env := range envs {
+		if len(env) > 0 {
+			editor = os.Getenv(env)
+		}
+		if len(editor) > 0 {
+			break
+		}
+	}
 	if len(editor) == 0 {
 		editor = platformize(defaultEditor, windowsEditor)
 	}

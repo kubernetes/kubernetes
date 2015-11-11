@@ -46,9 +46,9 @@ const (
 	editLong = `Edit a resource from the default editor.
 
 The edit command allows you to directly edit any API resource you can retrieve via the
-command line tools. It will open the editor defined by your KUBE_EDITOR, GIT_EDITOR,
-or EDITOR environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
-You can edit multiple objects, although changes are applied one at a time. The command 
+command line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
+environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
+You can edit multiple objects, although changes are applied one at a time. The command
 accepts filenames as well as command line arguments, although the files you point to must
 be previously saved versions of resources.
 
@@ -148,7 +148,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	}
 
 	windowsLineEndings := cmdutil.GetFlagBool(cmd, "windows-line-endings")
-	edit := editor.NewDefaultEditor()
+	edit := editor.NewDefaultEditor(f.EditorEnvs())
 	defaultVersion := cmdutil.OutputVersionFromGroupVersion(cmd, clientConfig.GroupVersion)
 	results := editResults{}
 	for {
