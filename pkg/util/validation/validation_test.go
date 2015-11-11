@@ -256,7 +256,7 @@ func TestIsValidIP(t *testing.T) {
 		"0.0.0.0",
 	}
 	for _, val := range goodValues {
-		if !IsValidIPv4(val) {
+		if !IsValidIP(val) {
 			t.Errorf("expected true for %q", val)
 		}
 	}
@@ -271,7 +271,7 @@ func TestIsValidIP(t *testing.T) {
 		"1.0.0.1.",
 	}
 	for _, val := range badValues {
-		if IsValidIPv4(val) {
+		if IsValidIP(val) {
 			t.Errorf("expected false for %q", val)
 		}
 	}
