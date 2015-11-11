@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func HTTPClientFunc(f func(*http.Request) (*http.Response, error)) *http.Client {
+func CreateHTTPClient(roundTripper func(*http.Request) (*http.Response, error)) *http.Client {
 	return &http.Client{
-		Transport: roundTripperFunc(f),
+		Transport: roundTripperFunc(roundTripper),
 	}
 }
 

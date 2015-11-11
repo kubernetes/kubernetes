@@ -99,7 +99,7 @@ func TestNegotiateVersion(t *testing.T) {
 				StatusCode: 200,
 				Body:       objBody(&unversionedapi.APIVersions{Versions: test.serverVersions}),
 			},
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if test.sendErr != nil {
 					return nil, test.sendErr
 				}
