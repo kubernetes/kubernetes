@@ -178,7 +178,7 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
-	devicePath := strings.Join([]string{"/dev/rbd", b.Pool, b.Image}, "/")
+	var devicePath string
 	exist := waitForPathToExist(devicePath, 1)
 	if !exist {
 		// modprobe
@@ -192,16 +192,18 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 		start := rand.Int() % l
 		// iterate all hosts until mount succeeds.
 		for i := start; i < start+l; i++ {
+			var rbdOut []byte
 			mon := b.Mon[i%l]
 			glog.V(1).Infof("rbd: map mon %s", mon)
 			if b.Secret != "" {
-				_, err = b.plugin.execCommand("rbd",
+				rbdOut, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "--key=" + b.Secret})
 			} else {
-				_, err = b.plugin.execCommand("rbd",
+				rbdOut, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "-k", b.Keyring})
 			}
 			if err == nil {
+				devicePath = strings.TrimRight(string(rbdOut), "\n")
 				break
 			}
 		}
