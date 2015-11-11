@@ -403,7 +403,7 @@ func TestKillContainerInPod(t *testing.T) {
 	containerToSpare := &containers[1]
 	fakeDocker.ContainerList = containers
 
-	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod); err != nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container in pod."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -468,7 +468,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 		},
 	}
 
-	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod); err != nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with preStop."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -505,7 +505,7 @@ func TestKillContainerInPodWithError(t *testing.T) {
 	fakeDocker.ContainerList = containers
 	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
 
-	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod); err == nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with error."); err == nil {
 		t.Errorf("expected error, found nil")
 	}
 }
@@ -1565,7 +1565,7 @@ func TestGetRestartCount(t *testing.T) {
 			t.Fatalf("unexpected error %v", err)
 		}
 		containerID := kubecontainer.ParseContainerID(status.ContainerStatuses[0].ContainerID)
-		dm.KillContainerInPod(containerID, &pod.Spec.Containers[0], pod)
+		dm.KillContainerInPod(containerID, &pod.Spec.Containers[0], pod, "test container restart count.")
 	}
 	// Container "bar" starts the first time.
 	// TODO: container lists are expected to be sorted reversely by time.
