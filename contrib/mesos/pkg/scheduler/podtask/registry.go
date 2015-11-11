@@ -41,7 +41,7 @@ const (
 type Registry interface {
 	// register the specified task with this registry, as long as the current error
 	// condition is nil. if no errors occur then return a copy of the registered task.
-	Register(*T, error) (*T, error)
+	Register(*T) (*T, error)
 
 	// unregister the specified task from this registry
 	Unregister(*T)
@@ -103,20 +103,19 @@ func (k *inMemoryRegistry) ForPod(podID string) (task *T, currentState StateType
 }
 
 // registers a pod task unless the spec'd error is not nil
-func (k *inMemoryRegistry) Register(task *T, err error) (*T, error) {
-	if err == nil {
-		k.rw.Lock()
-		defer k.rw.Unlock()
-		if _, found := k.podToTask[task.podKey]; found {
-			return nil, fmt.Errorf("task already registered for pod key %q", task.podKey)
-		}
-		if _, found := k.taskRegistry[task.ID]; found {
-			return nil, fmt.Errorf("task already registered for id %q", task.ID)
-		}
-		k.podToTask[task.podKey] = task.ID
-		k.taskRegistry[task.ID] = task
+func (k *inMemoryRegistry) Register(task *T) (*T, error) {
+	k.rw.Lock()
+	defer k.rw.Unlock()
+	if _, found := k.podToTask[task.podKey]; found {
+		return nil, fmt.Errorf("task already registered for pod key %q", task.podKey)
 	}
-	return task.Clone(), err
+	if _, found := k.taskRegistry[task.ID]; found {
+		return nil, fmt.Errorf("task already registered for id %q", task.ID)
+	}
+	k.podToTask[task.podKey] = task.ID
+	k.taskRegistry[task.ID] = task
+
+	return task.Clone(), nil
 }
 
 // updates internal task state. updates are limited to Spec, Flags, and Offer for
