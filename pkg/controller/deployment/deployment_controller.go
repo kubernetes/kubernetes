@@ -208,8 +208,9 @@ func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControll
 	}
 	// Check if we can scale down.
 	minAvailable := deployment.Spec.Replicas - maxUnavailable
+	minReadySeconds := deployment.Spec.Strategy.RollingUpdate.MinReadySeconds
 	// Find the number of ready pods.
-	readyPodCount, err := deploymentutil.GetAvailablePodsForRCs(d.client, allRCs)
+	readyPodCount, err := deploymentutil.GetAvailablePodsForRCs(d.client, allRCs, minReadySeconds)
 	if err != nil {
 		return false, fmt.Errorf("could not find available pods: %v", err)
 	}
