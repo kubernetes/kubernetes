@@ -302,7 +302,7 @@ type Interface interface{Method(a, b string) (c, d string)}
 		namer.NewPublicNamer(1),
 		namer.NewPrivateNamer(0),
 		namer.NewPrivateNamer(1),
-		namer.NewRawNamer(nil),
+		namer.NewRawNamer("", nil),
 	}
 
 	for nameIndex, namer := range namers {

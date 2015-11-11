@@ -56,6 +56,9 @@ func NewPrivateNamer(prependPackageNames int, ignoreWords ...string) *NameStrate
 // NewRawNamer will return a Namer that makes a name by which you would
 // directly refer to a type, optionally keeping track of the import paths
 // necessary to reference the names it provides. Tracker may be nil.
+// The 'pkg' is the full package name, in which the Namer is used - all
+// types from that package will be referenced by just type name without
+// referencing the package.
 //
 // For example, if the type is map[string]int, a raw namer will literally
 // return "map[string]int".
@@ -63,8 +66,8 @@ func NewPrivateNamer(prependPackageNames int, ignoreWords ...string) *NameStrate
 // Or if the type, in package foo, is "type Bar struct { ... }", then the raw
 // namer will return "foo.Bar" as the name of the type, and if 'tracker' was
 // not nil, will record that package foo needs to be imported.
-func NewRawNamer(tracker ImportTracker) *rawNamer {
-	return &rawNamer{tracker: tracker}
+func NewRawNamer(pkg string, tracker ImportTracker) *rawNamer {
+	return &rawNamer{pkg: pkg, tracker: tracker}
 }
 
 // Names is a map from Type to name, as defined by some Namer.
@@ -273,6 +276,7 @@ type ImportTracker interface {
 }
 
 type rawNamer struct {
+	pkg     string
 	tracker ImportTracker
 	Names
 }
@@ -291,9 +295,17 @@ func (r *rawNamer) Name(t *types.Type) string {
 		var name string
 		if r.tracker != nil {
 			r.tracker.AddType(t)
-			name = r.tracker.LocalNameOf(t.Name.Package) + "." + t.Name.Name
+			if t.Name.Package == r.pkg {
+				name = t.Name.Name
+			} else {
+				name = r.tracker.LocalNameOf(t.Name.Package) + "." + t.Name.Name
+			}
 		} else {
-			name = filepath.Base(t.Name.Package) + "." + t.Name.Name
+			if t.Name.Package == r.pkg {
+				name = t.Name.Name
+			} else {
+				name = filepath.Base(t.Name.Package) + "." + t.Name.Name
+			}
 		}
 		r.Names[t] = name
 		return name
