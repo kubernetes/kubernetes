@@ -56,6 +56,16 @@ func ParseGroupVersion(gv string) (GroupVersion, error) {
 	}
 }
 
+// ParseGroupVersionOrDie turns "group/version" string into a GroupVersion struct. It panics if
+// it cannot parse the string.
+func ParseGroupVersionOrDie(gv string) GroupVersion {
+	groupVersion, err := ParseGroupVersion(gv)
+	if err != nil {
+		panic(err.Error())
+	}
+	return groupVersion
+}
+
 // MarshalJSON implements the json.Marshaller interface.
 func (gv GroupVersion) MarshalJSON() ([]byte, error) {
 	s := gv.String()
