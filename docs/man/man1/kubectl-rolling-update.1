@@ -23,6 +23,10 @@ existing replication controller and overwrite at least one (common) label in its
 
 .SH OPTIONS
 .PP
+\fB\-\-container\fP=""
+    Container name which will have its image upgraded. Only relevant when \-\-image is specified, ignored otherwise. Required when using \-\-image on a multi\-container pod
+
+.PP
 \fB\-\-deployment\-label\-key\fP="deployment"
     The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when \-\-image is specified, ignored otherwise
 
