@@ -34,7 +34,7 @@ type TypeMeta struct {
 	// Servers should convert recognized schemas to the latest internal value, and
 	// may reject unrecognized values.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion GroupVersion `json:"apiVersion,omitempty"`
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and
