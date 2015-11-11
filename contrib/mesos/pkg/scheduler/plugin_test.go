@@ -880,15 +880,9 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 			UID:       "foo0",
 			Namespace: api.NamespaceDefault,
 		}}}
-
-	task, err := podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{})
+	_, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{}))
 	if err != nil {
 		t.Fatalf("failed to create task: %v", err)
-	}
-
-	_, err = reg.Register(task)
-	if err != nil {
-		t.Fatalf("failed to register task: %v", err)
 	}
 
 	// preconditions
@@ -923,13 +917,7 @@ func TestDeleteOne_Running(t *testing.T) {
 			UID:       "foo0",
 			Namespace: api.NamespaceDefault,
 		}}}
-
-	task, err := podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	task, err = reg.Register(task)
+	task, err := reg.Register(podtask.New(api.NewDefaultContext(), "bar", *pod.Pod, &mesos.ExecutorInfo{}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
