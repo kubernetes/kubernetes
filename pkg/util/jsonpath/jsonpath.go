@@ -130,7 +130,7 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 	case *ListNode:
 		return j.evalList(value, node)
 	case *TextNode:
-		return []reflect.Value{reflect.ValueOf(string(node.Text))}, nil
+		return []reflect.Value{reflect.ValueOf(node.Text)}, nil
 	case *FieldNode:
 		return j.evalField(value, node)
 	case *ArrayNode:
