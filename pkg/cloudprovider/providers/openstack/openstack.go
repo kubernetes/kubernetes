@@ -763,6 +763,14 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 
 	return os, true
 }
+
+// MasterBootstrap returns an implementation of MasterBootstrap for Openstack.
+// However the driver does not currently support master volumes,
+// so this implementation always returns (nil, false).
+func (os *OpenStack) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
+	return nil, false
+}
+
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
