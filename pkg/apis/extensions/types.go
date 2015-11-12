@@ -796,3 +796,51 @@ type ConfigMapList struct {
 	// Items is the list of ConfigMaps.
 	Items []ConfigMap `json:"items,omitempty"`
 }
+
+// ReplicaSet represents the configuration of a replica set.
+type ReplicaSet struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this ReplicaSet.
+	Spec ReplicaSetSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this ReplicaSet. This data may be
+	// out of date by some window of time.
+	Status ReplicaSetStatus `json:"status,omitempty"`
+}
+
+// ReplicaSetList is a collection of ReplicaSets.
+type ReplicaSetList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	Items []ReplicaSet `json:"items"`
+}
+
+// ReplicaSetSpec is the specification of a ReplicaSet.
+// As the internal representation of a ReplicaSet, it must have
+// a Template set.
+type ReplicaSetSpec struct {
+	// Replicas is the number of desired replicas.
+	Replicas int `json:"replicas"`
+
+	// Selector is a label query over pods that should match the replica count.
+	// Must match in order to be controlled.
+	// If empty, defaulted to labels on pod template.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	Selector *LabelSelector `json:"selector,omitempty"`
+
+	// Template is the object that describes the pod that will be created if
+	// insufficient replicas are detected.
+	Template *api.PodTemplateSpec `json:"template,omitempty"`
+}
+
+// ReplicaSetStatus represents the current status of a ReplicaSet.
+type ReplicaSetStatus struct {
+	// Replicas is the number of actual replicas.
+	Replicas int `json:"replicas"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
