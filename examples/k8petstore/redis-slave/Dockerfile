@@ -8,7 +8,7 @@
 #
 # Just a stub. 
 
-FROM jayunit100/redis:2.8.19
+FROM redis
 
 ADD run.sh /run.sh
 
