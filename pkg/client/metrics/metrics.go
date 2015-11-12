@@ -38,6 +38,15 @@ var (
 		},
 		[]string{"verb", "url"},
 	)
+
+	RequestResult = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: restClientSubsystem,
+			Name:      "request_status_codes",
+			Help:      "Number of http requests, partitioned by metadata",
+		},
+		[]string{"code", "method", "host"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -48,6 +57,7 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(RequestLatency)
+		prometheus.MustRegister(RequestResult)
 	})
 }
 
