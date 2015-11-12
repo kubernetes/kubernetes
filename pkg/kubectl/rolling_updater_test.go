@@ -1051,7 +1051,7 @@ func TestUpdateWithRetries(t *testing.T) {
 	}
 	fakeClient := &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
 				update := updates[0]
@@ -1142,7 +1142,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	updatedRc := false
 	fakeClient := &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("pods", "default", "") && m == "GET":
 				if req.URL.RawQuery != "labelSelector=foo%3Dbar" {

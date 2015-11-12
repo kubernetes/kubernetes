@@ -19,7 +19,7 @@ package unversioned_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -41,7 +41,6 @@ func objBody(object interface{}) io.ReadCloser {
 }
 
 func TestNegotiateVersion(t *testing.T) {
-	refusedErr := fmt.Errorf("connection refused")
 	tests := []struct {
 		name, version, expectedVersion string
 		serverVersions                 []string
@@ -87,8 +86,8 @@ func TestNegotiateVersion(t *testing.T) {
 			config:         &unversioned.Config{Version: testapi.Default.Version()},
 			serverVersions: []string{"version1"},
 			clientVersions: []string{"version1", testapi.Default.Version()},
-			sendErr:        refusedErr,
-			expectErr:      func(err error) bool { return err == refusedErr },
+			sendErr:        errors.New("connection refused"),
+			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "connection refused") },
 		},
 	}
 	codec := testapi.Default.Codec()
@@ -100,7 +99,7 @@ func TestNegotiateVersion(t *testing.T) {
 				StatusCode: 200,
 				Body:       objBody(&unversionedapi.APIVersions{Versions: test.serverVersions}),
 			},
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if test.sendErr != nil {
 					return nil, test.sendErr
 				}

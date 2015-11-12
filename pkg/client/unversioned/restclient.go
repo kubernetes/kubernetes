@@ -17,6 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -43,7 +44,7 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be
 	// used.
-	Client HTTPClient
+	Client *http.Client
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
 	Throttle util.RateLimiter
@@ -87,6 +88,9 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, maxQPS 
 func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
+	}
+	if c.Client == nil {
+		return NewRequest(nil, verb, c.baseURL, c.apiVersion, c.Codec)
 	}
 	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec)
 }
