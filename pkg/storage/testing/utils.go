@@ -49,7 +49,7 @@ func CreateObjList(prefix string, helper storage.Interface, items []runtime.Obje
 
 // CreateList will properly create a list using the storage interface
 func CreateList(prefix string, helper storage.Interface, list runtime.Object) error {
-	items, err := runtime.ExtractList(list)
+	items, err := meta.ExtractList(list)
 	if err != nil {
 		return err
 	}
@@ -57,5 +57,5 @@ func CreateList(prefix string, helper storage.Interface, list runtime.Object) er
 	if err != nil {
 		return err
 	}
-	return runtime.SetList(list, items)
+	return meta.SetList(list, items)
 }
