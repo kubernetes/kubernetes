@@ -66,7 +66,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	storageDestinations.AddAPIGroup("extensions", etcdstorage.NewEtcdStorage(fakeClient, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
 	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+	storageVersions["extensions"] = testapi.Extensions.GroupVersion().String()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
@@ -327,7 +327,7 @@ func TestExpapi(t *testing.T) {
 	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("extensions").RESTMapper)
 	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("extensions").Codec)
 	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("extensions").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("extensions").GroupVersion)
+	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("extensions").GroupVersion.String())
 }
 
 // TestGetNodeAddresses verifies that proper results are returned
@@ -401,7 +401,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	expectGroupName := "extensions"
 	expectVersions := []unversioned.GroupVersionForDiscovery{
 		{
-			GroupVersion: testapi.Extensions.GroupAndVersion(),
+			GroupVersion: testapi.Extensions.GroupVersion().String(),
 			Version:      testapi.Extensions.Version(),
 		},
 	}
@@ -481,7 +481,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 					},
 					TypeMeta: unversioned.TypeMeta{
 						Kind:       "Foo",
-						APIVersion: version,
+						APIVersion: unversioned.ParseGroupVersionOrDie(version),
 					},
 					SomeField:  "test field",
 					OtherField: 10,
@@ -492,7 +492,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 					},
 					TypeMeta: unversioned.TypeMeta{
 						Kind:       "Foo",
-						APIVersion: version,
+						APIVersion: unversioned.ParseGroupVersionOrDie(version),
 					},
 					SomeField:  "test field another",
 					OtherField: 20,
@@ -620,7 +620,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		},
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
-			APIVersion: version,
+			APIVersion: unversioned.ParseGroupVersionOrDie(version),
 		},
 		SomeField:  "test field",
 		OtherField: 10,
@@ -665,7 +665,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		},
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Foo",
-			APIVersion: "company.com/" + version,
+			APIVersion: unversioned.ParseGroupVersionOrDie("company.com/" + version),
 		},
 		SomeField:  "test field",
 		OtherField: 10,

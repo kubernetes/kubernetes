@@ -280,6 +280,7 @@ func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err err
 
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
+// TODO: use the GroupVersion struct.
 func (s *Scheme) Recognizes(version, kind string) bool {
 	return s.raw.Recognizes(version, kind)
 }
@@ -431,6 +432,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 // change the memory format yet not break compatibility with any stored
 // objects, whether they be in our storage layer (e.g., etcd), or in user's
 // config files.
+// TODO: change destVersion type GroupVersion
 func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
 	return s.raw.EncodeToVersion(obj, destVersion)
 }

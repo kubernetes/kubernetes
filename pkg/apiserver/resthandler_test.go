@@ -270,19 +270,19 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
 	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = "v1"
+	tc.startingPod.APIVersion = unversioned.ParseGroupVersionOrDie("v1")
 	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
 
 	tc.changedPod.Name = name
 	tc.changedPod.Namespace = namespace
 	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = "v1"
+	tc.changedPod.APIVersion = unversioned.ParseGroupVersionOrDie("v1")
 	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
 
 	tc.updatePod.Name = name
 	tc.updatePod.Namespace = namespace
 	tc.updatePod.ResourceVersion = "2"
-	tc.updatePod.APIVersion = "v1"
+	tc.updatePod.APIVersion = unversioned.ParseGroupVersionOrDie("v1")
 	tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
 	tc.updatePod.Spec.NodeName = "anywhere"
 
@@ -312,19 +312,19 @@ func TestPatchResourceWithConflict(t *testing.T) {
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
 	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = "v1"
+	tc.startingPod.APIVersion = unversioned.ParseGroupVersionOrDie("v1")
 	tc.startingPod.Spec.NodeName = "here"
 
 	tc.changedPod.Name = name
 	tc.changedPod.Namespace = namespace
 	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = "v1"
+	tc.changedPod.APIVersion = unversioned.ParseGroupVersionOrDie("v1")
 	tc.changedPod.Spec.NodeName = "there"
 
 	tc.updatePod.Name = name
 	tc.updatePod.Namespace = namespace
 	tc.updatePod.ResourceVersion = "2"
-	tc.updatePod.APIVersion = "v1"
+	tc.updatePod.APIVersion = unversioned.ParseGroupVersionOrDie("v1")
 	tc.updatePod.Spec.NodeName = "anywhere"
 
 	tc.Run(t)

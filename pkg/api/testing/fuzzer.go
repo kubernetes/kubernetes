@@ -57,7 +57,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(j *unversioned.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
+			j.APIVersion = unversioned.ParseGroupVersionOrDie("")
 			j.Kind = ""
 		},
 		func(j *api.ObjectMeta, c fuzz.Continue) {

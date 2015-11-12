@@ -166,7 +166,7 @@ func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubety
 		errStr := fmt.Sprintf("Invalid 'kind' returned in network status for pod '%s'. Valid value is 'PodNetworkStatus', got '%s'.", name, findVersion.Kind)
 		return nil, errors.New(errStr)
 	}
-	switch findVersion.APIVersion {
+	switch findVersion.APIVersion.Version {
 	case "":
 		fallthrough
 	case "v1beta1":

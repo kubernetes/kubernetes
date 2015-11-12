@@ -26,17 +26,17 @@ import (
 
 func TestGenericTypeMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind              string            `json:"kind,omitempty"`
-		Namespace         string            `json:"namespace,omitempty"`
-		Name              string            `json:"name,omitempty"`
-		GenerateName      string            `json:"generateName,omitempty"`
-		UID               string            `json:"uid,omitempty"`
-		CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
-		SelfLink          string            `json:"selfLink,omitempty"`
-		ResourceVersion   string            `json:"resourceVersion,omitempty"`
-		APIVersion        string            `json:"apiVersion,omitempty"`
-		Labels            map[string]string `json:"labels,omitempty"`
-		Annotations       map[string]string `json:"annotations,omitempty"`
+		Kind              string                   `json:"kind,omitempty"`
+		Namespace         string                   `json:"namespace,omitempty"`
+		Name              string                   `json:"name,omitempty"`
+		GenerateName      string                   `json:"generateName,omitempty"`
+		UID               string                   `json:"uid,omitempty"`
+		CreationTimestamp unversioned.Time         `json:"creationTimestamp,omitempty"`
+		SelfLink          string                   `json:"selfLink,omitempty"`
+		ResourceVersion   string                   `json:"resourceVersion,omitempty"`
+		APIVersion        unversioned.GroupVersion `json:"apiVersion,omitempty"`
+		Labels            map[string]string        `json:"labels,omitempty"`
+		Annotations       map[string]string        `json:"annotations,omitempty"`
 	}
 	type Object struct {
 		TypeMeta `json:",inline"`
@@ -47,7 +47,7 @@ func TestGenericTypeMeta(t *testing.T) {
 			Name:            "foo",
 			GenerateName:    "prefix",
 			UID:             "uid",
-			APIVersion:      "a",
+			APIVersion:      unversioned.ParseGroupVersionOrDie("group/a"),
 			Kind:            "b",
 			ResourceVersion: "1",
 			SelfLink:        "some/place/only/we/know",
@@ -71,7 +71,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "a", accessor.APIVersion(); e != a {
+	if e, a := "group/a", accessor.APIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "b", accessor.Kind(); e != a {
@@ -88,7 +88,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if e, a := "a", accessor.APIVersion(); e != a {
+	if e, a := "group/a", accessor.APIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "b", accessor.Kind(); e != a {
@@ -99,7 +99,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	accessor.SetName("bar")
 	accessor.SetGenerateName("generate")
 	accessor.SetUID("other")
-	accessor.SetAPIVersion("c")
+	accessor.SetAPIVersion("group/c")
 	accessor.SetKind("d")
 	accessor.SetResourceVersion("2")
 	accessor.SetSelfLink("google.com")
@@ -117,7 +117,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "other", j.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "c", j.APIVersion; e != a {
+	if e, a := "group/c", j.APIVersion.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "d", j.Kind; e != a {
@@ -130,9 +130,9 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	typeAccessor.SetAPIVersion("d")
+	typeAccessor.SetAPIVersion("group/d")
 	typeAccessor.SetKind("e")
-	if e, a := "d", j.APIVersion; e != a {
+	if e, a := "group/d", j.APIVersion.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "e", j.Kind; e != a {
@@ -141,17 +141,17 @@ func TestGenericTypeMeta(t *testing.T) {
 }
 
 type InternalTypeMeta struct {
-	Kind              string            `json:"kind,omitempty"`
-	Namespace         string            `json:"namespace,omitempty"`
-	Name              string            `json:"name,omitempty"`
-	GenerateName      string            `json:"generateName,omitempty"`
-	UID               string            `json:"uid,omitempty"`
-	CreationTimestamp unversioned.Time  `json:"creationTimestamp,omitempty"`
-	SelfLink          string            `json:"selfLink,omitempty"`
-	ResourceVersion   string            `json:"resourceVersion,omitempty"`
-	APIVersion        string            `json:"apiVersion,omitempty"`
-	Labels            map[string]string `json:"labels,omitempty"`
-	Annotations       map[string]string `json:"annotations,omitempty"`
+	Kind              string                   `json:"kind,omitempty"`
+	Namespace         string                   `json:"namespace,omitempty"`
+	Name              string                   `json:"name,omitempty"`
+	GenerateName      string                   `json:"generateName,omitempty"`
+	UID               string                   `json:"uid,omitempty"`
+	CreationTimestamp unversioned.Time         `json:"creationTimestamp,omitempty"`
+	SelfLink          string                   `json:"selfLink,omitempty"`
+	ResourceVersion   string                   `json:"resourceVersion,omitempty"`
+	APIVersion        unversioned.GroupVersion `json:"apiVersion,omitempty"`
+	Labels            map[string]string        `json:"labels,omitempty"`
+	Annotations       map[string]string        `json:"annotations,omitempty"`
 }
 type InternalObject struct {
 	TypeMeta InternalTypeMeta `json:",inline"`
@@ -166,7 +166,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 			Name:            "foo",
 			GenerateName:    "prefix",
 			UID:             "uid",
-			APIVersion:      "a",
+			APIVersion:      unversioned.ParseGroupVersionOrDie("group/a"),
 			Kind:            "b",
 			ResourceVersion: "1",
 			SelfLink:        "some/place/only/we/know",
@@ -207,7 +207,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if e, a := "a", apiVersion; e != a {
+	if e, a := "group/a", apiVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	kind, err := accessor.Kind(j)
@@ -258,7 +258,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if err := accessor.SetUID(j, "other"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := accessor.SetAPIVersion(j, "c"); err != nil {
+	if err := accessor.SetAPIVersion(j, "group/c"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := accessor.SetKind(j, "d"); err != nil {
@@ -291,7 +291,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if e, a := "other", j.TypeMeta.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "c", j.TypeMeta.APIVersion; e != a {
+	if e, a := "group/c", j.TypeMeta.APIVersion.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "d", j.TypeMeta.Kind; e != a {
@@ -313,8 +313,8 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 
 func TestGenericObjectMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind       string `json:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string                   `json:"kind,omitempty"`
+		APIVersion unversioned.GroupVersion `json:"apiVersion,omitempty"`
 	}
 	type ObjectMeta struct {
 		Namespace         string            `json:"namespace,omitempty"`
@@ -333,7 +333,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	}
 	j := Object{
 		TypeMeta{
-			APIVersion: "a",
+			APIVersion: unversioned.ParseGroupVersionOrDie("group/a"),
 			Kind:       "b",
 		},
 		ObjectMeta{
@@ -363,7 +363,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "a", accessor.APIVersion(); e != a {
+	if e, a := "group/a", accessor.APIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "b", accessor.Kind(); e != a {
@@ -386,7 +386,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	accessor.SetName("bar")
 	accessor.SetGenerateName("generate")
 	accessor.SetUID("other")
-	accessor.SetAPIVersion("c")
+	accessor.SetAPIVersion("group/c")
 	accessor.SetKind("d")
 	accessor.SetResourceVersion("2")
 	accessor.SetSelfLink("google.com")
@@ -406,7 +406,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	if e, a := "other", j.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "c", j.APIVersion; e != a {
+	if e, a := "group/c", j.APIVersion.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "d", j.Kind; e != a {
@@ -428,8 +428,8 @@ func TestGenericObjectMeta(t *testing.T) {
 
 func TestGenericListMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind       string `json:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string                   `json:"kind,omitempty"`
+		APIVersion unversioned.GroupVersion `json:"apiVersion,omitempty"`
 	}
 	type ListMeta struct {
 		SelfLink        string `json:"selfLink,omitempty"`
@@ -441,7 +441,7 @@ func TestGenericListMeta(t *testing.T) {
 	}
 	j := Object{
 		TypeMeta{
-			APIVersion: "a",
+			APIVersion: unversioned.ParseGroupVersionOrDie("group/a"),
 			Kind:       "b",
 		},
 		ListMeta{
@@ -459,7 +459,7 @@ func TestGenericListMeta(t *testing.T) {
 	if e, a := "", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "a", accessor.APIVersion(); e != a {
+	if e, a := "group/a", accessor.APIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "b", accessor.Kind(); e != a {
@@ -474,13 +474,13 @@ func TestGenericListMeta(t *testing.T) {
 
 	accessor.SetName("bar")
 	accessor.SetUID("other")
-	accessor.SetAPIVersion("c")
+	accessor.SetAPIVersion("group/c")
 	accessor.SetKind("d")
 	accessor.SetResourceVersion("2")
 	accessor.SetSelfLink("google.com")
 
 	// Prove that accessor changes the original object.
-	if e, a := "c", j.APIVersion; e != a {
+	if e, a := "group/c", j.APIVersion.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "d", j.Kind; e != a {

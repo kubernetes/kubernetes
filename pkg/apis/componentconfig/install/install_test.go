@@ -45,7 +45,7 @@ func TestInterfacesFor(t *testing.T) {
 	if _, err := latest.GroupOrDie("componentconfig").InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]string{latest.GroupOrDie("componentconfig").GroupVersion}, latest.GroupOrDie("componentconfig").GroupVersions...) {
+	for i, groupVersion := range append([]string{latest.GroupOrDie("componentconfig").GroupVersion.String()}, latest.GroupOrDie("componentconfig").GroupVersions...) {
 		if vi, err := latest.GroupOrDie("componentconfig").InterfacesFor(groupVersion); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}

@@ -81,6 +81,7 @@ type APIGroupVersion struct {
 
 	Root string
 	// TODO: caesarxuchao: Version actually contains "group/version", refactor it to avoid confusion.
+	// TODO: use the GroupVersion struct
 	Version string
 
 	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
@@ -93,6 +94,7 @@ type APIGroupVersion struct {
 	// empty, defaults to Version.
 	// TODO: caesarxuchao: ServerVersion actually contains "group/version",
 	// refactor it to avoid confusion.
+	// TODO: use the GroupVersion struct
 	ServerVersion string
 
 	Mapper meta.RESTMapper

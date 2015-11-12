@@ -357,14 +357,15 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	defer s.Close()
 
 	// Setup a client
+	groupVersion := unversioned.ParseGroupVersionOrDie("group2/version2")
 	dest, _ := url.Parse(s.URL)
-	dest.Path = "/api/" + newVersion + "/simple"
+	dest.Path = "/api/" + groupVersion.String() + "/simple"
 	dest.RawQuery = "watch=true"
 
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
-	watcher.Add(&apiservertesting.Simple{TypeMeta: unversioned.TypeMeta{APIVersion: newVersion}})
+	watcher.Add(&apiservertesting.Simple{TypeMeta: unversioned.TypeMeta{APIVersion: groupVersion}})
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)

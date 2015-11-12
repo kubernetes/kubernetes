@@ -57,7 +57,7 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("").Version || other.Kind != "Pod" {
+	if other.APIVersion != latest.GroupOrDie("").GroupVersion || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }

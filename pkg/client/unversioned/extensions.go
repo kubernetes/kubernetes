@@ -140,7 +140,7 @@ func setExtensionsDefaults(config *Config) error {
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	config.Version = g.GroupVersion.String()
 	//}
 
 	versionInterfaces, err := g.InterfacesFor(config.Version)

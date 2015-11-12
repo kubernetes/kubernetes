@@ -35,7 +35,7 @@ func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: "",
+			APIVersion: unversioned.ParseGroupVersionOrDie(""),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      "test",
@@ -98,7 +98,7 @@ func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: "",
+			APIVersion: unversioned.ParseGroupVersionOrDie(""),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      "test",

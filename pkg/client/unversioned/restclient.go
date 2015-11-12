@@ -35,6 +35,7 @@ import (
 type RESTClient struct {
 	baseURL *url.URL
 	// A string identifying the version of the API this client is expected to use.
+	// TODO: use the GroupVersion struct
 	apiVersion string
 
 	// Codec is the encoding and decoding scheme that applies to a particular set of
@@ -117,6 +118,7 @@ func (c *RESTClient) Delete() *Request {
 }
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
+// TODO: use the GroupVersion struct.
 func (c *RESTClient) APIVersion() string {
 	return c.apiVersion
 }

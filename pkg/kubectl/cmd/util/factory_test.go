@@ -129,7 +129,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "successful re-use of labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: unversioned.ParseGroupVersionOrDie("v1")},
 			},
 			expected: "svc=test",
 			err:      nil,
@@ -138,7 +138,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "empty labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: unversioned.ParseGroupVersionOrDie("v1")},
 			},
 			expected: "",
 			err:      nil,
@@ -147,7 +147,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "nil labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: unversioned.ParseGroupVersionOrDie("v1")},
 			},
 			expected: "",
 			err:      nil,

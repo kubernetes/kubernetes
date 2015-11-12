@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -97,7 +98,7 @@ func (g GroupMetaMap) AllPreferredGroupVersions() string {
 	}
 	var defaults []string
 	for _, groupMeta := range g {
-		defaults = append(defaults, groupMeta.GroupVersion)
+		defaults = append(defaults, groupMeta.GroupVersion.String())
 	}
 	sort.Strings(defaults)
 	return strings.Join(defaults, ",")
@@ -107,7 +108,7 @@ func (g GroupMetaMap) AllPreferredGroupVersions() string {
 type GroupMeta struct {
 	// GroupVersion represents the current external default version of the group. It
 	// is in the form of "group/version".
-	GroupVersion string
+	GroupVersion unversioned.GroupVersion
 
 	// Version represents the current external default version of the group.
 	// It equals to the "version" part of GroupVersion.
@@ -145,5 +146,6 @@ type GroupMeta struct {
 
 	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
 	// string, or an error if the version is not known.
+	// TODO: use the GroupVersion struct.
 	InterfacesFor func(version string) (*meta.VersionInterfaces, error)
 }

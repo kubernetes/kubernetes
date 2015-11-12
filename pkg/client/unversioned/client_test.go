@@ -225,12 +225,12 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 		// split the schemes for internal objects.
 		// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 		var bs []byte
-		if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+		if api.Scheme.Recognizes(testapi.Default.GroupVersion().String(), kind) {
 			bs, err = testapi.Default.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
-		} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
+		} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().String(), kind) {
 			bs, err = testapi.Extensions.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)

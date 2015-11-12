@@ -652,7 +652,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: testapi.Default.Version(),
+					APIVersion: testapi.Default.GroupVersion().String(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -684,7 +684,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.Version(),
+						APIVersion: testapi.Default.GroupVersion().String(),
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -697,7 +697,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.Version(),
+						APIVersion: testapi.Default.GroupVersion().String(),
 					},
 				},
 			}},
@@ -722,7 +722,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: testapi.Default.Version(),
+						APIVersion: testapi.Default.GroupVersion().String(),
 					},
 				},
 			}},
@@ -761,7 +761,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: testapi.Default.Version(),
+						APIVersion: testapi.Default.GroupVersion().String(),
 					},
 				},
 			}},

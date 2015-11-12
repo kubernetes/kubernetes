@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 
@@ -45,7 +46,7 @@ type TestGroup struct {
 	// Version of the group Group under test
 	VersionUnderTest string
 	// Group and Version. In most cases equals to Group + "/" + VersionUnverTest
-	GroupVersionUnderTest string
+	GroupVersionUnderTest unversioned.GroupVersion
 }
 
 func init() {
@@ -56,7 +57,7 @@ func init() {
 			// TODO: caesarxuchao: the apiutil package is hacky, it will be replaced
 			// by a following PR.
 			Groups[apiutil.GetGroup(groupVersion)] =
-				TestGroup{apiutil.GetGroup(groupVersion), apiutil.GetVersion(groupVersion), groupVersion}
+				TestGroup{apiutil.GetGroup(groupVersion), apiutil.GetVersion(groupVersion), unversioned.ParseGroupVersionOrDie(groupVersion)}
 		}
 	}
 
@@ -80,10 +81,9 @@ func (g TestGroup) Version() string {
 	return g.VersionUnderTest
 }
 
-// GroupAndVersion returns the API version to test against for a group, as set
+// GroupVersion returns the API version to test against for a group, as set
 // by the KUBE_TEST_API env var.
-// Return value is in the form of "group/version".
-func (g TestGroup) GroupAndVersion() string {
+func (g TestGroup) GroupVersion() unversioned.GroupVersion {
 	return g.GroupVersionUnderTest
 }
 
@@ -91,7 +91,7 @@ func (g TestGroup) GroupAndVersion() string {
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
-	interfaces, err := latest.GroupOrDie(g.Group).InterfacesFor(g.GroupVersionUnderTest)
+	interfaces, err := latest.GroupOrDie(g.Group).InterfacesFor(g.GroupVersionUnderTest.String())
 	if err != nil {
 		panic(err)
 	}
@@ -103,14 +103,14 @@ func (g TestGroup) Codec() runtime.Codec {
 func (g TestGroup) Converter() runtime.ObjectConvertor {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.GroupVersionUnderTest.String())
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.ObjectConvertor
 	}
 	if g.Group == "extensions" {
-		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.GroupVersionUnderTest.String())
 		if err != nil {
 			panic(err)
 		}
@@ -125,14 +125,14 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.GroupVersionUnderTest.String())
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.MetadataAccessor
 	}
 	if g.Group == "extensions" {
-		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.GroupVersionUnderTest.String())
 		if err != nil {
 			panic(err)
 		}
@@ -212,7 +212,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	// split the schemes for internal objects.
 	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 	for _, group := range Groups {
-		if api.Scheme.Recognizes(group.GroupAndVersion(), kind) {
+		if api.Scheme.Recognizes(group.GroupVersion().String(), kind) {
 			return group.Codec(), nil
 		}
 	}

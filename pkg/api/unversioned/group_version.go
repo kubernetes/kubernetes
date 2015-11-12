@@ -31,7 +31,6 @@ type GroupVersion struct {
 
 // String puts "group" and "version" into a single "group/version" string. For the legacy v1
 // it returns "v1".
-
 func (gv GroupVersion) String() string {
 	// special case for the internal version
 	if gv.Group == "" && gv.Version == "" {

@@ -161,9 +161,9 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 	// split the schemes for internal objects.
 	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 	var codec runtime.Codec
-	if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+	if api.Scheme.Recognizes(testapi.Default.GroupVersion().String(), kind) {
 		codec = testapi.Default.Codec()
-	} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
+	} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().String(), kind) {
 		codec = testapi.Extensions.Codec()
 	} else {
 		return nil, fmt.Errorf("unexpected kind: %v", kind)

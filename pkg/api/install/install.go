@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -50,12 +51,16 @@ func init() {
 	}
 	// Use the first API version in the list of registered versions as the latest.
 	registeredGroupVersions := registered.GroupVersionsForGroup("")
-	groupVersion := registeredGroupVersions[0]
+	groupVersion, err := unversioned.ParseGroupVersion(registeredGroupVersions[0])
+	if err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
-		Group:        apiutil.GetGroup(groupVersion),
-		Version:      apiutil.GetVersion(groupVersion),
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
+		Group:        groupVersion.Group,
+		Version:      groupVersion.Version,
+		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string

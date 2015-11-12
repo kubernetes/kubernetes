@@ -51,7 +51,7 @@ func TestGetAttrs(t *testing.T) {
 			Name:            "foo",
 			Namespace:       "baz",
 			UID:             "long uid string",
-			APIVersion:      testapi.Default.Version(),
+			APIVersion:      testapi.Default.GroupVersion().String(),
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},

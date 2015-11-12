@@ -52,6 +52,7 @@ import (
 // objects, whether they be in our storage layer (e.g., etcd), or in user's
 // config files.
 //
+// TODO: use the GroupVersion struct
 func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []byte, err error) {
 	buff := &bytes.Buffer{}
 	if err := s.EncodeToVersionStream(obj, destVersion, buff); err != nil {

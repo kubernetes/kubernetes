@@ -217,12 +217,16 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 				if err != nil {
 					return err
 				}
+				gv, err := unversioned.ParseGroupVersion(version)
+				if err != nil {
+					return err
+				}
 				decodedObj, err := scheme.DecodeToVersion(rawObj, "")
 				if err != nil {
 					return err
 				}
 				tpmeta := unversioned.TypeMeta{
-					APIVersion: version,
+					APIVersion: gv,
 					Kind:       kind,
 				}
 				s := reflect.ValueOf(decodedObj).Elem()

@@ -1029,7 +1029,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
 		Linker:        latest.GroupOrDie("extensions").SelfLinker,
 		Storage:       storage,
-		ServerVersion: latest.GroupOrDie("").GroupVersion,
+		ServerVersion: latest.GroupOrDie("").GroupVersion.String(),
 
 		Context: m.requestContextMapper,
 
@@ -1117,8 +1117,8 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Codec:         extensionsGroup.Codec,
 		Linker:        extensionsGroup.SelfLinker,
 		Storage:       storage,
-		Version:       extensionsGroup.GroupVersion,
-		ServerVersion: latest.GroupOrDie("").GroupVersion,
+		Version:       extensionsGroup.GroupVersion.String(),
+		ServerVersion: latest.GroupOrDie("").GroupVersion.String(),
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

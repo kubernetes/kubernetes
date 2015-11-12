@@ -51,7 +51,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if typeMeta.Kind != "Status" {
 		t.Errorf("Kind is not set to \"Status\". Got %v", string(encoded))
 	}
-	if typeMeta.APIVersion != "v1" {
+	if typeMeta.APIVersion.String() != "v1" {
 		t.Errorf("APIVersion is not set to \"v1\". Got %v", string(encoded))
 	}
 	decoded, err := v1Codec.Decode(encoded)
@@ -79,7 +79,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.Kind != "Status" {
 		t.Errorf("Kind is not set to \"Status\". Got %s", encoded)
 	}
-	if typeMeta.APIVersion != "" {
+	if typeMeta.APIVersion.String() != "" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
 	decoded, err := expCodec.Decode(encoded)

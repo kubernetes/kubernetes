@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -287,7 +288,7 @@ type genericAccessor struct {
 	name            *string
 	generateName    *string
 	uid             *types.UID
-	apiVersion      *string
+	apiVersion      *unversioned.GroupVersion
 	kind            *string
 	resourceVersion *string
 	selfLink        *string
@@ -351,12 +352,15 @@ func (a genericAccessor) SetUID(uid types.UID) {
 	*a.uid = uid
 }
 
+// TODO: use the GroupVersion struct.
 func (a genericAccessor) APIVersion() string {
-	return *a.apiVersion
+	return a.apiVersion.String()
 }
 
+// TODO: use the GroupVersion struct.
 func (a genericAccessor) SetAPIVersion(version string) {
-	*a.apiVersion = version
+	// TODO: we need to check the error.
+	*a.apiVersion, _ = unversioned.ParseGroupVersion(version)
 }
 
 func (a genericAccessor) Kind() string {

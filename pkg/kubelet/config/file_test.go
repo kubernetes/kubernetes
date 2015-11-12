@@ -82,7 +82,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			pod: &api.Pod{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
-					APIVersion: "",
+					APIVersion: unversioned.ParseGroupVersionOrDie(""),
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test",

@@ -59,16 +59,16 @@ func TestExtractInvalidPods(t *testing.T) {
 	}{
 		{
 			desc: "No version",
-			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: ""}},
+			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: unversioned.ParseGroupVersionOrDie("")}},
 		},
 		{
 			desc: "Invalid version",
-			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: "v1betta2"}},
+			pod:  &api.Pod{TypeMeta: unversioned.TypeMeta{APIVersion: unversioned.ParseGroupVersionOrDie("group/v1betta2")}},
 		},
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -77,7 +77,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -86,7 +86,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -95,7 +95,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -135,7 +135,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			pods: &api.Pod{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
-					APIVersion: "",
+					APIVersion: unversioned.ParseGroupVersionOrDie(""),
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
@@ -179,7 +179,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			pods: &api.PodList{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "PodList",
-					APIVersion: "",
+					APIVersion: unversioned.ParseGroupVersionOrDie(""),
 				},
 				Items: []api.Pod{
 					{
@@ -295,7 +295,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 func TestURLWithHeader(t *testing.T) {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: testapi.Default.Version(),
+			APIVersion: testapi.Default.GroupVersion(),
 			Kind:       "Pod",
 		},
 		ObjectMeta: api.ObjectMeta{

@@ -31,6 +31,7 @@ package runtime
 // your own with the same fields.
 //
 type TypeMeta struct {
+	// TODO: use the GroupVersion struct.
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }

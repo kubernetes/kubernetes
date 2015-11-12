@@ -252,9 +252,9 @@ bar
 					FieldSpec: "{.apiVersion}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}, TypeMeta: unversioned.TypeMeta{APIVersion: "baz"}},
+			obj: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}, TypeMeta: unversioned.TypeMeta{APIVersion: unversioned.ParseGroupVersionOrDie("group/baz")}},
 			expectedOutput: `NAME      API_VERSION
-foo       baz
+foo       group/baz
 `,
 		},
 	}

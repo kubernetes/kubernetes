@@ -114,7 +114,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 	serverPod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: "v1",
+			APIVersion: unversioned.ParseGroupVersionOrDie("v1"),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: config.prefix + "-server",
@@ -183,7 +183,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	clientPod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: "v1",
+			APIVersion: unversioned.ParseGroupVersionOrDie("v1"),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: config.prefix + "-client",
@@ -248,7 +248,7 @@ func injectHtml(client *client.Client, config VolumeTestConfig, volume api.Volum
 	injectPod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: "v1",
+			APIVersion: unversioned.ParseGroupVersionOrDie("v1"),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: config.prefix + "-injector",
@@ -393,7 +393,7 @@ var _ = Describe("Volumes", func() {
 			endpoints := api.Endpoints{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Endpoints",
-					APIVersion: "v1",
+					APIVersion: unversioned.ParseGroupVersionOrDie("v1"),
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name: config.prefix + "-server",
@@ -524,7 +524,7 @@ var _ = Describe("Volumes", func() {
 			secret := api.Secret{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
-					APIVersion: "v1",
+					APIVersion: unversioned.ParseGroupVersionOrDie("v1"),
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name: config.prefix + "-secret",
@@ -596,7 +596,7 @@ var _ = Describe("Volumes", func() {
 			secret := &api.Secret{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
-					APIVersion: "v1beta3",
+					APIVersion: unversioned.ParseGroupVersionOrDie("v1beta3"),
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name: config.prefix + "-secret",

@@ -52,6 +52,7 @@ type Config struct {
 	// Version is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
+	// TODO: change Version to groupVersion GroupVersion.
 	Version string
 	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
 	// to a RESTClient or Client. Required when initializing a RESTClient, optional

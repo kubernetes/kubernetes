@@ -56,7 +56,9 @@ type Interface interface {
 
 // TypeInterface exposes the type and APIVersion of versioned or internal API objects.
 type TypeInterface interface {
+	// use the GroupVersion struct
 	APIVersion() string
+	// use the GroupVersion struct
 	SetAPIVersion(version string)
 	Kind() string
 	SetKind(kind string)
@@ -69,7 +71,9 @@ type TypeInterface interface {
 //
 // MetadataAccessor exposes Interface in a way that can be used with multiple objects.
 type MetadataAccessor interface {
+	// use the GroupVersion struct
 	APIVersion(obj runtime.Object) (string, error)
+	// use the GroupVersion struct
 	SetAPIVersion(obj runtime.Object, version string) error
 
 	Kind(obj runtime.Object) (string, error)
@@ -152,6 +156,7 @@ type RESTMapper interface {
 	// TODO(caesarxuchao): Remove GroupForResource when multi-group support is in (since
 	// group will be part of the version).
 	GroupForResource(resource string) (string, error)
+	// TODO: change the input argument versions to type GroupVersion.
 	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

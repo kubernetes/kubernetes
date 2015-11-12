@@ -67,7 +67,7 @@ func TestGenerateContainerRef(t *testing.T) {
 		okPod = api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: testapi.Default.Version(),
+				APIVersion: testapi.Default.GroupVersion(),
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:            "ok",
@@ -89,7 +89,7 @@ func TestGenerateContainerRef(t *testing.T) {
 		defaultedSelfLinkPod = okPod
 	)
 	noSelfLinkPod.Kind = ""
-	noSelfLinkPod.APIVersion = ""
+	noSelfLinkPod.APIVersion = unversioned.ParseGroupVersionOrDie("")
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
 	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Default.Version() + "/pods/ok"
 
@@ -108,7 +108,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -123,7 +123,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			container: &api.Container{},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -147,7 +147,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -164,7 +164,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
@@ -46,12 +47,16 @@ func init() {
 		return
 	}
 	registeredGroupVersions := registered.GroupVersionsForGroup("componentconfig")
-	groupVersion := registeredGroupVersions[0]
+	groupVersion, err := unversioned.ParseGroupVersion(registeredGroupVersions[0])
+	if err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
-		Group:        apiutil.GetGroup(groupVersion),
-		Version:      apiutil.GetVersion(groupVersion),
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
+		Group:        groupVersion.Group,
+		Version:      groupVersion.Version,
+		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string

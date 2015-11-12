@@ -25,11 +25,13 @@ import (
 type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
 	// the given version and name.
+	// TODO: use the GroupVersion struct
 	versionMap map[string]map[string]reflect.Type
 
 	// typeToVersion allows one to figure out the version for a given go object.
 	// The reflect.Type we index by should *not* be a pointer. If the same type
 	// is registered for multiple versions, the last one wins.
+	// TODO: use the GroupVersion struct
 	typeToVersion map[reflect.Type]string
 
 	// typeToKind allows one to figure out the desired "kind" field for a given
