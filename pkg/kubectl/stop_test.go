@@ -37,7 +37,6 @@ func TestReplicationControllerStop(t *testing.T) {
 		Name            string
 		Objs            []runtime.Object
 		StopError       error
-		StopMessage     string
 		ExpectedActions []string
 	}{
 		{
@@ -67,7 +66,6 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			StopMessage:     "foo stopped",
 			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
 		},
 		{
@@ -106,7 +104,6 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			StopMessage:     "foo stopped",
 			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
 		},
 		{
@@ -146,7 +143,6 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz, please manage deletion individually with --cascade=false."),
-			StopMessage:     "",
 			ExpectedActions: []string{"get", "list"},
 		},
 
@@ -197,7 +193,6 @@ func TestReplicationControllerStop(t *testing.T) {
 			},
 
 			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
-			StopMessage:     "",
 			ExpectedActions: []string{"get", "list"},
 		},
 
@@ -239,7 +234,6 @@ func TestReplicationControllerStop(t *testing.T) {
 			},
 
 			StopError:       nil,
-			StopMessage:     "foo stopped",
 			ExpectedActions: []string{"get", "list", "delete"},
 		},
 	}
@@ -247,16 +241,12 @@ func TestReplicationControllerStop(t *testing.T) {
 	for _, test := range tests {
 		fake := testclient.NewSimpleFake(test.Objs...)
 		reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
-		s, err := reaper.Stop(ns, name, 0, nil)
+		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue
 		}
 
-		if s != test.StopMessage {
-			t.Errorf("%s expected '%s', got '%s'", test.Name, test.StopMessage, s)
-			continue
-		}
 		actions := fake.Actions()
 		if len(actions) != len(test.ExpectedActions) {
 			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
@@ -281,7 +271,6 @@ func TestJobStop(t *testing.T) {
 		Name            string
 		Objs            []runtime.Object
 		StopError       error
-		StopMessage     string
 		ExpectedActions []string
 	}{
 		{
@@ -316,8 +305,7 @@ func TestJobStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:   nil,
-			StopMessage: "foo stopped",
+			StopError: nil,
 			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
 				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
 		},
@@ -364,8 +352,7 @@ func TestJobStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:   nil,
-			StopMessage: "foo stopped",
+			StopError: nil,
 			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
 				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
 		},
@@ -374,16 +361,12 @@ func TestJobStop(t *testing.T) {
 	for _, test := range tests {
 		fake := testclient.NewSimpleFake(test.Objs...)
 		reaper := JobReaper{fake, time.Millisecond, time.Millisecond}
-		s, err := reaper.Stop(ns, name, 0, nil)
+		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue
 		}
 
-		if s != test.StopMessage {
-			t.Errorf("%s expected '%s', got '%s'", test.Name, test.StopMessage, s)
-			continue
-		}
 		actions := fake.Actions()
 		if len(actions) != len(test.ExpectedActions) {
 			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
@@ -499,16 +482,13 @@ func TestSimpleStop(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
-		s, err := reaper.Stop("default", "foo", 0, nil)
+		err = reaper.Stop("default", "foo", 0, nil)
 		if err != nil && !test.expectError {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
 		if err == nil {
 			if test.expectError {
 				t.Errorf("unexpected non-error: %v (%s)", err, test.test)
-			}
-			if s != "foo stopped" {
-				t.Errorf("unexpected return: %s (%s)", s, test.test)
 			}
 		}
 		actions := fake.Actions()
