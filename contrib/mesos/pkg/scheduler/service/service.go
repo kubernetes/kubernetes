@@ -196,7 +196,7 @@ func NewSchedulerServer() *SchedulerServer {
 		FrameworkName:          defaultFrameworkName,
 		HA:                     false,
 		mux:                    http.NewServeMux(),
-		KubeletCadvisorPort:    4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		KubeletCadvisorPort:    4194, // copied from github.com/kubernetes/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
 		KubeletSyncFrequency:   10 * time.Second,
 		ContainPodResources:    true,
 		AccountForPodResources: true,
@@ -625,7 +625,7 @@ func validateLeadershipTransition(desired, current string) {
 	}
 }
 
-// hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
+// hacked from https://github.com/kubernetes/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
 func newEtcd(etcdConfigFile string, etcdServerList []string) (client tools.EtcdClient, err error) {
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
