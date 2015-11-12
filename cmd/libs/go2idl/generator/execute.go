@@ -107,9 +107,9 @@ func (ft golangFileType) assemble(w io.Writer, f *File) {
 // format should be one line only, and not end with \n.
 func addIndentHeaderComment(b *bytes.Buffer, format string, args ...interface{}) {
 	if b.Len() > 0 {
-		fmt.Fprintf(b, "\n\t// "+format+"\n", args...)
+		fmt.Fprintf(b, "\n// "+format+"\n", args...)
 	} else {
-		fmt.Fprintf(b, "\t// "+format+"\n", args...)
+		fmt.Fprintf(b, "// "+format+"\n", args...)
 	}
 }
 
@@ -184,7 +184,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 		if vars := g.PackageVars(genContext); len(vars) > 0 {
 			addIndentHeaderComment(&f.Vars, "Package-wide variables from generator %q.", g.Name())
 			for _, v := range vars {
-				if _, err := fmt.Fprintf(&f.Vars, "\t%s\n", v); err != nil {
+				if _, err := fmt.Fprintf(&f.Vars, "%s\n", v); err != nil {
 					return err
 				}
 			}
@@ -192,7 +192,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 		if consts := g.PackageVars(genContext); len(consts) > 0 {
 			addIndentHeaderComment(&f.Consts, "Package-wide consts from generator %q.", g.Name())
 			for _, v := range consts {
-				if _, err := fmt.Fprintf(&f.Consts, "\t%s\n", v); err != nil {
+				if _, err := fmt.Fprintf(&f.Consts, "%s\n", v); err != nil {
 					return err
 				}
 			}
