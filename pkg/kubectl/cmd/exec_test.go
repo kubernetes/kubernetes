@@ -126,7 +126,7 @@ func TestPodAndContainer(t *testing.T) {
 		f, tf, codec := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			Codec:  codec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) { return nil, nil }),
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = &client.Config{}
@@ -182,7 +182,7 @@ func TestExec(t *testing.T) {
 		f, tf, codec := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
 					body := objBody(codec, test.pod)

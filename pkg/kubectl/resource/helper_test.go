@@ -131,11 +131,10 @@ func TestHelperCreate(t *testing.T) {
 	}
 
 	tests := []struct {
-		Resp     *http.Response
-		RespFunc fake.HTTPClientFunc
-		HttpErr  error
-		Modify   bool
-		Object   runtime.Object
+		Resp    *http.Response
+		HttpErr error
+		Modify  bool
+		Object  runtime.Object
 
 		ExpectObject runtime.Object
 		Err          bool
@@ -187,9 +186,6 @@ func TestHelperCreate(t *testing.T) {
 			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
-		}
-		if test.RespFunc != nil {
-			client.Client = test.RespFunc
 		}
 		modifier := &Helper{
 			RESTClient:      client,
@@ -380,11 +376,11 @@ func TestHelperReplace(t *testing.T) {
 	}
 
 	tests := []struct {
-		Resp      *http.Response
-		RespFunc  fake.HTTPClientFunc
-		HttpErr   error
-		Overwrite bool
-		Object    runtime.Object
+		Resp       *http.Response
+		HTTPClient *http.Client
+		HttpErr    error
+		Overwrite  bool
+		Object     runtime.Object
 
 		ExpectObject runtime.Object
 		Err          bool
@@ -421,12 +417,12 @@ func TestHelperReplace(t *testing.T) {
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			Overwrite: true,
-			RespFunc: func(req *http.Request) (*http.Response, error) {
+			HTTPClient: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.Method == "PUT" {
 					return &http.Response{StatusCode: http.StatusOK, Body: objBody(&unversioned.Status{Status: unversioned.StatusSuccess})}, nil
 				}
 				return &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
-			},
+			}),
 			Req: expectPut,
 		},
 		{
@@ -438,12 +434,10 @@ func TestHelperReplace(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
-			Resp:  test.Resp,
-			Err:   test.HttpErr,
-		}
-		if test.RespFunc != nil {
-			client.Client = test.RespFunc
+			Client: test.HTTPClient,
+			Codec:  testapi.Default.Codec(),
+			Resp:   test.Resp,
+			Err:    test.HttpErr,
 		}
 		modifier := &Helper{
 			RESTClient:      client,

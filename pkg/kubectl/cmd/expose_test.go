@@ -341,7 +341,7 @@ func TestRunExposeService(t *testing.T) {
 		tf.Printer = &kubectl.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.calls[m] && m == "GET":
 					return &http.Response{StatusCode: test.status, Body: objBody(codec, test.input)}, nil
