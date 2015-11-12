@@ -36,7 +36,9 @@ func (gv GroupVersion) String() string {
 	// special case for the internal version
 	if gv.Group == "" && gv.Version == "" {
 		return ""
-	} else if gv.Group == "" && gv.Version == "v1" {
+		// CHAO: temporarily disable this
+		// } else if gv.Group == "" && gv.Version == "v1" {
+	} else if gv.Group == "" {
 		// special case of "v1" for backward compatibility
 		return gv.Version
 	} else {
@@ -54,8 +56,11 @@ func ParseGroupVersion(gv string) (GroupVersion, error) {
 	// "v1" is the only special case. Otherwise GroupVersion is expected to contain
 	// one "/" dividing the string into two parts.
 	switch {
-	case len(s) == 1 && gv == "v1":
-		return GroupVersion{"", "v1"}, nil
+	// CHAO: temporarily disable this
+	// case len(s) == 1 && gv == "v1":
+	//  return GroupVersion{"", "v1"}, nil
+	case len(s) == 1:
+		return GroupVersion{"", s[0]}, nil
 	case len(s) == 2:
 		return GroupVersion{s[0], s[1]}, nil
 	default:
