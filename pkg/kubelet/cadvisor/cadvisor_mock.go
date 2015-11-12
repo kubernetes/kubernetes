@@ -31,7 +31,7 @@ var _ Interface = new(Mock)
 
 func (c *Mock) Start() error {
 	args := c.Called()
-	return args.Error(1)
+	return args.Error(0)
 }
 
 // ContainerInfo is a mock implementation of Interface.ContainerInfo.

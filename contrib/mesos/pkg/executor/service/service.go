@@ -36,6 +36,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -151,7 +152,6 @@ func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubetypes.PodUpdat
 			if err != nil {
 				return k, pc, err
 			}
-
 			klet := k.(*kubelet.Kubelet)
 
 			s.kletLock.Lock()
@@ -187,6 +187,11 @@ func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubetypes.PodUpdat
 			return err
 		}
 		kcfg.CAdvisorInterface = cAdvisorInterface
+		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, cAdvisorInterface)
+		if err != nil {
+			return err
+		}
+
 		go func() {
 			for ni := range nodeInfos {
 				// TODO(sttts): implement with MachineAllocable mechanism when https://github.com/kubernetes/kubernetes/issues/13984 is finished

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -41,6 +42,7 @@ func NewHollowKubelet(
 	cadvisorInterface cadvisor.Interface,
 	dockerClient dockertools.DockerInterface,
 	kubeletPort, kubeletReadOnlyPort int,
+	containerManager cm.ContainerManager,
 ) *HollowKubelet {
 	testRootDir := integration.MakeTempDirOrDie("hollow-kubelet.", "")
 	manifestFilePath := integration.MakeTempDirOrDie("manifest", testRootDir)
@@ -69,6 +71,7 @@ func NewHollowKubelet(
 			10*time.Second,         /* NodeStatusUpdateFrequency */
 			10*time.Second,         /* SyncFrequency */
 			40,                     /* MaxPods */
+			containerManager,
 		),
 	}
 }
