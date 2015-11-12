@@ -17,9 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"time"
-
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -28,9 +25,9 @@ type RawNode struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata, applying to the lists of stats.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	unversioned.ListMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 	// Reference to the measured Node.
-	NodeRef api.ObjectReference `json:"nodeRef,omitempty"`
+	NodeName string `json:"nodeName,omitempty"`
 	// Overall machine metrics.
 	Machine RawContainer `json:"machine,omitempty"`
 	// Metrics of system components.
@@ -42,9 +39,9 @@ type RawPod struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata, applying to the lists of stats.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	unversioned.ListMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 	// Reference to the measured Pod.
-	PodRef api.ObjectReference `json:"podRef,omitempty"`
+	PodRef unversioned.ObjectReference `json:"podRef,omitempty"`
 	// Metrics of containers in the measured pod.
 	Containers []RawContainer `json:"containers,omitempty"`
 }
@@ -61,7 +58,7 @@ type RawContainer struct {
 
 type ContainerSpec struct {
 	// Time at which the container was created.
-	CreationTime time.Time `json:"creationTime,omitempty"`
+	CreationTime unversioned.Time `json:"creationTime,omitempty"`
 
 	// Other names by which the container is known within a certain namespace.
 	// This is unique within that namespace.
@@ -71,7 +68,7 @@ type ContainerSpec struct {
 	// An example of a namespace is "docker" for Docker containers.
 	Namespace string `json:"namespace,omitempty"`
 
-	// Metadata labels associated with this container.
+	// Metadata labels associated with this container (not Kubernetes labels).
 	Labels map[string]string `json:"labels,omitempty"`
 
 	HasCpu bool    `json:"hasCpu,omitempty"`
@@ -119,7 +116,7 @@ type MemorySpec struct {
 
 type ContainerStats struct {
 	// The time of this stat point.
-	Timestamp time.Time `json:"timestamp,omitempty"`
+	Timestamp unversioned.Time `json:"timestamp,omitempty"`
 	// CPU statistics
 	HasCpu bool `json:"hasCpu,omitempty"`
 	// In nanoseconds (aggregated)
@@ -434,7 +431,7 @@ type MetricVal struct {
 	Label string `json:"label,omitempty"`
 
 	// Time at which the metric was queried
-	Timestamp time.Time `json:"timestamp,omitempty"`
+	Timestamp unversioned.Time `json:"timestamp,omitempty"`
 
 	// The value of the metric at this point.
 	IntValue   int64   `json:"intValue,omitempty"`
