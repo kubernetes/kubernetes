@@ -202,9 +202,9 @@ var _ = Describe("DaemonRestart", func() {
 	})
 
 	AfterEach(func() {
+		defer framework.afterEach()
 		close(stopCh)
 		expectNoError(DeleteRC(framework.Client, ns, rcName))
-		framework.afterEach()
 	})
 
 	It("Controller Manager should not create/delete replicas across restart", func() {
