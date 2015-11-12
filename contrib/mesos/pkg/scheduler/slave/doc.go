@@ -14,6 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package podschedulers defines an interface (w/ implementations) for matching
-// pods against offers.
-package podschedulers
+// Package slave manages node hostnames for slave ids.
+package slave
