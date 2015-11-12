@@ -2462,3 +2462,41 @@ func waitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Du
 	})
 	return address, err
 }
+
+// Looks for the given string in the log of a specific pod container
+func lookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		return runKubectlOrDie("log", podName, container, fmt.Sprintf("--namespace=%v", ns))
+	})
+}
+
+// Looks for the given string in a file in a specific pod container
+func lookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		return runKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
+	})
+}
+
+// Looks for the given string in the output of a command executed in a specific pod container
+func lookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		// use the first container
+		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
+		args = append(args, command...)
+		return runKubectlOrDie(args...)
+	})
+}
+
+// Looks for the given string in the output of fn, repeatedly calling fn until
+// the timeout is reached or the string is found. Returns last log and possibly
+// error if the string was not found.
+func lookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
+	for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+		result = fn()
+		if strings.Contains(result, expectedString) {
+			return
+		}
+	}
+	err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedString, result)
+	return
+}

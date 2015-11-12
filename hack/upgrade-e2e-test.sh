@@ -16,7 +16,7 @@
 
 # This does a checked upgrade of the MASTER using the locally built release, then runs e2e.
 echo "Running the checked master upgrade."
-go run "$(dirname $0)/e2e.go" -build -up -v -test -test_args='--ginkgo.focus=Skipped.*Cluster\supgrade.*gce-upgrade' -check_version_skew=false
+go run "$(dirname $0)/e2e.go" -build -up -v -test -test_args='--ginkgo.focus=Cluster\sUpgrade.*gce-upgrade' -check_version_skew=false
 if [ $? -eq 0 ]; then
     echo "Master upgrade complete. Running e2e on the upgraded cluster."
     go run "$(dirname $0)/e2e.go" -v -version="" -test -check_version_skew=false
