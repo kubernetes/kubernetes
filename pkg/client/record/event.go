@@ -17,7 +17,6 @@ limitations under the License.
 package record
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -28,7 +27,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -107,33 +105,23 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	var eventCache *historyCache = NewEventCache()
+	eventCorrelator := NewEventCorrelator(util.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *api.Event) {
 			// Make a copy before modification, because there could be multiple listeners.
 			// Events are safe to copy like this.
 			eventCopy := *event
 			event = &eventCopy
-			var patch []byte
-			previousEvent := eventCache.getEvent(event)
-			updateExistingEvent := previousEvent.Count > 0
-			if updateExistingEvent {
-				// we still need to copy Name because the Patch relies on the Name to find the target event
-				event.Name = previousEvent.Name
-				event.Count = previousEvent.Count + 1
-
-				// we need to make sure the Count and LastTimestamp are the only differences between event and the eventCopy2
-				eventCopy2 := *event
-				eventCopy2.Count = 0
-				eventCopy2.LastTimestamp = unversioned.NewTime(time.Unix(0, 0))
-				newData, _ := json.Marshal(event)
-				oldData, _ := json.Marshal(eventCopy2)
-				patch, _ = strategicpatch.CreateStrategicMergePatch(oldData, newData, event)
+			result, err := eventCorrelator.EventCorrelate(event)
+			if err != nil {
+				util.HandleError(err)
 			}
-
+			if result.Skip {
+				return
+			}
 			tries := 0
 			for {
-				if recordEvent(sink, event, patch, updateExistingEvent, eventCache) {
+				if recordEvent(sink, result.Event, result.Patch, result.Event.Count > 1, eventCorrelator) {
 					break
 				}
 				tries++
@@ -167,7 +155,7 @@ func isKeyNotFoundError(err error) bool {
 // was successfully recorded or discarded, false if it should be retried.
 // If updateExistingEvent is false, it creates a new event, otherwise it updates
 // existing event.
-func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingEvent bool, eventCache *historyCache) bool {
+func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingEvent bool, eventCorrelator *EventCorrelator) bool {
 	var newEvent *api.Event
 	var err error
 	if updateExistingEvent {
@@ -180,7 +168,8 @@ func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingE
 		newEvent, err = sink.Create(event)
 	}
 	if err == nil {
-		eventCache.addOrUpdateEvent(newEvent)
+		// we need to update our event correlator with the server returned state to handle name/resourceversion
+		eventCorrelator.UpdateState(newEvent)
 		return true
 	}
 
