@@ -74,7 +74,7 @@ type EC2 interface {
 	DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error)
 
 	// Attach a volume to an instance
-	AttachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error)
+	AttachVolume(*ec2.AttachVolumeInput) (*ec2.VolumeAttachment, error)
 	// Detach a volume from an instance it is attached to
 	DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error)
 	// Lists volumes
@@ -82,7 +82,7 @@ type EC2 interface {
 	// Create an EBS volume
 	CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error)
 	// Delete an EBS volume
-	DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error)
+	DeleteVolume(*ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error)
 
 	DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error)
 
@@ -347,13 +347,8 @@ func (s *awsSdkEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsIn
 	return response.SecurityGroups, nil
 }
 
-func (s *awsSdkEC2) AttachVolume(volumeID, instanceId, device string) (resp *ec2.VolumeAttachment, err error) {
-	request := ec2.AttachVolumeInput{
-		Device:     &device,
-		InstanceId: &instanceId,
-		VolumeId:   &volumeID,
-	}
-	return s.ec2.AttachVolume(&request)
+func (s *awsSdkEC2) AttachVolume(request *ec2.AttachVolumeInput) (*ec2.VolumeAttachment, error) {
+	return s.ec2.AttachVolume(request)
 }
 
 func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAttachment, error) {
@@ -388,9 +383,8 @@ func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volu
 	return s.ec2.CreateVolume(request)
 }
 
-func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error) {
-	request := ec2.DeleteVolumeInput{VolumeId: &volumeID}
-	return s.ec2.DeleteVolume(&request)
+func (s *awsSdkEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error) {
+	return s.ec2.DeleteVolume(request)
 }
 
 func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
@@ -1032,8 +1026,9 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 }
 
 // Deletes the EBS disk
-func (self *awsDisk) delete() error {
-	_, err := self.ec2.DeleteVolume(self.awsID)
+func (self *awsDisk) deleteVolume() error {
+	request := &ec2.DeleteVolumeInput{VolumeId: aws.String(self.awsID)}
+	_, err := self.ec2.DeleteVolume(request)
 	if err != nil {
 		return fmt.Errorf("error delete EBS volumes: %v", err)
 	}
@@ -1088,13 +1083,13 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 }
 
 // Implements Volumes.AttachDisk
-func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
-	disk, err := newAWSDisk(aws, diskName)
+func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
+	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := aws.getAwsInstance(instanceName)
+	awsInstance, err := c.getAwsInstance(instanceName)
 	if err != nil {
 		return "", err
 	}
@@ -1127,7 +1122,13 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	}()
 
 	if !alreadyAttached {
-		attachResponse, err := aws.ec2.AttachVolume(disk.awsID, awsInstance.awsID, ec2Device)
+		request := &ec2.AttachVolumeInput{
+			Device:     aws.String(ec2Device),
+			InstanceId: aws.String(awsInstance.awsID),
+			VolumeId:   aws.String(disk.awsID),
+		}
+
+		attachResponse, err := c.ec2.AttachVolume(request)
 		if err != nil {
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
@@ -1224,7 +1225,7 @@ func (aws *AWSCloud) DeleteVolume(volumeName string) error {
 	if err != nil {
 		return err
 	}
-	return awsDisk.delete()
+	return awsDisk.deleteVolume()
 }
 
 func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
