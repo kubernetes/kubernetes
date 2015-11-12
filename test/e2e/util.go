@@ -33,7 +33,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -1919,6 +1921,50 @@ func sshCore(cmd, host, provider string, verbose bool) (string, string, int, err
 		Logf("[%s] error:     %v", remote, err)
 	}
 	return stdout, stderr, code, err
+}
+
+// NewHostExecPodSpec returns the pod spec of hostexec pod
+func NewHostExecPodSpec(ns, name string) *api.Pod {
+	pod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: latest.GroupOrDie("").Version,
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:            "hostexec",
+					Image:           "gcr.io/google_containers/hostexec:1.2",
+					ImagePullPolicy: api.PullIfNotPresent,
+				},
+			},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+		},
+	}
+	return pod
+}
+
+// RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
+// inside of a shell.
+func RunHostCmd(ns, name, cmd string) string {
+	return runKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+}
+
+// LaunchHostExecPod launches a hostexec pod in the given namespace and waits
+// until it's Running
+func LaunchHostExecPod(client *client.Client, ns, name string) *api.Pod {
+	hostExecPod := NewHostExecPodSpec(ns, name)
+	pod, err := client.Pods(ns).Create(hostExecPod)
+	expectNoError(err)
+	err = waitForPodRunningInNamespace(client, pod.Name, pod.Namespace)
+	expectNoError(err)
+	return pod
 }
 
 // getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
