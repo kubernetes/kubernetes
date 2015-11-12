@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -386,5 +387,61 @@ func TestExceedUsagePersistentVolumeClaims(t *testing.T) {
 	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, "PersistentVolumeClaim", namespace, "name", "persistentvolumeclaims", "", admission.Create, nil), status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
+	}
+}
+
+func TestIncrementUsageOnUpdateIgnoresNonPodResources(t *testing.T) {
+	testCase := []struct {
+		kind        string
+		resource    string
+		subresource string
+		object      runtime.Object
+	}{
+		{
+			kind:     "Service",
+			resource: "services",
+			object:   &api.Service{},
+		},
+		{
+			kind:     "ReplicationController",
+			resource: "replicationcontrollers",
+			object:   &api.ReplicationController{},
+		},
+		{
+			kind:     "ResourceQuota",
+			resource: "resourcequotas",
+			object:   &api.ResourceQuota{},
+		},
+		{
+			kind:     "Secret",
+			resource: "secrets",
+			object:   &api.Secret{},
+		},
+		{
+			kind:     "PersistentVolumeClaim",
+			resource: "persistentvolumeclaims",
+			object:   &api.PersistentVolumeClaim{},
+		},
+	}
+
+	for _, testCase := range testCase {
+		client := testclient.NewSimpleFake()
+		status := &api.ResourceQuotaStatus{
+			Hard: api.ResourceList{},
+			Used: api.ResourceList{},
+		}
+		r := api.ResourceName(testCase.resource)
+		status.Hard[r] = resource.MustParse("2")
+		status.Used[r] = resource.MustParse("1")
+
+		attributesRecord := admission.NewAttributesRecord(testCase.object, testCase.kind, "my-ns", "new-thing",
+			testCase.resource, testCase.subresource, admission.Update, nil)
+		dirty, err := IncrementUsage(attributesRecord, status, client)
+		if err != nil {
+			t.Errorf("Increment usage of resource %v had unexpected error: %v", testCase.resource, err)
+		}
+		if dirty {
+			t.Errorf("Increment usage of resource %v should not result in a dirty quota on update", testCase.resource)
+		}
 	}
 }
