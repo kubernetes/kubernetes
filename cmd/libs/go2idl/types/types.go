@@ -195,6 +195,11 @@ func (t *Type) String() string {
 	return t.Name.String()
 }
 
+// IsAssignable returns whether the type is assignable.
+func (t *Type) IsAssignable() bool {
+	return t.Kind == Builtin || (t.Kind == Alias && t.Underlying.Kind == Builtin)
+}
+
 // A single struct member
 type Member struct {
 	// The name of the member.
