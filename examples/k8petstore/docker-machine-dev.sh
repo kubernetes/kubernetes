@@ -14,17 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-!/bin/bash
+#!/bin/bash
+
+source ../../hack/lib/util.sh  # need kube::util::host_platform()
+
+HOST_OS=$(kube::util::host_platform)
+HOST_OS=${HOST_OS%/*}  # just host_os name
 
 function setup_vm() {
     ### Provider = vbox.  You can use another one if you want... But untested.
     PROVIDER=virtualbox
 
     ### Create a VM specific to this app...
-    if docker-machine ls |grep -q k8petstore ; then 
-        echo "VM already exists, moving on..."
+    if docker-machine ls | grep -q k8petstore ; then 
+      echo "VM already exists, moving on..."
     else
-        docker-machine create --driver $PROVIDER k8petstore
+      docker-machine create --driver $PROVIDER k8petstore
     fi
 }
 
@@ -34,27 +39,24 @@ function setup_docker() {
     eval "$(docker-machine env k8petstore)"
     docker rm -f `docker ps -a -q`
 
-    ### Now capture the IP.
-    MACHINE_IP="`docker-machine ip k8petstore`"
-
 }
 
 function build_containers() {
 
     version="`date +"%m-%d-%Y-%s"`"
-    pushd ../redis
+    pushd redis
     docker build -t jayunit100/k8-petstore-redis:$version ./
     popd
 
-    pushd ../redis-master
+    pushd redis-master
     docker build -t jayunit100/k8-petstore-redis-master:$version ./    
     popd
     
-    pushd ../redis-slave
+    pushd redis-slave
     docker build -t jayunit100/k8-petstore-redis-slave:$version ./
     popd
     
-    pushd ../web-server
+    pushd web-server
     docker build -t jayunit100/k8-petstore-web-server:$version ./
     popd
 }
@@ -68,14 +70,16 @@ function runk8petstore() {
     ### TODO, add slaves.
 
     echo "Running k8petstore now..."
-    docker run -d -p 6379:6379 jayunit100/k8-petstore-redis-master:$version
-    docker run -d -e REDISMASTER_SERVICE_HOST=$MACHINE_IP -e REDISMASTER_SERVICE_PORT=6379 -p 3000:3000 jayunit100/k8-petstore-web-server:$version
+    docker run --name redis -d -p 6379:6379 jayunit100/k8-petstore-redis-master:$version
+    docker run --link redis:redis -d -e REDISMASTER_SERVICE_HOST=redis -e REDISMASTER_SERVICE_PORT=6379 -p 3000:3000 jayunit100/k8-petstore-web-server:$version
     
 }
 
-setup_vm
 
-setup_docker
+if [[ "$HOST_OS" != linux ]] ; then
+  setup_vm
+  setup_docker
+fi
 
 build_containers
 
