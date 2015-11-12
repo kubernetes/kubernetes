@@ -18,10 +18,13 @@ package types
 
 // A type name may have a package qualifier.
 type Name struct {
-	// Empty if embedded or builtin. This is the package path.
+	// Empty if embedded or builtin. This is the package path unless Path is specified.
 	Package string
 	// The type name.
 	Name string
+	// An optional location of the type definition for languages that can have disjoint
+	// packages and paths.
+	Path string
 }
 
 // String returns the name formatted as a string.
@@ -104,7 +107,7 @@ func (p *Package) Get(typeName string) *Type {
 			return t
 		}
 	}
-	t := &Type{Name: Name{p.Path, typeName}}
+	t := &Type{Name: Name{Package: p.Path, Name: typeName}}
 	p.Types[typeName] = t
 	return t
 }
