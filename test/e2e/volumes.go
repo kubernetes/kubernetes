@@ -312,7 +312,10 @@ func deleteCinderVolume(name string) error {
 	return err
 }
 
-var _ = Describe("Volumes", func() {
+// Marked with [Skipped] to skip the test by default (see driver.go),
+// these tests needs privileged containers, which are disabled by default.
+// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
+var _ = Describe("Volumes [Skipped]", func() {
 	framework := NewFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -331,10 +334,7 @@ var _ = Describe("Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] NFS", func() {
+	Describe("NFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -368,10 +368,7 @@ var _ = Describe("Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] GlusterFS", func() {
+	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -445,13 +442,12 @@ var _ = Describe("Volumes", func() {
 	// iSCSI
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
+	// The test needs privileged containers, which are disabled by default.
 	// Also, make sure that iscsiadm utility and iscsi target kernel modules
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	Describe("[Skipped] iSCSI", func() {
+	Describe("iSCSI", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -492,12 +488,7 @@ var _ = Describe("Volumes", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=RBD"
-
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] Ceph RBD", func() {
+	Describe("Ceph RBD", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -569,10 +560,7 @@ var _ = Describe("Volumes", func() {
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] CephFS", func() {
+	Describe("CephFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -638,13 +626,12 @@ var _ = Describe("Volumes", func() {
 	// OpenStack Cinder
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// The test assumes that OpenStack client tools are installed
+	// This test assumes that OpenStack client tools are installed
 	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 
-	Describe("[Skipped] Cinder", func() {
+	Describe("Cinder", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace: namespace.Name,

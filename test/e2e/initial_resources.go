@@ -26,10 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-var _ = Describe("Initial Resources", func() {
+var _ = Describe("Initial Resources [Skipped] ", func() {
 	f := NewFramework("initial-resources")
 
-	It("[Skipped] should set initial resources based on historical data", func() {
+	It("should set initial resources based on historical data", func() {
 		// Cleanup data in InfluxDB that left from previous tests.
 		influxdbClient, err := getInfluxdbClient(f.Client)
 		expectNoError(err, "failed to create influxdb client")

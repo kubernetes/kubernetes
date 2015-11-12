@@ -39,7 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[Performance Suite] Latency", func() {
+var _ = Describe("[Performance] Latency [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var additionalPodsPrefix string
@@ -100,8 +100,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		}
 	})
 
-	// Skipped to avoid running in e2e
-	It("[Skipped] pod start latency should be acceptable", func() {
+	It("pod start latency should be acceptable", func() {
 		runLatencyTest(nodeCount, c, ns)
 	})
 })
