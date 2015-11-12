@@ -141,7 +141,14 @@ func finalizeNamespaceFunc(kubeClient client.Interface, namespace *api.Namespace
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, api.FinalizerName(value))
 	}
-	return kubeClient.Namespaces().Finalize(&namespaceFinalize)
+	namespace, err := kubeClient.Namespaces().Finalize(&namespaceFinalize)
+	if err != nil {
+		// it was removed already, so life is good
+		if errors.IsNotFound(err) {
+			return namespace, nil
+		}
+	}
+	return namespace, err
 }
 
 type contentRemainingError struct {
@@ -268,10 +275,22 @@ func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Names
 }
 
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) (err error) {
+func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) error {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
+
+	// multiple controllers may edit a namespace during termination
+	// first get the latest state of the namespace before proceeding
+	// if the namespace was deleted already, don't do anything
+	namespace, err := kubeClient.Namespaces().Get(namespace.Name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	glog.V(4).Infof("Syncing namespace %s", namespace.Name)
 
 	// ensure that the status is up to date on the namespace
