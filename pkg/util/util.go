@@ -139,7 +139,7 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 // accept a name or number.
 type IntOrString struct {
 	Kind   IntstrKind
-	IntVal int
+	IntVal int64
 	StrVal string
 }
 
@@ -153,7 +153,7 @@ const (
 
 // NewIntOrStringFromInt creates an IntOrString object with an int value.
 func NewIntOrStringFromInt(val int) IntOrString {
-	return IntOrString{Kind: IntstrInt, IntVal: val}
+	return IntOrString{Kind: IntstrInt, IntVal: int64(val)}
 }
 
 // NewIntOrStringFromString creates an IntOrString object with a string value.
@@ -176,7 +176,7 @@ func (intstr *IntOrString) String() string {
 	if intstr.Kind == IntstrString {
 		return intstr.StrVal
 	}
-	return strconv.Itoa(intstr.IntVal)
+	return strconv.FormatInt(intstr.IntVal, 10)
 }
 
 // MarshalJSON implements the json.Marshaller interface.
@@ -206,13 +206,13 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 	}
 }
 
-func GetIntOrPercentValue(intStr *IntOrString) (int, bool, error) {
+func GetIntOrPercentValue(intStr *IntOrString) (int64, bool, error) {
 	switch intStr.Kind {
 	case IntstrInt:
 		return intStr.IntVal, false, nil
 	case IntstrString:
 		s := strings.Replace(intStr.StrVal, "%", "", -1)
-		v, err := strconv.Atoi(s)
+		v, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			return 0, false, fmt.Errorf("invalid value %q: %v", intStr.StrVal, err)
 		}
