@@ -31,9 +31,13 @@ type GroupVersion struct {
 
 // String puts "group" and "version" into a single "group/version" string. For the legacy v1
 // it returns "v1".
-func (gv *GroupVersion) String() string {
-	// special case of "v1" for backward compatibility
-	if gv.Group == "" && gv.Version == "v1" {
+
+func (gv GroupVersion) String() string {
+	// special case for the internal version
+	if gv.Group == "" && gv.Version == "" {
+		return ""
+	} else if gv.Group == "" && gv.Version == "v1" {
+		// special case of "v1" for backward compatibility
 		return gv.Version
 	} else {
 		return gv.Group + "/" + gv.Version
@@ -43,6 +47,9 @@ func (gv *GroupVersion) String() string {
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupVersion, error) {
+	if len(gv) == 0 {
+		return GroupVersion{"", ""}, nil
+	}
 	s := strings.Split(gv, "/")
 	// "v1" is the only special case. Otherwise GroupVersion is expected to contain
 	// one "/" dividing the string into two parts.
