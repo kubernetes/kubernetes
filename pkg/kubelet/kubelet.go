@@ -2633,9 +2633,6 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
-// Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
-var oldNodeUnschedulable bool
-
 func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	if kl.configureCBR0 {
@@ -2665,11 +2662,8 @@ func (kl *Kubelet) syncNetworkStatus() {
 	kl.runtimeState.setNetworkState(err)
 }
 
-// setNodeStatus fills in the Status fields of the given Node, overwriting
-// any fields that are currently set.
-// TODO(madhusudancs): Simplify the logic for setting node conditions and
-// refactor the node status condtion code out to a different file.
-func (kl *Kubelet) setNodeStatus(node *api.Node) error {
+// Set addresses for the node.
+func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 	// Set addresses for the node.
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
@@ -2728,7 +2722,10 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			}
 		}
 	}
+	return nil
+}
 
+func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
 	info, err := kl.GetCachedMachineInfo()
@@ -2756,7 +2753,10 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		node.Status.NodeInfo.BootID = info.BootID
 	}
+}
 
+// Set versioninfo for the node.
+func (kl *Kubelet) setNodeStatusVersionInfo(node *api.Node) {
 	verinfo, err := kl.cadvisor.VersionInfo()
 	if err != nil {
 		glog.Errorf("Error getting version info: %v", err)
@@ -2770,8 +2770,75 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 	}
 
-	node.Status.DaemonEndpoints = *kl.daemonEndpoints
+}
 
+// Set daemonEndpoints for the node.
+func (kl *Kubelet) setNodeStatusDaemonEndpoints(node *api.Node) {
+	node.Status.DaemonEndpoints = *kl.daemonEndpoints
+}
+
+// Set status for the node.
+func (kl *Kubelet) setNodeStatusInfo(node *api.Node) {
+	kl.setNodeStatusMachineInfo(node)
+	kl.setNodeStatusVersionInfo(node)
+	kl.setNodeStatusDaemonEndpoints(node)
+}
+
+// Set Readycondition for the node.
+func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
+	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
+	// This is due to an issue with version skewed kubelet and master components.
+	// ref: https://github.com/kubernetes/kubernetes/issues/16961
+	currentTime := unversioned.Now()
+	var newNodeReadyCondition api.NodeCondition
+	if rs := kl.runtimeState.errors(); len(rs) == 0 {
+		newNodeReadyCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionTrue,
+			Reason:            "KubeletReady",
+			Message:           "kubelet is posting ready status",
+			LastHeartbeatTime: currentTime,
+		}
+	} else {
+		newNodeReadyCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionFalse,
+			Reason:            "KubeletNotReady",
+			Message:           strings.Join(rs, ","),
+			LastHeartbeatTime: currentTime,
+		}
+	}
+
+	readyConditionUpdated := false
+	needToRecordEvent := false
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == api.NodeReady {
+			if node.Status.Conditions[i].Status == newNodeReadyCondition.Status {
+				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+			} else {
+				newNodeReadyCondition.LastTransitionTime = currentTime
+				needToRecordEvent = true
+			}
+			node.Status.Conditions[i] = newNodeReadyCondition
+			readyConditionUpdated = true
+			break
+		}
+	}
+	if !readyConditionUpdated {
+		newNodeReadyCondition.LastTransitionTime = currentTime
+		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
+	}
+	if needToRecordEvent {
+		if newNodeReadyCondition.Status == api.ConditionTrue {
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeReady)
+		} else {
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotReady)
+		}
+	}
+}
+
+// Set OODcondition for the node.
+func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 	currentTime := unversioned.Now()
 	var nodeOODCondition *api.NodeCondition
 
@@ -2826,56 +2893,13 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	if newOODCondition {
 		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
 	}
+}
 
-	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
-	// This is due to an issue with version skewed kubelet and master components.
-	// ref: https://github.com/kubernetes/kubernetes/issues/16961
-	var newNodeReadyCondition api.NodeCondition
-	var oldNodeReadyConditionStatus api.ConditionStatus
-	if rs := kl.runtimeState.errors(); len(rs) == 0 {
-		newNodeReadyCondition = api.NodeCondition{
-			Type:              api.NodeReady,
-			Status:            api.ConditionTrue,
-			Reason:            "KubeletReady",
-			Message:           "kubelet is posting ready status",
-			LastHeartbeatTime: currentTime,
-		}
-	} else {
-		newNodeReadyCondition = api.NodeCondition{
-			Type:              api.NodeReady,
-			Status:            api.ConditionFalse,
-			Reason:            "KubeletNotReady",
-			Message:           strings.Join(rs, ","),
-			LastHeartbeatTime: currentTime,
-		}
-	}
+// Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
+var oldNodeUnschedulable bool
 
-	updated := false
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == api.NodeReady {
-			oldNodeReadyConditionStatus = node.Status.Conditions[i].Status
-			if oldNodeReadyConditionStatus == newNodeReadyCondition.Status {
-				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
-			} else {
-				newNodeReadyCondition.LastTransitionTime = currentTime
-			}
-			node.Status.Conditions[i] = newNodeReadyCondition
-			updated = true
-			break
-		}
-	}
-	if !updated {
-		newNodeReadyCondition.LastTransitionTime = currentTime
-		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
-	}
-	if !updated || oldNodeReadyConditionStatus != newNodeReadyCondition.Status {
-		if newNodeReadyCondition.Status == api.ConditionTrue {
-			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeReady)
-		} else {
-			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotReady)
-		}
-	}
-
+// record if node schedulable change.
+func (kl *Kubelet) recordNodeSchdulableEvent(node *api.Node) {
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotSchedulable)
@@ -2884,6 +2908,20 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		oldNodeUnschedulable = node.Spec.Unschedulable
 	}
+}
+
+// setNodeStatus fills in the Status fields of the given Node, overwriting
+// any fields that are currently set.
+// TODO(madhusudancs): Simplify the logic for setting node conditions and
+// refactor the node status condtion code out to a different file.
+func (kl *Kubelet) setNodeStatus(node *api.Node) error {
+	if err := kl.setNodeAddress(node); err != nil {
+		return err
+	}
+	kl.setNodeStatusInfo(node)
+	kl.setNodeOODCondition(node)
+	kl.setNodeReadyCondition(node)
+	kl.recordNodeSchdulableEvent(node)
 	return nil
 }
 
