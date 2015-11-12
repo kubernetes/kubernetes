@@ -219,7 +219,7 @@ func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logF
 			}
 			pwd, err := os.Getwd()
 			if err != nil {
-				panic(fmt.Errorf("Cannot get current directory: %v", err))
+				log.Fatalf("Cannot get current directory: %v", err)
 			}
 			kmEnv = append(kmEnv, fmt.Sprintf("%s:%s", e, path.Join(pwd, "bin")))
 		}

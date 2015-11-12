@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package scheduler
 
 import (
 	"reflect"
@@ -25,9 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/slave"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -81,19 +81,12 @@ func (r *mockRegistrator) Register(hostName string, labels map[string]string) (b
 	}
 }
 
-func mockScheduler() scheduler.Scheduler {
-	mockScheduler := &scheduler.MockScheduler{}
-	reg := podtask.NewInMemoryRegistry()
-	mockScheduler.On("Tasks").Return(reg)
-	return mockScheduler
-}
-
 //test adding of ressource offer, should be added to offer registry and slaves
 func TestResourceOffer_Add(t *testing.T) {
 	assert := assert.New(t)
 
 	registrator := &mockRegistrator{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	testFramework := &framework{
+	testScheduler := &KubernetesScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -106,40 +99,39 @@ func TestResourceOffer_Add(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames:  newSlaveRegistry(),
+		slaveHostNames:  slave.NewRegistry(),
 		nodeRegistrator: registrator,
-		sched:           mockScheduler(),
 	}
 
 	hostname := "h1"
 	offerID1 := util.NewOfferID("test1")
 	offer1 := &mesos.Offer{Id: offerID1, Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers1 := []*mesos.Offer{offer1}
-	testFramework.ResourceOffers(nil, offers1)
+	testScheduler.ResourceOffers(nil, offers1)
 	assert.Equal(1, len(registrator.store.List()))
 
-	assert.Equal(1, getNumberOffers(testFramework.offers))
+	assert.Equal(1, getNumberOffers(testScheduler.offers))
 	//check slave hostname
-	assert.Equal(1, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(1, len(testScheduler.slaveHostNames.SlaveIDs()))
 
 	//add another offer
 	hostname2 := "h2"
 	offer2 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers2 := []*mesos.Offer{offer2}
-	testFramework.ResourceOffers(nil, offers2)
+	testScheduler.ResourceOffers(nil, offers2)
 
 	//check it is stored in registry
-	assert.Equal(2, getNumberOffers(testFramework.offers))
+	assert.Equal(2, getNumberOffers(testScheduler.offers))
 
 	//check slave hostnames
-	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(2, len(testScheduler.slaveHostNames.SlaveIDs()))
 }
 
 //test adding of ressource offer, should be added to offer registry and slavesf
 func TestResourceOffer_Add_Rescind(t *testing.T) {
 	assert := assert.New(t)
 
-	testFramework := &framework{
+	testScheduler := &KubernetesScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -152,43 +144,42 @@ func TestResourceOffer_Add_Rescind(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: newSlaveRegistry(),
-		sched:          mockScheduler(),
+		slaveHostNames: slave.NewRegistry(),
 	}
 
 	hostname := "h1"
 	offerID1 := util.NewOfferID("test1")
 	offer1 := &mesos.Offer{Id: offerID1, Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers1 := []*mesos.Offer{offer1}
-	testFramework.ResourceOffers(nil, offers1)
+	testScheduler.ResourceOffers(nil, offers1)
 
-	assert.Equal(1, getNumberOffers(testFramework.offers))
+	assert.Equal(1, getNumberOffers(testScheduler.offers))
 
 	//check slave hostname
-	assert.Equal(1, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(1, len(testScheduler.slaveHostNames.SlaveIDs()))
 
 	//add another offer
 	hostname2 := "h2"
 	offer2 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers2 := []*mesos.Offer{offer2}
-	testFramework.ResourceOffers(nil, offers2)
+	testScheduler.ResourceOffers(nil, offers2)
 
-	assert.Equal(2, getNumberOffers(testFramework.offers))
+	assert.Equal(2, getNumberOffers(testScheduler.offers))
 
 	//check slave hostnames
-	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(2, len(testScheduler.slaveHostNames.SlaveIDs()))
 
 	//next whether offers can be rescinded
-	testFramework.OfferRescinded(nil, offerID1)
-	assert.Equal(1, getNumberOffers(testFramework.offers))
+	testScheduler.OfferRescinded(nil, offerID1)
+	assert.Equal(1, getNumberOffers(testScheduler.offers))
 
 	//next whether offers can be rescinded
-	testFramework.OfferRescinded(nil, util.NewOfferID("test2"))
+	testScheduler.OfferRescinded(nil, util.NewOfferID("test2"))
 	//walk offers again and check it is removed from registry
-	assert.Equal(0, getNumberOffers(testFramework.offers))
+	assert.Equal(0, getNumberOffers(testScheduler.offers))
 
 	//remove non existing ID
-	testFramework.OfferRescinded(nil, util.NewOfferID("notExist"))
+	testScheduler.OfferRescinded(nil, util.NewOfferID("notExist"))
 }
 
 //test that when a slave is lost we remove all offers
@@ -196,7 +187,7 @@ func TestSlave_Lost(t *testing.T) {
 	assert := assert.New(t)
 
 	//
-	testFramework := &framework{
+	testScheduler := &KubernetesScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -206,46 +197,45 @@ func TestSlave_Lost(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: newSlaveRegistry(),
-		sched:          mockScheduler(),
+		slaveHostNames: slave.NewRegistry(),
 	}
 
 	hostname := "h1"
 	offer1 := &mesos.Offer{Id: util.NewOfferID("test1"), Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers1 := []*mesos.Offer{offer1}
-	testFramework.ResourceOffers(nil, offers1)
+	testScheduler.ResourceOffers(nil, offers1)
 	offer2 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers2 := []*mesos.Offer{offer2}
-	testFramework.ResourceOffers(nil, offers2)
+	testScheduler.ResourceOffers(nil, offers2)
 
 	//add another offer from different slaveID
 	hostname2 := "h2"
 	offer3 := &mesos.Offer{Id: util.NewOfferID("test3"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers3 := []*mesos.Offer{offer3}
-	testFramework.ResourceOffers(nil, offers3)
+	testScheduler.ResourceOffers(nil, offers3)
 
 	//test precondition
-	assert.Equal(3, getNumberOffers(testFramework.offers))
-	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(3, getNumberOffers(testScheduler.offers))
+	assert.Equal(2, len(testScheduler.slaveHostNames.SlaveIDs()))
 
 	//remove first slave
-	testFramework.SlaveLost(nil, util.NewSlaveID(hostname))
+	testScheduler.SlaveLost(nil, util.NewSlaveID(hostname))
 
 	//offers should be removed
-	assert.Equal(1, getNumberOffers(testFramework.offers))
+	assert.Equal(1, getNumberOffers(testScheduler.offers))
 	//slave hostnames should still be all present
-	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(2, len(testScheduler.slaveHostNames.SlaveIDs()))
 
 	//remove second slave
-	testFramework.SlaveLost(nil, util.NewSlaveID(hostname2))
+	testScheduler.SlaveLost(nil, util.NewSlaveID(hostname2))
 
 	//offers should be removed
-	assert.Equal(0, getNumberOffers(testFramework.offers))
+	assert.Equal(0, getNumberOffers(testScheduler.offers))
 	//slave hostnames should still be all present
-	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(2, len(testScheduler.slaveHostNames.SlaveIDs()))
 
 	//try to remove non existing slave
-	testFramework.SlaveLost(nil, util.NewSlaveID("notExist"))
+	testScheduler.SlaveLost(nil, util.NewSlaveID("notExist"))
 
 }
 
@@ -254,7 +244,7 @@ func TestDisconnect(t *testing.T) {
 	assert := assert.New(t)
 
 	//
-	testFramework := &framework{
+	testScheduler := &KubernetesScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -264,31 +254,30 @@ func TestDisconnect(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: newSlaveRegistry(),
-		sched:          mockScheduler(),
+		slaveHostNames: slave.NewRegistry(),
 	}
 
 	hostname := "h1"
 	offer1 := &mesos.Offer{Id: util.NewOfferID("test1"), Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers1 := []*mesos.Offer{offer1}
-	testFramework.ResourceOffers(nil, offers1)
+	testScheduler.ResourceOffers(nil, offers1)
 	offer2 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname, SlaveId: util.NewSlaveID(hostname)}
 	offers2 := []*mesos.Offer{offer2}
-	testFramework.ResourceOffers(nil, offers2)
+	testScheduler.ResourceOffers(nil, offers2)
 
 	//add another offer from different slaveID
 	hostname2 := "h2"
 	offer3 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers3 := []*mesos.Offer{offer3}
-	testFramework.ResourceOffers(nil, offers3)
+	testScheduler.ResourceOffers(nil, offers3)
 
 	//disconnect
-	testFramework.Disconnected(nil)
+	testScheduler.Disconnected(nil)
 
 	//all offers should be removed
-	assert.Equal(0, getNumberOffers(testFramework.offers))
+	assert.Equal(0, getNumberOffers(testScheduler.offers))
 	//slave hostnames should still be all present
-	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
+	assert.Equal(2, len(testScheduler.slaveHostNames.SlaveIDs()))
 }
 
 //test we can handle different status updates, TODO check state transitions
@@ -298,7 +287,7 @@ func TestStatus_Update(t *testing.T) {
 	// setup expectations
 	mockdriver.On("KillTask", util.NewTaskID("test-task-001")).Return(mesos.Status_DRIVER_RUNNING, nil)
 
-	testFramework := &framework{
+	testScheduler := &KubernetesScheduler{
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				return true
@@ -308,28 +297,28 @@ func TestStatus_Update(t *testing.T) {
 			TTL:           schedcfg.DefaultOfferTTL,
 			ListenerDelay: schedcfg.DefaultListenerDelay,
 		}),
-		slaveHostNames: newSlaveRegistry(),
+		slaveHostNames: slave.NewRegistry(),
 		driver:         &mockdriver,
-		sched:          mockScheduler(),
+		taskRegistry:   podtask.NewInMemoryRegistry(),
 	}
 
 	taskStatus_task_starting := util.NewTaskStatus(
 		util.NewTaskID("test-task-001"),
 		mesos.TaskState_TASK_RUNNING,
 	)
-	testFramework.StatusUpdate(testFramework.driver, taskStatus_task_starting)
+	testScheduler.StatusUpdate(testScheduler.driver, taskStatus_task_starting)
 
 	taskStatus_task_running := util.NewTaskStatus(
 		util.NewTaskID("test-task-001"),
 		mesos.TaskState_TASK_RUNNING,
 	)
-	testFramework.StatusUpdate(testFramework.driver, taskStatus_task_running)
+	testScheduler.StatusUpdate(testScheduler.driver, taskStatus_task_running)
 
 	taskStatus_task_failed := util.NewTaskStatus(
 		util.NewTaskID("test-task-001"),
 		mesos.TaskState_TASK_FAILED,
 	)
-	testFramework.StatusUpdate(testFramework.driver, taskStatus_task_failed)
+	testScheduler.StatusUpdate(testScheduler.driver, taskStatus_task_failed)
 
 	//assert that mock was invoked
 	mockdriver.AssertExpectations(t)

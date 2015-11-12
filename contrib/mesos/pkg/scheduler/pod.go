@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queuer
+package scheduler
 
 import (
 	"fmt"
@@ -29,12 +29,8 @@ import (
 type Pod struct {
 	*api.Pod
 	deadline *time.Time
-	Delay    *time.Duration
-	Notify   queue.BreakChan
-}
-
-func NewPodWithDeadline(pod *api.Pod, deadline *time.Time) *Pod {
-	return &Pod{Pod: pod, deadline: deadline}
+	delay    *time.Duration
+	notify   queue.BreakChan
 }
 
 // implements Copyable
@@ -58,21 +54,21 @@ func (p *Pod) GetUID() string {
 
 // implements Deadlined
 func (dp *Pod) Deadline() (time.Time, bool) {
-	if dp.Deadline != nil {
+	if dp.deadline != nil {
 		return *(dp.deadline), true
 	}
 	return time.Time{}, false
 }
 
 func (dp *Pod) GetDelay() time.Duration {
-	if dp.Delay != nil {
-		return *(dp.Delay)
+	if dp.delay != nil {
+		return *(dp.delay)
 	}
 	return 0
 }
 
 func (p *Pod) Breaker() queue.BreakChan {
-	return p.Notify
+	return p.notify
 }
 
 func (p *Pod) String() string {
