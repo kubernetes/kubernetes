@@ -99,16 +99,16 @@ func wildcardHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error
 	remaining := len(wildports)
 	foreachRange(offer, "ports", func(bp, ep uint64) {
 		log.V(3).Infof("Searching for wildcard port in range {%d:%d}", bp, ep)
-		for _, entry := range wildports {
-			if entry.OfferPort != 0 {
+		for i := range wildports {
+			if wildports[i].OfferPort != 0 {
 				continue
 			}
 			for port := bp; port <= ep && remaining > 0; port++ {
 				if _, inuse := taken[port]; inuse {
 					continue
 				}
-				entry.OfferPort = port
-				mapping = append(mapping, entry)
+				wildports[i].OfferPort = port
+				mapping = append(mapping, wildports[i])
 				remaining--
 				taken[port] = struct{}{}
 				break
