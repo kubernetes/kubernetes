@@ -71,12 +71,15 @@ type ContainerSpec struct {
 	// Metadata labels associated with this container (not Kubernetes labels).
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// Whether the container has CPU metrics.
 	HasCpu bool    `json:"hasCpu,omitempty"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
 
+	// Whether the container has memory metrics.
 	HasMemory bool       `json:"hasMemory,omitempty"`
 	Memory    MemorySpec `json:"memory,omitempty"`
 
+	// Whether the container has memory metrics.
 	HasCustomMetrics bool         `json:"hasCustomMetrics,omitempty"`
 	CustomMetrics    []MetricSpec `json:"customMetrics,omitempty"`
 
@@ -90,11 +93,11 @@ type ContainerSpec struct {
 }
 
 type CpuSpec struct {
-	// Requested cpu shares. Default is 1024.
-	// Units: milli-cpus.
+	// Requested core shares. Default is 1024.
+	// Units: millicore-seconds per second.
 	Limit uint64 `json:"limit,omitempty"`
 	// Requested cpu hard limit. Default is unlimited (0).
-	// Units: milli-cpus.
+	// Units: millicore-seconds per second.
 	MaxLimit uint64 `json:"maxLimit,omitempty"`
 	// Cpu affinity mask.
 	Mask string `json:"mask,omitempty"`
@@ -119,9 +122,9 @@ type ContainerStats struct {
 	Timestamp unversioned.Time `json:"timestamp,omitempty"`
 	// CPU statistics
 	HasCpu bool `json:"hasCpu,omitempty"`
-	// In nanoseconds (aggregated)
+	// In nanocore-seconds (aggregated)
 	Cpu CpuStats `json:"cpu,omitempty"`
-	// In nanocores per second (instantaneous)
+	// In nanocore-seconds per second (instantaneous)
 	CpuInst *CpuInstStats `json:"cpuInst,omitempty"`
 	// Disk IO statistics
 	HasDiskIo bool        `json:"hasDiskIo,omitempty"`
@@ -205,49 +208,49 @@ type CpuInstStats struct {
 
 // CPU usage time statistics.
 type CpuInstUsage struct {
-	// Total CPU usage.
-	// Units: nanocores per second
+	// Total CPU usage (sum of all cores).
+	// Units: nanocore-seconds per second
 	Total uint64 `json:"total,omitempty"`
 
-	// Per CPU/core usage of the container.
-	// Unit: nanocores per second
+	// Per core usage of the container, indexed by CPU index (0 to CPU MAX).
+	// Unit: nanocore-seconds per second
 	PerCpu []uint64 `json:"perCpu,omitempty"`
 
-	// Time spent in user space.
-	// Unit: nanocores per second
+	// Usage spent in user space.
+	// Unit: nanocore-seconds per second
 	User uint64 `json:"user,omitempty"`
 
-	// Time spent in kernel space.
-	// Unit: nanocores per second
+	// Usage spent in kernel space.
+	// Unit: nanocore-seconds per second
 	System uint64 `json:"system,omitempty"`
 }
 
 // CPU usage time statistics.
 type CpuUsage struct {
-	// Total CPU usage.
-	// Units: nanoseconds
+	// Total CPU usage (sum of all cores).
+	// Units: nanocore-seconds
 	Total uint64 `json:"total,omitempty"`
 
-	// Per CPU/core usage of the container.
-	// Unit: nanoseconds.
+	// Per core usage of the container, indexed by CPU index (0 to CPU MAX).
+	// Unit: nanocore-seconds
 	PerCpu []uint64 `json:"perCpu,omitempty"`
 
-	// Time spent in user space.
-	// Unit: nanoseconds
+	// Usage spent in user space.
+	// Unit: nanocore-seconds
 	User uint64 `json:"user,omitempty"`
 
-	// Time spent in kernel space.
-	// Unit: nanoseconds
+	// Usage spent in kernel space.
+	// Unit: nanocore-seconds
 	System uint64 `json:"system,omitempty"`
 }
 
 // All CPU usage metrics are cumulative from the creation of the container
 type CpuStats struct {
 	Usage CpuUsage `json:"usage,omitempty"`
-	// Smoothed average of number of runnable threads x 1000.
-	// We multiply by thousand to avoid using floats, but preserving precision.
-	// Load is smoothed over the last 10 seconds. Instantaneous value can be read
-	// from LoadStats.NrRunning.
+	// CPU load that the container is experiencing, represented as a smoothed
+	// average of number of runnable threads x 1000.  We multiply by thousand to
+	// avoid using floats, but preserving precision.  Load is smoothed over the
+	// last 10 seconds. Instantaneous value can be read from LoadStats.NrRunning.
 	LoadAverage int32 `json:"loadAverage,omitempty"`
 }
 
