@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // MetaFactory is used to store and retrieve the version and kind
@@ -73,6 +75,7 @@ func (f SimpleMetaFactory) Update(version, kind string, obj interface{}) error {
 // on a pointer to a struct to version and kind. Provided as a convenience for others
 // implementing MetaFactory. Pass an array to baseFields to check one or more nested structs
 // for the named fields. The version field is treated as optional if it is not present in the struct.
+// TODO: use the GroupVersion struct.
 func UpdateVersionAndKind(baseFields []string, versionField, version, kindField, kind string, obj interface{}) error {
 	v, err := EnforcePtr(obj)
 	if err != nil {
@@ -109,7 +112,19 @@ func UpdateVersionAndKind(baseFields []string, versionField, version, kindField,
 	field.SetString(kind)
 
 	if field := v.FieldByName(versionField); field.IsValid() {
-		field.SetString(version)
+		// TODO: version should be a GroupVersion struct when passed in.
+		// TODO: remove the type switch once we convert APIVersion field in all
+		// objects to struct GroupVersion.
+		switch field.Type().String() {
+		case "string":
+			field.SetString(version)
+		default:
+			gv, err := unversioned.ParseGroupVersion(version)
+			if err != nil {
+				return err
+			}
+			field.Set(reflect.ValueOf(gv))
+		}
 	}
 
 	return nil
