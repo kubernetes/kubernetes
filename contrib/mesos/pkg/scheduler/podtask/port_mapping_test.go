@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"github.com/mesos/mesos-go/mesosutil"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -172,6 +173,44 @@ func TestWildcardHostPortMatching(t *testing.T) {
 			valid++
 		}
 		if entry.ContainerIdx == 0 && entry.PortIdx == 1 && entry.OfferPort == 1 {
+			valid++
+		}
+	}
+	if valid < 2 {
+		t.Fatalf("Expected 2 valid port mappings, not %d", valid)
+	}
+
+	//-- port mapping in case of multiple discontinuous port ranges in mesos offer
+	pod.Spec = api.PodSpec{
+		Containers: []api.Container{{
+			Ports: []api.ContainerPort{{
+				HostPort: 0,
+			}, {
+				HostPort: 0,
+			}},
+		}},
+	}
+	task, err = New(api.NewDefaultContext(), "", *pod, &mesos.ExecutorInfo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	offer = &mesos.Offer{
+		Resources: []*mesos.Resource{
+			mesosutil.NewRangesResource("ports", []*mesos.Value_Range{mesosutil.NewValueRange(1, 1), mesosutil.NewValueRange(3, 5)}),
+		},
+	}
+	mapping, err = wildcardHostPortMapping(task, offer)
+	if err != nil {
+		t.Fatal(err)
+	} else if len(mapping) != 2 {
+		t.Fatal("Expected both ports allocated")
+	}
+	valid = 0
+	for _, entry := range mapping {
+		if entry.ContainerIdx == 0 && entry.PortIdx == 0 && entry.OfferPort == 1 {
+			valid++
+		}
+		if entry.ContainerIdx == 0 && entry.PortIdx == 1 && entry.OfferPort == 3 {
 			valid++
 		}
 	}
