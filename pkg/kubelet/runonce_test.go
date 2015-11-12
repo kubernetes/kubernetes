@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -56,7 +57,7 @@ func TestRunOnce(t *testing.T) {
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 	}
-	kb.containerManager, _ = newContainerManager(fakeContainerMgrMountInt(), cadvisor, "", "", "")
+	kb.containerManager = cm.NewStubContainerManager()
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {

@@ -14,20 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package cadvisor
 
 import (
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-// Manages the containers running on a machine.
-type containerManager interface {
-	// Runs the container manager's housekeeping.
-	// - Ensures that the Docker daemon is in a container.
-	// - Creates the system container where all non-containerized processes run.
-	Start() error
-
-	// Returns resources allocated to system containers in the machine.
-	// These containers include the system and Kubernetes services.
-	SystemContainersLimit() api.ResourceList
+func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
+	c := api.ResourceList{
+		api.ResourceCPU: *resource.NewMilliQuantity(
+			int64(info.NumCores*1000),
+			resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(
+			info.MemoryCapacity,
+			resource.BinarySI),
+	}
+	return c
 }

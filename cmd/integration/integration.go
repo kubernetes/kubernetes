@@ -49,6 +49,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -216,7 +217,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.20"}
-
+	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
 		cl,
 		&fakeDocker1,
@@ -238,7 +239,8 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
-		40 /* MaxPods */)
+		40,             /* MaxPods */
+		cm)
 
 	kubeletapp.RunKubelet(kcfg)
 	// Kubelet (machine)
@@ -270,7 +272,8 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
 
-		40 /* MaxPods */)
+		40, /* MaxPods */
+		cm)
 
 	kubeletapp.RunKubelet(kcfg)
 	return apiServer.URL, configFilePath
