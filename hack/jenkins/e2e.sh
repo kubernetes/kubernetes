@@ -119,10 +119,6 @@ function configure_upgrade_step() {
       E2E_UP="true"
       E2E_TEST="false"
       E2E_DOWN="false"
-
-      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-        E2E_SET_CLUSTER_API_VERSION=y
-      fi
       ;;
 
     step2)
@@ -635,7 +631,6 @@ case ${JOB_NAME} in
   kubernetes-e2e-gke-ci)
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
     : ${E2E_NETWORK:="e2e-gke-ci"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
@@ -648,7 +643,6 @@ case ${JOB_NAME} in
   kubernetes-e2e-gke-ci-reboot)
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
     : ${E2E_NETWORK:="e2e-gke-ci-reboot"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
@@ -663,7 +657,6 @@ case ${JOB_NAME} in
   kubernetes-e2e-gke-flaky)
     : ${E2E_CLUSTER_NAME:="kubernetes-gke-e2e-flaky"}
     : ${E2E_NETWORK:="gke-e2e-flaky"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
@@ -678,7 +671,6 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gke-soak-weekly"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${JENKINS_PUBLISHED_VERSION:="ci/latest"}
     : ${E2E_TEST:="false"}
     : ${E2E_UP:="true"}
@@ -1083,7 +1075,6 @@ export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
 export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
-export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
 export CMD_GROUP=${CMD_GROUP:-}
 export MACHINE_TYPE=${NODE_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
 
@@ -1172,11 +1163,6 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # - bucket
         # - build_version
         gsutil -m cp gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz .
-
-        # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
-        if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
-            export CLUSTER_API_VERSION=$(echo ${build_version} | cut -c 2-)
-        fi
     fi
 
     if [[ ! "${CIRCLECI:-}" == "true" ]]; then
