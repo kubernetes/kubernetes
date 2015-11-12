@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slave
+package framework
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 func TestSlaveStorage_Register(t *testing.T) {
 	assert := assert.New(t)
 
-	slaveStorage := NewRegistry()
+	slaveStorage := newSlaveRegistry()
 	assert.Equal(0, len(slaveStorage.hostNames))
 
 	slaveId := "slave1"
@@ -42,7 +42,7 @@ func TestSlaveStorage_Register(t *testing.T) {
 func TestSlaveStorage_HostName(t *testing.T) {
 	assert := assert.New(t)
 
-	slaveStorage := NewRegistry()
+	slaveStorage := newSlaveRegistry()
 	assert.Equal(0, len(slaveStorage.hostNames))
 
 	slaveId := "slave1"
@@ -62,7 +62,7 @@ func TestSlaveStorage_HostName(t *testing.T) {
 func TestSlaveStorage_SlaveIds(t *testing.T) {
 	assert := assert.New(t)
 
-	slaveStorage := NewRegistry()
+	slaveStorage := newSlaveRegistry()
 	assert.Equal(0, len(slaveStorage.hostNames))
 
 	slaveId := "1"
