@@ -26,35 +26,24 @@ grains:
   cbr-cidr: "${MASTER_IP_RANGE}"
 EOF
 
-if [[ -n "${DOCKER_OPTS}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+# Helper that sets a salt grain in grains.conf, if the upper-cased key is a non-empty env
+function env_to_salt {
+  local key=$1
+  local env_key=`echo $key | tr '[:lower:]' '[:upper:]'`
+  local value=${!env_key}
+  if [[ -n "${value}" ]]; then
+    # Note this is yaml, so indentation matters
+    cat <<EOF # >>/etc/salt/minion.d/grains.conf
+  ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
-fi
+  fi
+}
 
-if [[ -n "${DOCKER_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${KUBELET_ROOT}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ -n "${MASTER_EXTRA_SANS}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
-EOF
-fi
-
-if [[ ! -z "${RUNTIME_CONFIG:-}" ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
-EOF
-fi
+env_to_salt docker_opts
+env_to_salt docker_root
+env_to_salt kubelet_root
+env_to_salt master_extra_sans
+env_to_salt runtime_config
 
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
