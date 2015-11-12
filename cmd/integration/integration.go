@@ -308,6 +308,7 @@ func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Sel
 				return false, nil
 			}
 			if pod.Status.Phase != api.PodRunning {
+				glog.Infof("Pod %q is not running, status: %v", podString, pod.Status.Phase)
 				return false, nil
 			}
 		}
