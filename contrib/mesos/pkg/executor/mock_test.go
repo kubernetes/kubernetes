@@ -66,7 +66,7 @@ func (m *MockExecutorDriver) SendFrameworkMessage(msg string) (mesosproto.Status
 	return args.Get(0).(mesosproto.Status), args.Error(1)
 }
 
-func NewTestKubernetesExecutor() (*KubernetesExecutor, chan kubelet.PodUpdate) {
+func NewTestKubernetesExecutor() (*Executor, chan kubelet.PodUpdate) {
 	updates := make(chan kubelet.PodUpdate, 1024)
 	return New(Config{
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),

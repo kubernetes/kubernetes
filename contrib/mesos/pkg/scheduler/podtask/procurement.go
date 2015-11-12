@@ -17,8 +17,6 @@ limitations under the License.
 package podtask
 
 import (
-	"strings"
-
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
@@ -74,31 +72,11 @@ func ValidateProcurement(t *T, offer *mesos.Offer) error {
 	return nil
 }
 
-func setCommandArgument(ei *mesos.ExecutorInfo, flag, value string, create bool) {
-	argv := ei.Command.Arguments
-	overwrite := false
-	for i, arg := range argv {
-		if strings.HasPrefix(arg, flag+"=") {
-			overwrite = true
-			argv[i] = flag + "=" + value
-			break
-		}
-	}
-	if !overwrite && create {
-		ei.Command.Arguments = append(argv, flag+"="+value)
-	}
-}
-
 // NodeProcurement updates t.Spec in preparation for the task to be launched on the
 // slave associated with the offer.
 func NodeProcurement(t *T, offer *mesos.Offer) error {
 	t.Spec.SlaveID = offer.GetSlaveId().GetValue()
 	t.Spec.AssignedSlave = offer.GetHostname()
-
-	// hostname needs of the executor needs to match that of the offer, otherwise
-	// the kubelet node status checker/updater is very unhappy
-	setCommandArgument(t.executor, "--hostname-override", offer.GetHostname(), true)
-
 	return nil
 }
 

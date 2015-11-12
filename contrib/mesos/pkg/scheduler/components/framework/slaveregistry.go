@@ -14,25 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slave
+package framework
 
 import (
 	"sync"
 )
 
-type Registry struct {
+// slaveRegistry manages node hostnames for slave ids.
+type slaveRegistry struct {
 	lock      sync.Mutex
 	hostNames map[string]string
 }
 
-func NewRegistry() *Registry {
-	return &Registry{
+func newSlaveRegistry() *slaveRegistry {
+	return &slaveRegistry{
 		hostNames: map[string]string{},
 	}
 }
 
 // Register creates a mapping between a slaveId and slave if not existing.
-func (st *Registry) Register(slaveId, slaveHostname string) {
+func (st *slaveRegistry) Register(slaveId, slaveHostname string) {
 	st.lock.Lock()
 	defer st.lock.Unlock()
 	_, exists := st.hostNames[slaveId]
@@ -42,7 +43,7 @@ func (st *Registry) Register(slaveId, slaveHostname string) {
 }
 
 // SlaveIDs returns the keys of the registry
-func (st *Registry) SlaveIDs() []string {
+func (st *slaveRegistry) SlaveIDs() []string {
 	st.lock.Lock()
 	defer st.lock.Unlock()
 	slaveIds := make([]string, 0, len(st.hostNames))
@@ -53,7 +54,7 @@ func (st *Registry) SlaveIDs() []string {
 }
 
 // HostName looks up a hostname for a given slaveId
-func (st *Registry) HostName(slaveId string) string {
+func (st *slaveRegistry) HostName(slaveId string) string {
 	st.lock.Lock()
 	defer st.lock.Unlock()
 	return st.hostNames[slaveId]

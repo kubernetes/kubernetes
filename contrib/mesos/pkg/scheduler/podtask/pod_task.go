@@ -18,6 +18,7 @@ package podtask
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -62,7 +63,6 @@ type T struct {
 	UpdatedTime time.Time // time of the most recent StatusUpdate we've seen from the mesos master
 
 	podStatus  api.PodStatus
-	executor   *mesos.ExecutorInfo // readonly
 	podKey     string
 	launchTime time.Time
 	bindTime   time.Time
@@ -130,21 +130,49 @@ func generateTaskName(pod *api.Pod) string {
 	return fmt.Sprintf("%s.%s.pods", pod.Name, ns)
 }
 
-func (t *T) BuildTaskInfo() *mesos.TaskInfo {
+func setCommandArgument(ei *mesos.ExecutorInfo, flag, value string, create bool) {
+	argv := []string{}
+	overwrite := false
+	if ei.Command != nil && ei.Command.Arguments != nil {
+		argv = ei.Command.Arguments
+		for i, arg := range argv {
+			if strings.HasPrefix(arg, flag+"=") {
+				overwrite = true
+				argv[i] = flag + "=" + value
+				break
+			}
+		}
+	}
+	if !overwrite && create {
+		argv = append(argv, flag+"="+value)
+		if ei.Command == nil {
+			ei.Command = &mesos.CommandInfo{}
+		}
+		ei.Command.Arguments = argv
+	}
+}
+
+func (t *T) BuildTaskInfo(prototype *mesos.ExecutorInfo) *mesos.TaskInfo {
 	info := &mesos.TaskInfo{
 		Name:     proto.String(generateTaskName(&t.Pod)),
 		TaskId:   mutil.NewTaskID(t.ID),
 		SlaveId:  mutil.NewSlaveID(t.Spec.SlaveID),
-		Executor: t.executor,
+		Executor: proto.Clone(prototype).(*mesos.ExecutorInfo),
 		Data:     t.Spec.Data,
 		Resources: []*mesos.Resource{
 			mutil.NewScalarResource("cpus", float64(t.Spec.CPU)),
 			mutil.NewScalarResource("mem", float64(t.Spec.Memory)),
 		},
 	}
+
 	if portsResource := rangeResource("ports", t.Spec.Ports); portsResource != nil {
 		info.Resources = append(info.Resources, portsResource)
 	}
+
+	// hostname needs of the executor needs to match that of the offer, otherwise
+	// the kubelet node status checker/updater is very unhappy
+	setCommandArgument(info.Executor, "--hostname-override", t.Spec.AssignedSlave, true)
+
 	return info
 }
 
@@ -170,10 +198,7 @@ func (t *T) Has(f FlagType) (exists bool) {
 	return
 }
 
-func New(ctx api.Context, id string, pod api.Pod, executor *mesos.ExecutorInfo) (*T, error) {
-	if executor == nil {
-		return nil, fmt.Errorf("illegal argument: executor was nil")
-	}
+func New(ctx api.Context, id string, pod *api.Pod) (*T, error) {
 	key, err := MakePodKey(ctx, pod.Name)
 	if err != nil {
 		return nil, err
@@ -182,13 +207,12 @@ func New(ctx api.Context, id string, pod api.Pod, executor *mesos.ExecutorInfo) 
 		id = "pod." + uuid.NewUUID().String()
 	}
 	task := &T{
-		ID:       id,
-		Pod:      pod,
-		State:    StatePending,
-		podKey:   key,
-		mapper:   MappingTypeForPod(&pod),
-		Flags:    make(map[FlagType]struct{}),
-		executor: proto.Clone(executor).(*mesos.ExecutorInfo),
+		ID:     id,
+		Pod:    *pod,
+		State:  StatePending,
+		podKey: key,
+		mapper: MappingTypeForPod(pod),
+		Flags:  make(map[FlagType]struct{}),
 	}
 	task.CreateTime = time.Now()
 	return task, nil
@@ -198,7 +222,6 @@ func (t *T) SaveRecoveryInfo(dict map[string]string) {
 	dict[annotation.TaskIdKey] = t.ID
 	dict[annotation.SlaveIdKey] = t.Spec.SlaveID
 	dict[annotation.OfferIdKey] = t.Offer.Details().Id.GetValue()
-	dict[annotation.ExecutorIdKey] = t.executor.ExecutorId.GetValue()
 }
 
 // reconstruct a task from metadata stashed in a pod entry. there are limited pod states that
@@ -256,7 +279,6 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		annotation.TaskIdKey,
 		annotation.SlaveIdKey,
 		annotation.OfferIdKey,
-		annotation.ExecutorIdKey,
 	} {
 		v, found := pod.Annotations[k]
 		if !found {
@@ -271,10 +293,6 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 			offerId = v
 		case annotation.TaskIdKey:
 			t.ID = v
-		case annotation.ExecutorIdKey:
-			// this is nowhere near sufficient to re-launch a task, but we really just
-			// want this for tracking
-			t.executor = &mesos.ExecutorInfo{ExecutorId: mutil.NewExecutorID(v)}
 		}
 	}
 	t.Offer = offers.Expired(offerId, t.Spec.AssignedSlave, 0)

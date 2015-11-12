@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package podschedulers
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
@@ -62,7 +63,7 @@ func NewFCFSPodScheduler(as AllocationStrategy, lookupNode node.LookupFunc) PodS
 }
 
 // A first-come-first-serve scheduler: acquires the first offer that can support the task
-func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, unused SlaveIndex, task *podtask.T) (offers.Perishable, error) {
+func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, task *podtask.T) (offers.Perishable, error) {
 	podName := fmt.Sprintf("%s/%s", task.Pod.Namespace, task.Pod.Name)
 	var acceptedOffer offers.Perishable
 	err := r.Walk(func(p offers.Perishable) (bool, error) {
@@ -101,5 +102,5 @@ func (fps *fcfsPodScheduler) SchedulePod(r offers.Registry, unused SlaveIndex, t
 		return nil, err
 	}
 	log.V(2).Infof("failed to find a fit for pod: %s", podName)
-	return nil, noSuitableOffersErr
+	return nil, errors.NoSuitableOffersErr
 }

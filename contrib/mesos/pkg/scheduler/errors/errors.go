@@ -14,25 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package errors
 
 import (
-	"sync"
-
-	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"errors"
 )
 
-// Scheduler abstracts everything other components of the scheduler need
-// to access from eachother
-type Scheduler interface {
-	Tasks() podtask.Registry
-	sync.Locker // synchronize changes to tasks, i.e. lock, get task, change task, store task, unlock
-
-	Offers() offers.Registry
-	Reconcile(t *podtask.T)
-	KillTask(id string) error
-	LaunchTask(t *podtask.T) error
-
-	Run(done <-chan struct{})
-}
+var (
+	NoSuchPodErr               = errors.New("No such pod exists")
+	NoSuchTaskErr              = errors.New("No such task exists")
+	ReconciliationCancelledErr = errors.New("explicit task reconciliation cancelled")
+	NoSuitableOffersErr        = errors.New("No suitable offers for pod/task")
+)
