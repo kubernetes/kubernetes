@@ -167,7 +167,7 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 			if err != nil {
 				return nilValue, err
 			}
-			if err := runtime.SetList(out, arr); err != nil {
+			if err := meta.SetList(out, arr); err != nil {
 				return nilValue, err
 			}
 			if out, err = o.scheme.Copy(out); err != nil {
@@ -210,12 +210,12 @@ func (o objects) Add(obj runtime.Object) error {
 	}
 
 	switch {
-	case runtime.IsListType(obj):
+	case meta.IsListType(obj):
 		if kind != "List" {
 			o.types[kind] = append(o.types[kind], obj)
 		}
 
-		list, err := runtime.ExtractList(obj)
+		list, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
 		}
