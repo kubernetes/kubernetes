@@ -1001,6 +1001,9 @@ type Container struct {
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty"`
+	// Whether this container has a read-only root filesystem.
+	// Default is false.
+	ReadOnlyRootFS bool `json:"readOnlyRootFS,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
