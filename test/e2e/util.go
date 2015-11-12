@@ -1685,7 +1685,7 @@ func DeleteRC(c *client.Client, ns, name string) error {
 		return err
 	}
 	startTime := time.Now()
-	_, err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
+	err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
 	if apierrs.IsNotFound(err) {
 		Logf("RC %s was already deleted: %v", name, err)
 		return nil

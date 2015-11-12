@@ -175,7 +175,7 @@ var _ = Describe("Job", func() {
 		reaper, err := kubectl.ReaperFor("Job", f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
-		_, err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
+		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
