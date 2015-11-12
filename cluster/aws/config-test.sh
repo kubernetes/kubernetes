@@ -80,7 +80,10 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # Otherwise amazon-given public ip will be used (it'll change with reboot).
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
-ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
+
+# Enable various v1beta1 features
+ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
+ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
@@ -116,12 +119,6 @@ if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
   AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
-fi
-
-# Optional: Enable deployment experimental feature, not ready for production use.
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-false}"
-if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
-  ENABLE_EXPERIMENTAL_API=true
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
