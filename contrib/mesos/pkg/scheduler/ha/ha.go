@@ -112,10 +112,10 @@ type SchedulerProcess struct {
 	fin      chan struct{}
 }
 
-func New(sched bindings.Scheduler) *SchedulerProcess {
+func New(framework bindings.Scheduler) *SchedulerProcess {
 	p := &SchedulerProcess{
 		Process:   proc.New(),
-		Scheduler: sched,
+		Scheduler: framework,
 		stage:     initStage,
 		elected:   make(chan struct{}),
 		failover:  make(chan struct{}),

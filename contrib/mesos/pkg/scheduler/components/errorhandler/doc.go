@@ -14,25 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
-
-import (
-	"sync"
-
-	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-)
-
-// Scheduler abstracts everything other components of the scheduler need
-// to access from eachother
-type Scheduler interface {
-	Tasks() podtask.Registry
-	sync.Locker // synchronize changes to tasks, i.e. lock, get task, change task, store task, unlock
-
-	Offers() offers.Registry
-	Reconcile(t *podtask.T)
-	KillTask(id string) error
-	LaunchTask(t *podtask.T) error
-
-	Run(done <-chan struct{})
-}
+// Package errorhandler implements the ErrorHandler which handles scheduer error
+// and possibly requeue pods for scheduling again.
+package errorhandler

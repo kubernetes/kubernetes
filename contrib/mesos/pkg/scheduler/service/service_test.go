@@ -121,8 +121,8 @@ func Test_DefaultResourceLimits(t *testing.T) {
 	assert := assert.New(t)
 
 	s := NewSchedulerServer()
-	assert.Equal(s.DefaultContainerCPULimit, mresource.DefaultDefaultContainerCPULimit)
-	assert.Equal(s.DefaultContainerMemLimit, mresource.DefaultDefaultContainerMemLimit)
+	assert.Equal(s.defaultContainerCPULimit, mresource.DefaultDefaultContainerCPULimit)
+	assert.Equal(s.defaultContainerMemLimit, mresource.DefaultDefaultContainerMemLimit)
 }
 
 func Test_StaticPods(t *testing.T) {

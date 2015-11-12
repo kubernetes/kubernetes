@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package podschedulers
 
 import (
-	"errors"
-
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
@@ -37,25 +35,11 @@ type PodScheduler interface {
 	// SchedulePod implements how to schedule pods among slaves.
 	// We can have different implementation for different scheduling policy.
 	//
-	// The function accepts a group of slaves (each contains offers from
-	// that slave) and a single pod, which aligns well with the k8s scheduling
-	// algorithm. It returns an offerId that is acceptable for the pod, otherwise
-	// nil. The caller is responsible for filling in task state w/ relevant offer
-	// details.
+	// The function accepts a set of offers and a single pod, which aligns well
+	// with the k8s scheduling algorithm. It returns an offerId that is acceptable
+	// for the pod, otherwise nil. The caller is responsible for filling in task
+	// state w/ relevant offer details.
 	//
 	// See the FCFSPodScheduler for example.
-	SchedulePod(r offers.Registry, slaves SlaveIndex, task *podtask.T) (offers.Perishable, error)
-}
-
-// A minimal placeholder
-type empty struct{}
-
-var (
-	noSuitableOffersErr = errors.New("No suitable offers for pod/task")
-	noSuchPodErr        = errors.New("No such pod exists")
-	noSuchTaskErr       = errors.New("No such task exists")
-)
-
-type SlaveIndex interface {
-	slaveHostNameFor(id string) string
+	SchedulePod(r offers.Registry, task *podtask.T) (offers.Perishable, error)
 }
