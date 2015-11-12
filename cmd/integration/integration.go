@@ -170,6 +170,13 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("No public address for %s", host)
 	}
 
+	// The caller of master.New should guarantee pulicAddress is properly set
+	hostIP, err := util.ValidPublicAddrForMaster(publicAddress)
+	if err != nil {
+		glog.Fatalf("Unable to find suitable network address.error='%v' . "+
+			"Fail to get a valid public address for master.", err)
+	}
+
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		StorageDestinations:   storageDestinations,
@@ -182,7 +189,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
-		PublicAddress:         publicAddress,
+		PublicAddress:         hostIP,
 		CacheTimeout:          2 * time.Second,
 		StorageVersions:       storageVersions,
 	})
