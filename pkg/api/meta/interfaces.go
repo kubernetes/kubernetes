@@ -156,7 +156,7 @@ type RESTMapper interface {
 	// TODO(caesarxuchao): Remove GroupForResource when multi-group support is in (since
 	// group will be part of the version).
 	GroupForResource(resource string) (string, error)
-	// TODO: change the input argument versions to type GroupVersion.
+	// TODO: use the GroupVersion struct.
 	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

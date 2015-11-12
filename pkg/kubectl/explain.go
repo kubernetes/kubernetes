@@ -32,7 +32,7 @@ var allModels = make(map[string]*swagger.NamedModel)
 var recursive = false // this is global for convenience, can become int for multiple levels
 
 // GetSwaggerSchema returns the swagger spec from master
-// TODO: change to use GroupVersion struct.
+// TODO: use the GroupVersion struct.
 func GetSwaggerSchema(apiVer string, kubeClient client.Interface) (*swagger.ApiDeclaration, error) {
 	swaggerSchema, err := kubeClient.SwaggerSchema(apiVer)
 	if err != nil {
