@@ -86,6 +86,7 @@ apiserver:
     --service-node-port-range=30000-32767
     --cloud-provider=mesos
     --cloud-config=/opt/mesos-cloud.conf
+    --allow-privileged
     --tls-cert-file=/var/run/kubernetes/auth/apiserver.crt
     --tls-private-key-file=/var/run/kubernetes/auth/apiserver.key
     --runtime-config=experimental/v1alpha1
@@ -138,6 +139,7 @@ scheduler:
     --mesos-user=root
     --api-servers=http://apiserver:8888
     --mesos-master=mesosmaster1:5050
+    --allow-privileged
     --cluster-dns=10.10.10.10
     --cluster-domain=cluster.local
     --mesos-executor-cpus=1.0

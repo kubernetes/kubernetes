@@ -394,17 +394,11 @@ var _ = Describe("Services", func() {
 		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
-		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		if providerIs(providersWithSSH...) {
-			hosts, err := NodeSSHHosts(c)
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-			if code != 0 {
-				Failf("expected node port (%d) to be in use", nodePort)
-			}
+		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		cmd := fmt.Sprintf(`ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
+		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			Failf("expected node port (%d) to be in use, stdout: %v", nodePort, stdout)
 		}
 	})
 
@@ -759,17 +753,11 @@ var _ = Describe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		if providerIs(providersWithSSH...) {
-			hosts, err := NodeSSHHosts(c)
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-			if code == 0 {
-				Failf("expected node port (%d) to not be in use", nodePort)
-			}
+		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
+		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			Failf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 		}
 
 		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
