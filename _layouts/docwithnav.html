@@ -207,6 +207,7 @@
 				}
 				$('html, body').animate({scrollTop: offset}, 0);
 			});
+			$('#archivednotice').prop('href', window.location.href.replace('{{page.collection}}', 'v1.1'));
 		}
 		/* Load the code samples in a syntax formatted code block */
 		function displaycodesample(targethref) {
