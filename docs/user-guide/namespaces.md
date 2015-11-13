@@ -99,7 +99,9 @@ $ export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}'
 Then update the default namespace:
 
 ```console
-$ kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
+$ kubectl config set-context $CONTEXT --namespace=<insert-namespace-name-here>
+# Validate it
+$ kubectl config view | grep namespace:
 ```
 
 ## Namespaces and DNS
