@@ -31,7 +31,7 @@ type FakeCommandAction func(cmd string, args ...string) Cmd
 
 func (fake *FakeExec) Command(cmd string, args ...string) Cmd {
 	if fake.CommandCalls > len(fake.CommandScript)-1 {
-		panic("ran out of Command() actions")
+		panic(fmt.Sprintf("ran out of Command() actions. Could not handle command [%d]: %s args: %v", fake.CommandCalls, cmd, args))
 	}
 	i := fake.CommandCalls
 	fake.CommandCalls++
