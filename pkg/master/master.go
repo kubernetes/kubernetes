@@ -182,7 +182,6 @@ type Config struct {
 	// StorageVersions is a map between groups and their storage versions
 	StorageVersions map[string]string
 	EventTTL        time.Duration
-	NodeRegexp      string
 	KubeletClient   client.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
