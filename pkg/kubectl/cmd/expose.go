@@ -120,7 +120,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	if err := f.CanBeExposed(mapping.Kind); err != nil {
+	if err := f.CanBeExposed(mapping.GroupVersionKind.Kind); err != nil {
 		return err
 	}
 	// Get the input object
@@ -187,7 +187,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-		object, err = cmdutil.Merge(object, inline, mapping.Kind)
+		object, err = cmdutil.Merge(object, inline, mapping.GroupVersionKind.Kind)
 		if err != nil {
 			return err
 		}

@@ -20,6 +20,8 @@ package meta
 import (
 	"fmt"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Implements RESTScope interface
@@ -72,12 +74,12 @@ type typeMeta struct {
 //
 // TODO: Only accept plural for some operations for increased control?
 // (`get pod bar` vs `get pods bar`)
+// TODO these maps should be keyed based on GroupVersionKinds
 type DefaultRESTMapper struct {
 	mapping        map[string]typeMeta
 	reverse        map[typeMeta]string
 	scopes         map[typeMeta]RESTScope
-	group          string
-	versions       []string
+	groupVersions  []unversioned.GroupVersion
 	plurals        map[string]string
 	singulars      map[string]string
 	interfacesFunc VersionInterfacesFunc
@@ -92,7 +94,12 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
 // and the Kubernetes API conventions. Takes a group name, a priority list of the versions
 // to search when an object has no default version (set empty to return an error),
 // and a function that retrieves the correct codec and metadata for a given version.
-func NewDefaultRESTMapper(group string, versions []string, f VersionInterfacesFunc) *DefaultRESTMapper {
+// TODO remove group when this API is fixed.  It is no longer used.
+// The external API for a RESTMapper is cross-version and this is currently called using
+// group/version tuples.  In the end, the structure may be easier to understand with
+// a GroupRESTMapper and CrossGroupRESTMapper, but for now, this one is constructed and
+// used a CrossGroupRESTMapper.
+func NewDefaultRESTMapper(group string, gvStrings []string, f VersionInterfacesFunc) *DefaultRESTMapper {
 	mapping := make(map[string]typeMeta)
 	reverse := make(map[typeMeta]string)
 	scopes := make(map[typeMeta]RESTScope)
@@ -100,23 +107,29 @@ func NewDefaultRESTMapper(group string, versions []string, f VersionInterfacesFu
 	singulars := make(map[string]string)
 	// TODO: verify name mappings work correctly when versions differ
 
+	gvs := []unversioned.GroupVersion{}
+	for _, gvString := range gvStrings {
+		gvs = append(gvs, unversioned.ParseGroupVersionOrDie(gvString))
+	}
+
 	return &DefaultRESTMapper{
 		mapping:        mapping,
 		reverse:        reverse,
 		scopes:         scopes,
-		group:          group,
-		versions:       versions,
+		groupVersions:  gvs,
 		plurals:        plurals,
 		singulars:      singulars,
 		interfacesFunc: f,
 	}
 }
 
-func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
+func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, gvString string, mixedCase bool) {
+	gv := unversioned.ParseGroupVersionOrDie(gvString)
+
 	plural, singular := KindToResource(kind, mixedCase)
 	m.plurals[singular] = plural
 	m.singulars[plural] = singular
-	meta := typeMeta{APIVersion: version, Kind: kind}
+	meta := typeMeta{APIVersion: gv.String(), Kind: kind}
 	_, ok1 := m.mapping[plural]
 	_, ok2 := m.mapping[strings.ToLower(plural)]
 	if !ok1 && !ok2 {
@@ -177,74 +190,90 @@ func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultV
 }
 
 func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
-	if _, ok := m.mapping[strings.ToLower(resource)]; !ok {
+	typemeta, exists := m.mapping[strings.ToLower(resource)]
+	if !exists {
 		return "", fmt.Errorf("in group for resource, no resource %q has been defined", resource)
 	}
-	return m.group, nil
+
+	gv, err := unversioned.ParseGroupVersion(typemeta.APIVersion)
+	if err != nil {
+		return "", err
+	}
+	return gv.Group, nil
 }
 
 // RESTMapping returns a struct representing the resource path and conversion interfaces a
 // RESTClient should use to operate on the provided kind in order of versions. If a version search
 // order is not provided, the search order provided to DefaultRESTMapper will be used to resolve which
 // APIVersion should be used to access the named kind.
+// TODO version here in this RESTMapper means just APIVersion, but the RESTMapper API is intended to handle multiple groups
+// So this API is broken.  The RESTMapper test made it clear that versions here were API versions, but the code tries to use
+// them with group/version tuples.
+// TODO this should probably become RESTMapping(GroupKind, versions ...string)
 func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTMapping, error) {
 	// Pick an appropriate version
-	var version string
+	var groupVersion *unversioned.GroupVersion
 	hadVersion := false
 	for _, v := range versions {
 		if len(v) == 0 {
 			continue
 		}
+		currGroupVersion, err := unversioned.ParseGroupVersion(v)
+		if err != nil {
+			return nil, err
+		}
+
 		hadVersion = true
-		if _, ok := m.reverse[typeMeta{APIVersion: v, Kind: kind}]; ok {
-			version = v
+		if _, ok := m.reverse[typeMeta{APIVersion: currGroupVersion.String(), Kind: kind}]; ok {
+			groupVersion = &currGroupVersion
 			break
 		}
 	}
 	// Use the default preferred versions
-	if !hadVersion && len(version) == 0 {
-		for _, v := range m.versions {
-			if _, ok := m.reverse[typeMeta{APIVersion: v, Kind: kind}]; ok {
-				version = v
+	if !hadVersion && (groupVersion == nil) {
+		for _, currGroupVersion := range m.groupVersions {
+			if _, ok := m.reverse[typeMeta{APIVersion: currGroupVersion.String(), Kind: kind}]; ok {
+				groupVersion = &currGroupVersion
 				break
 			}
 		}
 	}
-	if len(version) == 0 {
+	if groupVersion == nil {
 		return nil, fmt.Errorf("no kind named %q is registered in versions %q", kind, versions)
 	}
 
+	gvk := unversioned.NewGroupVersionKind(*groupVersion, kind)
+
 	// Ensure we have a REST mapping
-	resource, ok := m.reverse[typeMeta{APIVersion: version, Kind: kind}]
+	resource, ok := m.reverse[typeMeta{APIVersion: gvk.GroupVersion().String(), Kind: gvk.Kind}]
 	if !ok {
-		found := []string{}
-		for _, v := range m.versions {
-			if _, ok := m.reverse[typeMeta{APIVersion: v, Kind: kind}]; ok {
-				found = append(found, v)
+		found := []unversioned.GroupVersion{}
+		for _, gv := range m.groupVersions {
+			if _, ok := m.reverse[typeMeta{APIVersion: gv.String(), Kind: kind}]; ok {
+				found = append(found, gv)
 			}
 		}
 		if len(found) > 0 {
-			return nil, fmt.Errorf("object with kind %q exists in versions %q, not %q", kind, strings.Join(found, ", "), version)
+			return nil, fmt.Errorf("object with kind %q exists in versions %v, not %v", kind, found, *groupVersion)
 		}
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", version, kind)
+		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", groupVersion, kind)
 	}
 
 	// Ensure we have a REST scope
-	scope, ok := m.scopes[typeMeta{APIVersion: version, Kind: kind}]
+	scope, ok := m.scopes[typeMeta{APIVersion: gvk.GroupVersion().String(), Kind: gvk.Kind}]
 	if !ok {
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", version, kind)
+		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion().String(), gvk.Kind)
 	}
 
-	interfaces, err := m.interfacesFunc(version)
+	interfaces, err := m.interfacesFunc(gvk.GroupVersion().String())
 	if err != nil {
-		return nil, fmt.Errorf("the provided version %q has no relevant versions", version)
+		return nil, fmt.Errorf("the provided version %q has no relevant versions", gvk.GroupVersion().String())
 	}
 
 	retVal := &RESTMapping{
-		Resource:   resource,
-		APIVersion: version,
-		Kind:       kind,
-		Scope:      scope,
+		Resource:         resource,
+		GroupVersionKind: gvk,
+		Scope:            scope,
 
 		Codec:            interfaces.Codec,
 		ObjectConvertor:  interfaces.ObjectConvertor,

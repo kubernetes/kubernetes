@@ -22,7 +22,26 @@ import (
 	"strings"
 )
 
-// TODO: We need to remove the GroupVersion in types.go. We use the name GroupVersion here temporarily.
+// GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
+// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+type GroupVersionKind struct {
+	Group   string
+	Version string
+	Kind    string
+}
+
+func NewGroupVersionKind(gv GroupVersion, kind string) GroupVersionKind {
+	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
+}
+
+func (gvk GroupVersionKind) GroupVersion() GroupVersion {
+	return GroupVersion{Group: gvk.Group, Version: gvk.Version}
+}
+
+func (gvk *GroupVersionKind) String() string {
+	return gvk.Group + "/" + gvk.Version + ", Kind=" + gvk.Kind
+}
+
 // GroupVersion contains the "group" and the "version", which uniquely identifies the API.
 type GroupVersion struct {
 	Group   string
@@ -31,7 +50,7 @@ type GroupVersion struct {
 
 // String puts "group" and "version" into a single "group/version" string. For the legacy v1
 // it returns "v1".
-func (gv *GroupVersion) String() string {
+func (gv GroupVersion) String() string {
 	// special case of "v1" for backward compatibility
 	if gv.Group == "" && gv.Version == "v1" {
 		return gv.Version
