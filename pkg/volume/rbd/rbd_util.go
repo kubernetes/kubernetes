@@ -237,13 +237,13 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 				break
 			}
 		}
-	}
-	if err != nil {
-		return err
-	}
-	devicePath, found = waitForPath(b.Pool, b.Image, 10)
-	if !found {
-		return errors.New("Could not map image: Timeout after 10s")
+		if err != nil {
+			return err
+		}
+		devicePath, found = waitForPath(b.Pool, b.Image, 10)
+		if !found {
+			return errors.New("Could not map image: Timeout after 10s")
+		}
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
