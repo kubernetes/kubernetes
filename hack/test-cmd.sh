@@ -611,7 +611,7 @@ runTests() {
   # Pre-Condition: no RC is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create the rc "nginx" with image nginx
-  kubectl run nginx --image=nginx --save-config "${kube_flags[@]}"
+  kubectl run nginx --image=nginx --save-config --generator=run/v1 "${kube_flags[@]}"
   # Post-Condition: rc "nginx" has configuration annotation
   [[ "$(kubectl get rc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   ## 5. kubectl expose --save-config should generate configuration annotation
@@ -646,6 +646,24 @@ runTests() {
   [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up 
   kubectl delete pods test-pod "${kube_flags[@]}"
+
+  ## kubectl run should create deployments or jobs 
+  # Pre-Condition: no Job is running 
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)'
+  # Post-Condition: Job "pi" is created 
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete jobs pi
+  # Pre-Condition: no Deployment is running 
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run nginx --image=nginx --generator=deployment/v1beta1
+  # Post-Condition: Deployment "nginx" is created 
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
+  # Clean up 
+  kubectl delete deployment nginx
 
   ##############
   # Namespaces #

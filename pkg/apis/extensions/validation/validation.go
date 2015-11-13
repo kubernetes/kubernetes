@@ -297,7 +297,10 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec) validation.ErrorLis
 	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(spec.Replicas), "replicas")...)
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecForRC(&spec.Template, spec.Selector, spec.Replicas, "template")...)
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, "strategy")...)
-	allErrs = append(allErrs, apivalidation.ValidateLabelName(spec.UniqueLabelKey, "uniqueLabel")...)
+	// empty string is a valid UniqueLabelKey
+	if len(spec.UniqueLabelKey) > 0 {
+		allErrs = append(allErrs, apivalidation.ValidateLabelName(spec.UniqueLabelKey, "uniqueLabel")...)
+	}
 	return allErrs
 }
 
