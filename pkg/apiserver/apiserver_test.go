@@ -64,7 +64,12 @@ var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "ve
 var newVersion = newGroupVersion.String()
 var prefix = "apis"
 
-var versions = []string{testVersion, newVersion}
+var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+var grouplessVersion = grouplessGroupVersion.String()
+var grouplessPrefix = "api"
+var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessVersion)
+
+var versions = []string{grouplessVersion, testVersion, newVersion}
 var codec = runtime.CodecFor(api.Scheme, testVersion)
 var newCodec = runtime.CodecFor(api.Scheme, newVersion)
 
@@ -89,6 +94,12 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
+	case grouplessVersion:
+		return &meta.VersionInterfaces{
+			Codec:            grouplessCodec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(versions, ", "))
 	}
@@ -96,6 +107,22 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 
 func newMapper() *meta.DefaultRESTMapper {
 	return meta.NewDefaultRESTMapper("testgroup", versions, interfacesFor)
+}
+
+func addGrouplessTypes() {
+	type ListOptions struct {
+		runtime.Object
+		unversioned.TypeMeta `json:",inline"`
+		LabelSelector        string `json:"labelSelector,omitempty"`
+		FieldSelector        string `json:"fieldSelector,omitempty"`
+		Watch                bool   `json:"watch,omitempty"`
+		ResourceVersion      string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
+	}
+	api.Scheme.AddKnownTypes(
+		grouplessVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddKnownTypes(grouplessVersion, &api.Pod{})
 }
 
 func addTestTypes() {
@@ -137,6 +164,7 @@ func init() {
 	api.Scheme.AddKnownTypes(
 		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&api.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	addGrouplessTypes()
 	addTestTypes()
 	addNewTestTypes()
 
@@ -160,6 +188,11 @@ func init() {
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = api.NewRequestContextMapper()
 
+	api.Scheme.AddFieldLabelConversionFunc(grouplessVersion, "Simple",
+		func(label, value string) (string, string, error) {
+			return label, value, nil
+		},
+	)
 	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
@@ -175,76 +208,93 @@ func init() {
 // defaultAPIServer exposes nested objects for testability.
 type defaultAPIServer struct {
 	http.Handler
-	group     *APIGroupVersion
 	container *restful.Container
 }
 
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(true, storage, admissionControl, selfLinker)
-}
-
-// uses the default settings for a v1 compatible api
-func handleNew(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(false, storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker)
 }
 
 // tests with a deny admission controller
 func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(true, storage, deny.NewAlwaysDeny(), selfLinker)
+	return handleInternal(storage, deny.NewAlwaysDeny(), selfLinker)
 }
 
 // tests using the new namespace scope mechanism
 func handleNamespaced(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(false, storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker)
 }
 
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
-	return handleInternal(true, storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker)
 }
 
 func newTestRequestInfoResolver() *RequestInfoResolver {
 	return &RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}
 }
 
-func handleInternal(legacy bool, storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
-	group := &APIGroupVersion{
+func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
+	container := restful.NewContainer()
+	container.Router(restful.CurlyRouter{})
+	mux := container.ServeMux
+
+	template := APIGroupVersion{
 		Storage: storage,
 
-		Root:                "/" + prefix,
 		RequestInfoResolver: newTestRequestInfoResolver(),
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
+		Mapper:    namespaceMapper,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
 	}
-	if legacy {
+
+	// groupless v1 version
+	{
+		group := template
+		group.Root = "/" + grouplessPrefix
+		group.GroupVersion = grouplessGroupVersion
+		group.ServerGroupVersion = &grouplessGroupVersion
+		group.Codec = grouplessCodec
+		if err := (&group).InstallREST(container); err != nil {
+			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+		}
+	}
+
+	// group version 1
+	{
+		group := template
+		group.Root = "/" + prefix
 		group.GroupVersion = testGroupVersion
 		group.ServerGroupVersion = &testGroupVersion
 		group.Codec = codec
-		group.Mapper = namespaceMapper
-	} else {
+		if err := (&group).InstallREST(container); err != nil {
+			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+		}
+	}
+
+	// group version 2
+	{
+		group := template
+		group.Root = "/" + prefix
 		group.GroupVersion = newGroupVersion
 		group.ServerGroupVersion = &newGroupVersion
 		group.Codec = newCodec
-		group.Mapper = namespaceMapper
+		if err := (&group).InstallREST(container); err != nil {
+			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+		}
 	}
 
-	container := restful.NewContainer()
-	container.Router(restful.CurlyRouter{})
-	mux := container.ServeMux
-	if err := group.InstallREST(container); err != nil {
-		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
-	}
 	ws := new(restful.WebService)
 	InstallSupport(mux, ws, false)
 	container.Add(ws)
-	return &defaultAPIServer{mux, group, container}
+	return &defaultAPIServer{mux, container}
 }
 
 func TestSimpleSetupRight(t *testing.T) {
@@ -603,6 +653,33 @@ func TestNotFound(t *testing.T) {
 	}
 	cases := map[string]T{
 		// Positive checks to make sure everything is wired correctly
+		"groupless GET root":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusOK},
+		"groupless GET namespaced": {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusOK},
+
+		"groupless GET long prefix": {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
+
+		"groupless root PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/blah", http.StatusNotFound},
+		"groupless root GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/", http.StatusNotFound},
+
+		"groupless namespaced PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced GET long prefix":              {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
+		"groupless namespaced GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/blah", http.StatusNotFound},
+		"groupless namespaced GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced POST with extra segment":      {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/", http.StatusNotFound},
+		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+
+		// Positive checks to make sure everything is wired correctly
 		"GET root": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
 		// TODO: JTL: "GET root item":       {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusOK},
 		"GET namespaced": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
@@ -676,6 +753,16 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
+		"groupless GET object":      {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
+		"groupless GET list":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo", http.StatusNotFound},
+		"groupless POST list":       {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo", http.StatusNotFound},
+		"groupless PUT object":      {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
+		"groupless DELETE object":   {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
+		"groupless watch list":      {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/foo", http.StatusNotFound},
+		"groupless watch object":    {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/foo/bar", http.StatusNotFound},
+		"groupless proxy object":    {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/proxy/foo/bar", http.StatusNotFound},
+		"groupless redirect object": {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/redirect/foo/bar", http.StatusNotFound},
+
 		"GET object":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
 		"GET list":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
 		"POST list":       {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
@@ -750,6 +837,84 @@ func TestList(t *testing.T) {
 		label     string
 		field     string
 	}{
+		// Groupless API
+
+		// legacy namespace param is ignored
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=",
+			namespace: "",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=other",
+			namespace: "",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
+			namespace: "",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			legacy:    true,
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// legacy api version is honored
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			namespace: "",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			namespace: "other",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
+			namespace: "other",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			legacy:    true,
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// list items across all namespaces
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			namespace: "",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			legacy:    true,
+		},
+		// list items in a namespace in the path
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/default/simple",
+			namespace: "default",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/default/simple",
+		},
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			namespace: "other",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+		},
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
+			namespace: "other",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// list items across all namespaces
+		{
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			namespace: "",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+		},
+
+		// Group API
+
 		// legacy namespace param is ignored
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=",
@@ -833,12 +998,7 @@ func TestList(t *testing.T) {
 			namespace:   testCase.namespace,
 			expectedSet: testCase.selfLink,
 		}
-		var handler http.Handler
-		if testCase.legacy {
-			handler = handleLinker(storage, selfLinker)
-		} else {
-			handler = handleInternal(false, storage, admissionControl, selfLinker)
-		}
+		var handler = handleInternal(storage, admissionControl, selfLinker)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -848,7 +1008,7 @@ func TestList(t *testing.T) {
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected status: %d, Expected: %d, %#v", i, resp.StatusCode, http.StatusOK, resp)
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
@@ -1263,7 +1423,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 		namespace:   "foo",
 	}
 	storage["simple"] = &simpleStorage
-	handler := handleInternal(false, storage, admissionControl, selfLinker)
+	handler := handleInternal(storage, admissionControl, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -2470,7 +2630,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		namespace:   "other",
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
-	handler := handleInternal(true, map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
+	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
