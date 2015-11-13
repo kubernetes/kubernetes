@@ -118,19 +118,17 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 	return &spec, nil
 }
 
-func (BasicReplicationController) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+func ExtractParams(genericParams map[string]interface{}) ([]string, map[string]string, []api.EnvVar, string, error) {
 	args := []string{}
 	val, found := genericParams["args"]
 	if found {
 		var isArray bool
 		args, isArray = val.([]string)
 		if !isArray {
-			return nil, fmt.Errorf("expected []string, found: %v", val)
+			return nil, nil, nil, "", fmt.Errorf("expected []string, found: %v", val)
 		}
 		delete(genericParams, "args")
 	}
-
-	// TODO: abstract this logic so that multiple generators can handle env in the same way. Same for parse envs.
 	var envs []api.EnvVar
 	envStrings, found := genericParams["env"]
 	if found {
@@ -138,11 +136,11 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 			var err error
 			envs, err = parseEnvs(envStringArray)
 			if err != nil {
-				return nil, err
+				return nil, nil, nil, "", err
 			}
 			delete(genericParams, "env")
 		} else {
-			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
+			return nil, nil, nil, "", fmt.Errorf("expected []string, found: %v", envStrings)
 		}
 	}
 
@@ -150,7 +148,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
 		if !isString {
-			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
+			return nil, nil, nil, "", fmt.Errorf("expected string, saw %v for '%s'", value, key)
 		}
 		params[key] = strVal
 	}
@@ -158,9 +156,18 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
+			return nil, nil, nil, "", fmt.Errorf("'name' is a required parameter.")
 		}
 	}
+	return args, params, envs, name, nil
+}
+
+func (BasicReplicationController) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, params, envs, name, errMsg := ExtractParams(genericParams)
+	if errMsg != nil {
+		return nil, errMsg
+	}
+
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
 	var labels map[string]string
@@ -279,47 +286,11 @@ func (BasicPod) ParamNames() []GeneratorParam {
 }
 
 func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
-	args := []string{}
-	val, found := genericParams["args"]
-	if found {
-		var isArray bool
-		args, isArray = val.([]string)
-		if !isArray {
-			return nil, fmt.Errorf("expected []string, found: %v", val)
-		}
-		delete(genericParams, "args")
-	}
-	// TODO: abstract this logic so that multiple generators can handle env in the same way. Same for parse envs.
-	var envs []api.EnvVar
-	envStrings, found := genericParams["env"]
-	if found {
-		if envStringArray, isArray := envStrings.([]string); isArray {
-			var err error
-			envs, err = parseEnvs(envStringArray)
-			if err != nil {
-				return nil, err
-			}
-			delete(genericParams, "env")
-		} else {
-			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
-		}
+	args, params, envs, name, errMsg := ExtractParams(genericParams)
+	if errMsg != nil {
+		return nil, errMsg
 	}
 
-	params := map[string]string{}
-	for key, value := range genericParams {
-		strVal, isString := value.(string)
-		if !isString {
-			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
-		}
-		params[key] = strVal
-	}
-	name, found := params["name"]
-	if !found || len(name) == 0 {
-		name, found = params["default-name"]
-		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
-		}
-	}
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
 	var labels map[string]string
