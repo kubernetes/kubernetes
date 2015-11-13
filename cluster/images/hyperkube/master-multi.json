@@ -12,6 +12,8 @@
               "/hyperkube",
               "controller-manager",
               "--master=127.0.0.1:8080",
+              "--terminated-pod-gc-threshold=100",
+              "--min-resync-period=3m",
               "--v=2"
         ]
     },
@@ -25,6 +27,7 @@
               "--address=0.0.0.0",
               "--etcd-servers=http://127.0.0.1:4001",
               "--cluster-name=kubernetes",
+              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota",
               "--v=2"
         ]
     },
