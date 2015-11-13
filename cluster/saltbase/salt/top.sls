@@ -67,12 +67,11 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
     - docker
     - kubelet
-{% if pillar.get('network_provider', '').lower() == 'calico' %}
-    - calico.master
-{% endif %}
 {% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
+{% elif pillar.get('network_provider', '').lower() == 'calico' %}
+    - calico.master
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':
