@@ -53,6 +53,7 @@ type EventRecorder interface {
 	// Event constructs an event from the given information and puts it in the queue for sending.
 	// 'object' is the object this event is about. Event will make a reference-- or you may also
 	// pass a reference to the object directly.
+	// 'type' of this event, and can be one of Normal, Warning. New types could be added in future
 	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it
 	// should be in UpperCamelCase format (starting with a capital letter). "reason" will be used
 	// to automate handling of events, so imagine people writing switch statements to handle them.
@@ -60,13 +61,13 @@ type EventRecorder interface {
 	// 'message' is intended to be human readable.
 	//
 	// The resulting event will be created in the same namespace as the reference object.
-	Event(object runtime.Object, reason, message string)
+	Event(object runtime.Object, eventtype, reason, message string)
 
 	// Eventf is just like Event, but with Sprintf for the message field.
-	Eventf(object runtime.Object, reason, messageFmt string, args ...interface{})
+	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
 
 	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
-	PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{})
+	PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{})
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
@@ -202,7 +203,7 @@ func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingE
 func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
 	return eventBroadcaster.StartEventWatcher(
 		func(e *api.Event) {
-			logf("Event(%#v): reason: '%v' %v", e.InvolvedObject, e.Reason, e.Message)
+			logf("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
 		})
 }
 
@@ -240,14 +241,19 @@ type recorderImpl struct {
 	clock util.Clock
 }
 
-func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, reason, message string) {
+func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
-		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
+		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
 		return
 	}
 
-	event := recorder.makeEvent(ref, reason, message)
+	if !validateEventType(eventtype) {
+		glog.Errorf("Unsupported event type: '%v'", eventtype)
+		return
+	}
+
+	event := recorder.makeEvent(ref, eventtype, reason, message)
 	event.Source = recorder.source
 
 	go func() {
@@ -256,19 +262,27 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 	}()
 }
 
-func (recorder *recorderImpl) Event(object runtime.Object, reason, message string) {
-	recorder.generateEvent(object, unversioned.Now(), reason, message)
+func validateEventType(eventtype string) bool {
+	switch eventtype {
+	case api.EventTypeNormal, api.EventTypeWarning:
+		return true
+	}
+	return false
 }
 
-func (recorder *recorderImpl) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	recorder.Event(object, reason, fmt.Sprintf(messageFmt, args...))
+func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {
+	recorder.generateEvent(object, unversioned.Now(), eventtype, reason, message)
 }
 
-func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
-	recorder.generateEvent(object, timestamp, reason, fmt.Sprintf(messageFmt, args...))
+func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	recorder.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder *recorderImpl) makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
+func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+	recorder.generateEvent(object, timestamp, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func (recorder *recorderImpl) makeEvent(ref *api.ObjectReference, eventtype, reason, message string) *api.Event {
 	t := unversioned.Time{recorder.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
@@ -285,5 +299,6 @@ func (recorder *recorderImpl) makeEvent(ref *api.ObjectReference, reason, messag
 		FirstTimestamp: t,
 		LastTimestamp:  t,
 		Count:          1,
+		Type:           eventtype,
 	}
 }
