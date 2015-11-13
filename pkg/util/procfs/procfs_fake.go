@@ -16,15 +16,15 @@ limitations under the License.
 
 package procfs
 
-type FakeProcFs struct{}
+type FakeProcFS struct{}
 
-func NewFakeProcFs() ProcFsInterface {
-	return &FakeProcFs{}
+func NewFakeProcFS() ProcFSInterface {
+	return &FakeProcFS{}
 }
 
-// getFullContainerName gets the container name given the root process id of the container.
+// GetFullContainerName gets the container name given the root process id of the container.
 // Eg. If the devices cgroup for the container is stored in /sys/fs/cgroup/devices/docker/nginx,
 // return docker/nginx. Assumes that the process is part of exactly one cgroup hierarchy.
-func (fakePfs *FakeProcFs) GetFullContainerName(pid int) (string, error) {
+func (fakePfs *FakeProcFS) GetFullContainerName(pid int) (string, error) {
 	return "", nil
 }
