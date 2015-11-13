@@ -133,11 +133,11 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Default.GroupAndVersion()})
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Extensions.GroupAndVersion()})
+	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Extensions.GroupVersion()})
 
 	storageVersions := make(map[string]string)
 	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
@@ -987,10 +987,10 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Default.GroupAndVersion()})
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, GroupVersion: testapi.Default.GroupVersion()})
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, Version: testapi.Extensions.GroupAndVersion()})
+	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, GroupVersion: testapi.Extensions.GroupVersion()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

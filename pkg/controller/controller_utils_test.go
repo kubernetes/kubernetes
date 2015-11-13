@@ -190,7 +190,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Default.Version()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	podControl := RealPodControl{
 		KubeClient: client,

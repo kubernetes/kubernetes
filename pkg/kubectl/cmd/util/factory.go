@@ -133,7 +133,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
 			CheckErr(err)
-			cmdApiVersion := cfg.Version
+			cmdApiVersion := ""
+			if cfg.GroupVersion != nil {
+				cmdApiVersion = cfg.GroupVersion.String()
+			}
 
 			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersion: cmdApiVersion}, api.Scheme
 		},
@@ -577,7 +580,10 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
-		defaultVersion := clientConfig.Version
+		defaultVersion := ""
+		if clientConfig.GroupVersion != nil {
+			defaultVersion = clientConfig.GroupVersion.String()
+		}
 
 		version := OutputVersion(cmd, defaultVersion)
 		if len(version) == 0 {

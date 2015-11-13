@@ -453,8 +453,8 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 
 	// create framework
 	client := client.NewOrDie(&client.Config{
-		Host:    apiServer.server.URL,
-		Version: testapi.Default.Version(),
+		Host:         apiServer.server.URL,
+		GroupVersion: testapi.Default.GroupVersion(),
 	})
 	c := *schedcfg.CreateDefaultConfig()
 	fw := framework.New(framework.Config{

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -432,9 +433,16 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
-		Version: s.DeprecatedStorageVersion,
+		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 	}
+	if len(s.DeprecatedStorageVersion) != 0 {
+		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
+		if err != nil {
+			glog.Fatalf("error in parsing group version: %s", err)
+		}
+		clientConfig.GroupVersion = &gv
+	}
+
 	client, err := client.New(clientConfig)
 	if err != nil {
 		glog.Fatalf("Invalid server address: %v", err)

@@ -26,6 +26,7 @@ import (
 	"github.com/imdario/mergo"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -99,7 +100,13 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 		u.Fragment = ""
 		clientConfig.Host = u.String()
 	}
-	clientConfig.Version = configClusterInfo.APIVersion
+	if len(configClusterInfo.APIVersion) != 0 {
+		gv, err := unversioned.ParseGroupVersion(configClusterInfo.APIVersion)
+		if err != nil {
+			return nil, err
+		}
+		clientConfig.GroupVersion = &gv
+	}
 
 	// only try to read the auth information if we are secure
 	if client.IsConfigTransportTLS(*clientConfig) {
