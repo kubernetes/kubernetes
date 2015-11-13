@@ -729,5 +729,7 @@ func SelectorFromSet(ls Set) Selector {
 			requirements = append(requirements, *r)
 		}
 	}
+	// sort to have deterministic string representation
+	sort.Sort(ByKey(requirements))
 	return LabelSelector(requirements)
 }
