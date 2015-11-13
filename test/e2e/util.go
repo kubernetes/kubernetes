@@ -878,13 +878,13 @@ func serviceResponding(c *client.Client, ns, name string) error {
 func loadConfig() (*client.Config, error) {
 	switch {
 	case testContext.KubeConfig != "":
-		fmt.Printf(">>> testContext.KubeConfig: %s\n", testContext.KubeConfig)
+		Logf(">>> testContext.KubeConfig: %s\n", testContext.KubeConfig)
 		c, err := clientcmd.LoadFromFile(testContext.KubeConfig)
 		if err != nil {
 			return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 		}
 		if testContext.KubeContext != "" {
-			fmt.Printf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
+			Logf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
 			c.CurrentContext = testContext.KubeContext
 		}
 		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: testContext.Host}}).ClientConfig()
