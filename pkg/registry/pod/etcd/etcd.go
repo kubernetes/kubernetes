@@ -57,12 +57,12 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(s storage.Interface, storageFactory storage.StorageFactory, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper) PodStorage {
+func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper) PodStorage {
 	prefix := "/pods"
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
-	storageInterface := storageFactory(
-		s, 1000, nil, &api.Pod{}, prefix, true, newListFunc)
+	storageInterface := storageDecorator(
+		s, 1000, &api.Pod{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },

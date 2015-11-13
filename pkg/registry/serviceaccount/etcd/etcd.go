@@ -32,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against service accounts.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/serviceaccounts"
 
 	newListFunc := func() runtime.Object { return &api.ServiceAccountList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &api.ServiceAccount{}, prefix, true, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &api.ServiceAccount{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ServiceAccount{} },

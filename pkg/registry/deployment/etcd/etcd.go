@@ -39,8 +39,8 @@ type DeploymentStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(s storage.Interface, storageFactory storage.StorageFactory) DeploymentStorage {
-	deploymentRest, deploymentStatusRest := NewREST(s, storageFactory)
+func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator) DeploymentStorage {
+	deploymentRest, deploymentStatusRest := NewREST(s, storageDecorator)
 	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
@@ -55,12 +55,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/deployments"
 
 	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &extensions.Deployment{}, prefix, false, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &extensions.Deployment{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.Deployment{} },
