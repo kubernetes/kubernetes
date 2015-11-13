@@ -84,7 +84,7 @@ parameters as follows:
     ```
 
 4. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
-   a value such as "1.0.7".
+   a value such as "1.1.1".
 
 ### Step One: Run etcd
 
@@ -124,8 +124,8 @@ At this point you should have a running Kubernetes cluster.  You can test this
 by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
 following links) and make it available by editing your PATH environment
 variable.
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/linux/amd64/kubectl))
 
 For example, OS X:
 
