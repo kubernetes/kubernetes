@@ -281,23 +281,3 @@ func PodHasRequests(pod *api.Pod, resourceName api.ResourceName) bool {
 	}
 	return true
 }
-
-// PodCPU computes total cpu limit across all containers in pod
-// TODO: Remove this once the mesos scheduler becomes request aware
-func PodCPU(pod *api.Pod) *resource.Quantity {
-	val := int64(0)
-	for j := range pod.Spec.Containers {
-		val = val + pod.Spec.Containers[j].Resources.Limits.Cpu().MilliValue()
-	}
-	return resource.NewMilliQuantity(int64(val), resource.DecimalSI)
-}
-
-// PodMemory computes total memory limit across all containers in a pod
-// TODO: Remove this once the mesos scheduler becomes request aware
-func PodMemory(pod *api.Pod) *resource.Quantity {
-	val := int64(0)
-	for j := range pod.Spec.Containers {
-		val = val + pod.Spec.Containers[j].Resources.Limits.Memory().Value()
-	}
-	return resource.NewQuantity(int64(val), resource.DecimalSI)
-}
