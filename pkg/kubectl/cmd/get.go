@@ -199,7 +199,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-		defaultVersion := clientConfig.Version
 
 		singular := false
 		r := b.Flatten().Do()
@@ -210,7 +209,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 		// the outermost object will be converted to the output-version, but inner
 		// objects can use their mappings
-		version := cmdutil.OutputVersion(cmd, defaultVersion)
+		version := cmdutil.OutputVersionFromGroupVersion(cmd, clientConfig.GroupVersion)
 		obj, err := resource.AsVersionedObject(infos, !singular, version)
 		if err != nil {
 			return err

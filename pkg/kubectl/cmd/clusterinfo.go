@@ -85,7 +85,12 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 					link += "http://" + ip + ":" + strconv.Itoa(port.Port) + " "
 				}
 			} else {
-				link = client.Host + "/api/" + client.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+				if len(client.GroupVersion.Group) == 0 {
+					link = client.Host + "/api/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+				} else {
+					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+
+				}
 			}
 			name := service.ObjectMeta.Labels["kubernetes.io/name"]
 			if len(name) == 0 {
