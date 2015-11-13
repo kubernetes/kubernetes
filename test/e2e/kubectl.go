@@ -44,6 +44,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -367,7 +368,7 @@ var _ = Describe("Kubectl client", func() {
 				execOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Pods(ns).Delete("run-test", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test", api.NewDeleteOptions(0))).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
 			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -375,24 +376,28 @@ var _ = Describe("Kubectl client", func() {
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Pods(ns).Delete("run-test-2", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", api.NewDeleteOptions(0))).To(BeNil())
 
 			By("executing a command with run and attach with stdin with open stdin should remain running")
 			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234\n").
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
-			if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, time.Minute) {
-				Failf("Pod %q should still be running", "run-test-3")
+			runTestPod, err := util.GetFirstPod(c, ns, map[string]string{"run": "run-test-3"})
+			if err != nil {
+				os.Exit(1)
+			}
+			if !checkPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
+				Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 			}
 
 			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
 			// to loop test.
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !checkPodsRunningReady(c, ns, []string{"run-test-3"}, 1*time.Second) {
-					Failf("Pod %q should still be running", "run-test-3")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				if !checkPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
+					Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 				}
-				logOutput := runKubectlOrDie(nsFlag, "logs", "run-test-3")
+				logOutput := runKubectlOrDie(nsFlag, "logs", runTestPod.Name)
 				Expect(logOutput).ToNot(ContainSubstring("stdin closed"))
 				return strings.Contains(logOutput, "abcd1234"), nil
 			})
@@ -401,7 +406,7 @@ var _ = Describe("Kubectl client", func() {
 			}
 			Expect(err).To(BeNil())
 
-			Expect(c.Pods(ns).Delete("run-test-3", api.NewDeleteOptions(0))).To(BeNil())
+			Expect(c.Extensions().Jobs(ns).Delete("run-test-3", api.NewDeleteOptions(0))).To(BeNil())
 		})
 
 		It("should support port-forward", func() {
@@ -804,54 +809,54 @@ var _ = Describe("Kubectl client", func() {
 
 	})
 
-	Describe("Kubectl run pod", func() {
+	Describe("Kubectl run job", func() {
 		var nsFlag string
-		var podName string
+		var jobName string
 
 		BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			podName = "e2e-test-nginx-pod"
+			jobName = "e2e-test-nginx-job"
 		})
 
 		AfterEach(func() {
-			runKubectlOrDie("stop", "pods", podName, nsFlag)
+			runKubectlOrDie("stop", "jobs", jobName, nsFlag)
 		})
 
-		It("should create a pod from an image when restart is OnFailure [Conformance]", func() {
+		It("should create a job from an image when restart is OnFailure [Conformance]", func() {
 			image := "nginx"
 
 			By("running the image " + image)
-			runKubectlOrDie("run", podName, "--restart=OnFailure", "--image="+image, nsFlag)
-			By("verifying the pod " + podName + " was created")
-			pod, err := c.Pods(ns).Get(podName)
+			runKubectlOrDie("run", jobName, "--restart=OnFailure", "--image="+image, nsFlag)
+			By("verifying the job " + jobName + " was created")
+			job, err := c.Extensions().Jobs(ns).Get(jobName)
 			if err != nil {
-				Failf("Failed getting pod %s: %v", podName, err)
+				Failf("Failed getting job %s: %v", jobName, err)
 			}
-			containers := pod.Spec.Containers
+			containers := job.Spec.Template.Spec.Containers
 			if containers == nil || len(containers) != 1 || containers[0].Image != image {
-				Failf("Failed creating pod %s for 1 pod with expected image %s", podName, image)
+				Failf("Failed creating job %s for 1 pod with expected image %s", jobName, image)
 			}
-			if pod.Spec.RestartPolicy != api.RestartPolicyOnFailure {
-				Failf("Failed creating a pod with correct restart policy for --restart=OnFailure")
+			if job.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+				Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
 			}
 		})
 
-		It("should create a pod from an image when restart is Never [Conformance]", func() {
+		It("should create a job from an image when restart is Never [Conformance]", func() {
 			image := "nginx"
 
 			By("running the image " + image)
-			runKubectlOrDie("run", podName, "--restart=Never", "--image="+image, nsFlag)
-			By("verifying the pod " + podName + " was created")
-			pod, err := c.Pods(ns).Get(podName)
+			runKubectlOrDie("run", jobName, "--restart=Never", "--image="+image, nsFlag)
+			By("verifying the job " + jobName + " was created")
+			job, err := c.Extensions().Jobs(ns).Get(jobName)
 			if err != nil {
-				Failf("Failed getting pod %s: %v", podName, err)
+				Failf("Failed getting job %s: %v", jobName, err)
 			}
-			containers := pod.Spec.Containers
+			containers := job.Spec.Template.Spec.Containers
 			if containers == nil || len(containers) != 1 || containers[0].Image != image {
-				Failf("Failed creating pod %s for 1 pod with expected image %s", podName, image)
+				Failf("Failed creating job %s for 1 pod with expected image %s", jobName, image)
 			}
-			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-				Failf("Failed creating a pod with correct restart policy for --restart=OnFailure")
+			if job.Spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
+				Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
 			}
 		})
 

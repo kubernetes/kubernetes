@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/fields"
@@ -116,6 +117,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		"service/v1":                      kubectl.ServiceGeneratorV1{},
 		"service/v2":                      kubectl.ServiceGeneratorV2{},
 		"horizontalpodautoscaler/v1beta1": kubectl.HorizontalPodAutoscalerV1Beta1{},
+		"deployment/v1beta1":              kubectl.DeploymentV1Beta1{},
+		"job/v1beta1":                     kubectl.JobV1Beta1{},
 	}
 
 	clientConfig := optionalClientConfig
@@ -312,18 +315,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			switch t := object.(type) {
 			case *api.ReplicationController:
-				var pods *api.PodList
-				for pods == nil || len(pods.Items) == 0 {
-					var err error
-					if pods, err = client.Pods(t.Namespace).List(labels.SelectorFromSet(t.Spec.Selector), fields.Everything()); err != nil {
-						return nil, err
-					}
-					if len(pods.Items) == 0 {
-						time.Sleep(2 * time.Second)
-					}
-				}
-				pod := &pods.Items[0]
-				return pod, nil
+				return GetFirstPod(client, t.Namespace, t.Spec.Selector)
+			case *extensions.Deployment:
+				return GetFirstPod(client, t.Namespace, t.Spec.Selector)
+			case *extensions.Job:
+				return GetFirstPod(client, t.Namespace, t.Spec.Selector.MatchLabels)
 			case *api.Pod:
 				return t, nil
 			default:
@@ -335,6 +331,22 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 		},
 	}
+}
+
+// GetFirstPod returns the first pod of an object from its namespace and selector
+func GetFirstPod(client *client.Client, namespace string, selector map[string]string) (*api.Pod, error) {
+	var pods *api.PodList
+	for pods == nil || len(pods.Items) == 0 {
+		var err error
+		if pods, err = client.Pods(namespace).List(labels.SelectorFromSet(selector), fields.Everything()); err != nil {
+			return nil, err
+		}
+		if len(pods.Items) == 0 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+	pod := &pods.Items[0]
+	return pod, nil
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
