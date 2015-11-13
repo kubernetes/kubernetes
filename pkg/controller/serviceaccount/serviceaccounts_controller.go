@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -206,17 +207,18 @@ func (e *ServiceAccountsController) createServiceAccountIfNeeded(name, namespace
 	e.createServiceAccount(name, namespace)
 }
 
-// createDefaultServiceAccount creates a default ServiceAccount in the specified namespace
+// createServiceAccount creates a ServiceAccount with the specified name and namespace
 func (e *ServiceAccountsController) createServiceAccount(name, namespace string) {
 	serviceAccount := &api.ServiceAccount{}
 	serviceAccount.Name = name
 	serviceAccount.Namespace = namespace
-	if _, err := e.client.ServiceAccounts(namespace).Create(serviceAccount); err != nil {
+	_, err := e.client.ServiceAccounts(namespace).Create(serviceAccount)
+	if err != nil && !apierrs.IsAlreadyExists(err) {
 		glog.Error(err)
 	}
 }
 
-// getDefaultServiceAccount returns the ServiceAccount with the given name for the given namespace
+// getServiceAccount returns the ServiceAccount with the given name for the given namespace
 func (e *ServiceAccountsController) getServiceAccount(name, namespace string) (*api.ServiceAccount, error) {
 	key := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
 	accounts, err := e.serviceAccounts.Index("namespace", key)
