@@ -82,6 +82,10 @@ func (daemonSetStrategy) Validate(ctx api.Context, obj runtime.Object) fielderro
 	return validation.ValidateDaemonSet(daemonSet)
 }
 
+// Canonicalize normalizes the object after validation.
+func (daemonSetStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for daemon set; this means a POST is
 // needed to create one
 func (daemonSetStrategy) AllowCreateOnUpdate() bool {

@@ -57,6 +57,10 @@ func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderr
 	return validation.ValidateLimitRange(limitRange)
 }
 
+// Canonicalize normalizes the object after validation.
+func (limitrangeStrategy) Canonicalize(obj runtime.Object) {
+}
+
 func (limitrangeStrategy) AllowCreateOnUpdate() bool {
 	return true
 }

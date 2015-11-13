@@ -55,6 +55,7 @@ func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) fielder
 func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return nil
 }
+func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
 
 func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 	return func(obj runtime.Object) bool {
