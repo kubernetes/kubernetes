@@ -19,10 +19,38 @@ limitations under the License.
 package metrics
 
 import (
+	time "time"
+
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
+
+func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
+	out.SelfLink = in.SelfLink
+	out.ResourceVersion = in.ResourceVersion
+	return nil
+}
+
+func deepCopy_unversioned_ObjectReference(in unversioned.ObjectReference, out *unversioned.ObjectReference, c *conversion.Cloner) error {
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.UID = in.UID
+	out.APIVersion = in.APIVersion
+	out.ResourceVersion = in.ResourceVersion
+	out.FieldPath = in.FieldPath
+	return nil
+}
+
+func deepCopy_unversioned_Time(in unversioned.Time, out *unversioned.Time, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.Time); err != nil {
+		return err
+	} else {
+		out.Time = newVal.(time.Time)
+	}
+	return nil
+}
 
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
@@ -30,9 +58,418 @@ func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.Typ
 	return nil
 }
 
+func deepCopy_metrics_ContainerSpec(in ContainerSpec, out *ContainerSpec, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_Time(in.CreationTime, &out.CreationTime, c); err != nil {
+		return err
+	}
+	if in.Aliases != nil {
+		out.Aliases = make([]string, len(in.Aliases))
+		for i := range in.Aliases {
+			out.Aliases[i] = in.Aliases[i]
+		}
+	} else {
+		out.Aliases = nil
+	}
+	out.Namespace = in.Namespace
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	out.HasCpu = in.HasCpu
+	if err := deepCopy_metrics_CpuSpec(in.Cpu, &out.Cpu, c); err != nil {
+		return err
+	}
+	out.HasMemory = in.HasMemory
+	if err := deepCopy_metrics_MemorySpec(in.Memory, &out.Memory, c); err != nil {
+		return err
+	}
+	out.HasCustomMetrics = in.HasCustomMetrics
+	if in.CustomMetrics != nil {
+		out.CustomMetrics = make([]MetricSpec, len(in.CustomMetrics))
+		for i := range in.CustomMetrics {
+			if err := deepCopy_metrics_MetricSpec(in.CustomMetrics[i], &out.CustomMetrics[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.CustomMetrics = nil
+	}
+	out.HasNetwork = in.HasNetwork
+	out.HasFilesystem = in.HasFilesystem
+	out.HasDiskIo = in.HasDiskIo
+	out.Image = in.Image
+	return nil
+}
+
+func deepCopy_metrics_ContainerStats(in ContainerStats, out *ContainerStats, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_Time(in.Timestamp, &out.Timestamp, c); err != nil {
+		return err
+	}
+	out.HasCpu = in.HasCpu
+	if err := deepCopy_metrics_CpuStats(in.Cpu, &out.Cpu, c); err != nil {
+		return err
+	}
+	if in.CpuInst != nil {
+		out.CpuInst = new(CpuInstStats)
+		if err := deepCopy_metrics_CpuInstStats(*in.CpuInst, out.CpuInst, c); err != nil {
+			return err
+		}
+	} else {
+		out.CpuInst = nil
+	}
+	out.HasDiskIo = in.HasDiskIo
+	if err := deepCopy_metrics_DiskIoStats(in.DiskIo, &out.DiskIo, c); err != nil {
+		return err
+	}
+	out.HasMemory = in.HasMemory
+	if err := deepCopy_metrics_MemoryStats(in.Memory, &out.Memory, c); err != nil {
+		return err
+	}
+	out.HasNetwork = in.HasNetwork
+	if err := deepCopy_metrics_NetworkStats(in.Network, &out.Network, c); err != nil {
+		return err
+	}
+	out.HasFilesystem = in.HasFilesystem
+	if in.Filesystem != nil {
+		out.Filesystem = make([]FsStats, len(in.Filesystem))
+		for i := range in.Filesystem {
+			if err := deepCopy_metrics_FsStats(in.Filesystem[i], &out.Filesystem[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Filesystem = nil
+	}
+	out.HasLoad = in.HasLoad
+	if err := deepCopy_metrics_LoadStats(in.Load, &out.Load, c); err != nil {
+		return err
+	}
+	out.HasCustomMetrics = in.HasCustomMetrics
+	if in.CustomMetrics != nil {
+		out.CustomMetrics = make([]CustomMetric, len(in.CustomMetrics))
+		for i := range in.CustomMetrics {
+			if err := deepCopy_metrics_CustomMetric(in.CustomMetrics[i], &out.CustomMetrics[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.CustomMetrics = nil
+	}
+	return nil
+}
+
+func deepCopy_metrics_CpuInstStats(in CpuInstStats, out *CpuInstStats, c *conversion.Cloner) error {
+	if err := deepCopy_metrics_CpuInstUsage(in.Usage, &out.Usage, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_metrics_CpuInstUsage(in CpuInstUsage, out *CpuInstUsage, c *conversion.Cloner) error {
+	out.Total = in.Total
+	if in.PerCpu != nil {
+		out.PerCpu = make([]uint64, len(in.PerCpu))
+		for i := range in.PerCpu {
+			out.PerCpu[i] = in.PerCpu[i]
+		}
+	} else {
+		out.PerCpu = nil
+	}
+	out.User = in.User
+	out.System = in.System
+	return nil
+}
+
+func deepCopy_metrics_CpuSpec(in CpuSpec, out *CpuSpec, c *conversion.Cloner) error {
+	out.Limit = in.Limit
+	out.MaxLimit = in.MaxLimit
+	out.Mask = in.Mask
+	return nil
+}
+
+func deepCopy_metrics_CpuStats(in CpuStats, out *CpuStats, c *conversion.Cloner) error {
+	if err := deepCopy_metrics_CpuUsage(in.Usage, &out.Usage, c); err != nil {
+		return err
+	}
+	out.LoadAverage = in.LoadAverage
+	return nil
+}
+
+func deepCopy_metrics_CpuUsage(in CpuUsage, out *CpuUsage, c *conversion.Cloner) error {
+	out.Total = in.Total
+	if in.PerCpu != nil {
+		out.PerCpu = make([]uint64, len(in.PerCpu))
+		for i := range in.PerCpu {
+			out.PerCpu[i] = in.PerCpu[i]
+		}
+	} else {
+		out.PerCpu = nil
+	}
+	out.User = in.User
+	out.System = in.System
+	return nil
+}
+
+func deepCopy_metrics_CustomMetric(in CustomMetric, out *CustomMetric, c *conversion.Cloner) error {
+	out.Name = in.Name
+	if in.Values != nil {
+		out.Values = make([]MetricVal, len(in.Values))
+		for i := range in.Values {
+			if err := deepCopy_metrics_MetricVal(in.Values[i], &out.Values[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
+func deepCopy_metrics_DiskIoStats(in DiskIoStats, out *DiskIoStats, c *conversion.Cloner) error {
+	if in.IoServiceBytes != nil {
+		out.IoServiceBytes = make([]PerDiskStats, len(in.IoServiceBytes))
+		for i := range in.IoServiceBytes {
+			if err := deepCopy_metrics_PerDiskStats(in.IoServiceBytes[i], &out.IoServiceBytes[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoServiceBytes = nil
+	}
+	if in.IoServiced != nil {
+		out.IoServiced = make([]PerDiskStats, len(in.IoServiced))
+		for i := range in.IoServiced {
+			if err := deepCopy_metrics_PerDiskStats(in.IoServiced[i], &out.IoServiced[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoServiced = nil
+	}
+	if in.IoQueued != nil {
+		out.IoQueued = make([]PerDiskStats, len(in.IoQueued))
+		for i := range in.IoQueued {
+			if err := deepCopy_metrics_PerDiskStats(in.IoQueued[i], &out.IoQueued[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoQueued = nil
+	}
+	if in.Sectors != nil {
+		out.Sectors = make([]PerDiskStats, len(in.Sectors))
+		for i := range in.Sectors {
+			if err := deepCopy_metrics_PerDiskStats(in.Sectors[i], &out.Sectors[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Sectors = nil
+	}
+	if in.IoServiceTime != nil {
+		out.IoServiceTime = make([]PerDiskStats, len(in.IoServiceTime))
+		for i := range in.IoServiceTime {
+			if err := deepCopy_metrics_PerDiskStats(in.IoServiceTime[i], &out.IoServiceTime[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoServiceTime = nil
+	}
+	if in.IoWaitTime != nil {
+		out.IoWaitTime = make([]PerDiskStats, len(in.IoWaitTime))
+		for i := range in.IoWaitTime {
+			if err := deepCopy_metrics_PerDiskStats(in.IoWaitTime[i], &out.IoWaitTime[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoWaitTime = nil
+	}
+	if in.IoMerged != nil {
+		out.IoMerged = make([]PerDiskStats, len(in.IoMerged))
+		for i := range in.IoMerged {
+			if err := deepCopy_metrics_PerDiskStats(in.IoMerged[i], &out.IoMerged[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoMerged = nil
+	}
+	if in.IoTime != nil {
+		out.IoTime = make([]PerDiskStats, len(in.IoTime))
+		for i := range in.IoTime {
+			if err := deepCopy_metrics_PerDiskStats(in.IoTime[i], &out.IoTime[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.IoTime = nil
+	}
+	return nil
+}
+
+func deepCopy_metrics_FsStats(in FsStats, out *FsStats, c *conversion.Cloner) error {
+	out.Device = in.Device
+	out.Limit = in.Limit
+	out.Usage = in.Usage
+	out.Available = in.Available
+	out.ReadsCompleted = in.ReadsCompleted
+	out.ReadsMerged = in.ReadsMerged
+	out.SectorsRead = in.SectorsRead
+	out.ReadTime = in.ReadTime
+	out.WritesCompleted = in.WritesCompleted
+	out.WritesMerged = in.WritesMerged
+	out.SectorsWritten = in.SectorsWritten
+	out.WriteTime = in.WriteTime
+	out.IoInProgress = in.IoInProgress
+	out.IoTime = in.IoTime
+	out.WeightedIoTime = in.WeightedIoTime
+	return nil
+}
+
+func deepCopy_metrics_InterfaceStats(in InterfaceStats, out *InterfaceStats, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.RxBytes = in.RxBytes
+	out.RxPackets = in.RxPackets
+	out.RxErrors = in.RxErrors
+	out.RxDropped = in.RxDropped
+	out.TxBytes = in.TxBytes
+	out.TxPackets = in.TxPackets
+	out.TxErrors = in.TxErrors
+	out.TxDropped = in.TxDropped
+	return nil
+}
+
+func deepCopy_metrics_LoadStats(in LoadStats, out *LoadStats, c *conversion.Cloner) error {
+	out.NrSleeping = in.NrSleeping
+	out.NrRunning = in.NrRunning
+	out.NrStopped = in.NrStopped
+	out.NrUninterruptible = in.NrUninterruptible
+	out.NrIoWait = in.NrIoWait
+	return nil
+}
+
+func deepCopy_metrics_MemorySpec(in MemorySpec, out *MemorySpec, c *conversion.Cloner) error {
+	out.Limit = in.Limit
+	out.Reservation = in.Reservation
+	out.SwapLimit = in.SwapLimit
+	return nil
+}
+
+func deepCopy_metrics_MemoryStats(in MemoryStats, out *MemoryStats, c *conversion.Cloner) error {
+	out.Usage = in.Usage
+	out.WorkingSet = in.WorkingSet
+	out.Failcnt = in.Failcnt
+	if err := deepCopy_metrics_MemoryStatsMemoryData(in.ContainerData, &out.ContainerData, c); err != nil {
+		return err
+	}
+	if err := deepCopy_metrics_MemoryStatsMemoryData(in.HierarchicalData, &out.HierarchicalData, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_metrics_MemoryStatsMemoryData(in MemoryStatsMemoryData, out *MemoryStatsMemoryData, c *conversion.Cloner) error {
+	out.Pgfault = in.Pgfault
+	out.Pgmajfault = in.Pgmajfault
+	return nil
+}
+
+func deepCopy_metrics_MetricSpec(in MetricSpec, out *MetricSpec, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.Type = in.Type
+	out.Format = in.Format
+	out.Units = in.Units
+	return nil
+}
+
+func deepCopy_metrics_MetricVal(in MetricVal, out *MetricVal, c *conversion.Cloner) error {
+	out.Label = in.Label
+	if err := deepCopy_unversioned_Time(in.Timestamp, &out.Timestamp, c); err != nil {
+		return err
+	}
+	out.IntValue = in.IntValue
+	out.FloatValue = in.FloatValue
+	return nil
+}
+
+func deepCopy_metrics_NetworkStats(in NetworkStats, out *NetworkStats, c *conversion.Cloner) error {
+	if in.Interfaces != nil {
+		out.Interfaces = make([]InterfaceStats, len(in.Interfaces))
+		for i := range in.Interfaces {
+			if err := deepCopy_metrics_InterfaceStats(in.Interfaces[i], &out.Interfaces[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Interfaces = nil
+	}
+	if err := deepCopy_metrics_TcpStat(in.Tcp, &out.Tcp, c); err != nil {
+		return err
+	}
+	if err := deepCopy_metrics_TcpStat(in.Tcp6, &out.Tcp6, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_metrics_PerDiskStats(in PerDiskStats, out *PerDiskStats, c *conversion.Cloner) error {
+	out.Major = in.Major
+	out.Minor = in.Minor
+	if in.Stats != nil {
+		out.Stats = make(map[string]uint64)
+		for key, val := range in.Stats {
+			out.Stats[key] = val
+		}
+	} else {
+		out.Stats = nil
+	}
+	return nil
+}
+
+func deepCopy_metrics_RawContainer(in RawContainer, out *RawContainer, c *conversion.Cloner) error {
+	out.Name = in.Name
+	if err := deepCopy_metrics_ContainerSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if in.Stats != nil {
+		out.Stats = make([]ContainerStats, len(in.Stats))
+		for i := range in.Stats {
+			if err := deepCopy_metrics_ContainerStats(in.Stats[i], &out.Stats[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Stats = nil
+	}
+	return nil
+}
+
 func deepCopy_metrics_RawNode(in RawNode, out *RawNode, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	out.NodeName = in.NodeName
+	if err := deepCopy_metrics_RawContainer(in.Machine, &out.Machine, c); err != nil {
+		return err
+	}
+	if in.SystemContainers != nil {
+		out.SystemContainers = make([]RawContainer, len(in.SystemContainers))
+		for i := range in.SystemContainers {
+			if err := deepCopy_metrics_RawContainer(in.SystemContainers[i], &out.SystemContainers[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SystemContainers = nil
 	}
 	return nil
 }
@@ -41,14 +478,69 @@ func deepCopy_metrics_RawPod(in RawPod, out *RawPod, c *conversion.Cloner) error
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ObjectReference(in.PodRef, &out.PodRef, c); err != nil {
+		return err
+	}
+	if in.Containers != nil {
+		out.Containers = make([]RawContainer, len(in.Containers))
+		for i := range in.Containers {
+			if err := deepCopy_metrics_RawContainer(in.Containers[i], &out.Containers[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
+	}
+	return nil
+}
+
+func deepCopy_metrics_TcpStat(in TcpStat, out *TcpStat, c *conversion.Cloner) error {
+	out.Established = in.Established
+	out.SynSent = in.SynSent
+	out.SynRecv = in.SynRecv
+	out.FinWait1 = in.FinWait1
+	out.FinWait2 = in.FinWait2
+	out.TimeWait = in.TimeWait
+	out.Close = in.Close
+	out.CloseWait = in.CloseWait
+	out.LastAck = in.LastAck
+	out.Listen = in.Listen
+	out.Closing = in.Closing
 	return nil
 }
 
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		deepCopy_unversioned_ListMeta,
+		deepCopy_unversioned_ObjectReference,
+		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
+		deepCopy_metrics_ContainerSpec,
+		deepCopy_metrics_ContainerStats,
+		deepCopy_metrics_CpuInstStats,
+		deepCopy_metrics_CpuInstUsage,
+		deepCopy_metrics_CpuSpec,
+		deepCopy_metrics_CpuStats,
+		deepCopy_metrics_CpuUsage,
+		deepCopy_metrics_CustomMetric,
+		deepCopy_metrics_DiskIoStats,
+		deepCopy_metrics_FsStats,
+		deepCopy_metrics_InterfaceStats,
+		deepCopy_metrics_LoadStats,
+		deepCopy_metrics_MemorySpec,
+		deepCopy_metrics_MemoryStats,
+		deepCopy_metrics_MemoryStatsMemoryData,
+		deepCopy_metrics_MetricSpec,
+		deepCopy_metrics_MetricVal,
+		deepCopy_metrics_NetworkStats,
+		deepCopy_metrics_PerDiskStats,
+		deepCopy_metrics_RawContainer,
 		deepCopy_metrics_RawNode,
 		deepCopy_metrics_RawPod,
+		deepCopy_metrics_TcpStat,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

@@ -30,11 +30,53 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("metrics/v1alpha1",
+	api.Scheme.AddKnownTypes("",
 		&RawNode{},
 		&RawPod{},
+		&RawContainer{},
+		&ContainerSpec{},
+		&CpuSpec{},
+		&MemorySpec{},
+		&ContainerStats{},
+		&TcpStat{},
+		&NetworkStats{},
+		&InterfaceStats{},
+		&CpuInstStats{},
+		&CpuInstUsage{},
+		&CpuUsage{},
+		&CpuStats{},
+		&PerDiskStats{},
+		&DiskIoStats{},
+		&MemoryStats{},
+		&MemoryStatsMemoryData{},
+		&FsStats{},
+		&LoadStats{},
+		&MetricSpec{},
+		&CustomMetric{},
+		&MetricVal{},
 	)
 }
 
-func (*RawNode) IsAnAPIObject() {}
-func (*RawPod) IsAnAPIObject()  {}
+func (*RawNode) IsAnAPIObject()               {}
+func (*RawPod) IsAnAPIObject()                {}
+func (*RawContainer) IsAnAPIObject()          {}
+func (*ContainerSpec) IsAnAPIObject()         {}
+func (*CpuSpec) IsAnAPIObject()               {}
+func (*MemorySpec) IsAnAPIObject()            {}
+func (*ContainerStats) IsAnAPIObject()        {}
+func (*TcpStat) IsAnAPIObject()               {}
+func (*NetworkStats) IsAnAPIObject()          {}
+func (*InterfaceStats) IsAnAPIObject()        {}
+func (*CpuInstStats) IsAnAPIObject()          {}
+func (*CpuInstUsage) IsAnAPIObject()          {}
+func (*CpuUsage) IsAnAPIObject()              {}
+func (*CpuStats) IsAnAPIObject()              {}
+func (*PerDiskStats) IsAnAPIObject()          {}
+func (*DiskIoStats) IsAnAPIObject()           {}
+func (*MemoryStats) IsAnAPIObject()           {}
+func (*MemoryStatsMemoryData) IsAnAPIObject() {}
+func (*FsStats) IsAnAPIObject()               {}
+func (*LoadStats) IsAnAPIObject()             {}
+func (*MetricSpec) IsAnAPIObject()            {}
+func (*CustomMetric) IsAnAPIObject()          {}
+func (*MetricVal) IsAnAPIObject()             {}
