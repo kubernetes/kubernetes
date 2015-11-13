@@ -42,12 +42,13 @@ Documentation for other releases can be found at
   - [Writing a Job Spec](#writing-a-job-spec)
     - [Pod Template](#pod-template)
     - [Pod Selector](#pod-selector)
-    - [Multiple Completions](#multiple-completions)
-    - [Parallelism](#parallelism)
+    - [Parallelism and Completions](#parallelism-and-completions)
   - [Handling Pod and Container Failures](#handling-pod-and-container-failures)
-  - [Alternatives to Job](#alternatives-to-job)
+  - [Job Patterns](#job-patterns)
+  - [Alternatives](#alternatives)
     - [Bare Pods](#bare-pods)
     - [Replication Controller](#replication-controller)
+    - [Single Job starts Controller Pod](#single-job-starts-controller-pod)
   - [Caveats](#caveats)
   - [Future work](#future-work)
 
@@ -61,6 +62,9 @@ of successful completions is reached, the job itself is complete.  Deleting a Jo
 pods it created.
 
 A simple case is to create 1 Job object in order to reliably run one Pod to completion.
+The Job object will start a new Pod if the first pod fails or is deleted (for example
+due to a node hardware failure or a node reboot).
+
 A Job can also be used to run multiple pods in parallel.
 
 ## Running an example Job
@@ -179,29 +183,27 @@ Also you should not normally create any pods whose labels match this selector, e
 via another Job, or via another controller such as ReplicationController.  Otherwise, the Job will
 think that those pods were created by it.  Kubernetes will not stop you from doing this.
 
-### Multiple Completions
+### Parallelism and Completions
 
-By default, a Job is complete when one Pod runs to successful completion.  You can also specify that
-this needs to happen multiple times by specifying `.spec.completions` with a value greater than 1.
-When multiple completions are requested, each Pod created by the Job controller has an identical
-[`spec`](../devel/api-conventions.md#spec-and-status).  In particular, all pods will have
-the same command line and the same image, the same volumes, and mostly the same environment
-variables.  It is up to the user to arrange for the pods to do work on different things.  For
-example, the pods might all access a shared work queue service to acquire work units.
+By default, a Job is complete when one Pod runs to successful completion.
 
-To create multiple pods which are similar, but have slightly different arguments, environment
-variables or images, use multiple Jobs.
+A single Job object can also be used to control multiple pods running in
+parallel.  There are several different [patterns for running parallel
+jobs](#job-patterns).
 
-### Parallelism
-
-You can suggest how many pods should run concurrently by setting `.spec.parallelism` to the number
-of pods you would like to have running concurrently.  This number is a suggestion. The number
-running concurrently may be lower or higher for a variety of reasons.  For example, it may be lower
-if the number of remaining completions is less, or as the controller is ramping up, or if it is
-throttling the job due to excessive failures.  It may be higher for example if a pod is gracefully
-shutdown, and the replacement starts early.
+With some of these patterns, you can suggest how many pods should run
+concurrently by setting `.spec.parallelism` to the number of pods you would
+like to have running concurrently.  This number is a suggestion. The number
+running concurrently may be lower or higher for a variety of reasons.  For
+example, it may be lower if the number of remaining completions is less, or as
+the controller is ramping up, or if it is throttling the job due to excessive
+failures.  It may be higher for example if a pod is gracefully shutdown, and
+the replacement starts early.
 
 If you do not specify `.spec.parallelism`, then it defaults to `.spec.completions`.
+
+Depending on the pattern you are using, you will either set `.spec.completions`
+to 1 or to the number of units of work (see [Job Patterns] for an explanation).
 
 ## Handling Pod and Container Failures
 
@@ -226,7 +228,61 @@ sometimes be started twice.
 If you do specify `.spec.parallelism` and `.spec.completions` both greater than 1, then there may be
 multiple pods running at once.  Therefore, your pods must also be tolerant of concurrency.
 
-## Alternatives to Job
+## Job Patterns
+
+The Job object can be used to support reliable parallel execution of Pods.  The Job object is not
+designed to support closely-communicating parallel processes, as commonly found in scientific
+computing.  It does support parallel processing of a set of independent but related *work items*.
+These might be emails to be sent, frames to be rendered, files to be transcoded, ranges of keys in a
+NoSQL database to scan, and so on.
+
+In a complex system, there may be multiple different sets of work items.  Here we are just
+considering one set of work items that the user wants to manage together &mdash; a *batch job*.
+
+There are several different patterns for parallel computation, each with strengths and weaknesses.
+The tradeoffs are:
+
+- One Job object for each work item, vs a single Job object for all work items.  The latter is
+  better for large numbers of work items.  The former creates some overhead for the user and for the
+  system to manage large numbers of Job objects.  Also, with the latter, the resource usage of the job
+  (number of concurrently running pods) can be easily adjusted using the `kubectl scale` command.
+- Number of pods created equals number of work items, vs each pod can process multiple work items.
+  The former typically requires less modification to existing code and containers.  The latter
+  is better for large numbers of work items, for similar reasons to the previous bullet.
+- Several approaches use a work queue.  This requires running a queue service,
+  and modifications to the existing program or container to make it use the work queue.
+  Other approaches are easier to adapt to an existing containerised application.
+
+
+The tradeoffs are summarized here, with columns 2 to 4 corresponding to the above tradeoffs.
+The pattern names are also links to examples and more detailed description.
+
+|                            Pattern                                         | Single Job object | Fewer pods than work items? | Use app unmodified? |  Works in Kube 1.1? |
+| -------------------------------------------------------------------------- |:-----------------:|:---------------------------:|:-------------------:|:-------------------:|
+| [Job Template Expansion](../../examples/job/expansions/README.md)          |                   |                             |          ✓          |          ✓          |
+| [Queue with Pod Per Work Item](../../examples/job/work-queue-1/README.md)  |         ✓         |                             |      sometimes      |          ✓          |
+| [Queue with Variable Pod Count](../../examples/job/work-queue-2/README.md) |                   |         ✓         |             ✓               |                     |          ✓          |
+| Single Job with Static Work Assignment                                     |         ✓         |                             |          ✓          |                     |
+
+When you specify completions with `.spec.completions`, each Pod created by the Job controller
+has an identical [`spec`](../devel/api-conventions.md#spec-and-status).  This means that
+all pods will have the same command line and the same
+image, the same volumes, and (almost) the same environment variables.  These patterns
+are different ways to arrange for pods to work on different things.
+
+This table shows the required settings for `.spec.parallelism` and `.spec.completions` for each of the patterns.
+Here, `W` is the number of work items.
+
+|                             Pattern                                        | `.spec.completions` |  `.spec.parallelism` |
+| -------------------------------------------------------------------------- |:-------------------:|:--------------------:|
+| [Job Template Expansion](../../examples/job/expansions/README.md)          |          1          |     should be 1      |
+| [Queue with Pod Per Work Item](../../examples/job/work-queue-1/README.md)  |          W          |        any           |
+| [Queue with Variable Pod Count](../../examples/job/work-queue-2/README.md) |          1          |        any           |
+| Single Job with Static Work Assignment                                     |          W          |        any           |
+
+
+
+## Alternatives
 
 ### Bare Pods
 
@@ -244,6 +300,19 @@ manages pods that are expected to terminate (e.g. batch jobs).
 As discussed in [life of a pod](pod-states.md), `Job` is *only* appropriate for pods with
 `RestartPolicy` equal to `OnFailure` or `Never`.  (Note: If `RestartPolicy` is not set, the default
 value is `Always`.)
+
+### Single Job starts Controller Pod
+
+Another pattern is for a single Job to create a pod which then creates other pods, acting as a sort
+of custom controller for those pods.  This allows the most flexibility, but may be somewhat
+complicated to get started with and offers less integration with Kubernetes.
+
+One example of this pattern would be a Job which starts a Pod which runs a script that in turn
+starts a Spark master controller (see [spark example](../../examples/spark/README.md)), runs a spark
+driver, and then cleans up.
+
+An advantage of this approach is that the overall process gets the completion guarantee of a Job
+object, but complete control over what pods are created and how work is assigned to them.
 
 ## Caveats
 
