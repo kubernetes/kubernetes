@@ -85,6 +85,7 @@ API_HOST=${API_HOST:-127.0.0.1}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
+KUBELET_ARGS=${KUBELET_ARGS:-""}
 LOG_LEVEL=${LOG_LEVEL:-3}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 RKT_PATH=${RKT_PATH:-""}
@@ -262,7 +263,7 @@ function start_kubelet {
         --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
-        --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
+        --port="$KUBELET_PORT" ${KUBELET_ARGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
       # Docker won't run a container with a cidfile (container id file)
