@@ -21,6 +21,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // This file contains all docker label related constants and functions, including:
@@ -30,52 +32,79 @@ import (
 const (
 	kubernetesPodNameLabel      = "io.kubernetes.pod.name"
 	kubernetesPodNamespaceLabel = "io.kubernetes.pod.namespace"
-	kubernetesPodUID            = "io.kubernetes.pod.uid"
+	kubernetesPodUIDLabel       = "io.kubernetes.pod.uid"
 
-	kubernetesContainerRestartCountLabel      = "io.kubernetes.container.restartCount"
-	kubernetesContainerTerminationMessagePath = "io.kubernetes.container.terminationMessagePath"
+	kubernetesContainerNameLabel                   = "io.kubernetes.container.name"
+	kubernetesContainerHashLabel                   = "io.kubernetes.container.hash"
+	kubernetesContainerRestartCountLabel           = "io.kubernetes.container.restartCount"
+	kubernetesContainerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
 
 	kubernetesPodLabel                    = "io.kubernetes.pod.data"
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
 )
 
+// Container information which has been labelled on each docker container
+type labelledContainerInfo struct {
+	PodName                string
+	PodNamespace           string
+	PodUID                 types.UID
+	Name                   string
+	Hash                   string
+	RestartCount           int
+	TerminationMessagePath string
+}
+
 func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
 	// TODO (random-liu) Move more label initialization here
 	labels := map[string]string{}
 	labels[kubernetesPodNameLabel] = pod.Name
 	labels[kubernetesPodNamespaceLabel] = pod.Namespace
-	labels[kubernetesPodUID] = string(pod.UID)
+	labels[kubernetesPodUIDLabel] = string(pod.UID)
 
+	labels[kubernetesContainerNameLabel] = container.Name
+	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
-	labels[kubernetesContainerTerminationMessagePath] = container.TerminationMessagePath
+	labels[kubernetesContainerTerminationMessagePathLabel] = container.TerminationMessagePath
 
 	return labels
 }
 
-func getRestartCountFromLabel(labels map[string]string) (restartCount int, err error) {
-	if restartCountString, found := labels[kubernetesContainerRestartCountLabel]; found {
-		restartCount, err = strconv.Atoi(restartCountString)
-		if err != nil {
-			// This really should not happen. Just set restartCount to 0 to handle this abnormal case
-			restartCount = 0
-		}
-	} else {
-		// Get restartCount from docker label. If there is no restart count label in a container,
-		// it should be an old container or an invalid container, we just set restart count to 0.
-		// Do not report error, because there should be many old containers without this label now
-		glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", kubernetesContainerRestartCountLabel)
+func getContainerInfoFromLabel(labels map[string]string) (*labelledContainerInfo, error) {
+	var err error
+	containerInfo := labelledContainerInfo{
+		PodName:      getStringValueFromLabel(labels, kubernetesPodNameLabel),
+		PodNamespace: getStringValueFromLabel(labels, kubernetesPodNamespaceLabel),
+		PodUID:       types.UID(getStringValueFromLabel(labels, kubernetesPodUIDLabel)),
+		Name:         getStringValueFromLabel(labels, kubernetesContainerNameLabel),
+		Hash:         getStringValueFromLabel(labels, kubernetesContainerHashLabel),
+		TerminationMessagePath: getStringValueFromLabel(labels, kubernetesContainerTerminationMessagePathLabel),
 	}
-	return restartCount, err
+	containerInfo.RestartCount, err = getIntValueFromLabel(labels, kubernetesContainerRestartCountLabel)
+	return &containerInfo, err
 }
 
-func getTerminationMessagePathFromLabel(labels map[string]string) string {
-	if terminationMessagePath, found := labels[kubernetesContainerTerminationMessagePath]; found {
-		return terminationMessagePath
-	} else {
-		// Do not report error, because there should be many old containers without this label now.
-		// Return empty string "" for these containers, the caller will get terminationMessagePath by other ways.
-		glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", kubernetesContainerTerminationMessagePath)
-		return ""
+func getStringValueFromLabel(labels map[string]string, label string) string {
+	if value, found := labels[label]; found {
+		return value
 	}
+	// Do not report error, because there should be many old containers without label now.
+	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	// Return empty string "" for these containers, the caller will get value by other ways.
+	return ""
+}
+
+func getIntValueFromLabel(labels map[string]string, label string) (int, error) {
+	if strValue, found := labels[label]; found {
+		intValue, err := strconv.Atoi(strValue)
+		if err != nil {
+			// This really should not happen. Just set value to 0 to handle this abnormal case
+			return 0, err
+		}
+		return intValue, nil
+	}
+	// Do not report error, because there should be many old containers without label now.
+	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	// Just set the value to 0
+	return 0, nil
 }
