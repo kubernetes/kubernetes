@@ -18,9 +18,9 @@ package extensions
 
 import (
 	"fmt"
-
 	"sort"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -64,4 +64,22 @@ func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
 	}
 	sort.Sort(labels.ByKey(selector))
 	return selector, nil
+}
+
+// ScaleFromDeployment returns a scale subresource for a deployment.
+func ScaleFromDeployment(deployment *Deployment) *Scale {
+	return &Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              deployment.Name,
+			Namespace:         deployment.Namespace,
+			CreationTimestamp: deployment.CreationTimestamp,
+		},
+		Spec: ScaleSpec{
+			Replicas: deployment.Spec.Replicas,
+		},
+		Status: ScaleStatus{
+			Replicas: deployment.Status.Replicas,
+			Selector: deployment.Spec.Selector,
+		},
+	}
 }

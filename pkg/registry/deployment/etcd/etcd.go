@@ -132,20 +132,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	if err != nil {
 		return nil, errors.NewNotFound("scale", name)
 	}
-	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
-			Name:              name,
-			Namespace:         deployment.Namespace,
-			CreationTimestamp: deployment.CreationTimestamp,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: deployment.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
-		},
-	}, nil
+	return extensions.ScaleFromDeployment(deployment), nil
 }
 
 func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
@@ -170,18 +157,5 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if err != nil {
 		return nil, false, errors.NewConflict("scale", scale.Name, err)
 	}
-	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
-			Name:              deployment.Name,
-			Namespace:         deployment.Namespace,
-			CreationTimestamp: deployment.CreationTimestamp,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: deployment.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
-		},
-	}, false, nil
+	return extensions.ScaleFromDeployment(deployment), false, nil
 }
