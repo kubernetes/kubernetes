@@ -1665,8 +1665,8 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 
 		Logf("\nLogging kubelet events for node %v", n)
 		for _, e := range getNodeEvents(c, n) {
-			Logf("source %v message %v reason %v first ts %v last ts %v, involved obj %+v",
-				e.Source, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
+			Logf("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
+				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
 		Logf("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
