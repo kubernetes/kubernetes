@@ -17,10 +17,7 @@ limitations under the License.
 package rest
 
 import (
-	"crypto/tls"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -29,31 +26,35 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"
-	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // UpgradeAwareProxyHandler is a handler for proxy requests that may require an upgrade
 type UpgradeAwareProxyHandler struct {
 	UpgradeRequired bool
 	Location        *url.URL
-	Transport       http.RoundTripper
-	FlushInterval   time.Duration
-	MaxBytesPerSec  int64
-	err             error
+	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
+	Transport http.RoundTripper
+	// WrapTransport indicates whether the provided Transport should be wrapped with default proxy transport behavior (URL rewriting, X-Forwarded-* header setting)
+	WrapTransport  bool
+	FlushInterval  time.Duration
+	MaxBytesPerSec int64
+	err            error
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
 
 // NewUpgradeAwareProxyHandler creates a new proxy handler with a default flush interval
-func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, upgradeRequired bool) *UpgradeAwareProxyHandler {
+func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool) *UpgradeAwareProxyHandler {
 	return &UpgradeAwareProxyHandler{
 		Location:        location,
 		Transport:       transport,
+		WrapTransport:   wrapTransport,
 		UpgradeRequired: upgradeRequired,
 		FlushInterval:   defaultFlushInterval,
 	}
@@ -101,8 +102,8 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	if h.Transport == nil {
-		h.Transport = h.defaultProxyTransport(req.URL)
+	if h.Transport == nil || h.WrapTransport {
+		h.Transport = h.defaultProxyTransport(req.URL, h.Transport)
 	}
 
 	newReq, err := http.NewRequest(req.Method, loc.String(), req.Body)
@@ -124,7 +125,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		return false
 	}
 
-	backendConn, err := h.dialURL()
+	backendConn, err := proxy.DialURL(h.Location, h.Transport)
 	if err != nil {
 		h.err = err
 		return true
@@ -185,75 +186,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	return true
 }
 
-func (h *UpgradeAwareProxyHandler) dialURL() (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(h.Location)
-
-	var dialer func(network, addr string) (net.Conn, error)
-	if httpTransport, ok := h.Transport.(*http.Transport); ok && httpTransport.Dial != nil {
-		dialer = httpTransport.Dial
-	}
-
-	switch h.Location.Scheme {
-	case "http":
-		if dialer != nil {
-			return dialer("tcp", dialAddr)
-		}
-		return net.Dial("tcp", dialAddr)
-	case "https":
-		// TODO: this TLS logic can probably be cleaned up; it's messy in an attempt
-		// to preserve behavior that we don't know for sure is exercised.
-
-		// Get the tls config from the transport if we recognize it
-		var tlsConfig *tls.Config
-		var tlsConn *tls.Conn
-		var err error
-		if h.Transport != nil {
-			httpTransport, ok := h.Transport.(*http.Transport)
-			if ok {
-				tlsConfig = httpTransport.TLSClientConfig
-			}
-		}
-		if dialer != nil {
-			// We have a dialer; use it to open the connection, then
-			// create a tls client using the connection.
-			netConn, err := dialer("tcp", dialAddr)
-			if err != nil {
-				return nil, err
-			}
-			// tls.Client requires non-nil config
-			if tlsConfig == nil {
-				glog.Warningf("using custom dialer with no TLSClientConfig. Defaulting to InsecureSkipVerify")
-				tlsConfig = &tls.Config{
-					InsecureSkipVerify: true,
-				}
-			}
-			tlsConn = tls.Client(netConn, tlsConfig)
-			if err := tlsConn.Handshake(); err != nil {
-				return nil, err
-			}
-
-		} else {
-			// Dial
-			tlsConn, err = tls.Dial("tcp", dialAddr, tlsConfig)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Verify
-		host, _, _ := net.SplitHostPort(dialAddr)
-		if err := tlsConn.VerifyHostname(host); err != nil {
-			tlsConn.Close()
-			return nil, err
-		}
-
-		return tlsConn, nil
-	default:
-		return nil, fmt.Errorf("unknown scheme: %s", h.Location.Scheme)
-	}
-}
-
-func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.RoundTripper {
+func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
 	scheme := url.Scheme
 	host := url.Host
 	suffix := h.Location.Path
@@ -261,13 +194,14 @@ func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.Roun
 		suffix += "/"
 	}
 	pathPrepend := strings.TrimSuffix(url.Path, suffix)
-	internalTransport := &proxy.Transport{
-		Scheme:      scheme,
-		Host:        host,
-		PathPrepend: pathPrepend,
+	rewritingTransport := &proxy.Transport{
+		Scheme:       scheme,
+		Host:         host,
+		PathPrepend:  pathPrepend,
+		RoundTripper: internalTransport,
 	}
 	return &corsRemovingTransport{
-		RoundTripper: internalTransport,
+		RoundTripper: rewritingTransport,
 	}
 }
 
@@ -284,7 +218,12 @@ func (p *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, er
 	}
 	removeCORSHeaders(resp)
 	return resp, nil
+}
 
+var _ = util.RoundTripperWrapper(&corsRemovingTransport{})
+
+func (rt *corsRemovingTransport) WrappedRoundTripper() http.RoundTripper {
+	return rt.RoundTripper
 }
 
 // removeCORSHeaders strip CORS headers sent from the backend

@@ -87,6 +87,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return nil, err
 	}
 
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return conn, nil
+	}
+
 	host, _, err := net.SplitHostPort(dialAddr)
 	if err != nil {
 		return nil, err

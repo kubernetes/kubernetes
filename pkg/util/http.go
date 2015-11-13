@@ -17,7 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"crypto/tls"
+	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
 )
@@ -43,4 +47,58 @@ func IsProbableEOF(err error) bool {
 		return true
 	}
 	return false
+}
+
+var defaultTransport = http.DefaultTransport.(*http.Transport)
+
+// SetTransportDefaults applies the defaults from http.DefaultTransport
+// for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
+func SetTransportDefaults(t *http.Transport) *http.Transport {
+	if t.Proxy == nil {
+		t.Proxy = defaultTransport.Proxy
+	}
+	if t.Dial == nil {
+		t.Dial = defaultTransport.Dial
+	}
+	if t.TLSHandshakeTimeout == 0 {
+		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
+	}
+	return t
+}
+
+type RoundTripperWrapper interface {
+	http.RoundTripper
+	WrappedRoundTripper() http.RoundTripper
+}
+
+type DialFunc func(net, addr string) (net.Conn, error)
+
+func Dialer(transport http.RoundTripper) (DialFunc, error) {
+	if transport == nil {
+		return nil, nil
+	}
+
+	switch transport := transport.(type) {
+	case *http.Transport:
+		return transport.Dial, nil
+	case RoundTripperWrapper:
+		return Dialer(transport.WrappedRoundTripper())
+	default:
+		return nil, fmt.Errorf("unknown transport type: %v", transport)
+	}
+}
+
+func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
+	if transport == nil {
+		return nil, nil
+	}
+
+	switch transport := transport.(type) {
+	case *http.Transport:
+		return transport.TLSClientConfig, nil
+	case RoundTripperWrapper:
+		return TLSClientConfig(transport.WrappedRoundTripper())
+	default:
+		return nil, fmt.Errorf("unknown transport type: %v", transport)
+	}
 }

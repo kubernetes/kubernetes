@@ -191,10 +191,10 @@ func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, erro
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	// Allow ID as "podname" or "podname:port".  If port is not specified,
-	// try to use the first defined port on the pod.
-	name, port, valid := util.SplitPort(id)
+func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
+	// If port is not specified, try to use the first defined port on the pod.
+	scheme, name, port, valid := util.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
@@ -215,15 +215,15 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 		}
 	}
 
-	// We leave off the scheme ('http://') because we have no idea what sort of server
-	// is listening at this endpoint.
-	loc := &url.URL{}
+	loc := &url.URL{
+		Scheme: scheme,
+	}
 	if port == "" {
 		loc.Host = pod.Status.PodIP
 	} else {
 		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
 	}
-	return loc, nil, nil
+	return loc, rt, nil
 }
 
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
