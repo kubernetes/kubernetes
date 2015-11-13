@@ -689,7 +689,7 @@ case ${JOB_NAME} in
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ) --ginkgo.focus=Reboot"}
+          )"}
     ;;
 
   kubernetes-e2e-gke-1.1)
