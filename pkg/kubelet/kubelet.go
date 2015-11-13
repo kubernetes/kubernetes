@@ -320,7 +320,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	procFs := procfs.NewProcFs()
+	procFs := procfs.NewProcFS()
 	imageBackOff := util.NewBackOff(resyncInterval, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
