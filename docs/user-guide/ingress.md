@@ -114,7 +114,7 @@ A minimal Ingress might look like:
 
 *POSTing this to the API server will have no effect if you have not configured an [Ingress controller](#ingress-controllers).*
 
-__Lines 1-4__: As with all other Kubernetes config, an Ingress needs `apiVersion`, `kind`, and `metadata` fields.  For general information about working with config files, see [here](simple-yaml.md), [here](configuring-containers.md), and [here](working-with-resources.md).
+__Lines 1-4__: As with all other Kubernetes config, an Ingress needs `apiVersion`, `kind`, and `metadata` fields.  For general information about working with config files, see [deploying applications](deploying-applications.md), [configuring containers](configuring-containers.md), and [working with resources](working-with-resources.md) documents.
 
 __Lines 5-7__: Ingress [spec](../devel/api-conventions.md#spec-and-status) has all the information needed to configure a loadbalancer or proxy server. Most importantly, it contains a list of rules matched against all incoming requests. Currently the Ingress resource only supports http rules.
 

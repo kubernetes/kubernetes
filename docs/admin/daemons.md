@@ -77,8 +77,8 @@ but with different flags and/or different memory and cpu requests for different 
 ### Required Fields
 
 As with all other Kubernetes config, a DaemonSet needs `apiVersion`, `kind`, and `metadata` fields.  For
-general information about working with config files, see [here](../user-guide/simple-yaml.md),
-[here](../user-guide/configuring-containers.md), and [here](../user-guide/working-with-resources.md).
+general information about working with config files, see [deploying applications](../user-guide/deploying-applications.md),
+[configuring containers](../user-guide/configuring-containers.md), and [working with resources](../user-guide/working-with-resources.md) documents.
 
 A DaemonSet also needs a [`.spec`](../devel/api-conventions.md#spec-and-status) section.
 

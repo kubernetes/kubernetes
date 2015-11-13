@@ -121,8 +121,8 @@ It is a recommended practice to put resources related to the same microservice o
 A URL can also be specified as a configuration source, which is handy for deploying directly from configuration files checked into github:
 
 ```console
-$ kubectl create -f https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/docs/user-guide/replication.yaml
-replicationcontrollers/nginx
+$ kubectl create -f https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/docs/user-guide/pod.yaml
+pods/nginx
 ```
 
 ## Bulk operations in kubectl
