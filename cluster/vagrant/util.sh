@@ -173,7 +173,6 @@ function create-provision-scripts {
     echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
     echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
-    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-calico.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
@@ -202,7 +201,6 @@ function create-provision-scripts {
       echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
       echo "NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-calico.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done

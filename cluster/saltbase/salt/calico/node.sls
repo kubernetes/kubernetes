@@ -13,7 +13,7 @@ calicoctl:
 
 calico-node:
   cmd.run:
-    - name: calicoctl node --kubernetes
+    - name: calicoctl node --kubernetes --kube-plugin-version=v0.5.0
     - unless: docker ps | grep calico-node
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"

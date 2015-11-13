@@ -108,8 +108,7 @@ done
 
 # Configure the openvswitch network
 if [ "${NETWORK_PROVIDER}" == "calico" ]; then
-  echo "Provisioning Calico network on minion"
-  provision-network-calico
+  echo "Using default networking for Calico on minion"
 else
   echo "Provisioning flannel network on minion"
   provision-network-minion
