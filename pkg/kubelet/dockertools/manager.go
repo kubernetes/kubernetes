@@ -338,8 +338,7 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 	return result
 }
 
-// TODO (random-liu) Remove parameter tPath when old containers are deprecated.
-func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string, pod *api.Pod) *containerStatusResult {
+func (dm *DockerManager) inspectContainer(dockerID, containerName string, pod *api.Pod) *containerStatusResult {
 	result := containerStatusResult{api.ContainerStatus{}, "", nil}
 
 	inspectResult, err := dm.client.InspectContainer(dockerID)
@@ -410,11 +409,6 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 			ContainerID: DockerPrefix + dockerID,
 		}
 		terminationMessagePath := getTerminationMessagePathFromLabel(inspectResult.Config.Labels)
-		if terminationMessagePath == "" {
-			// Because old containers have no terminationMessagePath Label, we stil have to rely on the information from apiserver here.
-			// TODO (random-liu) Remove this later when old containers with no labels are deprecated.
-			terminationMessagePath = tPath
-		}
 		if terminationMessagePath != "" {
 			path, found := inspectResult.Volumes[terminationMessagePath]
 			if found {
@@ -484,17 +478,16 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			continue
 		}
 		dockerContainerName := dockerName.ContainerName
-		c, found := expectedContainers[dockerContainerName]
+		_, found := expectedContainers[dockerContainerName]
 		if !found {
 			continue
 		}
-		terminationMessagePath := c.TerminationMessagePath
 		if containerDone.Has(dockerContainerName) {
 			continue
 		}
 
 		// Inspect the container.
-		result := dm.inspectContainer(value.ID, dockerContainerName, terminationMessagePath, pod)
+		result := dm.inspectContainer(value.ID, dockerContainerName, pod)
 		if result.err != nil {
 			return nil, result.err
 		}
