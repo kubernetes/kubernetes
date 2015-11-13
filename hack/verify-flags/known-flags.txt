@@ -203,6 +203,8 @@ network-plugin-dir
 node-instance-group
 node-monitor-grace-period
 node-monitor-period
+node-label
+node-labels-file
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
