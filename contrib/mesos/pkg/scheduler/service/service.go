@@ -453,18 +453,15 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 				return nil, nil, fmt.Errorf("error parsing static pod spec at %v: %v", podPath, err)
 			}
 
-			// TODO(sttts): allow unlimited static pods as well and patch in the default resource limits
-			unlimitedCPU := mresource.LimitPodCPU(&pod, s.defaultContainerCPULimit)
-			unlimitedMem := mresource.LimitPodMem(&pod, s.defaultContainerMemLimit)
-			if unlimitedCPU {
-				return nil, nil, fmt.Errorf("found static pod without limit on cpu resources: %v", podPath)
+			_, cpu, _, err := mresource.LimitPodCPU(&pod, s.defaultContainerCPULimit)
+			if err != nil {
+				return nil, nil, fmt.Errorf("cannot derive cpu limit for static pod: %v", podPath)
 			}
-			if unlimitedMem {
-				return nil, nil, fmt.Errorf("found static pod without limit on memory resources: %v", podPath)
+			_, mem, _, err := mresource.LimitPodMem(&pod, s.defaultContainerMemLimit)
+			if err != nil {
+				return nil, nil, fmt.Errorf("cannot derive memory limit for static pod: %v", podPath)
 			}
 
-			cpu := mresource.PodCPULimit(&pod)
-			mem := mresource.PodMemLimit(&pod)
 			log.V(2).Infof("reserving %.2f cpu shares and %.2f MB of memory to static pod %s", cpu, mem, pod.Name)
 
 			staticPodCPUs += float64(cpu)

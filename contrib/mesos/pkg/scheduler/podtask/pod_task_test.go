@@ -22,11 +22,9 @@ import (
 	"github.com/gogo/protobuf/proto"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
-	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 const (
@@ -41,93 +39,6 @@ func fakePodTask(id string) (*T, error) {
 			Namespace: api.NamespaceDefault,
 		},
 	})
-}
-
-func TestUnlimitedResources(t *testing.T) {
-	assert := assert.New(t)
-
-	task, _ := fakePodTask("unlimited")
-	pod := &task.Pod
-	pod.Spec = api.PodSpec{
-		Containers: []api.Container{{
-			Name: "a",
-			Ports: []api.ContainerPort{{
-				HostPort: 123,
-			}},
-			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
-					api.ResourceCPU:    *resource.NewQuantity(3, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(768*1024*1024, resource.BinarySI),
-				},
-			},
-		}, {
-			Name: "b",
-		}, {
-			Name: "c",
-		}},
-	}
-
-	beforeLimitingCPU := mresource.CPUForPod(pod, mresource.DefaultDefaultContainerCPULimit)
-	beforeLimitingMem := mresource.MemForPod(pod, mresource.DefaultDefaultContainerMemLimit)
-
-	unboundedCPU := mresource.LimitPodCPU(pod, mresource.DefaultDefaultContainerCPULimit)
-	unboundedMem := mresource.LimitPodMem(pod, mresource.DefaultDefaultContainerMemLimit)
-
-	cpu := mresource.PodCPULimit(pod)
-	mem := mresource.PodMemLimit(pod)
-
-	assert.True(unboundedCPU, "CPU resources are defined as unlimited")
-	assert.True(unboundedMem, "mem resources are defined as unlimited")
-
-	assert.Equal(2*float64(mresource.DefaultDefaultContainerCPULimit)+3.0, float64(cpu))
-	assert.Equal(2*float64(mresource.DefaultDefaultContainerMemLimit)+768.0, float64(mem))
-
-	assert.Equal(cpu, beforeLimitingCPU)
-	assert.Equal(mem, beforeLimitingMem)
-}
-
-func TestLimitedResources(t *testing.T) {
-	assert := assert.New(t)
-
-	task, _ := fakePodTask("limited")
-	pod := &task.Pod
-	pod.Spec = api.PodSpec{
-		Containers: []api.Container{{
-			Name: "a",
-			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
-					api.ResourceCPU:    *resource.NewQuantity(1, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(256*1024*1024, resource.BinarySI),
-				},
-			},
-		}, {
-			Name: "b",
-			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
-					api.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(512*1024*1024, resource.BinarySI),
-				},
-			},
-		}},
-	}
-
-	beforeLimitingCPU := mresource.CPUForPod(pod, mresource.DefaultDefaultContainerCPULimit)
-	beforeLimitingMem := mresource.MemForPod(pod, mresource.DefaultDefaultContainerMemLimit)
-
-	unboundedCPU := mresource.LimitPodCPU(pod, mresource.DefaultDefaultContainerCPULimit)
-	unboundedMem := mresource.LimitPodMem(pod, mresource.DefaultDefaultContainerMemLimit)
-
-	cpu := mresource.PodCPULimit(pod)
-	mem := mresource.PodMemLimit(pod)
-
-	assert.False(unboundedCPU, "CPU resources are defined as limited")
-	assert.False(unboundedMem, "mem resources are defined as limited")
-
-	assert.Equal(3.0, float64(cpu))
-	assert.Equal(768.0, float64(mem))
-
-	assert.Equal(cpu, beforeLimitingCPU)
-	assert.Equal(mem, beforeLimitingMem)
 }
 
 func TestEmptyOffer(t *testing.T) {
