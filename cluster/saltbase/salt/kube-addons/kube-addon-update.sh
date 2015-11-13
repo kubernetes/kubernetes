@@ -94,49 +94,124 @@ function log() {
   esac
 }
 
-#$1 yaml file path
+regex_kind='^kind:'
+regex_metadata='^metadata:'
+regex_leading_space='^[[:space:]]+'
+regex_labels='^[[:space:]]+labels:'
+regex_annotations='^[[:space:]]+annotations:'
+regex_cluster_svc="^[[:space:]]+kubernetes.io/cluster-service:[[:space:]]+[\"\']true[\"\']"
+regex_name='^[[:space:]]+name:'
+regex_namespace='^[[:space:]]+namespace:'
+
+# $1 is the yaml file path.
+# echo "true" if $1 is a cluster service (e.g. matadata.labels.kubernetes.io/cluster-service: "true")
+function is-cluster-service() {
+  local in_meta="false"
+  local in_meta_labels="false"
+  local cluster_svc="false"
+
+  IFS=''
+  while read line
+  do
+    if [[ ${line} =~ ${regex_metadata} ]]; then
+      in_meta="true"
+      continue
+    fi
+    if [[ ! ${line} =~ ${regex_leading_space} && ${in_meta} == "true" ]]; then
+      break # Exits metadata section
+    fi
+    if [[ ${line} =~ ${regex_labels} && ${in_meta} == "true" ]]; then
+      in_meta_labels="true"
+      continue
+    fi
+    if [[ ${line} =~ ${regex_annotations} && ${in_meta_labels} == "true" ]]; then
+      # Prevent from reading annotations. Don't care about other fields
+      # because they can't contain kubernetes.io/cluster-service: "true".
+      break
+    fi
+    if [[ ${line} =~ ${regex_cluster_svc} && ${in_meta_labels} == "true" ]]; then
+      echo "true"
+      return
+    fi
+  done < $1
+  echo "false"
+}
+
+# $1 is the yaml file path.
 function get-object-kind-from-file() {
-    # prints to stdout, so log cannot be used
-    #WARNING: only yaml is supported
-    cat $1 | python -c '''
-try:
-        import pipes,sys,yaml
-        y = yaml.load(sys.stdin)
-        labels = y["metadata"]["labels"]
-        if ("kubernetes.io/cluster-service", "true") not in labels.iteritems():
-            # all add-ons must have the label "kubernetes.io/cluster-service".
-            # Otherwise we are ignoring them (the update will not work anyway)
-            print "ERROR"
-        else:
-            print y["kind"]
-except Exception, ex:
-        print "ERROR"
-    '''
+  # prints to stdout, so log cannot be used
+  # WARNING: only yaml is supported
+  local array=""
+  IFS=''
+
+  if [[ $(is-cluster-service $1) != "true" ]]; then
+    echo "ERROR"
+    return
+  fi
+
+  while read line
+  do
+    if [[ ${line} =~ ${regex_kind} ]]; then
+      IFS=' '
+      array=(${line})  
+      echo ${array[-1]}
+      return
+    fi
+  done < $1
+  echo "ERROR"
 }
 
 # $1 yaml file path
 # returns a string of the form <namespace>/<name> (we call it nsnames)
 function get-object-nsname-from-file() {
-    # prints to stdout, so log cannot be used
-    #WARNING: only yaml is supported
-    #addons that do not specify a namespace are assumed to be in "default".
-    cat $1 | python -c '''
-try:
-        import pipes,sys,yaml
-        y = yaml.load(sys.stdin)
-        labels = y["metadata"]["labels"]
-        if ("kubernetes.io/cluster-service", "true") not in labels.iteritems():
-            # all add-ons must have the label "kubernetes.io/cluster-service".
-            # Otherwise we are ignoring them (the update will not work anyway)
-            print "ERROR"
-        else:
-            try:
-                print "%s/%s" % (y["metadata"]["namespace"], y["metadata"]["name"])
-            except Exception, ex:
-                print "default/%s" % y["metadata"]["name"]
-except Exception, ex:
-        print "ERROR"
-    '''
+  # prints to stdout, so log cannot be used
+  # WARNING: only yaml is supported
+  # addons that do not specify a namespace are assumed to be in "default".
+  local in_mata="false"
+  local name=""
+  local namespace=""
+  local array=""
+  IFS=''
+
+  if [[ $(is-cluster-service $1) != "true" ]]; then
+    echo "ERROR"
+    return
+  fi
+
+  while read line
+  do
+    if [[ ${line} =~ ${regex_metadata} ]]; then
+      in_meta="true"
+      continue
+    fi
+    if [[ ! ${line} =~ ${regex_leading_space} && ${in_meta} == "true" ]]; then
+      break # Exits metadata section
+    fi
+    if [[ ${line} =~ ${regex_namespace} && ${in_meta} == "true" ]]; then
+      IFS=' '
+      array=(${line})
+      namespace=${array[-1]}
+      IFS=''
+      continue
+    fi
+    if [[ ${line} =~ ${regex_name} && ${in_meta} == "true" ]]; then
+      IFS=' '
+      array=(${line})
+      name=${array[-1]}
+      IFS=''
+      continue
+    fi
+  done < $1
+
+  if [[ ${name} == "" ]]; then
+    echo "ERROR"
+    return
+  fi
+  if [[ ${namespace} == "" ]]; then
+    echo default/${name}
+    return
+  fi
+  echo ${namespace}/${name}
 }
 
 # $1 addon directory path
