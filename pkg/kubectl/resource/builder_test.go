@@ -470,7 +470,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Kind != "Pod" || mapping.Resource != "pods" {
+	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != "pods" {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }

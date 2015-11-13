@@ -75,16 +75,20 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := latest.GroupOrDie("extensions").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != "extensions/v1beta1" || k != "HorizontalPodAutoscaler" {
+	expectedGroupVersion := unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
+
+	if v, k, err := latest.GroupOrDie("extensions").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != expectedGroupVersion.String() || k != "HorizontalPodAutoscaler" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 
-	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.APIVersion != "extensions/v1beta1" || m.Resource != "daemonsets" {
+	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.GroupVersionKind.GroupVersion() != expectedGroupVersion || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, groupVersion := range latest.GroupOrDie("extensions").GroupVersions {
-		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("HorizontalPodAutoscaler", groupVersion)
+	for _, groupVersionString := range latest.GroupOrDie("extensions").GroupVersions {
+		gv, err := unversioned.ParseGroupVersion(groupVersionString)
+
+		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("HorizontalPodAutoscaler", gv.String())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -92,11 +96,11 @@ func TestRESTMapper(t *testing.T) {
 		if mapping.Resource != "horizontalpodautoscalers" {
 			t.Errorf("incorrect resource name: %#v", mapping)
 		}
-		if mapping.APIVersion != groupVersion {
+		if mapping.GroupVersionKind.GroupVersion() != gv {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("extensions").InterfacesFor(groupVersion)
+		interfaces, _ := latest.GroupOrDie("extensions").InterfacesFor(gv.String())
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

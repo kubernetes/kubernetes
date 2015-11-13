@@ -148,7 +148,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
@@ -165,11 +165,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
-			if describer, ok := kubectl.DescriberFor(group, mapping.Kind, client); ok {
+			if describer, ok := kubectl.DescriberFor(group, mapping.GroupVersionKind.Kind, client); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
@@ -242,18 +242,18 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.Kind, client)
+			return kubectl.ScalerFor(mapping.GroupVersionKind.Kind, client)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ReaperFor(mapping.Kind, client)
+			return kubectl.ReaperFor(mapping.GroupVersionKind.Kind, client)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
@@ -581,12 +581,12 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 
 		version := OutputVersion(cmd, defaultVersion)
 		if len(version) == 0 {
-			version = mapping.APIVersion
+			version = mapping.GroupVersionKind.GroupVersion().String()
 		}
 		if len(version) == 0 {
 			return nil, fmt.Errorf("you must specify an output-version when using this output format")
 		}
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.APIVersion)
+		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion().String())
 	} else {
 		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
 		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")

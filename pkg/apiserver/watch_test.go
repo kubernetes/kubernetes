@@ -178,8 +178,8 @@ func TestWatchParamParsing(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 
-	rootPath := "/" + prefix + "/" + testVersion + "/watch/simples"
-	namespacedPath := "/" + prefix + "/" + testVersion + "/watch/namespaces/other/simpleroots"
+	rootPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
+	namespacedPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/other/simpleroots"
 
 	table := []struct {
 		path            string
@@ -358,13 +358,13 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a client
 	dest, _ := url.Parse(s.URL)
-	dest.Path = "/" + prefix + "/" + newVersion + "/simple"
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
-	watcher.Add(&apiservertesting.Simple{TypeMeta: unversioned.TypeMeta{APIVersion: newVersion}})
+	watcher.Add(&apiservertesting.Simple{TypeMeta: unversioned.TypeMeta{APIVersion: newGroupVersion.String()}})
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)

@@ -21,6 +21,7 @@ import (
 	"io"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -79,53 +80,71 @@ func unmatchedVersionInterfaces(version string) (*VersionInterfaces, error) {
 }
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {
+	testGroup := "test.group"
+	testVersion := "test"
+	testGroupVersion := unversioned.GroupVersion{Group: testGroup, Version: testVersion}
+
 	testCases := []struct {
-		Resource         string
-		Kind, APIVersion string
-		MixedCase        bool
-		Err              bool
+		Resource               string
+		GroupVersionToRegister unversioned.GroupVersion
+		ExpectedGVK            unversioned.GroupVersionKind
+		MixedCase              bool
+		Err                    bool
 	}{
-		{Resource: "internalobjec", Err: true},
-		{Resource: "internalObjec", Err: true},
+		{Resource: "internalobjec", Err: true, GroupVersionToRegister: testGroupVersion},
+		{Resource: "internalObjec", Err: true, GroupVersionToRegister: testGroupVersion},
 
-		{Resource: "internalobject", Kind: "InternalObject", APIVersion: "test"},
-		{Resource: "internalobjects", Kind: "InternalObject", APIVersion: "test"},
+		{Resource: "internalobject", GroupVersionToRegister: testGroupVersion, ExpectedGVK: unversioned.NewGroupVersionKind(testGroupVersion, "InternalObject")},
+		{Resource: "internalobjects", GroupVersionToRegister: testGroupVersion, ExpectedGVK: unversioned.NewGroupVersionKind(testGroupVersion, "InternalObject")},
 
-		{Resource: "internalobject", MixedCase: true, Kind: "InternalObject", APIVersion: "test"},
-		{Resource: "internalobjects", MixedCase: true, Kind: "InternalObject", APIVersion: "test"},
+		{Resource: "internalobject", GroupVersionToRegister: testGroupVersion, MixedCase: true, ExpectedGVK: unversioned.NewGroupVersionKind(testGroupVersion, "InternalObject")},
+		{Resource: "internalobjects", GroupVersionToRegister: testGroupVersion, MixedCase: true, ExpectedGVK: unversioned.NewGroupVersionKind(testGroupVersion, "InternalObject")},
 
-		{Resource: "internalObject", MixedCase: true, Kind: "InternalObject", APIVersion: "test"},
-		{Resource: "internalObjects", MixedCase: true, Kind: "InternalObject", APIVersion: "test"},
+		{Resource: "internalObject", GroupVersionToRegister: testGroupVersion, MixedCase: true, ExpectedGVK: unversioned.NewGroupVersionKind(testGroupVersion, "InternalObject")},
+		{Resource: "internalObjects", GroupVersionToRegister: testGroupVersion, MixedCase: true, ExpectedGVK: unversioned.NewGroupVersionKind(testGroupVersion, "InternalObject")},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper("tgroup", []string{"test"}, fakeInterfaces)
-		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, testCase.MixedCase)
+		mapper := NewDefaultRESTMapper(testGroup, []string{testGroupVersion.String()}, fakeInterfaces)
+		mapper.Add(RESTScopeNamespace, testCase.ExpectedGVK.Kind, testCase.GroupVersionToRegister.String(), testCase.MixedCase)
 		v, k, err := mapper.VersionAndKindForResource(testCase.Resource)
+
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
 			continue
 		}
-		if v != testCase.APIVersion || k != testCase.Kind {
-			t.Errorf("%d: unexpected version and kind: %s %s", i, v, k)
+		if err != nil {
+			continue
+		}
+
+		actualGV, err := unversioned.ParseGroupVersion(v)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		actualGVK := unversioned.NewGroupVersionKind(actualGV, k)
+
+		if actualGVK != testCase.ExpectedGVK {
+			t.Errorf("%d: unexpected version and kind: e=%s a=%s", i, testCase.ExpectedGVK, actualGVK)
 		}
 	}
 }
 
 func TestRESTMapperGroupForResource(t *testing.T) {
 	testCases := []struct {
-		Resource                string
-		Kind, APIVersion, Group string
-		Err                     bool
+		Resource     string
+		Kind         string
+		GroupVersion unversioned.GroupVersion
+		Err          bool
 	}{
-		{Resource: "myObject", Kind: "MyObject", APIVersion: "test", Group: "testapi"},
-		{Resource: "myobject", Kind: "MyObject", APIVersion: "test", Group: "testapi2"},
-		{Resource: "myObje", Err: true, Kind: "MyObject", APIVersion: "test", Group: "testapi"},
-		{Resource: "myobje", Err: true, Kind: "MyObject", APIVersion: "test", Group: "testapi"},
+		{Resource: "myObject", Kind: "MyObject", GroupVersion: unversioned.GroupVersion{Group: "testapi", Version: "test"}},
+		{Resource: "myobject", Kind: "MyObject", GroupVersion: unversioned.GroupVersion{Group: "testapi2", Version: "test"}},
+		{Resource: "myObje", Err: true, Kind: "MyObject", GroupVersion: unversioned.GroupVersion{Group: "testapi", Version: "test"}},
+		{Resource: "myobje", Err: true, Kind: "MyObject", GroupVersion: unversioned.GroupVersion{Group: "testapi", Version: "test"}},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper(testCase.Group, []string{"test"}, fakeInterfaces)
-		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, false)
+		mapper := NewDefaultRESTMapper(testCase.GroupVersion.Group, []string{testCase.GroupVersion.String()}, fakeInterfaces)
+		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.GroupVersion.String(), false)
 		g, err := mapper.GroupForResource(testCase.Resource)
 		if testCase.Err {
 			if err == nil {
@@ -133,8 +152,8 @@ func TestRESTMapperGroupForResource(t *testing.T) {
 			}
 		} else if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
-		} else if g != testCase.Group {
-			t.Errorf("%d: expected group %q, got %q", i, testCase.Group, g)
+		} else if g != testCase.GroupVersion.Group {
+			t.Errorf("%d: expected group %q, got %q", i, testCase.GroupVersion.Group, g)
 		}
 	}
 }
@@ -170,31 +189,34 @@ func TestKindToResource(t *testing.T) {
 
 func TestRESTMapperResourceSingularizer(t *testing.T) {
 	testCases := []struct {
-		Kind, APIVersion string
-		MixedCase        bool
-		Plural           string
-		Singular         string
+		Kind      string
+		MixedCase bool
+		Plural    string
+		Singular  string
 	}{
-		{Kind: "Pod", APIVersion: "test", MixedCase: true, Plural: "pods", Singular: "pod"},
-		{Kind: "Pod", APIVersion: "test", MixedCase: false, Plural: "pods", Singular: "pod"},
+		{Kind: "Pod", MixedCase: true, Plural: "pods", Singular: "pod"},
+		{Kind: "Pod", MixedCase: false, Plural: "pods", Singular: "pod"},
 
-		{Kind: "ReplicationController", APIVersion: "test", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
-		{Kind: "ReplicationController", APIVersion: "test", MixedCase: false, Plural: "replicationcontrollers", Singular: "replicationcontroller"},
+		{Kind: "ReplicationController", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
+		{Kind: "ReplicationController", MixedCase: false, Plural: "replicationcontrollers", Singular: "replicationcontroller"},
 
-		{Kind: "ImageRepository", APIVersion: "test", MixedCase: true, Plural: "imageRepositories", Singular: "imageRepository"},
-		{Kind: "ImageRepository", APIVersion: "test", MixedCase: false, Plural: "imagerepositories", Singular: "imagerepository"},
+		{Kind: "ImageRepository", MixedCase: true, Plural: "imageRepositories", Singular: "imageRepository"},
+		{Kind: "ImageRepository", MixedCase: false, Plural: "imagerepositories", Singular: "imagerepository"},
 
-		{Kind: "Status", APIVersion: "test", MixedCase: true, Plural: "statuses", Singular: "status"},
-		{Kind: "Status", APIVersion: "test", MixedCase: false, Plural: "statuses", Singular: "status"},
+		{Kind: "Status", MixedCase: true, Plural: "statuses", Singular: "status"},
+		{Kind: "Status", MixedCase: false, Plural: "statuses", Singular: "status"},
 
-		{Kind: "lowercase", APIVersion: "test", MixedCase: false, Plural: "lowercases", Singular: "lowercase"},
+		{Kind: "lowercase", MixedCase: false, Plural: "lowercases", Singular: "lowercase"},
 		// Don't add extra s if the original object is already plural
-		{Kind: "lowercases", APIVersion: "test", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
+		{Kind: "lowercases", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper("tgroup", []string{"test"}, fakeInterfaces)
+		testGroupVersion := unversioned.GroupVersion{Group: "tgroup", Version: "test"}
+
+		mapper := NewDefaultRESTMapper(testGroupVersion.Group, []string{testGroupVersion.String()}, fakeInterfaces)
 		// create singular/plural mapping
-		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, testCase.MixedCase)
+		mapper.Add(RESTScopeNamespace, testCase.Kind, testGroupVersion.String(), testCase.MixedCase)
+
 		singular, _ := mapper.ResourceSingularizer(testCase.Plural)
 		if singular != testCase.Singular {
 			t.Errorf("%d: mismatched singular: %s, should be %s", i, singular, testCase.Singular)
@@ -203,37 +225,48 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 }
 
 func TestRESTMapperRESTMapping(t *testing.T) {
-	testCases := []struct {
-		Kind            string
-		APIVersions     []string
-		MixedCase       bool
-		DefaultVersions []string
+	testGroup := "tgroup"
+	testGroupVersion := unversioned.GroupVersion{Group: testGroup, Version: "test"}
 
-		Resource string
-		Version  string
-		Err      bool
+	testCases := []struct {
+		Kind             string
+		APIGroupVersions []unversioned.GroupVersion
+		MixedCase        bool
+		DefaultVersions  []string
+
+		Resource             string
+		ExpectedGroupVersion *unversioned.GroupVersion
+		Err                  bool
 	}{
 		{Kind: "Unknown", Err: true},
 		{Kind: "InternalObject", Err: true},
 
-		{DefaultVersions: []string{"test"}, Kind: "Unknown", Err: true},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "Unknown", Err: true},
 
-		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
-		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
 
-		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
 
-		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{}, Resource: "internalobjects", Version: "test"},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{}, Resource: "internalobjects", ExpectedGroupVersion: &unversioned.GroupVersion{Group: testGroup, Version: "test"}},
 
-		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
-		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, MixedCase: true, Resource: "internalObjects"},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
+		{DefaultVersions: []string{testGroupVersion.String()}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, MixedCase: true, Resource: "internalObjects"},
 
 		// TODO: add test for a resource that exists in one version but not another
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper("tgroup", testCase.DefaultVersions, fakeInterfaces)
-		mapper.Add(RESTScopeNamespace, "InternalObject", "test", testCase.MixedCase)
-		mapping, err := mapper.RESTMapping(testCase.Kind, testCase.APIVersions...)
+		internalGroupVersion := unversioned.GroupVersion{Group: testGroup, Version: "test"}
+
+		mapper := NewDefaultRESTMapper(testGroup, testCase.DefaultVersions, fakeInterfaces)
+		mapper.Add(RESTScopeNamespace, "InternalObject", internalGroupVersion.String(), testCase.MixedCase)
+
+		deprecatedGroupVersionStrings := []string{}
+		for _, gv := range testCase.APIGroupVersions {
+			deprecatedGroupVersionStrings = append(deprecatedGroupVersionStrings, gv.String())
+		}
+
+		mapping, err := mapper.RESTMapping(testCase.Kind, deprecatedGroupVersionStrings...)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
@@ -244,30 +277,37 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		if mapping.Resource != testCase.Resource {
 			t.Errorf("%d: unexpected resource: %#v", i, mapping)
 		}
-		version := testCase.Version
-		if version == "" {
-			version = testCase.APIVersions[0]
-		}
-		if mapping.APIVersion != version {
-			t.Errorf("%d: unexpected version: %#v", i, mapping)
-		}
+
 		if mapping.Codec == nil || mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
 			t.Errorf("%d: missing codec and accessor: %#v", i, mapping)
 		}
+
+		groupVersion := testCase.ExpectedGroupVersion
+		if groupVersion == nil {
+			groupVersion = &testCase.APIGroupVersions[0]
+		}
+		if mapping.GroupVersionKind.GroupVersion() != *groupVersion {
+			t.Errorf("%d: unexpected version: %#v", i, mapping)
+		}
+
 	}
 }
 
 func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
-	mapper := NewDefaultRESTMapper("tgroup", []string{"test1", "test2"}, fakeInterfaces)
-	mapper.Add(RESTScopeNamespace, "InternalObject", "test1", false)
-	mapper.Add(RESTScopeNamespace, "OtherObject", "test2", false)
+	expectedGroupVersion1 := unversioned.GroupVersion{Group: "tgroup", Version: "test1"}
+	expectedGroupVersion2 := unversioned.GroupVersion{Group: "tgroup", Version: "test2"}
+	expectedGroupVersion3 := unversioned.GroupVersion{Group: "tgroup", Version: "test3"}
+
+	mapper := NewDefaultRESTMapper("tgroup", []string{expectedGroupVersion1.String(), expectedGroupVersion2.String()}, fakeInterfaces)
+	mapper.Add(RESTScopeNamespace, "InternalObject", expectedGroupVersion1.String(), false)
+	mapper.Add(RESTScopeNamespace, "OtherObject", expectedGroupVersion2.String(), false)
 
 	// pick default matching object kind based on search order
 	mapping, err := mapper.RESTMapping("OtherObject")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "otherobjects" || mapping.APIVersion != "test2" {
+	if mapping.Resource != "otherobjects" || mapping.GroupVersionKind.GroupVersion() != expectedGroupVersion2 {
 		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 
@@ -275,45 +315,48 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "internalobjects" || mapping.APIVersion != "test1" {
+	if mapping.Resource != "internalobjects" || mapping.GroupVersionKind.GroupVersion() != expectedGroupVersion1 {
 		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 
 	// mismatch of version
-	mapping, err = mapper.RESTMapping("InternalObject", "test2")
+	mapping, err = mapper.RESTMapping("InternalObject", expectedGroupVersion2.String())
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	mapping, err = mapper.RESTMapping("OtherObject", "test1")
+	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion1.String())
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// not in the search versions
-	mapping, err = mapper.RESTMapping("OtherObject", "test3")
+	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion3.String())
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// explicit search order
-	mapping, err = mapper.RESTMapping("OtherObject", "test3", "test1")
+	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion3.String(), expectedGroupVersion1.String())
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
-	mapping, err = mapper.RESTMapping("OtherObject", "test3", "test2")
+	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion3.String(), expectedGroupVersion2.String())
 	if err != nil {
-		t.Fatalf("unexpected non-error")
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "otherobjects" || mapping.APIVersion != "test2" {
+	if mapping.Resource != "otherobjects" || mapping.GroupVersionKind.GroupVersion() != expectedGroupVersion2 {
 		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 }
 
 func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
-	mapper := NewDefaultRESTMapper("tgroup", []string{"test1", "test2"}, unmatchedVersionInterfaces)
-	mapper.Add(RESTScopeNamespace, "InternalObject", "test1", false)
-	_, err := mapper.RESTMapping("InternalObject", "test1")
+	expectedGroupVersion1 := unversioned.GroupVersion{Group: "tgroup", Version: "test1"}
+	expectedGroupVersion2 := unversioned.GroupVersion{Group: "tgroup", Version: "test2"}
+
+	mapper := NewDefaultRESTMapper("tgroup", []string{expectedGroupVersion1.String(), expectedGroupVersion2.String()}, unmatchedVersionInterfaces)
+	mapper.Add(RESTScopeNamespace, "InternalObject", expectedGroupVersion1.String(), false)
+	_, err := mapper.RESTMapping("InternalObject", expectedGroupVersion1.String())
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
