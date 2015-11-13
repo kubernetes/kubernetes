@@ -187,8 +187,8 @@ func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 		fmt.Fprint(w, "No resource limits.\n")
 		return
 	}
-	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tRequest\tLimit\tLimit/Request\n")
-	fmt.Fprintf(w, " ----\t--------\t---\t---\t-------\t-----\t-------------\n")
+	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
+	fmt.Fprintf(w, " ----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
 	for _, limitRange := range limitRanges.Items {
 		for i := range limitRange.Spec.Limits {
 			item := limitRange.Spec.Limits[i]
@@ -312,8 +312,8 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", limitRange.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", limitRange.Namespace)
-		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tRequest\tLimit\tLimit/Request\n")
-		fmt.Fprintf(out, "----\t--------\t---\t---\t-------\t-----\t-------------\n")
+		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
+		fmt.Fprintf(out, "----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
 		for i := range limitRange.Spec.Limits {
 			item := limitRange.Spec.Limits[i]
 			maxResources := item.Max
