@@ -110,14 +110,20 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *exte
 }
 
 func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource) errs.ValidationErrorList {
-	return ValidateThirdPartyResource(update)
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateThirdPartyResource(update)...)
+	return allErrs
+}
+
+func ValidateThirdPartyResourceName(name string, prefix bool) (bool, string) {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
 func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(obj.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
-	}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateThirdPartyResourceName).Prefix("metadata")...)
+
 	versions := sets.String{}
 	for ix := range obj.Versions {
 		version := &obj.Versions[ix]
