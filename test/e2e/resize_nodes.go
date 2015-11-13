@@ -420,6 +420,14 @@ var _ = Describe("Nodes", func() {
 			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				Failf("Couldn't restore the original cluster size: %v", err)
 			}
+			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
+			// the cluster is restored to health.
+			By("waiting for system pods to successfully restart")
+			pods, err := framework.Client.Pods(api.NamespaceSystem).List(labels.Everything(), fields.Everything())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = waitForPodsRunningReady(api.NamespaceSystem, len(pods.Items), podReadyBeforeTimeout)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should be able to delete nodes", func() {
