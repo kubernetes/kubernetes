@@ -224,10 +224,16 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
 GCE_RELEASE_SKIP_TESTS=(
     )
 
-# TODO(wonderfly): Delete this once
-# https://github.com/kubernetes/kubernetes/issues/12689 is fixed.
 TRUSTY_SKIP_TESTS=(
+    # TODO(wonderfly): Remove this once
+    # https://github.com/kubernetes/kubernetes/issues/12689 is fixed.
     "Services.*should\swork\safter\srestarting\skube-proxy"
+    # This test was broken and fixed after v1.1.1 release cut. As Trusty release
+    # tests pin to the latest release version of k8s, we'd have to wait till
+    # next release to pick up the fix.
+    # https://github.com/kubernetes/kubernetes/pull/14603
+    # TODO(wonderfly): Remove this once v1.1.2 is out.
+    "Kubelet\sregular\sresource\susage\stracking\sover\s30m0s\swith\s0\spods\sper\snode"
 )
 
 # Define environment variables based on the Jenkins project name.
