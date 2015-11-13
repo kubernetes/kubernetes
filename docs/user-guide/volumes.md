@@ -67,6 +67,7 @@ Familiarity with [pods](pods.md) is suggested.
     - [persistentVolumeClaim](#persistentvolumeclaim)
     - [downwardAPI](#downwardapi)
     - [FlexVolume](#flexvolume)
+    - [AzureFileVolume](#azurefilevolume)
   - [Resources](#resources)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -124,6 +125,7 @@ Kubernetes supports several types of Volumes:
    * `secret`
    * `persistentVolumeClaim`
    * `downwardAPI`
+   * `azureFileVolume`
 
 We welcome additional contributions.
 
@@ -427,6 +429,13 @@ an alpha feature and may change in future.
 
 More details are in [here](../../examples/flexvolume/README.md)
 
+### AzureFileVolume
+
+A `AzureFileVolume` is used to mount a Microsoft Azure File Volume (SMB 2.1 and 3.0)
+into a Pod.
+
+More details can be found [here](../../examples/azure_file/README.md)
+
 ## Resources
 
 The storage media (Disk, SSD, etc) of an `emptyDir` volume is determined by the
@@ -439,7 +448,6 @@ In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
 request a certain amount of space using a [resource](compute-resources.md)
 specification, and to select the type of media to use, for clusters that have
 several media types.
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.md?pixel)]()

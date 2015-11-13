@@ -494,6 +494,10 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("flexVolume"))...)
 	}
+	if source.AzureFile != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateAzureFile(source.AzureFile, fldPath.Child("azureFile"))...)
+	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
@@ -718,6 +722,17 @@ func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) fie
 	return allErrs
 }
 
+func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if azure.SecretName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
+	}
+	if azure.ShareName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("shareName"), ""))
+	}
+	return allErrs
+}
+
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
@@ -841,6 +856,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if pv.Spec.FlexVolume != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateFlexVolumeSource(pv.Spec.FlexVolume, specPath.Child("flexVolume"))...)
+	}
+	if pv.Spec.AzureFile != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateAzureFile(pv.Spec.AzureFile, specPath.Child("azureFile"))...)
 	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume type"))

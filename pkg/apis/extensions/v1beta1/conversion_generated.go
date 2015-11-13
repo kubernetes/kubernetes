@@ -44,6 +44,20 @@ func Convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolu
 	return autoConvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource(in, out, s)
 }
 
+func autoConvert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource(in *api.AzureFileVolumeSource, out *v1.AzureFileVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AzureFileVolumeSource))(in)
+	}
+	out.SecretName = in.SecretName
+	out.ShareName = in.ShareName
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource(in *api.AzureFileVolumeSource, out *v1.AzureFileVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource(in, out, s)
+}
+
 func autoConvert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *v1.Capabilities, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Capabilities))(in)
@@ -1257,6 +1271,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	} else {
 		out.FC = nil
 	}
+	// unable to generate simple pointer conversion for api.AzureFileVolumeSource -> v1.AzureFileVolumeSource
+	if in.AzureFile != nil {
+		out.AzureFile = new(v1.AzureFileVolumeSource)
+		if err := Convert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource(in.AzureFile, out.AzureFile, s); err != nil {
+			return err
+		}
+	} else {
+		out.AzureFile = nil
+	}
 	return nil
 }
 
@@ -1327,6 +1350,20 @@ func autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStore
 
 func Convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *v1.AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	return autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in, out, s)
+}
+
+func autoConvert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in *v1.AzureFileVolumeSource, out *api.AzureFileVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.AzureFileVolumeSource))(in)
+	}
+	out.SecretName = in.SecretName
+	out.ShareName = in.ShareName
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in *v1.AzureFileVolumeSource, out *api.AzureFileVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_Capabilities_To_api_Capabilities(in *v1.Capabilities, out *api.Capabilities, s conversion.Scope) error {
@@ -2517,6 +2554,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *a
 		}
 	} else {
 		out.FC = nil
+	}
+	// unable to generate simple pointer conversion for v1.AzureFileVolumeSource -> api.AzureFileVolumeSource
+	if in.AzureFile != nil {
+		out.AzureFile = new(api.AzureFileVolumeSource)
+		if err := Convert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in.AzureFile, out.AzureFile, s); err != nil {
+			return err
+		}
+	} else {
+		out.AzureFile = nil
 	}
 	return nil
 }
@@ -5213,6 +5259,7 @@ func Convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		autoConvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
+		autoConvert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource,
 		autoConvert_api_Capabilities_To_v1_Capabilities,
 		autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
 		autoConvert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
@@ -5320,6 +5367,7 @@ func init() {
 		autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
 		autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector,
 		autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
+		autoConvert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource,
 		autoConvert_v1_Capabilities_To_api_Capabilities,
 		autoConvert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
 		autoConvert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
