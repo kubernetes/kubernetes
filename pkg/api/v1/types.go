@@ -2459,6 +2459,17 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
+// GenerateSecretRequest is used to request a generated secret.
+type GenerateSecretRequest struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Used to specify the type of secret to generate.
+	Type SecretType `json:"type"`
+}
+
 // Type and constants for component health validation.
 type ComponentConditionType string
 

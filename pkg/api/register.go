@@ -53,6 +53,7 @@ func init() {
 		&ServiceAccountList{},
 		&Secret{},
 		&SecretList{},
+		&GenerateSecretRequest{},
 		&PersistentVolume{},
 		&PersistentVolumeList{},
 		&PersistentVolumeClaim{},
@@ -104,6 +105,7 @@ func (*ServiceAccount) IsAnAPIObject()            {}
 func (*ServiceAccountList) IsAnAPIObject()        {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
+func (*GenerateSecretRequest) IsAnAPIObject()     {}
 func (*PersistentVolume) IsAnAPIObject()          {}
 func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}

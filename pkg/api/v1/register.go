@@ -66,6 +66,7 @@ func addKnownTypes() {
 		&NamespaceList{},
 		&Secret{},
 		&SecretList{},
+		&GenerateSecretRequest{},
 		&ServiceAccount{},
 		&ServiceAccountList{},
 		&PersistentVolume{},
@@ -113,6 +114,7 @@ func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
+func (*GenerateSecretRequest) IsAnAPIObject()     {}
 func (*ServiceAccount) IsAnAPIObject()            {}
 func (*ServiceAccountList) IsAnAPIObject()        {}
 func (*PersistentVolume) IsAnAPIObject()          {}

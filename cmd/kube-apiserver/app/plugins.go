@@ -35,4 +35,8 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+
+	// Secret generators
+	_ "k8s.io/kubernetes/plugin/pkg/secret/password"
+	_ "k8s.io/kubernetes/plugin/pkg/secret/sshkey"
 )

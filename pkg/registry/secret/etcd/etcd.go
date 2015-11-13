@@ -23,16 +23,23 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/secret"
+	secretrest "k8s.io/kubernetes/pkg/registry/secret/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
+
+// SecretStorage includes storage for pods and all sub resources
+type SecretStorage struct {
+	Secret   *REST
+	Generate *secretrest.GenerateREST
+}
 
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewREST returns a RESTStorage object that will work against secrets.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
+// NewStorage returns a RESTStorage object that will work against secrets.
+func NewStorage(s storage.Interface, storageFactory storage.StorageFactory) SecretStorage {
 	prefix := "/secrets"
 
 	newListFunc := func() runtime.Object { return &api.SecretList{} }
@@ -61,5 +68,8 @@ func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
 
 		Storage: storageInterface,
 	}
-	return &REST{store}
+	return SecretStorage{
+		Secret:   &REST{store},
+		Generate: &secretrest.GenerateREST{Store: store},
+	}
 }

@@ -271,6 +271,7 @@ save-config
 scheduler-config
 schema-cache-dir
 secure-port
+secret-generators
 serialize-image-pulls
 service-account-key-file
 service-account-lookup

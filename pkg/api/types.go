@@ -1999,6 +1999,15 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
+// GenerateSecretRequest is used to request a generated secret.
+type GenerateSecretRequest struct {
+	unversioned.TypeMeta `json:",inline"`
+	ObjectMeta           `json:"metadata,omitempty"`
+
+	// Used to specify the type of secret to generate.
+	Type SecretType `json:"type"`
+}
+
 // These constants are for remote command execution and port forwarding and are
 // used by both the client side and server side components.
 //

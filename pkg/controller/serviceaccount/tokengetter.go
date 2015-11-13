@@ -76,6 +76,6 @@ func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) 
 func NewGetterFromStorageInterface(s storage.Interface) ServiceAccountTokenGetter {
 	return NewGetterFromRegistries(
 		serviceaccount.NewRegistry(serviceaccountetcd.NewREST(s, storage.NoDecoration)),
-		secret.NewRegistry(secretetcd.NewREST(s, storage.NoDecoration)),
+		secret.NewRegistry(secretetcd.NewStorage(s, storage.NoDecoration).Secret),
 	)
 }

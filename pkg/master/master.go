@@ -553,7 +553,7 @@ func (m *Master) init(c *Config) {
 	limitRangeStorage := limitrangeetcd.NewREST(dbClient("limitRanges"), storageFactory)
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(dbClient("resourceQuotas"), storageFactory)
-	secretStorage := secretetcd.NewREST(dbClient("secrets"), storageFactory)
+	secretStorage := secretetcd.NewStorage(dbClient("secrets"), storageFactory)
 	serviceAccountStorage := serviceaccountetcd.NewREST(dbClient("serviceAccounts"), storageFactory)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(dbClient("persistentVolumes"), storageFactory)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(dbClient("persistentVolumeClaims"), storageFactory)
@@ -618,7 +618,8 @@ func (m *Master) init(c *Config) {
 		"namespaces":                    namespaceStorage,
 		"namespaces/status":             namespaceStatusStorage,
 		"namespaces/finalize":           namespaceFinalizeStorage,
-		"secrets":                       secretStorage,
+		"secrets":                       secretStorage.Secret,
+		"secrets/generate":              secretStorage.Generate,
 		"serviceAccounts":               serviceAccountStorage,
 		"persistentVolumes":             persistentVolumeStorage,
 		"persistentVolumes/status":      persistentVolumeStatusStorage,

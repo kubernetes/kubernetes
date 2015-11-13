@@ -818,6 +818,24 @@ func convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSour
 	return autoconvert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource(in, out, s)
 }
 
+func autoconvert_api_GenerateSecretRequest_To_v1_GenerateSecretRequest(in *api.GenerateSecretRequest, out *GenerateSecretRequest, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.GenerateSecretRequest))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Type = SecretType(in.Type)
+	return nil
+}
+
+func convert_api_GenerateSecretRequest_To_v1_GenerateSecretRequest(in *api.GenerateSecretRequest, out *GenerateSecretRequest, s conversion.Scope) error {
+	return autoconvert_api_GenerateSecretRequest_To_v1_GenerateSecretRequest(in, out, s)
+}
+
 func autoconvert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource(in *api.GitRepoVolumeSource, out *GitRepoVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.GitRepoVolumeSource))(in)
@@ -3842,6 +3860,24 @@ func convert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSour
 	return autoconvert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource(in, out, s)
 }
 
+func autoconvert_v1_GenerateSecretRequest_To_api_GenerateSecretRequest(in *GenerateSecretRequest, out *api.GenerateSecretRequest, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*GenerateSecretRequest))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Type = api.SecretType(in.Type)
+	return nil
+}
+
+func convert_v1_GenerateSecretRequest_To_api_GenerateSecretRequest(in *GenerateSecretRequest, out *api.GenerateSecretRequest, s conversion.Scope) error {
+	return autoconvert_v1_GenerateSecretRequest_To_api_GenerateSecretRequest(in, out, s)
+}
+
 func autoconvert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource(in *GitRepoVolumeSource, out *api.GitRepoVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*GitRepoVolumeSource))(in)
@@ -6113,6 +6149,7 @@ func init() {
 		autoconvert_api_FCVolumeSource_To_v1_FCVolumeSource,
 		autoconvert_api_FlockerVolumeSource_To_v1_FlockerVolumeSource,
 		autoconvert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource,
+		autoconvert_api_GenerateSecretRequest_To_v1_GenerateSecretRequest,
 		autoconvert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource,
 		autoconvert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource,
 		autoconvert_api_HTTPGetAction_To_v1_HTTPGetAction,
@@ -6231,6 +6268,7 @@ func init() {
 		autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		autoconvert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource,
 		autoconvert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource,
+		autoconvert_v1_GenerateSecretRequest_To_api_GenerateSecretRequest,
 		autoconvert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource,
 		autoconvert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource,
 		autoconvert_v1_HTTPGetAction_To_api_HTTPGetAction,
