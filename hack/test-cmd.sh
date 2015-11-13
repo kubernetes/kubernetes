@@ -219,6 +219,8 @@ runTests() {
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.cpuUtilization.targetPercentage"
+  job_parallelism_field=".spec.parallelism"
+  deployment_replicas=".spec.replicas"
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -872,6 +874,23 @@ __EOF__
   kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '4'
   # Clean-up
   kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
+
+  ### Scale a job
+  kubectl create -f docs/user-guide/job.yaml "${kube_flags[@]}"
+  # Command
+  kubectl scale --replicas=2 job/pi
+  # Post-condition: 2 replicas for pi
+  kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
+  # Clean-up
+  kubectl delete job/pi "${kube_flags[@]}"
+  ### Scale a deployment
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  # Command
+  kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
+  # Post-condition: 1 replica for nginx-deployment
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
+  # Clean-up
+  kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
 
   ### Expose replication controller as service
   # Pre-condition: 2 replicas
