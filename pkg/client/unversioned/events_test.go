@@ -74,6 +74,7 @@ func TestEventCreate(t *testing.T) {
 		FirstTimestamp: timeStamp,
 		LastTimestamp:  timeStamp,
 		Count:          1,
+		Type:           api.EventTypeNormal,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -113,6 +114,7 @@ func TestEventGet(t *testing.T) {
 		FirstTimestamp: timeStamp,
 		LastTimestamp:  timeStamp,
 		Count:          1,
+		Type:           api.EventTypeNormal,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -152,6 +154,7 @@ func TestEventList(t *testing.T) {
 				FirstTimestamp: timeStamp,
 				LastTimestamp:  timeStamp,
 				Count:          1,
+				Type:           api.EventTypeNormal,
 			},
 		},
 	}
