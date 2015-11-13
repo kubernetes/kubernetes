@@ -545,6 +545,7 @@ func deepCopy_v1_Event(in Event, out *Event, c *conversion.Cloner) error {
 		return err
 	}
 	out.Count = in.Count
+	out.Type = in.Type
 	return nil
 }
 

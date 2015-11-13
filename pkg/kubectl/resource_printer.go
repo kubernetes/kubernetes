@@ -394,7 +394,7 @@ var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
 var daemonSetColumns = []string{"NAME", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "NODE-SELECTOR"}
-var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
+var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
@@ -1203,13 +1203,14 @@ func printEvent(event *api.Event, w io.Writer, withNamespace bool, wide bool, sh
 		}
 	}
 	if _, err := fmt.Fprintf(
-		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s",
+		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 		translateTimestamp(event.FirstTimestamp),
 		translateTimestamp(event.LastTimestamp),
 		event.Count,
 		event.InvolvedObject.Name,
 		event.InvolvedObject.Kind,
 		event.InvolvedObject.FieldPath,
+		event.Type,
 		event.Reason,
 		event.Source,
 		event.Message,

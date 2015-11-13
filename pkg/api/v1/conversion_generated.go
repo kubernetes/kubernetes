@@ -698,6 +698,7 @@ func autoconvert_api_Event_To_v1_Event(in *api.Event, out *Event, s conversion.S
 		return err
 	}
 	out.Count = in.Count
+	out.Type = in.Type
 	return nil
 }
 
@@ -3722,6 +3723,7 @@ func autoconvert_v1_Event_To_api_Event(in *Event, out *api.Event, s conversion.S
 		return err
 	}
 	out.Count = in.Count
+	out.Type = in.Type
 	return nil
 }
 
