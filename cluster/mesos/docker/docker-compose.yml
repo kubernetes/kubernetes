@@ -52,6 +52,7 @@ mesosslave:
   - MESOS_SWITCH_USER=0
   - MESOS_CONTAINERIZERS=docker,mesos
   - MESOS_ISOLATION=cgroups/cpu,cgroups/mem
+  - VAR_LIB_DOCKER_SIZE=10
   - DOCKER_DAEMON_ARGS
   links:
   - etcd
