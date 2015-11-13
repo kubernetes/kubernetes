@@ -116,6 +116,8 @@ type cache struct {
 	keyFunc KeyFunc
 }
 
+var _ Store = &cache{}
+
 // Add inserts an item into the cache.
 func (c *cache) Add(obj interface{}) error {
 	key, err := c.keyFunc(obj)
