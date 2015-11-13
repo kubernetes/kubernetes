@@ -95,7 +95,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	// TODO: change to restful.MIME_JSON when we set content type in client
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
-	ws.ApiVersion(a.group.GroupVersion.String())
+	ws.ApiVersion(a.group.Version)
 
 	return ws
 }
@@ -104,9 +104,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	admit := a.group.Admit
 	context := a.group.Context
 
-	serverGroupVersion := a.group.GroupVersion
-	if a.group.ServerGroupVersion != nil {
-		serverGroupVersion = *a.group.ServerGroupVersion
+	serverVersion := a.group.ServerVersion
+	if len(serverVersion) == 0 {
+		serverVersion = a.group.Version
 	}
 
 	var resource, subresource string
@@ -126,13 +126,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
-	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
+	versionedPtr, err := a.group.Creater.New(a.group.Version, kind)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.GroupVersion.String())
+	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.GroupVersion.String())
+		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -181,14 +181,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isLister {
 		list := lister.NewList()
 		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listKind)
+		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
 		if err != nil {
 			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	versionedListOptions, err := a.group.Creater.New(serverGroupVersion.String(), "ListOptions")
+	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		objectPtr, err := a.group.Creater.New(serverGroupVersion.String(), "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +206,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(serverGroupVersion.String(), "Status")
+	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, err
 		}
-		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsKind)
+		versionedGetOptions, err = a.group.Creater.New(serverVersion, getOptionsKind)
 		if err != nil {
 			return nil, err
 		}
@@ -245,7 +245,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if err != nil {
 				return nil, err
 			}
-			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsKind)
+			versionedConnectOptions, err = a.group.Creater.New(serverVersion, connectOptionsKind)
 		}
 	}
 
@@ -379,8 +379,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:          a.group.Creater,
 		Convertor:        a.group.Convertor,
 		Codec:            mapping.Codec,
-		APIVersion:       a.group.GroupVersion.String(),
-		ServerAPIVersion: serverGroupVersion.String(),
+		APIVersion:       a.group.Version,
+		ServerAPIVersion: serverVersion,
 		Resource:         resource,
 		Subresource:      subresource,
 		Kind:             kind,
