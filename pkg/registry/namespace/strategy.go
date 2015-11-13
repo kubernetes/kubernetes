@@ -82,6 +82,10 @@ func (namespaceStrategy) Validate(ctx api.Context, obj runtime.Object) fielderro
 	return validation.ValidateNamespace(namespace)
 }
 
+// Canonicalize normalizes the object after validation.
+func (namespaceStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for namespaces.
 func (namespaceStrategy) AllowCreateOnUpdate() bool {
 	return false
