@@ -206,7 +206,6 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Elasticsearch"
     "Namespaces.*should\sdelete\sfast"
     "ServiceAccounts"
-    "Networking\sshould\sfunction\sfor\sintra-pod\scommunication"  # possibly causing Ginkgo to get stuck, issue: #13485
     "Services.*identically\snamed" # error waiting for reachability, issue: #16285
     )
 
