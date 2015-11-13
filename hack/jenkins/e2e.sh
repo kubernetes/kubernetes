@@ -529,7 +529,7 @@ case ${JOB_NAME} in
     : ${ENABLE_CLUSTER_REGISTRY:=false}
     # Ideally we would pin to the latest release version but since 1.1 is not
     # out, we use the latest build number from the CI job.
-    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.1-beta.535+b59eb94b3bf0ee"}
+    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
     ;;
 
   # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
@@ -550,7 +550,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="ci/v1.1.1-beta.535+b59eb94b3bf0ee"}
+    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
     ;;
 
   # Runs non-flaky tests on GCE on the release candidate branch,
