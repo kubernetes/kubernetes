@@ -26,8 +26,31 @@ import (
 // Time is a wrapper around time.Time which supports correct
 // marshaling to YAML and JSON.  Wrappers are provided for many
 // of the factory methods that the time package offers.
+//
+// +genprotoidl.options.marshal=false
 type Time struct {
-	time.Time
+	time.Time `protobuf:"Timestamp,1,req,name=time"`
+}
+
+// ProtoTime is a struct that is equivalent to Time, but intended for
+// protobuf marshalling/unmarshalling. It is generated into a serialization
+// that matches Time. Do not use in Go structs.
+type ProtoTime struct {
+	// Represents the time of an event.
+	Timestamp Timestamp `json:"timestamp"`
+}
+
+// Timestamp is a protobuf Timestamp compatible representation of time.Time
+type Timestamp struct {
+	// Represents seconds of UTC time since Unix epoch
+	// 1970-01-01T00:00:00Z. Must be from from 0001-01-01T00:00:00Z to
+	// 9999-12-31T23:59:59Z inclusive.
+	Seconds int64 `json:"seconds"`
+	// Non-negative fractions of a second at nanosecond resolution. Negative
+	// second values with fractions must still have non-negative nanos values
+	// that count forward in time. Must be from 0 to 999,999,999
+	// inclusive.
+	Nanos int32 `json:"nanos"`
 }
 
 // NewTime returns a wrapped instance of the provided time
@@ -103,6 +126,42 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(t.UTC().Format(time.RFC3339))
+}
+
+// ProtoTime returns the Time as a new ProtoTime value.
+func (m *Time) ProtoTime() *ProtoTime {
+	if m == nil {
+		return &ProtoTime{}
+	}
+	return &ProtoTime{
+		Timestamp: Timestamp{
+			Seconds: m.Time.Unix(),
+			Nanos:   int32(m.Time.Nanosecond()),
+		},
+	}
+}
+
+// Size implements the protobuf marshalling interface.
+func (m *Time) Size() (n int) { return m.ProtoTime().Size() }
+
+// Reset implements the protobuf marshalling interface.
+func (m *Time) Unmarshal(data []byte) error {
+	p := ProtoTime{}
+	if err := p.Unmarshal(data); err != nil {
+		return err
+	}
+	m.Time = time.Unix(p.Timestamp.Seconds, int64(p.Timestamp.Nanos))
+	return nil
+}
+
+// Marshal implements the protobuf marshalling interface.
+func (m *Time) Marshal() (data []byte, err error) {
+	return m.ProtoTime().Marshal()
+}
+
+// MarshalTo implements the protobuf marshalling interface.
+func (m *Time) MarshalTo(data []byte) (int, error) {
+	return m.ProtoTime().MarshalTo(data)
 }
 
 // Fuzz satisfies fuzz.Interface.
