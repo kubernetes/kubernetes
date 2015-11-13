@@ -11,9 +11,14 @@ calicoctl:
     - makedirs: True
     - mode: 744
 
+plugin-config:
+  file.managed:
+    - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico_kubernetes.ini:
+    - source: salt://calico/calico_kubernetes.ini
+
 calico-node:
   cmd.run:
-    - name: calicoctl node --kubernetes --kube-plugin-version=v0.5.0
+    - name: calicoctl node --kubernetes --kube-plugin-version=v0.6.0
     - unless: docker ps | grep calico-node
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
@@ -22,8 +27,14 @@ calico-node:
       - kmod: xt_set
       - service: docker
       - file: calicoctl
-    - require_in:
-      - service: kubelet
+      - file: plugin-config
+
+restart-kubelet:
+  service.running:
+    - enable: True
+    - reload: True
+    - onchanges:
+      - cmd: calico-node
 
 calico-ip-pool-reset:
   cmd.run:

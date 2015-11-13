@@ -138,6 +138,7 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/'/''/g")'
   opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
   e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
+  kubelet_token: '$(echo "$KUBELET_TOKEN" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master
