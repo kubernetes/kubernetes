@@ -79,9 +79,8 @@ type Mux interface {
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
-	Root string
-	// TODO: caesarxuchao: Version actually contains "group/version", refactor it to avoid confusion.
-	Version string
+	Root         string
+	GroupVersion unversioned.GroupVersion
 
 	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
 	// TODO: refactor proxy handler to use sub resources
@@ -91,9 +90,8 @@ type APIGroupVersion struct {
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
 	// empty, defaults to Version.
-	// TODO: caesarxuchao: ServerVersion actually contains "group/version",
-	// refactor it to avoid confusion.
-	ServerVersion string
+	// TODO this seems suspicious.  Is this actually just "unversioned" now?
+	ServerGroupVersion *unversioned.GroupVersion
 
 	Mapper meta.RESTMapper
 
@@ -126,8 +124,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	installer := g.newInstaller()
 	ws := installer.NewWebService()
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
-	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	AddSupportedResourcesWebService(ws, g.GroupVersion, apiResources)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }
@@ -151,14 +148,13 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
-	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	AddSupportedResourcesWebService(ws, g.GroupVersion, apiResources)
 	return utilerrors.NewAggregate(registrationErrors)
 }
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
-	prefix := path.Join(g.Root, g.Version)
+	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
 		info:              g.RequestInfoResolver,
@@ -287,7 +283,7 @@ func AddGroupWebService(container *restful.Container, path string, group unversi
 
 // Adds a service to return the supported resources, E.g., a such web service
 // will be registered at /apis/extensions/v1.
-func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion string, apiResources []unversioned.APIResource) {
+func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) {
 	resourceHandler := SupportedResourcesHandler(groupVersion, apiResources)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
@@ -328,10 +324,10 @@ func GroupHandler(group unversioned.APIGroup) restful.RouteFunction {
 }
 
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
-func SupportedResourcesHandler(groupVersion string, apiResources []unversioned.APIResource) restful.RouteFunction {
+func SupportedResourcesHandler(groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeJSON(http.StatusOK, api.Codec, &unversioned.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter, true)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources}, resp.ResponseWriter, true)
 	}
 }
 
