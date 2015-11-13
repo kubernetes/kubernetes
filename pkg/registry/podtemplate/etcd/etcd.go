@@ -32,12 +32,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against pod templates.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory) *REST {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/podtemplates"
 
 	newListFunc := func() runtime.Object { return &api.PodTemplateList{} }
-	storageInterface := storageFactory(
-		s, 100, nil, &api.PodTemplate{}, prefix, false, newListFunc)
+	storageInterface := storageDecorator(
+		s, 100, &api.PodTemplate{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PodTemplate{} },

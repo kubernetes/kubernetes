@@ -112,28 +112,6 @@ type Cacher struct {
 	ListFromCache bool
 }
 
-// StorageFactory is a function signature for producing
-// a storage.Interface from given parameters.
-type StorageFactory func(
-	storage Interface,
-	capacity int,
-	versioner Versioner,
-	objectType runtime.Object,
-	resourcePrefix string,
-	namespaceScoped bool,
-	newListFunc func() runtime.Object) Interface
-
-func NoDecoration(
-	storage Interface,
-	capacity int,
-	versioner Versioner,
-	objectType runtime.Object,
-	resourcePrefix string,
-	namespaceScoped bool,
-	newListFunc func() runtime.Object) Interface {
-	return storage
-}
-
 // Create a new Cacher responsible from service WATCH and LIST requests from its
 // internal cache and updating its cache in the background based on the given
 // configuration.

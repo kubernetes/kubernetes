@@ -32,7 +32,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against events.
-func NewREST(s storage.Interface, storageFactory storage.StorageFactory, ttl uint64) *REST {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, ttl uint64) *REST {
 	prefix := "/events"
 
 	// We explicitly do NOT do any decoration here - switching on Cacher
