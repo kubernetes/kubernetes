@@ -27,15 +27,14 @@ import (
 // k8s api.Pod.Spec's that don't declare resources (all containers in k8s-mesos require cpu
 // and memory limits).
 func NewDefaultProcurement(c mresource.CPUShares, m mresource.MegaBytes) Procurement {
-	requireSome := &RequireSomePodResources{
+	resourceProcurer := &RequirePodResources{
 		defaultContainerCPULimit: c,
 		defaultContainerMemLimit: m,
 	}
 	return AllOrNothingProcurement([]Procurement{
 		ValidateProcurement,
 		NodeProcurement,
-		requireSome.Procure,
-		PodResourcesProcurement,
+		resourceProcurer.Procure,
 		PortsProcurement,
 	}).Procure
 }
@@ -80,37 +79,33 @@ func NodeProcurement(t *T, offer *mesos.Offer) error {
 	return nil
 }
 
-type RequireSomePodResources struct {
+type RequirePodResources struct {
 	defaultContainerCPULimit mresource.CPUShares
 	defaultContainerMemLimit mresource.MegaBytes
 }
 
-func (r *RequireSomePodResources) Procure(t *T, offer *mesos.Offer) error {
+func (r *RequirePodResources) Procure(t *T, offer *mesos.Offer) error {
 	// write resource limits into the pod spec which is transferred to the executor. From here
 	// on we can expect that the pod spec of a task has proper limits for CPU and memory.
 	// TODO(sttts): For a later separation of the kubelet and the executor also patch the pod on the apiserver
+	// TODO(sttts): fall back to requested resources if resource limit cannot be fulfilled by the offer
 	// TODO(jdef): changing the state of t.Pod here feels dirty, especially since we don't use a kosher
 	// method to clone the api.Pod state in T.Clone(). This needs some love.
-	if unlimitedCPU := mresource.LimitPodCPU(&t.Pod, r.defaultContainerCPULimit); unlimitedCPU {
-		log.V(2).Infof("Pod %s/%s without cpu limits is admitted %.2f cpu shares", t.Pod.Namespace, t.Pod.Name, mresource.PodCPULimit(&t.Pod))
+	_, cpuLimit, _, err := mresource.LimitPodCPU(&t.Pod, r.defaultContainerCPULimit)
+	if err != nil {
+		return err
 	}
-	if unlimitedMem := mresource.LimitPodMem(&t.Pod, r.defaultContainerMemLimit); unlimitedMem {
-		log.V(2).Infof("Pod %s/%s without memory limits is admitted %.2f MB", t.Pod.Namespace, t.Pod.Name, mresource.PodMemLimit(&t.Pod))
+
+	_, memLimit, _, err := mresource.LimitPodMem(&t.Pod, r.defaultContainerMemLimit)
+	if err != nil {
+		return err
 	}
-	return nil
-}
 
-// PodResourcesProcurement converts k8s pod cpu and memory resource requirements into
-// mesos resource allocations.
-func PodResourcesProcurement(t *T, offer *mesos.Offer) error {
-	// compute used resources
-	cpu := mresource.PodCPULimit(&t.Pod)
-	mem := mresource.PodMemLimit(&t.Pod)
+	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", offer.Id, t.Pod.Namespace, t.Pod.Name, cpuLimit, memLimit)
 
-	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", offer.Id, t.Pod.Namespace, t.Pod.Name, cpu, mem)
+	t.Spec.CPU = cpuLimit
+	t.Spec.Memory = memLimit
 
-	t.Spec.CPU = cpu
-	t.Spec.Memory = mem
 	return nil
 }
 
