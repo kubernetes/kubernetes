@@ -93,10 +93,12 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
 
 # The set of master binaries that run in Docker (on Linux)
+# Entry format is "<name-of-binary>,<base-image>".
+# Binaries are placed in /usr/local/bin inside the image.
 readonly KUBE_DOCKER_WRAPPED_BINARIES=(
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
+  kube-apiserver,busybox
+  kube-controller-manager,busybox
+  kube-scheduler,busybox
 )
 
 # The set of addons images that should be prepopulated
@@ -734,30 +736,44 @@ function kube::release::sha1() {
 
 # This will take binaries that run on master and creates Docker images
 # that wrap the binary in them. (One docker image per binary)
+# Args:
+#  $1 - binary_dir, the directory to save the tared images to.
+# Globals:
+#   KUBE_DOCKER_WRAPPED_BINARIES
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
+    local binary_dir="$1"
     local binary_name
-    for binary_name in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+    for wrappable in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+
+      local oldifs=$IFS
+      IFS=","
+      set $wrappable
+      IFS=$oldifs
+
+      local binary_name="$1"
+      local base_image="$2"
+
       kube::log::status "Starting Docker build for image: ${binary_name}"
 
       (
         local md5_sum
-        md5_sum=$(kube::release::md5 "$1/${binary_name}")
+        md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
 
-        local docker_build_path="$1/${binary_name}.dockerbuild"
+        local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
         local docker_file_path="${docker_build_path}/Dockerfile"
-        local binary_file_path="$1/${binary_name}"
+        local binary_file_path="${binary_dir}/${binary_name}"
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
-        ln $1/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM busybox \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
         docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        docker save ${docker_image_tag} > ${1}/${binary_name}.tar
-        echo $md5_sum > ${1}/${binary_name}.docker_tag
+        docker save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+        echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
 
@@ -769,6 +785,7 @@ function kube::release::create_docker_images_for_server() {
     kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
     kube::log::status "Docker builds done"
   )
+
 }
 
 # This will pull and save docker images for addons which need to placed
