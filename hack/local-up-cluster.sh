@@ -262,7 +262,7 @@ function start_kubelet {
         --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
-        --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
+        --port="$KUBELET_PORT" ${KUBELET_ARGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
       # Docker won't run a container with a cidfile (container id file)
