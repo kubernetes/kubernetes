@@ -17,11 +17,10 @@ limitations under the License.
 package v1
 
 import (
-	"strings"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func addDefaultingFuncs() {
@@ -59,10 +58,10 @@ func addDefaultingFuncs() {
 		},
 		func(obj *Container) {
 			if obj.ImagePullPolicy == "" {
-				// TODO(dchen1107): Move ParseImageName code to pkg/util
-				parts := strings.Split(obj.Image, ":")
+				_, tag := parsers.ParseImageName(obj.Image)
 				// Check image tag
-				if parts[len(parts)-1] == "latest" {
+
+				if tag == "latest" {
 					obj.ImagePullPolicy = PullAlways
 				} else {
 					obj.ImagePullPolicy = PullIfNotPresent

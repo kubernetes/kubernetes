@@ -132,12 +132,8 @@ func filterHTTPError(err error, image string) error {
 }
 
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
-	repoToPull, tag := parsers.ParseImageName(image)
-
 	// If no tag was specified, use the default "latest".
-	if len(tag) == 0 {
-		tag = "latest"
-	}
+	repoToPull, tag := parsers.ParseImageName(image)
 
 	opts := docker.PullImageOptions{
 		Repository: repoToPull,
