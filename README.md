@@ -20,7 +20,7 @@ providing basic mechanisms for deployment, maintenance, and scaling of applicati
 
 Kubernetes is:
 
-* **lean**: lightweight, simple, accessible
+* **lean**: lightweight,  simple, accessible
 * **portable**: public, private, hybrid, multi cloud
 * **extensible**: modular, pluggable, hookable, composable
 * **self-healing**: auto-placement, auto-restart, auto-replication
