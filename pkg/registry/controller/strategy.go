@@ -81,6 +81,10 @@ func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Vali
 	return validation.ValidateReplicationController(controller)
 }
 
+// Canonicalize normalizes the object after validation.
+func (rcStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for replication controllers; this means a POST is
 // needed to create one.
 func (rcStrategy) AllowCreateOnUpdate() bool {

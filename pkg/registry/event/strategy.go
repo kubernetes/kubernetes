@@ -53,6 +53,10 @@ func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.V
 	return validation.ValidateEvent(event)
 }
 
+// Canonicalize normalizes the object after validation.
+func (eventStrategy) Canonicalize(obj runtime.Object) {
+}
+
 func (eventStrategy) AllowCreateOnUpdate() bool {
 	return true
 }

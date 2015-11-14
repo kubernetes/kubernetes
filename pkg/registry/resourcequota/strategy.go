@@ -62,6 +62,10 @@ func (resourcequotaStrategy) Validate(ctx api.Context, obj runtime.Object) field
 	return validation.ValidateResourceQuota(resourcequota)
 }
 
+// Canonicalize normalizes the object after validation.
+func (resourcequotaStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for resourcequotas.
 func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 	return false

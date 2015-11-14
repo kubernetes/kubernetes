@@ -55,6 +55,10 @@ func (strategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Valida
 	return validation.ValidateThirdPartyResourceData(obj.(*extensions.ThirdPartyResourceData))
 }
 
+// Canonicalize normalizes the object after validation.
+func (strategy) Canonicalize(obj runtime.Object) {
+}
+
 func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }

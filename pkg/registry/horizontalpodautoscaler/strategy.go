@@ -58,6 +58,10 @@ func (autoscalerStrategy) Validate(ctx api.Context, obj runtime.Object) errs.Val
 	return validation.ValidateHorizontalPodAutoscaler(autoscaler)
 }
 
+// Canonicalize normalizes the object after validation.
+func (autoscalerStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for autoscalers.
 func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 	return false

@@ -63,6 +63,10 @@ func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Val
 	return validation.ValidateJob(job)
 }
 
+// Canonicalize normalizes the object after validation.
+func (jobStrategy) Canonicalize(obj runtime.Object) {
+}
+
 func (jobStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }

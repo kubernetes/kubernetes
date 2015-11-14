@@ -53,6 +53,10 @@ func (persistentvolumeStrategy) Validate(ctx api.Context, obj runtime.Object) fi
 	return validation.ValidatePersistentVolume(persistentvolume)
 }
 
+// Canonicalize normalizes the object after validation.
+func (persistentvolumeStrategy) Canonicalize(obj runtime.Object) {
+}
+
 func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
