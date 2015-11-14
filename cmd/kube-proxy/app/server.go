@@ -24,6 +24,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -107,6 +108,25 @@ const (
 	proxyModeIptables               = "iptables"
 	experimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
 	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
+	iptables_kmod_err               = "Check if iptables has been enabled in the kernel. " +
+		"Make sure the following kernel modules (or in kernel features) are compiled and loaded:\n" +
+		"xt_conntrack\n" +
+		"xt_addrtype\n" +
+		"iptable_nat\n" +
+		"nf_conntrack_ipv4\n" +
+		"nf_defrag_ipv4\n" +
+		"nf_nat_ipv4\n" +
+		"ipt_MASQUERADE\n" +
+		"nf_nat_masquerade_ipv4\n" +
+		"nft_reject_ipv4\n" +
+		"nft_reject\n" +
+		"nf_tables\n" +
+		"xt_conntrack\n" +
+		"xt_comment\n" +
+		"xt_nat" +
+		"xt_REDIRECT\n" +
+		"nf_nat\n" +
+		"nf_conntrack\n"
 )
 
 func checkKnownProxyMode(proxyMode string) bool {
@@ -244,7 +264,15 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		glog.V(2).Info("Using iptables Proxier.")
 		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IptablesSyncPeriod, config.MasqueradeAll)
 		if err != nil {
-			glog.Fatalf("Unable to create proxier: %v", err)
+			iptables_err := err.Error()
+			iptables_err_str := ""
+			if strings.Contains(iptables_err, "iptables") {
+				//	Error is most probably caused by lack of iptables
+				// configuration
+				iptables_err_str = iptables_kmod_err
+
+			}
+			glog.Fatalf("Unable to create proxer: %v.%s", err, iptables_err_str)
 		}
 		proxier = proxierIptables
 		endpointsHandler = proxierIptables
@@ -261,7 +289,14 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 
 		proxierUserspace, err := userspace.NewProxier(loadBalancer, config.BindAddress, iptInterface, config.PortRange, config.IptablesSyncPeriod, config.UDPIdleTimeout)
 		if err != nil {
-			glog.Fatalf("Unable to create proxier: %v", err)
+			iptables_err := err.Error()
+			iptables_err_str := ""
+			if strings.Contains(iptables_err, "iptables") {
+				//	Error is most probably caused by lack of iptables
+				// configuration
+				iptables_err_str = iptables_kmod_err
+			}
+			glog.Fatalf("Unable to create proxer: %v.%s", err, iptables_err_str)
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
