@@ -72,11 +72,11 @@ type ReplicationManager struct {
 	expectations controller.ControllerExpectationsInterface
 
 	// A store of replication controllers, populated by the rcController
-	rcStore cache.StoreToReplicationControllerLister
+	rcStore cache.ReplicationControllerListerByNamespace
 	// Watches changes to all replication controllers
 	rcController *framework.Controller
 	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
+	podStore cache.PodListerByNamespace
 	// Watches changes to all pods
 	podController *framework.Controller
 	// podStoreSynced returns true if the pod store has been synced at least once.
@@ -104,7 +104,7 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 		queue:         workqueue.New(),
 	}
 
-	rm.rcStore.Store, rm.rcController = framework.NewInformer(
+	rm.rcStore.Indexer, rm.rcController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(options)
@@ -143,9 +143,10 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 			// way of achieving this is by performing a `stop` operation on the controller.
 			DeleteFunc: rm.enqueueController,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
-	rm.podStore.Store, rm.podController = framework.NewInformer(
+	rm.podStore.Indexer, rm.podController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.Pods(api.NamespaceAll).List(options)
@@ -164,6 +165,7 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 			UpdateFunc: rm.updatePod,
 			DeleteFunc: rm.deletePod,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	rm.syncHandler = rm.syncReplicationController
@@ -183,7 +185,7 @@ func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer util.HandleCrash()
 	glog.Infof("Starting RC Manager")
-	controller.SyncAllPodsWithStore(rm.kubeClient, rm.podStore.Store)
+	controller.SyncAllPodsWithStore(rm.kubeClient, rm.podStore.Indexer)
 	go rm.rcController.Run(stopCh)
 	go rm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
@@ -406,7 +408,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		glog.V(4).Infof("Finished syncing controller %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := rm.rcStore.Store.GetByKey(key)
+	obj, exists, err := rm.rcStore.Indexer.GetByKey(key)
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
 		rm.expectations.DeleteExpectations(key)
