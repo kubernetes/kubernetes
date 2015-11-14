@@ -635,17 +635,17 @@ func TestValidateVolumes(t *testing.T) {
 		"dot dot path": {
 			[]api.Volume{{Name: "dotdotpath", VolumeSource: dotDotInPath}},
 			field.ErrorTypeInvalid,
-			"downwardAPI.path", `must not contain ".."`,
+			"downwardAPI.path", `must not contain '..'`,
 		},
 		"dot dot file name": {
 			[]api.Volume{{Name: "dotdotfilename", VolumeSource: dotDotPathName}},
 			field.ErrorTypeInvalid,
-			"downwardAPI.path", `must not start with ".."`,
+			"downwardAPI.path", `must not start with '..'`,
 		},
 		"dot dot first level dirent": {
 			[]api.Volume{{Name: "dotdotdirfilename", VolumeSource: dotDotFirstLevelDirent}},
 			field.ErrorTypeInvalid,
-			"downwardAPI.path", `must not start with ".."`,
+			"downwardAPI.path", `must not start with '..'`,
 		},
 		"empty wwn": {
 			[]api.Volume{{Name: "badimage", VolumeSource: zeroWWN}},
@@ -665,12 +665,12 @@ func TestValidateVolumes(t *testing.T) {
 		"starts with '..'": {
 			[]api.Volume{{Name: "badprefix", VolumeSource: startsWithDots}},
 			field.ErrorTypeInvalid,
-			"gitRepo.directory", `must not start with ".."`,
+			"gitRepo.directory", `must not start with '..'`,
 		},
 		"contains '..'": {
 			[]api.Volume{{Name: "containsdots", VolumeSource: containsDots}},
 			field.ErrorTypeInvalid,
-			"gitRepo.directory", `must not contain ".."`,
+			"gitRepo.directory", `must not contain '..'`,
 		},
 		"absolute target": {
 			[]api.Volume{{Name: "absolutetarget", VolumeSource: absPath}},
@@ -4172,7 +4172,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 	for k, v := range successCases {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) != 0 {
-			t.Errorf("Expected success for %s, got %v", k, errs)
+			t.Errorf("[%s Expected success, got %v", k, errs)
 		}
 	}
 
@@ -4197,12 +4197,12 @@ func TestValidateSecurityContext(t *testing.T) {
 		"negative RunAsUser": {
 			sc:          negativeRunAsUser,
 			errorType:   "FieldValueInvalid",
-			errorDetail: "runAsUser cannot be negative",
+			errorDetail: "cannot be negative",
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || errs[0].Detail != v.errorDetail {
-			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}
 }

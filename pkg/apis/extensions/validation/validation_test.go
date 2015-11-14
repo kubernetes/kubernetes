@@ -774,7 +774,7 @@ func TestValidateDeployment(t *testing.T) {
 			MaxSurge: intstr.FromString("20Percent"),
 		},
 	}
-	errorCases["value should be int(5) or percentage(5%)"] = invalidMaxSurgeDeployment
+	errorCases["should be int(5) or percentage(5%)"] = invalidMaxSurgeDeployment
 
 	// MaxSurge and MaxUnavailable cannot both be zero.
 	invalidRollingUpdateDeployment := validDeployment()
@@ -1155,7 +1155,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 	}
 
 	errorCases := map[string]extensions.ClusterAutoscaler{
-		"name must be ClusterAutoscaler": {
+		"must be ClusterAutoscaler": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "TestClusterAutoscaler",
 				Namespace: api.NamespaceDefault,
@@ -1171,7 +1171,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 				},
 			},
 		},
-		"namespace must be default": {
+		"must be default": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "ClusterAutoscaler",
 				Namespace: "test",
