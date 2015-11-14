@@ -19,8 +19,8 @@ If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
 <strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/user-guide/images.md).
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/user-guide/images.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -186,17 +186,48 @@ where node creation is automated.
 
 Kubernetes supports specifying registry keys on a pod.
 
-First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
-Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+First, login to your dockerhub registry by running `docker login` or to login to a private registry use `docker login <registry.domain>`.
+Docker will create a file named `config.json` under `~/.docker/`
 
 ```console
 $ docker login
 Username: janedoe
 Password: ●●●●●●●●●●●
 Email: jdoe@example.com
-WARNING: login credentials saved in /Users/jdoe/.dockercfg.
+WARNING: login credentials saved in /Users/jdoe/.docker/config.json
 Login Succeeded
+```
 
+This file has the following structure:
+
+```
+$ cat ~/.docker/config.json
+{
+	"auths": {
+		"https://index.docker.io/v1/": {
+			"auth": "ZmFrZXBhc3N3b3JkMTIK",
+			"email": "jdoe@example.com"
+		}
+	}
+}
+```
+
+Note that this is different than what is expected by the Kubernetes [secret resource](secrets.md): it expects a file named `.dockercfg` with the following structure:
+```console
+{ "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
+```
+The notable differences are:
+- There is no `"auths"` wrapping
+- It must be on a single line.
+- The url must be prefixed with the url scheme `https://`: if you login to your private registry with `docker login <registry.domain>` without the `https://` scheme, it will not be present in the `config.json` but is required for the `.dockercfg` used by `imagePullSecret`.
+
+If you have multiple registries, they will show as multiple entries under `"auths":`. You will need to create an `imagePullSecret` for each entry.
+
+Copy the config.json file over to `~/.dockercfg` and modify to match the one-liner object above.
+
+Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+
+```console
 $ echo $(cat ~/.dockercfg)
 { "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 
@@ -217,10 +248,11 @@ $ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
 $
 ```
+The type defined by `type: kubernetes.io/dockercfg` is important, as well as the data key name `.dockercfg`. The only value to edit is the `name` which is used by `imagePullSecret` inside the pod definition.
 
-If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid.
+If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid: the json must be on one line.
 If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
-the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file.
+the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file: this usually happens when the auth info is wrapped inside the "auths" key.
 
 This process only needs to be done one time (per namespace).
 
