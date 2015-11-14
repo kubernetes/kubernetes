@@ -186,7 +186,7 @@ where node creation is automated.
 
 Kubernetes supports specifying registry keys on a pod.
 
-First, login to your private registry by running `docker login <registry.domain>`.
+First, login to your dockerhub registry by running `docker login` or to login to a private registry use `docker login <registry.domain>`.
 Docker will create a file named `config.json` under `~/.docker/`
 
 ```console
@@ -204,7 +204,7 @@ This file has the following structure:
 $ cat ~/.docker/config.json
 {
 	"auths": {
-		"index.docker.io/v1/": {
+		"https://index.docker.io/v1/": {
 			"auth": "ZmFrZXBhc3N3b3JkMTIK",
 			"email": "jdoe@example.com"
 		}
@@ -217,11 +217,13 @@ Note that this is different than what is expected by the Kubernetes [secret reso
 { "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 ```
 The notable differences are:
-- there is no `"auths"` wrapping
-- the url must be prefixed with the url scheme `https://`
-- it must be on a single line.
+- There is no `"auths"` wrapping
+- It must be on a single line.
+- The url must be prefixed with the url scheme `https://`: if you login to your private registry with `docker login <registry.domain>` without the `https://` scheme, it will not be present in the `config.json` but is required for the `.dockercfg` used by `imagePullSecret`.
 
-copy the config.json file over to `~/.dockercfg` and modify to match the above.
+If you have multiple registries, they will show as multiple entries under `"auths":`. You will need to create an `imagePullSecret` for each entry.
+
+Copy the config.json file over to `~/.dockercfg` and modify to match the one-liner object above.
 
 Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
 
@@ -246,7 +248,7 @@ $ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
 $
 ```
-- Note: the `type: kubernetes.io/dockercfg` is important, as well as the data key name `.dockercfg`. The only value to edit is the `name` which is used by `imagePullSecret` inside the pod definition.
+The type defined by `type: kubernetes.io/dockercfg` is important, as well as the data key name `.dockercfg`. The only value to edit is the `name` which is used by `imagePullSecret` inside the pod definition.
 
 If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid: the json must be on one line.
 If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
