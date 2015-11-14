@@ -44,7 +44,7 @@ func TestMakeFuncs(t *testing.T) {
 			ErrorTypeNotFound,
 		},
 		{
-			func() *Error { return Required(NewPath("f")) },
+			func() *Error { return Required(NewPath("f"), "d") },
 			ErrorTypeRequired,
 		},
 		{

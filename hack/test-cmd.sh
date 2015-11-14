@@ -980,7 +980,7 @@ __EOF__
   # Pre-condition: use --name flag
   output_message=$(! kubectl expose -f hack/testdata/pod-with-large-name.yaml --name=invalid-large-service-name --port=8081 2>&1 "${kube_flags[@]}")
   # Post-condition: should fail due to invalid name
-  kube::test::if_has_string "${output_message}" 'metadata.name: invalid value'
+  kube::test::if_has_string "${output_message}" 'metadata.name: Invalid value'
   # Pre-condition: default run without --name flag; should succeed by truncating the inherited name
   output_message=$(kubectl expose -f hack/testdata/pod-with-large-name.yaml --port=8081 2>&1 "${kube_flags[@]}")
   # Post-condition: inherited name from pod has been truncated

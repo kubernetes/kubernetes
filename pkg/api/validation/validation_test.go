@@ -65,7 +65,7 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 func TestValidateObjectMetaNamespaces(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&api.ObjectMeta{Name: "test", Namespace: "foo.bar"},
-		false,
+		true,
 		func(s string, prefix bool) (bool, string) {
 			return true, ""
 		},
@@ -84,7 +84,7 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	}
 	errs = ValidateObjectMeta(
 		&api.ObjectMeta{Name: "test", Namespace: string(b)},
-		false,
+		true,
 		func(s string, prefix bool) (bool, string) {
 			return true, ""
 		},
@@ -629,7 +629,7 @@ func TestValidateVolumes(t *testing.T) {
 		},
 		"absolute path": {
 			[]api.Volume{{Name: "absolutepath", VolumeSource: absolutePathName}},
-			field.ErrorTypeForbidden,
+			field.ErrorTypeInvalid,
 			"downwardAPI.path", "",
 		},
 		"dot dot path": {
@@ -674,7 +674,7 @@ func TestValidateVolumes(t *testing.T) {
 		},
 		"absolute target": {
 			[]api.Volume{{Name: "absolutetarget", VolumeSource: absPath}},
-			field.ErrorTypeForbidden,
+			field.ErrorTypeInvalid,
 			"gitRepo.directory", "",
 		},
 	}
@@ -843,7 +843,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom: invalid value '', Details: sources cannot be specified when value is not empty",
+			expectedError: "[0].valueFrom: invalid value '', Details: may not be specified when `value` is not empty",
 		},
 		{
 			name: "missing FieldPath on ObjectFieldSelector",
@@ -3314,7 +3314,7 @@ func TestValidateLimitRange(t *testing.T) {
 					},
 				},
 			}},
-			"not supported when limit type is Pod",
+			"may not be specified when `type` is 'Pod'",
 		},
 		"default-request-limit-type-pod": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
@@ -3327,7 +3327,7 @@ func TestValidateLimitRange(t *testing.T) {
 					},
 				},
 			}},
-			"not supported when limit type is Pod",
+			"may not be specified when `type` is 'Pod'",
 		},
 		"min value 100m is greater than max value 10m": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
@@ -4002,7 +4002,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "invalid IPv4 address",
+			errorDetail: "must be a valid IPv4 address",
 		},
 		"Multiple ports, one without name": {
 			endpoints: api.Endpoints{
@@ -4052,7 +4052,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "invalid IPv4 address",
+			errorDetail: "must be a valid IPv4 address",
 		},
 		"Port missing number": {
 			endpoints: api.Endpoints{
@@ -4122,7 +4122,7 @@ func TestValidateEndpoints(t *testing.T) {
 
 	for k, v := range errorCases {
 		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
+			t.Errorf("[%s] Expected error type %s with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}
 }
@@ -4172,7 +4172,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 	for k, v := range successCases {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) != 0 {
-			t.Errorf("[%s Expected success, got %v", k, errs)
+			t.Errorf("[%s] Expected success, got %v", k, errs)
 		}
 	}
 
@@ -4192,12 +4192,12 @@ func TestValidateSecurityContext(t *testing.T) {
 		"request privileged when capabilities forbids": {
 			sc:          privRequestWithGlobalDeny,
 			errorType:   "FieldValueForbidden",
-			errorDetail: "",
+			errorDetail: "disallowed by policy",
 		},
 		"negative RunAsUser": {
 			sc:          negativeRunAsUser,
 			errorType:   "FieldValueInvalid",
-			errorDetail: "cannot be negative",
+			errorDetail: isNegativeErrorMsg,
 		},
 	}
 	for k, v := range errorCases {
