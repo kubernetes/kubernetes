@@ -67,6 +67,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
+	// TODO: this should probably move to strategy.PrepareForCreate()
 	releaseServiceIP := false
 	defer func() {
 		if releaseServiceIP {

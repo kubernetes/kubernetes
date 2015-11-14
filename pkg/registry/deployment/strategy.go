@@ -56,6 +56,10 @@ func (deploymentStrategy) Validate(ctx api.Context, obj runtime.Object) errs.Val
 	return validation.ValidateDeployment(deployment)
 }
 
+// Canonicalize normalizes the object after validation.
+func (deploymentStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for deployments.
 func (deploymentStrategy) AllowCreateOnUpdate() bool {
 	return false

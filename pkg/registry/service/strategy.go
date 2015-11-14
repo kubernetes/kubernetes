@@ -63,6 +63,10 @@ func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Val
 	return validation.ValidateService(service)
 }
 
+// Canonicalize normalizes the object after validation.
+func (svcStrategy) Canonicalize(obj runtime.Object) {
+}
+
 func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }

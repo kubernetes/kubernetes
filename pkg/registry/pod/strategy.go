@@ -72,6 +72,10 @@ func (podStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Val
 	return validation.ValidatePod(pod)
 }
 
+// Canonicalize normalizes the object after validation.
+func (podStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for pods.
 func (podStrategy) AllowCreateOnUpdate() bool {
 	return false

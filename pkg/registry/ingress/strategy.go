@@ -76,6 +76,10 @@ func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors
 	return err
 }
 
+// Canonicalize normalizes the object after validation.
+func (ingressStrategy) Canonicalize(obj runtime.Object) {
+}
+
 // AllowCreateOnUpdate is false for Ingress; this means POST is needed to create one.
 func (ingressStrategy) AllowCreateOnUpdate() bool {
 	return false
