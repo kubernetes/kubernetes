@@ -294,3 +294,7 @@ func (f *PersistentVolumeRecycler) GetMounter() mount.Interface {
 func (f *PersistentVolumeRecycler) GetWriter() ioutil.Writer {
 	return nil
 }
+
+func (f *PersistentVolumeRecycler) GetHostName() string {
+	return ""
+}
