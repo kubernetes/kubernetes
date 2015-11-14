@@ -111,7 +111,7 @@ func TestReadPodsFromFile(t *testing.T) {
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent",
+						ImagePullPolicy:        "Always",
 						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &api.PodSecurityContext{},
 				},
