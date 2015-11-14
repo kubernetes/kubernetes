@@ -13,8 +13,11 @@ calicoctl:
 
 plugin-config:
   file.managed:
-    - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico_kubernetes.ini:
+    - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico_kubernetes.ini
     - source: salt://calico/calico_kubernetes.ini
+    - template: jinja
+    - makedirs: True
+    - mode: 744
 
 calico-node:
   cmd.run:
