@@ -186,17 +186,46 @@ where node creation is automated.
 
 Kubernetes supports specifying registry keys on a pod.
 
-First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
-Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+First, login to your private registry by running `docker login <registry.domain>`.
+Docker will create a file named `config.json` under `~/.docker/`
 
 ```console
 $ docker login
 Username: janedoe
 Password: ●●●●●●●●●●●
 Email: jdoe@example.com
-WARNING: login credentials saved in /Users/jdoe/.dockercfg.
+WARNING: login credentials saved in /Users/jdoe/.docker/config.json
 Login Succeeded
+```
 
+This file has the following structure:
+
+```
+$ cat ~/.docker/config.json
+{
+	"auths": {
+		"index.docker.io/v1/": {
+			"auth": "ZmFrZXBhc3N3b3JkMTIK",
+			"email": "jdoe@example.com"
+		}
+	}
+}
+```
+
+Note that this is different than what is expected by the Kubernetes [secret resource](secrets.md): it expects a file named `.dockercfg` with the following structure:
+```console
+{ "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
+```
+The notable differences are:
+- there is no `"auths"` wrapping
+- the url must be prefixed with the url scheme `https://`
+- it must be on a single line.
+
+copy the config.json file over to `~/.dockercfg` and modify to match the above.
+
+Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+
+```console
 $ echo $(cat ~/.dockercfg)
 { "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 
@@ -217,10 +246,11 @@ $ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
 $
 ```
+- Note: the `type: kubernetes.io/dockercfg` is important, as well as the data key name `.dockercfg`. The only value to edit is the `name` which is used by `imagePullSecret` inside the pod definition.
 
-If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid.
+If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid: the json must be on one line.
 If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
-the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file.
+the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file: this usually happens when the auth info is wrapped inside the "auths" key.
 
 This process only needs to be done one time (per namespace).
 
