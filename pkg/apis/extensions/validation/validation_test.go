@@ -168,7 +168,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas: 5,
 				},
 			},
-			msg: "must be greater than or equal to 1",
+			msg: "must be greater than 0",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -184,7 +184,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas: 5,
 				},
 			},
-			msg: "must be greater than or equal to minReplicas",
+			msg: "must be greater than or equal to `minReplicas`",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -201,7 +201,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: -70},
 				},
 			},
-			msg: "must be greater than or equal to 1",
+			msg: "must be greater than 0",
 		},
 	}
 
@@ -746,7 +746,7 @@ func TestValidateDeployment(t *testing.T) {
 	invalidSelectorDeployment.Spec.Selector = map[string]string{
 		"name": "def",
 	}
-	errorCases["selector does not match labels"] = invalidSelectorDeployment
+	errorCases["`selector` does not match template `labels`"] = invalidSelectorDeployment
 
 	// RestartPolicy should be always.
 	invalidRestartPolicyDeployment := validDeployment()
@@ -764,7 +764,7 @@ func TestValidateDeployment(t *testing.T) {
 		Type:          extensions.RecreateDeploymentStrategyType,
 		RollingUpdate: &extensions.RollingUpdateDeployment{},
 	}
-	errorCases["should be nil when strategy type is Recreate"] = invalidRecreateDeployment
+	errorCases["may not be specified when strategy `type` is 'Recreate'"] = invalidRecreateDeployment
 
 	// MaxSurge should be in the form of 20%.
 	invalidMaxSurgeDeployment := validDeployment()
@@ -774,7 +774,7 @@ func TestValidateDeployment(t *testing.T) {
 			MaxSurge: intstr.FromString("20Percent"),
 		},
 	}
-	errorCases["should be int(5) or percentage(5%)"] = invalidMaxSurgeDeployment
+	errorCases["must be an integer or percentage"] = invalidMaxSurgeDeployment
 
 	// MaxSurge and MaxUnavailable cannot both be zero.
 	invalidRollingUpdateDeployment := validDeployment()
@@ -785,7 +785,7 @@ func TestValidateDeployment(t *testing.T) {
 			MaxUnavailable: intstr.FromInt(0),
 		},
 	}
-	errorCases["cannot be 0 when maxSurge is 0 as well"] = invalidRollingUpdateDeployment
+	errorCases["may not be 0 when `maxSurge` is 0"] = invalidRollingUpdateDeployment
 
 	// MaxUnavailable should not be more than 100%.
 	invalidMaxUnavailableDeployment := validDeployment()
@@ -795,14 +795,14 @@ func TestValidateDeployment(t *testing.T) {
 			MaxUnavailable: intstr.FromString("110%"),
 		},
 	}
-	errorCases["should not be more than 100%"] = invalidMaxUnavailableDeployment
+	errorCases["must not be greater than 100%"] = invalidMaxUnavailableDeployment
 
 	for k, v := range errorCases {
 		errs := ValidateDeployment(v)
 		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+			t.Errorf("[%s] expected failure", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+			t.Errorf("unexpected error: %v, expected: %q", errs[0], k)
 		}
 	}
 }
@@ -841,7 +841,7 @@ func TestValidateJob(t *testing.T) {
 	negative := -1
 	negative64 := int64(-1)
 	errorCases := map[string]extensions.Job{
-		"spec.parallelism:must be non-negative": {
+		"spec.parallelism:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -852,7 +852,7 @@ func TestValidateJob(t *testing.T) {
 				Template:    validPodTemplateSpec,
 			},
 		},
-		"spec.completions:must be non-negative": {
+		"spec.completions:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -863,7 +863,7 @@ func TestValidateJob(t *testing.T) {
 				Template:    validPodTemplateSpec,
 			},
 		},
-		"spec.activeDeadlineSeconds:must be non-negative": {
+		"spec.activeDeadlineSeconds:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -883,7 +883,7 @@ func TestValidateJob(t *testing.T) {
 				Template: validPodTemplateSpec,
 			},
 		},
-		"spec.template.metadata.labels: invalid value 'map[y:z]', Details: selector does not match template": {
+		"spec.template.metadata.labels: invalid value 'map[y:z]', Details: selector does not match template `labels`": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -1155,7 +1155,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 	}
 
 	errorCases := map[string]extensions.ClusterAutoscaler{
-		"must be ClusterAutoscaler": {
+		"must be 'ClusterAutoscaler'": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "TestClusterAutoscaler",
 				Namespace: api.NamespaceDefault,
@@ -1171,7 +1171,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 				},
 			},
 		},
-		"must be default": {
+		"must be 'default'": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "ClusterAutoscaler",
 				Namespace: "test",
@@ -1188,7 +1188,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 			},
 		},
 
-		`must be non-negative`: {
+		`must be greater than or equal to 0`: {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "ClusterAutoscaler",
 				Namespace: api.NamespaceDefault,
@@ -1204,7 +1204,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 				},
 			},
 		},
-		`must be greater than or equal to minNodes`: {
+		"must be greater than or equal to `minNodes`": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "ClusterAutoscaler",
 				Namespace: api.NamespaceDefault,
@@ -1236,9 +1236,9 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 	for k, v := range errorCases {
 		errs := ValidateClusterAutoscaler(&v)
 		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+			t.Errorf("[%s] expected failure", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+			t.Errorf("unexpected error: %v, expected: %q", errs[0], k)
 		}
 	}
 }
@@ -1294,7 +1294,7 @@ func TestValidateScale(t *testing.T) {
 					Replicas: -1,
 				},
 			},
-			msg: "must be non-negative",
+			msg: "must be greater than or equal to 0",
 		},
 	}
 

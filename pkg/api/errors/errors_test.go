@@ -137,7 +137,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			field.Required(field.NewPath("field[0].name")),
+			field.Required(field.NewPath("field[0].name"), ""),
 			&unversioned.StatusDetails{
 				Kind: "Kind",
 				Name: "name",
