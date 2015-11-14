@@ -47,8 +47,8 @@ const fieldImmutableErrorMsg string = `field is immutable`
 const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNotIntegerErrorMsg string = `must be an integer`
 
-func IntervalErrorMsg(lo, hi int) string {
-	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
+func InclusiveRangeErrorMsg(lo, hi int) string {
+	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }
 
 var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, validation.LabelValueMaxLength, validation.LabelValueFmt)
@@ -56,8 +56,8 @@ var qualifiedNameErrorMsg string = fmt.Sprintf(`must be a qualified name (at mos
 var DNSSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, validation.DNS1123SubdomainMaxLength, validation.DNS1123SubdomainFmt)
 var DNS1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS1123LabelMaxLength, validation.DNS1123LabelFmt)
 var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS952LabelMaxLength, validation.DNS952LabelFmt)
-var pdPartitionErrorMsg string = IntervalErrorMsg(0, 255)
-var PortRangeErrorMsg string = IntervalErrorMsg(0, 65536)
+var pdPartitionErrorMsg string = InclusiveRangeErrorMsg(1, 255)
+var PortRangeErrorMsg string = InclusiveRangeErrorMsg(1, 65535)
 var PortNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
@@ -276,7 +276,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 		}
 	} else {
 		if len(meta.Namespace) != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, "namespace is not allowed on this type"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, "not allowed on this type"))
 		}
 	}
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
@@ -321,7 +321,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *api.ObjectMeta, fldPath *field.P
 
 	// Reject updates that don't specify a resource version
 	if len(newMeta.ResourceVersion) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.ResourceVersion, "resourceVersion must be specified for an update"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.ResourceVersion, "must be specified for an update"))
 	}
 
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.Name, oldMeta.Name, fldPath.Child("name"))...)
@@ -464,7 +464,7 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 		allErrs = append(allErrs, field.Required(fldPath.Child("fsType")))
 	}
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, ""))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, InclusiveRangeErrorMsg(0, 255)))
 	}
 	return allErrs
 }
@@ -483,7 +483,7 @@ func validateFCVolumeSource(fc *api.FCVolumeSource, fldPath *field.Path) field.E
 		allErrs = append(allErrs, field.Required(fldPath.Child("lun")))
 	} else {
 		if *fc.Lun < 0 || *fc.Lun > 255 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, ""))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, InclusiveRangeErrorMsg(0, 255)))
 		}
 	}
 	return allErrs
@@ -597,11 +597,11 @@ func validateVolumeSourcePath(targetPath string, fldPath *field.Path) field.Erro
 
 	for _, item := range items {
 		if item == ".." {
-			allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain \"..\""))
+			allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '..'"))
 		}
 	}
 	if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
-		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not start with \"..\""))
+		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not start with '..'"))
 	}
 	return allErrs
 }
@@ -864,7 +864,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 	} else {
 		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
 		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, "error converting fieldPath"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
 		} else if !expressions.Has(internalFieldPath) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
 		}
@@ -1496,7 +1496,7 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 		idxPath := fldPath.Index(i)
 		if vol.GCEPersistentDisk != nil {
 			if vol.GCEPersistentDisk.ReadOnly == false {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", ".readOnly"), false, "readOnly must be true for replicated pods > 1, as GCE PD can only be mounted on multiple machines if it is read-only."))
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1, as GCE PD can only be mounted on multiple machines if it is read-only."))
 			}
 		}
 		// TODO: What to do for AWS?  It doesn't support replicas
@@ -1526,7 +1526,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// TODO: Enable the code once we have better api object.status update model. Currently,
 	// anyone can update node status.
 	// if !api.Semantic.DeepEqual(node.Status, api.NodeStatus{}) {
-	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "status must be empty"))
+	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
 	// Validte no duplicate addresses in node status.
@@ -1800,7 +1800,7 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 				limitValue = quantity.MilliValue()
 			}
 			if limitValue < requestValue {
-				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "limit cannot be smaller than request"))
+				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "cannot be smaller than request"))
 			}
 		}
 	}
@@ -2060,7 +2060,7 @@ func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field
 
 	if sc.RunAsUser != nil {
 		if *sc.RunAsUser < 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *sc.RunAsUser, "runAsUser cannot be negative"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *sc.RunAsUser, "cannot be negative"))
 		}
 	}
 	return allErrs
@@ -2069,18 +2069,17 @@ func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field
 func ValidatePodLogOptions(opts *api.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, "tailLines must be a non-negative integer or nil"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, "must be a non-negative integer or nil"))
 	}
 	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "limitBytes must be a positive integer or nil"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be a positive integer or nil"))
 	}
 	switch {
 	case opts.SinceSeconds != nil && opts.SinceTime != nil:
-		allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "only one of sinceTime or sinceSeconds can be provided"))
-		allErrs = append(allErrs, field.Invalid(field.NewPath("sinceTime"), *opts.SinceTime, "only one of sinceTime or sinceSeconds can be provided"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath(""), *opts.SinceSeconds, "only one of sinceTime or sinceSeconds can be provided"))
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "sinceSeconds must be a positive integer"))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be a positive integer"))
 		}
 	}
 	return allErrs

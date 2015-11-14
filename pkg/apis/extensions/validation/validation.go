@@ -222,7 +222,7 @@ func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *fiel
 	allErrs := field.ErrorList{}
 	if intOrPercent.Type == intstr.String {
 		if !validation.IsValidPercent(intOrPercent.StrVal) {
-			allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, "value should be int(5) or percentage(5%)"))
+			allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, "should be int(5) or percentage(5%)"))
 		}
 	} else if intOrPercent.Type == intstr.Int {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(intOrPercent.IntValue()), fldPath)...)
@@ -417,7 +417,7 @@ func ValidateIngressSpec(spec *extensions.IngressSpec, fldPath *field.Path) fiel
 	if spec.Backend != nil {
 		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"))...)
 	} else if len(spec.Rules) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("rules"), spec.Rules, "Either a default backend or a set of host rules are required for ingress."))
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either a default backend or a set of host rules are required for ingress."))
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"))...)
@@ -452,7 +452,7 @@ func validateIngressRules(IngressRules []extensions.IngressRule, fldPath *field.
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, errMsg))
 			}
 			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "Host must be a DNS name, not ip address"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "must be a DNS name, not an IP address"))
 			}
 		}
 		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(0))...)
@@ -476,7 +476,7 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRu
 	for i, rule := range httpIngressRuleValue.Paths {
 		if len(rule.Path) > 0 {
 			if !strings.HasPrefix(rule.Path, "/") {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must begin with /"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must begin with '/'"))
 			}
 			// TODO: More draconian path regex validation.
 			// Path must be a valid regex. This is the basic requirement.
@@ -489,7 +489,7 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRu
 			// the user is confusing url regexes with path regexes.
 			_, err := regexp.CompilePOSIX(rule.Path)
 			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be a valid regex."))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be a valid regex"))
 			}
 		}
 		allErrs = append(allErrs, validateIngressBackend(&rule.Backend, fldPath.Child("backend"))...)
@@ -548,10 +548,10 @@ func validateClusterAutoscalerSpec(spec extensions.ClusterAutoscalerSpec, fldPat
 func ValidateClusterAutoscaler(autoscaler *extensions.ClusterAutoscaler) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if autoscaler.Name != "ClusterAutoscaler" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), autoscaler.Name, `name must be ClusterAutoscaler`))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), autoscaler.Name, `must be ClusterAutoscaler`))
 	}
 	if autoscaler.Namespace != api.NamespaceDefault {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "namespace"), autoscaler.Namespace, `namespace must be default`))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "namespace"), autoscaler.Namespace, `must be default`))
 	}
 	allErrs = append(allErrs, validateClusterAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"))...)
 	return allErrs
