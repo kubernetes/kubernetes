@@ -1534,64 +1534,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 }
 
-func waitingState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Waiting: &api.ContainerStateWaiting{},
-		},
-	}
-}
-func waitingStateWithLastTermination(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Waiting: &api.ContainerStateWaiting{},
-		},
-		LastTerminationState: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-}
-func runningState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-}
-func stoppedState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{},
-		},
-	}
-}
-func succeededState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-}
-func failedState(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name: cName,
-		State: api.ContainerState{
-			Terminated: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
-}
-
 func TestPodPhaseWithRestartAlways(t *testing.T) {
 	desiredState := api.PodSpec{
 		NodeName: "machine",
