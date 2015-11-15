@@ -80,7 +80,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.kind: required",
+			msg: "scaleRef.kind: Required",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -92,7 +92,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.kind: invalid",
+			msg: "scaleRef.kind: Invalid",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -104,7 +104,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.name: required",
+			msg: "scaleRef.name: Required",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -116,7 +116,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.name: invalid",
+			msg: "scaleRef.name: Invalid",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -128,7 +128,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.subresource: required",
+			msg: "scaleRef.subresource: Required",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -140,7 +140,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.subresource: invalid",
+			msg: "scaleRef.subresource: Invalid",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -152,7 +152,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
 			},
-			msg: "scaleRef.subresource: unsupported",
+			msg: "scaleRef.subresource: Unsupported",
 		},
 		{
 			horizontalPodAutoscaler: extensions.HorizontalPodAutoscaler{
@@ -736,7 +736,7 @@ func TestValidateDeployment(t *testing.T) {
 	}
 
 	errorCases := map[string]*extensions.Deployment{}
-	errorCases["metadata.name: required value"] = &extensions.Deployment{
+	errorCases["metadata.name: Required value"] = &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 		},
@@ -751,12 +751,12 @@ func TestValidateDeployment(t *testing.T) {
 	// RestartPolicy should be always.
 	invalidRestartPolicyDeployment := validDeployment()
 	invalidRestartPolicyDeployment.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
-	errorCases["unsupported value 'Never'"] = invalidRestartPolicyDeployment
+	errorCases["Unsupported value: \"Never\""] = invalidRestartPolicyDeployment
 
 	// invalid unique label key.
 	invalidUniqueLabelDeployment := validDeployment()
 	invalidUniqueLabelDeployment.Spec.UniqueLabelKey = "abc/def/ghi"
-	errorCases["spec.uniqueLabel: invalid value"] = invalidUniqueLabelDeployment
+	errorCases["spec.uniqueLabel: Invalid value"] = invalidUniqueLabelDeployment
 
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()
@@ -802,7 +802,7 @@ func TestValidateDeployment(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("[%s] expected failure", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
-			t.Errorf("unexpected error: %v, expected: %q", errs[0], k)
+			t.Errorf("unexpected error: %q, expected: %q", errs[0].Error(), k)
 		}
 	}
 }
@@ -874,7 +874,7 @@ func TestValidateJob(t *testing.T) {
 				Template:              validPodTemplateSpec,
 			},
 		},
-		"spec.selector:required value": {
+		"spec.selector:Required value": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -883,7 +883,7 @@ func TestValidateJob(t *testing.T) {
 				Template: validPodTemplateSpec,
 			},
 		},
-		"spec.template.metadata.labels: invalid value 'map[y:z]', Details: selector does not match template `labels`": {
+		"spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -902,7 +902,7 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.template.spec.restartPolicy:unsupported value": {
+		"spec.template.spec.restartPolicy: Unsupported value": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
@@ -1006,19 +1006,19 @@ func TestValidateIngress(t *testing.T) {
 			Backend: defaultBackend,
 		},
 	}
-	badPathErr := fmt.Sprintf("spec.rules[0].http.paths[0].path: invalid value '%v'", badPathExpr)
+	badPathErr := fmt.Sprintf("spec.rules[0].http.paths[0].path: Invalid value: '%v'", badPathExpr)
 	hostIP := "127.0.0.1"
 	badHostIP := newValid()
 	badHostIP.Spec.Rules[0].Host = hostIP
-	badHostIPErr := fmt.Sprintf("spec.rules[0].host: invalid value '%v'", hostIP)
+	badHostIPErr := fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", hostIP)
 
 	errorCases := map[string]extensions.Ingress{
-		"spec.backend.serviceName: required value":        servicelessBackend,
-		"spec.backend.serviceName: invalid value":         invalidNameBackend,
-		"spec.backend.servicePort: invalid value":         noPortBackend,
-		"spec.rules[0].host: invalid value":               badHost,
-		"spec.rules[0].http.paths: required value":        noPaths,
-		"spec.rules[0].http.paths[0].path: invalid value": noForwardSlashPath,
+		"spec.backend.serviceName: Required value":        servicelessBackend,
+		"spec.backend.serviceName: Invalid value":         invalidNameBackend,
+		"spec.backend.servicePort: Invalid value":         noPortBackend,
+		"spec.rules[0].host: Invalid value":               badHost,
+		"spec.rules[0].http.paths: Required value":        noPaths,
+		"spec.rules[0].http.paths[0].path: Invalid value": noForwardSlashPath,
 	}
 	errorCases[badPathErr] = badRegexPath
 	errorCases[badHostIPErr] = badHostIP
@@ -1112,8 +1112,8 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	}
 
 	errorCases := map[string]extensions.Ingress{
-		"status.loadBalancer.ingress[0].ip: invalid value":       invalidIP,
-		"status.loadBalancer.ingress[0].hostname: invalid value": invalidHostname,
+		"status.loadBalancer.ingress[0].ip: Invalid value":       invalidIP,
+		"status.loadBalancer.ingress[0].hostname: Invalid value": invalidHostname,
 	}
 	for k, v := range errorCases {
 		errs := ValidateIngressStatusUpdate(&v, &oldValue)
@@ -1220,7 +1220,7 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 				},
 			},
 		},
-		"required value": {
+		"Required value": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "ClusterAutoscaler",
 				Namespace: api.NamespaceDefault,

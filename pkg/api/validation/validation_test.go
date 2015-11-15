@@ -73,7 +73,7 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	if len(errs) != 1 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
-	if !strings.Contains(errs[0].Error(), "invalid value 'foo.bar'") {
+	if !strings.Contains(errs[0].Error(), `Invalid value: "foo.bar"`) {
 		t.Errorf("unexpected error message: %v", errs)
 	}
 	maxLength := 63
@@ -92,7 +92,7 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	if len(errs) != 1 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
-	if !strings.Contains(errs[0].Error(), "invalid value") {
+	if !strings.Contains(errs[0].Error(), "Invalid value") {
 		t.Errorf("unexpected error message: %v", errs)
 	}
 }
@@ -824,12 +824,12 @@ func TestValidateEnv(t *testing.T) {
 		{
 			name:          "zero-length name",
 			envs:          []api.EnvVar{{Name: ""}},
-			expectedError: "[0].name: required value",
+			expectedError: "[0].name: Required value",
 		},
 		{
 			name:          "name not a C identifier",
 			envs:          []api.EnvVar{{Name: "a.b.c"}},
-			expectedError: `[0].name: invalid value 'a.b.c', Details: must be a C identifier (matching regex [A-Za-z_][A-Za-z0-9_]*): e.g. "my_name" or "MyName"`,
+			expectedError: `[0].name: Invalid value: "a.b.c": must be a C identifier (matching regex [A-Za-z_][A-Za-z0-9_]*): e.g. "my_name" or "MyName"`,
 		},
 		{
 			name: "value and valueFrom specified",
@@ -843,7 +843,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom: invalid value '', Details: may not be specified when `value` is not empty",
+			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
 		},
 		{
 			name: "missing FieldPath on ObjectFieldSelector",
@@ -855,7 +855,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: required value",
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Required value`,
 		},
 		{
 			name: "missing APIVersion on ObjectFieldSelector",
@@ -867,7 +867,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.apiVersion: required value",
+			expectedError: `[0].valueFrom.fieldRef.apiVersion: Required value`,
 		},
 		{
 			name: "invalid fieldPath",
@@ -880,7 +880,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: invalid value 'metadata.whoops', Details: error converting fieldPath",
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Invalid value: "metadata.whoops": error converting fieldPath`,
 		},
 		{
 			name: "invalid fieldPath labels",
@@ -893,7 +893,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.labels', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, status.podIP`,
 		},
 		{
 			name: "invalid fieldPath annotations",
@@ -906,7 +906,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.annotations', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, status.podIP`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -919,7 +919,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "valueFrom.fieldRef.fieldPath: unsupported value 'status.phase', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, status.podIP`,
 		},
 	}
 	for _, tc := range errorCases {

@@ -17,12 +17,11 @@ limitations under the License.
 package field
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 // Error is an implementation of the 'error' interface, which represents a
@@ -46,13 +45,20 @@ func (v *Error) Error() string {
 func (v *Error) ErrorBody() string {
 	var s string
 	switch v.Type {
-	case ErrorTypeRequired, ErrorTypeTooLong, ErrorTypeInternal:
+	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
 		s = fmt.Sprintf("%s", v.Type)
 	default:
-		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
+		var bad string
+		badBytes, err := json.Marshal(v.BadValue)
+		if err != nil {
+			bad = err.Error()
+		} else {
+			bad = string(badBytes)
+		}
+		s = fmt.Sprintf("%s: %s", v.Type, bad)
 	}
 	if len(v.Detail) != 0 {
-		s += fmt.Sprintf(", Details: %s", v.Detail)
+		s += fmt.Sprintf(": %s", v.Detail)
 	}
 	return s
 }
@@ -98,21 +104,21 @@ const (
 func (t ErrorType) String() string {
 	switch t {
 	case ErrorTypeNotFound:
-		return "not found"
+		return "Not found"
 	case ErrorTypeRequired:
-		return "required value"
+		return "Required value"
 	case ErrorTypeDuplicate:
-		return "duplicate value"
+		return "Duplicate value"
 	case ErrorTypeInvalid:
-		return "invalid value"
+		return "Invalid value"
 	case ErrorTypeNotSupported:
-		return "unsupported value"
+		return "Unsupported value"
 	case ErrorTypeForbidden:
-		return "forbidden"
+		return "Forbidden"
 	case ErrorTypeTooLong:
-		return "too long"
+		return "Too long"
 	case ErrorTypeInternal:
-		return "internal error"
+		return "Internal error"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", t))
 		return ""
