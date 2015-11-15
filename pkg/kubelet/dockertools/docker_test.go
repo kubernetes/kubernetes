@@ -37,6 +37,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
@@ -204,16 +205,16 @@ func TestParseImageName(t *testing.T) {
 		name      string
 		tag       string
 	}{
-		{"ubuntu", "ubuntu", ""},
+		{"ubuntu", "ubuntu", "latest"},
 		{"ubuntu:2342", "ubuntu", "2342"},
 		{"ubuntu:latest", "ubuntu", "latest"},
 		{"foo/bar:445566", "foo/bar", "445566"},
-		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", ""},
+		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", "latest"},
 		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
 		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
 	}
 	for _, test := range tests {
-		name, tag := parseImageName(test.imageName)
+		name, tag := parsers.ParseImageName(test.imageName)
 		if name != test.name || tag != test.tag {
 			t.Errorf("Expected name/tag: %s/%s, got %s/%s", test.name, test.tag, name, tag)
 		}
