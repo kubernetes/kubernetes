@@ -10,7 +10,7 @@
 "containers":[
     {
     "name": "kube-scheduler",
-    "image": "gcr.io/google_containers/kube-scheduler:34d0b8f8b31e27937327961528739bc9",
+    "image": "gcr.io/google_containers/kube-scheduler",
     "command": [
                  "/bin/sh",
                  "-c",

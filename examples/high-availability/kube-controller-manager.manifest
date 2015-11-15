@@ -10,7 +10,7 @@
 "containers":[
     {
     "name": "kube-controller-manager",
-    "image": "gcr.io/google_containers/kube-controller-manager:fda24638d51a48baa13c35337fcd4793",
+    "image": "gcr.io/google_containers/kube-controller-manager",
     "command": [
                  "/bin/sh",
                  "-c",
