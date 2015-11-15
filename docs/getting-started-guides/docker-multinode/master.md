@@ -102,6 +102,12 @@ or
 sudo systemctl stop docker
 ```
 
+or
+
+```sh
+sudo service docker stop
+```
+
 or it may be something else.
 
 #### Run flannel
