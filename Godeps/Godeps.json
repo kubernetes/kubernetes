@@ -408,6 +408,11 @@
 			"Rev": "2093b57e5ca2ccbee4626814100bc1aada691b18"
 		},
 		{
+			"ImportPath": "github.com/gogo/protobuf/sortkeys",
+			"Comment": "v0.1-55-g2093b57",
+			"Rev": "2093b57e5ca2ccbee4626814100bc1aada691b18"
+		},
+		{
 			"ImportPath": "github.com/golang/glog",
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
 		},
