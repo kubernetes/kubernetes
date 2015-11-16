@@ -981,9 +981,9 @@ func deepCopy_extensions_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *
 
 func deepCopy_extensions_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(PodSelector)
+		if err := deepCopy_extensions_PodSelector(*in.Selector, out.Selector, c); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil

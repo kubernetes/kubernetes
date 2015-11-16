@@ -185,26 +185,26 @@ func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplat
 func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	selector := labels.Set(spec.Selector).AsSelector()
-	if selector.Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
-	}
+	allErrs = append(allErrs, ValidatePodSelector(spec.Selector)...)
 
 	if spec.Template == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired("template"))
-	} else {
-		labels := labels.Set(spec.Template.Labels)
-		if !selector.Matches(labels) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
-		}
-		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
-		// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
-		allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
-		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
-		if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
-			allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
-		}
+		return allErrs
 	}
+
+	selector, err := extensions.PodSelectorAsSelector(spec.Selector)
+	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+	}
+
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
+	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
+	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
+	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+	}
+
 	return allErrs
 }
 
@@ -226,7 +226,6 @@ func ValidatePositiveIntOrPercent(intOrPercent util.IntOrString, fieldName strin
 		if !validation.IsValidPercent(intOrPercent.StrVal) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
 		}
-
 	} else if intOrPercent.Kind == util.IntstrInt {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(intOrPercent.IntVal), fieldName)...)
 	}
