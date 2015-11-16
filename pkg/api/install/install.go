@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -52,16 +51,16 @@ func init() {
 	registeredGroupVersions := registered.GroupVersionsForGroup("")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Group:        apiutil.GetGroup(groupVersion),
-		Version:      apiutil.GetVersion(groupVersion),
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
+		GroupVersion: groupVersion.String(),
+		Group:        groupVersion.Group,
+		Version:      groupVersion.Version,
+		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, apiutil.GetVersion(registeredGroupVersions[i]))
-		groupVersions = append(groupVersions, registeredGroupVersions[i])
+		versions = append(versions, registeredGroupVersions[i].Version)
+		groupVersions = append(groupVersions, registeredGroupVersions[i].String())
 	}
 	groupMeta.Versions = versions
 	groupMeta.GroupVersions = groupVersions

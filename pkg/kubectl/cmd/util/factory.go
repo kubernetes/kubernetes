@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -476,8 +477,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		return fmt.Errorf("unable to parse group/version from %q: %v", version, err)
+	}
+	if ok := registered.IsRegisteredAPIGroupVersion(gv); !ok {
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredGroupVersions)
 	}
 	resource, _ := meta.KindToResource(kind, false)
 	group, err := c.mapper.GroupForResource(resource)
