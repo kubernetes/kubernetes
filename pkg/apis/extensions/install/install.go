@@ -46,25 +46,21 @@ func init() {
 		return
 	}
 
-	worstToBestGroupVersions := []unversioned.GroupVersion{}
-
 	registeredGroupVersions := registered.GroupVersionsForGroup("extensions")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion.String(),
-		Group:        groupVersion.Group,
-		Version:      groupVersion.Version,
+		GroupVersion: groupVersion,
 		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
+
 	var versions []string
-	var groupVersions []string
+	worstToBestGroupVersions := []unversioned.GroupVersion{}
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
 		versions = append(versions, registeredGroupVersions[i].Version)
-		groupVersions = append(groupVersions, registeredGroupVersions[i].String())
 		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
 	}
 	groupMeta.Versions = versions
-	groupMeta.GroupVersions = groupVersions
+	groupMeta.GroupVersions = registeredGroupVersions
 
 	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 

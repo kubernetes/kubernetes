@@ -347,13 +347,13 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 			glog.Errorf("invalid api group %s: %v", group, err)
 			continue
 		}
-		if _, found := storageVersions[apigroup.Group]; !found {
-			glog.Errorf("Couldn't find the storage version for group %s", apigroup.Group)
+		if _, found := storageVersions[apigroup.GroupVersion.Group]; !found {
+			glog.Errorf("Couldn't find the storage version for group %s", apigroup.GroupVersion.Group)
 			continue
 		}
 
 		servers := strings.Split(tokens[1], ";")
-		etcdOverrideStorage, err := newEtcdFn("", servers, apigroup.InterfacesFor, storageVersions[apigroup.Group], prefix)
+		etcdOverrideStorage, err := newEtcdFn("", servers, apigroup.InterfacesFor, storageVersions[apigroup.GroupVersion.Group], prefix)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -456,10 +456,10 @@ func (s *APIServer) Run(_ []string) error {
 	storageDestinations := master.NewStorageDestinations()
 
 	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
-	if _, found := storageVersions[legacyV1Group.Group]; !found {
-		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.Group, storageVersions)
+	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
+		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.Group], s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -470,10 +470,10 @@ func (s *APIServer) Run(_ []string) error {
 		if err != nil {
 			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
-		if _, found := storageVersions[expGroup.Group]; !found {
-			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.Group, storageVersions)
+		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.Group], s.EtcdPathPrefix)
+		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}

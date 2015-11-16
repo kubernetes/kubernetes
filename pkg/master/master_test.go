@@ -354,7 +354,7 @@ func TestExpapi(t *testing.T) {
 	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
 	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
 	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
-	assert.Equal(expAPIGroup.GroupVersion, unversioned.GroupVersion{Group: extensionsGroupMeta.Group, Version: extensionsGroupMeta.Version})
+	assert.Equal(expAPIGroup.GroupVersion, extensionsGroupMeta.GroupVersion)
 }
 
 // TestGetNodeAddresses verifies that proper results are returned
