@@ -69,7 +69,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, ver
 	// TODO figure out why we're doing this rewriting
 	extensionGK := unversioned.GroupKind{Group: "extensions", Kind: "ThirdPartyResourceData"}
 
-	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie("extensions").Version)
+	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie("extensions").GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}

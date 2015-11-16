@@ -143,7 +143,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").Version,
+			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
@@ -204,7 +204,7 @@ func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName str
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").Version,
+			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,

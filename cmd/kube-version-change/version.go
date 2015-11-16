@@ -39,7 +39,7 @@ var (
 	inputSource   = flag.StringP("input", "i", "-", "Input source; '-' means stdin")
 	outputDest    = flag.StringP("output", "o", "-", "Output destination; '-' means stdout")
 	rewrite       = flag.StringP("rewrite", "r", "", "If nonempty, use this as both input and output.")
-	outputVersion = flag.StringP("out-version", "v", latest.GroupOrDie("").Version, "Version to convert input to")
+	outputVersion = flag.StringP("out-version", "v", latest.GroupOrDie("").GroupVersion.Version, "Version to convert input to")
 )
 
 // isYAML determines whether data is JSON or YAML formatted by seeing

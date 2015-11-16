@@ -64,12 +64,12 @@ func init() {
 	// TODO: caesarxuchao: we need a central place to store all available API
 	// groups and their metadata.
 	if _, ok := Groups[""]; !ok {
-		// TODO: The second latest.GroupOrDie("").Version will be latest.GroupVersion after we
+		// TODO: The second latest.GroupOrDie("").GroupVersion.Version will be latest.GroupVersion after we
 		// have multiple group support
-		Groups[""] = TestGroup{"", latest.GroupOrDie("").Version, latest.GroupOrDie("").GroupVersion}
+		Groups[""] = TestGroup{"", latest.GroupOrDie("").GroupVersion.Version, latest.GroupOrDie("").GroupVersion.String()}
 	}
 	if _, ok := Groups["extensions"]; !ok {
-		Groups["extensions"] = TestGroup{"extensions", latest.GroupOrDie("extensions").Version, latest.GroupOrDie("extensions").GroupVersion}
+		Groups["extensions"] = TestGroup{"extensions", latest.GroupOrDie("extensions").GroupVersion.Version, latest.GroupOrDie("extensions").GroupVersion.String()}
 	}
 
 	Default = Groups[""]
