@@ -364,6 +364,11 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 		// TODO(mikedanese): remove this once daemonpods forgive nodes
 		shouldRun = shouldRun && api.IsNodeReady(&node)
 
+		// If the node is unschedulable, don't run it
+		// TODO(mikedanese): remove this once we have the right node admitance levels.
+		// See https://github.com/kubernetes/kubernetes/issues/17297#issuecomment-156857375.
+		shouldRun = shouldRun && !node.Spec.Unschedulable
+
 		daemonPods, isRunning := nodeToDaemonPods[nodeName]
 		if shouldRun && !isRunning {
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
