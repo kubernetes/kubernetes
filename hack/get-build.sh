@@ -71,7 +71,7 @@ if [[ "${print_version}" == "true" ]]; then
   echo "${KUBE_VERSION}"
 else
   echo "Using version at ${1}: ${KUBE_VERSION}" >&2
-  if [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
+  if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes.tar.gz"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes.tar.gz"
