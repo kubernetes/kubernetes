@@ -17,10 +17,12 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
 type fakeNodeInterface struct {
@@ -31,40 +33,176 @@ func (fake *fakeNodeInterface) Get(hostname string) (*api.Node, error) {
 	return &fake.node, nil
 }
 
-func Test_mayTryIptablesProxy(t *testing.T) {
+type fakeIptablesVersioner struct {
+	version string // what to return
+	err     error  // what to return
+}
+
+func (fake *fakeIptablesVersioner) GetVersion() (string, error) {
+	return fake.version, fake.err
+}
+
+func Test_getProxyMode(t *testing.T) {
 	var cases = []struct {
-		flag     string
-		annKey   string
-		annVal   string
-		expected bool
+		flag            string
+		annotationKey   string
+		annotationVal   string
+		iptablesVersion string
+		iptablesError   error
+		expected        string
 	}{
-		{"userspace", "", "", false},
-		{"iptables", "", "", true},
-		{"", "", "", false},
-		{"", "net.experimental.kubernetes.io/proxy-mode", "userspace", false},
-		{"", "net.experimental.kubernetes.io/proxy-mode", "iptables", true},
-		{"", "net.experimental.kubernetes.io/proxy-mode", "other", false},
-		{"", "net.experimental.kubernetes.io/proxy-mode", "", false},
-		{"", "net.beta.kubernetes.io/proxy-mode", "userspace", false},
-		{"", "net.beta.kubernetes.io/proxy-mode", "iptables", true},
-		{"", "net.beta.kubernetes.io/proxy-mode", "other", false},
-		{"", "net.beta.kubernetes.io/proxy-mode", "", false},
-		{"", "proxy-mode", "iptables", false},
-		{"userspace", "net.experimental.kubernetes.io/proxy-mode", "userspace", false},
-		{"userspace", "net.experimental.kubernetes.io/proxy-mode", "iptables", false},
-		{"iptables", "net.experimental.kubernetes.io/proxy-mode", "userspace", true},
-		{"iptables", "net.experimental.kubernetes.io/proxy-mode", "iptables", true},
-		{"userspace", "net.beta.kubernetes.io/proxy-mode", "userspace", false},
-		{"userspace", "net.beta.kubernetes.io/proxy-mode", "iptables", false},
-		{"iptables", "net.beta.kubernetes.io/proxy-mode", "userspace", true},
-		{"iptables", "net.beta.kubernetes.io/proxy-mode", "iptables", true},
+		{ // flag says userspace
+			flag:     "userspace",
+			expected: proxyModeUserspace,
+		},
+		{ // flag says iptables, error detecting version
+			flag:          "iptables",
+			iptablesError: fmt.Errorf("oops!"),
+			expected:      proxyModeUserspace,
+		},
+		{ // flag says iptables, version too low
+			flag:            "iptables",
+			iptablesVersion: "0.0.0",
+			expected:        proxyModeUserspace,
+		},
+		{ // flag says iptables, version ok
+			flag:            "iptables",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // detect, error
+			flag:          "",
+			iptablesError: fmt.Errorf("oops!"),
+			expected:      proxyModeUserspace,
+		},
+		{ // detect, version too low
+			flag:            "",
+			iptablesVersion: "0.0.0",
+			expected:        proxyModeUserspace,
+		},
+		{ // detect, version ok
+			flag:            "",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // annotation says userspace
+			flag:          "",
+			annotationKey: "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal: "userspace",
+			expected:      proxyModeUserspace,
+		},
+		{ // annotation says iptables, error detecting
+			flag:          "",
+			annotationKey: "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal: "iptables",
+			iptablesError: fmt.Errorf("oops!"),
+			expected:      proxyModeUserspace,
+		},
+		{ // annotation says iptables, version too low
+			flag:            "",
+			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal:   "iptables",
+			iptablesVersion: "0.0.0",
+			expected:        proxyModeUserspace,
+		},
+		{ // annotation says iptables, version ok
+			flag:            "",
+			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal:   "iptables",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // annotation says something else, version ok
+			flag:            "",
+			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal:   "other",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // annotation says nothing, version ok
+			flag:            "",
+			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal:   "",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // annotation says userspace
+			flag:          "",
+			annotationKey: "net.beta.kubernetes.io/proxy-mode",
+			annotationVal: "userspace",
+			expected:      proxyModeUserspace,
+		},
+		{ // annotation says iptables, error detecting
+			flag:          "",
+			annotationKey: "net.beta.kubernetes.io/proxy-mode",
+			annotationVal: "iptables",
+			iptablesError: fmt.Errorf("oops!"),
+			expected:      proxyModeUserspace,
+		},
+		{ // annotation says iptables, version too low
+			flag:            "",
+			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
+			annotationVal:   "iptables",
+			iptablesVersion: "0.0.0",
+			expected:        proxyModeUserspace,
+		},
+		{ // annotation says iptables, version ok
+			flag:            "",
+			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
+			annotationVal:   "iptables",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // annotation says something else, version ok
+			flag:            "",
+			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
+			annotationVal:   "other",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // annotation says nothing, version ok
+			flag:            "",
+			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
+			annotationVal:   "",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // flag says userspace, annotation disagrees
+			flag:            "userspace",
+			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal:   "iptables",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeUserspace,
+		},
+		{ // flag says iptables, annotation disagrees
+			flag:            "iptables",
+			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
+			annotationVal:   "userspace",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
+		{ // flag says userspace, annotation disagrees
+			flag:            "userspace",
+			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
+			annotationVal:   "iptables",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeUserspace,
+		},
+		{ // flag says iptables, annotation disagrees
+			flag:            "iptables",
+			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
+			annotationVal:   "userspace",
+			iptablesVersion: iptables.MinCheckVersion,
+			expected:        proxyModeIptables,
+		},
 	}
 	for i, c := range cases {
 		getter := &fakeNodeInterface{}
-		getter.node.Annotations = map[string]string{c.annKey: c.annVal}
-		r := mayTryIptablesProxy(c.flag, getter, "host")
+		getter.node.Annotations = map[string]string{c.annotationKey: c.annotationVal}
+		versioner := &fakeIptablesVersioner{c.iptablesVersion, c.iptablesError}
+		r := getProxyMode(c.flag, getter, "host", versioner)
 		if r != c.expected {
-			t.Errorf("Case[%d] Expected %t, got %t", i, c.expected, r)
+			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
 		}
 	}
 }
