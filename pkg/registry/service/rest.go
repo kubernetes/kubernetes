@@ -172,13 +172,13 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id)
 }
 
-func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
 	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
 // It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, options)
 }
 
