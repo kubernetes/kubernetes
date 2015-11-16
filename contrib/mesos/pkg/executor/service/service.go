@@ -40,12 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
-const (
-	// if we don't use this source then the kubelet will do funny, mirror things.
-	// @see ConfigSourceAnnotationKey
-	MESOS_CFG_SOURCE = kubelet.ApiserverSource
-)
-
 type KubeletExecutorServer struct {
 	*app.KubeletServer
 	SuicideTimeout    time.Duration
@@ -77,8 +71,14 @@ func (s *KubeletExecutorServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.LaunchGracePeriod, "mesos-launch-grace-period", s.LaunchGracePeriod, "Launch grace period after which launching tasks will be cancelled. Zero disables launch cancellation.")
 }
 
-func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate, nodeInfos chan<- executor.NodeInfo, kubeletFinished <-chan struct{},
-	staticPodsConfigPath string, apiclient *client.Client) error {
+func (s *KubeletExecutorServer) runExecutor(
+	execUpdates chan<- kubelet.PodUpdate,
+	nodeInfos chan<- executor.NodeInfo,
+	kubeletFinished <-chan struct{},
+	staticPodsConfigPath string,
+	apiclient *client.Client,
+	podLW *cache.ListWatch,
+) error {
 	exec := executor.New(executor.Config{
 		Updates:         execUpdates,
 		APIClient:       apiclient,
@@ -109,10 +109,8 @@ func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate
 			return status, nil
 		},
 		StaticPodsConfigPath: staticPodsConfigPath,
-		PodLW: cache.NewListWatchFromClient(apiclient, "pods", api.NamespaceAll,
-			fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
-		),
-		NodeInfos: nodeInfos,
+		PodLW:                podLW,
+		NodeInfos:            nodeInfos,
 	})
 
 	// initialize driver and initialize the executor with it
@@ -139,8 +137,14 @@ func (s *KubeletExecutorServer) runExecutor(execUpdates chan<- kubelet.PodUpdate
 	return nil
 }
 
-func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate, nodeInfos <-chan executor.NodeInfo, kubeletDone chan<- struct{},
-	staticPodsConfigPath string, apiclient *client.Client) error {
+func (s *KubeletExecutorServer) runKubelet(
+	execUpdates <-chan kubelet.PodUpdate,
+	nodeInfos <-chan executor.NodeInfo,
+	kubeletDone chan<- struct{},
+	staticPodsConfigPath string,
+	apiclient *client.Client,
+	podLW *cache.ListWatch,
+) error {
 	kcfg, err := s.KubeletConfig()
 	if err == nil {
 		// apply Messo specific settings
@@ -193,17 +197,8 @@ func (s *KubeletExecutorServer) runKubelet(execUpdates <-chan kubelet.PodUpdate,
 			}
 		}()
 
-		// create main pod source
-		updates := kcfg.PodConfig.Channel(MESOS_CFG_SOURCE)
-		go func() {
-			// execUpdates will be closed by the executor on shutdown
-			defer close(executorDone)
-
-			for u := range execUpdates {
-				u.Source = MESOS_CFG_SOURCE
-				updates <- u
-			}
-		}()
+		// create main pod source, it will close executorDone when the executor updates stop flowing
+		newSourceMesos(executorDone, execUpdates, kcfg.PodConfig.Channel(mesosSource), podLW)
 
 		// create static-pods directory file source
 		log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
@@ -251,14 +246,18 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		return fmt.Errorf("cannot create API client: %v", err)
 	}
 
+	pw := cache.NewListWatchFromClient(apiclient, "pods", api.NamespaceAll,
+		fields.OneTermEqualSelector(client.PodHost, s.HostnameOverride),
+	)
+
 	// start executor
-	err = s.runExecutor(execUpdates, nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient)
+	err = s.runExecutor(execUpdates, nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient, pw)
 	if err != nil {
 		return err
 	}
 
 	// start kubelet, blocking
-	return s.runKubelet(execUpdates, nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient)
+	return s.runKubelet(execUpdates, nodeInfos, kubeletFinished, staticPodsConfigPath, apiclient, pw)
 }
 
 func defaultBindingAddress() string {

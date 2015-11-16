@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package archive provides utilities to archive and unarchive filesystem
-// hierarchies.
-package archive
+// podutil contains utilities for reading, writing and filtering streams
+// and lists of api.Pod objects.
+package podutil
