@@ -515,8 +515,8 @@ func (f *stubVolume) GetPath() string {
 	return f.path
 }
 
-func (f *stubVolume) IsReadOnly() bool {
-	return false
+func (f *stubVolume) GetAttributes() volume.Attributes {
+	return volume.Attributes{}
 }
 
 func (f *stubVolume) SetUp() error {
@@ -525,14 +525,6 @@ func (f *stubVolume) SetUp() error {
 
 func (f *stubVolume) SetUpAt(dir string) error {
 	return nil
-}
-
-func (f *stubVolume) SupportsSELinux() bool {
-	return false
-}
-
-func (f *stubVolume) SupportsOwnershipManagement() bool {
-	return false
 }
 
 func TestMakeVolumeMounts(t *testing.T) {

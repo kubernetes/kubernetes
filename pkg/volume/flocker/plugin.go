@@ -113,10 +113,14 @@ type flockerBuilder struct {
 	readOnly bool
 }
 
-func (_ *flockerBuilder) SupportsOwnershipManagement() bool {
-	return false
+func (b flockerBuilder) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.readOnly,
+		Managed:                     false,
+		SupportsOwnershipManagement: false,
+		SupportsSELinux:             false,
+	}
 }
-
 func (b flockerBuilder) GetPath() string {
 	return b.flocker.path
 }
@@ -199,14 +203,6 @@ func (b flockerBuilder) SetUpAt(dir string) error {
 	b.flocker.path = s.Path
 	volumeutil.SetReady(b.getMetaDir())
 	return nil
-}
-
-func (b flockerBuilder) IsReadOnly() bool {
-	return b.readOnly
-}
-
-func (b flockerBuilder) SupportsSELinux() bool {
-	return false
 }
 
 // updateDatasetPrimary will update the primary in Flocker and wait for it to

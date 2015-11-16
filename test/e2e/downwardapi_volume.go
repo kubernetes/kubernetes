@@ -29,62 +29,24 @@ var _ = Describe("Downward API volume", func() {
 	f := NewFramework("downward-api")
 
 	It("should provide labels and annotations files [Conformance]", func() {
+		podName := "downwardapi-volume-" + string(util.NewUUID())
+		pod := downwardAPIVolumePod(podName)
+
+		testContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+			fmt.Sprintf("cluster=\"rack10\"\n"),
+			fmt.Sprintf("builder=\"john-doe\"\n"),
+			fmt.Sprintf("%s\n", podName),
+		}, f.Namespace.Name)
+	})
+
+	It("should provide labels and annotations files as non-root with fsgroup [Conformance] [Skipped]", func() {
 		podName := "metadata-volume-" + string(util.NewUUID())
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:        podName,
-				Labels:      map[string]string{"cluster": "rack10"},
-				Annotations: map[string]string{"builder": "john-doe"},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:    "client-container",
-						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"sh", "-c", "cat /etc/labels /etc/annotations /etc/podname"},
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      "podinfo",
-								MountPath: "/etc",
-								ReadOnly:  false,
-							},
-						},
-					},
-				},
-				Volumes: []api.Volume{
-					{
-						Name: "podinfo",
-						VolumeSource: api.VolumeSource{
-							DownwardAPI: &api.DownwardAPIVolumeSource{
-								Items: []api.DownwardAPIVolumeFile{
-									{
-										Path: "labels",
-										FieldRef: api.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.labels",
-										},
-									},
-									{
-										Path: "annotations",
-										FieldRef: api.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.annotations",
-										},
-									},
-									{
-										Path: "podname",
-										FieldRef: api.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.name",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				RestartPolicy: api.RestartPolicyNever,
-			},
+		uid := int64(1001)
+		gid := int64(1234)
+		pod := downwardAPIVolumePod(podName)
+		pod.Spec.SecurityContext = &api.PodSecurityContext{
+			RunAsUser: &uid,
+			FSGroup:   &gid,
 		}
 		testContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
 			fmt.Sprintf("cluster=\"rack10\"\n"),
@@ -93,5 +55,64 @@ var _ = Describe("Downward API volume", func() {
 		}, f.Namespace.Name)
 	})
 })
+
+func downwardAPIVolumePod(name string) *api.Pod {
+	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:        name,
+			Labels:      map[string]string{"cluster": "rack10"},
+			Annotations: map[string]string{"builder": "john-doe"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    "client-container",
+					Image:   "gcr.io/google_containers/busybox",
+					Command: []string{"sh", "-c", "cat /etc/labels /etc/annotations /etc/podname"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "podinfo",
+							MountPath: "/etc",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "podinfo",
+					VolumeSource: api.VolumeSource{
+						DownwardAPI: &api.DownwardAPIVolumeSource{
+							Items: []api.DownwardAPIVolumeFile{
+								{
+									Path: "labels",
+									FieldRef: api.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.labels",
+									},
+								},
+								{
+									Path: "annotations",
+									FieldRef: api.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.annotations",
+									},
+								},
+								{
+									Path: "podname",
+									FieldRef: api.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.name",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+}
 
 // TODO: add test-webserver example as pointed out in https://github.com/kubernetes/kubernetes/pull/5093#discussion-diff-37606771

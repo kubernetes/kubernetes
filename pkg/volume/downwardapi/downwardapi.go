@@ -107,8 +107,14 @@ type downwardAPIVolumeBuilder struct {
 // downwardAPIVolumeBuilder implements volume.Builder interface
 var _ volume.Builder = &downwardAPIVolumeBuilder{}
 
-func (_ *downwardAPIVolumeBuilder) SupportsOwnershipManagement() bool {
-	return false
+// downward API volumes are always ReadOnlyManaged
+func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    true,
+		Managed:                     true,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
 
 // SetUp puts in place the volume plugin.
@@ -150,15 +156,6 @@ func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
 
 	glog.V(3).Infof("Data dumped for downwardAPI volume %v for pod %v/%v", b.volName, b.pod.Namespace, b.pod.Name)
 	return nil
-}
-
-// IsReadOnly func to fulfill volume.Builder interface
-func (d *downwardAPIVolume) IsReadOnly() bool {
-	return true
-}
-
-func (d *downwardAPIVolume) SupportsSELinux() bool {
-	return true
 }
 
 // collectData collects requested downwardAPI in data map.

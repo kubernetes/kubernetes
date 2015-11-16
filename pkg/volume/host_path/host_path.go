@@ -167,8 +167,13 @@ type hostPathBuilder struct {
 
 var _ volume.Builder = &hostPathBuilder{}
 
-func (_ *hostPathBuilder) SupportsOwnershipManagement() bool {
-	return false
+func (b *hostPathBuilder) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.readOnly,
+		Managed:                     false,
+		SupportsOwnershipManagement: false,
+		SupportsSELinux:             false,
+	}
 }
 
 // SetUp does nothing.
@@ -179,14 +184,6 @@ func (b *hostPathBuilder) SetUp() error {
 // SetUpAt does not make sense for host paths - probably programmer error.
 func (b *hostPathBuilder) SetUpAt(dir string) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
-}
-
-func (b *hostPathBuilder) IsReadOnly() bool {
-	return b.readOnly
-}
-
-func (b *hostPathBuilder) SupportsSELinux() bool {
-	return false
 }
 
 func (b *hostPathBuilder) GetPath() string {

@@ -62,7 +62,7 @@ func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.
 	}
 	// Perform a bind mount to the full path to allow duplicate mounts of the same disk.
 	options := []string{"bind"}
-	if b.IsReadOnly() {
+	if (&b).GetAttributes().ReadOnly {
 		options = append(options, "ro")
 	}
 	err = mounter.Mount(globalPDPath, volPath, "", options)
