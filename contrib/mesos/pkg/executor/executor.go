@@ -30,9 +30,9 @@ import (
 	bindings "github.com/mesos/mesos-go/executor"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
-	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
+	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
 	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
@@ -205,10 +205,18 @@ func (k *Executor) isDone() bool {
 	}
 }
 
-// sendPodUpdate assumes that caller is holding state lock; returns true when update is sent otherwise false
-func (k *Executor) sendPodUpdate(u *kubetypes.PodUpdate) bool {
+// sendPodsSnapshot assumes that caller is holding state lock; returns true when update is sent otherwise false
+func (k *Executor) sendPodsSnapshot() bool {
 	if k.isDone() {
 		return false
+	}
+	snapshot := make([]*api.Pod, 0, len(k.pods))
+	for _, v := range k.pods {
+		snapshot = append(snapshot, v)
+	}
+	u := &kubetypes.PodUpdate{
+		Op:   kubetypes.SET,
+		Pods: snapshot,
 	}
 	k.updateChan <- *u
 	return true
@@ -227,7 +235,10 @@ func (k *Executor) Registered(driver bindings.ExecutorDriver,
 	}
 
 	if executorInfo != nil && executorInfo.Data != nil {
-		k.initializeStaticPodsSource(executorInfo.Data)
+		err := k.initializeStaticPodsSource(slaveInfo.GetHostname(), executorInfo.Data)
+		if err != nil {
+			log.Errorf("failed to initialize static pod configuration: %v", err)
+		}
 	}
 
 	if slaveInfo != nil {
@@ -240,10 +251,7 @@ func (k *Executor) Registered(driver bindings.ExecutorDriver,
 	// emit an empty update to allow the mesos "source" to be marked as seen
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	k.sendPodUpdate(&kubetypes.PodUpdate{
-		Pods: []*api.Pod{},
-		Op:   kubetypes.SET,
-	})
+	k.sendPodsSnapshot()
 
 	if slaveInfo != nil && k.nodeInfos != nil {
 		k.nodeInfos <- nodeInfo(slaveInfo, executorInfo) // leave it behind the upper lock to avoid panics
@@ -280,13 +288,15 @@ func (k *Executor) Reregistered(driver bindings.ExecutorDriver, slaveInfo *mesos
 }
 
 // initializeStaticPodsSource unzips the data slice into the static-pods directory
-func (k *Executor) initializeStaticPodsSource(data []byte) {
+func (k *Executor) initializeStaticPodsSource(hostname string, data []byte) error {
 	log.V(2).Infof("extracting static pods config to %s", k.staticPodsConfigPath)
-	err := archive.UnzipDir(data, k.staticPodsConfigPath)
-	if err != nil {
-		log.Errorf("Failed to extract static pod config: %v", err)
-		return
-	}
+	// annotate the pod with BindingHostKey so that the scheduler will ignore the pod
+	// once it appears in the pod registry. the stock kubelet sets the pod host in order
+	// to accomplish the same; we do this because the k8sm scheduler works differently.
+	annotator := podutil.Annotator(map[string]string{
+		meta.BindingHostKey: hostname,
+	})
+	return podutil.WriteToDir(annotator.Do(podutil.Gunzip(data)), k.staticPodsConfigPath)
 }
 
 // Disconnected is called when the executor is disconnected from the slave.
@@ -390,10 +400,7 @@ func (k *Executor) handleChangedApiserverPod(pod *api.Pod) {
 			oldPod.DeletionTimestamp = pod.DeletionTimestamp
 			oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
 
-			k.sendPodUpdate(&kubetypes.PodUpdate{
-				Op:   kubetypes.UPDATE,
-				Pods: []*api.Pod{oldPod},
-			})
+			k.sendPodsSnapshot()
 		}
 	}
 }
@@ -557,17 +564,14 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, taskId string, pod
 	//TODO(jdef) check for duplicate pod name, if found send TASK_ERROR
 
 	// send the new pod to the kubelet which will spin it up
-	ok := k.sendPodUpdate(&kubetypes.PodUpdate{
-		Op:   kubetypes.ADD,
-		Pods: []*api.Pod{pod},
-	})
-	if !ok {
-		return // executor is terminating, cancel launch
-	}
-
-	// mark task as sent by setting the podName and register the sent pod
 	task.podName = podFullName
 	k.pods[podFullName] = pod
+	ok := k.sendPodsSnapshot()
+	if !ok {
+		task.podName = ""
+		delete(k.pods, podFullName)
+		return // executor is terminating, cancel launch
+	}
 
 	// From here on, we need to delete containers associated with the task upon
 	// it going into a terminal state.
@@ -752,7 +756,7 @@ func (k *Executor) removePodTask(driver bindings.ExecutorDriver, tid, reason str
 	k.resetSuicideWatch(driver)
 
 	pid := task.podName
-	pod, found := k.pods[pid]
+	_, found := k.pods[pid]
 	if !found {
 		log.Warningf("Cannot remove unknown pod %v for task %v", pid, tid)
 	} else {
@@ -760,10 +764,7 @@ func (k *Executor) removePodTask(driver bindings.ExecutorDriver, tid, reason str
 		delete(k.pods, pid)
 
 		// tell the kubelet to remove the pod
-		k.sendPodUpdate(&kubetypes.PodUpdate{
-			Op:   kubetypes.REMOVE,
-			Pods: []*api.Pod{pod},
-		})
+		k.sendPodsSnapshot()
 	}
 	// TODO(jdef): ensure that the update propagates, perhaps return a signal chan?
 	k.sendStatus(driver, newStatus(mutil.NewTaskID(tid), state, reason))

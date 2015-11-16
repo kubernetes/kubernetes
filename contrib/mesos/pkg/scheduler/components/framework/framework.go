@@ -547,7 +547,6 @@ func (k *framework) SlaveLost(driver bindings.SchedulerDriver, slaveId *mesos.Sl
 // ExecutorLost is called when some executor is lost.
 func (k *framework) ExecutorLost(driver bindings.SchedulerDriver, executorId *mesos.ExecutorID, slaveId *mesos.SlaveID, status int) {
 	log.Infof("Executor %v of slave %v is lost, status: %v\n", executorId, slaveId, status)
-	// TODO(yifan): Restart any unfinished tasks of the executor.
 }
 
 // Error is called when there is an unrecoverable error in the scheduler or scheduler driver.
