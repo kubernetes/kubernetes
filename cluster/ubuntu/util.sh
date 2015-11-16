@@ -117,10 +117,10 @@ function verify-cluster() {
     if [ "${roles[${ii}]}" == "a" ]; then
       verify-master
     elif [ "${roles[${ii}]}" == "i" ]; then
-      verify-node $i
+      verify-node "$i"
     elif [ "${roles[${ii}]}" == "ai" ]; then
       verify-master
-      verify-node $i
+      verify-node "$i"
     else
       echo "unsupported role for ${i}. please check"
       exit 1
@@ -142,12 +142,12 @@ function verify-master() {
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-      ssh $SSH_OPTS "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
+      ssh $SSH_OPTS "$MASTER" "pgrep -f '${daemon}'" >/dev/null 2>&1 || {
         echo -n "."
         validated="1"
         ((try_count=try_count+1))
         if [[ ${try_count} -gt ${max_try_count} ]]; then
-          echo -e "\nWarning: Process \"${daemon}\" failed to run on ${MASTER}, please check.\n"
+          echo -e "\nWarning: Process '${daemon}' failed to run on ${MASTER}, please check.\n"
           exit 1
         fi
         sleep 2
@@ -169,12 +169,12 @@ function verify-node() {
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-      ssh $SSH_OPTS "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
+      ssh $SSH_OPTS "$1" "pgrep -f '${daemon}'" >/dev/null 2>&1 || {
         echo -n "."
         validated="1"
         ((try_count=try_count+1))
         if [[ ${try_count} -gt ${max_try_count} ]]; then
-          echo -e "\nWarning: Process \"${daemon}\" failed to run on ${1}, please check.\n"
+          echo -e "\nWarning: Process '${daemon}' failed to run on ${1}, please check.\n"
           exit 1
         fi
         sleep 2
@@ -263,13 +263,11 @@ EOF
 # Assumed vars:
 #   MASTER_NAME
 # Vars set:
-#   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
   setClusterInfo
-  KUBE_MASTER=${MASTER}
-  KUBE_MASTER_IP=${MASTER_IP}
+  KUBE_MASTER_IP="${MASTER_IP}"
   echo "Using master $MASTER_IP"
 }
 
@@ -280,7 +278,7 @@ function detect-master() {
 # Vars set:
 #   KUBE_NODE_IP_ADDRESS (array)
 function detect-nodes() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
   KUBE_NODE_IP_ADDRESSES=()
   setClusterInfo
@@ -296,7 +294,7 @@ function detect-nodes() {
   done
 
   if [[ -z "${KUBE_NODE_IP_ADDRESSES[@]}" ]]; then
-    echo -e "Could not detect Kubernetes node nodes.\
+    echo "Could not detect Kubernetes node nodes.\
     Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
@@ -304,12 +302,12 @@ function detect-nodes() {
 
 # Instantiate a kubernetes cluster on ubuntu
 function kube-up() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
   # ensure the binaries are well prepared
-  if [ ! -f "ubuntu/binaries/master/kube-apiserver" ]; then
-    echo -n "No local binaries for kube-up, downloading..."
-    ${KUBE_ROOT}/cluster/ubuntu/build.sh
+  if [[ ! -f "ubuntu/binaries/master/kube-apiserver" ]]; then
+    echo "No local binaries for kube-up, downloading..."
+    "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
   fi
 
   setClusterInfo
@@ -323,7 +321,7 @@ function kube-up() {
       elif [ "${roles[${ii}]}" == "ai" ]; then
         provision-masterandnode
       elif [ "${roles[${ii}]}" == "i" ]; then
-        provision-node $i
+        provision-node "$i"
       else
         echo "unsupported role for ${i}. Please check"
         exit 1
@@ -350,15 +348,15 @@ function kube-up() {
 
 function provision-master() {
   
-  echo -e "Deploying master on machine ${MASTER_IP}\n"
+  echo -e "\nDeploying master on machine ${MASTER_IP}"
 
-  ssh $SSH_OPTS $MASTER "mkdir -p ~/kube/default"
+  ssh $SSH_OPTS "$MASTER" "mkdir -p ~/kube/default"
 
   # copy the binaries and scripts to the ~/kube directory on the master
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
     ubuntu/reconfDocker.sh \
-    ubuntu/config-default.sh \
+    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
     ubuntu/util.sh \
     ubuntu/master/* \
     ubuntu/binaries/master/ \
@@ -373,10 +371,10 @@ function provision-master() {
     DNS:kubernetes.default.svc.cluster.local
   )
   
-  EXTRA_SANS=$(echo ${EXTRA_SANS[@]} | tr ' ' ',')
+  EXTRA_SANS=$(echo "${EXTRA_SANS[@]}" | tr ' ' ,)
 
   # remote login to MASTER and configue k8s master
-  ssh $SSH_OPTS -t ${MASTER} "
+  ssh $SSH_OPTS -t "${MASTER}" "
     source ~/kube/util.sh
 
     setClusterInfo
@@ -394,11 +392,11 @@ function provision-master() {
       cp ~/kube/init_scripts/* /etc/init.d/
       
       groupadd -f -r kube-cert
-      "${PROXY_SETTING}" ~/kube/make-ca-cert.sh "${MASTER_IP}" "${EXTRA_SANS}"
+      \"${PROXY_SETTING}\" ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
-      FLANNEL_NET="${FLANNEL_NET}" ~/kube/reconfDocker.sh a
+      FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh a
       '" || {
       echo "Deploying master on machine ${MASTER_IP} failed"
       exit 1
@@ -407,13 +405,13 @@ function provision-master() {
 
 function provision-node() {
   
-  echo -e "Deploying node on machine ${1#*@}\n"
+  echo -e "\nDeploying node on machine ${1#*@}"
 
   ssh $SSH_OPTS $1 "mkdir -p ~/kube/default"
 
   # copy the binaries and scripts to the ~/kube directory on the node
   scp -r $SSH_OPTS \
-    ubuntu/config-default.sh \
+    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
     ubuntu/util.sh \
     ubuntu/reconfDocker.sh \
     ubuntu/minion/* \
@@ -421,7 +419,7 @@ function provision-node() {
     "${1}:~/kube"
 
   # remote login to node and configue k8s node
-  ssh $SSH_OPTS -t $1 "
+  ssh $SSH_OPTS -t "$1" "
     source ~/kube/util.sh
     
     setClusterInfo
@@ -457,7 +455,7 @@ function provision-masterandnode() {
   # scp order matters
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
-    ubuntu/config-default.sh \
+    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
     ubuntu/util.sh \
     ubuntu/minion/* \
     ubuntu/master/* \
@@ -475,10 +473,10 @@ function provision-masterandnode() {
     DNS:kubernetes.default.svc.cluster.local
   )
   
-  EXTRA_SANS=$(echo ${EXTRA_SANS[@]} | tr ' ' ',')
+  EXTRA_SANS=$(echo "${EXTRA_SANS[@]}" | tr ' ' ,)
 
   # remote login to the master/node and configue k8s
-  ssh $SSH_OPTS -t $MASTER "
+  ssh $SSH_OPTS -t "$MASTER" "
     source ~/kube/util.sh
      
     setClusterInfo
@@ -503,13 +501,13 @@ function provision-masterandnode() {
       cp ~/kube/init_scripts/* /etc/init.d/
       
       groupadd -f -r kube-cert
-      "${PROXY_SETTING}" ~/kube/make-ca-cert.sh "${MASTER_IP}" "${EXTRA_SANS}"
+      \"${PROXY_SETTING}\" ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/ 
       cp ~/kube/master/* /opt/bin/
       cp ~/kube/minion/* /opt/bin/
 
       service etcd start
-      FLANNEL_NET="${FLANNEL_NET}" ~/kube/reconfDocker.sh ai
+      FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh ai
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
       exit 1
@@ -520,7 +518,7 @@ function provision-masterandnode() {
 function kube-down() {
   
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
   source "${KUBE_ROOT}/cluster/common.sh"
 
   tear_down_alive_resources
@@ -529,7 +527,7 @@ function kube-down() {
   for i in ${nodes}; do
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
         echo "Cleaning on master ${i#*@}"
-        ssh $SSH_OPTS -t $i "
+        ssh $SSH_OPTS -t "$i" "
           pgrep etcd && \
           sudo -p '[sudo] password to stop master: ' -- /bin/bash -c '
             service etcd stop
@@ -546,7 +544,7 @@ function kube-down() {
         " || echo "Cleaning on master ${i#*@} failed"
       elif [[ "${roles[${ii}]}" == "i" ]]; then
         echo "Cleaning on node ${i#*@}"
-        ssh $SSH_OPTS -t $i "
+        ssh $SSH_OPTS -t "$i" "
           pgrep flanneld && \
           sudo -p '[sudo] password to stop node: ' -- /bin/bash -c '
             service flanneld stop            
@@ -556,7 +554,7 @@ function kube-down() {
         echo "unsupported role for ${i}"
       fi
       
-      ssh $SSH_OPTS -t $i "sudo -- /bin/bash -c '
+      ssh $SSH_OPTS -t "$i" "sudo -- /bin/bash -c '
         rm -f \
           /opt/bin/kube* \
           /opt/bin/flanneld \
@@ -580,7 +578,8 @@ function kube-down() {
 # Perform common upgrade setup tasks
 function prepare-push() {
   # Use local binaries for kube-push
-  if [[ -z ${KUBE_VERSION} ]]; then
+  if [[ -z "${KUBE_VERSION}" ]]; then
+    echo "Use local binaries for kube-push" 
     if [[ ! -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
       echo "No local binaries.Please check"
       exit 1
@@ -589,15 +588,15 @@ function prepare-push() {
       sleep 3
     fi
   else
-    # Run build.sh to get the required release 
+    # Run download-release.sh to get the required release 
     export KUBE_VERSION
-    ${KUBE_ROOT}/cluster/ubuntu/build.sh
+    "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
   fi
 }
 
 # Update a kubernetes master with expected release
 function push-master() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
   
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -611,7 +610,7 @@ function push-master() {
   for i in ${nodes}; do
     if [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
       echo "Cleaning master ${i#*@}"
-      ssh $SSH_OPTS -t $i "
+      ssh $SSH_OPTS -t "$i" "
         pgrep etcd && sudo -p '[sudo] stop the all process: ' -- /bin/bash -c '
         service etcd stop
         sleep 3
@@ -652,7 +651,7 @@ function push-master() {
 
 # Update a kubernetes node with expected release
 function push-node() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/minion/kubelet" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -665,12 +664,12 @@ function push-node() {
   
   local node_ip=${1}
   local ii=0
-  local localexisting=false
+  local existing=false
 
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "i" && ${i#*@} == $node_ip ]]; then
+    if [[ "${roles[${ii}]}" == "i" && ${i#*@} == "$node_ip" ]]; then
       echo "Cleaning node ${i#*@}"
-      ssh $SSH_OPTS -t $i "
+      ssh $SSH_OPTS -t "$i" "
         sudo -p '[sudo] stop the all process: ' -- /bin/bash -c '
           service flanneld stop
 
@@ -689,9 +688,9 @@ function push-node() {
 
           rm -rf ~/kube
         '" || echo "Cleaning node ${i#*@} failed"
-      provision-node $i
+      provision-node "$i"
       existing=true
-    elif [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]] && [[ ${i#*@} == $node_ip ]]; then
+    elif [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]] && [[ ${i#*@} == "$node_ip" ]]; then
       echo "${i} is master node, please try ./kube-push -m instead"
       existing=true
     elif [[ "${roles[${ii}]}" == "i" || "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
@@ -714,7 +713,7 @@ function push-node() {
 # Update a kubernetes cluster with expected source
 function kube-push() { 
   prepare-push
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -727,7 +726,7 @@ function kube-push() {
   for i in ${nodes}; do
      if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
        echo "Cleaning on master ${i#*@}"
-       ssh $SSH_OPTS -t $i "
+       ssh $SSH_OPTS -t "$i" "
         pgrep etcd && \
         sudo -p '[sudo] password to stop master: ' -- /bin/bash -c '
           service etcd stop
@@ -749,7 +748,7 @@ function kube-push() {
         echo "unsupported role for ${i}"
       fi
 
-      ssh $SSH_OPTS -t $i "sudo -- /bin/bash -c '
+      ssh $SSH_OPTS -t "$i" "sudo -- /bin/bash -c '
         rm -f \
           /opt/bin/kube* \
           /opt/bin/flanneld
@@ -776,7 +775,7 @@ function kube-push() {
     if [[ "${roles[${ii}]}" == "a" ]]; then
       provision-master
     elif [[ "${roles[${ii}]}" == "i" ]]; then
-      provision-node $i
+      provision-node "$i"
     elif [[ "${roles[${ii}]}" == "ai" ]]; then
       provision-masterandnode
     else
