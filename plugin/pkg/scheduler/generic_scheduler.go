@@ -19,6 +19,7 @@ package scheduler
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 
@@ -87,32 +88,20 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	return g.selectHost(priorityList)
 }
 
-// This method takes a prioritized list of nodes, shuffles those with the highest scores to the
-// front of the list, and then picks one randomly from the nodes that had the highest score.
+// This method takes a prioritized list of nodes and sorts them in reverse order based on scores
+// and then picks one randomly from the nodes that had the highest score
 func (g *genericScheduler) selectHost(priorityList algorithm.HostPriorityList) (string, error) {
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
-	max := priorityList[0].Score
-	n := 0
-	for i, hostEntry := range priorityList {
-		if hostEntry.Score < max {
-			continue
-		}
-		if hostEntry.Score > max {
-			max = hostEntry.Score
-			n = 0
-		}
-		priorityList[i], priorityList[n] = priorityList[n], priorityList[i]
-		n++
-	}
-	if n == 1 {
-		return priorityList[0].Host, nil
-	}
+	sort.Sort(sort.Reverse(priorityList))
 
+	hosts := getBestHosts(priorityList)
 	g.randomLock.Lock()
 	defer g.randomLock.Unlock()
-	return priorityList[g.random.Intn(n)].Host, nil
+
+	ix := g.random.Int() % len(hosts)
+	return hosts[ix], nil
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
@@ -188,6 +177,18 @@ func PrioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfig
 		result = append(result, algorithm.HostPriority{Host: host, Score: score})
 	}
 	return result, nil
+}
+
+func getBestHosts(list algorithm.HostPriorityList) []string {
+	result := []string{}
+	for _, hostEntry := range list {
+		if hostEntry.Score == list[0].Score {
+			result = append(result, hostEntry.Host)
+		} else {
+			break
+		}
+	}
+	return result
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
