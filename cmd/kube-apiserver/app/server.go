@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -130,7 +131,7 @@ func NewAPIServer() *APIServer {
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
-		EtcdPathPrefix:         master.DefaultEtcdPathPrefix,
+		EtcdPathPrefix:         genericapiserver.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		CertDirectory:          "/var/run/kubernetes",
@@ -314,7 +315,7 @@ func generateStorageVersionMap(legacyVersion string, storageVersions string) map
 }
 
 // parse the value of --etcd-servers-overrides and update given storageDestinations.
-func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, storageDestinations *master.StorageDestinations, newEtcdFn newEtcdFunc) {
+func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc) {
 	if len(overrides) == 0 {
 		return
 	}
@@ -448,7 +449,7 @@ func (s *APIServer) Run(_ []string) error {
 		return err
 	}
 
-	storageDestinations := master.NewStorageDestinations()
+	storageDestinations := genericapiserver.NewStorageDestinations()
 
 	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
 	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
@@ -539,36 +540,39 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	config := &master.Config{
-		StorageDestinations:       storageDestinations,
-		StorageVersions:           storageVersions,
-		EventTTL:                  s.EventTTL,
-		KubeletClient:             kubeletClient,
-		ServiceClusterIPRange:     &n,
-		EnableCoreControllers:     true,
-		EnableLogsSupport:         s.EnableLogsSupport,
-		EnableUISupport:           true,
-		EnableSwaggerSupport:      true,
-		EnableProfiling:           s.EnableProfiling,
-		EnableWatchCache:          s.EnableWatchCache,
-		EnableIndex:               true,
-		APIPrefix:                 s.APIPrefix,
-		APIGroupPrefix:            s.APIGroupPrefix,
-		CorsAllowedOriginList:     s.CorsAllowedOriginList,
-		ReadWritePort:             s.SecurePort,
-		PublicAddress:             s.AdvertiseAddress,
-		Authenticator:             authenticator,
-		SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
-		Authorizer:                authorizer,
-		AdmissionControl:          admissionController,
-		APIGroupVersionOverrides:  apiGroupVersionOverrides,
-		MasterServiceNamespace:    s.MasterServiceNamespace,
-		ExternalHost:              s.ExternalHost,
-		MinRequestTimeout:         s.MinRequestTimeout,
-		ProxyDialer:               proxyDialerFn,
-		ProxyTLSClientConfig:      proxyTLSClientConfig,
-		Tunneler:                  tunneler,
-		ServiceNodePortRange:      s.ServiceNodePortRange,
-		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
+		Config: &genericapiserver.Config{
+			StorageDestinations:       storageDestinations,
+			StorageVersions:           storageVersions,
+			ServiceClusterIPRange:     &n,
+			EnableLogsSupport:         s.EnableLogsSupport,
+			EnableUISupport:           true,
+			EnableSwaggerSupport:      true,
+			EnableProfiling:           s.EnableProfiling,
+			EnableWatchCache:          s.EnableWatchCache,
+			EnableIndex:               true,
+			APIPrefix:                 s.APIPrefix,
+			APIGroupPrefix:            s.APIGroupPrefix,
+			CorsAllowedOriginList:     s.CorsAllowedOriginList,
+			ReadWritePort:             s.SecurePort,
+			PublicAddress:             s.AdvertiseAddress,
+			Authenticator:             authenticator,
+			SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
+			Authorizer:                authorizer,
+			AdmissionControl:          admissionController,
+			APIGroupVersionOverrides:  apiGroupVersionOverrides,
+			MasterServiceNamespace:    s.MasterServiceNamespace,
+			ExternalHost:              s.ExternalHost,
+			MinRequestTimeout:         s.MinRequestTimeout,
+			ProxyDialer:               proxyDialerFn,
+			ProxyTLSClientConfig:      proxyTLSClientConfig,
+			ServiceNodePortRange:      s.ServiceNodePortRange,
+			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
+		},
+		EnableCoreControllers: true,
+		EventTTL:              s.EventTTL,
+		KubeletClient:         kubeletClient,
+
+		Tunneler: tunneler,
 	}
 	m := master.New(config)
 
@@ -682,7 +686,7 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 }
 
 // Parses the given runtime-config and formats it into map[string]ApiGroupVersionOverride
-func (s *APIServer) parseRuntimeConfig() (map[string]master.APIGroupVersionOverride, error) {
+func (s *APIServer) parseRuntimeConfig() (map[string]genericapiserver.APIGroupVersionOverride, error) {
 	// "api/all=false" allows users to selectively enable specific api versions.
 	disableAllAPIs := false
 	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
@@ -703,9 +707,9 @@ func (s *APIServer) parseRuntimeConfig() (map[string]master.APIGroupVersionOverr
 	disableV1 := disableAllAPIs
 	v1GroupVersion := "api/v1"
 	disableV1 = !s.getRuntimeConfigValue(v1GroupVersion, !disableV1)
-	apiGroupVersionOverrides := map[string]master.APIGroupVersionOverride{}
+	apiGroupVersionOverrides := map[string]genericapiserver.APIGroupVersionOverride{}
 	if disableV1 {
-		apiGroupVersionOverrides[v1GroupVersion] = master.APIGroupVersionOverride{
+		apiGroupVersionOverrides[v1GroupVersion] = genericapiserver.APIGroupVersionOverride{
 			Disable: true,
 		}
 	}
@@ -717,7 +721,7 @@ func (s *APIServer) parseRuntimeConfig() (map[string]master.APIGroupVersionOverr
 	// TODO: Make this a loop over all group/versions when there are more of them.
 	disableExtensions = !s.getRuntimeConfigValue(extensionsGroupVersion, !disableExtensions)
 	if disableExtensions {
-		apiGroupVersionOverrides[extensionsGroupVersion] = master.APIGroupVersionOverride{
+		apiGroupVersionOverrides[extensionsGroupVersion] = genericapiserver.APIGroupVersionOverride{
 			Disable: true,
 		}
 	}
