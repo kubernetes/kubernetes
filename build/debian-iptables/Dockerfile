@@ -1,4 +1,4 @@
-FROM debian
+FROM debian:jessie
 
 # All apt-get's must be in one run command or the
 # cleanup has no effect.
