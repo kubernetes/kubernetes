@@ -430,10 +430,6 @@ func getConfigFromFileOrDie(filename string) *clientcmdapi.Config {
 		return clientcmdapi.NewConfig()
 	}
 
-	if config.Clusters == nil {
-		config.Clusters = map[string]*clientcmdapi.Cluster{}
-	}
-
 	return config
 }
 
