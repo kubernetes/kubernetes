@@ -40,7 +40,7 @@ import (
 const (
 	PodInfraContainerName  = leaky.PodInfraContainerName
 	DockerPrefix           = "docker://"
-	PodInfraContainerImage = "beta.gcr.io/google_containers/pause:2.0"
+	PodInfraContainerImage = "gcr.io/google_containers/pause:2.0"
 	LogSuffix              = "log"
 )
 

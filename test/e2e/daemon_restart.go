@@ -208,7 +208,7 @@ var _ = Describe("DaemonRestart", func() {
 			Client:      framework.Client,
 			Name:        rcName,
 			Namespace:   ns,
-			Image:       "beta.gcr.io/google_containers/pause:2.0",
+			Image:       "gcr.io/google_containers/pause:2.0",
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
