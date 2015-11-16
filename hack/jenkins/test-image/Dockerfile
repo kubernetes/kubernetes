@@ -24,7 +24,8 @@ ENV TERM                    xterm
 WORKDIR /workspace
 
 RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
-RUN apt-get install -y file
+# libapparmor1 is needed for docker-in-docker.
+RUN apt-get install -y file libapparmor1
 RUN mkdir -p /go/src/k8s.io/kubernetes
 RUN ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
 
