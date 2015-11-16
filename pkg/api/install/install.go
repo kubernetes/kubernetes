@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -47,6 +48,9 @@ func init() {
 		glog.V(4).Infof("%v", err)
 		return
 	}
+
+	worstToBestGroupVersions := []unversioned.GroupVersion{}
+
 	// Use the first API version in the list of registered versions as the latest.
 	registeredGroupVersions := registered.GroupVersionsForGroup("")
 	groupVersion := registeredGroupVersions[0]
@@ -61,6 +65,7 @@ func init() {
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
 		versions = append(versions, registeredGroupVersions[i].Version)
 		groupVersions = append(groupVersions, registeredGroupVersions[i].String())
+		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
 	}
 	groupMeta.Versions = versions
 	groupMeta.GroupVersions = groupVersions
@@ -89,7 +94,7 @@ func init() {
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")
 
-	mapper := api.NewDefaultRESTMapper("", versions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 	groupMeta.RESTMapper = mapper

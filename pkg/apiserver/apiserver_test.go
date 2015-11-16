@@ -107,8 +107,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	gvStrings := []string{testGroupVersion.String(), newGroupVersion.String()}
-	return meta.NewDefaultRESTMapper(testAPIGroup, gvStrings, interfacesFor)
+	return meta.NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
 }
 
 func addGrouplessTypes() {
@@ -176,11 +175,13 @@ func init() {
 	// the mapper how to address our resources
 	for _, gv := range groupVersions {
 		for kind := range api.Scheme.KnownTypes(gv.String()) {
+			gvk := gv.WithKind(kind)
+
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(meta.RESTScopeRoot, kind, gv.String(), false)
+				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
 			} else {
-				nsMapper.Add(meta.RESTScopeNamespace, kind, gv.String(), false)
+				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
 			}
 		}
 	}
