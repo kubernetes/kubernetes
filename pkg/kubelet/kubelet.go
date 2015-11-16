@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -111,6 +112,19 @@ const (
 	housekeepingPeriod = time.Second * 2
 
 	etcHostsPath = "/etc/hosts"
+
+	// Capacity of the channel for recieving pod lifecycle events. This number
+	// is a bit arbitrary and may be adjusted in the future.
+	plegChannelCapacity = 1000
+
+	// Generic PLEG relies on relisting for discovering container events.
+	// The period directly affects the response time of kubelet.
+	plegRelistPeriod = time.Second * 3
+
+	// backOffPeriod is the period to back off when pod syncing resulting in an
+	// error. It is also used as the base period for the exponential backoff
+	// container restarts and image pulls.
+	backOffPeriod = time.Second * 10
 )
 
 var (
@@ -351,6 +365,7 @@ func NewMainKubelet(
 			serializeImagePulls,
 		)
 
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -372,6 +387,7 @@ func NewMainKubelet(
 		}
 		klet.containerRuntime = rktRuntime
 		klet.imageManager = rkt.NewImageManager(rktRuntime)
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
 
 		// No Docker daemon to put in a container.
 		dockerDaemonContainer = ""
@@ -425,11 +441,9 @@ func NewMainKubelet(
 	}
 	klet.runtimeCache = runtimeCache
 	klet.workQueue = queue.NewBasicWorkQueue()
-	// TODO(yujuhong): backoff and resync interval should be set differently
-	// once we switch to using pod event generator.
-	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, klet.resyncInterval)
+	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod)
 
-	klet.backOff = util.NewBackOff(resyncInterval, MaxContainerBackOff)
+	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
 	return klet, nil
@@ -557,6 +571,9 @@ type Kubelet struct {
 	//    status. Kubelet may fail to update node status reliably if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
+
+	// Generates pod events.
+	pleg pleg.PodLifecycleEventGenerator
 
 	// The name of the resource-only container to run the Kubelet in (empty for no container).
 	// Name must be absolute.
@@ -871,6 +888,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Run the system oom watcher forever.
 	kl.statusManager.Start()
+	// Start the pod lifecycle event generator.
+	kl.pleg.Start()
 	kl.syncLoop(updates, kl)
 }
 
@@ -2124,20 +2143,21 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	// sync interval is defaulted to 10s.
 	syncTicker := time.NewTicker(time.Second)
 	housekeepingTicker := time.NewTicker(housekeepingPeriod)
+	plegCh := kl.pleg.Watch()
 	for {
 		if rs := kl.runtimeState.errors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C) {
+		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C, plegCh) {
 			break
 		}
 	}
 }
 
 func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler SyncHandler,
-	syncCh <-chan time.Time, housekeepingCh <-chan time.Time) bool {
+	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
 	kl.syncLoopMonitor.Store(time.Now())
 	select {
 	case u, open := <-updates:
@@ -2146,6 +2166,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			return false
 		}
 		kl.addSource(u.Source)
+
 		switch u.Op {
 		case kubetypes.ADD:
 			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, kubeletutil.FormatPodNames(u.Pods))
@@ -2160,6 +2181,25 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
+	case e := <-plegCh:
+		// Filter out started events since we don't use them now.
+		if e.Type == pleg.ContainerStarted {
+			break
+		}
+		pod, ok := kl.podManager.GetPodByUID(e.ID)
+		if !ok {
+			// If the pod no longer exists, ignore the event.
+			glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
+			break
+		}
+		glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", kubeletutil.FormatPodName(pod), e)
+		// Force the container runtime cache to update.
+		if err := kl.runtimeCache.ForceUpdateIfOlder(time.Now()); err != nil {
+			glog.Errorf("SyncLoop: unable to update runtime cache")
+			// TODO (yujuhong): should we delay the sync until container
+			// runtime can be updated?
+		}
+		handler.HandlePodSyncs([]*api.Pod{pod})
 	case <-syncCh:
 		podsToSync := kl.getPodsToSync()
 		if len(podsToSync) == 0 {

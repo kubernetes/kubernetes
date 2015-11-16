@@ -216,7 +216,7 @@ func NewKubeletServer() *KubeletServer {
 		RootDirectory:                  defaultRootDir,
 		SerializeImagePulls:            true,
 		StreamingConnectionIdleTimeout: 5 * time.Minute,
-		SyncFrequency:                  10 * time.Second,
+		SyncFrequency:                  1 * time.Minute,
 		SystemContainer:                "",
 		ReconcileCIDR:                  true,
 		KubeAPIQPS:                     5.0,
