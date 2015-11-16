@@ -57,13 +57,8 @@ DOCKER_CONF=""
 # Configure docker net settings, then restart it
 # $lsb_dist is detected in kube-deploy/common.sh
 # TODO: deal with ubuntu 15.04
-case "$lsb_dist" in
-    amzn)
-        DOCKER_CONF="/etc/sysconfig/docker"
-        echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-        ifconfig docker0 down
-        yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
-    ;;
+# Configure docker net settings, then restart it
+case "${lsb_dist}" in
     centos)
         DOCKER_CONF="/etc/sysconfig/docker"
         echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
@@ -72,17 +67,30 @@ case "$lsb_dist" in
         fi
         ifconfig docker0 down
         yum -y -q install bridge-utils && brctl delbr docker0 && systemctl restart docker
-    ;;
+        ;;
+    amzn)
+        DOCKER_CONF="/etc/sysconfig/docker"
+        echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+        ifconfig docker0 down
+        yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
+        ;;
     ubuntu|debian)
         DOCKER_CONF="/etc/default/docker"
         echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
         ifconfig docker0 down
-        apt-get install bridge-utils && brctl delbr docker0 && service docker restart
-    ;;
+        apt-get install bridge-utils
+        brctl delbr docker0
+        service docker stop
+        while [ `ps aux | grep /usr/bin/docker | grep -v grep | wc -l` -gt 0 ]; do
+            echo "Waiting for docker to terminate"
+            sleep 1
+        done
+        service docker start
+        ;;
     *)
-        echo "Unsupported operations system $lsb_dist"
+        echo "Unsupported operations system ${lsb_dist}"
         exit 1
-    ;;
+        ;;
 esac
 
 # Wait for docker daemon ready

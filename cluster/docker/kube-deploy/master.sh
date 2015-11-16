@@ -20,9 +20,6 @@ set -e
 
 source ~/docker/kube-deploy/common.sh
 
-# REGISTER_MASTER_KUBELET set in util.sh & passed here as $1
-REGISTER_MASTER_KUBELET=$1
-
 # Start k8s components in containers
 function start_k8s(){
     
@@ -53,7 +50,7 @@ function start_k8s(){
         MASTER_CONF=""
     fi
 
-    # if REGISTER_MASTER_KUBELET is set from $1, deploy this machine as "both master & node"
+    # if REGISTER_MASTER_KUBELET is set to 'yes', deploy this machine as "both master & node"
     if [[ "yes" == $REGISTER_MASTER_KUBELET ]]; then
         # This machine will register itself to this local master
         REGISTER_MASTER_KUBELET="--api-servers=http://localhost:8080"
@@ -64,7 +61,9 @@ function start_k8s(){
 
     # Start kubelet & proxy, then start master components as pods
     # TODO for now we did not use SSL/authorization, will be fixed soon
-    docker run --net=host --privileged --restart=always -d $MASTER_CONF \
+    docker run --restart=always \
+        -d \
+        $MASTER_CONF \
         -v /:/rootfs:ro \
         -v /sys:/sys:ro \
         -v /dev:/dev \
@@ -75,8 +74,12 @@ function start_k8s(){
         --privileged=true \
         --name=kube_in_docker_kubelet_$RANDOM \
         gcr.io/google_containers/hyperkube:v$K8S_VERSION \
-        /hyperkube kubelet --containerized $REGISTER_MASTER_KUBELET \
+        /hyperkube kubelet \
+        --containerized \
+        $REGISTER_MASTER_KUBELET \
         --config=/etc/kubernetes/manifests-multi/master.json \
+        --cluster-dns=$DNS_SERVER_IP \
+        --cluster-domain=$DNS_DOMAIN \
         $KUBELET_OPTS
 
     docker run -d --net=host --privileged --restart=always \

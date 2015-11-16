@@ -17,8 +17,9 @@
 ## Contains configuration values for the bare-metal cluster
 
 # (0) Versions
-export ETCD_VERSION=${ETCD_VERSION:-"2.0.12"}
-export K8S_VERSION=${K8S_VERSION:-"1.0.3"}
+# TODO(harryz) can these versions moved to kube-up.sh or some place unified?
+export ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
+export K8S_VERSION=${K8S_VERSION:-"1.1.2"}
 
 # (1) Cluster topology
 # And separated with blank space:
@@ -46,6 +47,12 @@ export SSH_OPTS=${SSH_OPTS:-"-oStrictHostKeyChecking=no -oUserKnownHostsFile=/de
 
 # (3) Networking
 export FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
-# Define the IP range used for flannel overlay network, should not conflict with SERVICE_CLUSTER_IP_RANGE
+# Define the IP range used for flannel overlay network
+# Should not conflict with --service-cluster-ip-range (10.0.0.1/24 by default)
 export FLANNEL_NET=${FLANNEL_NET:-10.16.0.0/16}
 
+# (4) DNS addon
+# DNS_SERVER_IP must be a IP in --service-cluster-ip-range (10.0.0.1/24 by default)
+export DNS_SERVER_IP=${DNS_SERVER_IP:-"10.0.0.10"}
+export DNS_DOMAIN=${DNS_DOMAIN:-"cluster.local"}
+export DNS_REPLICAS=${DNS_REPLICAS:-1}

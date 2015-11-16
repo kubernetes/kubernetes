@@ -28,7 +28,10 @@ function start_k8s() {
     $DESTROY_SH clear_old_components
 
     # start kubelet
-    docker run --net=host --privileged --restart=always -d \
+    docker run --net=host \
+        --privileged=true \
+        --restart=always \
+        -d \
         -v /:/rootfs:ro \
         -v /sys:/sys:ro \
         -v /dev:/dev \
@@ -37,8 +40,11 @@ function start_k8s() {
         -v /var/run:/var/run:rw \
         --name=kube_in_docker_kubelet_$RANDOM \
         gcr.io/google_containers/hyperkube:v$K8S_VERSION \
-        /hyperkube kubelet --containerized \
+        /hyperkube kubelet \
+        --containerized \
         --api-servers=http://$MASTER_IP:8080 \
+        --cluster-dns=$DNS_SERVER_IP \
+        --cluster-domain=$DNS_DOMAIN \
         $KUBELET_OPTS
 
     docker run -d --net=host --restart=always --privileged \

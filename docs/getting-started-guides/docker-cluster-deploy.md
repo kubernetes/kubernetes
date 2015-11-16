@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/docker-multinode.md).
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/docker-cluster-deploy.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -283,6 +283,8 @@ See [docker-multinode/master.md](docker-multinode/master.md) and [docker-multino
 
 2. ServiceAccounts can not work now: please track [#17213](https://github.com/kubernetes/kubernetes/pull/17213)
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-cluster-deploy.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

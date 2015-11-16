@@ -20,7 +20,7 @@ source ~/docker/kube-config/kubelet.env
 
 DESTROY_SH=~/docker/kube-deploy/destroy.sh
 
-: ${K8S_VERSION?"K8S_VERSION is not exported on Node"}
+: ${K8S_VERSION?"K8S_VERSION is not popultated on Node"}
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
@@ -42,12 +42,12 @@ function command_exists() {
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
 function detect_lsb() {
     case "$(uname -m)" in
-    *64)
-        ;;
-    *)
-        echo "[ERROR]: We currently only support 64-bit platforms."       
-        exit 1
-        ;;
+        *64)
+            ;;
+        *)
+            echo "Error: We currently only support 64-bit platforms."       
+            exit 1
+            ;;
     esac
 
     if command_exists lsb_release; then
@@ -68,6 +68,16 @@ function detect_lsb() {
 
     export lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
     echo "... ... OS distro Detected: $lsb_dist"
+
+    case "${lsb_dist}" in
+        amzn|centos|debian|ubuntu)
+            ;;
+        *)
+            echo "... ... Error: We currently only support ubuntu|debian|amzn|centos."
+            exit 1
+            ;;
+    esac
+
 }
 
 

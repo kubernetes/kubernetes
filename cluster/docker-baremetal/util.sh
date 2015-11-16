@@ -68,7 +68,6 @@ function verify-prereqs-baremetal {
 #
 # Assumed vars:
 #   MASTER
-#   REGISTER_MASTER_KUBELET
 #   SSH_OPTS
 function deploy-node-master-baremetal() {
   local files="${KUBE_ROOT}/cluster/images/hyperkube/master-multi.json \
@@ -78,8 +77,7 @@ function deploy-node-master-baremetal() {
   $SCP_TO_NODE $files $dest_dir
   
   local machine=$MASTER
-  # $REGISTER_MASTER_KUBELET is the flag that this machine is both master & node
-  local cmd="sudo bash ~/docker/kube-deploy/master.sh $REGISTER_MASTER_KUBELET;"
+  local cmd="sudo bash ~/docker/kube-deploy/master.sh;"
 
   # Remotely login to $MASTER and use $cmd to deploy k8s master
   $SSH_TO_NODE $machine $cmd
@@ -108,15 +106,19 @@ function deploy-node-baremetal() {
 # Destroy k8s cluster
 #
 # Assumed vars:
-#   node
+#   NODES
 #   SSH_OPTS
+#   MASTER
 function kube-down-baremetal() {
   for node in ${NODES}; do
   {
-    echo "... Cleaning on node ${node#*@}"
-    $SSH_TO_NODE $node "sudo bash ~/destroy.sh clear_all && rm -rf ~/docker/"
+    echo "... Cleaning on node ${node}"
+    $SSH_TO_NODE ${node} "sudo bash ~/docker/kube-deploy/destroy.sh clear_all && rm -rf ~/docker/"
   }
-  done 
+  done
+
+  echo "... Cleaning on MASTER ${MASTER}"
+  $SSH_TO_NODE ${MASTER} "sudo bash ~/docker/kube-deploy/destroy.sh clear_all && rm -rf ~/docker/" 
 }
 
 # Verify cluster
