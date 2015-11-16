@@ -28,7 +28,7 @@ var Codec = runtime.CodecFor(api.Scheme, "v1")
 
 func init() {
 	// Check if v1 is in the list of supported API versions.
-	if !registered.IsRegisteredAPIVersion("v1") {
+	if !registered.IsRegisteredAPIGroupVersion(unversioned.GroupVersion{Group: "", Version: "v1"}) {
 		return
 	}
 
