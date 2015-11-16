@@ -17,7 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"fmt"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -35,23 +34,16 @@ func RegisterRESTMapper(m meta.RESTMapper) {
 	RESTMapper = append(RESTMapper.(meta.MultiRESTMapper), m)
 }
 
-func NewDefaultRESTMapper(group string, groupVersionStrings []string, interfacesFunc meta.VersionInterfacesFunc,
+func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
 	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {
 
-	mapper := meta.NewDefaultRESTMapper(group, groupVersionStrings, interfacesFunc)
+	mapper := meta.NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
 	// our resources.
-	for _, gvString := range groupVersionStrings {
-		gv, err := unversioned.ParseGroupVersion(gvString)
-		// TODO stop panicing when the types are fixed
-		if err != nil {
-			panic(err)
-		}
-		if gv.Group != group {
-			panic(fmt.Sprintf("%q does not match the expect %q", gv.Group, group))
-		}
-
+	for _, gv := range defaultGroupVersions {
 		for kind, oType := range Scheme.KnownTypes(gv.String()) {
+			gvk := gv.WithKind(kind)
+
 			// TODO: Remove import path prefix check.
 			// We check the import path prefix because we currently stuff both "api" and "extensions" objects
 			// into the same group within Scheme since Scheme has no notion of groups yet.
@@ -62,7 +54,7 @@ func NewDefaultRESTMapper(group string, groupVersionStrings []string, interfaces
 			if rootScoped.Has(kind) {
 				scope = meta.RESTScopeRoot
 			}
-			mapper.Add(scope, kind, gv.String(), false)
+			mapper.Add(gvk, scope, false)
 		}
 	}
 	return mapper

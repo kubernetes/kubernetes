@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/metrics"
 	"k8s.io/kubernetes/pkg/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,6 +45,9 @@ func init() {
 		glog.V(4).Infof("%v", err)
 		return
 	}
+
+	worstToBestGroupVersions := []unversioned.GroupVersion{}
+
 	registeredGroupVersions := registered.GroupVersionsForGroup("metrics")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
@@ -57,6 +61,7 @@ func init() {
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
 		versions = append(versions, registeredGroupVersions[i].Version)
 		groupVersions = append(groupVersions, registeredGroupVersions[i].String())
+		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
 	}
 	groupMeta.Versions = versions
 	groupMeta.GroupVersions = groupVersions
@@ -69,7 +74,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper("metrics", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 }

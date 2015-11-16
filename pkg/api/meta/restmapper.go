@@ -69,7 +69,7 @@ var RESTScopeRoot = &restScope{
 // (`get pod bar` vs `get pods bar`)
 // TODO these maps should be keyed based on GroupVersionKinds
 type DefaultRESTMapper struct {
-	groupVersions []unversioned.GroupVersion
+	defaultGroupVersions []unversioned.GroupVersion
 
 	resourceToKind       map[string]unversioned.GroupVersionKind
 	kindToPluralResource map[unversioned.GroupVersionKind]string
@@ -89,12 +89,7 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
 // and the Kubernetes API conventions. Takes a group name, a priority list of the versions
 // to search when an object has no default version (set empty to return an error),
 // and a function that retrieves the correct codec and metadata for a given version.
-// TODO remove group when this API is fixed.  It is no longer used.
-// The external API for a RESTMapper is cross-version and this is currently called using
-// group/version tuples.  In the end, the structure may be easier to understand with
-// a GroupRESTMapper and CrossGroupRESTMapper, but for now, this one is constructed and
-// used a CrossGroupRESTMapper.
-func NewDefaultRESTMapper(group string, gvStrings []string, f VersionInterfacesFunc) *DefaultRESTMapper {
+func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f VersionInterfacesFunc) *DefaultRESTMapper {
 	resourceToKind := make(map[string]unversioned.GroupVersionKind)
 	kindToPluralResource := make(map[unversioned.GroupVersionKind]string)
 	kindToScope := make(map[unversioned.GroupVersionKind]RESTScope)
@@ -102,27 +97,19 @@ func NewDefaultRESTMapper(group string, gvStrings []string, f VersionInterfacesF
 	pluralToSingular := make(map[string]string)
 	// TODO: verify name mappings work correctly when versions differ
 
-	gvs := []unversioned.GroupVersion{}
-	for _, gvString := range gvStrings {
-		gvs = append(gvs, unversioned.ParseGroupVersionOrDie(gvString))
-	}
-
 	return &DefaultRESTMapper{
 		resourceToKind:       resourceToKind,
 		kindToPluralResource: kindToPluralResource,
 		kindToScope:          kindToScope,
-		groupVersions:        gvs,
+		defaultGroupVersions: defaultGroupVersions,
 		singularToPlural:     singularToPlural,
 		pluralToSingular:     pluralToSingular,
 		interfacesFunc:       f,
 	}
 }
 
-func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, gvString string, mixedCase bool) {
-	gv := unversioned.ParseGroupVersionOrDie(gvString)
-	gvk := gv.WithKind(kind)
-
-	plural, singular := KindToResource(kind, mixedCase)
+func (m *DefaultRESTMapper) Add(gvk unversioned.GroupVersionKind, scope RESTScope, mixedCase bool) {
+	plural, singular := KindToResource(gvk.Kind, mixedCase)
 	m.singularToPlural[singular] = plural
 	m.pluralToSingular[plural] = singular
 	_, ok1 := m.resourceToKind[plural]
@@ -223,7 +210,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 	}
 	// Use the default preferred versions
 	if !hadVersion && (groupVersion == nil) {
-		for _, currGroupVersion := range m.groupVersions {
+		for _, currGroupVersion := range m.defaultGroupVersions {
 			currGVK := currGroupVersion.WithKind(kind)
 			if _, ok := m.kindToPluralResource[currGVK]; ok {
 				groupVersion = &currGroupVersion
@@ -241,7 +228,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 	resource, ok := m.kindToPluralResource[gvk]
 	if !ok {
 		found := []unversioned.GroupVersion{}
-		for _, gv := range m.groupVersions {
+		for _, gv := range m.defaultGroupVersions {
 			if _, ok := m.kindToPluralResource[gvk]; ok {
 				found = append(found, gv)
 			}
