@@ -11,6 +11,16 @@ calicoctl:
     - makedirs: True
     - mode: 744
 
+calico-plugin:
+  file.managed:
+    - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
+    - source: https://github.com/projectcalico/calico-kubernetes/releases/download/v0.6.0/calico_kubernetes
+    - source_hash: sha512=5b95b837071daf6e413c76f22d7d423e74be9c0525230cd074ff3f8ecb724e6f5a7db8a31d6473b5f783096a4f12ce688dde3b5258f0d5949947df3635ac1613
+    - makedirs: True
+    - mode: 744
+    - require_in:
+      - service: kubelet
+
 plugin-config:
   file.managed:
     - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico_kubernetes.ini
@@ -21,7 +31,7 @@ plugin-config:
 
 calico-node:
   cmd.run:
-    - name: calicoctl node --kubernetes --kube-plugin-version=v0.6.0
+    - name: calicoctl node
     - unless: docker ps | grep calico-node
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
@@ -31,6 +41,7 @@ calico-node:
       - service: docker
       - file: calicoctl
       - file: plugin-config
+      - file: calico-plugin
 
 restart-kubelet:
   service.running:
