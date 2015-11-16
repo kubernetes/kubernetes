@@ -314,8 +314,6 @@ type containerStatusResult struct {
 	err    error
 }
 
-const podIPDownwardAPISelector = "status.podIP"
-
 // determineContainerIP determines the IP address of the given container.  It is expected
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
