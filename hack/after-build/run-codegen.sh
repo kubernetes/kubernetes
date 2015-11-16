@@ -23,8 +23,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-setgen=$(kube::util::find-binary "set-gen")
 clientgen=$(kube::util::find-binary "client-gen")
+deepcopygen=$(kube::util::find-binary "deepcopy-gen")
+setgen=$(kube::util::find-binary "set-gen")
 
 # Please do not add any logic to this shell script. Add logic to the go code
 # that generates the set-gen program.
@@ -33,6 +34,7 @@ clientgen=$(kube::util::find-binary "client-gen")
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
+${deepcopygen} "$@"
 ${setgen} "$@"
 
 # You may add additional calls of code generators like set-gen above.
