@@ -74,20 +74,22 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := latest.GroupOrDie("").RESTMapper.VersionAndKindForResource("replicationcontrollers"); err != nil || v != "v1" || k != "ReplicationController" {
-		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
+	gv := unversioned.GroupVersion{Group: "", Version: "v1"}
+	rcGVK := gv.WithKind("ReplicationController")
+	podTemplateGVK := gv.WithKind("PodTemplate")
+
+	if gvk, err := latest.GroupOrDie("").RESTMapper.KindFor("replicationcontrollers"); err != nil || gvk != rcGVK {
+		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	expectedGroupVersion := unversioned.GroupVersion{Version: "v1"}
-
-	if m, err := latest.GroupOrDie("").RESTMapper.RESTMapping("PodTemplate", ""); err != nil || m.GroupVersionKind.GroupVersion() != expectedGroupVersion || m.Resource != "podtemplates" {
+	if m, err := latest.GroupOrDie("").RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
 	for _, version := range latest.GroupOrDie("").Versions {
 		currGroupVersion := unversioned.GroupVersion{Version: version}
 
-		mapping, err := latest.GroupOrDie("").RESTMapper.RESTMapping("ReplicationController", currGroupVersion.String())
+		mapping, err := latest.GroupOrDie("").RESTMapper.RESTMapping(rcGVK.GroupKind(), currGroupVersion.String())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

@@ -150,7 +150,8 @@ type RESTMapper interface {
 	// KindFor takes a resource and returns back the unambiguous Kind (GroupVersionKind)
 	KindFor(resource string) (unversioned.GroupVersionKind, error)
 
-	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
+	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
 	ResourceIsValid(resource string) bool
