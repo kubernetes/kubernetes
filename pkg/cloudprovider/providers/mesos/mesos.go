@@ -30,8 +30,16 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+const (
+	ProviderName = "mesos"
+
+	// KubernetesExecutorName is shared between contrib/mesos and Mesos cloud provider.
+	// Because cloud provider -> contrib dependencies are forbidden, this constant
+	// is defined here, not in contrib.
+	KubernetesExecutorName = "Kubelet-Executor"
+)
+
 var (
-	ProviderName  = "mesos"
 	CloudProvider *MesosCloud
 
 	noHostNameSpecified = errors.New("No hostname specified")
@@ -182,7 +190,21 @@ func ipAddress(name string) (net.IP, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (c *MesosCloud) ExternalID(instance string) (string, error) {
-	ip, err := ipAddress(instance)
+	//TODO(jdef) use a timeout here? 15s?
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	nodes, err := c.client.listSlaves(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	node := nodes[instance]
+	if node == nil {
+		return "", cloudprovider.InstanceNotFound
+	}
+
+	ip, err := ipAddress(node.hostname)
 	if err != nil {
 		return "", err
 	}
@@ -194,9 +216,7 @@ func (c *MesosCloud) InstanceID(name string) (string, error) {
 	return "", nil
 }
 
-// List lists instances that match 'filter' which is a regular expression
-// which must match the entire instance name (fqdn).
-func (c *MesosCloud) List(filter string) ([]string, error) {
+func (c *MesosCloud) listNodes() (map[string]*slaveNode, error) {
 	//TODO(jdef) use a timeout here? 15s?
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
@@ -209,6 +229,16 @@ func (c *MesosCloud) List(filter string) ([]string, error) {
 		log.V(2).Info("no slaves found, are any running?")
 		return nil, nil
 	}
+	return nodes, nil
+}
+
+// List lists instances that match 'filter' which is a regular expression
+// which must match the entire instance name (fqdn).
+func (c *MesosCloud) List(filter string) ([]string, error) {
+	nodes, err := c.listNodes()
+	if err != nil {
+		return nil, err
+	}
 	filterRegex, err := regexp.Compile(filter)
 	if err != nil {
 		return nil, err
@@ -219,7 +249,23 @@ func (c *MesosCloud) List(filter string) ([]string, error) {
 			addr = append(addr, node.hostname)
 		}
 	}
-	return addr, err
+	return addr, nil
+}
+
+// ListWithKubelet list those instance which have no running kubelet, i.e. the
+// Kubernetes executor.
+func (c *MesosCloud) ListWithoutKubelet() ([]string, error) {
+	nodes, err := c.listNodes()
+	if err != nil {
+		return nil, err
+	}
+	addr := make([]string, 0, len(nodes))
+	for _, n := range nodes {
+		if !n.kubeletRunning {
+			addr = append(addr, n.hostname)
+		}
+	}
+	return addr, nil
 }
 
 // NodeAddresses returns the addresses of the specified instance.
