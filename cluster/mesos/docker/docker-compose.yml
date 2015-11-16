@@ -142,6 +142,7 @@ scheduler:
     --cluster-domain=cluster.local
     --mesos-executor-cpus=1.0
     --mesos-sandbox-overlay=/opt/sandbox-overlay.tar.gz
+    --static-pods-config=/opt/static-pods
     --v=4
     --executor-logv=4
     --profiling=true
@@ -149,6 +150,8 @@ scheduler:
   - etcd
   - mesosmaster1
   - apiserver
+  volumes:
+  - ./static-pod.json:/opt/static-pods/static-pod.json
 keygen:
   image: mesosphere/kubernetes-mesos-keygen
   command:

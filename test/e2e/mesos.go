@@ -17,12 +17,15 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/fields"
 )
 
 var _ = Describe("Mesos", func() {
@@ -49,5 +52,18 @@ var _ = Describe("Mesos", func() {
 			}
 		}
 		Expect(len(addr)).NotTo(Equal(""))
+	})
+
+	It("starts static pods on every node in the mesos cluster", func() {
+		client := framework.Client
+		expectNoError(allNodesReady(client, util.ForeverTestTimeout), "all nodes ready")
+
+		nodelist, err := client.Nodes().List(labels.Everything(), fields.Everything())
+		expectNoError(err, "nodes fetched from apiserver")
+
+		const ns = "static-pods"
+		numpods := len(nodelist.Items)
+		expectNoError(waitForPodsRunningReady(ns, numpods, util.ForeverTestTimeout),
+			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
 })
