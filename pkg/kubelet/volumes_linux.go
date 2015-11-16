@@ -28,8 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// Bitmask to OR with current ownership of volumes that allow ownership management by the Kubelet
-const managedOwnershipBitmask = os.FileMode(0660)
+// Bitmasks to OR with current ownership of volumes that allow ownership management by the Kubelet
+const (
+	rwMask = os.FileMode(0660)
+	roMask = os.FileMode(0440)
+)
 
 // manageVolumeOwnership modifies the given volume to be owned by fsGroup.
 func (kl *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, builder volume.Builder, fsGroup int64) error {
@@ -53,7 +56,12 @@ func (kl *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, bui
 			glog.Errorf("Chown failed on %v: %v", path, err)
 		}
 
-		err = kl.chmodRunner.Chmod(path, info.Mode()|managedOwnershipBitmask|os.ModeSetgid)
+		mask := rwMask
+		if builder.GetAttributes().ReadOnly {
+			mask = roMask
+		}
+
+		err = kl.chmodRunner.Chmod(path, info.Mode()|mask|os.ModeSetgid)
 		if err != nil {
 			glog.Errorf("Chmod failed on %v: %v", path, err)
 		}

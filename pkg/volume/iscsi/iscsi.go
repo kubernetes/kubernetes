@@ -158,8 +158,13 @@ type iscsiDiskBuilder struct {
 
 var _ volume.Builder = &iscsiDiskBuilder{}
 
-func (_ *iscsiDiskBuilder) SupportsOwnershipManagement() bool {
-	return true
+func (b *iscsiDiskBuilder) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.readOnly,
+		Managed:                     !b.readOnly,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
 
 func (b *iscsiDiskBuilder) SetUp() error {
@@ -180,14 +185,6 @@ type iscsiDiskCleaner struct {
 }
 
 var _ volume.Cleaner = &iscsiDiskCleaner{}
-
-func (b *iscsiDiskBuilder) IsReadOnly() bool {
-	return b.readOnly
-}
-
-func (b *iscsiDiskBuilder) SupportsSELinux() bool {
-	return true
-}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.

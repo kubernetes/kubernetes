@@ -147,8 +147,13 @@ type nfsBuilder struct {
 
 var _ volume.Builder = &nfsBuilder{}
 
-func (_ *nfsBuilder) SupportsOwnershipManagement() bool {
-	return false
+func (b *nfsBuilder) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.readOnly,
+		Managed:                     false,
+		SupportsOwnershipManagement: false,
+		SupportsSELinux:             false,
+	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -198,14 +203,6 @@ func (b *nfsBuilder) SetUpAt(dir string) error {
 		return err
 	}
 	return nil
-}
-
-func (b *nfsBuilder) IsReadOnly() bool {
-	return b.readOnly
-}
-
-func (b *nfsBuilder) SupportsSELinux() bool {
-	return false
 }
 
 //
