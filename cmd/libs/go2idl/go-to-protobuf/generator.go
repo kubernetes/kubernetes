@@ -44,6 +44,10 @@ type genProtoIDL struct {
 
 func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 	return []string{
+		"option (gogoproto.marshaler_all) = true;",
+		"option (gogoproto.sizer_all) = true;",
+		"option (gogoproto.unmarshaler_all) = true;",
+		"option (gogoproto.goproto_unrecognized_all) = false;",
 		"option (gogoproto.goproto_stringer_all) = false;",
 		"option (gogoproto.goproto_enum_prefix_all) = false;",
 		"option (gogoproto.goproto_getters_all) = false;",
@@ -244,10 +248,15 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) {
 
 	for i, field := range fields {
 		genComment(out, field.CommentLines, "  ")
-		if field.Repeated {
-			fmt.Fprintf(out, "  repeated ")
-		} else {
-			fmt.Fprintf(out, "  ")
+		fmt.Fprintf(out, "  ")
+		switch {
+		case field.Map:
+		case field.Repeated:
+			fmt.Fprintf(out, "repeated ")
+		case field.Optional:
+			fmt.Fprintf(out, "optional ")
+		default:
+			fmt.Fprintf(out, "required ")
 		}
 		sw.Do(`$.Type|local$ $.Name$ = $.Tag$`, field)
 		if len(field.Extras) > 0 {
@@ -280,6 +289,7 @@ type protoField struct {
 	Map      bool
 	Repeated bool
 	Optional bool
+	Nullable bool
 	Extras   map[string]string
 
 	CommentLines string
@@ -352,8 +362,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		if err := memberTypeToProtobufField(locator, field, t.Elem); err != nil {
 			return err
 		}
-		field.Optional = true
-		field.OptionalSet = true
+		field.Nullable = true
 	case types.Alias:
 		if err := memberTypeToProtobufField(locator, field, t.Underlying); err != nil {
 			return err
@@ -373,8 +382,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 			return errUnrecognizedType
 		}
 		field.Type, err = locator.ProtoTypeFor(t)
-		field.Optional = false
-		field.OptionalSet = true
+		field.Nullable = false
 	default:
 		return errUnrecognizedType
 	}
@@ -475,20 +483,20 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 			if len(field.Name) == 0 && len(parts[0]) != 0 {
 				field.Name = parts[0]
 			}
-			if len(parts) > 1 {
+			/*if len(parts) > 1 {
 				for _, s := range parts[1:] {
 					switch s {
 					case "omitempty":
 						// TODO: make this nullable
-						if !field.OptionalSet {
-							field.Optional = true
-							field.OptionalSet = true
-						}
+						//if !field.OptionalSet {
+						//	field.Optional = true
+						//	field.OptionalSet = true
+						//}
 					case "inline":
 						// TODO: inline all members, give them contextual tag that is non-conflicting
 					}
 				}
-			}
+			}*/
 		}
 
 		if field.Type == nil {
@@ -503,21 +511,18 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 		if field.Map && field.Repeated {
 			// maps cannot be repeated
 			field.Repeated = false
-			// this preserves the distinction between an empty map and a nil map, but might be better implemented another way
-			field.Optional = true
-			field.OptionalSet = true
+			field.Nullable = true
 		}
 		// embedded fields that are not repeated should be considered required
-		if m.Embedded && !field.Repeated && !field.OptionalSet {
-			field.Optional = false
-			field.OptionalSet = true
-		}
-		if field.Repeated && isPackable(field.Type) {
-			field.Extras["packed"] = "true"
-		}
-		// optional, non-proto3 native types can be embedded
-		if !field.Optional && (field.Type.Kind != typesKindProtobuf || !isPrivateGoName(field.Type.Name.Name)) {
+		//if m.Embedded && !field.Repeated {
+		//	field.Nullable = false
+		//}
+
+		if !field.Nullable {
 			field.Extras["(gogoproto.nullable)"] = "false"
+		}
+		if (field.Type.Name.Name == "bytes" && field.Type.Name.Package == "") || (field.Repeated && field.Type.Name.Package == "" && isPrivateGoName(field.Type.Name.Name)) {
+			delete(field.Extras, "(gogoproto.nullable)")
 		}
 		if field.Name != m.Name {
 			field.Extras["(gogoproto.customname)"] = strconv.Quote(m.Name)
@@ -595,7 +600,7 @@ func (ft protoIDLFileType) AssembleFile(f *generator.File, pathname string) erro
 func (ft protoIDLFileType) assemble(w io.Writer, f *generator.File) {
 	w.Write(f.Header)
 
-	fmt.Fprint(w, "syntax = 'proto3';\n\n")
+	fmt.Fprint(w, "syntax = 'proto2';\n\n")
 
 	if len(f.PackageName) > 0 {
 		fmt.Fprintf(w, "package %v;\n\n", f.PackageName)

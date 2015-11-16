@@ -34,11 +34,12 @@ import (
 )
 
 var (
-	inputPackages = flag.StringP("input-packages", "i" /*"k8s.io/kubernetes/pkg/api,k8s.io/kubernetes/pkg/apis/extensions"*/, "", "comma-separated list of directories to get input types from.")
-	packages      = flag.StringP("packages", "p", "-k8s.io/kubernetes/pkg/util,-k8s.io/kubernetes/pkg/runtime,k8s.io/kubernetes/pkg/api/unversioned,k8s.io/kubernetes/pkg/api/v1,k8s.io/kubernetes/pkg/apis/extensions/v1beta1", "comma-separated list of directories to get input types from.")
-	outputBase    = flag.StringP("output-base", "o", filepath.Join(os.Getenv("GOPATH"), "src"), "Output base; defaults to $GOPATH/src/")
-	protoImport   = flag.String("proto-import", os.Getenv("PROTO_PATH"), "The search path for the core protobuf .protos, required.")
-	onlyIDL       = flag.Bool("only-idl", false, "If true, only generate the IDL for each package.")
+	inputPackages        = flag.StringP("input-packages", "i" /*"k8s.io/kubernetes/pkg/api,k8s.io/kubernetes/pkg/apis/extensions"*/, "", "comma-separated list of directories to get input types from.")
+	packages             = flag.StringP("packages", "p", "-k8s.io/kubernetes/pkg/util/intstr,-k8s.io/kubernetes/pkg/runtime,k8s.io/kubernetes/pkg/api/unversioned,k8s.io/kubernetes/pkg/api/v1,k8s.io/kubernetes/pkg/apis/extensions/v1beta1", "comma-separated list of directories to get input types from.")
+	outputBase           = flag.StringP("output-base", "o", filepath.Join(os.Getenv("GOPATH"), "src"), "Output base; defaults to $GOPATH/src/")
+	protoImport          = flag.String("proto-import", os.Getenv("PROTO_PATH"), "The search path for the core protobuf .protos, required.")
+	onlyIDL              = flag.Bool("only-idl", false, "If true, only generate the IDL for each package.")
+	skipGeneratedRewrite = flag.Bool("skip-generated-rewrite", false, "If true, skip fixing up the generated.pb.go file (debugging only).")
 )
 
 const (
@@ -120,7 +121,7 @@ func main() {
 	if len(*protoImport) != 0 {
 		searchArgs = append(searchArgs, "-I", *protoImport)
 	}
-	args := append(searchArgs, fmt.Sprintf("--gogofaster_out=%s", *outputBase))
+	args := append(searchArgs, fmt.Sprintf("--gogo_out=%s", *outputBase))
 
 	for _, p := range generatedPackages {
 		path := filepath.Join(*outputBase, p.ImportPath())
@@ -132,8 +133,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("Unable to generate protoc: %v", err)
 		}
-		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.GoPackageName(), p.HasGoType); err != nil {
-			log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
+		if !*skipGeneratedRewrite {
+			if err := RewriteGeneratedGogoProtobufFile(outputPath, p.GoPackageName(), p.HasGoType); err != nil {
+				log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
+			}
 		}
 	}
 }
