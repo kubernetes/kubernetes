@@ -287,6 +287,7 @@ manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
 num_nodes: $(echo "${NUM_MINIONS}")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
+kubelet_port: '$(echo "$KUBELET_PORT")'
 EOF
 
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
