@@ -240,6 +240,16 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 		config.Contexts[key] = obj
 	}
 
+	if config.AuthInfos == nil {
+		config.AuthInfos = map[string]*clientcmdapi.AuthInfo{}
+	}
+	if config.Clusters == nil {
+		config.Clusters = map[string]*clientcmdapi.Cluster{}
+	}
+	if config.Contexts == nil {
+		config.Contexts = map[string]*clientcmdapi.Context{}
+	}
+
 	return config, nil
 }
 
