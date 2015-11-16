@@ -430,7 +430,7 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(gvk.Kind, gvk.GroupVersion().String())
+		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(gvk.Kind, gvk.GroupVersion().String())
+		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, err
 		}

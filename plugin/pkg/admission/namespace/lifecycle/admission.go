@@ -61,7 +61,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
-	mapping, err := api.RESTMapper.RESTMapping(gvk.Kind, gvk.GroupVersion().String())
+	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}

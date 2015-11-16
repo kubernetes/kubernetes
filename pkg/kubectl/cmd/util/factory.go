@@ -567,12 +567,16 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 // PrintObject prints an api object given command line flags to modify the output format
 func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
 	mapper, _ := f.Object()
-	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	gvString, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return err
+	}
+	gv, err := unversioned.ParseGroupVersion(gvString)
 	if err != nil {
 		return err
 	}
 
-	mapping, err := mapper.RESTMapping(kind)
+	mapping, err := mapper.RESTMapping(unversioned.GroupKind{Group: gv.Group, Kind: kind})
 	if err != nil {
 		return err
 	}

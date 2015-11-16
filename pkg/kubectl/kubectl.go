@@ -51,13 +51,13 @@ type OutputVersionMapper struct {
 }
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
-	mapping, err := m.RESTMapper.RESTMapping(kind, m.OutputVersion)
+func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	mapping, err := m.RESTMapper.RESTMapping(gk, m.OutputVersion)
 	if err == nil {
 		return mapping, nil
 	}
 
-	return m.RESTMapper.RESTMapping(kind, versions...)
+	return m.RESTMapper.RESTMapping(gk, versions...)
 }
 
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes

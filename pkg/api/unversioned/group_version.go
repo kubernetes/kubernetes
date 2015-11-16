@@ -22,6 +22,21 @@ import (
 	"strings"
 )
 
+// GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
+// concepts during lookup stages without having partially valid types
+type GroupKind struct {
+	Group string
+	Kind  string
+}
+
+func (gk GroupKind) WithVersion(version string) GroupVersionKind {
+	return GroupVersionKind{Group: gk.Group, Version: version, Kind: gk.Kind}
+}
+
+func (gk *GroupKind) String() string {
+	return gk.Group + ", Kind=" + gk.Kind
+}
+
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
 type GroupVersionKind struct {
@@ -33,6 +48,10 @@ type GroupVersionKind struct {
 // TODO remove this
 func NewGroupVersionKind(gv GroupVersion, kind string) GroupVersionKind {
 	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
+}
+
+func (gvk GroupVersionKind) GroupKind() GroupKind {
+	return GroupKind{Group: gvk.Group, Kind: gvk.Kind}
 }
 
 func (gvk GroupVersionKind) GroupVersion() GroupVersion {
