@@ -151,7 +151,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return clients.ClientConfigForVersion("")
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
+			gvk, err := api.RESTMapper.KindFor(mapping.Resource)
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +159,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			switch group {
+			switch gvk.Group {
 			case "":
 				return client.RESTClient, nil
 			case "extensions":
@@ -168,7 +168,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			group, err := api.RESTMapper.GroupForResource(mapping.Resource)
+			gvk, err := api.RESTMapper.KindFor(mapping.Resource)
 			if err != nil {
 				return nil, err
 			}
@@ -176,7 +176,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			if describer, ok := kubectl.DescriberFor(group, mapping.GroupVersionKind.Kind, client); ok {
+			if describer, ok := kubectl.DescriberFor(gvk.Group, mapping.GroupVersionKind.Kind, client); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
@@ -497,11 +497,11 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredGroupVersions)
 	}
 	resource, _ := meta.KindToResource(kind, false)
-	group, err := c.mapper.GroupForResource(resource)
+	gvk, err := c.mapper.KindFor(resource)
 	if err != nil {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
 	}
-	if group == "extensions" {
+	if gvk.Group == "extensions" {
 		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}

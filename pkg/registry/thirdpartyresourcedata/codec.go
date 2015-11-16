@@ -39,15 +39,17 @@ type thirdPartyResourceDataMapper struct {
 	group   string
 }
 
+var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
+
 func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
 	return resource == strings.ToLower(t.kind)+"s"
 }
 
-func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string, error) {
+func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	if t.isThirdPartyResource(resource) {
-		return t.group, nil
+		return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}, nil
 	}
-	return t.mapper.GroupForResource(resource)
+	return t.mapper.KindFor(resource)
 }
 
 func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, groupVersions ...string) (*meta.RESTMapping, error) {
@@ -74,13 +76,6 @@ func (t *thirdPartyResourceDataMapper) AliasesForResource(resource string) ([]st
 
 func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return t.mapper.ResourceSingularizer(resource)
-}
-
-func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
-	if t.isThirdPartyResource(resource) {
-		return t.version, t.kind, nil
-	}
-	return t.mapper.VersionAndKindForResource(resource)
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource

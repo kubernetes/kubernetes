@@ -80,6 +80,8 @@ type DefaultRESTMapper struct {
 	interfacesFunc VersionInterfacesFunc
 }
 
+var _ RESTMapper = &DefaultRESTMapper{}
+
 // VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
 type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
@@ -163,21 +165,12 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resource string) (singular stri
 }
 
 // VersionAndKindForResource implements RESTMapper
-func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (gvString, kind string, err error) {
+func (m *DefaultRESTMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	gvk, ok := m.resourceToKind[strings.ToLower(resource)]
 	if !ok {
-		return "", "", fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
+		return gvk, fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
 	}
-	return gvk.GroupVersion().String(), gvk.Kind, nil
-}
-
-func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
-	gvk, exists := m.resourceToKind[strings.ToLower(resource)]
-	if !exists {
-		return "", fmt.Errorf("in group for resource, no resource %q has been defined", resource)
-	}
-
-	return gvk.Group, nil
+	return gvk, nil
 }
 
 // RESTMapping returns a struct representing the resource path and conversion interfaces a
@@ -295,7 +288,7 @@ func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource
 func (m *DefaultRESTMapper) ResourceIsValid(resource string) bool {
-	_, _, err := m.VersionAndKindForResource(resource)
+	_, err := m.KindFor(resource)
 	return err == nil
 }
 
@@ -317,21 +310,9 @@ func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string,
 // VersionAndKindForResource provides the Version and Kind  mappings for the
 // REST resources. This implementation supports multiple REST schemas and return
 // the first match.
-func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+func (m MultiRESTMapper) KindFor(resource string) (gvk unversioned.GroupVersionKind, err error) {
 	for _, t := range m {
-		defaultVersion, kind, err = t.VersionAndKindForResource(resource)
-		if err == nil {
-			return
-		}
-	}
-	return
-}
-
-// GroupForResource provides the Group mappings for the REST resources. This
-// implementation supports multiple REST schemas and returns the first match.
-func (m MultiRESTMapper) GroupForResource(resource string) (group string, err error) {
-	for _, t := range m {
-		group, err = t.GroupForResource(resource)
+		gvk, err = t.KindFor(resource)
 		if err == nil {
 			return
 		}

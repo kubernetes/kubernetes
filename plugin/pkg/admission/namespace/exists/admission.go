@@ -49,11 +49,11 @@ type exists struct {
 }
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
-	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
+	gvk, err := api.RESTMapper.KindFor(a.GetResource())
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
-	mapping, err := api.RESTMapper.RESTMapping(kind, defaultVersion)
+	mapping, err := api.RESTMapper.RESTMapping(gvk.Kind, gvk.GroupVersion().String())
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
