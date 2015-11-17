@@ -21,6 +21,9 @@ import (
 	"syscall"
 )
 
+// ErrExecutableNotFound is returned if the executable is not found.
+var ErrExecutableNotFound = osexec.ErrNotFound
+
 // Interface is an interface that presents a subset of the os/exec API.  Use this
 // when you want to inject fakeable/mockable exec behavior.
 type Interface interface {
@@ -81,13 +84,17 @@ func (cmd *cmdWrapper) SetDir(dir string) {
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).CombinedOutput()
 	if err != nil {
-		ee, ok := err.(*osexec.ExitError)
-		if !ok {
-			return out, err
+		if ee, ok := err.(*osexec.ExitError); ok {
+			// Force a compile fail if exitErrorWrapper can't convert to ExitError.
+			var x ExitError = &exitErrorWrapper{ee}
+			return out, x
 		}
-		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &exitErrorWrapper{ee}
-		return out, x
+		if ee, ok := err.(*osexec.Error); ok {
+			if ee.Err == osexec.ErrNotFound {
+				return out, ErrExecutableNotFound
+			}
+		}
+		return out, err
 	}
 	return out, nil
 }
