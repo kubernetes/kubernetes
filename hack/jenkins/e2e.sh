@@ -453,6 +453,8 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gce-soak-weekly"}
     : ${E2E_UP:="false"}
+    # Clear out any orphaned namespaces in case previous run was interrupted.
+    : ${E2E_CLEAN_START:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
@@ -481,6 +483,8 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
     : ${E2E_UP:="false"}
+    # Clear out any orphaned namespaces in case previous run was interrupted.
+    : ${E2E_CLEAN_START:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
@@ -749,6 +753,8 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="gke-soak-weekly"}
     : ${E2E_DOWN:="false"}
     : ${E2E_UP:="false"}
+    # Clear out any orphaned namespaces in case previous run was interrupted.
+    : ${E2E_CLEAN_START:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
@@ -1448,6 +1454,7 @@ export KUBE_SKIP_CONFIRMATIONS=y
 export E2E_UP="${E2E_UP:-true}"
 export E2E_TEST="${E2E_TEST:-true}"
 export E2E_DOWN="${E2E_DOWN:-true}"
+export E2E_CLEAN_START="${E2E_CLEAN_START:-}"
 # Used by hack/ginkgo-e2e.sh to enable ginkgo's parallel test runner.
 export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
 
