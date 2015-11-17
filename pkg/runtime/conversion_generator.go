@@ -111,6 +111,22 @@ func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVer
 	return nil
 }
 
+// primitiveConversion returns true if the two types can be converted via a cast.
+func primitiveConversion(inType, outType reflect.Type) (string, bool) {
+	switch inType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		switch outType.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+			reflect.Float32, reflect.Float64:
+			return outType.Name(), true
+		}
+	}
+	return "", false
+}
+
 func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect.Type) error {
 	existingConversion := g.scheme.Converter().HasConversionFunc(inType, outType) && g.scheme.Converter().HasConversionFunc(outType, inType)
 
@@ -123,6 +139,10 @@ func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect
 	}
 	if inType == outType {
 		// Don't generate conversion methods for the same type.
+		return nil
+	}
+
+	if _, ok := primitiveConversion(inType, outType); ok {
 		return nil
 	}
 
