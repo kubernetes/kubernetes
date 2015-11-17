@@ -78,7 +78,7 @@ type Status struct {
 	// the reason type.
 	Details *StatusDetails `json:"details,omitempty"`
 	// Suggested HTTP return code for this status, 0 if not set.
-	Code int `json:"code,omitempty"`
+	Code int32 `json:"code,omitempty"`
 }
 
 // StatusDetails is a set of additional properties that MAY be set by the
@@ -99,7 +99,7 @@ type StatusDetails struct {
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty"`
 	// If specified, the time in seconds before the operation should be retried.
-	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
+	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty"`
 }
 
 // Values of Status.Status

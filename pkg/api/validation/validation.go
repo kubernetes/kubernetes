@@ -933,7 +933,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, errs.NewFieldRequired("path"))
 	}
-	if http.Port.Kind == util.IntstrInt && !validation.IsValidPortNum(http.Port.IntVal) {
+	if http.Port.Kind == util.IntstrInt && !validation.IsValidPortNum(int(http.Port.IntVal)) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port, PortRangeErrorMsg))
 	} else if http.Port.Kind == util.IntstrString && !validation.IsValidPortName(http.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port.StrVal, PortNameErrorMsg))
@@ -947,7 +947,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 
 func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
-	if tcp.Port.Kind == util.IntstrInt && !validation.IsValidPortNum(tcp.Port.IntVal) {
+	if tcp.Port.Kind == util.IntstrInt && !validation.IsValidPortNum(int(tcp.Port.IntVal)) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port, PortRangeErrorMsg))
 	} else if tcp.Port.Kind == util.IntstrString && !validation.IsValidPortName(tcp.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port.StrVal, PortNameErrorMsg))
@@ -1334,7 +1334,7 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 		allErrs = append(allErrs, errs.NewFieldValueNotSupported("protocol", sp.Protocol, supportedPortProtocols.List()))
 	}
 
-	if sp.TargetPort.Kind == util.IntstrInt && !validation.IsValidPortNum(sp.TargetPort.IntVal) {
+	if sp.TargetPort.Kind == util.IntstrInt && !validation.IsValidPortNum(int(sp.TargetPort.IntVal)) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("targetPort", sp.TargetPort, PortRangeErrorMsg))
 	}
 	if sp.TargetPort.Kind == util.IntstrString && !validation.IsValidPortName(sp.TargetPort.StrVal) {

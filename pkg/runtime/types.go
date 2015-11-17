@@ -98,6 +98,8 @@ type EmbeddedObject struct {
 // JSON stored in RawExtension, turning it into the correct object type, and storing it
 // in the EmbeddedObject. (TODO: In the case where the object is of an unknown type, a
 // runtime.Unknown object will be created and stored.)
+//
+// +genprotoidl=true
 type RawExtension struct {
 	RawJSON []byte
 }
