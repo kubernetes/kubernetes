@@ -58,6 +58,7 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
+var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: ""}
 var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
 var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
 var prefix = "apis"
@@ -136,8 +137,9 @@ func init() {
 
 	// "internal" version
 	api.Scheme.AddKnownTypes(
-		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		testInternalGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddInternalGroupVersion(testInternalGroupVersion)
 	addGrouplessTypes()
 	addTestTypes()
 	addNewTestTypes()
@@ -1630,7 +1632,7 @@ func TestConnectWithOptions(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)
@@ -1677,7 +1679,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)

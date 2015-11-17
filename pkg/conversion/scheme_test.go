@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
@@ -118,7 +119,6 @@ func GetTestScheme() *Scheme {
 	s.AddKnownTypeWithName("v1", "TestType2", &ExternalTestType2{})
 	s.AddKnownTypeWithName("", "TestType3", &TestType1{})
 	s.AddKnownTypeWithName("v1", "TestType3", &ExternalTestType1{})
-	s.InternalVersion = ""
 	s.MetaFactory = testMetaFactory{}
 	return s
 }
@@ -361,7 +361,7 @@ func TestBadJSONRejection(t *testing.T) {
 
 func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
 	s := GetTestScheme()
-	s.InternalVersion = "v1"
+	s.InternalVersions[""] = unversioned.GroupVersion{Version: "v1"}
 	badJSONs := [][]byte{
 		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
 	}

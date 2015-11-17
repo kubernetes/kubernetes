@@ -88,7 +88,8 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 
 func (g *conversionGenerator) GenerateConversionsForType(version string, reflection reflect.Type) error {
 	kind := reflection.Name()
-	internalObj, err := g.scheme.NewObject(g.scheme.InternalVersion, kind)
+	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
+	internalObj, err := g.scheme.NewObject(g.scheme.InternalVersions[""].String(), kind)
 	if err != nil {
 		return fmt.Errorf("cannot create an object of type %v in internal version", kind)
 	}

@@ -41,7 +41,7 @@ func BenchmarkPodConversion(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.Group].String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -69,7 +69,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.Group].String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -97,7 +97,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.Group].String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}

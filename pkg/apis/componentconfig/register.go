@@ -25,7 +25,8 @@ func init() {
 }
 
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("",
+	// TODO this will get cleaned up with the scheme types are fixed
+	api.Scheme.AddKnownTypes("componentconfig/",
 		&KubeProxyConfiguration{},
 	)
 }
