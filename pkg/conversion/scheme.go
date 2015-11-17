@@ -158,14 +158,14 @@ func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
 
 // NewObject returns a new object of the given version and name,
 // or an error if it hasn't been registered.
-func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
-	if types, ok := s.versionMap[versionName]; ok {
+func (s *Scheme) NewObject(gvString, kind string) (interface{}, error) {
+	if types, ok := s.versionMap[gvString]; ok {
 		if t, ok := types[kind]; ok {
 			return reflect.New(t).Interface(), nil
 		}
-		return nil, &notRegisteredErr{kind: kind, version: versionName}
+		return nil, &notRegisteredErr{kind: kind, version: gvString}
 	}
-	return nil, &notRegisteredErr{kind: kind, version: versionName}
+	return nil, &notRegisteredErr{kind: kind, version: gvString}
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -43,9 +44,12 @@ func (*InternalSimple) IsAnAPIObject() {}
 func (*ExternalSimple) IsAnAPIObject() {}
 
 func TestScheme(t *testing.T) {
+	internalGVK := unversioned.GroupVersionKind{Group: "test.group", Version: "", Kind: "Simple"}
+	externalGVK := unversioned.GroupVersionKind{Group: "test.group", Version: "externalVersion", Kind: "Simple"}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
+	scheme.AddKnownTypeWithName(internalGVK.GroupVersion().String(), internalGVK.Kind, &InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGVK.GroupVersion().String(), externalGVK.Kind, &ExternalSimple{})
 
 	// test that scheme is an ObjectTyper
 	var _ runtime.ObjectTyper = scheme
@@ -56,10 +60,10 @@ func TestScheme(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := scheme.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-			if e, a := "", scope.Meta().SrcVersion; e != a {
+			if e, a := internalGVK.GroupVersion().String(), scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "externalVersion", scope.Meta().DestVersion; e != a {
+			if e, a := externalGVK.GroupVersion().String(), scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
@@ -68,10 +72,10 @@ func TestScheme(t *testing.T) {
 			return nil
 		},
 		func(in *ExternalSimple, out *InternalSimple, scope conversion.Scope) error {
-			if e, a := "externalVersion", scope.Meta().SrcVersion; e != a {
+			if e, a := externalGVK.GroupVersion().String(), scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "", scope.Meta().DestVersion; e != a {
+			if e, a := internalGVK.GroupVersion().String(), scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
@@ -93,7 +97,7 @@ func TestScheme(t *testing.T) {
 	obj2, err2 := scheme.Decode(data)
 	obj3 := &InternalSimple{}
 	err3 := scheme.DecodeInto(data, obj3)
-	obj4, err4 := scheme.DecodeToVersion(data, "externalVersion")
+	obj4, err4 := scheme.DecodeToVersion(data, externalGVK.GroupVersion())
 	if err != nil || err2 != nil || err3 != nil || err4 != nil {
 		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
