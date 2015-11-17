@@ -45,7 +45,7 @@ type plugin struct {
 	store  cache.Store
 }
 
-// NewSecurityContextDeny creates a new instance of the SecurityContextDeny admission controller
+// NewUidEnforcer creates a new instance of the UidEnforcer admission controller
 func NewUidEnforcer(client client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
