@@ -28,6 +28,8 @@ import (
 
 type fakeCodec struct{}
 
+var _ runtime.Decoder = fakeCodec{}
+
 func (fakeCodec) Encode(runtime.Object) ([]byte, error) {
 	return []byte{}, nil
 }
@@ -40,7 +42,7 @@ func (fakeCodec) Decode([]byte) (runtime.Object, error) {
 	return nil, nil
 }
 
-func (fakeCodec) DecodeToVersion([]byte, string) (runtime.Object, error) {
+func (fakeCodec) DecodeToVersion([]byte, unversioned.GroupVersion) (runtime.Object, error) {
 	return nil, nil
 }
 
@@ -48,7 +50,7 @@ func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
 	return nil
 }
 
-func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, string, string) error {
+func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, unversioned.GroupVersionKind) error {
 	return nil
 }
 

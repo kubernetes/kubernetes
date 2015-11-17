@@ -217,7 +217,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 				if err != nil {
 					return err
 				}
-				decodedObj, err := scheme.DecodeToVersion(rawObj, "")
+				decodedObj, err := scheme.DecodeToVersion(rawObj, unversioned.GroupVersion{})
 				if err != nil {
 					return err
 				}

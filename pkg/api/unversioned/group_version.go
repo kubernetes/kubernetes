@@ -52,6 +52,11 @@ type GroupVersion struct {
 // String puts "group" and "version" into a single "group/version" string. For the legacy v1
 // it returns "v1".
 func (gv GroupVersion) String() string {
+	// special case the internal apiVersion for kube
+	if len(gv.Group) == 0 && len(gv.Version) == 0 {
+		return ""
+	}
+
 	// special case of "v1" for backward compatibility
 	if gv.Group == "" && gv.Version == "v1" {
 		return gv.Version
@@ -63,6 +68,11 @@ func (gv GroupVersion) String() string {
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupVersion, error) {
+	// this can be the internal version for kube
+	if (len(gv) == 0) || (gv == "/") {
+		return GroupVersion{}, nil
+	}
+
 	s := strings.Split(gv, "/")
 	// "v1" is the only special case. Otherwise GroupVersion is expected to contain
 	// one "/" dividing the string into two parts.
