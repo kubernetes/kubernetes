@@ -402,7 +402,7 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.Flags().Set(k, v)
 		}
 		options := &AnnotateOptions{}
-		err := options.Complete(f, testCase.args)
+		err := options.Complete(f, buf, cmd, testCase.args)
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
@@ -450,15 +450,18 @@ func TestAnnotateObject(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
 
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdAnnotate(f, buf)
+	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
 	args := []string{"pods/foo", "a=b", "c-"}
-	if err := options.Complete(f, args); err != nil {
+	if err := options.Complete(f, buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -497,16 +500,19 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
 
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdAnnotate(f, buf)
+	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
 	options.filenames = []string{"../../../examples/cassandra/cassandra.yaml"}
 	args := []string{"a=b", "c-"}
-	if err := options.Complete(f, args); err != nil {
+	if err := options.Complete(f, buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -547,16 +553,19 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
 
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdAnnotate(f, buf)
+	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
 	options.all = true
 	args := []string{"pods", "a=b", "c-"}
-	if err := options.Complete(f, args); err != nil {
+	if err := options.Complete(f, buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
