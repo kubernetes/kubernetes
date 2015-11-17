@@ -546,7 +546,7 @@ case ${JOB_NAME} in
           ) --ginkgo.skip=$(join_regex_allow_empty \
           ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
           )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-slow"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-slow"}
     : ${PROJECT:="k8s-e2e-gce-trusty-slow"}
     : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
@@ -558,10 +558,10 @@ case ${JOB_NAME} in
 
   # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
   # sequentially.
-  kubernetes-e2e-gce-trusty-release-beta)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-release-beta"}
+  kubernetes-e2e-gce-trusty-beta-release)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-beta-release"}
     : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-release-beta"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-beta-release"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
@@ -580,16 +580,16 @@ case ${JOB_NAME} in
 
   # Runs slow tests on GCE with Trusy-beta as base image for minions,
   # sequentially.
-  kubernetes-e2e-gce-trusty-slow-beta)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-slow-beta"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-slow-beta"}
+  kubernetes-e2e-gce-trusty-beta-slow)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-beta-slow"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-beta-slow"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           ) --ginkgo.skip=$(join_regex_allow_empty \
           ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
           )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-slow-beta"}
-    : ${PROJECT:="k8s-e2e-gce-trusty-slow-beta"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-beta-slow"}
+    : ${PROJECT:="k8s-e2e-gce-trusty-beta-slow"}
     : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
