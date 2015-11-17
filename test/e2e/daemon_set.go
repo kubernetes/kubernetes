@@ -100,7 +100,7 @@ var _ = Describe("Daemon set", func() {
 			Logf("Check that reaper kills all daemon pods for %s", dsName)
 			dsReaper, err := kubectl.ReaperFor("DaemonSet", c)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = dsReaper.Stop(ns, dsName, 0, nil)
+			err = dsReaper.Stop(ns, dsName, 0, nil)
 			Expect(err).NotTo(HaveOccurred())
 			err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, label))
 			Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to be reaped")

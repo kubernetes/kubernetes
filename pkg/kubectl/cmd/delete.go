@@ -165,7 +165,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 		if gracePeriod >= 0 {
 			options = api.NewDeleteOptions(int64(gracePeriod))
 		}
-		if _, err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
+		if err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
 			return cmdutil.AddSourceToErr("stopping", info.Source, err)
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "deleted")
