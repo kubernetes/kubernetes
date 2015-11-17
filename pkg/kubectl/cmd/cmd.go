@@ -180,6 +180,8 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
 
+	cmds.AddCommand(NewCmdPush(f, out))
+
 	return cmds
 }
 

@@ -31,6 +31,7 @@ type BasicReplicationController struct{}
 
 func (BasicReplicationController) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
+		{"archive", false},
 		{"labels", false},
 		{"default-name", false},
 		{"name", true},
@@ -144,6 +145,12 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		} else {
 			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
 		}
+	}
+	if val, found := genericParams["archive"]; found {
+		envs = append(envs, api.EnvVar{
+			Name:  "K8S_ARCHIVE",
+			Value: val.(string),
+		})
 	}
 
 	params := map[string]string{}
@@ -260,6 +267,7 @@ type BasicPod struct{}
 
 func (BasicPod) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
+		{"archive", false},
 		{"labels", false},
 		{"default-name", false},
 		{"name", true},
@@ -303,6 +311,12 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		} else {
 			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
 		}
+	}
+	if val, found := genericParams["archive"]; found {
+		envs = append(envs, api.EnvVar{
+			Name:  "K8S_ARCHIVE",
+			Value: val.(string),
+		})
 	}
 
 	params := map[string]string{}
