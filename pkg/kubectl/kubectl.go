@@ -18,6 +18,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -68,8 +69,33 @@ func (m OutputVersionMapper) RESTMapping(kind string, versions ...string) (*meta
 	return m.RESTMapper.RESTMapping(kind, preferred...)
 }
 
+// GroupExpander handles resource values that include a qualified group (jobs.extensions) and
+// verifies the specified group is empty or matches the resource group.
+// TODO: allow resolution of resources that exist in multiple groups by knowing about all
+// possible groups and checking them in order
+type GroupExpander struct {
+	meta.RESTMapper
+}
+
+func (e GroupExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+	if !strings.Contains(resource, ".") {
+		return e.RESTMapper.VersionAndKindForResource(resource)
+	}
+	parts := strings.SplitN(resource, ".", 2)
+	resource, expectGroup := parts[0], parts[1]
+	group, err := e.RESTMapper.GroupForResource(resource)
+	if err != nil {
+		return "", "", err
+	}
+	if group != expectGroup {
+		return "", "", fmt.Errorf("resource %q is part of group %q, not %q", resource, group, expectGroup)
+	}
+	return e.RESTMapper.VersionAndKindForResource(resource)
+}
+
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes
-// resources.
+// resources that expands shortened resources. It cannot handle fully
+// qualified resource values.
 type ShortcutExpander struct {
 	meta.RESTMapper
 }
@@ -82,10 +108,25 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 	return defaultVersion, kind, err
 }
 
-// ResourceIsValid takes a string (kind) and checks if it's a valid resource.
+// ResourceIsValid takes a string and checks if it's a valid resource.
 // It expands the resource first, then invokes the wrapped mapper.
 func (e ShortcutExpander) ResourceIsValid(resource string) bool {
 	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
+}
+
+// GroupForResource expands the resource and then calls the wrapped mapper.
+func (e ShortcutExpander) GroupForResource(resource string) (string, error) {
+	return e.RESTMapper.GroupForResource(expandResourceShortcut(resource))
+}
+
+// AliasesForResource expands the resource and then calls the wrapped mapper.
+func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
+	return e.RESTMapper.AliasesForResource(expandResourceShortcut(resource))
+}
+
+// ResourceSingularizer expands the resource and then calls the wrapped mapper.
+func (e ShortcutExpander) ResourceSingularizer(resource string) (singular string, err error) {
+	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(resource))
 }
 
 // expandResourceShortcut will return the expanded version of resource

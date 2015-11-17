@@ -785,6 +785,35 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
 
+  #######################
+  # Extension resources #
+  #######################
+
+  ### Create hpa-test horizontal pod autoscaler
+  # Command
+  kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "HorizontalPodAutoscaler",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "hpa-test"
+  },
+  "spec": {
+    "scaleRef": {
+      "kind": "ReplicationController",
+      "name": "test",
+      "subresource": "scale"
+    },
+    "maxReplicas": 10
+  }
+}
+__EOF__
+  # Post-condition:hpa-test has been created
+  kube::test::get_object_assert hpa "{{range.items}}{{$id_field}}:{{end}}" 'hpa-test:'
+  kube::test::get_object_assert hpa.extensions "{{range.items}}{{$id_field}}:{{end}}" 'hpa-test:'
+  kubectl delete hpa.extensions/hpa-test
+
+
   ###########################
   # Replication controllers #
   ###########################
