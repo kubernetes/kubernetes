@@ -43,6 +43,10 @@ type AnnotateOptions struct {
 	overwrite       bool
 	all             bool
 	resourceVersion string
+
+	f   *cmdutil.Factory
+	out io.Writer
+	cmd *cobra.Command
 }
 
 const (
@@ -87,17 +91,18 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    annotate_long,
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, args); err != nil {
+			if err := options.Complete(f, out, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			if err := options.RunAnnotate(f); err != nil {
+			if err := options.RunAnnotate(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
 	}
+	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
@@ -107,7 +112,8 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string) (err error) {
+func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -151,6 +157,10 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string) (err error
 		Flatten().
 		Latest()
 
+	o.f = f
+	o.out = out
+	o.cmd = cmd
+
 	return nil
 }
 
@@ -169,7 +179,7 @@ func (o AnnotateOptions) Validate(args []string) error {
 }
 
 // RunAnnotate does the work
-func (o AnnotateOptions) RunAnnotate(f *cmdutil.Factory) error {
+func (o AnnotateOptions) RunAnnotate() error {
 	r := o.builder.Do()
 	if err := r.Err(); err != nil {
 		return err
@@ -198,14 +208,23 @@ func (o AnnotateOptions) RunAnnotate(f *cmdutil.Factory) error {
 		}
 
 		mapping := info.ResourceMapping()
-		client, err := f.RESTClient(mapping)
+		client, err := o.f.RESTClient(mapping)
 		if err != nil {
 			return err
 		}
 		helper := resource.NewHelper(client, mapping)
 
-		_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
-		return err
+		outputObj, err := helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+		if err != nil {
+			return err
+		}
+		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
+		if outputFormat != "" {
+			return o.f.PrintObject(o.cmd, outputObj, o.out)
+		}
+		mapper, _ := o.f.Object()
+		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, "annotated")
+		return nil
 	})
 }
 
