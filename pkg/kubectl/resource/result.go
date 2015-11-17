@@ -254,7 +254,7 @@ func AsVersionedObjects(infos []*Info, version string) ([]runtime.Object, error)
 			}
 		}
 
-		converted, err := tryConvert(info.Mapping.ObjectConvertor, info.Object, version, info.Mapping.APIVersion)
+		converted, err := tryConvert(info.Mapping.ObjectConvertor, info.Object, version, info.Mapping.GroupVersionKind.GroupVersion().String())
 		if err != nil {
 			return nil, err
 		}

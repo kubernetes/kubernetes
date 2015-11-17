@@ -59,19 +59,16 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
 var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
-var testVersion = testGroupVersion.String()
 var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
-var newVersion = newGroupVersion.String()
 var prefix = "apis"
 
 var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
-var grouplessVersion = grouplessGroupVersion.String()
 var grouplessPrefix = "api"
-var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessVersion)
+var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessGroupVersion.String())
 
-var versions = []string{grouplessVersion, testVersion, newVersion}
-var codec = runtime.CodecFor(api.Scheme, testVersion)
-var newCodec = runtime.CodecFor(api.Scheme, newVersion)
+var groupVersions = []unversioned.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
+var codec = runtime.CodecFor(api.Scheme, testGroupVersion.String())
+var newCodec = runtime.CodecFor(api.Scheme, newGroupVersion.String())
 
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
@@ -81,32 +78,37 @@ var admissionControl admission.Interface
 var requestContextMapper api.RequestContextMapper
 
 func interfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case testVersion:
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		return nil, err
+	}
+	switch gv {
+	case testGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
-	case newVersion:
+	case newGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            newCodec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
-	case grouplessVersion:
+	case grouplessGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            grouplessCodec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, groupVersions)
 	}
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper("testgroup", versions, interfacesFor)
+	gvStrings := []string{testGroupVersion.String(), newGroupVersion.String()}
+	return meta.NewDefaultRESTMapper(testAPIGroup, gvStrings, interfacesFor)
 }
 
 func addGrouplessTypes() {
@@ -120,9 +122,9 @@ func addGrouplessTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(
-		grouplessVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		grouplessGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessVersion, &api.Pod{})
+	api.Scheme.AddKnownTypes(grouplessGroupVersion.String(), &api.Pod{})
 }
 
 func addTestTypes() {
@@ -136,9 +138,9 @@ func addTestTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(
-		testVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		testGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(testVersion, &api.Pod{})
+	api.Scheme.AddKnownTypes(testGroupVersion.String(), &api.Pod{})
 }
 
 func addNewTestTypes() {
@@ -152,7 +154,7 @@ func addNewTestTypes() {
 		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(
-		newVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		newGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
@@ -172,13 +174,13 @@ func init() {
 
 	// enumerate all supported versions, get the kinds, and register with
 	// the mapper how to address our resources
-	for _, version := range versions {
-		for kind := range api.Scheme.KnownTypes(version) {
+	for _, gv := range groupVersions {
+		for kind := range api.Scheme.KnownTypes(gv.String()) {
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(meta.RESTScopeRoot, kind, version, false)
+				nsMapper.Add(meta.RESTScopeRoot, kind, gv.String(), false)
 			} else {
-				nsMapper.Add(meta.RESTScopeNamespace, kind, version, false)
+				nsMapper.Add(meta.RESTScopeNamespace, kind, gv.String(), false)
 			}
 		}
 	}
@@ -188,17 +190,17 @@ func init() {
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = api.NewRequestContextMapper()
 
-	api.Scheme.AddFieldLabelConversionFunc(grouplessVersion, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(testGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(newVersion, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(newGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -653,31 +655,31 @@ func TestNotFound(t *testing.T) {
 	}
 	cases := map[string]T{
 		// Positive checks to make sure everything is wired correctly
-		"groupless GET root":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusOK},
-		"groupless GET namespaced": {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusOK},
+		"groupless GET root":       {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusOK},
+		"groupless GET namespaced": {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
 
 		"groupless GET long prefix": {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
 
-		"groupless root PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
-		"groupless root GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/blah", http.StatusNotFound},
-		"groupless root GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
-		"groupless root DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
-		"groupless root PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/", http.StatusNotFound},
+		"groupless root PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/blah", http.StatusNotFound},
+		"groupless root GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusNotFound},
 
-		"groupless namespaced PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
 		"groupless namespaced GET long prefix":              {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
-		"groupless namespaced GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/blah", http.StatusNotFound},
-		"groupless namespaced GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced POST with extra segment":      {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
-		"groupless namespaced DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"groupless namespaced DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/", http.StatusNotFound},
-		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/blah", http.StatusNotFound},
+		"groupless namespaced GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced POST with extra segment":      {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusNotFound},
+		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
 
 		// Positive checks to make sure everything is wired correctly
 		"GET root": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
@@ -753,15 +755,15 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
-		"groupless GET object":      {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
-		"groupless GET list":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo", http.StatusNotFound},
-		"groupless POST list":       {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo", http.StatusNotFound},
-		"groupless PUT object":      {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
-		"groupless DELETE object":   {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
-		"groupless watch list":      {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/foo", http.StatusNotFound},
-		"groupless watch object":    {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/foo/bar", http.StatusNotFound},
-		"groupless proxy object":    {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/proxy/foo/bar", http.StatusNotFound},
-		"groupless redirect object": {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/redirect/foo/bar", http.StatusNotFound},
+		"groupless GET object":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless GET list":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless POST list":       {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless PUT object":      {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless DELETE object":   {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless watch list":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"groupless watch object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"groupless proxy object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
+		"groupless redirect object": {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/redirect/foo/bar", http.StatusNotFound},
 
 		"GET object":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
 		"GET list":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
@@ -841,76 +843,76 @@ func TestList(t *testing.T) {
 
 		// legacy namespace param is ignored
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=other",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=other",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// legacy api version is honored
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// list items across all namespaces
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		// list items in a namespace in the path
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/default/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 			namespace: "default",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/default/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 		},
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 		},
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// list items across all namespaces
 		{
-			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 		},
 
 		// Group API
@@ -2862,7 +2864,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2903,7 +2905,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2927,7 +2929,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testVersion+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

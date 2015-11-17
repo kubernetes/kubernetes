@@ -159,19 +159,19 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		"handles specific version": {
 			outputVersion:   testapi.Default.Version(),
 			listVersion:     testapi.Default.Version(),
-			testtypeVersion: "unlikelyversion",
+			testtypeVersion: unlikelyGV.String(),
 			rcVersion:       testapi.Default.Version(),
 		},
 		"handles second specific version": {
 			outputVersion:   "unlikelyversion",
 			listVersion:     testapi.Default.Version(),
-			testtypeVersion: "unlikelyversion",
+			testtypeVersion: unlikelyGV.String(),
 			rcVersion:       testapi.Default.Version(), // see expected behavior 3b
 		},
 		"handles common version": {
 			outputVersion:   testapi.Default.Version(),
 			listVersion:     testapi.Default.Version(),
-			testtypeVersion: "unlikelyversion",
+			testtypeVersion: unlikelyGV.String(),
 			rcVersion:       testapi.Default.Version(),
 		},
 	}
@@ -198,6 +198,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		cmd := NewCmdGet(f, buf)
 		cmd.SetOutput(buf)
 		cmd.Flags().Set("output", "json")
+
 		cmd.Flags().Set("output-version", test.outputVersion)
 		err := RunGet(f, buf, cmd, []string{"type/foo", "replicationcontrollers/foo"}, &GetOptions{})
 		if err != nil {
