@@ -35,7 +35,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 var (
@@ -129,7 +129,7 @@ func main() {
 				Ports: []api.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
-					TargetPort: util.NewIntOrStringFromInt(9376),
+					TargetPort: intstr.FromInt(9376),
 				}},
 				Selector: map[string]string{
 					"name": "serve-hostname",

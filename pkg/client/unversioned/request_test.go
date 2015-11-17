@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
@@ -697,7 +698,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: util.NewIntOrStringFromInt(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
@@ -828,7 +829,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: util.NewIntOrStringFromInt(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
@@ -870,7 +871,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: util.NewIntOrStringFromInt(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
@@ -926,7 +927,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: util.NewIntOrStringFromInt(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
@@ -973,7 +974,7 @@ func TestWasCreated(t *testing.T) {
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: util.NewIntOrStringFromInt(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{

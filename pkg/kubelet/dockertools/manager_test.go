@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -1468,7 +1469,7 @@ func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 						PostStart: &api.Handler{
 							HTTPGet: &api.HTTPGetAction{
 								Host: "foo",
-								Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+								Port: intstr.FromInt(8080),
 								Path: "bar",
 							},
 						},
@@ -1519,7 +1520,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 						PostStart: &api.Handler{
 							HTTPGet: &api.HTTPGetAction{
 								Host: "does.no.exist",
-								Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+								Port: intstr.FromInt(8080),
 								Path: "bar",
 							},
 						},

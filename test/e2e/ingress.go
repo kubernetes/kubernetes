@@ -30,7 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -105,7 +105,7 @@ func ruleByIndex(i int) extensions.IngressRule {
 						Path: fmt.Sprintf("/%v%d", pathPrefix, i),
 						Backend: extensions.IngressBackend{
 							ServiceName: fmt.Sprintf("%v%d", appPrefix, i),
-							ServicePort: util.NewIntOrStringFromInt(httpContainerPort),
+							ServicePort: intstr.FromInt(httpContainerPort),
 						},
 					},
 				},
@@ -129,7 +129,7 @@ func createIngress(c *client.Client, ns string, start, num int) extensions.Ingre
 		Spec: extensions.IngressSpec{
 			Backend: &extensions.IngressBackend{
 				ServiceName: fmt.Sprintf("%v%d", appPrefix, start),
-				ServicePort: util.NewIntOrStringFromInt(httpContainerPort),
+				ServicePort: intstr.FromInt(httpContainerPort),
 			},
 			Rules: []extensions.IngressRule{},
 		},

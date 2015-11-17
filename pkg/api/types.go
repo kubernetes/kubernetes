@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // Common string formats
@@ -681,7 +681,7 @@ type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty"`
 	// Required: Name or number of the port to access on the container.
-	Port util.IntOrString `json:"port,omitempty"`
+	Port intstr.IntOrString `json:"port,omitempty"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty"`
 	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
@@ -701,7 +701,7 @@ const (
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
 	// Required: Port to connect to.
-	Port util.IntOrString `json:"port,omitempty"`
+	Port intstr.IntOrString `json:"port,omitempty"`
 }
 
 // ExecAction describes a "run in container" action.
@@ -1300,7 +1300,7 @@ type ServicePort struct {
 	// is a string, it will be looked up as a named port in the target
 	// Pod's container ports.  If this is not specified, the default value
 	// is the sames as the Port field (an identity map).
-	TargetPort util.IntOrString `json:"targetPort"`
+	TargetPort intstr.IntOrString `json:"targetPort"`
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.

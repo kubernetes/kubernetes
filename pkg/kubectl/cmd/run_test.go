@@ -30,7 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -136,7 +136,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: util.NewIntOrStringFromInt(80),
+							TargetPort: intstr.FromInt(80),
 						},
 					},
 					Selector: map[string]string{
@@ -168,7 +168,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: util.NewIntOrStringFromInt(80),
+							TargetPort: intstr.FromInt(80),
 						},
 					},
 					Selector: map[string]string{

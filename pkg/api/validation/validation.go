@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
 
@@ -933,9 +933,9 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, errs.NewFieldRequired("path"))
 	}
-	if http.Port.Kind == util.IntstrInt && !validation.IsValidPortNum(http.Port.IntVal) {
+	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port, PortRangeErrorMsg))
-	} else if http.Port.Kind == util.IntstrString && !validation.IsValidPortName(http.Port.StrVal) {
+	} else if http.Port.Type == intstr.String && !validation.IsValidPortName(http.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port.StrVal, PortNameErrorMsg))
 	}
 	supportedSchemes := sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
@@ -947,9 +947,9 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 
 func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
-	if tcp.Port.Kind == util.IntstrInt && !validation.IsValidPortNum(tcp.Port.IntVal) {
+	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port, PortRangeErrorMsg))
-	} else if tcp.Port.Kind == util.IntstrString && !validation.IsValidPortName(tcp.Port.StrVal) {
+	} else if tcp.Port.Type == intstr.String && !validation.IsValidPortName(tcp.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port.StrVal, PortNameErrorMsg))
 	}
 	return allErrors
@@ -1334,10 +1334,10 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 		allErrs = append(allErrs, errs.NewFieldValueNotSupported("protocol", sp.Protocol, supportedPortProtocols.List()))
 	}
 
-	if sp.TargetPort.Kind == util.IntstrInt && !validation.IsValidPortNum(sp.TargetPort.IntVal) {
+	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntVal) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("targetPort", sp.TargetPort, PortRangeErrorMsg))
 	}
-	if sp.TargetPort.Kind == util.IntstrString && !validation.IsValidPortName(sp.TargetPort.StrVal) {
+	if sp.TargetPort.Type == intstr.String && !validation.IsValidPortName(sp.TargetPort.StrVal) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("targetPort", sp.TargetPort, PortNameErrorMsg))
 	}
 

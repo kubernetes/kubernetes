@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -117,7 +117,7 @@ var _ = Describe("Networking", func() {
 				Ports: []api.ServicePort{{
 					Protocol:   "TCP",
 					Port:       8080,
-					TargetPort: util.NewIntOrStringFromInt(8080),
+					TargetPort: intstr.FromInt(8080),
 				}},
 				Selector: map[string]string{
 					"name": svcname,

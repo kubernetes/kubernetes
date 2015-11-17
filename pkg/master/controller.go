@@ -31,6 +31,7 @@ import (
 	servicecontroller "k8s.io/kubernetes/pkg/registry/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/service/portallocator/controller"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/golang/glog"
 )
@@ -157,7 +158,7 @@ func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName str
 	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
 		Port:       servicePort,
 		Name:       servicePortName,
-		TargetPort: util.NewIntOrStringFromInt(servicePort)}}
+		TargetPort: intstr.FromInt(servicePort)}}
 	serviceType := api.ServiceTypeClusterIP
 	if nodePort > 0 {
 		servicePorts[0].NodePort = nodePort

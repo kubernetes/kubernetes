@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/emicklei/go-restful"
@@ -221,13 +222,13 @@ func TestControllerServicePorts(t *testing.T) {
 			Name:       "additional-port-1",
 			Port:       1000,
 			Protocol:   api.ProtocolTCP,
-			TargetPort: util.NewIntOrStringFromInt(1000),
+			TargetPort: intstr.FromInt(1000),
 		},
 		{
 			Name:       "additional-port-2",
 			Port:       1010,
 			Protocol:   api.ProtocolTCP,
-			TargetPort: util.NewIntOrStringFromInt(1010),
+			TargetPort: intstr.FromInt(1010),
 		},
 	}
 

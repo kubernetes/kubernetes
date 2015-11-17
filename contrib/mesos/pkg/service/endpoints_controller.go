@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
@@ -408,8 +409,8 @@ func (e *endpointController) checkLeftoverEndpoints() {
 // HACK(jdef): return the HostPort in addition to the ContainerPort for generic mesos compatibility
 func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 	portName := svcPort.TargetPort
-	switch portName.Kind {
-	case util.IntstrString:
+	switch portName.Type {
+	case intstr.String:
 		name := portName.StrVal
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
@@ -419,7 +420,7 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 				}
 			}
 		}
-	case util.IntstrInt:
+	case intstr.Int:
 		// HACK(jdef): slightly different semantics from upstream here:
 		// we ensure that if the user spec'd a port in the service that
 		// it actually maps to a host-port assigned to the pod. upstream
