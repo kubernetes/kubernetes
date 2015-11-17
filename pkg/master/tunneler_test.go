@@ -83,7 +83,8 @@ func TestRefreshTunnels(t *testing.T) {
 // is honored.
 func TestIsTunnelSyncHealthy(t *testing.T) {
 	tunneler := &SSHTunneler{}
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
 	master.tunneler = tunneler
 
 	// Pass case: 540 second lag
