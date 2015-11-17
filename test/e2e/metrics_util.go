@@ -30,6 +30,8 @@ import (
 	"time"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
@@ -37,9 +39,11 @@ import (
 )
 
 const (
-	podStartupThreshold     time.Duration = 5 * time.Second
-	listPodLatencyThreshold time.Duration = 2 * time.Second
-	apiCallLatencyThreshold time.Duration = 250 * time.Millisecond
+	podStartupThreshold           time.Duration = 5 * time.Second
+	listPodLatencyThreshold       time.Duration = 2 * time.Second
+	apiCallLatencySmallThreshold  time.Duration = 250 * time.Millisecond
+	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
+	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
 )
 
 // Dashboard metrics
@@ -136,9 +140,27 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 	return a, err
 }
 
+// Returns threshold for API call depending on the size of the cluster.
+// In general our goal is 1s, but for smaller clusters, we want to enforce
+// smaller limits, to allow noticing regressions.
+func apiCallLatencyThreshold(numNodes int) time.Duration {
+	if numNodes <= 250 {
+		return apiCallLatencySmallThreshold
+	}
+	if numNodes <= 500 {
+		return apiCallLatencyMediumThreshold
+	}
+	return apiCallLatencyLargeThreshold
+}
+
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
 func HighLatencyRequests(c *client.Client) (int, error) {
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return 0, err
+	}
+	numNodes := len(nodes.Items)
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -147,7 +169,7 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 	badMetrics := 0
 	top := 5
 	for _, metric := range metrics.APICalls {
-		threshold := apiCallLatencyThreshold
+		threshold := apiCallLatencyThreshold(numNodes)
 		if metric.Verb == "LIST" && metric.Resource == "pods" {
 			threshold = listPodLatencyThreshold
 		}
