@@ -60,8 +60,8 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 		// Check if we can admit the pod.
 		if ok, reason, message := kl.canAdmitPod(append(admitted, pod), pod); !ok {
 			kl.rejectPod(pod, reason, message)
-		} else {
-			admitted = append(admitted, pod)
+			// if cannot admit the pod, remove it from admitted
+			admitted = admitted[:(len(admitted) - 1)]
 		}
 		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
