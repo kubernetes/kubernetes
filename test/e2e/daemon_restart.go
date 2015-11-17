@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
@@ -222,7 +223,7 @@ var _ = Describe("DaemonRestart", func() {
 				ListFunc: func() (runtime.Object, error) {
 					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), options)
 				},
 			},

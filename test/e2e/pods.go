@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -306,7 +307,7 @@ var _ = Describe("Pods", func() {
 		Expect(len(pods.Items)).To(Equal(0))
 		w, err := podClient.Watch(
 			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(),
-			api.ListOptions{ResourceVersion: pods.ListMeta.ResourceVersion})
+			unversioned.ListOptions{ResourceVersion: pods.ListMeta.ResourceVersion})
 		if err != nil {
 			Failf("Failed to set up watch: %v", err)
 		}

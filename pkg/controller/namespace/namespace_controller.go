@@ -50,7 +50,7 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Namespaces().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

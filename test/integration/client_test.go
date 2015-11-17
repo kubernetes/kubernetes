@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -247,7 +248,7 @@ func TestMultiWatch(t *testing.T) {
 			w, err := client.Pods(ns).Watch(
 				labels.Set{"watchlabel": name}.AsSelector(),
 				fields.Everything(),
-				api.ListOptions{ResourceVersion: rv},
+				unversioned.ListOptions{ResourceVersion: rv},
 			)
 			if err != nil {
 				panic(fmt.Sprintf("watch error for %v: %v", name, err))

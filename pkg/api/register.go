@@ -58,7 +58,6 @@ func init() {
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
-		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
 		&PodExecOptions{},
@@ -70,6 +69,7 @@ func init() {
 	)
 
 	// Register Unversioned types
+	Scheme.AddKnownTypes("", &unversioned.ListOptions{})
 	Scheme.AddKnownTypes("", &unversioned.Status{})
 	Scheme.AddKnownTypes("", &unversioned.APIVersions{})
 	Scheme.AddKnownTypes("", &unversioned.APIGroupList{})

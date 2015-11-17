@@ -198,7 +198,7 @@ var _ = Describe("Density [Skipped]", func() {
 					ListFunc: func() (runtime.Object, error) {
 						return c.Events(ns).List(labels.Everything(), fields.Everything())
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 						return c.Events(ns).Watch(labels.Everything(), fields.Everything(), options)
 					},
 				},
@@ -281,7 +281,7 @@ var _ = Describe("Density [Skipped]", func() {
 						ListFunc: func() (runtime.Object, error) {
 							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
 						},
-						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+						WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), options)
 						},
 					},

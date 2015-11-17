@@ -160,7 +160,7 @@ func newPodStore(c *client.Client, namespace string, label labels.Selector, fiel
 		ListFunc: func() (runtime.Object, error) {
 			return c.Pods(namespace).List(label, field)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return c.Pods(namespace).Watch(label, field, options)
 		},
 	}
