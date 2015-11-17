@@ -133,7 +133,7 @@ type DockerManager struct {
 	oomAdjuster *oom.OOMAdjuster
 
 	// Get information from /proc mount.
-	procFs procfs.ProcFsInterface
+	procFs procfs.ProcFSInterface
 
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
@@ -158,7 +158,7 @@ func NewDockerManager(
 	httpClient kubetypes.HttpGetter,
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
-	procFs procfs.ProcFsInterface,
+	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
 	imageBackOff *util.Backoff,
 	serializeImagePulls bool) *DockerManager {

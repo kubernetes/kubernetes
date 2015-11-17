@@ -147,6 +147,8 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 	desiredState := map[string]int{
 		utilsysctl.VmOvercommitMemory: utilsysctl.VmOvercommitMemoryAlways,
 		utilsysctl.VmPanicOnOOM:       utilsysctl.VmPanicOnOOMInvokeOOMKiller,
+		utilsysctl.KernelPanic:        utilsysctl.KernelPanicRebootTimeout,
+		utilsysctl.KernelPanicOnOops:  utilsysctl.KernelPanicOnOopsAlways,
 	}
 
 	errList := []error{}
