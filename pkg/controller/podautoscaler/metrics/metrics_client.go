@@ -34,9 +34,7 @@ import (
 
 const (
 	DefaultHeapsterNamespace = "kube-system"
-	DefaultHeapsterScheme    = "http"
 	DefaultHeapsterService   = "heapster"
-	DefaultHeapsterPort      = "" // use the first exposed port on the service
 )
 
 var heapsterQueryStart = -5 * time.Minute
@@ -69,9 +67,7 @@ type HeapsterMetricsClient struct {
 	client              client.Interface
 	resourceDefinitions map[api.ResourceName]metricDefinition
 	heapsterNamespace   string
-	heapsterScheme      string
 	heapsterService     string
-	heapsterPort        string
 }
 
 var heapsterMetricDefinitions = map[api.ResourceName]metricDefinition{
@@ -97,14 +93,12 @@ var heapsterMetricDefinitions = map[api.ResourceName]metricDefinition{
 }
 
 // NewHeapsterMetricsClient returns a new instance of Heapster-based implementation of MetricsClient interface.
-func NewHeapsterMetricsClient(client client.Interface, namespace, scheme, service, port string) *HeapsterMetricsClient {
+func NewHeapsterMetricsClient(client client.Interface, namespace, service string) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
 		client:              client,
 		resourceDefinitions: heapsterMetricDefinitions,
 		heapsterNamespace:   namespace,
-		heapsterScheme:      scheme,
 		heapsterService:     service,
-		heapsterPort:        port,
 	}
 }
 
@@ -166,7 +160,7 @@ func (h *HeapsterMetricsClient) getForPods(resourceName api.ResourceName, namesp
 		metricSpec.name)
 
 	resultRaw, err := h.client.Services(h.heapsterNamespace).
-		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
+		ProxyGet(h.heapsterService, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
 		DoRaw()
 
 	if err != nil {
