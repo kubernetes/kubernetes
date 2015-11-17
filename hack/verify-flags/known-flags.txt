@@ -32,6 +32,7 @@ cert-dir
 certificate-authority
 cgroup-root
 chaos-chance
+clean-start
 cleanup-iptables
 client-ca-file
 client-certificate
