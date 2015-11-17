@@ -342,7 +342,7 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
-			metricsClient := metrics.NewHeapsterMetricsClient(kubeClient, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterPort, metrics.DefaultHeapsterService)
+			metricsClient := metrics.NewHeapsterMetricsClient(kubeClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 			podautoscaler.NewHorizontalController(kubeClient, metricsClient).
 				Run(s.HorizontalPodAutoscalerSyncPeriod)
 		}
