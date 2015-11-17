@@ -50,6 +50,7 @@ using resources with kubectl can be found in [Working with resources](../user-gu
         - [Typical status properties](#typical-status-properties)
       - [References to related objects](#references-to-related-objects)
       - [Lists of named subobjects preferred over maps](#lists-of-named-subobjects-preferred-over-maps)
+      - [Primitive types](#primitive-types)
       - [Constants](#constants)
     - [Lists and Simple kinds](#lists-and-simple-kinds)
   - [Differing Representations](#differing-representations)
@@ -246,6 +247,14 @@ ports:
 ```
 
 This rule maintains the invariant that all JSON/YAML keys are fields in API objects. The only exceptions are pure maps in the API (currently, labels, selectors, annotations, data), as opposed to sets of subobjects.
+
+#### Primitive types
+
+* Avoid floating-point values as much as possible, and never use them in spec. Floating-point values cannot be reliably round-tripped (encoded and re-decoded) without changing, and have varying precision and representations across languages and architectures.
+* Do not use unsigned integers. Similarly, not all languages (e.g., Javascript) support unsigned integers.
+* int64 is converted to float by Javascript and some other languages, so they also need to be accepted as strings.
+* Do not use enums. Use aliases for string instead (e.g., `NodeConditionType`).
+* Look at similar fields in the API (e.g., ports, durations) and follow the conventions of existing fields.
 
 #### Constants
 
