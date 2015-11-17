@@ -156,9 +156,28 @@ setfacl -m g:kvm:--x ~
 
 By default, the libvirt-coreos setup will create a single Kubernetes master and 3 Kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
 
+There are two major options to run Kubernetes cluster on above of [CoreOS](https://coreos.com/) with libvirt - fully automated (for testing purposes and common deployments) and manual (for advanced users and if extra customizations are needed).
+
+#### Automated CoreOS libvirt-based Kubernetes cluster provisioning
+
+To start the fully automated deployment of CoreOS libvirt Kubernetes cluster,
+you'll have to run the following command:
+
+`export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash`
+
+This command will set "libvirt-coreos" as an environment variable; download the latest Kubernetes release; unpack it into the current directory and run the installation script. In a few minutes the CoreOS libvirt-based Kubernetes cluster will be provisioned with the default settings (a single Kubernetes master with 3 Kubernetes nodes).
+
+### Manual way of CoreOS libvirt-based Kubernetes cluster provisioning
+
+First of all, you'll have to download the Kubernetes bundle archive (to
+find the the latest release of Kubernetes, please, follow this
+[link](https://github.com/kubernetes/kubernetes/releases/latest))
+
+`
 To start your local cluster, open a shell and run:
 
 ```sh
+tar xvf kubernetes.tar.gz 
 cd kubernetes
 
 export KUBERNETES_PROVIDER=libvirt-coreos
