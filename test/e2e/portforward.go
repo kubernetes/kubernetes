@@ -116,7 +116,7 @@ func runKubectlWithTimeout(timeout time.Duration, args ...string) string {
 	logOutput := make(chan string)
 	go func() {
 		defer GinkgoRecover()
-		logOutput <- runKubectl(args...)
+		logOutput <- runKubectlOrDie(args...)
 	}()
 	select {
 	case <-time.After(timeout):

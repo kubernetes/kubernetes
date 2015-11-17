@@ -926,14 +926,14 @@ func cleanup(filePath string, ns string, selectors ...string) {
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	runKubectl("stop", "--grace-period=0", "-f", filePath, nsArg)
+	runKubectlOrDie("stop", "--grace-period=0", "-f", filePath, nsArg)
 
 	for _, selector := range selectors {
-		resources := runKubectl("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
+		resources := runKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
 		if resources != "" {
 			Failf("Resources left running after stop:\n%s", resources)
 		}
-		pods := runKubectl("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+		pods := runKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
 		if pods != "" {
 			Failf("Pods left unterminated after stop:\n%s", pods)
 		}
@@ -967,7 +967,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
+		getPodsOutput := runKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
@@ -975,13 +975,13 @@ waitLoop:
 		}
 		var runningPods []string
 		for _, podID := range pods {
-			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
+			running := runKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
 				continue waitLoop
 			}
 
-			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
+			currentImage := runKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue waitLoop
@@ -1062,29 +1062,39 @@ func (b kubectlBuilder) withStdinReader(reader io.Reader) *kubectlBuilder {
 	return &b
 }
 
-func (b kubectlBuilder) exec() string {
+func (b kubectlBuilder) execOrDie() string {
+	str, err := b.exec()
+	Expect(err).NotTo(HaveOccurred())
+	return str
+}
+
+func (b kubectlBuilder) exec() (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Run(); err != nil {
-		Failf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
-		return ""
+		return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf(stdout.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
-	return strings.TrimSpace(stdout.String())
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+// runKubectlOrDie is a convenience wrapper over kubectlBuilder
+func runKubectlOrDie(args ...string) string {
+	return newKubectlCommand(args...).execOrDie()
 }
 
 // runKubectl is a convenience wrapper over kubectlBuilder
-func runKubectl(args ...string) string {
+func runKubectl(args ...string) (string, error) {
 	return newKubectlCommand(args...).exec()
 }
 
-// runKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func runKubectlInput(data string, args ...string) string {
-	return newKubectlCommand(args...).withStdinData(data).exec()
+// runKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+func runKubectlOrDieInput(data string, args ...string) string {
+	return newKubectlCommand(args...).withStdinData(data).execOrDie()
 }
 
 func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
@@ -1973,7 +1983,7 @@ func NewHostExecPodSpec(ns, name string) *api.Pod {
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) string {
-	return runKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+	return runKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
 }
 
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
