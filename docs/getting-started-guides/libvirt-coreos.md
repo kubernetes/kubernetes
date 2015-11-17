@@ -167,13 +167,12 @@ you'll have to run the following command:
 
 This command will set "libvirt-coreos" as an environment variable; download the latest Kubernetes release; unpack it into the current directory and run the installation script. In a few minutes the CoreOS libvirt-based Kubernetes cluster will be provisioned with the default settings (a single Kubernetes master with 3 Kubernetes nodes).
 
-### Manual way of CoreOS libvirt-based Kubernetes cluster provisioning
+#### Manual way of CoreOS libvirt-based Kubernetes cluster provisioning
 
 First of all, you'll have to download the Kubernetes bundle archive (to
 find the the latest release of Kubernetes, please, follow this
 [link](https://github.com/kubernetes/kubernetes/releases/latest))
 
-`
 To start your local cluster, open a shell and run:
 
 ```sh
