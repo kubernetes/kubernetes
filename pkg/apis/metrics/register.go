@@ -27,7 +27,8 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("",
+	// TODO this will get cleaned up with the scheme types are fixed
+	api.Scheme.AddKnownTypes("metrics/",
 		&RawNode{},
 		&RawPod{},
 	)

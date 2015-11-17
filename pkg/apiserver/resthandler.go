@@ -73,10 +73,11 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource    string
-	Subresource string
-	Kind        string
-	APIVersion  string
+	Resource        string
+	Subresource     string
+	Kind            string
+	APIVersion      string
+	InternalVersion unversioned.GroupVersion
 
 	// The version of apiserver resources to use
 	ServerAPIVersion string
@@ -156,7 +157,7 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 	if err := scope.Codec.DecodeParametersInto(query, versioned); err != nil {
 		return nil, errors.NewBadRequest(err.Error())
 	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, "")
+	out, err := scope.Convertor.ConvertToVersion(versioned, scope.InternalVersion.String())
 	if err != nil {
 		// programmer error
 		return nil, err

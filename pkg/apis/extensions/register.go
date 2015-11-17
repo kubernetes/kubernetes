@@ -27,7 +27,8 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("",
+	// TODO this gets cleaned up when the types are fixed
+	api.Scheme.AddKnownTypes("extensions/",
 		&ClusterAutoscaler{},
 		&ClusterAutoscalerList{},
 		&Deployment{},
