@@ -258,6 +258,9 @@ func providerIs(providers ...string) bool {
 // providersWithSSH are those providers where each node is accessible with SSH
 var providersWithSSH = []string{"gce", "gke", "aws"}
 
+// providersWithMasterSSH are those providers where the master node is accessible with SSH
+var providersWitMasterSSH = []string{"gce", "aws"}
+
 type podCondition func(pod *api.Pod) (bool, error)
 
 // podReady returns whether pod has a condition of Ready with a status of true.
@@ -1985,6 +1988,24 @@ func LaunchHostExecPod(client *client.Client, ns, name string) *api.Pod {
 	err = waitForPodRunningInNamespace(client, pod.Name, pod.Namespace)
 	expectNoError(err)
 	return pod
+}
+
+func SCP(host, provider, data, dir, fileName string, mode os.FileMode) error {
+	// Get a signer for the provider.
+	signer, err := getSigner(provider)
+	if err != nil {
+		return fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+	}
+
+	Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, host))
+
+	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
+	// defaulting here as well for logging clarity.
+	user := os.Getenv("KUBE_SSH_USER")
+	if user == "" {
+		user = os.Getenv("USER")
+	}
+	return util.RunSCP(user, host, data, dir, fileName, mode, signer)
 }
 
 // getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
