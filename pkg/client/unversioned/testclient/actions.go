@@ -169,12 +169,14 @@ func NewWatchAction(resource, namespace string, label labels.Selector, field fie
 	return action
 }
 
-func NewProxyGetAction(resource, namespace, name, path string, params map[string]string) ProxyGetActionImpl {
+func NewProxyGetAction(resource, namespace, scheme, name, port, path string, params map[string]string) ProxyGetActionImpl {
 	action := ProxyGetActionImpl{}
 	action.Verb = "get"
 	action.Resource = resource
 	action.Namespace = namespace
+	action.Scheme = scheme
 	action.Name = name
+	action.Port = port
 	action.Path = path
 	action.Params = params
 	return action
@@ -235,7 +237,9 @@ type WatchAction interface {
 
 type ProxyGetAction interface {
 	Action
+	GetScheme() string
 	GetName() string
+	GetPort() string
 	GetPath() string
 	GetParams() map[string]string
 }
@@ -338,13 +342,23 @@ func (a WatchActionImpl) GetWatchRestrictions() WatchRestrictions {
 
 type ProxyGetActionImpl struct {
 	ActionImpl
+	Scheme string
 	Name   string
+	Port   string
 	Path   string
 	Params map[string]string
 }
 
+func (a ProxyGetActionImpl) GetScheme() string {
+	return a.Scheme
+}
+
 func (a ProxyGetActionImpl) GetName() string {
 	return a.Name
+}
+
+func (a ProxyGetActionImpl) GetPort() string {
+	return a.Port
 }
 
 func (a ProxyGetActionImpl) GetPath() string {

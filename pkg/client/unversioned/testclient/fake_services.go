@@ -76,6 +76,6 @@ func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, opts 
 	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, label, field, opts))
 }
 
-func (c *FakeServices) ProxyGet(name, path string, params map[string]string) unversioned.ResponseWrapper {
-	return c.Fake.InvokesProxy(NewProxyGetAction("services", c.Namespace, name, path, params))
+func (c *FakeServices) ProxyGet(scheme, name, port, path string, params map[string]string) unversioned.ResponseWrapper {
+	return c.Fake.InvokesProxy(NewProxyGetAction("services", c.Namespace, scheme, name, port, path, params))
 }
