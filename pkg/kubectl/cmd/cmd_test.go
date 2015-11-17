@@ -77,23 +77,27 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
+var validVersion = testapi.Default.Version()
+var internalGV = unversioned.GroupVersion{Group: "apitest", Version: ""}
+var unlikelyGV = unversioned.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
+var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVersion}
+
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Type", &internalType{})
-	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
+	scheme.AddKnownTypeWithName(internalGV.Version, "Type", &internalType{})
+	scheme.AddKnownTypeWithName(unlikelyGV.String(), "Type", &externalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
-	scheme.AddKnownTypeWithName(testapi.Default.Version(), "Type", &ExternalType2{})
+	scheme.AddKnownTypeWithName(validVersionGV.String(), "Type", &ExternalType2{})
 
-	codec := runtime.CodecFor(scheme, "unlikelyversion")
-	validVersion := testapi.Default.Version()
-	mapper := meta.NewDefaultRESTMapper("apitest", []string{"unlikelyversion", validVersion}, func(version string) (*meta.VersionInterfaces, error) {
+	codec := runtime.CodecFor(scheme, unlikelyGV.String())
+	mapper := meta.NewDefaultRESTMapper("apitest", []string{unlikelyGV.String(), validVersionGV.String()}, func(version string) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
 			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
-		}, versionErrIfFalse(version == validVersion || version == "unlikelyversion")
+		}, versionErrIfFalse(version == validVersionGV.String() || version == unlikelyGV.String())
 	})
-	for _, version := range []string{"unlikelyversion", validVersion} {
+	for _, version := range []string{unlikelyGV.String(), validVersionGV.String()} {
 		for kind := range scheme.KnownTypes(version) {
 			mixedCase := false
 			scope := meta.RESTScopeNamespace

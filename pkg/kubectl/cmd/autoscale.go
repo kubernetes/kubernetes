@@ -96,7 +96,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	if err := f.CanBeAutoscaled(mapping.Kind); err != nil {
+	if err := f.CanBeAutoscaled(mapping.GroupVersionKind.Kind); err != nil {
 		return err
 	}
 
@@ -111,9 +111,9 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	name := info.Name
 	params["default-name"] = name
 
-	params["scaleRef-kind"] = mapping.Kind
+	params["scaleRef-kind"] = mapping.GroupVersionKind.Kind
 	params["scaleRef-name"] = name
-	params["scaleRef-apiVersion"] = mapping.APIVersion
+	params["scaleRef-apiVersion"] = mapping.GroupVersionKind.GroupVersion().String()
 
 	if err = kubectl.ValidateParams(names, params); err != nil {
 		return err
