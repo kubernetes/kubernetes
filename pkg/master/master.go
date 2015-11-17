@@ -670,8 +670,8 @@ func (m *Master) init(c *Config) {
 		}
 		expAPIVersions := []unversioned.GroupVersionForDiscovery{
 			{
-				GroupVersion: expVersion.Version,
-				Version:      apiutil.GetVersion(expVersion.Version),
+				GroupVersion: expVersion.GroupVersion.String(),
+				Version:      expVersion.GroupVersion.Version,
 			},
 		}
 		storageVersion, found := c.StorageVersions[g.Group]
@@ -685,7 +685,7 @@ func (m *Master) init(c *Config) {
 		}
 		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group, group)
 		allGroups = append(allGroups, group)
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.Version})
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
 
 	// This should be done after all groups are registered
@@ -896,7 +896,7 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	}
 	version := m.defaultAPIGroupVersion()
 	version.Storage = storage
-	version.Version = "v1"
+	version.GroupVersion = unversioned.GroupVersion{Version: "v1"}
 	version.Codec = v1.Codec
 	return version
 }
@@ -1009,7 +1009,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 	}
 	apiserver.AddGroupWebService(m.handlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{thirdparty.Version})
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
 
@@ -1022,20 +1022,22 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
+	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
+
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
-		Version:             apiutil.GetGroupVersion(group, version),
+		GroupVersion:        unversioned.GroupVersion{Group: group, Version: version},
 		RequestInfoResolver: m.newRequestInfoResolver(),
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:        thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
-		Codec:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
-		Linker:        latest.GroupOrDie("extensions").SelfLinker,
-		Storage:       storage,
-		ServerVersion: latest.GroupOrDie("").GroupVersion,
+		Mapper:             thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
+		Codec:              thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
+		Linker:             latest.GroupOrDie("extensions").SelfLinker,
+		Storage:            storage,
+		ServerGroupVersion: &serverGroupVersion,
 
 		Context: m.requestContextMapper,
 
@@ -1110,6 +1112,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	extensionsGroup := latest.GroupOrDie("extensions")
+	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
 
 	return &apiserver.APIGroupVersion{
 		Root:                m.apiGroupPrefix,
@@ -1119,12 +1122,12 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:        extensionsGroup.RESTMapper,
-		Codec:         extensionsGroup.Codec,
-		Linker:        extensionsGroup.SelfLinker,
-		Storage:       storage,
-		Version:       extensionsGroup.GroupVersion,
-		ServerVersion: latest.GroupOrDie("").GroupVersion,
+		Mapper:             extensionsGroup.RESTMapper,
+		Codec:              extensionsGroup.Codec,
+		Linker:             extensionsGroup.SelfLinker,
+		Storage:            storage,
+		GroupVersion:       unversioned.ParseGroupVersionOrDie(extensionsGroup.GroupVersion),
+		ServerGroupVersion: &serverGroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

@@ -57,10 +57,19 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 }
 
 // This creates fake API versions, similar to api/latest.go.
-const testVersion = "version"
-const newVersion = "version2"
+var testAPIGroup = "test.group"
+var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
+var testVersion = testGroupVersion.String()
+var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
+var newVersion = newGroupVersion.String()
+var prefix = "apis"
 
-var versions = []string{testVersion, newVersion}
+var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+var grouplessVersion = grouplessGroupVersion.String()
+var grouplessPrefix = "api"
+var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessVersion)
+
+var versions = []string{grouplessVersion, testVersion, newVersion}
 var codec = runtime.CodecFor(api.Scheme, testVersion)
 var newCodec = runtime.CodecFor(api.Scheme, newVersion)
 
@@ -85,6 +94,12 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
+	case grouplessVersion:
+		return &meta.VersionInterfaces{
+			Codec:            grouplessCodec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(versions, ", "))
 	}
@@ -92,6 +107,22 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 
 func newMapper() *meta.DefaultRESTMapper {
 	return meta.NewDefaultRESTMapper("testgroup", versions, interfacesFor)
+}
+
+func addGrouplessTypes() {
+	type ListOptions struct {
+		runtime.Object
+		unversioned.TypeMeta `json:",inline"`
+		LabelSelector        string `json:"labelSelector,omitempty"`
+		FieldSelector        string `json:"fieldSelector,omitempty"`
+		Watch                bool   `json:"watch,omitempty"`
+		ResourceVersion      string `json:"resourceVersion,omitempty"`
+		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
+	}
+	api.Scheme.AddKnownTypes(
+		grouplessVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddKnownTypes(grouplessVersion, &api.Pod{})
 }
 
 func addTestTypes() {
@@ -133,6 +164,7 @@ func init() {
 	api.Scheme.AddKnownTypes(
 		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&api.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	addGrouplessTypes()
 	addTestTypes()
 	addNewTestTypes()
 
@@ -156,6 +188,11 @@ func init() {
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = api.NewRequestContextMapper()
 
+	api.Scheme.AddFieldLabelConversionFunc(grouplessVersion, "Simple",
+		func(label, value string) (string, string, error) {
+			return label, value, nil
+		},
+	)
 	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
@@ -171,76 +208,93 @@ func init() {
 // defaultAPIServer exposes nested objects for testability.
 type defaultAPIServer struct {
 	http.Handler
-	group     *APIGroupVersion
 	container *restful.Container
 }
 
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(true, storage, admissionControl, selfLinker)
-}
-
-// uses the default settings for a v1 compatible api
-func handleNew(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(false, storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker)
 }
 
 // tests with a deny admission controller
 func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(true, storage, deny.NewAlwaysDeny(), selfLinker)
+	return handleInternal(storage, deny.NewAlwaysDeny(), selfLinker)
 }
 
 // tests using the new namespace scope mechanism
 func handleNamespaced(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(false, storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker)
 }
 
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
-	return handleInternal(true, storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker)
 }
 
 func newTestRequestInfoResolver() *RequestInfoResolver {
 	return &RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}
 }
 
-func handleInternal(legacy bool, storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
-	group := &APIGroupVersion{
+func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
+	container := restful.NewContainer()
+	container.Router(restful.CurlyRouter{})
+	mux := container.ServeMux
+
+	template := APIGroupVersion{
 		Storage: storage,
 
-		Root:                "/api",
 		RequestInfoResolver: newTestRequestInfoResolver(),
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
+		Mapper:    namespaceMapper,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
 	}
-	if legacy {
-		group.Version = testVersion
-		group.ServerVersion = testVersion
-		group.Codec = codec
-		group.Mapper = namespaceMapper
-	} else {
-		group.Version = newVersion
-		group.ServerVersion = newVersion
-		group.Codec = newCodec
-		group.Mapper = namespaceMapper
+
+	// groupless v1 version
+	{
+		group := template
+		group.Root = "/" + grouplessPrefix
+		group.GroupVersion = grouplessGroupVersion
+		group.ServerGroupVersion = &grouplessGroupVersion
+		group.Codec = grouplessCodec
+		if err := (&group).InstallREST(container); err != nil {
+			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+		}
 	}
 
-	container := restful.NewContainer()
-	container.Router(restful.CurlyRouter{})
-	mux := container.ServeMux
-	if err := group.InstallREST(container); err != nil {
-		panic(fmt.Sprintf("unable to install container %s: %v", group.Version, err))
+	// group version 1
+	{
+		group := template
+		group.Root = "/" + prefix
+		group.GroupVersion = testGroupVersion
+		group.ServerGroupVersion = &testGroupVersion
+		group.Codec = codec
+		if err := (&group).InstallREST(container); err != nil {
+			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+		}
 	}
+
+	// group version 2
+	{
+		group := template
+		group.Root = "/" + prefix
+		group.GroupVersion = newGroupVersion
+		group.ServerGroupVersion = &newGroupVersion
+		group.Codec = newCodec
+		if err := (&group).InstallREST(container); err != nil {
+			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
+		}
+	}
+
 	ws := new(restful.WebService)
 	InstallSupport(mux, ws, false)
 	container.Add(ws)
-	return &defaultAPIServer{mux, group, container}
+	return &defaultAPIServer{mux, container}
 }
 
 func TestSimpleSetupRight(t *testing.T) {
@@ -599,35 +653,62 @@ func TestNotFound(t *testing.T) {
 	}
 	cases := map[string]T{
 		// Positive checks to make sure everything is wired correctly
-		"GET root": {"GET", "/api/version/simpleroots", http.StatusOK},
-		// TODO: JTL: "GET root item":       {"GET", "/api/version/simpleroots/bar", http.StatusOK},
-		"GET namespaced": {"GET", "/api/version/namespaces/ns/simples", http.StatusOK},
-		// TODO: JTL: "GET namespaced item": {"GET", "/api/version/namespaces/ns/simples/bar", http.StatusOK},
+		"groupless GET root":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusOK},
+		"groupless GET namespaced": {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusOK},
 
-		"GET long prefix": {"GET", "/api/", http.StatusNotFound},
+		"groupless GET long prefix": {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
 
-		"root PATCH method":           {"PATCH", "/api/version/simpleroots", http.StatusMethodNotAllowed},
-		"root GET missing storage":    {"GET", "/api/version/blah", http.StatusNotFound},
-		"root GET with extra segment": {"GET", "/api/version/simpleroots/bar/baz", http.StatusNotFound},
-		// TODO: JTL: "root POST with extra segment":      {"POST", "/api/version/simpleroots/bar", http.StatusMethodNotAllowed},
-		"root DELETE without extra segment": {"DELETE", "/api/version/simpleroots", http.StatusMethodNotAllowed},
-		"root DELETE with extra segment":    {"DELETE", "/api/version/simpleroots/bar/baz", http.StatusNotFound},
-		"root PUT without extra segment":    {"PUT", "/api/version/simpleroots", http.StatusMethodNotAllowed},
-		"root PUT with extra segment":       {"PUT", "/api/version/simpleroots/bar/baz", http.StatusNotFound},
-		"root watch missing storage":        {"GET", "/api/version/watch/", http.StatusNotFound},
-		// TODO: JTL: "root watch with bad method":        {"POST", "/api/version/watch/simpleroot/bar", http.StatusMethodNotAllowed},
+		"groupless root PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/blah", http.StatusNotFound},
+		"groupless root GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/", http.StatusNotFound},
 
-		"namespaced PATCH method":                 {"PATCH", "/api/version/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"namespaced GET long prefix":              {"GET", "/api/", http.StatusNotFound},
-		"namespaced GET missing storage":          {"GET", "/api/version/blah", http.StatusNotFound},
-		"namespaced GET with extra segment":       {"GET", "/api/version/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced POST with extra segment":      {"POST", "/api/version/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
-		"namespaced DELETE without extra segment": {"DELETE", "/api/version/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"namespaced DELETE with extra segment":    {"DELETE", "/api/version/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced PUT without extra segment":    {"PUT", "/api/version/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"namespaced PUT with extra segment":       {"PUT", "/api/version/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced watch missing storage":        {"GET", "/api/version/watch/", http.StatusNotFound},
-		"namespaced watch with bad method":        {"POST", "/api/version/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced GET long prefix":              {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
+		"groupless namespaced GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/blah", http.StatusNotFound},
+		"groupless namespaced GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced POST with extra segment":      {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/", http.StatusNotFound},
+		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+
+		// Positive checks to make sure everything is wired correctly
+		"GET root": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
+		// TODO: JTL: "GET root item":       {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusOK},
+		"GET namespaced": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
+		// TODO: JTL: "GET namespaced item": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusOK},
+
+		"GET long prefix": {"GET", "/" + prefix + "/", http.StatusNotFound},
+
+		"root PATCH method":           {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"root GET missing storage":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
+		"root GET with extra segment": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		// TODO: JTL: "root POST with extra segment":      {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusMethodNotAllowed},
+		"root DELETE without extra segment": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"root DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"root PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"root PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"root watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusNotFound},
+		// TODO: JTL: "root watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simpleroot/bar", http.StatusMethodNotAllowed},
+
+		"namespaced PATCH method":                 {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced GET long prefix":              {"GET", "/" + prefix + "/", http.StatusNotFound},
+		"namespaced GET missing storage":          {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
+		"namespaced GET with extra segment":       {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced POST with extra segment":      {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"namespaced DELETE without extra segment": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusNotFound},
+		"namespaced watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
 	}
 	handler := handle(map[string]rest.Storage{
 		"simples":     &SimpleRESTStorage{},
@@ -672,15 +753,25 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
-		"GET object":      {"GET", "/api/version/foo/bar", http.StatusNotFound},
-		"GET list":        {"GET", "/api/version/foo", http.StatusNotFound},
-		"POST list":       {"POST", "/api/version/foo", http.StatusNotFound},
-		"PUT object":      {"PUT", "/api/version/foo/bar", http.StatusNotFound},
-		"DELETE object":   {"DELETE", "/api/version/foo/bar", http.StatusNotFound},
-		"watch list":      {"GET", "/api/version/watch/foo", http.StatusNotFound},
-		"watch object":    {"GET", "/api/version/watch/foo/bar", http.StatusNotFound},
-		"proxy object":    {"GET", "/api/version/proxy/foo/bar", http.StatusNotFound},
-		"redirect object": {"GET", "/api/version/redirect/foo/bar", http.StatusNotFound},
+		"groupless GET object":      {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
+		"groupless GET list":        {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo", http.StatusNotFound},
+		"groupless POST list":       {"POST", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo", http.StatusNotFound},
+		"groupless PUT object":      {"PUT", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
+		"groupless DELETE object":   {"DELETE", "/" + grouplessPrefix + "/" + grouplessVersion + "/foo/bar", http.StatusNotFound},
+		"groupless watch list":      {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/foo", http.StatusNotFound},
+		"groupless watch object":    {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/watch/foo/bar", http.StatusNotFound},
+		"groupless proxy object":    {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/proxy/foo/bar", http.StatusNotFound},
+		"groupless redirect object": {"GET", "/" + grouplessPrefix + "/" + grouplessVersion + "/redirect/foo/bar", http.StatusNotFound},
+
+		"GET object":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"GET list":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"POST list":       {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"PUT object":      {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"DELETE object":   {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"watch list":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"watch object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"proxy object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
+		"redirect object": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/redirect/foo/bar", http.StatusNotFound},
 	}
 	handler := handle(map[string]rest.Storage{
 		"foo": UnimplementedRESTStorage{},
@@ -746,78 +837,156 @@ func TestList(t *testing.T) {
 		label     string
 		field     string
 	}{
+		// Groupless API
+
 		// legacy namespace param is ignored
 		{
-			url:       "/api/version/simple?namespace=",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=",
 			namespace: "",
-			selfLink:  "/api/version/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/api/version/simple?namespace=other",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=other",
 			namespace: "",
-			selfLink:  "/api/version/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/api/version/simple?namespace=other&labels=a%3Db&fields=c%3Dd",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "",
-			selfLink:  "/api/version/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// legacy api version is honored
 		{
-			url:       "/api/version/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			namespace: "",
-			selfLink:  "/api/version/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/api/version/namespaces/other/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/api/version/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
 			legacy:    true,
 		},
 		{
-			url:       "/api/version/namespaces/other/simple?labels=a%3Db&fields=c%3Dd",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/api/version/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// list items across all namespaces
 		{
-			url:       "/api/version/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			namespace: "",
-			selfLink:  "/api/version/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			legacy:    true,
 		},
 		// list items in a namespace in the path
 		{
-			url:       "/api/version2/namespaces/default/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/default/simple",
 			namespace: "default",
-			selfLink:  "/api/version2/namespaces/default/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/default/simple",
 		},
 		{
-			url:       "/api/version2/namespaces/other/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/api/version2/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
 		},
 		{
-			url:       "/api/version2/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/api/version2/namespaces/other/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/namespaces/other/simple",
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// list items across all namespaces
 		{
-			url:       "/api/version2/simple",
+			url:       "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
 			namespace: "",
-			selfLink:  "/api/version2/simple",
+			selfLink:  "/" + grouplessPrefix + "/" + grouplessVersion + "/simple",
+		},
+
+		// Group API
+
+		// legacy namespace param is ignored
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=",
+			namespace: "",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other",
+			namespace: "",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other&labels=a%3Db&fields=c%3Dd",
+			namespace: "",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			legacy:    true,
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// legacy api version is honored
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			namespace: "",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
+			namespace: "other",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple?labels=a%3Db&fields=c%3Dd",
+			namespace: "other",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
+			legacy:    true,
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// list items across all namespaces
+		{
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			namespace: "",
+			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
+			legacy:    true,
+		},
+		// list items in a namespace in the path
+		{
+			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/default/simple",
+			namespace: "default",
+			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/default/simple",
+		},
+		{
+			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple",
+			namespace: "other",
+			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple",
+		},
+		{
+			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
+			namespace: "other",
+			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple",
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// list items across all namespaces
+		{
+			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple",
+			namespace: "",
+			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple",
 		},
 	}
 	for i, testCase := range testCases {
@@ -829,12 +998,7 @@ func TestList(t *testing.T) {
 			namespace:   testCase.namespace,
 			expectedSet: testCase.selfLink,
 		}
-		var handler http.Handler
-		if testCase.legacy {
-			handler = handleLinker(storage, selfLinker)
-		} else {
-			handler = handleInternal(false, storage, admissionControl, selfLinker)
-		}
+		var handler = handleInternal(storage, admissionControl, selfLinker)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -844,7 +1008,7 @@ func TestList(t *testing.T) {
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected status: %d, Expected: %d, %#v", i, resp.StatusCode, http.StatusOK, resp)
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
@@ -881,7 +1045,7 @@ func TestErrorList(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -906,7 +1070,7 @@ func TestNonEmptyList(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -933,10 +1097,10 @@ func TestNonEmptyList(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if listOut.SelfLink != "/api/version/simple" {
+	if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
 		t.Errorf("unexpected list self link: %#v", listOut)
 	}
-	expectedSelfLink := "/api/version/namespaces/other/simple/something"
+	expectedSelfLink := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple/something"
 	if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
 	}
@@ -957,7 +1121,7 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -983,7 +1147,7 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if listOut.SelfLink != "/api/version/simple" {
+	if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
 		t.Errorf("unexpected list self link: %#v", listOut)
 	}
 	expectedSelfLink := ""
@@ -1021,7 +1185,7 @@ func TestGet(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/namespaces/default/simple/id",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
 		name:        "id",
 		namespace:   "default",
 	}
@@ -1030,7 +1194,7 @@ func TestGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/id")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1062,7 +1226,7 @@ func TestGetBinary(t *testing.T) {
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
 	defer server.Close()
 
-	req, err := http.NewRequest("GET", server.URL+"/api/version/namespaces/default/simple/binary", nil)
+	req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/binary", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1078,7 +1242,7 @@ func TestGetBinary(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !stream.closed || stream.version != "version" || stream.accept != "text/other, */*" ||
+	if !stream.closed || stream.version != testGroupVersion.String() || stream.accept != "text/other, */*" ||
 		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
 		t.Errorf("unexpected stream: %#v", stream)
 	}
@@ -1139,7 +1303,7 @@ func TestGetWithOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/id?param1=test1&param2=test2")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?param1=test1&param2=test2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1181,7 +1345,7 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1216,7 +1380,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/namespaces/test/simple/id",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/test/simple/id",
 		name:        "id",
 		namespace:   "test",
 	}
@@ -1225,7 +1389,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/test/simple/id")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/test/simple/id")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1254,16 +1418,16 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version2/namespaces/foo/simple/id",
+		expectedSet: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simple/id",
 		name:        "id",
 		namespace:   "foo",
 	}
 	storage["simple"] = &simpleStorage
-	handler := handleInternal(false, storage, admissionControl, selfLinker)
+	handler := handleInternal(storage, admissionControl, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version2/namespaces/foo/simple/id")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simple/id")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1292,7 +1456,7 @@ func TestGetMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/id")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/id")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1318,7 +1482,7 @@ func TestConnect(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1356,7 +1520,7 @@ func TestConnectResponderObject(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1397,7 +1561,7 @@ func TestConnectResponderError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1466,7 +1630,7 @@ func TestConnectWithOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1516,7 +1680,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1557,7 +1721,7 @@ func TestDelete(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1589,7 +1753,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1621,7 +1785,7 @@ func TestLegacyDelete(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1653,7 +1817,7 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1679,7 +1843,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1701,7 +1865,7 @@ func TestDeleteMissing(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1726,7 +1890,7 @@ func TestPatch(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/namespaces/default/simple/" + ID,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
 		name:        ID,
 		namespace:   api.NamespaceDefault,
 	}
@@ -1735,7 +1899,7 @@ func TestPatch(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 	_, err = client.Do(request)
 	if err != nil {
@@ -1767,7 +1931,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
+	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
 	request.Header.Set("Content-Type", "application/merge-patch+json")
 	response, err := client.Do(request)
 	if err != nil {
@@ -1785,7 +1949,7 @@ func TestUpdate(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/namespaces/default/simple/" + ID,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
 		name:        ID,
 		namespace:   api.NamespaceDefault,
 	}
@@ -1807,7 +1971,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	_, err = client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1844,7 +2008,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1873,7 +2037,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1905,7 +2069,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1943,7 +2107,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	_, err = client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1980,7 +2144,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2014,7 +2178,7 @@ func TestUpdateMissing(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2041,7 +2205,7 @@ func TestCreateNotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2067,7 +2231,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2092,7 +2256,7 @@ func TestUpdateREST(t *testing.T) {
 	makeGroup := func(storage map[string]rest.Storage) *APIGroupVersion {
 		return &APIGroupVersion{
 			Storage:             storage,
-			Root:                "/api",
+			Root:                "/" + prefix,
 			RequestInfoResolver: newTestRequestInfoResolver(),
 			Creater:             api.Scheme,
 			Convertor:           api.Scheme,
@@ -2103,9 +2267,9 @@ func TestUpdateREST(t *testing.T) {
 			Context: requestContextMapper,
 			Mapper:  namespaceMapper,
 
-			Version:       newVersion,
-			ServerVersion: newVersion,
-			Codec:         newCodec,
+			GroupVersion:       newGroupVersion,
+			ServerGroupVersion: &newGroupVersion,
+			Codec:              newCodec,
 		}
 	}
 
@@ -2119,13 +2283,13 @@ func TestUpdateREST(t *testing.T) {
 
 	testREST := func(t *testing.T, container *restful.Container, barCode int) {
 		w := httptest.NewRecorder()
-		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/version2/namespaces/test/foo/test"}})
+		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/foo/test"}})
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected OK: %#v", w)
 		}
 
 		w = httptest.NewRecorder()
-		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/version2/namespaces/test/bar/test"}})
+		container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/bar/test"}})
 		if w.Code != barCode {
 			t.Errorf("expected response code %d for GET to bar but received %d", barCode, w.Code)
 		}
@@ -2174,7 +2338,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Storage: map[string]rest.Storage{
 			"simple/sub": storage,
 		},
-		Root:                "/api",
+		Root:                "/" + prefix,
 		RequestInfoResolver: newTestRequestInfoResolver(),
 		Creater:             api.Scheme,
 		Convertor:           api.Scheme,
@@ -2185,9 +2349,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       newVersion,
-		ServerVersion: newVersion,
-		Codec:         newCodec,
+		GroupVersion:       newGroupVersion,
+		ServerGroupVersion: &newGroupVersion,
+		Codec:              newCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -2203,7 +2367,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple":     &SimpleRESTStorage{},
 			"simple/sub": storage,
 		},
-		Root:                "/api",
+		Root:                "/" + prefix,
 		RequestInfoResolver: newTestRequestInfoResolver(),
 		Creater:             api.Scheme,
 		Convertor:           api.Scheme,
@@ -2214,9 +2378,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       newVersion,
-		ServerVersion: newVersion,
-		Codec:         newCodec,
+		GroupVersion:       newGroupVersion,
+		ServerGroupVersion: &newGroupVersion,
+		Codec:              newCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {
@@ -2225,14 +2389,14 @@ func TestParentResourceIsRequired(t *testing.T) {
 
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
-	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/simple/test/sub"}})
+	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/simple/test/sub"}})
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected not found: %#v", w)
 	}
 
 	// resource is registered in the namespace scope
 	w = httptest.NewRecorder()
-	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/version2/namespaces/test/simple/test/sub"}})
+	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/simple/test/sub"}})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected OK: %#v", w)
 	}
@@ -2257,7 +2421,7 @@ func TestCreateWithName(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2284,7 +2448,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/bar", bytes.NewBuffer(data))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2346,7 +2510,7 @@ func TestCreate(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "default",
-		expectedSet: "/api/version/namespaces/default/foo/bar",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar",
 	}
 	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2360,7 +2524,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/foo", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2405,7 +2569,7 @@ func TestCreateInNamespace(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "other",
-		expectedSet: "/api/version/namespaces/other/foo/bar",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
 	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2419,7 +2583,7 @@ func TestCreateInNamespace(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2464,9 +2628,9 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "other",
-		expectedSet: "/api/version/namespaces/other/foo/bar",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
-	handler := handleInternal(true, map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
+	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -2478,7 +2642,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2532,7 +2696,7 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/api/version/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
+	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != unversioned.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != unversioned.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -2606,7 +2770,7 @@ func TestCreateTimeout(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	itemOut := expectApiStatus(t, "POST", server.URL+"/api/version/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
+	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
 	if itemOut.Status != unversioned.StatusFailure || itemOut.Reason != unversioned.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
@@ -2698,7 +2862,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("POST", server.URL+"/api/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2739,7 +2903,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	request, err := http.NewRequest("POST", server.URL+"/api/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2763,7 +2927,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request, err := http.NewRequest("PUT", server.URL+"/api/"+testVersion+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
+	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testVersion+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

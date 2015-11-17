@@ -176,7 +176,7 @@ func TestFindExternalAddress(t *testing.T) {
 func TestApi_v1(t *testing.T) {
 	master, _, assert := setUp(t)
 	version := master.api_v1()
-	assert.Equal("v1", version.Version, "Version was not v1: %s", version.Version)
+	assert.Equal(unversioned.GroupVersion{Version: "v1"}, version.GroupVersion, "Version was not v1: %s", version.GroupVersion)
 	assert.Equal(v1.Codec, version.Codec, "version.Codec was not for v1: %s", version.Codec)
 	for k, v := range master.storage {
 		assert.Contains(version.Storage, v, "Value %s not found (key: %s)", k, v)
@@ -323,12 +323,14 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 func TestExpapi(t *testing.T) {
 	master, config, assert := setUp(t)
 
+	extensionsGroupMeta := latest.GroupOrDie("extensions")
+
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
-	assert.Equal(expAPIGroup.Mapper, latest.GroupOrDie("extensions").RESTMapper)
-	assert.Equal(expAPIGroup.Codec, latest.GroupOrDie("extensions").Codec)
-	assert.Equal(expAPIGroup.Linker, latest.GroupOrDie("extensions").SelfLinker)
-	assert.Equal(expAPIGroup.Version, latest.GroupOrDie("extensions").GroupVersion)
+	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
+	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
+	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
+	assert.Equal(expAPIGroup.GroupVersion, unversioned.GroupVersion{Group: extensionsGroupMeta.Group, Version: extensionsGroupMeta.Version})
 }
 
 // TestGetNodeAddresses verifies that proper results are returned
