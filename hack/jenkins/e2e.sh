@@ -588,6 +588,7 @@ case ${JOB_NAME} in
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
+          "Autoscaling\sSuite.*via\sreplicationController" \
           "GCE\sL7\sLoadBalancer\sController"
           )"}
     : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
