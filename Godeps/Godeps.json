@@ -780,6 +780,10 @@
 			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
 		},
 		{
+			"ImportPath": "google.golang.org/api/storage/v1",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+		},
+		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",
 			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
 		},
