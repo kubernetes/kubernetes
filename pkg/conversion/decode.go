@@ -25,18 +25,29 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version, kind string, err error) {
-	version, kind, err = s.DataVersionAndKind(data)
+func (s *Scheme) DecodeToVersionedObject(data []byte) (interface{}, string, string, error) {
+	version, kind, err := s.DataVersionAndKind(data)
 	if err != nil {
-		return
+		return nil, "", "", err
 	}
-	if version == "" && s.InternalVersion != "" {
+
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	internalGV, exists := s.InternalVersions[gv.Group]
+	if !exists {
+		return nil, "", "", fmt.Errorf("no internalVersion specified for %v", gv)
+	}
+
+	if len(gv.Version) == 0 && len(internalGV.Version) != 0 {
 		return nil, "", "", fmt.Errorf("version not set in '%s'", string(data))
 	}
 	if kind == "" {
 		return nil, "", "", fmt.Errorf("kind not set in '%s'", string(data))
 	}
-	obj, err = s.NewObject(version, kind)
+	obj, err := s.NewObject(version, kind)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -44,7 +55,7 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
 		return nil, "", "", err
 	}
-	return
+	return obj, version, kind, nil
 }
 
 // Decode converts a JSON string back into a pointer to an api object.
@@ -53,8 +64,7 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
-	// TODO this is cleaned up when internal types are fixed
-	return s.DecodeToVersion(data, unversioned.ParseGroupVersionOrDie(s.InternalVersion))
+	return s.DecodeToVersion(data, unversioned.GroupVersion{})
 }
 
 // DecodeToVersion converts a JSON string back into a pointer to an api object.
@@ -62,6 +72,8 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 // technique. The object will be converted, if necessary, into the versioned
 // type before being returned. Decode will not decode objects without version
 // set unless version is also "".
+// a GroupVersion with .IsEmpty() == true is means "use the internal version
+// for this group
 func (s *Scheme) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (interface{}, error) {
 	obj, sourceVersion, kind, err := s.DecodeToVersionedObject(data)
 	if err != nil {
@@ -72,8 +84,23 @@ func (s *Scheme) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (inte
 		return nil, err
 	}
 
+	sourceGV, err := unversioned.ParseGroupVersion(sourceVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	// if the gv is empty, then we want the internal version, but the internal version varies by
+	// group.  We can lookup the group now because we have knowledge of the group
+	if gv.IsEmpty() {
+		exists := false
+		gv, exists = s.InternalVersions[sourceGV.Group]
+		if !exists {
+			return nil, fmt.Errorf("no internalVersion specified for %v", gv)
+		}
+	}
+
 	// Convert if needed.
-	if gv.String() != sourceVersion {
+	if gv != sourceGV {
 		objOut, err := s.NewObject(gv.String(), kind)
 		if err != nil {
 			return nil, err

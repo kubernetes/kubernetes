@@ -19,6 +19,8 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Scheme defines an entire encoding and decoding scheme.
@@ -50,7 +52,9 @@ type Scheme struct {
 
 	// InternalVersion is the default internal version. It is recommended that
 	// you use "" for the internal version.
-	InternalVersion string
+	// TODO logically the InternalVersion is different for every Group, so this structure
+	// must be map
+	InternalVersions map[string]unversioned.GroupVersion
 
 	// MetaInsertionFactory is used to create an object to store and retrieve
 	// the version and kind information for all objects. The default uses the
@@ -61,13 +65,19 @@ type Scheme struct {
 // NewScheme manufactures a new scheme.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		versionMap:      map[string]map[string]reflect.Type{},
-		typeToVersion:   map[reflect.Type]string{},
-		typeToKind:      map[reflect.Type][]string{},
-		converter:       NewConverter(),
-		cloner:          NewCloner(),
-		InternalVersion: "",
-		MetaFactory:     DefaultMetaFactory,
+		versionMap:    map[string]map[string]reflect.Type{},
+		typeToVersion: map[reflect.Type]string{},
+		typeToKind:    map[reflect.Type][]string{},
+		converter:     NewConverter(),
+		cloner:        NewCloner(),
+		// TODO remove this hard coded list.  As step one, hardcode it here so this pull doesn't become even bigger
+		InternalVersions: map[string]unversioned.GroupVersion{
+			"":                unversioned.GroupVersion{},
+			"componentconfig": unversioned.GroupVersion{Group: "componentconfig"},
+			"extensions":      unversioned.GroupVersion{Group: "extensions"},
+			"metrics":         unversioned.GroupVersion{Group: "metrics"},
+		},
+		MetaFactory: DefaultMetaFactory,
 	}
 	s.converter.nameFunc = s.nameFunc
 	return s

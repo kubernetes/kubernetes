@@ -181,8 +181,16 @@ func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExt
 		default:
 			version := outVersion
 			// if the object exists
-			if inVersion, _, err := scheme.ObjectVersionAndKind(src[i]); err == nil && len(inVersion) != 0 {
-				version = inVersion
+			// this code is try to set the outputVersion, but only if the object has a non-internal group version
+			if inGVString, _, err := scheme.ObjectVersionAndKind(src[i]); err == nil && len(inGVString) != 0 {
+				inGV, err := unversioned.ParseGroupVersion(inGVString)
+				if err != nil {
+					return err
+				}
+
+				if self.raw.InternalVersions[inGV.Group] != inGV {
+					version = inGV.String()
+				}
 			}
 			data, err := scheme.EncodeToVersion(src[i], version)
 			if err != nil {
@@ -222,9 +230,13 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 }
 
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
-func NewScheme() *Scheme {
+func NewScheme(internalGroupVersions ...unversioned.GroupVersion) *Scheme {
 	s := &Scheme{conversion.NewScheme(), map[string]map[string]FieldLabelConversionFunc{}}
-	s.raw.InternalVersion = ""
+
+	for _, internalGV := range internalGroupVersions {
+		s.raw.InternalVersions[internalGV.Group] = internalGV
+	}
+
 	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
 	if err := s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
@@ -245,6 +257,10 @@ func NewScheme() *Scheme {
 		panic(err)
 	}
 	return s
+}
+
+func (s *Scheme) AddInternalGroupVersion(gv unversioned.GroupVersion) {
+	s.raw.InternalVersions[gv.Group] = gv
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.

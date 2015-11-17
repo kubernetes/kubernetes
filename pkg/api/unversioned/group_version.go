@@ -48,6 +48,10 @@ type GroupVersion struct {
 	Version string
 }
 
+func (gv GroupVersion) IsEmpty() bool {
+	return len(gv.Group) == 0 && len(gv.Version) == 0
+}
+
 // String puts "group" and "version" into a single "group/version" string. For the legacy v1
 // it returns "v1".
 func (gv GroupVersion) String() string {
