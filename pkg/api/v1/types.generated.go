@@ -29,7 +29,7 @@ import (
 	pkg2_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg6_runtime "k8s.io/kubernetes/pkg/runtime"
 	pkg1_types "k8s.io/kubernetes/pkg/types"
-	pkg5_util "k8s.io/kubernetes/pkg/util"
+	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	pkg4_inf "speter.net/go/exp/math/dec/inf"
@@ -62,7 +62,7 @@ func init() {
 		var v1 pkg2_unversioned.Time
 		var v2 pkg6_runtime.RawExtension
 		var v3 pkg1_types.UID
-		var v4 pkg5_util.IntOrString
+		var v4 pkg5_intstr.IntOrString
 		var v5 pkg4_inf.Dec
 		var v6 time.Time
 		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
@@ -12029,7 +12029,7 @@ func (x *HTTPGetAction) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "port":
 			if r.TryDecodeAsNil() {
-				x.Port = pkg5_util.IntOrString{}
+				x.Port = pkg5_intstr.IntOrString{}
 			} else {
 				yyv928 := &x.Port
 				yym929 := z.DecBinary()
@@ -12096,7 +12096,7 @@ func (x *HTTPGetAction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		return
 	}
 	if r.TryDecodeAsNil() {
-		x.Port = pkg5_util.IntOrString{}
+		x.Port = pkg5_intstr.IntOrString{}
 	} else {
 		yyv934 := &x.Port
 		yym935 := z.DecBinary()
@@ -12290,7 +12290,7 @@ func (x *TCPSocketAction) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		switch yys949 {
 		case "port":
 			if r.TryDecodeAsNil() {
-				x.Port = pkg5_util.IntOrString{}
+				x.Port = pkg5_intstr.IntOrString{}
 			} else {
 				yyv950 := &x.Port
 				yym951 := z.DecBinary()
@@ -12330,7 +12330,7 @@ func (x *TCPSocketAction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		return
 	}
 	if r.TryDecodeAsNil() {
-		x.Port = pkg5_util.IntOrString{}
+		x.Port = pkg5_intstr.IntOrString{}
 	} else {
 		yyv953 := &x.Port
 		yym954 := z.DecBinary()
@@ -23258,7 +23258,7 @@ func (x *ServicePort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "targetPort":
 			if r.TryDecodeAsNil() {
-				x.TargetPort = pkg5_util.IntOrString{}
+				x.TargetPort = pkg5_intstr.IntOrString{}
 			} else {
 				yyv1926 := &x.TargetPort
 				yym1927 := z.DecBinary()
@@ -23349,7 +23349,7 @@ func (x *ServicePort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		return
 	}
 	if r.TryDecodeAsNil() {
-		x.TargetPort = pkg5_util.IntOrString{}
+		x.TargetPort = pkg5_intstr.IntOrString{}
 	} else {
 		yyv1933 := &x.TargetPort
 		yym1934 := z.DecBinary()

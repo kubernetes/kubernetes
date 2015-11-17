@@ -27,7 +27,7 @@ import (
 	fields "k8s.io/kubernetes/pkg/fields"
 	labels "k8s.io/kubernetes/pkg/labels"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	util "k8s.io/kubernetes/pkg/util"
+	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	inf "speter.net/go/exp/math/dec/inf"
 )
 
@@ -600,7 +600,7 @@ func deepCopy_api_GlusterfsVolumeSource(in GlusterfsVolumeSource, out *Glusterfs
 
 func deepCopy_api_HTTPGetAction(in HTTPGetAction, out *HTTPGetAction, c *conversion.Cloner) error {
 	out.Path = in.Path
-	if err := deepCopy_util_IntOrString(in.Port, &out.Port, c); err != nil {
+	if err := deepCopy_intstr_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
 	}
 	out.Host = in.Host
@@ -2110,7 +2110,7 @@ func deepCopy_api_ServicePort(in ServicePort, out *ServicePort, c *conversion.Cl
 	out.Name = in.Name
 	out.Protocol = in.Protocol
 	out.Port = in.Port
-	if err := deepCopy_util_IntOrString(in.TargetPort, &out.TargetPort, c); err != nil {
+	if err := deepCopy_intstr_IntOrString(in.TargetPort, &out.TargetPort, c); err != nil {
 		return err
 	}
 	out.NodePort = in.NodePort
@@ -2159,7 +2159,7 @@ func deepCopy_api_ServiceStatus(in ServiceStatus, out *ServiceStatus, c *convers
 }
 
 func deepCopy_api_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *conversion.Cloner) error {
-	if err := deepCopy_util_IntOrString(in.Port, &out.Port, c); err != nil {
+	if err := deepCopy_intstr_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
 	}
 	return nil
@@ -2347,8 +2347,8 @@ func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.Typ
 	return nil
 }
 
-func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *conversion.Cloner) error {
-	out.Kind = in.Kind
+func deepCopy_intstr_IntOrString(in intstr.IntOrString, out *intstr.IntOrString, c *conversion.Cloner) error {
+	out.Type = in.Type
 	out.IntVal = in.IntVal
 	out.StrVal = in.StrVal
 	return nil
@@ -2479,7 +2479,7 @@ func init() {
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
-		deepCopy_util_IntOrString,
+		deepCopy_intstr_IntOrString,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

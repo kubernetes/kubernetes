@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 type HandlerRunner struct {
@@ -66,8 +66,8 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod
 // an attempt is made to find a port with the same name in the container spec.
 // If a port with the same name is found, it's ContainerPort value is returned.  If no matching
 // port is found, an error is returned.
-func resolvePort(portReference util.IntOrString, container *api.Container) (int, error) {
-	if portReference.Kind == util.IntstrInt {
+func resolvePort(portReference intstr.IntOrString, container *api.Container) (int, error) {
+	if portReference.Type == intstr.Int {
 		return portReference.IntVal, nil
 	} else {
 		portName := portReference.StrVal
@@ -99,7 +99,7 @@ func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, 
 		host = status.PodIP
 	}
 	var port int
-	if handler.HTTPGet.Port.Kind == util.IntstrString && len(handler.HTTPGet.Port.StrVal) == 0 {
+	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
 		port = 80
 	} else {
 		var err error

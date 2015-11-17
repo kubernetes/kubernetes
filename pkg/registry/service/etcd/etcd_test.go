@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
@@ -48,7 +48,7 @@ func validService() *api.Service {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -76,7 +76,7 @@ func TestCreate(t *testing.T) {
 				Ports: []api.ServicePort{{
 					Port:       6502,
 					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
+					TargetPort: intstr.FromInt(6502),
 				}},
 			},
 		},
@@ -99,7 +99,7 @@ func TestUpdate(t *testing.T) {
 				Ports: []api.ServicePort{{
 					Port:       6502,
 					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
+					TargetPort: intstr.FromInt(6502),
 				}},
 			}
 			return object

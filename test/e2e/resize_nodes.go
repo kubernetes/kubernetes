@@ -29,7 +29,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -123,8 +123,8 @@ func svcByName(name string, port int) *api.Service {
 				"name": name,
 			},
 			Ports: []api.ServicePort{{
-				Port:       port,
-				TargetPort: util.NewIntOrStringFromInt(port),
+				Port:       9376,
+				TargetPort: intstr.FromInt(port),
 			}},
 		},
 	}

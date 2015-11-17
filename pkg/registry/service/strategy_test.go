@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestCheckGeneratedNameError(t *testing.T) {
@@ -56,7 +56,7 @@ func makeValidService() api.Service {
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
-			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: util.NewIntOrStringFromInt(8675)}},
+			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
 		},
 	}
 }

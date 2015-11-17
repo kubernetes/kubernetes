@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addConversionFuncs() {
@@ -288,13 +288,13 @@ func convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployme
 		defaulting.(func(*extensions.RollingUpdateDeployment))(in)
 	}
 	if out.MaxUnavailable == nil {
-		out.MaxUnavailable = &util.IntOrString{}
+		out.MaxUnavailable = &intstr.IntOrString{}
 	}
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
 	}
 	if out.MaxSurge == nil {
-		out.MaxSurge = &util.IntOrString{}
+		out.MaxSurge = &intstr.IntOrString{}
 	}
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err

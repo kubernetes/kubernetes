@@ -32,8 +32,8 @@ import (
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/golang/glog"
 )
@@ -158,13 +158,13 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", kubecontainer.GetPodFullName(pod), container.Name)
 }
 
-func extractPort(param util.IntOrString, container api.Container) (int, error) {
+func extractPort(param intstr.IntOrString, container api.Container) (int, error) {
 	port := -1
 	var err error
-	switch param.Kind {
-	case util.IntstrInt:
+	switch param.Type {
+	case intstr.Int:
 		port = param.IntVal
-	case util.IntstrString:
+	case intstr.String:
 		if port, err = findPortByName(container, param.StrVal); err != nil {
 			// Last ditch effort - maybe it was an int stored as string?
 			if port, err = strconv.Atoi(param.StrVal); err != nil {

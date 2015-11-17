@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -96,7 +97,7 @@ var _ = Describe("Services", func() {
 				Selector: labels,
 				Ports: []api.ServicePort{{
 					Port:       80,
-					TargetPort: util.NewIntOrStringFromInt(80),
+					TargetPort: intstr.FromInt(80),
 				}},
 			},
 		}
@@ -159,12 +160,12 @@ var _ = Describe("Services", func() {
 					{
 						Name:       "portname1",
 						Port:       80,
-						TargetPort: util.NewIntOrStringFromString(svc1port),
+						TargetPort: intstr.FromString(svc1port),
 					},
 					{
 						Name:       "portname2",
 						Port:       81,
-						TargetPort: util.NewIntOrStringFromString(svc2port),
+						TargetPort: intstr.FromString(svc2port),
 					},
 				},
 			},
@@ -800,7 +801,7 @@ var _ = Describe("Services", func() {
 		svc1 := t1.BuildServiceSpec()
 		svc1.Spec.Type = api.ServiceTypeLoadBalancer
 		svc1.Spec.Ports[0].Port = servicePort
-		svc1.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		svc1.Spec.Ports[0].TargetPort = intstr.FromInt(80)
 		_, err = t1.CreateService(svc1)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -825,7 +826,7 @@ var _ = Describe("Services", func() {
 		svc2 := t2.BuildServiceSpec()
 		svc2.Spec.Type = api.ServiceTypeLoadBalancer
 		svc2.Spec.Ports[0].Port = servicePort
-		svc2.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		svc2.Spec.Ports[0].TargetPort = intstr.FromInt(80)
 		svc2.Spec.LoadBalancerIP = loadBalancerIP
 		_, err = t2.CreateService(svc2)
 		Expect(err).NotTo(HaveOccurred())
@@ -1236,7 +1237,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
 				Port:       port,
-				TargetPort: util.NewIntOrStringFromInt(9376),
+				TargetPort: intstr.FromInt(9376),
 				Protocol:   "TCP",
 			}},
 			Selector: map[string]string{
@@ -1411,7 +1412,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 			Selector: t.Labels,
 			Ports: []api.ServicePort{{
 				Port:       80,
-				TargetPort: util.NewIntOrStringFromInt(80),
+				TargetPort: intstr.FromInt(80),
 			}},
 		},
 	}

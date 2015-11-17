@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/util"
 	errors "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestValidateHorizontalPodAutoscaler(t *testing.T) {
@@ -772,7 +772,7 @@ func TestValidateDeployment(t *testing.T) {
 	invalidMaxSurgeDeployment.Spec.Strategy = extensions.DeploymentStrategy{
 		Type: extensions.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &extensions.RollingUpdateDeployment{
-			MaxSurge: util.NewIntOrStringFromString("20Percent"),
+			MaxSurge: intstr.FromString("20Percent"),
 		},
 	}
 	errorCases["value should be int(5) or percentage(5%)"] = invalidMaxSurgeDeployment
@@ -782,8 +782,8 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRollingUpdateDeployment.Spec.Strategy = extensions.DeploymentStrategy{
 		Type: extensions.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &extensions.RollingUpdateDeployment{
-			MaxSurge:       util.NewIntOrStringFromString("0%"),
-			MaxUnavailable: util.NewIntOrStringFromInt(0),
+			MaxSurge:       intstr.FromString("0%"),
+			MaxUnavailable: intstr.FromInt(0),
 		},
 	}
 	errorCases["cannot be 0 when maxSurge is 0 as well"] = invalidRollingUpdateDeployment
@@ -793,7 +793,7 @@ func TestValidateDeployment(t *testing.T) {
 	invalidMaxUnavailableDeployment.Spec.Strategy = extensions.DeploymentStrategy{
 		Type: extensions.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &extensions.RollingUpdateDeployment{
-			MaxUnavailable: util.NewIntOrStringFromString("110%"),
+			MaxUnavailable: intstr.FromString("110%"),
 		},
 	}
 	errorCases["should not be more than 100%"] = invalidMaxUnavailableDeployment
@@ -931,7 +931,7 @@ type ingressRules map[string]string
 func TestValidateIngress(t *testing.T) {
 	defaultBackend := extensions.IngressBackend{
 		ServiceName: "default-backend",
-		ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+		ServicePort: intstr.FromInt(80),
 	}
 
 	newValid := func() extensions.Ingress {
@@ -943,7 +943,7 @@ func TestValidateIngress(t *testing.T) {
 			Spec: extensions.IngressSpec{
 				Backend: &extensions.IngressBackend{
 					ServiceName: "default-backend",
-					ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+					ServicePort: intstr.FromInt(80),
 				},
 				Rules: []extensions.IngressRule{
 					{
@@ -1030,7 +1030,7 @@ func TestValidateIngress(t *testing.T) {
 func TestValidateIngressStatusUpdate(t *testing.T) {
 	defaultBackend := extensions.IngressBackend{
 		ServiceName: "default-backend",
-		ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+		ServicePort: intstr.FromInt(80),
 	}
 
 	newValid := func() extensions.Ingress {
@@ -1043,7 +1043,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			Spec: extensions.IngressSpec{
 				Backend: &extensions.IngressBackend{
 					ServiceName: "default-backend",
-					ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+					ServicePort: intstr.FromInt(80),
 				},
 				Rules: []extensions.IngressRule{
 					{

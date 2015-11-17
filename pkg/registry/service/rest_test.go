@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // TODO(wojtek-t): Cleanup this file.
@@ -77,7 +78,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -120,7 +121,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 				Ports: []api.ServicePort{{
 					Port:       6502,
 					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
+					TargetPort: intstr.FromInt(6502),
 				}},
 			},
 		},
@@ -170,7 +171,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	})
@@ -189,7 +190,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	})
@@ -234,7 +235,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 				Ports: []api.ServicePort{{
 					Port:       6502,
 					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
+					TargetPort: intstr.FromInt(6502),
 				}},
 			},
 		},
@@ -247,7 +248,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 				Ports: []api.ServicePort{{
 					Port:       6502,
 					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
+					TargetPort: intstr.FromInt(6502),
 				}},
 			},
 		},
@@ -275,7 +276,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -350,7 +351,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -388,12 +389,12 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 				Name:       "p",
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}, {
 				Name:       "q",
 				Port:       8086,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(8086),
+				TargetPort: intstr.FromInt(8086),
 			}},
 		},
 	}
@@ -569,7 +570,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -592,7 +593,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		}}
 	ctx = api.NewDefaultContext()
@@ -624,7 +625,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -651,7 +652,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -679,7 +680,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -706,7 +707,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
@@ -760,7 +761,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
-				TargetPort: util.NewIntOrStringFromInt(6502),
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}

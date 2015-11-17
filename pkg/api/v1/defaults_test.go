@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -300,14 +300,14 @@ func TestSetDefaulServiceTargetPort(t *testing.T) {
 	in := &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234}}}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*versioned.Service)
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(1234) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(1234) {
 		t.Errorf("Expected TargetPort to be defaulted, got %v", out.Spec.Ports[0].TargetPort)
 	}
 
-	in = &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234, TargetPort: util.NewIntOrStringFromInt(5678)}}}}
+	in = &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234, TargetPort: intstr.FromInt(5678)}}}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*versioned.Service)
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(5678) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(5678) {
 		t.Errorf("Expected TargetPort to be unchanged, got %v", out.Spec.Ports[0].TargetPort)
 	}
 }
@@ -316,42 +316,42 @@ func TestSetDefaultServicePort(t *testing.T) {
 	// Unchanged if set.
 	in := &versioned.Service{Spec: versioned.ServiceSpec{
 		Ports: []versioned.ServicePort{
-			{Protocol: "UDP", Port: 9376, TargetPort: util.NewIntOrStringFromString("p")},
-			{Protocol: "UDP", Port: 8675, TargetPort: util.NewIntOrStringFromInt(309)},
+			{Protocol: "UDP", Port: 9376, TargetPort: intstr.FromString("p")},
+			{Protocol: "UDP", Port: 8675, TargetPort: intstr.FromInt(309)},
 		},
 	}}
 	out := roundTrip(t, runtime.Object(in)).(*versioned.Service)
 	if out.Spec.Ports[0].Protocol != versioned.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromString("p") {
+	if out.Spec.Ports[0].TargetPort != intstr.FromString("p") {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != util.NewIntOrStringFromInt(309) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt(309) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 
 	// Defaulted.
 	in = &versioned.Service{Spec: versioned.ServiceSpec{
 		Ports: []versioned.ServicePort{
-			{Protocol: "", Port: 9376, TargetPort: util.NewIntOrStringFromString("")},
-			{Protocol: "", Port: 8675, TargetPort: util.NewIntOrStringFromInt(0)},
+			{Protocol: "", Port: 9376, TargetPort: intstr.FromString("")},
+			{Protocol: "", Port: 8675, TargetPort: intstr.FromInt(0)},
 		},
 	}}
 	out = roundTrip(t, runtime.Object(in)).(*versioned.Service)
 	if out.Spec.Ports[0].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(in.Spec.Ports[0].Port) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(in.Spec.Ports[0].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != util.NewIntOrStringFromInt(in.Spec.Ports[1].Port) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt(in.Spec.Ports[1].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }

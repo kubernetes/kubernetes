@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // The only difference between ServiceGeneratorV1 and V2 is that the service port is named "default" in V1, while it is left unnamed in V2.
@@ -156,11 +156,11 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		targetPortString, found = params["container-port"]
 	}
 	if found && len(targetPortString) > 0 {
-		var targetPort util.IntOrString
+		var targetPort intstr.IntOrString
 		if portNum, err := strconv.Atoi(targetPortString); err != nil {
-			targetPort = util.NewIntOrStringFromString(targetPortString)
+			targetPort = intstr.FromString(targetPortString)
 		} else {
-			targetPort = util.NewIntOrStringFromInt(portNum)
+			targetPort = intstr.FromInt(portNum)
 		}
 		// Use the same target-port for every port
 		for i := range service.Spec.Ports {
@@ -171,7 +171,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		// should be the same as Port
 		for i := range service.Spec.Ports {
 			port := service.Spec.Ports[i].Port
-			service.Spec.Ports[i].TargetPort = util.NewIntOrStringFromInt(port)
+			service.Spec.Ports[i].TargetPort = intstr.FromInt(port)
 		}
 	}
 	if params["create-external-load-balancer"] == "true" {
