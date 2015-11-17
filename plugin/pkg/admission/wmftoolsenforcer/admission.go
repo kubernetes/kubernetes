@@ -113,7 +113,7 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 					RunAsUser: &uid,
 				}
 			} else {
-				container.SecurityContext.RunAsUser = &uid
+				return apierrors.NewBadRequest("Must have an empty SecuriyContext to pass!")
 			}
 		} else {
 			return apierrors.NewBadRequest("Namespace's RunAsUser not an integer")
