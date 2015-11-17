@@ -713,20 +713,11 @@ func (m *Master) init(c *Config) {
 	}
 
 	handler := http.Handler(m.mux.(*http.ServeMux))
+	insecureHandler := handler
 
 	// TODO: handle CORS and auth using go-restful
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
 	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	m.InsecureHandler = handler
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, m.newRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
@@ -739,6 +730,19 @@ func (m *Master) init(c *Config) {
 		}
 		handler = authenticatedHandler
 	}
+
+	// Since OPTIONS request cannot carry authn headers (by w3c standards), we are doing CORS check
+	// before auth check. Otherwise all the CORS request will be rejected.
+	if len(c.CorsAllowedOriginList) > 0 {
+		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
+		if err != nil {
+			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
+		}
+		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
+		insecureHandler = apiserver.CORS(insecureHandler, allowedOriginRegexps, nil, nil, "true")
+	}
+
+	m.InsecureHandler = insecureHandler
 
 	// Install root web services
 	m.handlerContainer.Add(m.rootWebService)
