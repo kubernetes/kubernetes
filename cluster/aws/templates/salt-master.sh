@@ -33,7 +33,7 @@ function env_to_salt {
   local value=${!env_key}
   if [[ -n "${value}" ]]; then
     # Note this is yaml, so indentation matters
-    cat <<EOF # >>/etc/salt/minion.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
   fi
