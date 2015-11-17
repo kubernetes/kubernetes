@@ -46,6 +46,7 @@ import (
 	thirdpartyresourcedatastorage "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -56,28 +57,31 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
+func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+	server := etcdtesting.NewEtcdTestClientServer(t)
+
 	master := Master{}
 	config := Config{}
-	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
 	storageVersions := make(map[string]string)
 	storageDestinations := NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdstorage.NewEtcdStorage(fakeClient, testapi.Default.Codec(), etcdtest.PathPrefix()))
-	storageDestinations.AddAPIGroup("extensions", etcdstorage.NewEtcdStorage(fakeClient, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
+	storageDestinations.AddAPIGroup(
+		"", etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()))
+	storageDestinations.AddAPIGroup(
+		"extensions", etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
 	storageVersions[""] = testapi.Default.Version()
 	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
-	return master, config, assert.New(t)
+	return master, server, config, assert.New(t)
 }
 
 // TestNew verifies that the New function returns a Master
 // using the configuration properly.
 func TestNew(t *testing.T) {
-	_, config, assert := setUp(t)
+	_, etcdserver, config, assert := setUp(t)
+	defer etcdserver.Terminate(t)
 
 	config.KubeletClient = client.FakeKubeletClient{}
 
@@ -121,27 +125,31 @@ func TestNew(t *testing.T) {
 // TestNewEtcdStorage verifies that the usage of NewEtcdStorage reacts properly when
 // the correct data is input
 func TestNewEtcdStorage(t *testing.T) {
+	etcdserver := etcdtesting.NewEtcdTestClientServer(t)
+	defer etcdserver.Terminate(t)
+
 	assert := assert.New(t)
-	fakeClient := tools.NewFakeEtcdClient(t)
 	// Pass case
-	_, err := NewEtcdStorage(fakeClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+	_, err := NewEtcdStorage(etcdserver.Client, latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
 	assert.NoError(err, "Unable to create etcdstorage: %s", err)
 
 	// Fail case
 	errorFunc := func(apiVersion string) (*meta.VersionInterfaces, error) { return nil, errors.New("ERROR") }
-	_, err = NewEtcdStorage(fakeClient, errorFunc, testapi.Default.Version(), etcdtest.PathPrefix())
+	_, err = NewEtcdStorage(etcdserver.Client, errorFunc, testapi.Default.Version(), etcdtest.PathPrefix())
 	assert.Error(err, "NewEtcdStorage should have failed")
-
 }
 
 // TestGetServersToValidate verifies the unexported getServersToValidate function
 func TestGetServersToValidate(t *testing.T) {
-	master, config, assert := setUp(t)
+	master, etcdserver, config, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	servers := master.getServersToValidate(&config)
 
-	assert.Equal(5, len(servers), "unexpected server list: %#v", servers)
+	// Expected servers to validate: scheduler, controller-manager and etcd.
+	assert.Equal(3, len(servers), "unexpected server list: %#v", servers)
 
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0", "etcd-1", "etcd-2"} {
+	for _, server := range []string{"scheduler", "controller-manager", "etcd-0"} {
 		if _, ok := servers[server]; !ok {
 			t.Errorf("server list missing: %s", server)
 		}
@@ -174,7 +182,9 @@ func TestFindExternalAddress(t *testing.T) {
 // TestApi_v1 verifies that the unexported api_v1 function does indeed
 // utilize the correct Version and Codec.
 func TestApi_v1(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	version := master.api_v1()
 	assert.Equal(unversioned.GroupVersion{Version: "v1"}, version.GroupVersion, "Version was not v1: %s", version.GroupVersion)
 	assert.Equal(v1.Codec, version.Codec, "version.Codec was not for v1: %s", version.Codec)
@@ -186,7 +196,9 @@ func TestApi_v1(t *testing.T) {
 // TestNewBootstrapController verifies master fields are properly copied into controller
 func TestNewBootstrapController(t *testing.T) {
 	// Tests a subset of inputs to ensure they are set properly in the controller
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	portRange := util.PortRange{Base: 10, Size: 10}
 
 	master.namespaceRegistry = namespace.NewRegistry(nil)
@@ -212,7 +224,9 @@ func TestNewBootstrapController(t *testing.T) {
 // TestControllerServicePorts verifies master extraServicePorts are
 // correctly copied into controller
 func TestControllerServicePorts(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	master.namespaceRegistry = namespace.NewRegistry(nil)
 	master.serviceRegistry = registrytest.NewServiceRegistry()
 	master.endpointRegistry = endpoint.NewRegistry(nil)
@@ -250,7 +264,9 @@ func TestNewHandlerContainer(t *testing.T) {
 // TestHandleWithAuth verifies HandleWithAuth adds the path
 // to the muxHelper.RegisteredPaths.
 func TestHandleWithAuth(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
 	master.muxHelper = &mh
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
@@ -262,7 +278,9 @@ func TestHandleWithAuth(t *testing.T) {
 // TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
 // to the muxHelper.RegisteredPaths.
 func TestHandleFuncWithAuth(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
 	master.muxHelper = &mh
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
@@ -274,7 +292,9 @@ func TestHandleFuncWithAuth(t *testing.T) {
 // TestInstallSwaggerAPI verifies that the swagger api is added
 // at the proper endpoint.
 func TestInstallSwaggerAPI(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	mux := http.NewServeMux()
 	master.handlerContainer = NewHandlerContainer(mux)
 
@@ -308,7 +328,8 @@ func TestInstallSwaggerAPI(t *testing.T) {
 // TestDefaultAPIGroupVersion verifies that the unexported defaultAPIGroupVersion
 // creates the expected APIGroupVersion based off of master.
 func TestDefaultAPIGroupVersion(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
 
 	apiGroup := master.defaultAPIGroupVersion()
 
@@ -321,7 +342,8 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 // TestExpapi verifies that the unexported exapi creates
 // the an experimental unversioned.APIGroupVersion.
 func TestExpapi(t *testing.T) {
-	master, config, assert := setUp(t)
+	master, etcdserver, config, assert := setUp(t)
+	defer etcdserver.Terminate(t)
 
 	extensionsGroupMeta := latest.GroupOrDie("extensions")
 
@@ -336,7 +358,8 @@ func TestExpapi(t *testing.T) {
 // TestGetNodeAddresses verifies that proper results are returned
 // when requesting node addresses.
 func TestGetNodeAddresses(t *testing.T) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
 
 	// Fail case (no addresses associated with nodes)
 	nodes, _ := master.nodeRegistry.ListNodes(api.NewDefaultContext(), nil)
@@ -365,7 +388,9 @@ func TestGetNodeAddresses(t *testing.T) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	master, config, assert := setUp(t)
+	master, etcdserver, config, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	// ================= preparation for master.init() ======================
 	portRange := util.PortRange{Base: 10, Size: 10}
 	master.serviceNodePortRange = portRange
@@ -435,7 +460,9 @@ type FooList struct {
 }
 
 func initThirdParty(t *testing.T, version string) (*Master, *tools.FakeEtcdClient, *httptest.Server, *assert.Assertions) {
-	master, _, assert := setUp(t)
+	master, etcdserver, _, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
 	master.thirdPartyResources = map[string]*thirdpartyresourcedatastorage.REST{}
 	api := &extensions.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
@@ -567,12 +594,12 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 	return testapi.Extensions.Codec().Encode(&thirdPartyData)
 }
 
-func storeToEtcd(fakeClient *tools.FakeEtcdClient, path, name string, obj interface{}) error {
+func storeToEtcd(client tools.EtcdClient, path, name string, obj interface{}) error {
 	data, err := encodeToThirdParty(name, obj)
 	if err != nil {
 		return err
 	}
-	_, err = fakeClient.Set(etcdtest.PathPrefix()+path, string(data), 0)
+	_, err = client.Set(etcdtest.PathPrefix()+path, string(data), 0)
 	return err
 }
 
