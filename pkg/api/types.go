@@ -1433,7 +1433,7 @@ type NodeSpec struct {
 // DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpoint struct {
 	// Port number of the given endpoint.
-	Port int `json:port`
+	Port int `json:"port"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.

@@ -178,14 +178,12 @@ func isFormatRequired(devicePath string, fstype string, exec *cinderSafeFormatAn
 		glog.Warningf("Failed to get any response from /bin/lsblk")
 		return false, errors.New("Failed to get reponse from /bin/lsblk")
 	}
-	glog.Warningf("Unknown error occured executing /bin/lsblk")
-	return false, errors.New("Unknown error occured executing /bin/lsblk")
 }
 
 func formatVolume(devicePath string, fstype string, exec *cinderSafeFormatAndMount) (bool, error) {
 	if "ext4" != fstype && "ext3" != fstype {
 		glog.Warningf("Unsupported format type: %q\n", fstype)
-		return false, errors.New(fmt.Sprint("Unsupported format type: %q\n", fstype))
+		return false, errors.New(fmt.Sprintf("Unsupported format type: %q\n", fstype))
 	}
 	args := []string{devicePath}
 	cmd := exec.runner.Command(fmt.Sprintf("/sbin/mkfs.%s", fstype), args...)

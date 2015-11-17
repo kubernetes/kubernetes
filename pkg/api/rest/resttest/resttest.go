@@ -597,7 +597,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, setFn SetFunc,
 		t.Errorf("unexpected error: %v", err)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
-		t.Fatalf("did not gracefully delete resource", err)
+		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
 	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
@@ -624,7 +624,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, setFn SetFunc, 
 		t.Errorf("unexpected error: %v", err)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
-		t.Fatalf("did not gracefully delete resource", err)
+		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
 	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
@@ -651,7 +651,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, setFn SetFunc, get
 		t.Errorf("unexpected error: %v", err)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
-		t.Fatalf("did not gracefully delete resource", err)
+		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
 	// second delete duration is ignored
@@ -683,7 +683,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, setFn SetFunc, 
 		t.Errorf("unexpected error: %v", err)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
-		t.Fatalf("did not gracefully delete resource", err)
+		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
 	// second delete is immediate, resource is deleted
@@ -942,7 +942,7 @@ func (t *Tester) testListNotFound(assignFn AssignFunc, setRVFn SetRVFunc) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if meta.ResourceVersion != "123" {
-		t.Errorf("unexpected resource version: %d", meta.ResourceVersion)
+		t.Errorf("unexpected resource version: %s", meta.ResourceVersion)
 	}
 }
 

@@ -56,7 +56,7 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*Master, Config, *assert.Assertions) {
 	master := Master{}
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
@@ -71,7 +71,7 @@ func setUp(t *testing.T) (Master, Config, *assert.Assertions) {
 	config.StorageVersions = storageVersions
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
-	return master, config, assert.New(t)
+	return &master, config, assert.New(t)
 }
 
 // TestNew verifies that the New function returns a Master

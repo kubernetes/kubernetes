@@ -54,7 +54,6 @@ func TestBackoffReset(t *testing.T) {
 	step := time.Second
 	maxDuration := step * 5
 	b := NewFakeBackOff(step, maxDuration, tc)
-	startTime := tc.Now()
 
 	// get to backoff = maxDuration
 	for i := 0; i <= int(maxDuration/step); i++ {
@@ -70,7 +69,7 @@ func TestBackoffReset(t *testing.T) {
 	lastUpdate := tc.Now()
 	tc.Step(2*maxDuration + step) // time += 11s, 11 > 2*maxDuration
 	if b.IsInBackOffSince(id, lastUpdate) {
-		t.Errorf("now=%s lastUpdate=%s (%s) expected Backoff reset got %s b.lastUpdate=%s", tc.Now(), startTime, tc.Now().Sub(lastUpdate), b.Get(id))
+		t.Errorf("now=%s lastUpdate=%s (%s) expected Backoff reset got %s", tc.Now(), lastUpdate, tc.Now().Sub(lastUpdate), b.Get(id))
 	}
 }
 
