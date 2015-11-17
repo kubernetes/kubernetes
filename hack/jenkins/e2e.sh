@@ -52,7 +52,13 @@ TRUSTY_IMAGE_PROJECT="${TRUSTY_IMAGE_PROJECT:-}"
 
 # Get the latest Trusty image for a Jenkins job.
 function get_latest_trusty_image() {
-    local image_index="${1:-${JOB_NAME}}"
+    local job_name="${1:-${JOB_NAME}}"
+    local image_index=""
+    if [[ "${job_name}" =~ trusty-beta ]]; then
+      image_index="trusty-beta"
+    elif [[ "${job_name}" =~ trusty ]]; then
+      image_index="trusty"
+    fi
     gsutil cat "gs://${TRUSTY_IMAGE_PROJECT}/image-indices/latest-test-image-${image_index}"
     # Clean up gsutil artifacts otherwise the later test stage will complain.
     rm -rf .config &> /dev/null
@@ -525,6 +531,7 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
@@ -533,21 +540,39 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    # Ideally we would pin to the latest release version but since 1.1 is not
-    # out, we use the latest build number from the CI job.
     : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    ;;
+
+  # Runs slow tests on GCE with Trusy as base image for minions, sequentially.
+  kubernetes-e2e-gce-trusty-slow)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-slow"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-slow"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          ) --ginkgo.skip=$(join_regex_allow_empty \
+          ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-slow"}
+    : ${PROJECT:="k8s-e2e-gce-trusty-slow"}
+    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_OS_DISTRIBUTION:="trusty"}
+    : ${ENABLE_CLUSTER_REGISTRY:=false}
+    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
   # sequentially.
-  kubernetes-e2e-gce-trusty-release-beta)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-release-beta"}
+  kubernetes-e2e-gce-trusty-beta-release)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-beta-release"}
     : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-release-beta"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-beta-release"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
@@ -557,6 +582,26 @@ case ${JOB_NAME} in
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
     : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    ;;
+
+  # Runs slow tests on GCE with Trusy-beta as base image for minions,
+  # sequentially.
+  kubernetes-e2e-gce-trusty-beta-slow)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-beta-slow"}
+    : ${E2E_NETWORK:="e2e-gce-trusty-beta-slow"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          ) --ginkgo.skip=$(join_regex_allow_empty \
+          ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-beta-slow"}
+    : ${PROJECT:="k8s-e2e-gce-trusty-beta-slow"}
+    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_OS_DISTRIBUTION:="trusty"}
+    : ${ENABLE_CLUSTER_REGISTRY:=false}
+    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs non-flaky tests on GCE on the release candidate branch,
