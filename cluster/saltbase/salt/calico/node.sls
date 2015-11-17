@@ -43,13 +43,6 @@ calico-node:
       - file: plugin-config
       - file: calico-plugin
 
-restart-kubelet:
-  service.running:
-    - enable: True
-    - reload: True
-    - onchanges:
-      - cmd: calico-node
-
 calico-ip-pool-reset:
   cmd.run:
     - name: calicoctl pool remove 192.168.0.0/16
@@ -60,6 +53,8 @@ calico-ip-pool-reset:
       - service: docker
       - file: calicoctl
       - cmd: calico-node
+    - require_in:
+      - service: kubelet
 
 calico-ip-pool:
   cmd.run:
@@ -71,6 +66,8 @@ calico-ip-pool:
       - service: docker
       - file: calicoctl
       - cmd: calico-node
+    - require_in:
+      - service: kubelet
 
 ip6_tables:
   kmod.present
