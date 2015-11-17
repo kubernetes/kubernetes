@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -225,6 +226,7 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	glog.V(3).Infoln("Config loaded from file", filename)
 
 	// set LocationOfOrigin on every Cluster, User, and Context
 	for key, obj := range config.AuthInfos {
