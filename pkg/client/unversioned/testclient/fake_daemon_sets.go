@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kclientlib "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -80,6 +80,6 @@ func (c *FakeDaemonSets) Delete(name string) error {
 	return err
 }
 
-func (c *FakeDaemonSets) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeDaemonSets) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, label, field, opts))
 }

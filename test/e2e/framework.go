@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -178,7 +179,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(
 			labels.Everything(),
 			fields.Set{"metadata.name": serviceName}.AsSelector(),
-			api.ListOptions{ResourceVersion: rv},
+			unversioned.ListOptions{ResourceVersion: rv},
 		)
 		if err != nil {
 			return err

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -87,7 +88,7 @@ func NewProvision(c client.Interface) admission.Interface {
 			ListFunc: func() (runtime.Object, error) {
 				return c.Namespaces().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return c.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

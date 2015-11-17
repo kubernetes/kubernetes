@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -35,7 +36,7 @@ type PodTemplateInterface interface {
 	Delete(name string, options *api.DeleteOptions) error
 	Create(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
 	Update(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // podTemplates implements PodTemplatesNamespacer interface
@@ -94,7 +95,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 }
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *podTemplates) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

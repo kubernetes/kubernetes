@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -85,7 +86,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 			ListFunc: func() (runtime.Object, error) {
 				return cl.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return cl.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
@@ -99,7 +100,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 			ListFunc: func() (runtime.Object, error) {
 				return cl.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return cl.Secrets(api.NamespaceAll).Watch(labels.Everything(), tokenSelector, options)
 			},
 		},

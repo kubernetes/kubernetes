@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -36,7 +37,7 @@ type ReplicationControllerInterface interface {
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateStatus(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // replicationControllers implements ReplicationControllersNamespacer interface
@@ -91,7 +92,7 @@ func (c *replicationControllers) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
-func (c *replicationControllers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

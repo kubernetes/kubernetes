@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -36,7 +37,7 @@ type NodeInterface interface {
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
 	UpdateStatus(*api.Node) (*api.Node, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // nodes implements NodesInterface
@@ -102,7 +103,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 }
 
 // Watch returns a watch.Interface that watches the requested nodes.
-func (c *nodes) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *nodes) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(api.NamespaceAll).

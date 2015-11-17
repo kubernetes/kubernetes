@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -80,7 +81,7 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), accountSelector)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), accountSelector, options)
 			},
 		},
@@ -97,7 +98,7 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.Namespaces().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
