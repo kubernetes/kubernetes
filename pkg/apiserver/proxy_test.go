@@ -95,7 +95,7 @@ func TestProxy(t *testing.T) {
 			server           *httptest.Server
 			proxyTestPattern string
 		}{
-			{namespaceServer, "/api/version2/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
+			{namespaceServer, "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
 		}
 
 		for _, serverPattern := range serverPatterns {
@@ -212,7 +212,7 @@ func TestProxyUpgrade(t *testing.T) {
 		server := httptest.NewServer(namespaceHandler)
 		defer server.Close()
 
-		ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/api/version2/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
+		ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/"+prefix+"/"+newGroupVersion.Group+"/"+newGroupVersion.Version+"/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
 		if err != nil {
 			t.Errorf("%s: websocket dial err: %s", k, err)
 			continue
@@ -276,7 +276,7 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
-		proxyTestPattern := "/api/version2/proxy/namespaces/ns/foo/id" + item.path
+		proxyTestPattern := "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/proxy/namespaces/ns/foo/id" + item.path
 		req, err := http.NewRequest(
 			"GET",
 			server.URL+proxyTestPattern+"?"+item.query,

@@ -62,7 +62,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
-	dest.Path = "/api/version/watch/simples"
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
@@ -114,7 +114,7 @@ func TestWatchHTTP(t *testing.T) {
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/version/watch/simples"
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	request, err := http.NewRequest("GET", dest.String(), nil)
@@ -178,8 +178,8 @@ func TestWatchParamParsing(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 
-	rootPath := "/api/" + testVersion + "/watch/simples"
-	namespacedPath := "/api/" + testVersion + "/watch/namespaces/other/simpleroots"
+	rootPath := "/" + prefix + "/" + testVersion + "/watch/simples"
+	namespacedPath := "/" + prefix + "/" + testVersion + "/watch/namespaces/other/simpleroots"
 
 	table := []struct {
 		path            string
@@ -286,7 +286,7 @@ func TestWatchProtocolSelection(t *testing.T) {
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/version/watch/simples"
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	table := []struct {
@@ -358,7 +358,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a client
 	dest, _ := url.Parse(s.URL)
-	dest.Path = "/api/" + newVersion + "/simple"
+	dest.Path = "/" + prefix + "/" + newVersion + "/simple"
 	dest.RawQuery = "watch=true"
 
 	req, _ := http.NewRequest("GET", dest.String(), nil)
