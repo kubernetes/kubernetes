@@ -151,11 +151,11 @@ If node labels are changed, the DaemonSet will promptly add pods to newly matchi
 pods from newly not-matching nodes.
 
 You can modify the pods that a DaemonSet creates.  However, pods do not allow all
-fields to be updated.  Also, the DeamonSet controller will use the original template the next
+fields to be updated.  Also, the DaemonSet controller will use the original template the next
 time a node (even with the same name) is created.
 
 
-You can delete a DeamonSet.  If you specify `--cascade=false` with `kubectl`, then the pods
+You can delete a DaemonSet.  If you specify `--cascade=false` with `kubectl`, then the pods
 will be left on the nodes.  You can then create a new DaemonSet with a different template.
 the new DaemonSet with the different template will recognize all the existing pods as having
 matching labels.  It will not modify or delete them despite a mismatch in the pod template.
