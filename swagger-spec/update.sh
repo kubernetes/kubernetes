@@ -33,5 +33,8 @@ curl $SOURCE_ROOT_PATH/resourceListing.json > $DESTINATION_PATH/index.html
 curl $SOURCE_ROOT_PATH/api.json > $DESTINATION_PATH/api/index.html
 curl $SOURCE_ROOT_PATH/v1.json > $DESTINATION_PATH/api/v1/index.html
 curl $SOURCE_ROOT_PATH/version.json > $DESTINATION_PATH/version/index.html
+curl $SOURCE_ROOT_PATH/apis.json > $DESTINATION_PATH/apis/index.html
+curl $SOURCE_ROOT_PATH/extensions.json > $DESTINATION_PATH/apis/extensions/index.html
+curl $SOURCE_ROOT_PATH/v1beta1.json > $DESTINATION_PATH/apis/extensions/v1beta1/index.html
 
 echo "SUCCESS!!"
