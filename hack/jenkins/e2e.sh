@@ -52,7 +52,13 @@ TRUSTY_IMAGE_PROJECT="${TRUSTY_IMAGE_PROJECT:-}"
 
 # Get the latest Trusty image for a Jenkins job.
 function get_latest_trusty_image() {
-    local image_index="${1:-${JOB_NAME}}"
+    local job_name="${1:-${JOB_NAME}}"
+    local image_index=""
+    if [[ "${job_name}" =~ trusty-beta ]]; then
+      image_index="trusty-beta"
+    elif [[ "${job_name}" =~ trusty ]]; then
+      image_index="trusty"
+    fi
     gsutil cat "gs://${TRUSTY_IMAGE_PROJECT}/image-indices/latest-test-image-${image_index}"
     # Clean up gsutil artifacts otherwise the later test stage will complain.
     rm -rf .config &> /dev/null
