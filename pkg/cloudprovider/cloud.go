@@ -19,6 +19,7 @@ package cloudprovider
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 
@@ -37,6 +38,8 @@ type Interface interface {
 	Clusters() (Clusters, bool)
 	// Routes returns a routes interface along with whether the interface is supported.
 	Routes() (Routes, bool)
+	// Storage returns a storage interface along with whether the interface is supported.
+	Storage() (Storage, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
 	// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
@@ -141,6 +144,11 @@ type Routes interface {
 	// DeleteRoute deletes the specified managed route
 	// Route should be as returned by ListRoutes
 	DeleteRoute(clusterName string, route *Route) error
+}
+
+type Storage interface {
+	// UploadFile uploads the specified file to a particular file in a bucket
+	UploadFile(bucket, file string, stream io.Reader) error
 }
 
 var InstanceNotFound = errors.New("instance not found")

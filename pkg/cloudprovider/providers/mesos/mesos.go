@@ -276,3 +276,7 @@ func (c *MesosCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	}
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
 }
+
+func (s *MesosCloud) Storage() (cloudprovider.Storage, bool) {
+	return nil, false
+}
