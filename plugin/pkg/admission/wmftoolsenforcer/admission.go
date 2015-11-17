@@ -70,31 +70,12 @@ func NewUidEnforcer(client client.Interface) admission.Interface {
 }
 
 // This will verify the following:
-//  - Not a namespace modification from a namespaced user for their own namespace
 //  - User object has a numeric uid
 //  - Namespace object has an annotation called RunAsUser that's an integer
 //
 // If after all this there's no SecurityContext on each Container with a RunAsUser set to the same RunAsUser, it'll be set
 func (p *plugin) Admit(a admission.Attributes) (err error) {
-	if a.GetResource() != string(api.ResourcePods) && a.GetResource() != "namespace" {
-		return nil
-	}
-
-	// HACK: This should probably be a separate AdmissionController
-	hackNamespace, ok := a.GetObject().(*api.Namespace)
-	if ok {
-		user := a.GetUserInfo()
-		if user == nil {
-			return apierrors.NewBadRequest("uidenforcer admission controller can not be used if there is no user set")
-		}
-
-		// This is a namespace!
-		// We hope only users can directly change this!
-		// So namespaced users can not affect other namespaces, but can change the
-		// annotations on their own namespace. let's deny that
-		if hackNamespace.Name == user.GetName() {
-			return apierrors.NewBadRequest("Can not modify users' own namespace")
-		}
+	if a.GetResource() != string(api.ResourcePods) {
 		return nil
 	}
 
