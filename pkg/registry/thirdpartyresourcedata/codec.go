@@ -154,7 +154,7 @@ func (t *thirdPartyResourceDataCodec) Decode(data []byte) (runtime.Object, error
 	return result, nil
 }
 
-func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, version string) (runtime.Object, error) {
+func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (runtime.Object, error) {
 	// TODO: this is hacky, there must be a better way...
 	obj, err := t.Decode(data)
 	if err != nil {
@@ -164,7 +164,7 @@ func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, version strin
 	if err != nil {
 		return nil, err
 	}
-	return t.delegate.DecodeToVersion(objData, version)
+	return t.delegate.DecodeToVersion(objData, gv)
 }
 
 func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object) error {
@@ -175,14 +175,14 @@ func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object
 	return t.populate(thirdParty, data)
 }
 
-func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, version, kind string) error {
+func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, gvk unversioned.GroupVersionKind) error {
 	thirdParty, ok := obj.(*extensions.ThirdPartyResourceData)
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
 
-	if kind != "ThirdPartyResourceData" {
-		return fmt.Errorf("unexpeceted kind: %s", kind)
+	if gvk.Kind != "ThirdPartyResourceData" {
+		return fmt.Errorf("unexpeceted kind: %s", gvk.Kind)
 	}
 
 	var dataObj interface{}
@@ -194,25 +194,25 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 		return fmt.Errorf("unexpcted object: %#v", dataObj)
 	}
 	if kindObj, found := mapObj["kind"]; !found {
-		mapObj["kind"] = kind
+		mapObj["kind"] = gvk.Kind
 	} else {
 		kindStr, ok := kindObj.(string)
 		if !ok {
 			return fmt.Errorf("unexpected object for 'kind': %v", kindObj)
 		}
 		if kindStr != t.kind {
-			return fmt.Errorf("kind doesn't match, expecting: %s, got %s", kind, kindStr)
+			return fmt.Errorf("kind doesn't match, expecting: %s, got %s", gvk.Kind, kindStr)
 		}
 	}
 	if versionObj, found := mapObj["apiVersion"]; !found {
-		mapObj["apiVersion"] = version
+		mapObj["apiVersion"] = gvk.GroupVersion().String()
 	} else {
 		versionStr, ok := versionObj.(string)
 		if !ok {
 			return fmt.Errorf("unexpected object for 'apiVersion': %v", versionObj)
 		}
-		if versionStr != version {
-			return fmt.Errorf("version doesn't match, expecting: %s, got %s", version, versionStr)
+		if versionStr != gvk.GroupVersion().String() {
+			return fmt.Errorf("version doesn't match, expecting: %v, got %s", gvk.GroupVersion(), versionStr)
 		}
 	}
 
