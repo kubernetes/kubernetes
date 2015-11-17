@@ -44,7 +44,7 @@ func NewFakeDockerManager(
 	httpClient kubetypes.HttpGetter, imageBackOff *util.Backoff) *DockerManager {
 
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
-	fakeProcFs := procfs.NewFakeProcFs()
+	fakeProcFs := procfs.NewFakeProcFS()
 	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
 		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, true)
