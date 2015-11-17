@@ -31,6 +31,7 @@ source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
 function create-node-instance-template {
   local template_name="$1"
   create-node-template "$template_name" "${scope_flags[*]}" \
-		"kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml"
+    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
+    "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml" \
+    "configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh"
 }
