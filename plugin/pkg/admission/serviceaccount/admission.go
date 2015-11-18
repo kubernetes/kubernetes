@@ -168,12 +168,16 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	// Set the default service account if needed
+	// Set the default service account if unspecified.
 	if pod.Spec.ServiceAccountName == nil {
 		pod.Spec.ServiceAccountName = new(string)
-	}
-	if len(*pod.Spec.ServiceAccountName) == 0 {
 		*pod.Spec.ServiceAccountName = DefaultServiceAccountName
+	} else {
+		// If an empty string ServiceAccountName is explicitly provided,
+		// the user does not want a service account for the Pod.
+		if len(*pod.Spec.ServiceAccountName) == 0 {
+			return nil
+		}
 	}
 
 	// Ensure the referenced service account exists

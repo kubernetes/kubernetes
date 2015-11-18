@@ -176,6 +176,39 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	}
 }
 
+func TestDoesNotOverrideEmptyString(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount(nil)
+	admit.MountServiceAccountToken = true
+	admit.RequireAPIToken = false
+
+	// Add the default service account for the ns into the cache
+	admit.serviceAccounts.Add(&api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+	})
+	// empty string means no service account please.
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			ServiceAccountName: new(string),
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, "myname", string(api.ResourcePods), "", admission.Create, nil)
+	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if pod.Spec.ServiceAccountName == nil {
+		t.Errorf("Expected service account non-nil, got nil")
+	}
+	if *pod.Spec.ServiceAccountName != "" {
+		t.Errorf("Expected service account '%s' assigned, got %s", "", *pod.Spec.ServiceAccountName)
+	}
+}
+
 func TestFetchesUncachedServiceAccount(t *testing.T) {
 	ns := "myns"
 
