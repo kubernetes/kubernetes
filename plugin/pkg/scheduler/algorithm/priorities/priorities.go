@@ -73,7 +73,7 @@ func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
+func calculateResourceOccupancy(pod *api.Pod, node *api.Node, pods []*api.Pod) algorithm.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
@@ -114,15 +114,13 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2
-func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return algorithm.HostPriorityList{}, err
-	}
-	podsToMachines, err := predicates.MapPodsToMachines(podLister)
-
+func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, nodes []*api.Node) (algorithm.HostPriorityList, error) {
 	list := algorithm.HostPriorityList{}
-	for _, node := range nodes.Items {
+	podsToMachines, err := predicates.MapPodsToMachines(podLister)
+	if err != nil {
+		return list, err
+	}
+	for _, node := range nodes {
 		list = append(list, calculateResourceOccupancy(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
@@ -144,15 +142,11 @@ func NewNodeLabelPriority(label string, presence bool) algorithm.PriorityFunctio
 // CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister algorithm.PodLister, nodes []*api.Node) (algorithm.HostPriorityList, error) {
 	var score int
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
-	}
 
 	labeledNodes := map[string]bool{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		exists := labels.Set(node.Labels).Has(n.label)
 		labeledNodes[node.Name] = (exists && n.presence) || (!exists && !n.presence)
 	}
@@ -177,21 +171,19 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podListe
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return algorithm.HostPriorityList{}, err
-	}
-	podsToMachines, err := predicates.MapPodsToMachines(podLister)
-
+func BalancedResourceAllocation(pod *api.Pod, podLister algorithm.PodLister, nodes []*api.Node) (algorithm.HostPriorityList, error) {
 	list := algorithm.HostPriorityList{}
-	for _, node := range nodes.Items {
+	podsToMachines, err := predicates.MapPodsToMachines(podLister)
+	if err != nil {
+		return list, err
+	}
+	for _, node := range nodes {
 		list = append(list, calculateBalancedResourceAllocation(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
 }
 
-func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
+func calculateBalancedResourceAllocation(pod *api.Pod, node *api.Node, pods []*api.Pod) algorithm.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	score := int(0)

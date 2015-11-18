@@ -17,7 +17,6 @@ limitations under the License.
 package scheduler
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"strconv"
@@ -44,14 +43,10 @@ func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (boo
 	return len(existingPods) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
+func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodes []*api.Node) (algorithm.HostPriorityList, error) {
 	result := []algorithm.HostPriority{}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %v", err)
-	}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		score, err := strconv.Atoi(node.Name)
 		if err != nil {
 			return nil, err
@@ -64,11 +59,11 @@ func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister alg
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodes []*api.Node) (algorithm.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []algorithm.HostPriority{}
-	result, err := numericPriority(pod, podLister, nodeLister)
+	result, err := numericPriority(pod, podLister, nodes)
 	if err != nil {
 		return nil, err
 	}
