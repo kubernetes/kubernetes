@@ -18,6 +18,11 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
+if ! command -v kubectl >/dev/null 2>&1; then
+  echo "Please install kubectl before running this script"
+  exit 1
+fi
+
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
 RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
