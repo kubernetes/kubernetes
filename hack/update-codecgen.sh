@@ -53,7 +53,8 @@ result=""
 function depends {
   file=${generated_files[$1]//\.generated\.go/.go}
   deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
-  fullpath=$(readlink -f ${generated_files[$2]//\.generated\.go/.go})
+  inputfile=${generated_files[$2]//\.generated\.go/.go}
+  fullpath=$(cd "$(dirname "${inputfile}")" && pwd -P)
   candidate=$(dirname "${fullpath}")
   result=false
   for dep in ${deps}; do
