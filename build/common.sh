@@ -909,6 +909,8 @@ function kube::release::package_full_tarball() {
   mkdir -p "${release_stage}/contrib/completions/bash"
   cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
 
+  echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
+
   kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
