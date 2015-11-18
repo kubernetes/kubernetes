@@ -267,8 +267,9 @@ EOF
 function detect-master() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
   setClusterInfo
-  KUBE_MASTER_IP="${MASTER_IP}"
-  echo "Using master $MASTER_IP"
+  export KUBE_MASTER="${MASTER}" 
+  export KUBE_MASTER_IP="${MASTER_IP}"
+  echo "Using master ${MASTER_IP}"
 }
 
 # Detect the information about the nodes
@@ -304,11 +305,11 @@ function detect-nodes() {
 function kube-up() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
-  # ensure the binaries are well prepared
-  if [[ ! -f "ubuntu/binaries/master/kube-apiserver" ]]; then
-    echo "No local binaries for kube-up, downloading..."
-    "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
+  # downloading tarball release
+  if [[ -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
+    rm -rf "${KUBE_ROOT}/cluster/ubuntu/binaries"
   fi
+  "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
 
   setClusterInfo
   local ii=0
