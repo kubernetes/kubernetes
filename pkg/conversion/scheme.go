@@ -72,10 +72,10 @@ func NewScheme() *Scheme {
 		cloner:        NewCloner(),
 		// TODO remove this hard coded list.  As step one, hardcode it here so this pull doesn't become even bigger
 		InternalVersions: map[string]unversioned.GroupVersion{
-			"":                unversioned.GroupVersion{},
-			"componentconfig": unversioned.GroupVersion{Group: "componentconfig"},
-			"extensions":      unversioned.GroupVersion{Group: "extensions"},
-			"metrics":         unversioned.GroupVersion{Group: "metrics"},
+			"":                {},
+			"componentconfig": {Group: "componentconfig"},
+			"extensions":      {Group: "extensions"},
+			"metrics":         {Group: "metrics"},
 		},
 		MetaFactory: DefaultMetaFactory,
 	}
