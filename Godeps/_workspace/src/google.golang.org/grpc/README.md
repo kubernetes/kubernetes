@@ -13,9 +13,14 @@ To install this package, you need to install Go 1.4 and setup your Go workspace 
 $ go get google.golang.org/grpc
 ```
 
+Prerequisites
+-------------
+
+This requires Go 1.4 or above.
+
 Documentation
 -------------
-You can find more detailed documentation and examples in the [grpc-common repository](http://github.com/grpc/grpc-common).
+You can find more detailed documentation and examples in the [examples directory](examples/).
 
 Status
 ------
