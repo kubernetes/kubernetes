@@ -346,14 +346,13 @@ function kube::build::destroy_container() {
 #   version
 # Returns:
 #   If version is a valid release version
-# Sets:
-#  BASH_REMATCH, so you can do something like:
-#    local -r version_major="${BASH_REMATCH[1]}"
-#    local -r version_minor="${BASH_REMATCH[2]}"
-#    local -r version_patch="${BASH_REMATCH[3]}"
-#    local -r version_extra="${BASH_REMATCH[4]}"
-#    local -r version_prerelease="${BASH_REMATCH[5]}"
-#    local -r version_prerelease_rev="${BASH_REMATCH[6]}"
+# Sets:                    (e.g. for '1.2.3-alpha.4')
+#   VERSION_MAJOR          (e.g. '1')
+#   VERSION_MINOR          (e.g. '2')
+#   VERSION_PATCH          (e.g. '3')
+#   VERSION_EXTRA          (e.g. '-alpha.4')
+#   VERSION_PRERELEASE     (e.g. 'alpha')
+#   VERSION_PRERELEASE_REV (e.g. '4')
 function kube::release::parse_and_validate_release_version() {
   local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
   local -r version="${1-}"
@@ -361,6 +360,12 @@ function kube::release::parse_and_validate_release_version() {
     kube::log::error "Invalid release version: '${version}', must match regex ${version_regex}"
     return 1
   }
+  VERSION_MAJOR="${BASH_REMATCH[1]}"
+  VERSION_MINOR="${BASH_REMATCH[2]}"
+  VERSION_PATCH="${BASH_REMATCH[3]}"
+  VERSION_EXTRA="${BASH_REMATCH[4]}"
+  VERSION_PRERELEASE="${BASH_REMATCH[5]}"
+  VERSION_PRERELEASE_REV="${BASH_REMATCH[6]}"
 }
 
 # Validate a ci version
@@ -371,23 +376,29 @@ function kube::release::parse_and_validate_release_version() {
 #   version
 # Returns:
 #   If version is a valid ci version
-# Sets:
-#  BASH_REMATCH, so you can do something like:
-#    local -r version_major="${BASH_REMATCH[1]}"
-#    local -r version_minor="${BASH_REMATCH[2]}"
-#    local -r version_patch="${BASH_REMATCH[3]}"
-#    local -r version_prerelease="${BASH_REMATCH[4]}"
-#    local -r version_prerelease_rev="${BASH_REMATCH[5]}"
-#    local -r version_build_info="${BASH_REMATCH[6]}"
-#    local -r version_commits="${BASH_REMATCH[7]}"
+# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcd789-dirty')
+#   VERSION_MAJOR          (e.g. '1')
+#   VERSION_MINOR          (e.g. '2')
+#   VERSION_PATCH          (e.g. '3')
+#   VERSION_PRERELEASE     (e.g. 'alpha')
+#   VERSION_PRERELEASE_REV (e.g. '4')
+#   VERSION_BUILD_INFO     (e.g. '.56+abcd789-dirty')
+#   VERSION_COMMITS        (e.g. '56')
 function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.0.456+abcd789-dirty" or "v1.2.3-beta.0.456"
+  # Accept things like "v1.2.3-alpha.4.56+abcd789-dirty" or "v1.2.3-beta.4.56"
   local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
     kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
     return 1
   }
+  VERSION_MAJOR="${BASH_REMATCH[1]}"
+  VERSION_MINOR="${BASH_REMATCH[2]}"
+  VERSION_PATCH="${BASH_REMATCH[3]}"
+  VERSION_PRERELEASE="${BASH_REMATCH[4]}"
+  VERSION_PRERELEASE_REV="${BASH_REMATCH[5]}"
+  VERSION_BUILD_INFO="${BASH_REMATCH[6]}"
+  VERSION_COMMITS="${BASH_REMATCH[7]}"
 }
 
 # ---------------------------------------------------------------------------
@@ -1073,8 +1084,8 @@ function kube::release::gcs::publish_ci() {
   kube::release::gcs::verify_release_files || return 1
 
   kube::release::parse_and_validate_ci_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
 
   local -r publish_files=(ci/latest.txt ci/latest-${version_major}.txt ci/latest-${version_major}.${version_minor}.txt)
 
@@ -1103,8 +1114,8 @@ function kube::release::gcs::publish_official() {
   kube::release::gcs::verify_release_files || return 1
 
   kube::release::parse_and_validate_release_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
 
   local publish_files
   if [[ "${release_kind}" == 'latest' ]]; then
@@ -1162,11 +1173,11 @@ function kube::release::gcs::verify_release_gt() {
 
   kube::release::parse_and_validate_release_version "${new_version}" || return 1
 
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
-  local -r version_patch="${BASH_REMATCH[3]}"
-  local -r version_prerelease="${BASH_REMATCH[5]}"
-  local -r version_prerelease_rev="${BASH_REMATCH[6]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
+  local -r version_patch="${VERSION_PATCH}"
+  local -r version_prerelease="${VERSION_PRERELEASE}"
+  local -r version_prerelease_rev="${VERSION_PRERELEASE_REV}"
 
   local gcs_version
   if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
@@ -1175,11 +1186,11 @@ function kube::release::gcs::verify_release_gt() {
       return 1
     }
 
-    local -r gcs_version_major="${BASH_REMATCH[1]}"
-    local -r gcs_version_minor="${BASH_REMATCH[2]}"
-    local -r gcs_version_patch="${BASH_REMATCH[3]}"
-    local -r gcs_version_prerelease="${BASH_REMATCH[5]}"
-    local -r gcs_version_prerelease_rev="${BASH_REMATCH[6]}"
+    local -r gcs_version_major="${VERSION_MAJOR}"
+    local -r gcs_version_minor="${VERSION_MINOR}"
+    local -r gcs_version_patch="${VERSION_PATCH}"
+    local -r gcs_version_prerelease="${VERSION_PRERELEASE}"
+    local -r gcs_version_prerelease_rev="${VERSION_PRERELEASE_REV}"
 
     local greater=true
     if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
@@ -1246,12 +1257,12 @@ function kube::release::gcs::verify_ci_ge() {
 
   kube::release::parse_and_validate_ci_version "${new_version}" || return 1
 
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
-  local -r version_patch="${BASH_REMATCH[3]}"
-  local -r version_prerelease="${BASH_REMATCH[4]}"
-  local -r version_prerelease_rev="${BASH_REMATCH[5]}"
-  local -r version_commits="${BASH_REMATCH[7]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
+  local -r version_patch="${VERSION_PATCH}"
+  local -r version_prerelease="${VERSION_PRERELEASE}"
+  local -r version_prerelease_rev="${VERSION_PRERELEASE_REV}"
+  local -r version_commits="${VERSION_COMMITS}"
 
   local gcs_version
   if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
@@ -1260,12 +1271,12 @@ function kube::release::gcs::verify_ci_ge() {
       return 1
     }
 
-    local -r gcs_version_major="${BASH_REMATCH[1]}"
-    local -r gcs_version_minor="${BASH_REMATCH[2]}"
-    local -r gcs_version_patch="${BASH_REMATCH[3]}"
-    local -r gcs_version_prerelease="${BASH_REMATCH[4]}"
-    local -r gcs_version_prerelease_rev="${BASH_REMATCH[5]}"
-    local -r gcs_version_commits="${BASH_REMATCH[7]}"
+    local -r gcs_version_major="${VERSION_MAJOR}"
+    local -r gcs_version_minor="${VERSION_MINOR}"
+    local -r gcs_version_patch="${VERSION_PATCH}"
+    local -r gcs_version_prerelease="${VERSION_PRERELEASE}"
+    local -r gcs_version_prerelease_rev="${VERSION_PRERELEASE_REV}"
+    local -r gcs_version_commits="${VERSION_COMMITS}"
 
     local greater=true
     if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
