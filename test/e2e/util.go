@@ -121,6 +121,21 @@ const (
 var subResourcePodProxyVersion = version.MustParse("v1.1.0")
 var subResourceServiceAndNodeProxyVersion = version.MustParse("v1.2.0")
 
+func getServicesProxyRequest(c *client.Client, request *client.Request) (*client.Request, error) {
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	if err != nil {
+		return nil, err
+	}
+	if subResourceProxyAvailable {
+		return request.Resource("services").SubResource("proxy"), nil
+	}
+	return request.Prefix("proxy").Resource("services"), nil
+}
+
+func GetServicesProxyRequest(c *client.Client, request *client.Request) (*client.Request, error) {
+	return getServicesProxyRequest(c, request)
+}
+
 type CloudConfig struct {
 	ProjectID         string
 	Zone              string
@@ -1081,10 +1096,12 @@ func serviceResponding(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
 	return wait.PollImmediate(poll, serviceRespondingTimeout, func() (done bool, err error) {
-		body, err := c.Get().
-			Prefix("proxy").
-			Namespace(ns).
-			Resource("services").
+		proxyRequest, errProxy := getServicesProxyRequest(c, c.Get())
+		if errProxy != nil {
+			Logf("Failed to get services proxy request: %v:", errProxy)
+			return false, nil
+		}
+		body, err := proxyRequest.Namespace(ns).
 			Name(name).
 			Do().
 			Raw()

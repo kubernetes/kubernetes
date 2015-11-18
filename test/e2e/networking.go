@@ -150,20 +150,22 @@ var _ = Describe("Networking", func() {
 		//once response OK, evaluate response body for pass/fail.
 		var body []byte
 		getDetails := func() ([]byte, error) {
-			return f.Client.Get().
-				Namespace(f.Namespace.Name).
-				Prefix("proxy").
-				Resource("services").
+			proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+			if errProxy != nil {
+				return nil, errProxy
+			}
+			return proxyRequest.Namespace(f.Namespace.Name).
 				Name(svc.Name).
 				Suffix("read").
 				DoRaw()
 		}
 
 		getStatus := func() ([]byte, error) {
-			return f.Client.Get().
-				Namespace(f.Namespace.Name).
-				Prefix("proxy").
-				Resource("services").
+			proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+			if errProxy != nil {
+				return nil, errProxy
+			}
+			return proxyRequest.Namespace(f.Namespace.Name).
 				Name(svc.Name).
 				Suffix("status").
 				DoRaw()
