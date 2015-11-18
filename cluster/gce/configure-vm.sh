@@ -77,12 +77,13 @@ function set-kube-env() {
   done
 
   # kube-env has all the environment variables we care about, in a flat yaml format
-  eval $(python -c '''
+  eval "$(python -c '
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():
-  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
-''' < "${kube_env_yaml}")
+  print """readonly {var}={value}""".format(var = k, value = pipes.quote(str(v)))
+  print """export {var}""".format(var = k)
+  ' < """${kube_env_yaml}""")"
 }
 
 function remove-docker-artifacts() {
@@ -524,7 +525,7 @@ function download-release() {
   done
 
   echo "Running release install script"
-  sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
+  kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
 }
 
 function fix-apt-sources() {

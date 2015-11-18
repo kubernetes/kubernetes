@@ -25,7 +25,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-proxy
-    image: gcr.io/google_containers/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
     command:
     - /bin/sh
     - -c
