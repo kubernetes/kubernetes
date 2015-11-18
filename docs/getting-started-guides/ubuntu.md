@@ -87,6 +87,17 @@ $ export FLANNEL_VERSION=0.5.0
 $ export ETCD_VERSION=2.2.0
 ```
 
+**Note**
+
+For users who want to bring up a cluster with k8s version v1.1.1, `controller manager` may fail to start
+due to [a known issue](https://github.com/kubernetes/kubernetes/issues/17109). You could raise it
+up manually by using following command on the remote master server. Note that
+you should do this only after `api-server` is up.
+
+```console
+$ sudo service kube-controller-manager start
+```
+
 Note that we use flannel here to set up overlay network, yet it's optional. Actually you can build up k8s
 cluster natively, or use flannel, Open vSwitch or any other SDN tool you like.
 
@@ -222,7 +233,7 @@ We are working on these features which we'd like to let everybody know:
 to eliminate OS-distro differences.
 2. Tearing Down scripts: clear and re-create the whole stack by one click.
 
-### Trouble shooting
+### Troubleshooting
 
 Generally, what this approach does is quite simple:
 
