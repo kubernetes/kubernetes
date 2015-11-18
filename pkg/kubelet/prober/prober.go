@@ -163,7 +163,7 @@ func extractPort(param intstr.IntOrString, container api.Container) (int, error)
 	var err error
 	switch param.Type {
 	case intstr.Int:
-		port = param.IntVal
+		port = param.IntValue()
 	case intstr.String:
 		if port, err = findPortByName(container, param.StrVal); err != nil {
 			// Last ditch effort - maybe it was an int stored as string?

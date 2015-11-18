@@ -881,8 +881,9 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 		return allErrs
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler)...)
-	allErrs = append(allErrs, ValidatePositiveField(probe.InitialDelaySeconds, "initialDelaySeconds")...)
-	allErrs = append(allErrs, ValidatePositiveField(probe.TimeoutSeconds, "timeoutSeconds")...)
+
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.InitialDelaySeconds), "initialDelaySeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.TimeoutSeconds), "timeoutSeconds")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(probe.PeriodSeconds), "periodSeconds")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(probe.SuccessThreshold), "successThreshold")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(probe.FailureThreshold), "failureThreshold")...)
@@ -933,7 +934,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, errs.NewFieldRequired("path"))
 	}
-	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntVal) {
+	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntValue()) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port, PortRangeErrorMsg))
 	} else if http.Port.Type == intstr.String && !validation.IsValidPortName(http.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port.StrVal, PortNameErrorMsg))
@@ -947,7 +948,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 
 func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
-	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntVal) {
+	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntValue()) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port, PortRangeErrorMsg))
 	} else if tcp.Port.Type == intstr.String && !validation.IsValidPortName(tcp.Port.StrVal) {
 		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port.StrVal, PortNameErrorMsg))
@@ -1334,7 +1335,7 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 		allErrs = append(allErrs, errs.NewFieldValueNotSupported("protocol", sp.Protocol, supportedPortProtocols.List()))
 	}
 
-	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntVal) {
+	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntValue()) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("targetPort", sp.TargetPort, PortRangeErrorMsg))
 	}
 	if sp.TargetPort.Type == intstr.String && !validation.IsValidPortName(sp.TargetPort.StrVal) {

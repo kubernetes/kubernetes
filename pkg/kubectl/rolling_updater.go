@@ -489,7 +489,7 @@ func extractMaxValue(field intstr.IntOrString, name string, value int) (int, err
 		if field.IntVal < 0 {
 			return 0, fmt.Errorf("%s must be >= 0", name)
 		}
-		return field.IntVal, nil
+		return field.IntValue(), nil
 	case intstr.String:
 		s := strings.Replace(field.StrVal, "%", "", -1)
 		v, err := strconv.Atoi(s)
