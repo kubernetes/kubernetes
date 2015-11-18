@@ -686,15 +686,29 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 // to use it.
 // TODO: add appropriate structured error responses
 func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
-	versioned, err := scope.Creater.New(scope.APIVersion, kind)
+	// TODO Options a mess.  Basically the intent is:
+	// 1. try to decode using the expected external GroupVersion
+	// 2. if that fails, fall back to the old external serialization being used before, which was
+	//    "v1" and decode into the unversioned/legacykube group
+	gvString := scope.APIVersion
+	internalGVString := scope.InternalVersion.String()
+
+	versioned, err := scope.Creater.New(gvString, kind)
 	if err != nil {
-		// programmer error
-		return nil, err
+		gvString = "v1"
+		internalGVString = ""
+
+		var secondErr error
+		versioned, secondErr = scope.Creater.New(gvString, kind)
+		// if we have an error, return the original failure
+		if secondErr != nil {
+			return nil, err
+		}
 	}
 	if err := scope.Convertor.Convert(&query, versioned); err != nil {
 		return nil, errors.NewBadRequest(err.Error())
 	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, scope.InternalVersion.String())
+	out, err := scope.Convertor.ConvertToVersion(versioned, internalGVString)
 	if err != nil {
 		// programmer error
 		return nil, err
