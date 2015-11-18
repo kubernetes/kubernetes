@@ -96,7 +96,7 @@ only be available through the kubelet. The types of metrics are detailed
   - `/rawNodes/localhost` - The only node provided is `localhost`; type
     metrics.Node
 - `/derivedNodes` - host metrics; type `[]metrics.DerivedNode`
-  - `/nodes/{node}` - derived metrics for a specific node
+  - `/derivedNodes/{node}` - derived metrics for a specific node
 - `/rawPods` - All raw pod metrics across all namespaces; type
   `[]metrics.RawPod`
 - `/derivedPods` - All derived pod metrics across all namespaces; type
