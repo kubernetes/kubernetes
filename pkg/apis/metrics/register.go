@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func init() {
@@ -25,10 +26,13 @@ func init() {
 	addKnownTypes()
 }
 
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "metrics", Version: ""}
+
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
 	// TODO this will get cleaned up with the scheme types are fixed
-	api.Scheme.AddKnownTypes("metrics/",
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&RawNode{},
 		&RawPod{},
 	)

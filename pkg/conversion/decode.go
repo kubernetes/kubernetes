@@ -124,14 +124,14 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	return s.DecodeIntoWithSpecifiedVersionKind(data, obj, unversioned.GroupVersionKind{})
 }
 
-// DecodeIntoWithSpecifiedVersionKind compares the passed in specifiedVersion and
-// specifiedKind with data.Version and data.Kind, defaulting data.Version and
+// DecodeIntoWithSpecifiedVersionKind compares the passed in requestGroupVersionKind
+// with data.Version and data.Kind, defaulting data.Version and
 // data.Kind to the specified value if they are empty, or generating an error if
 // data.Version and data.Kind are not empty and differ from the specified value.
 // The function then implements the functionality of DecodeInto.
 // If specifiedVersion and specifiedKind are empty, the function degenerates to
 // DecodeInto.
-func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}, gvk unversioned.GroupVersionKind) error {
+func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}, requestedGVK unversioned.GroupVersionKind) error {
 	if len(data) == 0 {
 		return errors.New("empty input")
 	}
@@ -140,16 +140,16 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 		return err
 	}
 	if dataVersion == "" {
-		dataVersion = gvk.GroupVersion().String()
+		dataVersion = requestedGVK.GroupVersion().String()
 	}
 	if dataKind == "" {
-		dataKind = gvk.Kind
+		dataKind = requestedGVK.Kind
 	}
-	if (len(gvk.Group) > 0 || len(gvk.Version) > 0) && (dataVersion != gvk.GroupVersion().String()) {
-		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%v)", dataVersion, gvk.GroupVersion()))
+	if (len(requestedGVK.Group) > 0 || len(requestedGVK.Version) > 0) && (dataVersion != requestedGVK.GroupVersion().String()) {
+		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%v)", dataVersion, requestedGVK.GroupVersion()))
 	}
-	if len(gvk.Kind) > 0 && (dataKind != gvk.Kind) {
-		return errors.New(fmt.Sprintf("The kind in the data (%s) does not match the specified kind(%v)", dataKind, gvk))
+	if len(requestedGVK.Kind) > 0 && (dataKind != requestedGVK.Kind) {
+		return errors.New(fmt.Sprintf("The kind in the data (%s) does not match the specified kind(%v)", dataKind, requestedGVK))
 	}
 
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)

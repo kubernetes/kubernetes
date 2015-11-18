@@ -30,7 +30,7 @@ import (
 )
 
 type ConversionGenerator interface {
-	GenerateConversionsForType(version string, reflection reflect.Type) error
+	GenerateConversionsForType(groupVersion unversioned.GroupVersion, reflection reflect.Type) error
 	WriteConversionFunctions(w io.Writer) error
 	RegisterConversionFunctions(w io.Writer, pkg string) error
 	AddImport(pkg string) string
@@ -87,12 +87,7 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 	return g.addImportByPath(pkg)
 }
 
-func (g *conversionGenerator) GenerateConversionsForType(gvString string, reflection reflect.Type) error {
-	gv, err := unversioned.ParseGroupVersion(gvString)
-	if err != nil {
-		return err
-	}
-
+func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVersion, reflection reflect.Type) error {
 	kind := reflection.Name()
 	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
 	internalGV, exists := g.scheme.InternalVersions[gv.Group]

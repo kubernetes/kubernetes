@@ -46,13 +46,11 @@ func (*ExternalSimple) IsAnAPIObject() {}
 func TestScheme(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
-	internalGVK := internalGV.WithKind("Simple")
-	externalGVK := externalGV.WithKind("Simple")
 
 	scheme := runtime.NewScheme()
 	scheme.AddInternalGroupVersion(internalGV)
-	scheme.AddKnownTypeWithName(internalGV.String(), internalGVK.Kind, &InternalSimple{})
-	scheme.AddKnownTypeWithName(externalGV.String(), externalGVK.Kind, &ExternalSimple{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
 
 	// test that scheme is an ObjectTyper
 	var _ runtime.ObjectTyper = scheme
@@ -138,8 +136,10 @@ func TestScheme(t *testing.T) {
 }
 
 func TestInvalidObjectValueKind(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "", Version: ""}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 
 	embedded := &runtime.EmbeddedObject{}
 	switch obj := embedded.Object.(type) {
@@ -210,8 +210,8 @@ func TestExternalToInternalMapping(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	scheme.AddInternalGroupVersion(internalGV)
-	scheme.AddKnownTypeWithName(internalGV.String(), "OptionalExtensionType", &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName(externalGV.String(), "OptionalExtensionType", &ExternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &ExternalOptionalExtensionType{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -246,14 +246,14 @@ func TestExtensionMapping(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	scheme.AddInternalGroupVersion(internalGV)
-	scheme.AddKnownTypeWithName(internalGV.String(), "ExtensionType", &InternalExtensionType{})
-	scheme.AddKnownTypeWithName(internalGV.String(), "OptionalExtensionType", &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName(internalGV.String(), "A", &ExtensionA{})
-	scheme.AddKnownTypeWithName(internalGV.String(), "B", &ExtensionB{})
-	scheme.AddKnownTypeWithName(externalGV.String(), "ExtensionType", &ExternalExtensionType{})
-	scheme.AddKnownTypeWithName(externalGV.String(), "OptionalExtensionType", &ExternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName(externalGV.String(), "A", &ExtensionA{})
-	scheme.AddKnownTypeWithName(externalGV.String(), "B", &ExtensionB{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("ExtensionType"), &InternalExtensionType{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("A"), &ExtensionA{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("B"), &ExtensionB{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("ExtensionType"), &ExternalExtensionType{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &ExternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("A"), &ExtensionA{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("B"), &ExtensionB{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -304,8 +304,8 @@ func TestEncode(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	scheme.AddInternalGroupVersion(internalGV)
-	scheme.AddKnownTypeWithName(internalGV.String(), "Simple", &InternalSimple{})
-	scheme.AddKnownTypeWithName(externalGV.String(), "Simple", &ExternalSimple{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
 	codec := runtime.CodecFor(scheme, externalGV.String())
 	test := &InternalSimple{
 		TestString: "I'm the same",

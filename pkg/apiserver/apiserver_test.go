@@ -113,21 +113,21 @@ func newMapper() *meta.DefaultRESTMapper {
 
 func addGrouplessTypes() {
 	api.Scheme.AddKnownTypes(
-		grouplessGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		grouplessGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessGroupVersion.String(), &api.Pod{})
+	api.Scheme.AddKnownTypes(grouplessGroupVersion, &api.Pod{})
 }
 
 func addTestTypes() {
 	api.Scheme.AddKnownTypes(
-		testGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		testGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(testGroupVersion.String(), &api.Pod{})
+	api.Scheme.AddKnownTypes(testGroupVersion, &api.Pod{})
 }
 
 func addNewTestTypes() {
 	api.Scheme.AddKnownTypes(
-		newGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		newGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
@@ -137,7 +137,7 @@ func init() {
 
 	// "internal" version
 	api.Scheme.AddKnownTypes(
-		testInternalGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		testInternalGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddInternalGroupVersion(testInternalGroupVersion)
 	addGrouplessTypes()
@@ -149,9 +149,8 @@ func init() {
 	// enumerate all supported versions, get the kinds, and register with
 	// the mapper how to address our resources
 	for _, gv := range groupVersions {
-		for kind := range api.Scheme.KnownTypes(gv.String()) {
+		for kind := range api.Scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
-
 			root := bool(kind == "SimpleRoot")
 			if root {
 				nsMapper.Add(gvk, meta.RESTScopeRoot, false)

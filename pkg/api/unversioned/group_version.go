@@ -49,6 +49,7 @@ type GroupVersion struct {
 	Version string
 }
 
+// IsEmpty returns true if group and version are empty
 func (gv GroupVersion) IsEmpty() bool {
 	return len(gv.Group) == 0 && len(gv.Version) == 0
 }
@@ -56,7 +57,7 @@ func (gv GroupVersion) IsEmpty() bool {
 // String puts "group" and "version" into a single "group/version" string. For the legacy v1
 // it returns "v1".
 func (gv GroupVersion) String() string {
-	// special case the internal apiVersion for kube
+	// special case the internal apiVersion for the legacy kube types
 	if gv.IsEmpty() {
 		return ""
 	}
@@ -72,7 +73,8 @@ func (gv GroupVersion) String() string {
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupVersion, error) {
-	// this can be the internal version for kube
+	// this can be the internal version for the legacy kube types
+	// TODO once we've cleared the last uses as strings, this special case should be removed.
 	if (len(gv) == 0) || (gv == "/") {
 		return GroupVersion{}, nil
 	}
@@ -99,6 +101,7 @@ func ParseGroupVersionOrDie(gv string) GroupVersion {
 	return ret
 }
 
+// WithKind creates a GroupVersionKind based on the method receiver's GroupVersion and the passed Kind.
 func (gv GroupVersion) WithKind(kind string) GroupVersionKind {
 	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
 }

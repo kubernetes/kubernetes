@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/google/gofuzz"
@@ -31,10 +32,10 @@ import (
 
 func TestDeepCopyApiObjects(t *testing.T) {
 	for i := 0; i < *fuzzIters; i++ {
-		for _, version := range []string{"", testapi.Default.Version()} {
-			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
-			for kind := range api.Scheme.KnownTypes(version) {
-				doDeepCopyTest(t, version, kind, f)
+		for _, gv := range []unversioned.GroupVersion{testapi.Default.InternalGroupVersion(), *testapi.Default.GroupVersion()} {
+			f := apitesting.FuzzerFor(t, gv.String(), rand.NewSource(rand.Int63()))
+			for kind := range api.Scheme.KnownTypes(gv) {
+				doDeepCopyTest(t, gv.String(), kind, f)
 			}
 		}
 	}

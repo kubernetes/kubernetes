@@ -63,14 +63,15 @@ func (*EmbeddedTestExternal) IsAnAPIObject() {}
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
-	externalGVK := unversioned.GroupVersionKind{Group: "test.group", Version: "v1test", Kind: "ObjectTest"}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
+	externalGVK := externalGV.WithKind("ObjectTest")
 
 	s := runtime.NewScheme()
 	s.AddInternalGroupVersion(internalGV)
-	s.AddKnownTypes(internalGV.String(), &ObjectTest{})
-	s.AddKnownTypeWithName(externalGVK.GroupVersion().String(), externalGVK.Kind, &ObjectTestExternal{})
+	s.AddKnownTypes(internalGV, &ObjectTest{})
+	s.AddKnownTypeWithName(externalGVK, &ObjectTestExternal{})
 
-	obj, err := s.Decode([]byte(`{"kind":"` + externalGVK.Kind + `","apiVersion":"` + externalGVK.GroupVersion().String() + `","items":[{}]}`))
+	obj, err := s.Decode([]byte(`{"kind":"` + externalGVK.Kind + `","apiVersion":"` + externalGV.String() + `","items":[{}]}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 
-	obj, err = s.Decode([]byte(`{"kind":"` + externalGVK.Kind + `","apiVersion":"` + externalGVK.GroupVersion().String() + `","items":[{"kind":"Other","apiVersion":"v1"}]}`))
+	obj, err = s.Decode([]byte(`{"kind":"` + externalGVK.Kind + `","apiVersion":"` + externalGV.String() + `","items":[{"kind":"Other","apiVersion":"v1"}]}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,10 +96,10 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddInternalGroupVersion(internalGV)
-	s.AddKnownTypes(internalGV.String(), &EmbeddedTest{})
-	s.AddKnownTypeWithName(externalGV.String(), "EmbeddedTest", &EmbeddedTestExternal{})
-	s.AddKnownTypes(internalGV.String(), &ObjectTest{})
-	s.AddKnownTypeWithName(externalGV.String(), "ObjectTest", &ObjectTestExternal{})
+	s.AddKnownTypes(internalGV, &EmbeddedTest{})
+	s.AddKnownTypeWithName(externalGV.WithKind("EmbeddedTest"), &EmbeddedTestExternal{})
+	s.AddKnownTypes(internalGV, &ObjectTest{})
+	s.AddKnownTypeWithName(externalGV.WithKind("ObjectTest"), &ObjectTestExternal{})
 
 	internal := &ObjectTest{
 		Items: []runtime.Object{
@@ -162,8 +163,8 @@ func TestEmbeddedObject(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddInternalGroupVersion(internalGV)
-	s.AddKnownTypes(internalGV.String(), &EmbeddedTest{})
-	s.AddKnownTypeWithName(externalGV.String(), embeddedTestExternalGVK.Kind, &EmbeddedTestExternal{})
+	s.AddKnownTypes(internalGV, &EmbeddedTest{})
+	s.AddKnownTypeWithName(embeddedTestExternalGVK, &EmbeddedTestExternal{})
 
 	outer := &EmbeddedTest{
 		ID: "outer",
@@ -226,8 +227,8 @@ func TestDeepCopyOfEmbeddedObject(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddInternalGroupVersion(internalGV)
-	s.AddKnownTypes(internalGV.String(), &EmbeddedTest{})
-	s.AddKnownTypeWithName(externalGV.String(), embeddedTestExternalGVK.Kind, &EmbeddedTestExternal{})
+	s.AddKnownTypes(internalGV, &EmbeddedTest{})
+	s.AddKnownTypeWithName(embeddedTestExternalGVK, &EmbeddedTestExternal{})
 
 	original := &EmbeddedTest{
 		ID: "outer",
