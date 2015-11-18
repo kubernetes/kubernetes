@@ -72,8 +72,8 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 // technique. The object will be converted, if necessary, into the versioned
 // type before being returned. Decode will not decode objects without version
 // set unless version is also "".
-// a GroupVersion with .IsEmpty() == true is means "use the internal version
-// for this group
+// a GroupVersion with .IsEmpty() == true is means "use the internal version for
+// the object's group"
 func (s *Scheme) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (interface{}, error) {
 	obj, sourceVersion, kind, err := s.DecodeToVersionedObject(data)
 	if err != nil {
@@ -144,7 +144,7 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 	if dataKind == "" {
 		dataKind = gvk.Kind
 	}
-	if (len(gvk.GroupVersion().Group) > 0 || len(gvk.GroupVersion().Version) > 0) && (dataVersion != gvk.GroupVersion().String()) {
+	if (len(gvk.Group) > 0 || len(gvk.Version) > 0) && (dataVersion != gvk.GroupVersion().String()) {
 		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%v)", dataVersion, gvk.GroupVersion()))
 	}
 	if len(gvk.Kind) > 0 && (dataKind != gvk.Kind) {

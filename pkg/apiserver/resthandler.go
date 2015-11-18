@@ -72,10 +72,11 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource    string
-	Subresource string
-	Kind        string
-	APIVersion  string
+	Resource        string
+	Subresource     string
+	Kind            string
+	APIVersion      string
+	InternalVersion unversioned.GroupVersion
 
 	// The version of apiserver resources to use
 	ServerAPIVersion string
@@ -685,7 +686,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 // to use it.
 // TODO: add appropriate structured error responses
 func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
-	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
+	versioned, err := scope.Creater.New(scope.APIVersion, kind)
 	if err != nil {
 		// programmer error
 		return nil, err
@@ -693,7 +694,7 @@ func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.O
 	if err := scope.Convertor.Convert(&query, versioned); err != nil {
 		return nil, errors.NewBadRequest(err.Error())
 	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, "")
+	out, err := scope.Convertor.ConvertToVersion(versioned, scope.InternalVersion.String())
 	if err != nil {
 		// programmer error
 		return nil, err

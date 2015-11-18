@@ -1705,7 +1705,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)

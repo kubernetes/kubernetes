@@ -56,7 +56,7 @@ func (gv GroupVersion) IsEmpty() bool {
 // it returns "v1".
 func (gv GroupVersion) String() string {
 	// special case the internal apiVersion for kube
-	if len(gv.Group) == 0 && len(gv.Version) == 0 {
+	if gv.IsEmpty() {
 		return ""
 	}
 
