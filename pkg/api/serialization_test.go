@@ -110,7 +110,7 @@ func TestSpecificKind(t *testing.T) {
 	api.Scheme.Log(t)
 	defer api.Scheme.Log(nil)
 
-	kind := "JobList"
+	kind := "Pod"
 	for i := 0; i < *fuzzIters; i++ {
 		doRoundTripTest(kind, t)
 		if t.Failed() {
