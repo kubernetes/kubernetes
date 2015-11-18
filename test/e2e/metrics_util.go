@@ -57,6 +57,12 @@ type PodStartupLatency struct {
 	Latency LatencyMetric `json:"latency"`
 }
 
+type SchedulingLatency struct {
+	Scheduling LatencyMetric `json:"scheduling:`
+	Binding    LatencyMetric `json:"binding"`
+	Total      LatencyMetric `json:"total"`
+}
+
 type APICall struct {
 	Resource string        `json:"resource"`
 	Verb     string        `json:"verb"`
@@ -78,26 +84,31 @@ func (a APIResponsiveness) Less(i, j int) bool {
 func (a *APIResponsiveness) addMetric(resource, verb string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
 		if apicall.Resource == resource && apicall.Verb == verb {
-			a.APICalls[i] = setQuantile(apicall, quantile, latency)
+			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
 			return
 		}
 	}
-	apicall := setQuantile(APICall{Resource: resource, Verb: verb}, quantile, latency)
+	apicall := setQuantileAPICall(APICall{Resource: resource, Verb: verb}, quantile, latency)
 	a.APICalls = append(a.APICalls, apicall)
 }
 
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
-func setQuantile(apicall APICall, quantile float64, latency time.Duration) APICall {
+func setQuantileAPICall(apicall APICall, quantile float64, latency time.Duration) APICall {
+	setQuantile(&apicall.Latency, quantile, latency)
+	return apicall
+}
+
+// Only 0.5, 0.9 and 0.99 quantiles are supported.
+func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration) {
 	switch quantile {
 	case 0.5:
-		apicall.Latency.Perc50 = latency
+		metric.Perc50 = latency
 	case 0.9:
-		apicall.Latency.Perc90 = latency
+		metric.Perc90 = latency
 	case 0.99:
-		apicall.Latency.Perc99 = latency
+		metric.Perc99 = latency
 	}
-	return apicall
 }
 
 func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
@@ -231,6 +242,56 @@ func getMetrics(c *client.Client) (string, error) {
 		return "", err
 	}
 	return string(body), nil
+}
+
+// Retrieves scheduler metrics information.
+func getSchedulingLatency() (SchedulingLatency, error) {
+	result := SchedulingLatency{}
+
+	cmd := "curl http://localhost:10251/metrics"
+	sshResult, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
+	if err != nil || sshResult.Code != 0 {
+		return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+	}
+	samples, err := extractMetricSamples(sshResult.Stdout)
+	if err != nil {
+		return result, err
+	}
+
+	for _, sample := range samples {
+		var metric *LatencyMetric = nil
+		switch sample.Metric[model.MetricNameLabel] {
+		case "scheduler_scheduling_algorithm_latency_microseconds":
+			metric = &result.Scheduling
+		case "scheduler_binding_latency_microseconds":
+			metric = &result.Binding
+		case "scheduler_e2e_scheduling_latency_microseconds":
+			metric = &result.Total
+		}
+		if metric == nil {
+			continue
+		}
+
+		latency := sample.Value
+		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+		if err != nil {
+			return result, err
+		}
+		setQuantile(metric, quantile, time.Duration(int64(latency))*time.Microsecond)
+	}
+	return result, nil
+}
+
+// Verifies (currently just by logging them) the scheduling latencies.
+func VerifySchedulerLatency() error {
+	latency, err := getSchedulingLatency()
+	if err != nil {
+		return err
+	}
+	Logf("Scheduling latency: %s", prettyPrintJSON(latency))
+
+	// TODO: Add some reasonable checks once we know more about the values.
+	return nil
 }
 
 func prettyPrintJSON(metrics interface{}) string {
