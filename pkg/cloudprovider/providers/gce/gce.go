@@ -39,7 +39,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
-	container "google.golang.org/api/container/v1beta1"
+	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
 )
@@ -1550,7 +1550,7 @@ func (gce *GCECloud) convertDiskToAttachedDisk(disk *compute.Disk, readWrite str
 }
 
 func (gce *GCECloud) ListClusters() ([]string, error) {
-	list, err := gce.containerService.Projects.Clusters.List(gce.projectID).Do()
+	list, err := gce.containerService.Projects.Zones.Clusters.List(gce.projectID, gce.zone).Do()
 	if err != nil {
 		return nil, err
 	}
