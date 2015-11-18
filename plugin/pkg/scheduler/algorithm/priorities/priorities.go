@@ -34,7 +34,7 @@ func calculateScore(requested int64, capacity int64, node string) int {
 		return 0
 	}
 	if requested > capacity {
-		glog.Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+		glog.V(2).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
 			requested, capacity, node)
 		return 0
 	}
