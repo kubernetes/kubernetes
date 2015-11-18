@@ -47,10 +47,11 @@ const (
 // readTransactions reads # of transactions from the k8petstore web server endpoint.
 // for more details see the source of the k8petstore web server.
 func readTransactions(c *client.Client, ns string) (error, int) {
-	body, err := c.Get().
-		Namespace(ns).
-		Prefix("proxy").
-		Resource("services").
+	proxyRequest, errProxy := getServicesProxyRequest(c, c.Get())
+	if errProxy != nil {
+		return errProxy, -1
+	}
+	body, err := proxyRequest.Namespace(ns).
 		Name("frontend").
 		Suffix("llen").
 		DoRaw()

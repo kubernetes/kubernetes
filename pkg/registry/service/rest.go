@@ -39,6 +39,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// ServiceRest includes storage for services and all sub resources
+type ServiceRest struct {
+	Service *REST
+	Proxy   *ProxyREST
+}
+
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
 	registry         Registry
@@ -50,13 +56,17 @@ type REST struct {
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *REST {
-	return &REST{
+	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *ServiceRest {
+	rest := &REST{
 		registry:         registry,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
 		proxyTransport:   proxyTransport,
+	}
+	return &ServiceRest{
+		Service: rest,
+		Proxy:   &ProxyREST{ServiceRest: rest, ProxyTransport: proxyTransport},
 	}
 }
 

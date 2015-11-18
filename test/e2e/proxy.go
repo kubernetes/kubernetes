@@ -137,6 +137,9 @@ func proxyContext(version string) {
 		svcProxyURL := func(scheme, port string) string {
 			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
 		}
+		subresourceServiceProxyURL := func(scheme, port string) string {
+			return prefix + "/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port) + "/proxy"
+		}
 		podProxyURL := func(scheme, port string) string {
 			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
 		}
@@ -158,6 +161,13 @@ func proxyContext(version string) {
 			svcProxyURL("https", "443") + "/":          "tls baz",
 			svcProxyURL("https", "tlsportname2") + "/": "tls qux",
 			svcProxyURL("https", "444") + "/":          "tls qux",
+
+			subresourceServiceProxyURL("", "portname1") + "/":         "foo",
+			subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
+			subresourceServiceProxyURL("", "portname2") + "/":         "bar",
+			subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
+			subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
+			subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
 
 			podProxyURL("", "80") + "/":  `<a href="` + podProxyURL("", "80") + `/rewriteme">test</a>`,
 			podProxyURL("", "160") + "/": "foo",
