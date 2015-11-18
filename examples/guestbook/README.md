@@ -104,7 +104,7 @@ redis-master      10.0.136.3       <none>            6379/TCP      app=redis,rol
 redis-slave       10.0.21.92       <none>            6379/TCP      app=redis,role=slave,tier=backend   1h
 ```
 
-Now you can access the guestbook on each node with frontend service's `<ClusterIP>:Port`, e.g. `10.0.93.211:80` in this guide. `<ClusterIP>` is an a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to frontend service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, setting the type field to "LoadBalancer" will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
+Now you can access the guestbook on each node with frontend service's `<ClusterIP>:Port`, e.g. `10.0.93.211:80` in this guide. `<ClusterIP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to frontend service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, setting the type field to "LoadBalancer" will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
 
 Clean up the guestbook:
 
