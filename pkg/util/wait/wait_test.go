@@ -246,3 +246,18 @@ func TestWaitFor(t *testing.T) {
 		}
 	}
 }
+
+func TestWaitForWithDelay(t *testing.T) {
+	done := make(chan struct{})
+	defer close(done)
+	WaitFor(poller(time.Millisecond, util.ForeverTestTimeout), func() (bool, error) {
+		time.Sleep(10 * time.Millisecond)
+		return true, nil
+	}, done)
+	// If polling goroutine doesn't see the done signal it will leak timers.
+	select {
+	case done <- struct{}{}:
+	case <-time.After(util.ForeverTestTimeout):
+		t.Errorf("expected an ack of the done signal.")
+	}
+}

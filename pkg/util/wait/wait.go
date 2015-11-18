@@ -121,7 +121,12 @@ func poller(interval, timeout time.Duration) WaitFunc {
 			for {
 				select {
 				case <-tick.C:
-					ch <- struct{}{}
+					// If the consumer isn't ready for this signal drop it and
+					// check the other channels.
+					select {
+					case ch <- struct{}{}:
+					default:
+					}
 				case <-after:
 					close(ch)
 					return
