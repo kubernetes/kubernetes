@@ -39,6 +39,14 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
+# Make sure master ip is properly set
+if [ -z ${MASTER_IP} ]; then
+    echo "Please export MASTER_IP in your env"
+    exit 1
+else
+    echo "k8s master is set to: ${MASTER_IP}"
+fi
+
 # Check if a command is valid
 command_exists() {
     command -v "$@" > /dev/null 2>&1
@@ -112,8 +120,8 @@ start_k8s(){
     -d \
     gcr.io/google_containers/etcd:2.2.1 \
     /usr/local/bin/etcd \
-    --addr=127.0.0.1:4001 \
-    --bind-addr=0.0.0.0:4001 \
+    --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
+    --advertise-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001
     --data-dir=/var/etcd/data
 
     sleep 5
