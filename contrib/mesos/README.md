@@ -34,7 +34,10 @@ This project combines concepts and technologies from two already-complex project
 * [Mesos Documentation](http://mesos.apache.org/documentation/latest)
 * [Kubernetes Documentation](../../README.md)
 
-To get up and running with Kubernetes-Mesos, follow the [Getting started guide](../../docs/getting-started-guides/mesos.md).
+To get up and running with Kubernetes-Mesos, follow:
+
+- the [Getting started guide](../../docs/getting-started-guides/mesos.md) to launch a Kuberneters-Mesos cluster,
+- the [Kubernetes-Mesos Scheduler Guide](./docs/scheduler.md) for topics concerning the custom scheduler used in this distribution.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/mesos/README.md?pixel)]()
