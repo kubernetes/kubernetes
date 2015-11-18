@@ -99,7 +99,7 @@ type Status struct {
 	// the reason type.
 	Details *StatusDetails `json:"details,omitempty"`
 	// Suggested HTTP return code for this status, 0 if not set.
-	Code int `json:"code,omitempty"`
+	Code int32 `json:"code,omitempty"`
 }
 
 // StatusDetails is a set of additional properties that MAY be set by the
@@ -120,7 +120,7 @@ type StatusDetails struct {
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty"`
 	// If specified, the time in seconds before the operation should be retried.
-	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
+	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty"`
 }
 
 // Values of Status.Status
@@ -204,7 +204,7 @@ const (
 	// Details (optional):
 	//   "kind" string - the kind attribute of the resource being acted on.
 	//   "id"   string - the operation that is being attempted.
-	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
+	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 
@@ -214,7 +214,7 @@ const (
 	// The request might succeed with an increased value of timeout param. The client *should*
 	// wait at least the number of seconds specified by the retryAfterSeconds field.
 	// Details (optional):
-	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
+	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 

@@ -136,14 +136,14 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 func GetIntOrPercentValue(intOrStr *intstr.IntOrString) (int, bool, error) {
 	switch intOrStr.Type {
 	case intstr.Int:
-		return intOrStr.IntVal, false, nil
+		return intOrStr.IntValue(), false, nil
 	case intstr.String:
 		s := strings.Replace(intOrStr.StrVal, "%", "", -1)
 		v, err := strconv.Atoi(s)
 		if err != nil {
 			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
 		}
-		return v, true, nil
+		return int(v), true, nil
 	}
 	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
 }

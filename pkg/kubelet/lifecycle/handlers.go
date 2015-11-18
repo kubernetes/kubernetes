@@ -68,19 +68,17 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod
 // port is found, an error is returned.
 func resolvePort(portReference intstr.IntOrString, container *api.Container) (int, error) {
 	if portReference.Type == intstr.Int {
-		return portReference.IntVal, nil
-	} else {
-		portName := portReference.StrVal
-		port, err := strconv.Atoi(portName)
-		if err == nil {
-			return port, nil
+		return portReference.IntValue(), nil
+	}
+	portName := portReference.StrVal
+	port, err := strconv.Atoi(portName)
+	if err == nil {
+		return port, nil
+	}
+	for _, portSpec := range container.Ports {
+		if portSpec.Name == portName {
+			return portSpec.ContainerPort, nil
 		}
-		for _, portSpec := range container.Ports {
-			if portSpec.Name == portName {
-				return portSpec.ContainerPort, nil
-			}
-		}
-
 	}
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
