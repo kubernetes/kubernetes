@@ -197,6 +197,17 @@ func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
+// DaemonSets should not place onto Unschedulable nodes
+func TestUnschedulableNodeDaemonDoesNotLaunchPod(t *testing.T) {
+	manager, podControl := newTestController()
+	node := newNode("not-ready", nil)
+	node.Spec.Unschedulable = true
+	manager.nodeStore.Add(node)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
 func TestDealsWithExistingPods(t *testing.T) {
 	manager, podControl := newTestController()
