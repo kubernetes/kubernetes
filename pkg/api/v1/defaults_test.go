@@ -156,8 +156,8 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	}
 }
 
-func newInt(val int) *int {
-	p := new(int)
+func newInt(val int32) *int32 {
+	p := new(int32)
 	*p = val
 	return p
 }
@@ -165,7 +165,7 @@ func newInt(val int) *int {
 func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 	tests := []struct {
 		rc             versioned.ReplicationController
-		expectReplicas int
+		expectReplicas int32
 	}{
 		{
 			rc: versioned.ReplicationController{
@@ -345,13 +345,13 @@ func TestSetDefaultServicePort(t *testing.T) {
 	if out.Spec.Ports[0].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(in.Spec.Ports[0].Port) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(int(in.Spec.Ports[0].Port)) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != intstr.FromInt(in.Spec.Ports[1].Port) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt(int(in.Spec.Ports[1].Port)) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }
@@ -367,7 +367,7 @@ func TestSetDefaultNamespace(t *testing.T) {
 }
 
 func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
-	portNum := 8080
+	portNum := int32(8080)
 	s := versioned.PodSpec{}
 	s.HostNetwork = true
 	s.Containers = []versioned.Container{

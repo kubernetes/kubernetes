@@ -294,9 +294,9 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
-func newInt(val int) *int {
-	p := new(int)
-	*p = val
+func newInt(val int) *int32 {
+	p := new(int32)
+	*p = int32(val)
 	return p
 }
 
