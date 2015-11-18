@@ -4086,14 +4086,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">entrypoint array; not executed within a shell; the docker image’s entrypoint is used if this is not provided; cannot be updated; variable references $(VAR_NAME) are expanded using the container’s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">entrypoint array; not executed within a shell; the docker image’s entrypoint is used if this is not provided; cannot be updated; variable references $(VAR_NAME) are expanded using the container’s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">args</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">command array; the docker image’s .html is used if this is not provided; arguments to the entrypoint; cannot be updated; variable references $(VAR_NAME) are expanded using the container’s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">command array; the docker image’s .html is used if this is not provided; arguments to the entrypoint; cannot be updated; variable references $(VAR_NAME) are expanded using the container’s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.0/docs/user-guide/containers.html#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5142,7 +5142,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">value</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">value of the environment variable; defaults to empty string; variable references $(VAR_NAME) are expanded using the previously defined environment varibles in the container and any service environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">value of the environment variable; defaults to empty string; variable references $(VAR_NAME) are expanded using the previously defined environment varibles in the container and any service environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
