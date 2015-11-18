@@ -332,3 +332,24 @@ function find-release-tars() {
     exit 1
   fi
 }
+
+# Discover the git version of the current build package
+#
+# Assumed vars:
+#   KUBE_ROOT
+# Vars set:
+#   KUBE_GIT_VERSION
+function find-release-version() {
+  KUBE_GIT_VERSION=""
+  if [[ -f "${KUBE_ROOT}/version" ]]; then
+    KUBE_GIT_VERSION="$(cat ${KUBE_ROOT}/version)"
+  fi
+  if [[ -f "${KUBE_ROOT}/_output/full/kubernetes/version" ]]; then
+    KUBE_GIT_VERSION="$(cat ${KUBE_ROOT}/_output/full/kubernetes/version)"
+  fi
+
+  if [[ -z "${KUBE_GIT_VERSION}" ]]; then
+    echo "!!! Cannot find release version"
+    exit 1
+  fi
+}
