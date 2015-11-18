@@ -251,8 +251,8 @@ This rule maintains the invariant that all JSON/YAML keys are fields in API obje
 #### Primitive types
 
 * Avoid floating-point values as much as possible, and never use them in spec. Floating-point values cannot be reliably round-tripped (encoded and re-decoded) without changing, and have varying precision and representations across languages and architectures.
-* Do not use unsigned integers. Similarly, not all languages (e.g., Javascript) support unsigned integers.
-* int64 is converted to float by Javascript and some other languages, so they also need to be accepted as strings.
+* All numbers (e.g., uint32, int64) are converted to float64 by Javascript and some other languages, so any field which is expected to exceed that either in magnitude or in precision (specifically integer values > 53 bits) should be serialized and accepted as strings.
+* Do not use unsigned integers, due to inconsistent support across languages and libraries. Just validate that the integer is non-negative if that's the case.
 * Do not use enums. Use aliases for string instead (e.g., `NodeConditionType`).
 * Look at similar fields in the API (e.g., ports, durations) and follow the conventions of existing fields.
 
