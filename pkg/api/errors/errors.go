@@ -224,7 +224,7 @@ func NewServerTimeout(kind, operation string, retryAfterSeconds int) error {
 		Details: &unversioned.StatusDetails{
 			Kind:              kind,
 			Name:              operation,
-			RetryAfterSeconds: retryAfterSeconds,
+			RetryAfterSeconds: int32(retryAfterSeconds),
 		},
 		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, kind),
 	}}
@@ -252,7 +252,7 @@ func NewTimeoutError(message string, retryAfterSeconds int) error {
 		Reason:  unversioned.StatusReasonTimeout,
 		Message: fmt.Sprintf("Timeout: %s", message),
 		Details: &unversioned.StatusDetails{
-			RetryAfterSeconds: retryAfterSeconds,
+			RetryAfterSeconds: int32(retryAfterSeconds),
 		},
 	}}
 }
@@ -318,14 +318,14 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	}
 	return &StatusError{unversioned.Status{
 		Status: unversioned.StatusFailure,
-		Code:   code,
+		Code:   int32(code),
 		Reason: reason,
 		Details: &unversioned.StatusDetails{
 			Kind: kind,
 			Name: name,
 
 			Causes:            causes,
-			RetryAfterSeconds: retryAfterSeconds,
+			RetryAfterSeconds: int32(retryAfterSeconds),
 		},
 		Message: message,
 	}}
@@ -410,7 +410,7 @@ func SuggestsClientDelay(err error) (int, bool) {
 		if t.Status().Details != nil {
 			switch t.Status().Reason {
 			case unversioned.StatusReasonServerTimeout, unversioned.StatusReasonTimeout:
-				return t.Status().Details.RetryAfterSeconds, true
+				return int(t.Status().Details.RetryAfterSeconds), true
 			}
 		}
 	}

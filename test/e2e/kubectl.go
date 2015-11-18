@@ -616,7 +616,7 @@ var _ = Describe("Kubectl client", func() {
 				if port.Port != servicePort {
 					Failf("Wrong service port: %d", port.Port)
 				}
-				if port.TargetPort.IntVal != redisPort {
+				if port.TargetPort.IntValue() != redisPort {
 					Failf("Wrong target port: %d")
 				}
 			}

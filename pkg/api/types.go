@@ -719,11 +719,11 @@ type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
 	// Length of time before health checking is activated.  In seconds.
-	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+	InitialDelaySeconds int `json:"initialDelaySeconds,omitempty"`
 	// Length of time before health checking times out.  In seconds.
-	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds int `json:"timeoutSeconds,omitempty"`
 	// How often (in seconds) to perform the probe.
-	PeriodSeconds int64 `json:"periodSeconds,omitempty"`
+	PeriodSeconds int `json:"periodSeconds,omitempty"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Must be 1 for liveness.
 	SuccessThreshold int `json:"successThreshold,omitempty"`

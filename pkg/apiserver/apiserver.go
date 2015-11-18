@@ -420,8 +420,9 @@ func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWrite
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
 func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
-	writeJSON(status.Code, codec, status, w, true)
-	return status.Code
+	code := int(status.Code)
+	writeJSON(code, codec, status, w, true)
+	return code
 }
 
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
@@ -429,16 +430,17 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
+	code := int(status.Code)
 	output, err := codec.Encode(status)
 	if err != nil {
-		w.WriteHeader(status.Code)
+		w.WriteHeader(code)
 		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)
-		return status.Code
+		return code
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status.Code)
+	w.WriteHeader(code)
 	w.Write(output)
-	return status.Code
+	return code
 }
 
 // writeRawJSON writes a non-API object in JSON.
