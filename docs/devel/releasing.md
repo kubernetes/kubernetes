@@ -134,123 +134,22 @@ cd kubernetes
 
 or `git checkout upstream/master` from an existing repo.
 
-#### Cutting an alpha release (`vX.Y.0-alpha.W`)
+Decide what version you're cutting and export it:
 
-Figure out what version you're cutting, and
+- alpha release: `export VER="vX.Y.0-alpha.W"`;
+- beta release: `export VER="vX.Y.Z-beta.W"`;
+- official release: `export VER="vX.Y.Z"`;
+- new release series: `export VER="vX.Y"`.
 
-```console
-export VER="vX.Y.0-alpha.W"
-```
-
-then, run
-
-```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}"
-```
-
-This will do a dry run of:
-
-1. mark the `vX.Y.0-alpha.W` tag at the given git hash;
-1. prompt you to do the remainder of the work, including building the
-   appropriate binaries and pushing them to the appropriate places.
-
-If you're satisfied with the result, run
-
-```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
-```
-
-and follow the instructions.
-
-#### Cutting an beta release (`vX.Y.Z-beta.W`)
-
-Figure out what version you're cutting, and
-
-```console
-export VER="vX.Y.Z-beta.W"
-```
-
-then, run
+Then, run
 
 ```console
 ./release/cut-official-release.sh "${VER}" "${GITHASH}"
 ```
 
-This will do a dry run of:
-
-1. do a series of commits on the release branch for `vX.Y.Z-beta.W`;
-1. mark the `vX.Y.Z-beta.W` tag at the beta version commit;
-1. prompt you to do the remainder of the work, including building the
-   appropriate binaries and pushing them to the appropriate places.
-
-If you're satisfied with the result, run
-
-```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
-```
-
-and follow the instructions.
-
-#### Cutting an official release (`vX.Y.Z`)
-
-Figure out what version you're cutting, and
-
-```console
-export VER="vX.Y.Z"
-```
-
-then, run
-
-```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}"
-```
-
-This will do a dry run of:
-
-1. do a series of commits on the branch for `vX.Y.Z`;
-1. mark the `vX.Y.Z` tag at the release version commit;
-1. do a series of commits on the branch for `vX.Y.(Z+1)-beta.0` on top of the
-   previous commits;
-1. mark the `vX.Y.(Z+1)-beta.0` tag at the beta version commit;
-1. prompt you to do the remainder of the work, including building the
-   appropriate binaries and pushing them to the appropriate places.
-
-If you're satisfied with the result, run
-
-```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
-```
-
-and follow the instructions.
-
-#### Branching a new release series (`vX.Y`)
-
-Once again, **this is a big deal!**  If you're reading this doc for the first
-time, you probably shouldn't be doing this release, and should talk to someone
-on the release team.
-
-Figure out what series you're cutting, and
-
-```console
-export VER="vX.Y"
-```
-
-then, run
-
-```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}"
-```
-
-This will do a dry run of:
-
-1. mark the `vX.(Y+1).0-alpha.0` tag at the given git hash on `master`;
-1. fork a new branch `release-X.Y` off of `master` at the given git hash;
-1. do a series of commits on the branch for `vX.Y.0-beta.0`;
-1. mark the `vX.Y.0-beta.0` tag at the beta version commit;
-1. prompt you to do the remainder of the work, including building the
-   appropriate binaries and pushing them to the appropriate places.
-
-If you're satisfied with the result, run
+This will do a dry run of the release.  It will give you instructions at the
+end for `pushd`ing into the dry-run directory and having a look around.  If
+you're satisfied with the result, run
 
 ```console
 ./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
@@ -260,8 +159,50 @@ and follow the instructions.
 
 ### Publishing binaries and release notes
 
-The script you ran above will prompt you to take any remaining steps, including
-publishing binaries and release notes.
+The script you ran above will prompt you to take any remaining steps to push
+tars, and will also give you a template for the release notes.  Compose an
+email to the team with the template, and use `build/make-release-notes.sh`
+and/or `release-notes/release-notes.go` in
+[kubernetes/contrib](https://github.com/kubernetes/contrib) to make the release
+notes, (see #17444 for more info).
+
+- Alpha release:
+  - Figure out what the PR numbers for this release and last release are, and
+    get an api-token from GitHub (https://github.com/settings/tokens).  From a
+    clone of kubernetes/contrib at upstream/master,
+      go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token>
+    Feel free to prune.
+- Beta release:
+  - Only publish a beta release if it's a standalone pre-release.  (We create
+    beta tags after we do official releases to maintain proper semantic
+    versioning, *we don't publish these beta releases*.)  Use
+    `./hack/cherry_pick_list.sh ${VER}` to get release notes for such a
+    release.
+- Official release:
+  - From your clone of upstream/master, run `./hack/cherry_pick_list.sh ${VER}`
+    to get the release notes for the patch release you just created. Feel free
+    to prune anything internal, but typically for patch releases we tend to
+    include everything in the release notes.
+  - If this is a first official release (vX.Y.0), look through the release
+    notes for all of the alpha releases since the last cycle, and include
+    anything important in release notes.
+
+Send the email out, letting people know these are the draft release notes.  If
+they want to change anything, they should update the appropriate PRs with the
+`release-note` label.
+
+When we're ready to announce the release, [create a GitHub
+release](https://github.com/kubernetes/kubernetes/releases/new):
+
+1. pick the appropriate tag;
+1. check "This is a pre-release" if it's an alpha or beta release;
+1. fill in the release title from the draft;
+1. re-run the appropriate release notes tool(s) to pick up any changes people
+   have made;
+1. find the appropriate `kubernetes.tar.gz` in GCS, download it, double check
+   the hash (compare to what you had in the release notes draft), and attach it
+   to the release; and
+1. publish!
 
 ## Injecting Version into Binaries
 

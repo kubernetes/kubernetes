@@ -98,18 +98,13 @@ instructions elsewhere):
 
   1) pushd ${KUBE_BUILD_DIR}; build/push-official-release.sh ${KUBE_RELEASE_VERSION}
 
-  2) Go to https://github.com/GoogleCloudPlatform/kubernetes/releases
-     and create a new release with the ${KUBE_RELEASE_VERSION} tag.
+  2) Release notes draft, to be published when the release is announced:
 
-     a) Mark it as a pre-release (someone on the GKE team will mark it as an
-     official release when it's being rolled out, but should not be considered
-     stable prior to that).
-
-     b) Title it:
+     a) Title:
 
        Release ${KUBE_RELEASE_VERSION}
 
-     c) Use this template for the description:
+     b) Template for the description:
 
 ## [Documentation](http://releases.k8s.io/${RELEASE_BRANCH}/docs/README.md)
 ## [Examples](http://releases.k8s.io/${RELEASE_BRANCH}/examples)
@@ -124,10 +119,9 @@ binary | hash alg | hash
 
      We'll fill in the release notes in the next stage.
 
-  3) Upload the ${KUBE_BUILD_DIR}/kubernetes.tar.gz to GitHub
+  4) Ensure all the binaries are in place on GCS before cleaning, (you might
+  want to wait until the release is announced and published on GitHub, too).
 
-  4) Ensure all the binaries are in place on GitHub and GCS before cleaning.
-
-  5) (make clean; popd; rm -rf ${KUBE_BUILD_DIR})
+  5) make clean; popd; rm -rf ${KUBE_BUILD_DIR}
 
 EOM
