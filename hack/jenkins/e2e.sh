@@ -320,8 +320,8 @@ case ${JOB_NAME} in
 
   # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
   kubernetes-pull-build-test-e2e-gce)
-    : ${E2E_CLUSTER_NAME:="jenkins-pull-gce-e2e-${EXECUTOR_NUMBER}"}
-    : ${E2E_NETWORK:="pull-e2e-parallel-${EXECUTOR_NUMBER}"}
+    : ${E2E_CLUSTER_NAME:="jnks-e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
+    : ${E2E_NETWORK:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel.
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
@@ -331,8 +331,8 @@ case ${JOB_NAME} in
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${NODE_NAME}-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
