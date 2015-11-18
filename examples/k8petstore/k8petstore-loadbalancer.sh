@@ -253,7 +253,7 @@ function pollfor {
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
       echo "Trying curl ... $PUBLIC_IP:3000 , attempt $i . expect a few failures while pulling images... "
-      curl --connect-timeout 1 "$PUBLIC_IP:3000" > result
+      curl --max-time 1 "$PUBLIC_IP:3000" > result
       cat result
       cat result | grep -q "k8-bps"
       if [ $? -eq 0 ]; then
@@ -279,7 +279,7 @@ function tests {
     for i in `seq 1 $_SECONDS`;
      do
         echo "curl : $PUBLIC_IP:3000 , $i of $_SECONDS"
-        curr_cnt="`curl --connect-timeout 1 "$PUBLIC_IP:3000/llen"`" 
+        curr_cnt="`curl --max-time 1 "$PUBLIC_IP:3000/llen"`" 
         ### Write CSV File of # of trials / total transcations.
         echo "$i $curr_cnt" >> result
         echo "total transactions so far : $curr_cnt"
