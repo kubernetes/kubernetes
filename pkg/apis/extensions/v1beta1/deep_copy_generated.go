@@ -300,7 +300,7 @@ func deepCopy_v1_FCVolumeSource(in v1.FCVolumeSource, out *v1.FCVolumeSource, c 
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int)
+		out.Lun = new(int32)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil
@@ -1046,7 +1046,7 @@ func deepCopy_v1beta1_DeploymentList(in DeploymentList, out *DeploymentList, c *
 
 func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
 	if in.Replicas != nil {
-		out.Replicas = new(int)
+		out.Replicas = new(int32)
 		*out.Replicas = *in.Replicas
 	} else {
 		out.Replicas = nil
@@ -1156,7 +1156,7 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec
 		return err
 	}
 	if in.MinReplicas != nil {
-		out.MinReplicas = new(int)
+		out.MinReplicas = new(int32)
 		*out.MinReplicas = *in.MinReplicas
 	} else {
 		out.MinReplicas = nil
@@ -1191,7 +1191,7 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerSt
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
-		out.CurrentCPUUtilizationPercentage = new(int)
+		out.CurrentCPUUtilizationPercentage = new(int32)
 		*out.CurrentCPUUtilizationPercentage = *in.CurrentCPUUtilizationPercentage
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
@@ -1344,13 +1344,13 @@ func deepCopy_v1beta1_JobList(in JobList, out *JobList, c *conversion.Cloner) er
 
 func deepCopy_v1beta1_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
 	if in.Parallelism != nil {
-		out.Parallelism = new(int)
+		out.Parallelism = new(int32)
 		*out.Parallelism = *in.Parallelism
 	} else {
 		out.Parallelism = nil
 	}
 	if in.Completions != nil {
-		out.Completions = new(int)
+		out.Completions = new(int32)
 		*out.Completions = *in.Completions
 	} else {
 		out.Completions = nil

@@ -9122,7 +9122,7 @@ func (x *GCEPersistentDiskVolumeSource) codecDecodeSelfFromMap(l int, d *codec19
 			if r.TryDecodeAsNil() {
 				x.Partition = 0
 			} else {
-				x.Partition = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Partition = int32(r.DecodeInt(32))
 			}
 		case "readOnly":
 			if r.TryDecodeAsNil() {
@@ -9189,7 +9189,7 @@ func (x *GCEPersistentDiskVolumeSource) codecDecodeSelfFromArray(l int, d *codec
 	if r.TryDecodeAsNil() {
 		x.Partition = 0
 	} else {
-		x.Partition = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Partition = int32(r.DecodeInt(32))
 	}
 	yyj674++
 	if yyhl674 {
@@ -9399,7 +9399,7 @@ func (x *AWSElasticBlockStoreVolumeSource) codecDecodeSelfFromMap(l int, d *code
 			if r.TryDecodeAsNil() {
 				x.Partition = 0
 			} else {
-				x.Partition = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Partition = int32(r.DecodeInt(32))
 			}
 		case "readOnly":
 			if r.TryDecodeAsNil() {
@@ -9466,7 +9466,7 @@ func (x *AWSElasticBlockStoreVolumeSource) codecDecodeSelfFromArray(l int, d *co
 	if r.TryDecodeAsNil() {
 		x.Partition = 0
 	} else {
-		x.Partition = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Partition = int32(r.DecodeInt(32))
 	}
 	yyj700++
 	if yyhl700 {
@@ -10259,7 +10259,7 @@ func (x *ISCSIVolumeSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) 
 			if r.TryDecodeAsNil() {
 				x.Lun = 0
 			} else {
-				x.Lun = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Lun = int32(r.DecodeInt(32))
 			}
 		case "fsType":
 			if r.TryDecodeAsNil() {
@@ -10332,7 +10332,7 @@ func (x *ISCSIVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	if r.TryDecodeAsNil() {
 		x.Lun = 0
 	} else {
-		x.Lun = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Lun = int32(r.DecodeInt(32))
 	}
 	yyj778++
 	if yyhl778 {
@@ -10571,13 +10571,13 @@ func (x *FCVolumeSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.Lun == nil {
-					x.Lun = new(int)
+					x.Lun = new(int32)
 				}
 				yym806 := z.DecBinary()
 				_ = yym806
 				if false {
 				} else {
-					*((*int)(x.Lun)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.Lun)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "fsType":
@@ -10645,13 +10645,13 @@ func (x *FCVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.Lun == nil {
-			x.Lun = new(int)
+			x.Lun = new(int32)
 		}
 		yym813 := z.DecBinary()
 		_ = yym813
 		if false {
 		} else {
-			*((*int)(x.Lun)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.Lun)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj809++
@@ -10891,13 +10891,13 @@ func (x *ContainerPort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.HostPort = 0
 			} else {
-				x.HostPort = int(r.DecodeInt(codecSelferBitsize1234))
+				x.HostPort = int32(r.DecodeInt(32))
 			}
 		case "containerPort":
 			if r.TryDecodeAsNil() {
 				x.ContainerPort = 0
 			} else {
-				x.ContainerPort = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ContainerPort = int32(r.DecodeInt(32))
 			}
 		case "protocol":
 			if r.TryDecodeAsNil() {
@@ -10955,7 +10955,7 @@ func (x *ContainerPort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.HostPort = 0
 	} else {
-		x.HostPort = int(r.DecodeInt(codecSelferBitsize1234))
+		x.HostPort = int32(r.DecodeInt(32))
 	}
 	yyj839++
 	if yyhl839 {
@@ -10970,7 +10970,7 @@ func (x *ContainerPort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ContainerPort = 0
 	} else {
-		x.ContainerPort = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ContainerPort = int32(r.DecodeInt(32))
 	}
 	yyj839++
 	if yyhl839 {
@@ -12887,31 +12887,31 @@ func (x *Probe) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.InitialDelaySeconds = 0
 			} else {
-				x.InitialDelaySeconds = int64(r.DecodeInt(64))
+				x.InitialDelaySeconds = int32(r.DecodeInt(32))
 			}
 		case "timeoutSeconds":
 			if r.TryDecodeAsNil() {
 				x.TimeoutSeconds = 0
 			} else {
-				x.TimeoutSeconds = int64(r.DecodeInt(64))
+				x.TimeoutSeconds = int32(r.DecodeInt(32))
 			}
 		case "periodSeconds":
 			if r.TryDecodeAsNil() {
 				x.PeriodSeconds = 0
 			} else {
-				x.PeriodSeconds = int64(r.DecodeInt(64))
+				x.PeriodSeconds = int32(r.DecodeInt(32))
 			}
 		case "successThreshold":
 			if r.TryDecodeAsNil() {
 				x.SuccessThreshold = 0
 			} else {
-				x.SuccessThreshold = int(r.DecodeInt(codecSelferBitsize1234))
+				x.SuccessThreshold = int32(r.DecodeInt(32))
 			}
 		case "failureThreshold":
 			if r.TryDecodeAsNil() {
 				x.FailureThreshold = 0
 			} else {
-				x.FailureThreshold = int(r.DecodeInt(codecSelferBitsize1234))
+				x.FailureThreshold = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys990)
@@ -13002,7 +13002,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.InitialDelaySeconds = 0
 	} else {
-		x.InitialDelaySeconds = int64(r.DecodeInt(64))
+		x.InitialDelaySeconds = int32(r.DecodeInt(32))
 	}
 	yyj999++
 	if yyhl999 {
@@ -13017,7 +13017,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.TimeoutSeconds = 0
 	} else {
-		x.TimeoutSeconds = int64(r.DecodeInt(64))
+		x.TimeoutSeconds = int32(r.DecodeInt(32))
 	}
 	yyj999++
 	if yyhl999 {
@@ -13032,7 +13032,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.PeriodSeconds = 0
 	} else {
-		x.PeriodSeconds = int64(r.DecodeInt(64))
+		x.PeriodSeconds = int32(r.DecodeInt(32))
 	}
 	yyj999++
 	if yyhl999 {
@@ -13047,7 +13047,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.SuccessThreshold = 0
 	} else {
-		x.SuccessThreshold = int(r.DecodeInt(codecSelferBitsize1234))
+		x.SuccessThreshold = int32(r.DecodeInt(32))
 	}
 	yyj999++
 	if yyhl999 {
@@ -13062,7 +13062,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.FailureThreshold = 0
 	} else {
-		x.FailureThreshold = int(r.DecodeInt(codecSelferBitsize1234))
+		x.FailureThreshold = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj999++
@@ -15771,13 +15771,13 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromMap(l int, d *codec1978.De
 			if r.TryDecodeAsNil() {
 				x.ExitCode = 0
 			} else {
-				x.ExitCode = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ExitCode = int32(r.DecodeInt(32))
 			}
 		case "signal":
 			if r.TryDecodeAsNil() {
 				x.Signal = 0
 			} else {
-				x.Signal = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Signal = int32(r.DecodeInt(32))
 			}
 		case "reason":
 			if r.TryDecodeAsNil() {
@@ -15860,7 +15860,7 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromArray(l int, d *codec1978.
 	if r.TryDecodeAsNil() {
 		x.ExitCode = 0
 	} else {
-		x.ExitCode = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ExitCode = int32(r.DecodeInt(32))
 	}
 	yyj1239++
 	if yyhl1239 {
@@ -15875,7 +15875,7 @@ func (x *ContainerStateTerminated) codecDecodeSelfFromArray(l int, d *codec1978.
 	if r.TryDecodeAsNil() {
 		x.Signal = 0
 	} else {
-		x.Signal = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Signal = int32(r.DecodeInt(32))
 	}
 	yyj1239++
 	if yyhl1239 {
@@ -16507,7 +16507,7 @@ func (x *ContainerStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.RestartCount = 0
 			} else {
-				x.RestartCount = int(r.DecodeInt(codecSelferBitsize1234))
+				x.RestartCount = int32(r.DecodeInt(32))
 			}
 		case "image":
 			if r.TryDecodeAsNil() {
@@ -16618,7 +16618,7 @@ func (x *ContainerStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.RestartCount = 0
 	} else {
-		x.RestartCount = int(r.DecodeInt(codecSelferBitsize1234))
+		x.RestartCount = int32(r.DecodeInt(32))
 	}
 	yyj1301++
 	if yyhl1301 {
@@ -20977,13 +20977,13 @@ func (x *ReplicationControllerSpec) codecDecodeSelfFromMap(l int, d *codec1978.D
 				}
 			} else {
 				if x.Replicas == nil {
-					x.Replicas = new(int)
+					x.Replicas = new(int32)
 				}
 				yym1720 := z.DecBinary()
 				_ = yym1720
 				if false {
 				} else {
-					*((*int)(x.Replicas)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.Replicas)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "selector":
@@ -21041,13 +21041,13 @@ func (x *ReplicationControllerSpec) codecDecodeSelfFromArray(l int, d *codec1978
 		}
 	} else {
 		if x.Replicas == nil {
-			x.Replicas = new(int)
+			x.Replicas = new(int32)
 		}
 		yym1726 := z.DecBinary()
 		_ = yym1726
 		if false {
 		} else {
-			*((*int)(x.Replicas)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.Replicas)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj1724++
@@ -21233,7 +21233,7 @@ func (x *ReplicationControllerStatus) codecDecodeSelfFromMap(l int, d *codec1978
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "observedGeneration":
 			if r.TryDecodeAsNil() {
@@ -21270,7 +21270,7 @@ func (x *ReplicationControllerStatus) codecDecodeSelfFromArray(l int, d *codec19
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj1743++
 	if yyhl1743 {
@@ -23254,7 +23254,7 @@ func (x *ServicePort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Port = 0
 			} else {
-				x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Port = int32(r.DecodeInt(32))
 			}
 		case "targetPort":
 			if r.TryDecodeAsNil() {
@@ -23275,7 +23275,7 @@ func (x *ServicePort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.NodePort = 0
 			} else {
-				x.NodePort = int(r.DecodeInt(codecSelferBitsize1234))
+				x.NodePort = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys1922)
@@ -23336,7 +23336,7 @@ func (x *ServicePort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Port = 0
 	} else {
-		x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Port = int32(r.DecodeInt(32))
 	}
 	yyj1929++
 	if yyhl1929 {
@@ -23375,7 +23375,7 @@ func (x *ServicePort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.NodePort = 0
 	} else {
-		x.NodePort = int(r.DecodeInt(codecSelferBitsize1234))
+		x.NodePort = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj1929++
@@ -25677,7 +25677,7 @@ func (x *EndpointPort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Port = 0
 			} else {
-				x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Port = int32(r.DecodeInt(32))
 			}
 		case "protocol":
 			if r.TryDecodeAsNil() {
@@ -25729,7 +25729,7 @@ func (x *EndpointPort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Port = 0
 	} else {
-		x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Port = int32(r.DecodeInt(32))
 	}
 	yyj2150++
 	if yyhl2150 {
@@ -26478,7 +26478,7 @@ func (x *DaemonEndpoint) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Port = 0
 			} else {
-				x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Port = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys2219)
@@ -26509,7 +26509,7 @@ func (x *DaemonEndpoint) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Port = 0
 	} else {
-		x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Port = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj2221++
@@ -34120,7 +34120,7 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Count = 0
 			} else {
-				x.Count = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Count = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys2935)
@@ -34311,7 +34311,7 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Count = 0
 	} else {
-		x.Count = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Count = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj2948++
@@ -40599,7 +40599,7 @@ func (x codecSelfer1234) decSliceContainerPort(v *[]ContainerPort, d *codec1978.
 	yyrr3506 = yyl3506
 
 	if yyv3506 == nil {
-		if yyrl3506, yyrt3506 = z.DecInferLen(yyl3506, z.DecBasicHandle().MaxInitLen, 64); yyrt3506 {
+		if yyrl3506, yyrt3506 = z.DecInferLen(yyl3506, z.DecBasicHandle().MaxInitLen, 56); yyrt3506 {
 			yyrr3506 = yyrl3506
 		}
 		yyv3506 = make([]ContainerPort, yyrl3506)
@@ -40614,7 +40614,7 @@ func (x codecSelfer1234) decSliceContainerPort(v *[]ContainerPort, d *codec1978.
 	} else if yyl3506 > 0 {
 
 		if yyl3506 > cap(yyv3506) {
-			yyrl3506, yyrt3506 = z.DecInferLen(yyl3506, z.DecBasicHandle().MaxInitLen, 64)
+			yyrl3506, yyrt3506 = z.DecInferLen(yyl3506, z.DecBasicHandle().MaxInitLen, 56)
 			yyv3506 = make([]ContainerPort, yyrl3506)
 			yyc3506 = true
 
@@ -41306,7 +41306,7 @@ func (x codecSelfer1234) decSliceContainerStatus(v *[]ContainerStatus, d *codec1
 	yyrr3548 = yyl3548
 
 	if yyv3548 == nil {
-		if yyrl3548, yyrt3548 = z.DecInferLen(yyl3548, z.DecBasicHandle().MaxInitLen, 128); yyrt3548 {
+		if yyrl3548, yyrt3548 = z.DecInferLen(yyl3548, z.DecBasicHandle().MaxInitLen, 120); yyrt3548 {
 			yyrr3548 = yyrl3548
 		}
 		yyv3548 = make([]ContainerStatus, yyrl3548)
@@ -41321,7 +41321,7 @@ func (x codecSelfer1234) decSliceContainerStatus(v *[]ContainerStatus, d *codec1
 	} else if yyl3548 > 0 {
 
 		if yyl3548 > cap(yyv3548) {
-			yyrl3548, yyrt3548 = z.DecInferLen(yyl3548, z.DecBasicHandle().MaxInitLen, 128)
+			yyrl3548, yyrt3548 = z.DecInferLen(yyl3548, z.DecBasicHandle().MaxInitLen, 120)
 			yyv3548 = make([]ContainerStatus, yyrl3548)
 			yyc3548 = true
 

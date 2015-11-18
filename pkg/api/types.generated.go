@@ -13288,19 +13288,19 @@ func (x *Probe) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.InitialDelaySeconds = 0
 			} else {
-				x.InitialDelaySeconds = int64(r.DecodeInt(64))
+				x.InitialDelaySeconds = int(r.DecodeInt(codecSelferBitsize1234))
 			}
 		case "timeoutSeconds":
 			if r.TryDecodeAsNil() {
 				x.TimeoutSeconds = 0
 			} else {
-				x.TimeoutSeconds = int64(r.DecodeInt(64))
+				x.TimeoutSeconds = int(r.DecodeInt(codecSelferBitsize1234))
 			}
 		case "periodSeconds":
 			if r.TryDecodeAsNil() {
 				x.PeriodSeconds = 0
 			} else {
-				x.PeriodSeconds = int64(r.DecodeInt(64))
+				x.PeriodSeconds = int(r.DecodeInt(codecSelferBitsize1234))
 			}
 		case "successThreshold":
 			if r.TryDecodeAsNil() {
@@ -13403,7 +13403,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.InitialDelaySeconds = 0
 	} else {
-		x.InitialDelaySeconds = int64(r.DecodeInt(64))
+		x.InitialDelaySeconds = int(r.DecodeInt(codecSelferBitsize1234))
 	}
 	yyj1028++
 	if yyhl1028 {
@@ -13418,7 +13418,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.TimeoutSeconds = 0
 	} else {
-		x.TimeoutSeconds = int64(r.DecodeInt(64))
+		x.TimeoutSeconds = int(r.DecodeInt(codecSelferBitsize1234))
 	}
 	yyj1028++
 	if yyhl1028 {
@@ -13433,7 +13433,7 @@ func (x *Probe) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.PeriodSeconds = 0
 	} else {
-		x.PeriodSeconds = int64(r.DecodeInt(64))
+		x.PeriodSeconds = int(r.DecodeInt(codecSelferBitsize1234))
 	}
 	yyj1028++
 	if yyhl1028 {
