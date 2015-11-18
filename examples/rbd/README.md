@@ -7,7 +7,7 @@
 
 Install Ceph on the Kubernetes host. For example, on Fedora 21
 
-    # yum -y install ceph
+    # yum -y install ceph-common
 
 If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/rootfs/docker-ceph)
 
@@ -26,7 +26,14 @@ Once you have installed Ceph and new Kubernetes, you can create a pod based on m
 
 # Use Ceph Authentication Secret
 
-If Ceph authentication secret is provided, the secret should be first be base64 encoded, then encoded string is placed in a secret yaml. An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
+If Ceph authentication secret is provided, the secret should be first be *base64 encoded*, then encoded string is placed in a secret yaml. For example, getting Ceph user `kube`'s base64 encoded secret can use the following command:
+
+```console
+  # grep key /etc/ceph/ceph.client.kube.keyring |awk '{printf "%s", $NF}'|base64
+QVFBTWdYaFZ3QkNlRGhBQTlubFBhRnlmVVNhdEdENGRyRldEdlE9PQ==
+```
+
+An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
 
 ```console
     # kubectl create -f examples/rbd/secret/ceph-secret.yaml
