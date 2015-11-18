@@ -386,7 +386,7 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
-			deployment.NewDeploymentController(clientForUserAgentOrDie(*kubeconfig, "deployment-controller")).
+			go deployment.NewDeploymentController(clientForUserAgentOrDie(*kubeconfig, "deployment-controller"), s.ResyncPeriod).
 				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
 		}
 	}

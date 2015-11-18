@@ -167,7 +167,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	var rc api.ReplicationController
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No controllers found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
@@ -186,7 +186,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		controllers = append(controllers, rc)
 	}
 	if len(controllers) == 0 {
-		err = fmt.Errorf("Could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -220,7 +220,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationControl
 	var d extensions.Deployment
 
 	if len(rc.Labels) == 0 {
-		err = fmt.Errorf("No controllers found for replication controller %v because it has no labels", rc.Name)
+		err = fmt.Errorf("no deployments found for replication controller %v because it has no labels", rc.Name)
 		return
 	}
 
@@ -233,14 +233,14 @@ func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationControl
 		labelSet := labels.Set(d.Spec.Selector)
 		selector = labels.Set(d.Spec.Selector).AsSelector()
 
-		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
 		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(rc.Labels)) {
 			continue
 		}
 		deployments = append(deployments, d)
 	}
 	if len(deployments) == 0 {
-		err = fmt.Errorf("Could not find deployments set for replication controller %s in namespace %s with labels: %v", rc.Name, rc.Namespace, rc.Labels)
+		err = fmt.Errorf("could not find deployments set for replication controller %s in namespace %s with labels: %v", rc.Name, rc.Namespace, rc.Labels)
 	}
 	return
 }
@@ -275,7 +275,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	var daemonSet extensions.DaemonSet
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No daemon sets found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
@@ -297,7 +297,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		daemonSets = append(daemonSets, daemonSet)
 	}
 	if len(daemonSets) == 0 {
-		err = fmt.Errorf("Could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -337,7 +337,7 @@ func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Serv
 		}
 	}
 	if len(services) == 0 {
-		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
 	return
@@ -364,7 +364,7 @@ func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.E
 			return ep, nil
 		}
 	}
-	err = fmt.Errorf("Could not find endpoints for service: %v", svc.Name)
+	err = fmt.Errorf("could not find endpoints for service: %v", svc.Name)
 	return
 }
 
@@ -396,7 +396,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 	var job extensions.Job
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No jobs found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
@@ -413,7 +413,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 		jobs = append(jobs, job)
 	}
 	if len(jobs) == 0 {
-		err = fmt.Errorf("Could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
