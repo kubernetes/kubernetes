@@ -123,7 +123,7 @@ func svcByName(name string, port int) *api.Service {
 				"name": name,
 			},
 			Ports: []api.ServicePort{{
-				Port:       9376,
+				Port:       port,
 				TargetPort: intstr.FromInt(port),
 			}},
 		},
