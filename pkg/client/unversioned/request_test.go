@@ -347,7 +347,7 @@ func TestTransformResponse(t *testing.T) {
 				t.Errorf("%d: response should have been transformable into APIStatus: %v", i, err)
 				continue
 			}
-			if status.Status().Code != test.Response.StatusCode {
+			if int(status.Status().Code) != test.Response.StatusCode {
 				t.Errorf("%d: status code did not match response: %#v", i, status.Status())
 			}
 		}

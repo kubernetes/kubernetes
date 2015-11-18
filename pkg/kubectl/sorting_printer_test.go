@@ -33,7 +33,7 @@ func encodeOrDie(obj runtime.Object) []byte {
 }
 
 func TestSortingPrinter(t *testing.T) {
-	intPtr := func(val int) *int { return &val }
+	intPtr := func(val int32) *int32 { return &val }
 
 	a := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
