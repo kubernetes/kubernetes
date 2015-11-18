@@ -104,10 +104,15 @@ var _ = Describe("Density [Skipped]", func() {
 
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
-		// Verify latency metrics
+		// Verify latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+
+		// Verify scheduler metrics.
+		// TODO: Reset metrics at the beginning of the test.
+		// We should do something similar to how we do it for APIserver.
+		expectNoError(VerifySchedulerLatency())
 	})
 
 	framework := NewFramework("density")
