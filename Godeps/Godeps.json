@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.5.1",
+	"GoVersion": "go1.4.3",
 	"Packages": [
 		"./..."
 	],
@@ -772,7 +772,7 @@
 			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
 		},
 		{
-			"ImportPath": "google.golang.org/api/container/v1beta1",
+			"ImportPath": "google.golang.org/api/container/v1",
 			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
 		},
 		{
