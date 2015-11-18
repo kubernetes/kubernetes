@@ -46,7 +46,7 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
 	if in.OOMScoreAdj != nil {
-		out.OOMScoreAdj = new(int)
+		out.OOMScoreAdj = new(int32)
 		*out.OOMScoreAdj = *in.OOMScoreAdj
 	} else {
 		out.OOMScoreAdj = nil

@@ -597,7 +597,7 @@ func deepCopy_v1_FCVolumeSource(in FCVolumeSource, out *FCVolumeSource, c *conve
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int)
+		out.Lun = new(int32)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil
@@ -1803,7 +1803,7 @@ func deepCopy_v1_ReplicationControllerList(in ReplicationControllerList, out *Re
 
 func deepCopy_v1_ReplicationControllerSpec(in ReplicationControllerSpec, out *ReplicationControllerSpec, c *conversion.Cloner) error {
 	if in.Replicas != nil {
-		out.Replicas = new(int)
+		out.Replicas = new(int32)
 		*out.Replicas = *in.Replicas
 	} else {
 		out.Replicas = nil

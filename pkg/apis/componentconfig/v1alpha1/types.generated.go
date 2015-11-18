@@ -546,7 +546,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			if r.TryDecodeAsNil() {
 				x.HealthzPort = 0
 			} else {
-				x.HealthzPort = int(r.DecodeInt(codecSelferBitsize1234))
+				x.HealthzPort = int32(r.DecodeInt(32))
 			}
 		case "hostnameOverride":
 			if r.TryDecodeAsNil() {
@@ -558,19 +558,19 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			if r.TryDecodeAsNil() {
 				x.IPTablesSyncePeriodSeconds = 0
 			} else {
-				x.IPTablesSyncePeriodSeconds = int(r.DecodeInt(codecSelferBitsize1234))
+				x.IPTablesSyncePeriodSeconds = int32(r.DecodeInt(32))
 			}
 		case "kubeAPIBurst":
 			if r.TryDecodeAsNil() {
 				x.KubeAPIBurst = 0
 			} else {
-				x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.KubeAPIBurst = int32(r.DecodeInt(32))
 			}
 		case "kubeAPIQPS":
 			if r.TryDecodeAsNil() {
 				x.KubeAPIQPS = 0
 			} else {
-				x.KubeAPIQPS = int(r.DecodeInt(codecSelferBitsize1234))
+				x.KubeAPIQPS = int32(r.DecodeInt(32))
 			}
 		case "kubeconfigPath":
 			if r.TryDecodeAsNil() {
@@ -597,13 +597,13 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 				}
 			} else {
 				if x.OOMScoreAdj == nil {
-					x.OOMScoreAdj = new(int)
+					x.OOMScoreAdj = new(int32)
 				}
 				yym74 := z.DecBinary()
 				_ = yym74
 				if false {
 				} else {
-					*((*int)(x.OOMScoreAdj)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.OOMScoreAdj)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "mode":
@@ -628,7 +628,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			if r.TryDecodeAsNil() {
 				x.UDPTimeoutMilliseconds = 0
 			} else {
-				x.UDPTimeoutMilliseconds = int(r.DecodeInt(codecSelferBitsize1234))
+				x.UDPTimeoutMilliseconds = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys59)
@@ -738,7 +738,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.HealthzPort = 0
 	} else {
-		x.HealthzPort = int(r.DecodeInt(codecSelferBitsize1234))
+		x.HealthzPort = int32(r.DecodeInt(32))
 	}
 	yyj79++
 	if yyhl79 {
@@ -770,7 +770,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.IPTablesSyncePeriodSeconds = 0
 	} else {
-		x.IPTablesSyncePeriodSeconds = int(r.DecodeInt(codecSelferBitsize1234))
+		x.IPTablesSyncePeriodSeconds = int32(r.DecodeInt(32))
 	}
 	yyj79++
 	if yyhl79 {
@@ -786,7 +786,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.KubeAPIBurst = 0
 	} else {
-		x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.KubeAPIBurst = int32(r.DecodeInt(32))
 	}
 	yyj79++
 	if yyhl79 {
@@ -802,7 +802,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.KubeAPIQPS = 0
 	} else {
-		x.KubeAPIQPS = int(r.DecodeInt(codecSelferBitsize1234))
+		x.KubeAPIQPS = int32(r.DecodeInt(32))
 	}
 	yyj79++
 	if yyhl79 {
@@ -869,13 +869,13 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 		}
 	} else {
 		if x.OOMScoreAdj == nil {
-			x.OOMScoreAdj = new(int)
+			x.OOMScoreAdj = new(int32)
 		}
 		yym94 := z.DecBinary()
 		_ = yym94
 		if false {
 		} else {
-			*((*int)(x.OOMScoreAdj)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.OOMScoreAdj)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj79++
@@ -940,7 +940,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.UDPTimeoutMilliseconds = 0
 	} else {
-		x.UDPTimeoutMilliseconds = int(r.DecodeInt(codecSelferBitsize1234))
+		x.UDPTimeoutMilliseconds = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj79++

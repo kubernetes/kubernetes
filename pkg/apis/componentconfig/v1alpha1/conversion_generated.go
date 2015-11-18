@@ -36,24 +36,24 @@ func autoconvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.CleanupIPTables = in.CleanupIPTables
 	out.HealthzBindAddress = in.HealthzBindAddress
-	out.HealthzPort = in.HealthzPort
+	out.HealthzPort = int32(in.HealthzPort)
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesSyncePeriodSeconds = in.IPTablesSyncePeriodSeconds
-	out.KubeAPIBurst = in.KubeAPIBurst
-	out.KubeAPIQPS = in.KubeAPIQPS
+	out.IPTablesSyncePeriodSeconds = int32(in.IPTablesSyncePeriodSeconds)
+	out.KubeAPIBurst = int32(in.KubeAPIBurst)
+	out.KubeAPIQPS = int32(in.KubeAPIQPS)
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
 	if in.OOMScoreAdj != nil {
-		out.OOMScoreAdj = new(int)
-		*out.OOMScoreAdj = *in.OOMScoreAdj
+		out.OOMScoreAdj = new(int32)
+		*out.OOMScoreAdj = int32(*in.OOMScoreAdj)
 	} else {
 		out.OOMScoreAdj = nil
 	}
 	out.Mode = ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	out.UDPTimeoutMilliseconds = in.UDPTimeoutMilliseconds
+	out.UDPTimeoutMilliseconds = int32(in.UDPTimeoutMilliseconds)
 	return nil
 }
 
@@ -71,24 +71,24 @@ func autoconvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.CleanupIPTables = in.CleanupIPTables
 	out.HealthzBindAddress = in.HealthzBindAddress
-	out.HealthzPort = in.HealthzPort
+	out.HealthzPort = int(in.HealthzPort)
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesSyncePeriodSeconds = in.IPTablesSyncePeriodSeconds
-	out.KubeAPIBurst = in.KubeAPIBurst
-	out.KubeAPIQPS = in.KubeAPIQPS
+	out.IPTablesSyncePeriodSeconds = int(in.IPTablesSyncePeriodSeconds)
+	out.KubeAPIBurst = int(in.KubeAPIBurst)
+	out.KubeAPIQPS = int(in.KubeAPIQPS)
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
 	if in.OOMScoreAdj != nil {
 		out.OOMScoreAdj = new(int)
-		*out.OOMScoreAdj = *in.OOMScoreAdj
+		*out.OOMScoreAdj = int(*in.OOMScoreAdj)
 	} else {
 		out.OOMScoreAdj = nil
 	}
 	out.Mode = componentconfig.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	out.UDPTimeoutMilliseconds = in.UDPTimeoutMilliseconds
+	out.UDPTimeoutMilliseconds = int(in.UDPTimeoutMilliseconds)
 	return nil
 }
 
