@@ -46,6 +46,8 @@ var _ = Describe("KubeletManagedEtcHosts", func() {
 	}
 
 	It("should test kubelet managed /etc/hosts file", func() {
+		// we don't manage this file on older clusters
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
 		By("Setting up the test")
 		config.setup()
 

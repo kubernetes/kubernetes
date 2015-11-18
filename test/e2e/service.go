@@ -601,6 +601,9 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should prevent NodePort collisions", func() {
+		// Slight variations in error text, not worth fixing
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
+
 		baseName := "nodeport-collision-"
 		serviceName1 := baseName + "1"
 		serviceName2 := baseName + "2"
@@ -655,6 +658,9 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should check NodePort out-of-range", func() {
+		// Slight differences in error text, not worth fixing
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
+
 		serviceName := "nodeport-range-test"
 		ns := f.Namespace.Name
 

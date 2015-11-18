@@ -469,6 +469,9 @@ var _ = Describe("Kubectl client", func() {
 	})
 
 	Describe("Kubectl describe", func() {
+		// Bad required field breaks validation in 1.0 swagger, not worth fixing
+		SkipIfMajorMinorVersionIs(framework.Client, "1", "0")
+
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
@@ -682,6 +685,9 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should be able to retrieve and filter logs [Conformance]", func() {
+			// Filtering isn't in 1.0.x
+			SkipIfMajorMinorVersionIs(framework.Client, "1", "0")
+
 			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
 				By("checking for a matching strings")
 				_, err := lookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", podStartTimeout)
