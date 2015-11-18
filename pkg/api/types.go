@@ -990,7 +990,7 @@ type PodSpec struct {
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount
-	ServiceAccountName string `json:"serviceAccountName"`
+	ServiceAccountName *string `json:"serviceAccountName"`
 
 	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
 	// the scheduler simply schedules this pod onto that node, assuming that it fits resource

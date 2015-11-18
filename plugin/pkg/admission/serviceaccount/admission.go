@@ -155,8 +155,10 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
-		if len(pod.Spec.ServiceAccountName) != 0 {
-			return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
+		if pod.Spec.ServiceAccountName != nil {
+			if len(*pod.Spec.ServiceAccountName) != 0 {
+				return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
+			}
 		}
 		for _, volume := range pod.Spec.Volumes {
 			if volume.VolumeSource.Secret != nil {
@@ -167,18 +169,21 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	// Set the default service account if needed
-	if len(pod.Spec.ServiceAccountName) == 0 {
-		pod.Spec.ServiceAccountName = DefaultServiceAccountName
+	if pod.Spec.ServiceAccountName == nil {
+		pod.Spec.ServiceAccountName = new(string)
+	}
+	if len(*pod.Spec.ServiceAccountName) == 0 {
+		*pod.Spec.ServiceAccountName = DefaultServiceAccountName
 	}
 
 	// Ensure the referenced service account exists
-	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
+	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), *pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), *pod.Spec.ServiceAccountName, err))
 	}
 	if serviceAccount == nil {
 		// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
-		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
+		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), *pod.Spec.ServiceAccountName))
 	}
 
 	if s.LimitSecretReferences {

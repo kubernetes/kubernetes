@@ -1237,6 +1237,7 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
+	validServiceAcctName := "acct"
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -1256,7 +1257,7 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
-			ServiceAccountName:    "acct",
+			ServiceAccountName:    &validServiceAcctName,
 		},
 		{ // Populate HostNetwork.
 			Containers: []api.Container{
@@ -1294,7 +1295,7 @@ func TestValidatePodSpec(t *testing.T) {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
-
+	invalidServiceAccountName := "invalidName"
 	activeDeadlineSeconds = int64(0)
 	failureCases := map[string]api.PodSpec{
 		"bad volume": {
@@ -1321,7 +1322,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:         []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy:      api.RestartPolicyAlways,
 			DNSPolicy:          api.DNSClusterFirst,
-			ServiceAccountName: "invalidName",
+			ServiceAccountName: &invalidServiceAccountName,
 		},
 		"bad restart policy": {
 			RestartPolicy: "UnknowPolicy",
