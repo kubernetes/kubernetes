@@ -28,10 +28,10 @@ import (
 )
 
 const (
-	RunOnceManifestDelay     = 1 * time.Second
-	RunOnceMaxRetries        = 10
-	RunOnceRetryDelay        = 1 * time.Second
-	RunOnceRetryDelayBackoff = 2
+	runOnceManifestDelay     = 1 * time.Second
+	runOnceMaxRetries        = 10
+	runOnceRetryDelay        = 1 * time.Second
+	runOnceRetryDelayBackoff = 2
 )
 
 type RunPodResult struct {
@@ -44,11 +44,11 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 	select {
 	case u := <-updates:
 		glog.Infof("processing manifest with %d pods", len(u.Pods))
-		result, err := kl.runOnce(u.Pods, RunOnceRetryDelay)
+		result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
 		glog.Infof("finished processing %d pods", len(u.Pods))
 		return result, err
-	case <-time.After(RunOnceManifestDelay):
-		return nil, fmt.Errorf("no pod manifest update after %v", RunOnceManifestDelay)
+	case <-time.After(runOnceManifestDelay):
+		return nil, fmt.Errorf("no pod manifest update after %v", runOnceManifestDelay)
 	}
 }
 
@@ -119,14 +119,14 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		if err = kl.syncPod(pod, mirrorPod, p, kubetypes.SyncPodUpdate); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
-		if retry >= RunOnceMaxRetries {
-			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, RunOnceMaxRetries)
+		if retry >= runOnceMaxRetries {
+			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, runOnceMaxRetries)
 		}
 		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
 		glog.Infof("pod %q containers synced, waiting for %v", pod.Name, delay)
 		time.Sleep(delay)
 		retry++
-		delay *= RunOnceRetryDelayBackoff
+		delay *= runOnceRetryDelayBackoff
 	}
 }
 
