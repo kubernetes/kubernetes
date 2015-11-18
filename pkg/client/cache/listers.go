@@ -203,7 +203,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		controllers = append(controllers, rc)
 	}
 	if len(controllers) == 0 {
-		err = fmt.Errorf("Could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("Could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
