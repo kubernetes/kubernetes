@@ -45,6 +45,17 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		f.RandSource(src)
 	}
 	f.Funcs(
+		func(j *int, c fuzz.Continue) {
+			*j = int(c.Int31())
+		},
+		func(j **int, c fuzz.Continue) {
+			if c.RandBool() {
+				i := int(c.Int31())
+				*j = &i
+			} else {
+				*j = nil
+			}
+		},
 		func(j *runtime.PluginBase, c fuzz.Continue) {
 			// Do nothing; this struct has only a Kind field and it must stay blank in memory.
 		},
@@ -140,8 +151,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(j *extensions.JobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			completions := c.Rand.Int()
-			parallelism := c.Rand.Int()
+			completions := int(c.Rand.Int31())
+			parallelism := int(c.Rand.Int31())
 			j.Completions = &completions
 			j.Parallelism = &parallelism
 		},
@@ -227,24 +238,23 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
+		// Only api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
+		// defaulted to a version otherwise roundtrip will fail
+		// For the remaining volume plugins the default fuzzer is enough.
+		func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
+			m.Path = c.RandString()
+			versions := []string{"v1"}
+			m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
+			m.FieldRef.FieldPath = c.RandString()
+		},
 		func(vs *api.VolumeSource, c fuzz.Continue) {
 			// Exactly one of the fields must be set.
 			v := reflect.ValueOf(vs).Elem()
 			i := int(c.RandUint64() % uint64(v.NumField()))
-			v = v.Field(i).Addr()
-			// Use a new fuzzer which cannot populate nil to ensure one field will be set.
-			f := fuzz.New().NilChance(0).NumElements(1, 1)
-			f.Funcs(
-				// Only api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
-				// defaulted to a version otherwise roundtrip will fail
-				// For the remaining volume plugins the default fuzzer is enough.
-				func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
-					m.Path = c.RandString()
-					versions := []string{"v1"}
-					m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
-					m.FieldRef.FieldPath = c.RandString()
-				},
-			).Fuzz(v.Interface())
+			t := v.Field(i).Addr()
+			for v.Field(i).IsNil() {
+				c.Fuzz(t.Interface())
+			}
 		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
@@ -363,9 +373,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(s *extensions.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			minReplicas := c.Rand.Int()
+			minReplicas := int(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
-			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(c.RandUint64())}
+			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(c.Int31())}
 		},
 	)
 	return f

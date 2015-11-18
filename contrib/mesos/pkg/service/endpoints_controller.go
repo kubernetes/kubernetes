@@ -430,8 +430,8 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 		p := portName.IntVal
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
-				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {
-					hostPort, err := findMappedPort(pod, port.Protocol, p)
+				if port.ContainerPort == int(p) && port.Protocol == svcPort.Protocol {
+					hostPort, err := findMappedPort(pod, port.Protocol, int(p))
 					return hostPort, port.ContainerPort, err
 				}
 			}
