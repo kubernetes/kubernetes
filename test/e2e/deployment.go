@@ -72,8 +72,14 @@ func testNewDeployment(f *Framework) {
 	})
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
 	}()
 	// Check that deployment is created fine.
 	deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -166,8 +172,14 @@ func testRollingUpdateDeployment(f *Framework) {
 	_, err = c.Deployments(ns).Create(&newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, 3, 2, 4, 0)
@@ -247,8 +259,14 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	_, err = c.Deployments(ns).Create(&newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, 1, 0, 2, 0)

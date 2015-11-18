@@ -24,13 +24,13 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -40,27 +40,18 @@ import (
 )
 
 const (
-	// We'll attempt to recompute the required replicas of all deployments
-	// that have fulfilled their expectations at least this often. This recomputation
-	// happens based on contents in the local caches.
+	// FullDeploymentResyncPeriod means we'll attempt to recompute the required replicas
+	// of all deployments that have fulfilled their expectations at least this often.
+	// This recomputation happens based on contents in the local caches.
 	FullDeploymentResyncPeriod = 30 * time.Second
-
-	// We'll keep replication controller watches open up to this long. In the unlikely case
-	// that a watch misdelivers info about an RC, it'll take this long for
-	// that mistake to be rectified.
-	ControllerRelistPeriod = 5 * time.Minute
-
-	// We'll keep pod watches open up to this long. In the unlikely case
-	// that a watch misdelivers info about a pod, it'll take this long for
-	// that mistake to be rectified.
-	PodRelistPeriod = 5 * time.Minute
 )
 
+// DeploymentController is responsible for synchronizing Deployment objects stored
+// in the system with actual running rcs and pods.
 type DeploymentController struct {
 	client        client.Interface
 	expClient     client.ExtensionsInterface
 	eventRecorder record.EventRecorder
-	rcControl     controller.RCControlInterface
 
 	// To allow injection of syncDeployment for testing.
 	syncHandler func(dKey string) error
@@ -88,7 +79,8 @@ type DeploymentController struct {
 	queue *workqueue.Type
 }
 
-func NewDeploymentController(client client.Interface) *DeploymentController {
+// NewDeploymentController creates a new DeploymentController.
+func NewDeploymentController(client client.Interface, resyncPeriod controller.ResyncPeriodFunc) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(client.Events(""))
@@ -103,10 +95,10 @@ func NewDeploymentController(client client.Interface) *DeploymentController {
 	dc.dStore.Store, dc.dController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dc.expClient.Deployments(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return dc.expClient.Deployments(api.NamespaceAll).List(unversioned.ListOptions{})
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.expClient.Deployments(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return dc.expClient.Deployments(api.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.Deployment{},
@@ -118,8 +110,6 @@ func NewDeploymentController(client client.Interface) *DeploymentController {
 				dc.enqueueDeployment(cur)
 			},
 			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
-			// way of achieving this is by performing a `stop` operation on the deployment.
 			DeleteFunc: dc.enqueueDeployment,
 		},
 	)
@@ -127,14 +117,14 @@ func NewDeploymentController(client client.Interface) *DeploymentController {
 	dc.rcStore.Store, dc.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dc.client.ReplicationControllers(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return dc.client.ReplicationControllers(api.NamespaceAll).List(unversioned.ListOptions{})
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.ReplicationControllers(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return dc.client.ReplicationControllers(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ReplicationController{},
-		ControllerRelistPeriod,
+		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    dc.addRC,
 			UpdateFunc: dc.updateRC,
@@ -148,24 +138,44 @@ func NewDeploymentController(client client.Interface) *DeploymentController {
 	dc.podStore.Store, dc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dc.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return dc.client.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return dc.client.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
-		PodRelistPeriod,
-		framework.ResourceEventHandlerFuncs{},
+		resyncPeriod(),
+		framework.ResourceEventHandlerFuncs{
+			// When pod updates (becomes ready), we need to enqueue deployment
+			UpdateFunc: dc.updatePod,
+		},
 	)
 
 	dc.syncHandler = dc.syncDeployment
+	dc.rcStoreSynced = dc.rcController.HasSynced
+	dc.podStoreSynced = dc.podController.HasSynced
 	return dc
 }
 
-// When an RC is created, enqueue the deployment that manages it.
+// Run begins watching and syncing.
+func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
+	defer util.HandleCrash()
+	go dc.dController.Run(stopCh)
+	go dc.rcController.Run(stopCh)
+	go dc.podController.Run(stopCh)
+	for i := 0; i < workers; i++ {
+		go util.Until(dc.worker, time.Second, stopCh)
+	}
+	<-stopCh
+	glog.Infof("Shutting down deployment controller")
+	dc.queue.ShutDown()
+}
+
+// addRC enqueues the deployment that manages an RC when the RC is created.
 func (dc *DeploymentController) addRC(obj interface{}) {
 	rc := obj.(*api.ReplicationController)
+	glog.V(4).Infof("Replication controller %s added.", rc.Name)
 	if d := dc.getDeploymentForRC(rc); rc != nil {
 		dc.enqueueDeployment(d)
 	}
@@ -175,8 +185,8 @@ func (dc *DeploymentController) addRC(obj interface{}) {
 // TODO: Surface that we are ignoring multiple deployments for a given controller.
 func (dc *DeploymentController) getDeploymentForRC(rc *api.ReplicationController) *extensions.Deployment {
 	deployments, err := dc.dStore.GetDeploymentsForRC(rc)
-	if err != nil {
-		glog.V(4).Infof("No deployments found for replication controller %v, deployment controller will avoid syncing", rc.Name)
+	if err != nil || len(deployments) == 0 {
+		glog.V(4).Infof("Error: %v. No deployment found for replication controller %v, deployment controller will avoid syncing.", err, rc.Name)
 		return nil
 	}
 	// Because all RC's belonging to a deployment should have a unique label key,
@@ -187,9 +197,9 @@ func (dc *DeploymentController) getDeploymentForRC(rc *api.ReplicationController
 	return &deployments[0]
 }
 
-// When a controller is updated, figure out what deployment/s manage it and wake them
-// up. If the labels of the controller have changed we need to awaken both the old
-// and new deployments. old and cur must be *api.ReplicationController types.
+// updateRC figures out what deployment(s) manage an RC when the RC is updated and
+// wake them up. If the anything of the RCs have changed, we need to awaken both
+// the old and new deployments. old and cur must be *api.ReplicationController types.
 func (dc *DeploymentController) updateRC(old, cur interface{}) {
 	if api.Semantic.DeepEqual(old, cur) {
 		// A periodic relist will send update events for all known controllers.
@@ -197,13 +207,13 @@ func (dc *DeploymentController) updateRC(old, cur interface{}) {
 	}
 	// TODO: Write a unittest for this case
 	curRC := cur.(*api.ReplicationController)
+	glog.V(4).Infof("Replication controller %s updated.", curRC.Name)
 	if d := dc.getDeploymentForRC(curRC); d != nil {
 		dc.enqueueDeployment(d)
 	}
 	// A number of things could affect the old deployment: labels changing,
 	// pod template changing, etc.
 	oldRC := old.(*api.ReplicationController)
-	// TODO: Is this the right way to check this, or is checking names sufficient?
 	if !api.Semantic.DeepEqual(oldRC, curRC) {
 		if oldD := dc.getDeploymentForRC(oldRC); oldD != nil {
 			dc.enqueueDeployment(oldD)
@@ -211,11 +221,12 @@ func (dc *DeploymentController) updateRC(old, cur interface{}) {
 	}
 }
 
-// When a controller is deleted, enqueue the deployment that manages it.
+// deleteRC enqueues the deployment that manages an RC when the RC is deleted.
 // obj could be an *api.ReplicationController, or a DeletionFinalStateUnknown
 // marker item.
 func (dc *DeploymentController) deleteRC(obj interface{}) {
 	rc, ok := obj.(*api.ReplicationController)
+	glog.V(4).Infof("Replication controller %s deleted.", rc.Name)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
@@ -238,6 +249,44 @@ func (dc *DeploymentController) deleteRC(obj interface{}) {
 	}
 }
 
+// getDeploymentForPod returns the deployment managing the RC that manages the given Pod.
+// TODO: Surface that we are ignoring multiple deployments for a given Pod.
+func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.Deployment {
+	rcs, err := dc.rcStore.GetPodControllers(pod)
+	if err != nil {
+		glog.V(4).Infof("Error: %v. No replication controllers found for pod %v, deployment controller will avoid syncing.", err, pod.Name)
+		return nil
+	}
+	for _, rc := range rcs {
+		deployments, err := dc.dStore.GetDeploymentsForRC(&rc)
+		if err == nil && len(deployments) > 0 {
+			return &deployments[0]
+		}
+	}
+	glog.V(4).Infof("No deployments found for pod %v, deployment controller will avoid syncing.", pod.Name)
+	return nil
+}
+
+// updatePod figures out what deployment(s) manage the RC that manages the Pod when the Pod
+// is updated and wake them up. If anything of the Pods have changed, we need to awaken both
+// the old and new deployments. old and cur must be *api.Pod types.
+func (dc *DeploymentController) updatePod(old, cur interface{}) {
+	if api.Semantic.DeepEqual(old, cur) {
+		return
+	}
+	curPod := cur.(*api.Pod)
+	glog.V(4).Infof("Pod %s updated.", curPod.Name)
+	if d := dc.getDeploymentForPod(curPod); d != nil {
+		dc.enqueueDeployment(d)
+	}
+	oldPod := old.(*api.Pod)
+	if !api.Semantic.DeepEqual(oldPod, curPod) {
+		if oldD := dc.getDeploymentForPod(oldPod); oldD != nil {
+			dc.enqueueDeployment(oldD)
+		}
+	}
+}
+
 // obj could be an *api.Deployment, or a DeletionFinalStateUnknown marker item.
 func (dc *DeploymentController) enqueueDeployment(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
@@ -253,19 +302,6 @@ func (dc *DeploymentController) enqueueDeployment(obj interface{}) {
 	// by querying the store for all deployments that this deployment overlaps, as well as all
 	// deployments that overlap this deployments, and sorting them.
 	dc.queue.Add(key)
-}
-
-func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
-	go dc.dController.Run(stopCh)
-	go dc.rcController.Run(stopCh)
-	go dc.podController.Run(stopCh)
-	for i := 0; i < workers; i++ {
-		go util.Until(dc.worker, time.Second, stopCh)
-	}
-	<-stopCh
-	glog.Infof("Shutting down deployment controller")
-	dc.queue.ShutDown()
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -286,6 +322,8 @@ func (dc *DeploymentController) worker() {
 	}
 }
 
+// syncDeployment will sync the deployment with the given key.
+// This function is not meant to be invoked concurrently with the same key.
 func (dc *DeploymentController) syncDeployment(key string) error {
 	startTime := time.Now()
 	defer func() {
@@ -293,14 +331,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}()
 
 	obj, exists, err := dc.dStore.Store.GetByKey(key)
-	if !exists {
-		glog.Infof("Deployment has been deleted %v", key)
-		return nil
-	}
 	if err != nil {
 		glog.Infof("Unable to retrieve deployment %v from store: %v", key, err)
 		dc.queue.Add(key)
 		return err
+	}
+	if !exists {
+		glog.Infof("Deployment has been deleted %v", key)
+		return nil
 	}
 	d := *obj.(*extensions.Deployment)
 	switch d.Spec.Strategy.Type {
@@ -309,7 +347,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	case extensions.RollingUpdateDeploymentStrategyType:
 		return dc.syncRollingUpdateDeployment(d)
 	}
-	return fmt.Errorf("Unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
+	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
@@ -349,14 +387,36 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 		// Update DeploymentStatus
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
+
+	// Sync deployment status
+	totalReplicas := deploymentutil.GetReplicaCountForRCs(allRCs)
+	updatedReplicas := deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
+	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas {
+		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
+	}
+
 	// TODO: raise an event, neither scaled up nor down.
 	return nil
+}
+
+func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, error) {
+	return deploymentutil.GetOldRCsFromLists(deployment, dc.client,
+		func(namespace string, options unversioned.ListOptions) (*api.PodList, error) {
+			podList, err := dc.podStore.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector))
+			return &podList, err
+		},
+		func(namespace string, options unversioned.ListOptions) ([]api.ReplicationController, error) {
+			return dc.rcStore.List()
+		})
 }
 
 // Returns an RC that matches the intent of the given deployment.
 // It creates a new RC if required.
 func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api.ReplicationController, error) {
-	existingNewRC, err := deploymentutil.GetNewRC(deployment, dc.client)
+	existingNewRC, err := deploymentutil.GetNewRCFromList(deployment, dc.client,
+		func(namespace string, options unversioned.ListOptions) ([]api.ReplicationController, error) {
+			return dc.rcStore.List()
+		})
 	if err != nil || existingNewRC != nil {
 		return existingNewRC, err
 	}
@@ -383,40 +443,6 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 		return nil, fmt.Errorf("error creating replication controller: %v", err)
 	}
 	return createdRC, nil
-}
-
-func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, error) {
-	// TODO: (janet) HEAD >>> return deploymentutil.GetOldRCs(deployment, d.client)
-	namespace := deployment.ObjectMeta.Namespace
-	// 1. Find all pods whose labels match deployment.Spec.Selector
-	podList, err := dc.podStore.Pods(api.NamespaceAll).List(labels.SelectorFromSet(deployment.Spec.Selector))
-	if err != nil {
-		return nil, fmt.Errorf("error listing pods: %v", err)
-	}
-	// 2. Find the corresponding RCs for pods in podList.
-	oldRCs := map[string]api.ReplicationController{}
-	rcList, err := dc.rcStore.List()
-	if err != nil {
-		return nil, fmt.Errorf("error listing replication controllers: %v", err)
-	}
-	for _, pod := range podList.Items {
-		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
-		for _, rc := range rcList {
-			rcLabelsSelector := labels.SelectorFromSet(rc.Spec.Selector)
-			if rcLabelsSelector.Matches(podLabelsSelector) {
-				// Filter out RC that has the same pod template spec as the deployment - that is the new RC.
-				if api.Semantic.DeepEqual(rc.Spec.Template, deploymentutil.GetNewRCTemplate(deployment)) {
-					continue
-				}
-				oldRCs[rc.ObjectMeta.Name] = rc
-			}
-		}
-	}
-	rcSlice := []*api.ReplicationController{}
-	for _, value := range oldRCs {
-		rcSlice = append(rcSlice, &value)
-	}
-	return rcSlice, nil
 }
 
 func (dc *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) (bool, error) {
@@ -510,7 +536,7 @@ func (dc *DeploymentController) updateDeploymentStatus(allRCs []*api.Replication
 		Replicas:        totalReplicas,
 		UpdatedReplicas: updatedReplicas,
 	}
-	_, err := dc.client.Extensions().Deployments(api.NamespaceAll).UpdateStatus(&newDeployment)
+	_, err := dc.expClient.Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
 	return err
 }
 
@@ -521,7 +547,7 @@ func (dc *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationControl
 	}
 	newRC, err := dc.scaleRC(rc, newScale)
 	if err == nil {
-		d.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
+		dc.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
 	}
 	return newRC, err
 }
@@ -534,5 +560,5 @@ func (dc *DeploymentController) scaleRC(rc *api.ReplicationController, newScale 
 
 func (dc *DeploymentController) updateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	// TODO: Using client for now, update to use store when it is ready.
-	return dc.client.Extensions().Deployments(api.NamespaceAll).Update(deployment)
+	return dc.expClient.Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
 }

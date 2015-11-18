@@ -640,7 +640,7 @@ runTests() {
   # Post-Condition: hpa "frontend" has configuration annotation
   [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up
-  kubectl delete rc,hpa frontend
+  kubectl delete rc,hpa frontend "${kube_flags[@]}"
 
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD is running 
@@ -658,19 +658,20 @@ runTests() {
   # Pre-Condition: no Job is running 
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)'
+  kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created 
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
-  kubectl delete jobs pi
+  kubectl delete jobs pi "${kube_flags[@]}"
   # Pre-Condition: no Deployment is running 
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run nginx --image=nginx --generator=deployment/v1beta1
+  kubectl run nginx --image=nginx --generator=deployment/v1beta1 "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created 
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   # Clean up 
-  kubectl delete deployment nginx
+  kubectl delete deployment nginx "${kube_flags[@]}"
+  kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
 
   ##############
   # Namespaces #
@@ -1050,11 +1051,12 @@ __EOF__
   kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   # autoscale 2~3 pods, default CPU utilization (80%)
-  kubectl autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
+  kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
   kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
 
   ######################
   # Multiple Resources #
