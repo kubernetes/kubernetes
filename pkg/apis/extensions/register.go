@@ -18,7 +18,11 @@ package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
+
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: ""}
 
 func init() {
 	// Register the API.
@@ -28,7 +32,7 @@ func init() {
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
 	// TODO this gets cleaned up when the types are fixed
-	api.Scheme.AddKnownTypes("extensions/",
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&ClusterAutoscaler{},
 		&ClusterAutoscalerList{},
 		&Deployment{},

@@ -24,12 +24,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -89,11 +89,13 @@ func (g TestGroup) GroupAndVersion() string {
 }
 
 func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
-	gv, err := unversioned.ParseGroupVersion(g.GroupVersionUnderTest)
-	if err != nil {
-		panic(err)
-	}
-	return &gv
+	return &unversioned.GroupVersion{Group: g.Group, Version: g.VersionUnderTest}
+}
+
+// InternalGroupVersion returns the group,version used to identify the internal
+// types for this API
+func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
+	return unversioned.GroupVersion{Group: g.Group}
 }
 
 // Codec returns the codec for the API version to test against, as set by the

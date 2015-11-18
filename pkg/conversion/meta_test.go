@@ -130,8 +130,8 @@ func TestMetaValues(t *testing.T) {
 
 	s := NewScheme()
 	s.InternalVersions[internalGV.Group] = internalGV
-	s.AddKnownTypeWithName(internalGV.String(), "Simple", &InternalSimple{})
-	s.AddKnownTypeWithName(externalGV.String(), "Simple", &ExternalSimple{})
+	s.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
+	s.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
 
 	internalToExternalCalls := 0
 	externalToInternalCalls := 0

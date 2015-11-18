@@ -135,7 +135,7 @@ func TestRoundTripTypes(t *testing.T) {
 	// api.Scheme.Log(t)
 	// defer api.Scheme.Log(nil)
 
-	for kind := range api.Scheme.KnownTypes("") {
+	for kind := range api.Scheme.KnownTypes(testapi.Default.InternalGroupVersion()) {
 		if nonRoundTrippableTypes.Has(kind) {
 			continue
 		}

@@ -76,6 +76,7 @@ type codecWrapper struct {
 	version string
 }
 
+// codecWrapper implements Decoder
 var _ Decoder = &codecWrapper{}
 
 // Encode implements Codec

@@ -27,16 +27,11 @@ import (
 type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
 	// the given version and name.
-	versionMap map[string]map[string]reflect.Type
+	gvkToType map[unversioned.GroupVersionKind]reflect.Type
 
-	// typeToVersion allows one to figure out the version for a given go object.
-	// The reflect.Type we index by should *not* be a pointer. If the same type
-	// is registered for multiple versions, the last one wins.
-	typeToVersion map[reflect.Type]string
-
-	// typeToKind allows one to figure out the desired "kind" field for a given
-	// go object. Requirements and caveats are the same as typeToVersion.
-	typeToKind map[reflect.Type][]string
+	// typeToGroupVersion allows one to find metadata for a given go object.
+	// The reflect.Type we index by should *not* be a pointer.
+	typeToGVK map[reflect.Type][]unversioned.GroupVersionKind
 
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
@@ -65,11 +60,10 @@ type Scheme struct {
 // NewScheme manufactures a new scheme.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		versionMap:    map[string]map[string]reflect.Type{},
-		typeToVersion: map[reflect.Type]string{},
-		typeToKind:    map[reflect.Type][]string{},
-		converter:     NewConverter(),
-		cloner:        NewCloner(),
+		gvkToType: map[unversioned.GroupVersionKind]reflect.Type{},
+		typeToGVK: map[reflect.Type][]unversioned.GroupVersionKind{},
+		converter: NewConverter(),
+		cloner:    NewCloner(),
 		// TODO remove this hard coded list.  As step one, hardcode it here so this pull doesn't become even bigger
 		InternalVersions: map[string]unversioned.GroupVersion{
 			"":                {},
@@ -92,30 +86,32 @@ func (s *Scheme) Log(l DebugLogger) {
 // a conversion. Defaults to the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
 	// find the preferred names for this type
-	names, ok := s.typeToKind[t]
+	gvks, ok := s.typeToGVK[t]
 	if !ok {
 		return t.Name()
 	}
-	if internal, ok := s.versionMap[""]; ok {
-		for _, name := range names {
-			if t, ok := internal[name]; ok {
-				return s.typeToKind[t][0]
-			}
+
+	for _, gvk := range gvks {
+		internalGV, exists := s.InternalVersions[gvk.Group]
+		if !exists {
+			internalGV := gvk.GroupVersion()
+			internalGV.Version = ""
+		}
+		internalGVK := internalGV.WithKind(gvk.Kind)
+
+		if internalType, exists := s.gvkToType[internalGVK]; exists {
+			return s.typeToGVK[internalType][0].Kind
 		}
 	}
-	return names[0]
+
+	return gvks[0].Kind
 }
 
-// AddKnownTypes registers all types passed in 'types' as being members of version 'version.
+// AddKnownTypes registers all types passed in 'types' as being members of version 'version'.
 // Encode() will refuse objects unless their type has been registered with AddKnownTypes.
 // All objects passed to types should be pointers to structs. The name that go reports for
 // the struct becomes the "kind" field when encoding.
-func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
-	knownTypes, found := s.versionMap[version]
-	if !found {
-		knownTypes = map[string]reflect.Type{}
-		s.versionMap[version] = knownTypes
-	}
+func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...interface{}) {
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
 		if t.Kind() != reflect.Ptr {
@@ -125,21 +121,17 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 		if t.Kind() != reflect.Struct {
 			panic("All types must be pointers to structs.")
 		}
-		knownTypes[t.Name()] = t
-		s.typeToVersion[t] = version
-		s.typeToKind[t] = append(s.typeToKind[t], t.Name())
+
+		gvk := gv.WithKind(t.Name())
+		s.gvkToType[gvk] = t
+		s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
 	}
 }
 
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
 // your structs.
-func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
-	knownTypes, found := s.versionMap[version]
-	if !found {
-		knownTypes = map[string]reflect.Type{}
-		s.versionMap[version] = knownTypes
-	}
+func (s *Scheme) AddKnownTypeWithName(gvk unversioned.GroupVersionKind, obj interface{}) {
 	t := reflect.TypeOf(obj)
 	if t.Kind() != reflect.Ptr {
 		panic("All types must be pointers to structs.")
@@ -148,21 +140,24 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
 	if t.Kind() != reflect.Struct {
 		panic("All types must be pointers to structs.")
 	}
-	knownTypes[kind] = t
-	s.typeToVersion[t] = version
-	s.typeToKind[t] = append(s.typeToKind[t], kind)
+
+	s.gvkToType[gvk] = t
+	s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
+
 }
 
 // KnownTypes returns an array of the types that are known for a particular version.
-func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
-	all, ok := s.versionMap[version]
-	if !ok {
-		return map[string]reflect.Type{}
+func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type {
+	types := map[string]reflect.Type{}
+
+	for gvk, t := range s.gvkToType {
+		if gv != gvk.GroupVersion() {
+			continue
+		}
+
+		types[gvk.Kind] = t
 	}
-	types := make(map[string]reflect.Type)
-	for k, v := range all {
-		types[k] = v
-	}
+
 	return types
 }
 
@@ -175,12 +170,8 @@ func (s *Scheme) NewObject(gvString, kind string) (interface{}, error) {
 	}
 	gvk := gv.WithKind(kind)
 
-	if types, ok := s.versionMap[gvString]; ok {
-		if t, ok := types[kind]; ok {
-			return reflect.New(t).Interface(), nil
-		}
-
-		return nil, &notRegisteredErr{gvk: gvk}
+	if t, exists := s.gvkToType[gvk]; exists {
+		return reflect.New(t).Interface(), nil
 	}
 
 	return nil, &notRegisteredErr{gvk: gvk}
@@ -292,13 +283,15 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
-func (s *Scheme) Recognizes(version, kind string) bool {
-	m, ok := s.versionMap[version]
-	if !ok {
+func (s *Scheme) Recognizes(gvString, kind string) bool {
+	gv, err := unversioned.ParseGroupVersion(gvString)
+	if err != nil {
 		return false
 	}
-	_, ok = m[kind]
-	return ok
+	gvk := gv.WithKind(kind)
+
+	_, exists := s.gvkToType[gvk]
+	return exists
 }
 
 // RegisterInputDefaults sets the provided field mapping function and field matching
@@ -349,18 +342,18 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
 	}
 
-	kinds, ok := s.typeToKind[t]
+	gvks, ok := s.typeToGVK[t]
 	if !ok {
 		return nil, fmt.Errorf("%v cannot be converted into version %q", t, outVersion)
 	}
-	outKind := kinds[0]
+	outKind := gvks[0]
 
 	inVersion, _, err := s.ObjectVersionAndKind(in)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := s.NewObject(outVersion, outKind)
+	out, err := s.NewObject(outVersion, outKind.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +363,7 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
-	if err := s.SetVersionAndKind(outVersion, outKind, out); err != nil {
+	if err := s.SetVersionAndKind(outVersion, outKind.Kind, out); err != nil {
 		return nil, err
 	}
 
@@ -406,13 +399,13 @@ func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string,
 		return "", "", err
 	}
 	t := v.Type()
-	version, vOK := s.typeToVersion[t]
-	kinds, kOK := s.typeToKind[t]
-	if !vOK || !kOK {
+
+	gvks, ok := s.typeToGVK[t]
+	if !ok {
 		return "", "", &notRegisteredErr{t: t}
 	}
-	apiVersion = version
-	kind = kinds[0]
+	apiVersion = gvks[0].GroupVersion().String()
+	kind = gvks[0].Kind
 	return
 }
 
