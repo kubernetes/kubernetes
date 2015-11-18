@@ -70,7 +70,7 @@ across reboots and failures.
 Run:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 --advertise-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 --data-dir=/var/etcd/data
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 --advertise-client-urls=http://${MASTER_IP}:4001 --data-dir=/var/etcd/data
 ```
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:

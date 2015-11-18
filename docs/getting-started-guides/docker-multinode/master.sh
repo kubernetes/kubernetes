@@ -121,7 +121,7 @@ start_k8s(){
     gcr.io/google_containers/etcd:2.2.1 \
     /usr/local/bin/etcd \
     --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
-    --advertise-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001
+    --advertise-client-urls=http://${MASTER_IP}:4001
     --data-dir=/var/etcd/data
 
     sleep 5
