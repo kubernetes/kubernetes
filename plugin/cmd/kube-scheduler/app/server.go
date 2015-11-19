@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
@@ -112,15 +111,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func (s *SchedulerServer) Run(_ []string) error {
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
-	}
-
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
-	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return err
 	}
