@@ -98,9 +98,9 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 		t.Errorf("unexpected error: %v", err)
 		return
 	}*/
-	codec := protobuf.NewCodec(api.Scheme, api.Scheme)
 
 	version := testapi.Default.Version()
+	codec := protobuf.NewCodec(version, api.Scheme, api.Scheme, api.Scheme)
 	if !set.Has(version) {
 		fuzzInternalObject(t, version, item, seed)
 		roundTrip(t, codec, item)
@@ -112,7 +112,7 @@ func TestSpecificKind(t *testing.T) {
 	api.Scheme.Log(t)
 	defer api.Scheme.Log(nil)
 
-	kind := "JobList"
+	kind := "Pod"
 	for i := 0; i < *fuzzIters; i++ {
 		doRoundTripTest(kind, t)
 		if t.Failed() {
