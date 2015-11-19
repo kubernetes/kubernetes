@@ -19,8 +19,8 @@ If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/images.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/images.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -213,9 +213,11 @@ $ cat ~/.docker/config.json
 ```
 
 Note that this is different than what is expected by the Kubernetes [secret resource](secrets.md): it expects a file named `.dockercfg` with the following structure:
+
 ```console
 { "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 ```
+
 The notable differences are:
 - There is no `"auths"` wrapping
 - It must be on a single line.
@@ -248,6 +250,7 @@ $ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
 $
 ```
+
 The type defined by `type: kubernetes.io/dockercfg` is important, as well as the data key name `.dockercfg`. The only value to edit is the `name` which is used by `imagePullSecret` inside the pod definition.
 
 If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid: the json must be on one line.
