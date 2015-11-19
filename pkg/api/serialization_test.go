@@ -30,6 +30,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/protobuf"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -92,11 +93,12 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
 
-	codec, err := testapi.GetCodecForObject(item)
+	/*codec, err := testapi.GetCodecForObject(item)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
-	}
+	}*/
+	codec := protobuf.NewCodec(api.Scheme, api.Scheme)
 
 	version := testapi.Default.Version()
 	if !set.Has(version) {

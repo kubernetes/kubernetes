@@ -29,6 +29,8 @@ import (
 // inner type.  This allows you to have, for example, a JSON field that can
 // accept a name or number.
 // TODO: Rename to Int32OrString
+//
+// +genprotoidl=true
 type IntOrString struct {
 	Type   Type
 	IntVal int32

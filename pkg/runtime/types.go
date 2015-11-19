@@ -30,6 +30,7 @@ package runtime
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 //
+// +genprotoidl=true
 type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
@@ -109,6 +110,8 @@ type RawExtension struct {
 // TypeMeta features-- kind, version, etc.
 // TODO: Make this object have easy access to field based accessors and settors for
 // metadata and field mutatation.
+//
+// +genprotoidl=true
 type Unknown struct {
 	TypeMeta `json:",inline"`
 	// RawJSON will hold the complete JSON of the object which couldn't be matched
