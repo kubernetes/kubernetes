@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -28,14 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	"k8s.io/kubernetes/pkg/tools"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func newStorage(t *testing.T) (*DeploymentStorage, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "extensions")
+func newStorage(t *testing.T) (*DeploymentStorage, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
 	deploymentStorage := NewStorage(etcdStorage, generic.UndecoratedStorage)
-	return &deploymentStorage, fakeClient
+	return &deploymentStorage, server
 }
 
 var namespace = "foo-namespace"
@@ -92,8 +91,9 @@ func validNewScale() *extensions.Scale {
 var validScale = *validNewScale()
 
 func TestCreate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Deployment.Etcd)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Deployment.Etcd)
 	deployment := validNewDeployment()
 	deployment.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -110,8 +110,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Deployment.Etcd)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Deployment.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewDeployment(),
@@ -146,26 +147,30 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Deployment.Etcd)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Deployment.Etcd)
 	test.TestDelete(validNewDeployment())
 }
 
 func TestGet(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Deployment.Etcd)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Deployment.Etcd)
 	test.TestGet(validNewDeployment())
 }
 
 func TestList(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Deployment.Etcd)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Deployment.Etcd)
 	test.TestList(validNewDeployment())
 }
 
 func TestWatch(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Deployment.Etcd)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Deployment.Etcd)
 	test.TestWatch(
 		validNewDeployment(),
 		// matching labels
@@ -188,11 +193,12 @@ func TestWatch(t *testing.T) {
 }
 
 func TestScaleGet(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Extensions.Codec(), &validDeployment), 0); err != nil {
+	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -202,17 +208,17 @@ func TestScaleGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if e, a := expect, scale; !api.Semantic.DeepEqual(e, a) {
+	if e, a := expect, scale; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("unexpected scale: %s", util.ObjectDiff(e, a))
 	}
 }
 
 func TestScaleUpdate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Extensions.Codec(), &validDeployment), 0); err != nil {
+	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
@@ -226,24 +232,24 @@ func TestScaleUpdate(t *testing.T) {
 	if _, _, err := storage.Scale.Update(ctx, &update); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	response, err := fakeClient.Get(key, false, false)
+	obj, err := storage.Scale.Get(ctx, name)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var deployment extensions.Deployment
-	testapi.Extensions.Codec().DecodeInto([]byte(response.Node.Value), &deployment)
+	deployment := obj.(*extensions.Scale)
 	if deployment.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
 	}
 }
 
 func TestStatusUpdate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if _, err := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Extensions.Codec(), &validDeployment), 0); err != nil {
+	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	update := extensions.Deployment{
@@ -259,13 +265,12 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := storage.Status.Update(ctx, &update); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	response, err := fakeClient.Get(key, false, false)
+	obj, err := storage.Deployment.Get(ctx, name)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var deployment extensions.Deployment
-	testapi.Extensions.Codec().DecodeInto([]byte(response.Node.Value), &deployment)
+	deployment := obj.(*extensions.Deployment)
 	if deployment.Spec.Replicas != 7 {
 		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", deployment.Spec.Replicas)
 	}

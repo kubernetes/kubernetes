@@ -80,7 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-	utilsets "k8s.io/kubernetes/pkg/util/sets"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
@@ -1047,7 +1046,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // experimental returns the resources and codec for the experimental api
 func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	// All resources except these are disabled by default.
-	enabledResources := utilsets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
+	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
 	resourceOverrides := m.apiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
