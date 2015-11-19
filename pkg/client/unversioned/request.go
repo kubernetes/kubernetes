@@ -94,6 +94,7 @@ type Request struct {
 	selector     labels.Selector
 	timeout      time.Duration
 
+	serverBase string // serverBase is the un-versioned, un-api'd base to the server
 	apiVersion string
 
 	// output
@@ -106,7 +107,7 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, serverBase, apiVersion string,
 	codec runtime.Codec) *Request {
 	metrics.Register()
 	return &Request{
@@ -116,6 +117,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion str
 		path:       baseURL.Path,
 		apiVersion: apiVersion,
 		codec:      codec,
+		serverBase: serverBase,
 	}
 }
 
@@ -230,11 +232,16 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
+	// join serverBase+segments
 	if len(segments) == 1 {
 		// preserve any trailing slashes for legacy behavior
-		r.path = segments[0]
+		p := path.Join(r.serverBase, segments[0])
+		if strings.HasSuffix(segments[0], "/") && len(p) > 1 {
+			p += "/"
+		}
+		r.path = p
 	} else {
-		r.path = path.Join(segments...)
+		r.path = path.Join(r.serverBase, path.Join(segments...))
 	}
 	return r
 }

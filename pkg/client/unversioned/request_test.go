@@ -80,11 +80,6 @@ func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
-
-	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
-	if s := r.URL().String(); s != "/foo/" {
-		t.Errorf("trailing slash should be preserved: %s", s)
-	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
@@ -223,7 +218,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "test", nil)
+	r := NewRequest(nil, "POST", uri, "", "test", nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -284,7 +279,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, testapi.Default.Version(), testapi.Default.Codec())
+		r := NewRequest(nil, "", uri, "", testapi.Default.Version(), testapi.Default.Codec())
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -985,11 +980,37 @@ func TestUnversionedPath(t *testing.T) {
 }
 
 func TestAbsPath(t *testing.T) {
-	expectedPath := "/bar/foo"
-	c := NewOrDie(&Config{})
-	r := c.Post().Prefix("/foo").AbsPath(expectedPath)
-	if r.path != expectedPath {
-		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
+	for i, tc := range []struct {
+		configPrefix   string
+		resourcePrefix string
+		absPath        string
+		wantsAbsPath   string
+	}{
+		{"", "", "", ""},
+		{"", "", "/", "/"},
+		{"", "", "/api", "/api"},
+		{"", "", "/api/", "/api/"},
+		{"", "", "/apis", "/apis"},
+		{"", "/foo", "/bar/foo", "/bar/foo"},
+		{"", "/api/foo/123", "/bar/foo", "/bar/foo"},
+		{"/p1/api", "", "", "/p1"},
+		{"/p1/api", "", "/", "/p1/"},
+		{"/p1/api", "", "/api", "/p1/api"},
+		{"/p1/api", "", "/apis", "/p1/apis"},
+		{"/p1/api", "/r1", "/apis", "/p1/apis"},
+		{"/p1/api", "/api/r1", "/apis", "/p1/apis"},
+		{"/p1/api/p2/api", "", "", "/p1/api/p2"},
+		{"/p1/api/p2/api", "", "/", "/p1/api/p2/"},
+		{"/p1/api/p2/api", "", "/api", "/p1/api/p2/api"},
+		{"/p1/api/p2/api", "", "/api/", "/p1/api/p2/api/"},
+		{"/p1/api/p2/api", "/r1", "/api/", "/p1/api/p2/api/"},
+		{"/p1/api/p2/api", "/api/r1", "/api/", "/p1/api/p2/api/"},
+	} {
+		c := NewOrDie(&Config{Prefix: tc.configPrefix})
+		r := c.Post().Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
+		if r.path != tc.wantsAbsPath {
+			t.Errorf("test case %d failed, unexpected path: %q, expected %q", i, r.path, tc.wantsAbsPath)
+		}
 	}
 }
 

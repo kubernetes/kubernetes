@@ -41,6 +41,18 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const (
+	defaultAPIPrefix = "/api"
+	groupAPIPrefix   = "/apis"
+)
+
+var (
+	apiPrefixes = map[string]struct{}{
+		defaultAPIPrefix: {},
+		groupAPIPrefix:   {},
+	}
+)
+
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
@@ -205,15 +217,14 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	}
 	client := http.Client{Transport: transport}
 
-	configCopy := *c
-	configCopy.Version = ""
-	configCopy.Prefix = ""
-	baseURL, err := defaultServerUrlFor(c)
+	baseURL, err := unversionedURL(*c)
 	if err != nil {
 		return nil, err
 	}
+	stripped := stripAPIFromPrefix(baseURL.Path)
+
 	// Get the groupVersions exposed at /api
-	baseURL.Path = "/api"
+	baseURL.Path = path.Join(stripped, defaultAPIPrefix)
 	resp, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
@@ -227,7 +238,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 
 	groupVersions = append(groupVersions, v.Versions...)
 	// Get the groupVersions exposed at /apis
-	baseURL.Path = "/apis"
+	baseURL.Path = path.Join(stripped, groupAPIPrefix)
 	resp2, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
@@ -355,7 +366,7 @@ func NewInCluster() (*Client, error) {
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 func SetKubernetesDefaults(config *Config) error {
 	if config.Prefix == "" {
-		config.Prefix = "/api"
+		config.Prefix = defaultAPIPrefix
 	}
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
@@ -397,7 +408,14 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
+	// baseURL is versioned, let's get a base without the version
+	unversioned, err := unversionedURL(*config)
+	if err != nil {
+		return nil, err
+	}
+
+	stripped := stripAPIFromPrefix(unversioned.Path)
+	client := NewRESTClient(baseURL, stripped, config.Version, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -422,7 +440,14 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
+	// baseURL may be versioned, let's get a base without the version
+	unversioned, err := unversionedURL(*config)
+	if err != nil {
+		return nil, err
+	}
+
+	stripped := stripAPIFromPrefix(unversioned.Path)
+	client := NewRESTClient(baseURL, stripped, config.Version, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -587,17 +612,22 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 
 	// If the user specified a URL without a path component (http://server.com), automatically
 	// append the default prefix
-	if hostURL.Path == "" {
-		if prefix == "" {
-			prefix = "/"
-		}
-		hostURL.Path = prefix
-	}
+	prefix = findPrefix(hostURL.Path, prefix)
 
 	// Add the version to the end of the path
-	hostURL.Path = path.Join(hostURL.Path, version)
+	hostURL.Path = path.Join(prefix, version)
 
 	return hostURL, nil
+}
+
+// findPrefix returns the first non-empty string or "/" if all are empty.
+func findPrefix(prefixes ...string) string {
+	for _, p := range prefixes {
+		if p != "" {
+			return p
+		}
+	}
+	return "/"
 }
 
 // IsConfigTransportTLS returns true if and only if the provided config will result in a protected
@@ -657,4 +687,24 @@ func DefaultKubernetesUserAgent() string {
 	seg := strings.SplitN(version, "-", 2)
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
+}
+
+func stripAPIFromPrefix(base string) string {
+	// normalize the base
+	if !strings.HasPrefix(base, "/") {
+		base = "/" + base
+	}
+
+	for p := range apiPrefixes {
+		if strings.HasSuffix(base, p) {
+			base = base[0 : len(base)-len(p)]
+			return base
+		}
+	}
+	return base
+}
+
+func unversionedURL(config Config) (*url.URL, error) {
+	config.Version = ""
+	return defaultServerUrlFor(&config)
 }
