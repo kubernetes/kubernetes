@@ -131,7 +131,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := f.Generator(generatorName)
+	generators := f.Generators("expose")
+	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
@@ -177,6 +178,10 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		params["labels"] = kubectl.MakeLabels(labels)
 	}
 	if err = kubectl.ValidateParams(names, params); err != nil {
+		return err
+	}
+	// Check for invalid flags used against the present generator.
+	if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
 		return err
 	}
 
