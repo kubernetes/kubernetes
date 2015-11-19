@@ -92,17 +92,25 @@ func main() {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
+	var schemeVersion string
+	if *groupVersion == "" || *groupVersion == "/" {
+		// This occurs when we generate deep-copy for internal version.
+		schemeVersion = ""
+	} else {
+		schemeVersion = *groupVersion
+	}
+
 	versionPath := pkgPath(group, version)
 	generator := kruntime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
 	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
 	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(version, "")
-	for _, knownType := range api.Scheme.KnownTypes(*groupVersion) {
+	for _, knownType := range api.Scheme.KnownTypes(schemeVersion) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}
-		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
+		if err := generator.GenerateConversionsForType(*groupVersion, knownType); err != nil {
 			glog.Errorf("Error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}

@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -86,10 +87,20 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 	return g.addImportByPath(pkg)
 }
 
-func (g *conversionGenerator) GenerateConversionsForType(version string, reflection reflect.Type) error {
+func (g *conversionGenerator) GenerateConversionsForType(gvString string, reflection reflect.Type) error {
+	gv, err := unversioned.ParseGroupVersion(gvString)
+	if err != nil {
+		return err
+	}
+
 	kind := reflection.Name()
 	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
-	internalObj, err := g.scheme.NewObject(g.scheme.InternalVersions[""].String(), kind)
+	internalGV, exists := g.scheme.InternalVersions[gv.Group]
+	if !exists {
+		return fmt.Errorf("no internal version for %v", gv)
+	}
+
+	internalObj, err := g.scheme.NewObject(internalGV.String(), kind)
 	if err != nil {
 		return fmt.Errorf("cannot create an object of type %v in internal version", kind)
 	}

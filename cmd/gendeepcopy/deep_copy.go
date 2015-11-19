@@ -125,8 +125,9 @@ func main() {
 			generator.OverwritePackage(vals[0], vals[1])
 		}
 	}
+
 	var schemeVersion string
-	if version == "" {
+	if *groupVersion == "" || *groupVersion == "/" {
 		// This occurs when we generate deep-copy for internal version.
 		schemeVersion = ""
 	} else {
