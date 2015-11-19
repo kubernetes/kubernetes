@@ -35,6 +35,8 @@ import (
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
 	baseURL *url.URL
+	// serverBase is the unversioned, un-api'd sub path of the server
+	serverBase string
 	// A string identifying the version of the API this client is expected to use.
 	apiVersion string
 
@@ -55,7 +57,7 @@ type RESTClient struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
+func NewRESTClient(baseURL *url.URL, serverBase, apiVersion string, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -69,6 +71,7 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, maxQPS 
 	}
 	return &RESTClient{
 		baseURL:    &base,
+		serverBase: serverBase,
 		apiVersion: apiVersion,
 		Codec:      c,
 		Throttle:   throttle,
@@ -91,7 +94,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.serverBase, c.apiVersion, c.Codec).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
