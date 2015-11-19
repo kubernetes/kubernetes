@@ -1,6 +1,6 @@
 all: push
 push: push-spark push-zeppelin
-.PHONY: push push-spark push-zeppelin spark zeppelin
+.PHONY: push push-spark push-zeppelin spark zeppelin zeppelin-build
 
 # To bump the Spark version, bump the version in base/Dockerfile, bump
 # the version in zeppelin/Dockerfile, bump this tag and reset to
@@ -12,7 +12,7 @@ TAG = 1.5.1_v2
 
 # To bump the Zeppelin version, bump the version in
 # zeppelin/Dockerfile and bump this tag and reset to v1.
-ZEPPELIN_TAG = v0.5.5_v1
+ZEPPELIN_TAG = v0.5.5_v2
 
 spark:
 	docker build -t gcr.io/google_containers/spark-base base
@@ -24,7 +24,15 @@ spark:
 	docker build -t gcr.io/google_containers/spark-driver driver
 	docker tag gcr.io/google_containers/spark-driver gcr.io/google_containers/spark-driver:$(TAG)
 
-zeppelin:
+zeppelin-build:
+	docker build -t gcr.io/google_containers/zeppelin-build zeppelin-build
+	docker tag -f gcr.io/google_containers/zeppelin-build gcr.io/google_containers/zeppelin-build:$(ZEPPELIN_TAG)
+
+zeppelin: zeppelin-build
+	docker create --name=zeppelin-build-tmp gcr.io/google_containers/zeppelin-build:$(ZEPPELIN_TAG)
+	docker cp zeppelin-build-tmp:/zeppelin.tgz zeppelin
+	docker rm -f zeppelin-build-tmp
+
 	docker build -t gcr.io/google_containers/zeppelin zeppelin
 	docker tag -f gcr.io/google_containers/zeppelin gcr.io/google_containers/zeppelin:$(ZEPPELIN_TAG)
 
