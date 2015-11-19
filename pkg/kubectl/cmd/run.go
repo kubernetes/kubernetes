@@ -153,9 +153,10 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			generatorName = "job/v1beta1"
 		}
 	}
-	generator, found := f.Generator(generatorName)
+	generators := f.Generators("run")
+	generator, found := generators[generatorName]
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generatorName))
+		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
@@ -342,7 +343,8 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 }
 
 func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
-	generator, found := f.Generator(serviceGenerator)
+	generators := f.Generators("expose")
+	generator, found := generators[serviceGenerator]
 	if !found {
 		return fmt.Errorf("missing service generator: %s", serviceGenerator)
 	}
@@ -394,6 +396,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 		return nil, "", nil, nil, err
 	}
 
+	// TODO: Validate flag usage against selected generator. More tricky since --expose was added.
 	obj, err := generator.Generate(params)
 	if err != nil {
 		return nil, "", nil, nil, err
