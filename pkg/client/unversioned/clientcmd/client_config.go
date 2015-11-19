@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -334,4 +335,24 @@ func (inClusterClientConfig) Possible() bool {
 	return os.Getenv("KUBERNETES_SERVICE_HOST") != "" &&
 		os.Getenv("KUBERNETES_SERVICE_PORT") != "" &&
 		err == nil && !fi.IsDir()
+}
+
+// BuildConfigFromFlags is a helper function that builds configs from a master
+// url or a kubeconfig filepath. These are passed in as command line flags for cluster
+// components. Warnings should reflect this usage. If neither masterUrl or kubeconfigPath
+// are passed in we fallback to inClusterConfig. If inClusterConfig fails, we fallback
+// to the default config.
+func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*client.Config, error) {
+	if kubeconfigPath == "" && masterUrl == "" {
+		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
+		kubeconfig, err := client.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
+		}
+		glog.Warning("error creating inClusterConfig, falling back to default config: %v", err)
+	}
+
+	return NewNonInteractiveDeferredLoadingClientConfig(
+		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
 }
