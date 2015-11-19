@@ -27,17 +27,21 @@ import (
 )
 
 // NewCodec
-func NewCodec(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.Codec {
+func NewCodec(version string, creater runtime.ObjectCreater, typer runtime.ObjectTyper, convertor runtime.ObjectConvertor) runtime.Codec {
 	return &codec{
-		creater: creater,
-		typer:   typer,
+		version:   version,
+		creater:   creater,
+		typer:     typer,
+		convertor: convertor,
 	}
 }
 
 // codec decodes protobuf objects
 type codec struct {
-	creater runtime.ObjectCreater
-	typer   runtime.ObjectTyper
+	version   string
+	creater   runtime.ObjectCreater
+	typer     runtime.ObjectTyper
+	convertor runtime.ObjectConvertor
 }
 
 var _ runtime.Codec = codec{}
@@ -61,6 +65,7 @@ func (c codec) Decode(data []byte) (runtime.Object, error) {
 func (c codec) DecodeToVersion(data []byte, version string) (runtime.Object, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
+
 func (c codec) DecodeInto(data []byte, obj runtime.Object) error {
 	pobj, ok := obj.(proto.Message)
 	if !ok {
@@ -68,17 +73,26 @@ func (c codec) DecodeInto(data []byte, obj runtime.Object) error {
 	}
 	return proto.Unmarshal(data, pobj)
 }
+
 func (c codec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, kind, version string) error {
 	return fmt.Errorf("unimplemented")
 }
+
 func (c codec) Encode(obj runtime.Object) (data []byte, err error) {
 	version, kind, err := c.typer.ObjectVersionAndKind(obj)
 	if err != nil {
 		return nil, err
 	}
+	if len(version) == 0 {
+		converted, err := c.convertor.ConvertToVersion(obj, c.version)
+		if err != nil {
+			return nil, err
+		}
+		obj = converted
+	}
 	m, ok := obj.(proto.Marshaler)
 	if !ok {
-		return nil, fmt.Errorf("object %s %v does not implement ProtoBuf marshalling")
+		return nil, fmt.Errorf("object %v (kind: %s in version: %s) does not implement ProtoBuf marshalling", reflect.TypeOf(obj), kind, c.version)
 	}
 	b, err := m.Marshal()
 	if err != nil {
