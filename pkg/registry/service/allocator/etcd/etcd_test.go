@@ -21,21 +21,19 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	"k8s.io/kubernetes/pkg/tools"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 
 	"golang.org/x/net/context"
 )
 
-func newStorage(t *testing.T) (*Etcd, *tools.FakeEtcdClient, allocator.Interface) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+func newStorage(t *testing.T) (*Etcd, *etcdtesting.EtcdTestServer, allocator.Interface) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
 	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", etcdStorage)
-	return etcd, fakeClient, mem
+	return etcd, server, mem
 }
 
 func validNewRangeAllocation() *api.RangeAllocation {
@@ -50,16 +48,17 @@ func key() string {
 }
 
 func TestEmpty(t *testing.T) {
-	storage, fakeClient, _ := newStorage(t)
-	fakeClient.ExpectNotFoundGet(key())
+	storage, server, _ := newStorage(t)
+	defer server.Terminate(t)
 	if _, err := storage.Allocate(1); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
 		t.Fatal(err)
 	}
 }
 
 func TestStore(t *testing.T) {
-	storage, fakeClient, backing := newStorage(t)
-	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
+	storage, server, backing := newStorage(t)
+	defer server.Terminate(t)
+	if err := storage.storage.Set(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -77,20 +76,11 @@ func TestStore(t *testing.T) {
 		t.Fatal("Expected allocation to fail")
 	}
 
-	obj := fakeClient.Data[key()]
-	if obj.R == nil || obj.R.Node == nil {
-		t.Fatalf("%s is empty: %#v", key(), obj)
-	}
-	t.Logf("data: %#v", obj.R.Node)
-
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
 	if err := storage.storage.Get(context.TODO(), key(), allocation, false); err != nil {
 		t.Fatal(err)
-	}
-	if allocation.ResourceVersion != "2" {
-		t.Fatalf("%#v", allocation)
 	}
 	if allocation.Range != "rangeSpecValue" {
 		t.Errorf("unexpected stored Range: %s", allocation.Range)

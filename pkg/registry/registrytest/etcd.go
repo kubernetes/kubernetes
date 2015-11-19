@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
-
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
@@ -32,28 +31,26 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	"k8s.io/kubernetes/pkg/tools"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
-func NewEtcdStorage(t *testing.T, group string) (storage.Interface, *tools.FakeEtcdClient) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Groups[group].Codec(), etcdtest.PathPrefix())
-	return etcdStorage, fakeClient
+func NewEtcdStorage(t *testing.T, group string) (storage.Interface, *etcdtesting.EtcdTestServer) {
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	storage := etcdstorage.NewEtcdStorage(server.Client, testapi.Groups[group].Codec(), etcdtest.PathPrefix())
+	return storage, server
 }
 
 type Tester struct {
-	tester     *resttest.Tester
-	fakeClient *tools.FakeEtcdClient
-	storage    *etcdgeneric.Etcd
+	tester  *resttest.Tester
+	storage *etcdgeneric.Etcd
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
-func New(t *testing.T, fakeClient *tools.FakeEtcdClient, storage *etcdgeneric.Etcd) *Tester {
+func New(t *testing.T, storage *etcdgeneric.Etcd) *Tester {
 	return &Tester{
-		tester:     resttest.New(t, storage, fakeClient.SetError),
-		fakeClient: fakeClient,
-		storage:    storage,
+		tester:  resttest.New(t, storage),
+		storage: storage,
 	}
 }
 
@@ -98,7 +95,6 @@ func (t *Tester) TestUpdate(valid runtime.Object, validUpdateFunc UpdateFunc, in
 	t.tester.TestUpdate(
 		valid,
 		t.setObject,
-		t.setResourceVersion,
 		t.getObject,
 		resttest.UpdateFunc(validUpdateFunc),
 		invalidFuncs...,
@@ -110,7 +106,7 @@ func (t *Tester) TestDelete(valid runtime.Object) {
 		valid,
 		t.setObject,
 		t.getObject,
-		isNotFoundEtcdError,
+		errors.IsNotFound,
 	)
 }
 
@@ -131,21 +127,19 @@ func (t *Tester) TestList(valid runtime.Object) {
 	t.tester.TestList(
 		valid,
 		t.setObjectsForList,
-		t.setResourceVersion,
 	)
 }
 
 func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels.Set, fieldsPass, fieldsFail []fields.Set) {
 	t.tester.TestWatch(
 		valid,
-		t.fakeClient.WaitForWatchCompletion,
-		t.injectWatchError,
 		t.emitObject,
 		labelsPass,
 		labelsFail,
 		fieldsPass,
 		fieldsFail,
-		[]string{etcdstorage.EtcdCreate, etcdstorage.EtcdSet, etcdstorage.EtcdCAS, etcdstorage.EtcdDelete},
+		// TODO: This should be filtered, the registry should not be aware of this level of detail
+		[]string{etcdstorage.EtcdCreate, etcdstorage.EtcdDelete},
 	)
 }
 
@@ -178,22 +172,9 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if err != nil {
 		return nil, err
 	}
-	key, err := t.storage.KeyFunc(ctx, meta.Name)
-	if err != nil {
-		return nil, err
-	}
-	key = etcdtest.AddPrefix(key)
-	resp, err := t.fakeClient.Get(key, false, false)
-	if err != nil {
-		return nil, err
-	}
-	result := t.storage.NewFunc()
 
-	codec, err := getCodec(obj)
+	result, err := t.storage.Get(ctx, meta.Name)
 	if err != nil {
-		return nil, err
-	}
-	if err := codec.DecodeInto([]byte(resp.Node.Value), result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -208,82 +189,34 @@ func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	key = etcdtest.AddPrefix(key)
-
-	codec, err := getCodec(obj)
-	if err != nil {
-		return err
-	}
-	_, err = t.fakeClient.Set(key, runtime.EncodeOrDie(codec, obj), 0)
-	return err
+	return t.storage.Storage.Set(ctx, key, obj, nil, 0)
 }
 
 func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
-	result := make([]runtime.Object, len(objects))
-	key := etcdtest.AddPrefix(t.storage.KeyRootFunc(t.tester.TestContext()))
-
-	if len(objects) > 0 {
-		nodes := make([]*etcd.Node, len(objects))
-		for i, obj := range objects {
-			codec, _ := getCodec(obj)
-			encoded := runtime.EncodeOrDie(codec, obj)
-			decoded, _ := codec.Decode([]byte(encoded))
-			nodes[i] = &etcd.Node{Value: encoded}
-			result[i] = decoded
-		}
-		t.fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Nodes: nodes,
-				},
-			},
-			E: nil,
-		}
-	} else {
-		t.fakeClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{},
-			E: t.fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-		}
+	key := t.storage.KeyRootFunc(t.tester.TestContext())
+	if err := storagetesting.CreateObjList(key, t.storage.Storage, objects); err != nil {
+		t.tester.Errorf("unexpected error: %v", err)
+		return nil
 	}
-	return result
-}
-
-func (t *Tester) setResourceVersion(resourceVersion uint64) {
-	t.fakeClient.ChangeIndex = resourceVersion
-}
-
-func (t *Tester) injectWatchError(err error) {
-	t.fakeClient.WatchInjectError <- err
+	return objects
 }
 
 func (t *Tester) emitObject(obj runtime.Object, action string) error {
-	codec, err := getCodec(obj)
-	if err != nil {
-		return err
-	}
-	encoded, err := codec.Encode(obj)
-	if err != nil {
-		return err
-	}
-	node := &etcd.Node{
-		Value: string(encoded),
-	}
-	var prevNode *etcd.Node = nil
-	if action == etcdstorage.EtcdDelete {
-		prevNode = node
-	}
-	t.fakeClient.WatchResponse <- &etcd.Response{
-		Action:   action,
-		Node:     node,
-		PrevNode: prevNode,
-	}
-	return nil
-}
+	ctx := t.tester.TestContext()
+	var err error
 
-func isNotFoundEtcdError(err error) bool {
-	etcdError, ok := err.(*etcd.EtcdError)
-	if !ok {
-		return false
+	switch action {
+	case etcdstorage.EtcdCreate:
+		err = t.setObject(ctx, obj)
+	case etcdstorage.EtcdDelete:
+		meta, err := api.ObjectMetaFor(obj)
+		if err != nil {
+			return err
+		}
+		_, err = t.storage.Delete(ctx, meta.Name, nil)
+	default:
+		err = fmt.Errorf("unexpected action: %v", action)
 	}
-	return etcdError.ErrorCode == tools.EtcdErrorCodeNotFound
+
+	return err
 }
