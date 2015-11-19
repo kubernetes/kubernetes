@@ -46,7 +46,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	pb "google.golang.org/grpc/examples/route_guide/proto"
+	pb "google.golang.org/grpc/examples/route_guide/routeguide"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -175,6 +175,8 @@ func main() {
 			creds = credentials.NewClientTLSFromCert(nil, sn)
 		}
 		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
 	}
 	conn, err := grpc.Dial(*serverAddr, opts...)
 	if err != nil {
