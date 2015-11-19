@@ -73,7 +73,8 @@ import (
 )
 
 var (
-	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
+	fakeDocker1 = dockertools.NewFakeDockerClient()
+	fakeDocker2 = dockertools.NewFakeDockerClient()
 	// Limit the number of concurrent tests.
 	maxConcurrency int
 
@@ -220,7 +221,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
 		cl,
-		&fakeDocker1,
+		fakeDocker1,
 		"localhost",
 		testRootDir,
 		firstManifestURL,
@@ -252,7 +253,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	kcfg = kubeletapp.SimpleKubelet(
 		cl,
-		&fakeDocker2,
+		fakeDocker2,
 		"127.0.0.1",
 		testRootDir,
 		secondManifestURL,
