@@ -182,7 +182,7 @@ func TestEtcdList(t *testing.T) {
 		server, registry := NewTestGenericEtcdRegistry(t)
 
 		if item.in != nil {
-			if err := storagetesting.CreateList(t, "/pods", registry.Storage, item.in); err != nil {
+			if err := storagetesting.CreateList("/pods", registry.Storage, item.in); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 		}

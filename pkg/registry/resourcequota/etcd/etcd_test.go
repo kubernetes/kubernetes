@@ -17,26 +17,23 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	"k8s.io/kubernetes/pkg/tools"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	resourceQuotaStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
-	return resourceQuotaStorage, statusStorage, fakeClient
+	return resourceQuotaStorage, statusStorage, server
 }
 
 func validNewResourceQuota() *api.ResourceQuota {
@@ -59,8 +56,9 @@ func validNewResourceQuota() *api.ResourceQuota {
 }
 
 func TestCreate(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -73,23 +71,13 @@ func TestCreate(t *testing.T) {
 	)
 }
 
-func TestCreateRegistryError(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	fakeClient.Err = fmt.Errorf("test error")
-
-	resourcequota := validNewResourceQuota()
-	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
-	if err != fakeClient.Err {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestCreateSetsFields(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
 	ctx := api.NewDefaultContext()
 	resourcequota := validNewResourceQuota()
 	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
-	if err != fakeClient.Err {
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -107,26 +95,30 @@ func TestCreateSetsFields(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd).ReturnDeletedObject()
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd).ReturnDeletedObject()
 	test.TestDelete(validNewResourceQuota())
 }
 
 func TestGet(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestGet(validNewResourceQuota())
 }
 
 func TestList(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestList(validNewResourceQuota())
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestWatch(
 		validNewResourceQuota(),
 		// matching labels
@@ -147,19 +139,22 @@ func TestWatch(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
-	storage, status, fakeClient := newStorage(t)
+	storage, status, server := newStorage(t)
+	defer server.Terminate(t)
 	ctx := api.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	resourcequotaStart := validNewResourceQuota()
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), resourcequotaStart), 0)
+	err := storage.Storage.Set(ctx, key, resourcequotaStart, nil, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	resourcequotaIn := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
-			Name:            "foo",
-			Namespace:       api.NamespaceDefault,
-			ResourceVersion: "1",
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
 		Status: api.ResourceQuotaStatus{
 			Used: api.ResourceList{
@@ -181,17 +176,14 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	expected := *resourcequotaStart
-	expected.ResourceVersion = "2"
-	expected.Labels = resourcequotaIn.Labels
-	expected.Status = resourcequotaIn.Status
-
-	_, _, err := status.Update(ctx, resourcequotaIn)
+	_, _, err = status.Update(ctx, resourcequotaIn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	rqOut, err := storage.Get(ctx, "foo")
-	if !api.Semantic.DeepEqual(&expected, rqOut) {
-		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, rqOut))
+	obj, err := storage.Get(ctx, "foo")
+	rqOut := obj.(*api.ResourceQuota)
+	// only compare the meaningful update b/c we can't compare due to metadata
+	if !api.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {
+		t.Errorf("unexpected object: %s", util.ObjectDiff(resourcequotaIn, rqOut))
 	}
 }
