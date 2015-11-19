@@ -33,27 +33,35 @@ import (
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
-// TODO: create a proper constructor for FakeDockerClient, so we won't need to check if ContainerMap is not nil.
 type FakeDockerClient struct {
 	sync.Mutex
 	ContainerList       []docker.APIContainers
 	ExitedContainerList []docker.APIContainers
-	Container           *docker.Container
 	ContainerMap        map[string]*docker.Container
 	Image               *docker.Image
 	Images              []docker.APIImages
 	Errors              map[string]error
 	called              []string
-	Stopped             []string
 	pulled              []string
-	Created             []string
-	Removed             []string
-	RemovedImages       sets.String
-	VersionInfo         docker.Env
-	Information         docker.Env
-	ExecInspect         *docker.ExecInspect
-	execCmd             []string
-	EnableSleep         bool
+	// Created, Stopped and Removed all container docker ID
+	Created       []string
+	Stopped       []string
+	Removed       []string
+	RemovedImages sets.String
+	VersionInfo   docker.Env
+	Information   docker.Env
+	ExecInspect   *docker.ExecInspect
+	execCmd       []string
+	EnableSleep   bool
+}
+
+func NewFakeDockerClient() *FakeDockerClient {
+	return &FakeDockerClient{
+		VersionInfo:   docker.Env{"Version=1.1.3", "ApiVersion=1.15"},
+		Errors:        make(map[string]error),
+		RemovedImages: sets.String{},
+		ContainerMap:  make(map[string]*docker.Container),
+	}
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -199,12 +207,10 @@ func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_container")
 	err := f.popError("inspect_container")
-	if f.ContainerMap != nil {
-		if container, ok := f.ContainerMap[id]; ok {
-			return container, err
-		}
+	if container, ok := f.ContainerMap[id]; ok {
+		return container, err
 	}
-	return f.Container, err
+	return nil, err
 }
 
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
@@ -240,19 +246,17 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	if err := f.popError("create"); err != nil {
 		return nil, err
 	}
-	f.Created = append(f.Created, c.Name)
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
+	f.Created = append(f.Created, name)
 	// The newest container should be in front, because we assume so in GetPodStatus()
 	f.ContainerList = append([]docker.APIContainers{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
 	}, f.ContainerList...)
 	container := docker.Container{ID: name, Name: name, Config: c.Config}
-	if f.ContainerMap != nil {
-		containerCopy := container
-		f.ContainerMap[name] = &containerCopy
-	}
+	containerCopy := container
+	f.ContainerMap[name] = &containerCopy
 	f.normalSleep(200, 50, 50)
 	return &container, nil
 }
@@ -266,32 +270,18 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	if err := f.popError("start"); err != nil {
 		return err
 	}
-	f.Container = &docker.Container{
-		ID:         id,
-		Name:       id, // For testing purpose, we set name to id
-		Config:     &docker.Config{Image: "testimage"},
-		HostConfig: hostConfig,
-		State: docker.State{
-			Running:   true,
-			Pid:       os.Getpid(),
-			StartedAt: time.Now(),
-		},
-		NetworkSettings: &docker.NetworkSettings{IPAddress: "1.2.3.4"},
+	container, ok := f.ContainerMap[id]
+	if !ok {
+		container = &docker.Container{ID: id, Name: id}
 	}
-	if f.ContainerMap != nil {
-		container, ok := f.ContainerMap[id]
-		if !ok {
-			container = &docker.Container{ID: id, Name: id}
-		}
-		container.HostConfig = hostConfig
-		container.State = docker.State{
-			Running:   true,
-			Pid:       os.Getpid(),
-			StartedAt: time.Now(),
-		}
-		container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
-		f.ContainerMap[id] = container
+	container.HostConfig = hostConfig
+	container.State = docker.State{
+		Running:   true,
+		Pid:       os.Getpid(),
+		StartedAt: time.Now(),
 	}
+	container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
+	f.ContainerMap[id] = container
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -316,24 +306,22 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		newList = append(newList, container)
 	}
 	f.ContainerList = newList
-	if f.ContainerMap != nil {
-		container, ok := f.ContainerMap[id]
-		if !ok {
-			container = &docker.Container{
-				ID:   id,
-				Name: id,
-				State: docker.State{
-					Running:    false,
-					StartedAt:  time.Now().Add(-time.Second),
-					FinishedAt: time.Now(),
-				},
-			}
-		} else {
-			container.State.FinishedAt = time.Now()
-			container.State.Running = false
+	container, ok := f.ContainerMap[id]
+	if !ok {
+		container = &docker.Container{
+			ID:   id,
+			Name: id,
+			State: docker.State{
+				Running:    false,
+				StartedAt:  time.Now().Add(-time.Second),
+				FinishedAt: time.Now(),
+			},
 		}
-		f.ContainerMap[id] = container
+	} else {
+		container.State.FinishedAt = time.Now()
+		container.State.Running = false
 	}
+	f.ContainerMap[id] = container
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -346,9 +334,7 @@ func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) e
 	if err == nil {
 		f.Removed = append(f.Removed, opts.ID)
 	}
-	if f.ContainerMap != nil {
-		delete(f.ContainerMap, opts.ID)
-	}
+	delete(f.ContainerMap, opts.ID)
 	return err
 }
 

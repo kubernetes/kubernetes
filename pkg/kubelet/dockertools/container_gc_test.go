@@ -28,6 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// TODO (random-liu) Cleanup the test soon
 func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
 	fakeDocker := new(FakeDockerClient)
 	gc := NewContainerGC(fakeDocker, "")
