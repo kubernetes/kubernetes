@@ -171,7 +171,6 @@ GCE_FLAKY_TESTS=(
     "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
     "Resource\susage\sof\ssystem\scontainers"
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
-    "deployment.*\sin\sthe\sright\sorder" # issue: #15369
     )
 
 # The following tests are known to be slow running (> 2 min), and are
