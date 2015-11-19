@@ -185,7 +185,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	filterNodes(nodes, func(node api.Node) bool {
-		return isNodeConditionSetAsExpected(&node, api.NodeReady, true)
+		return isNodeReadySetAsExpected(&node, true)
 	})
 	if len(nodes.Items) < 2 {
 		Failf("Less than two nodes were found Ready: %d", len(nodes.Items))
