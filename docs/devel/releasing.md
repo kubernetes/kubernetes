@@ -148,8 +148,17 @@ Then, run
 ```
 
 This will do a dry run of the release.  It will give you instructions at the
-end for `pushd`ing into the dry-run directory and having a look around.  If
-you're satisfied with the result, run
+end for `pushd`ing into the dry-run directory and having a look around.
+`pushd` into the directory and make sure everythig looks as you expect:
+
+```console
+git log "${VER}"  # do you see the commit you expect?
+make release
+./cluster/kubectl.sh version -c
+```
+
+If you're satisfied with the result of the script, go back to `upstream/master`
+run
 
 ```console
 ./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
