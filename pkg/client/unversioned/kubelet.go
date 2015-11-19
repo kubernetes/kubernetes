@@ -29,7 +29,7 @@ type KubeletClient interface {
 }
 
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(host string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetConnectionInfo() (scheme string, port uint, transport http.RoundTripper, err error)
 }
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
@@ -82,7 +82,7 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	}, nil
 }
 
-func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (c *HTTPKubeletClient) GetConnectionInfo() (string, uint, http.RoundTripper, error) {
 	scheme := "http"
 	if c.Config.EnableHttps {
 		scheme = "https"
@@ -95,6 +95,6 @@ func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.R
 // no kubelets.
 type FakeKubeletClient struct{}
 
-func (c FakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (c FakeKubeletClient) GetConnectionInfo() (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
