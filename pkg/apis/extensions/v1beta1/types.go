@@ -62,7 +62,7 @@ type SubresourceReference struct {
 	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
 	Name string `json:"name,omitempty"`
 	// API version of the referent
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion unversioned.GroupVersion `json:"apiVersion,omitempty"`
 	// Subresource name of the referent
 	Subresource string `json:"subresource,omitempty"`
 }
