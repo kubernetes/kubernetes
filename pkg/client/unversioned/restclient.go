@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -89,10 +90,11 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
 	}
+	backoff := &URLBackoff{Backoff: util.NewBackOff(1*time.Second, 120*time.Second)}
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.baseURL, c.apiVersion, c.Codec)
+		return NewRequest(nil, verb, c.baseURL, c.apiVersion, c.Codec, backoff)
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec)
+	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec, backoff)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
