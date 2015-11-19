@@ -138,11 +138,16 @@ var _ = Describe("Density", func() {
 
 		Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
+			var internalIP, externalIP string
 			for _, address := range node.Status.Addresses {
 				if address.Type == api.NodeInternalIP {
-					Logf("Name: %v IP: %v", node.ObjectMeta.Name, address.Address)
+					internalIP = address.Address
+				}
+				if address.Type == api.NodeExternalIP {
+					externalIP = address.Address
 				}
 			}
+			Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
 		}
 	})
 
