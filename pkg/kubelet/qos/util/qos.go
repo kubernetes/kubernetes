@@ -62,15 +62,16 @@ func GetQoS(container *api.Container) map[api.ResourceName]string {
 	return resourceToQoS
 }
 
-// supportedComputeResources returns a list of supported compute resources
-func supportedComputeResources() []api.ResourceName {
-	return []api.ResourceName{api.ResourceCPU, api.ResourceMemory}
+// supportedComputeResources is the list of supported compute resources
+var supportedComputeResources = []api.ResourceName{
+	api.ResourceCPU,
+	api.ResourceMemory,
 }
 
 // allResources returns a set of all possible resources whose mapped key value is true if present on the container
 func allResources(container *api.Container) map[api.ResourceName]bool {
 	resources := map[api.ResourceName]bool{}
-	for _, resource := range supportedComputeResources() {
+	for _, resource := range supportedComputeResources {
 		resources[resource] = false
 	}
 	for resource := range container.Resources.Requests {
