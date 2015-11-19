@@ -2211,3 +2211,63 @@ func waitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Du
 	})
 	return address, err
 }
+
+// getSvcNodePort returns the node port for the given service:port.
+func getSvcNodePort(client *client.Client, ns, name string, svcPort int) (int, error) {
+	svc, err := client.Services(ns).Get(name)
+	if err != nil {
+		return 0, err
+	}
+	for _, p := range svc.Spec.Ports {
+		if p.Port == svcPort {
+			if p.NodePort != 0 {
+				return p.NodePort, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf(
+		"No node port found for service %v, port %v", name, svcPort)
+}
+
+// getNodePortURL returns the url to a nodeport Service.
+func getNodePortURL(client *client.Client, ns, name string, svcPort int) (string, error) {
+	nodePort, err := getSvcNodePort(client, ns, name, svcPort)
+	if err != nil {
+		return "", err
+	}
+	nodes, err := client.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return "", err
+	}
+	if len(nodes.Items) == 0 {
+		return "", fmt.Errorf("Unable to list nodes in cluster.")
+	}
+	for _, node := range nodes.Items {
+		for _, address := range node.Status.Addresses {
+			if address.Type == api.NodeExternalIP {
+				if address.Address != "" {
+					return fmt.Sprintf("http://%v:%v", address.Address, nodePort), nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("Failed to find external address for service %v", name)
+}
+
+// scaleRCByName scales an RC via ns/name lookup. If replicas == 0 it waits till
+// none are running, otherwise it does what a synchronous scale operation would do.
+func scaleRCByName(client *client.Client, ns, name string, replicas uint) error {
+	if err := ScaleRC(client, ns, name, replicas, false); err != nil {
+		return err
+	}
+	rc, err := client.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		return err
+	}
+	if replicas == 0 {
+		return waitForRCPodsGone(client, rc)
+	} else {
+		return waitForPodsWithLabelRunning(
+			client, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector)))
+	}
+}
