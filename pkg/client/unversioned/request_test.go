@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -271,7 +272,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "test", nil)
+	r := NewRequest(nil, "POST", uri, "test", nil, nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -332,7 +333,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, testapi.Default.Version(), testapi.Default.Codec())
+		r := NewRequest(nil, "", uri, testapi.Default.Version(), testapi.Default.Codec(), nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -551,6 +552,8 @@ func TestRequestWatch(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
+		glog.Infof("testcase %v", testCase.Request)
+		testCase.Request.backoffMgr = &NoBackoff{}
 		watch, err := testCase.Request.Watch()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -613,6 +616,7 @@ func TestRequestStream(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
+		testCase.Request.backoffMgr = &NoBackoff{}
 		body, err := testCase.Request.Stream()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -682,6 +686,7 @@ func TestRequestDo(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
+		testCase.Request.backoffMgr = &NoBackoff{}
 		body, err := testCase.Request.Do().Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -729,6 +734,39 @@ func TestDoRequestNewWay(t *testing.T) {
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &reqBody)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
+	}
+}
+
+//This test assumes that the client implementation backs off exponentially, for an individual request.
+func TestBackoffLifecycle(t *testing.T) {
+	count := 0
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		count++
+		t.Logf("attempt %d", count)
+		//requests "1" and "2" both fail.
+		if count == 5 || count == 9 {
+			w.WriteHeader(http.StatusOK)
+			return
+		} else {
+			w.WriteHeader(http.StatusGatewayTimeout)
+			return
+		}
+	}))
+	defer testServer.Close()
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Default.Version(), Username: "user", Password: "pass"})
+
+	//Test backoff recovery and increase.  This correlates to the constants
+	//which are used in the server implementation returning StatusOK above.
+	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
+	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
+	for _, sec := range seconds {
+		start := time.Now()
+		request.DoRaw()
+		finish := time.Since(start)
+		glog.Infof("%v finished in %v", sec, finish)
+		if finish < time.Duration(sec)*time.Second || finish >= time.Duration(sec+5)*time.Second {
+			t.Fatalf("%v not in range %v", finish, sec)
+		}
 	}
 }
 
