@@ -35,7 +35,7 @@ import (
 
 var (
 	inputPackages        = flag.StringP("input-packages", "i" /*"k8s.io/kubernetes/pkg/api,k8s.io/kubernetes/pkg/apis/extensions"*/, "", "comma-separated list of directories to get input types from.")
-	packages             = flag.StringP("packages", "p", "-k8s.io/kubernetes/pkg/util/intstr,-k8s.io/kubernetes/pkg/runtime,k8s.io/kubernetes/pkg/api/unversioned,k8s.io/kubernetes/pkg/api/v1,k8s.io/kubernetes/pkg/apis/extensions/v1beta1", "comma-separated list of directories to get input types from.")
+	packages             = flag.StringP("packages", "p", "-k8s.io/kubernetes/pkg/util/intstr,-k8s.io/kubernetes/pkg/api/resource,-k8s.io/kubernetes/pkg/runtime,k8s.io/kubernetes/pkg/api/unversioned,k8s.io/kubernetes/pkg/api/v1,k8s.io/kubernetes/pkg/apis/extensions/v1beta1", "comma-separated list of directories to get input types from.")
 	outputBase           = flag.StringP("output-base", "o", filepath.Join(os.Getenv("GOPATH"), "src"), "Output base; defaults to $GOPATH/src/")
 	protoImport          = flag.String("proto-import", os.Getenv("PROTO_PATH"), "The search path for the core protobuf .protos, required.")
 	onlyIDL              = flag.Bool("only-idl", false, "If true, only generate the IDL for each package.")
@@ -127,15 +127,26 @@ func main() {
 		path := filepath.Join(*outputBase, p.ImportPath())
 		outputPath := filepath.Join(*outputBase, p.OutputPath())
 		cmd := exec.Command("protoc", append(args, path)...)
-		log.Printf("Running: %q", cmd.Args)
 		out, err := cmd.CombinedOutput()
-		log.Printf(string(out))
+		if len(out) > 0 {
+			log.Printf(string(out))
+		}
 		if err != nil {
-			log.Fatalf("Unable to generate protoc: %v", err)
+			log.Println(strings.Join(cmd.Args, " "))
+			log.Fatalf("Unable to generate protoc on %s: %v", p.PackageName, err)
 		}
 		if !*skipGeneratedRewrite {
 			if err := RewriteGeneratedGogoProtobufFile(outputPath, p.GoPackageName(), p.HasGoType); err != nil {
 				log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
+			}
+			cmd := exec.Command("goimports", "-w", outputPath)
+			out, err := cmd.CombinedOutput()
+			if len(out) > 0 {
+				log.Printf(string(out))
+			}
+			if err != nil {
+				log.Println(strings.Join(cmd.Args, " "))
+				log.Fatalf("Unable to rewrite imports for %s: %v", p.PackageName, err)
 			}
 		}
 	}

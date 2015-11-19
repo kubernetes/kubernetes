@@ -105,7 +105,7 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 		return false
 	default:
 		// Uncomment this if types aren't showing up
-		// log.Printf("type is not protable: %s", t.Name)
+		log.Printf("type is not protable: %s", t.Name)
 		return false
 	}
 }
@@ -209,20 +209,13 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) {
 	if isPrivateGoName(b.t.Name.Name) {
 		return
 	}
-	fields, err := membersToFields(b.locator, b.t, b.localPackage)
-	if err != nil {
-		sw.Do(fmt.Sprintf("// ERROR: type $.Name$ cannot be converted to protobuf: %v\n", err), b.t)
-		return
-	}
-	out := sw.Out()
-	genComment(out, b.t.CommentLines, "")
-	sw.Do(`message $.Name.Name$ {
-`, b.t)
 
+	var fields []protoField
 	options := []string{}
 	allOptions := types.ExtractCommentTags("+", b.t.CommentLines)
 	for k, v := range allOptions {
-		if strings.HasPrefix(k, "genprotoidl.options.") {
+		switch {
+		case strings.HasPrefix(k, "genprotoidl.options."):
 			key := strings.TrimPrefix(k, "genprotoidl.options.")
 			switch key {
 			case "marshal":
@@ -236,8 +229,37 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) {
 			default:
 				options = append(options, fmt.Sprintf("%s = %s", key, v))
 			}
+		case k == "genprotoidl.embed":
+			fields = []protoField{
+				{
+					Tag:  1,
+					Name: v,
+					Type: &types.Type{
+						Name: types.Name{
+							Name:    v,
+							Package: b.localPackage.Package,
+							Path:    b.localPackage.Path,
+						},
+					},
+				},
+			}
 		}
 	}
+
+	if fields == nil {
+		memberFields, err := membersToFields(b.locator, b.t, b.localPackage)
+		if err != nil {
+			sw.Do(fmt.Sprintf("// ERROR: type $.Name$ cannot be converted to protobuf: %v\n", err), b.t)
+			return
+		}
+		fields = memberFields
+	}
+
+	out := sw.Out()
+	genComment(out, b.t.CommentLines, "")
+	sw.Do(`message $.Name.Name$ {
+`, b.t)
+
 	if len(options) > 0 {
 		sort.Sort(sort.StringSlice(options))
 		for _, s := range options {
@@ -326,6 +348,8 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 			return &types.Type{Name: types.Name{Name: "double"}, Kind: typesKindProtobuf}, true
 		case "float32":
 			return &types.Type{Name: types.Name{Name: "float"}, Kind: typesKindProtobuf}, true
+		case "uintptr":
+			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: typesKindProtobuf}, true
 		}
 		// TODO: complex?
 	}
@@ -357,6 +381,12 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 			Key:  keyField.Type,
 			Kind: types.Map,
 		}
+		if !strings.HasPrefix(t.Name.Name, "map[") {
+			field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
+		}
+		if _, ok := keyField.Extras["(gogoproto.casttype)"]; ok {
+			log.Printf("%s had key with cast type: %#v", t.Name, field)
+		}
 		field.Map = true
 	case types.Pointer:
 		if err := memberTypeToProtobufField(locator, field, t.Elem); err != nil {
@@ -365,9 +395,16 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		field.Nullable = true
 	case types.Alias:
 		if err := memberTypeToProtobufField(locator, field, t.Underlying); err != nil {
+			log.Printf("failed to alias: %s %s: err", t.Name, t.Underlying.Name, err)
 			return err
 		}
+		if field.Extras == nil {
+			field.Extras = make(map[string]string)
+		}
 		field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
+		if t.Underlying.Kind == types.Map {
+			log.Printf("alias to map: %s %s", t.Name, t.Underlying.Name)
+		}
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
 			field.Type = &types.Type{Name: types.Name{Name: "bytes"}, Kind: typesKindProtobuf}

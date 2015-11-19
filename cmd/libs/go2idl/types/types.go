@@ -283,6 +283,10 @@ var (
 		Name: Name{Name: "uint"},
 		Kind: Builtin,
 	}
+	Uintptr = &Type{
+		Name: Name{Name: "uintptr"},
+		Kind: Builtin,
+	}
 	Float64 = &Type{
 		Name: Name{Name: "float64"},
 		Kind: Builtin,
@@ -318,6 +322,7 @@ var (
 			"uint32":  Uint32,
 			"uint16":  Uint16,
 			"uint8":   Byte,
+			"uintptr": Uintptr,
 			"byte":    Byte,
 			"float":   Float,
 			"float64": Float64,
