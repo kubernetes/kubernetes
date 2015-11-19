@@ -275,10 +275,10 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) {
 		case field.Map:
 		case field.Repeated:
 			fmt.Fprintf(out, "repeated ")
-		case field.Optional:
-			fmt.Fprintf(out, "optional ")
-		default:
+		case field.Required:
 			fmt.Fprintf(out, "required ")
+		default:
+			fmt.Fprintf(out, "optional ")
 		}
 		sw.Do(`$.Type|local$ $.Name$ = $.Tag$`, field)
 		if len(field.Extras) > 0 {
@@ -311,6 +311,7 @@ type protoField struct {
 	Map      bool
 	Repeated bool
 	Optional bool
+	Required bool
 	Nullable bool
 	Extras   map[string]string
 
@@ -384,9 +385,6 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		if !strings.HasPrefix(t.Name.Name, "map[") {
 			field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
 		}
-		if _, ok := keyField.Extras["(gogoproto.casttype)"]; ok {
-			log.Printf("%s had key with cast type: %#v", t.Name, field)
-		}
 		field.Map = true
 	case types.Pointer:
 		if err := memberTypeToProtobufField(locator, field, t.Elem); err != nil {
@@ -402,9 +400,6 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 			field.Extras = make(map[string]string)
 		}
 		field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
-		if t.Underlying.Kind == types.Map {
-			log.Printf("alias to map: %s %s", t.Name, t.Underlying.Name)
-		}
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
 			field.Type = &types.Type{Name: types.Name{Name: "bytes"}, Kind: typesKindProtobuf}
