@@ -43,6 +43,7 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
@@ -139,16 +140,19 @@ func NewServer(opt ...ServerOption) *Server {
 // server. Called from the IDL generated code. This must be called before
 // invoking Serve.
 func (s *Server) RegisterService(sd *ServiceDesc, ss interface{}) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// Does some sanity checks.
-	if _, ok := s.m[sd.ServiceName]; ok {
-		grpclog.Fatalf("grpc: Server.RegisterService found duplicate service registration for %q", sd.ServiceName)
-	}
 	ht := reflect.TypeOf(sd.HandlerType).Elem()
 	st := reflect.TypeOf(ss)
 	if !st.Implements(ht) {
 		grpclog.Fatalf("grpc: Server.RegisterService found the handler of type %v that does not satisfy %v", st, ht)
+	}
+	s.register(sd, ss)
+}
+
+func (s *Server) register(sd *ServiceDesc, ss interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.m[sd.ServiceName]; ok {
+		grpclog.Fatalf("grpc: Server.RegisterService found duplicate service registration for %q", sd.ServiceName)
 	}
 	srv := &service{
 		server: ss,
@@ -195,8 +199,9 @@ func (s *Server) Serve(lis net.Listener) error {
 		if err != nil {
 			return err
 		}
+		var authInfo credentials.AuthInfo
 		if creds, ok := s.opts.creds.(credentials.TransportAuthenticator); ok {
-			c, err = creds.ServerHandshake(c)
+			c, authInfo, err = creds.ServerHandshake(c)
 			if err != nil {
 				grpclog.Println("grpc: Server.Serve failed to complete security handshake.")
 				continue
@@ -208,7 +213,7 @@ func (s *Server) Serve(lis net.Listener) error {
 			c.Close()
 			return nil
 		}
-		st, err := transport.NewServerTransport("http2", c, s.opts.maxConcurrentStreams)
+		st, err := transport.NewServerTransport("http2", c, s.opts.maxConcurrentStreams, authInfo)
 		if err != nil {
 			s.mu.Unlock()
 			c.Close()
@@ -244,13 +249,26 @@ func (s *Server) sendResponse(t transport.ServerTransport, stream *transport.Str
 	return t.Write(stream, p, opts)
 }
 
-func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.Stream, srv *service, md *MethodDesc) {
+func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.Stream, srv *service, md *MethodDesc) (err error) {
+	var traceInfo traceInfo
+	if EnableTracing {
+		traceInfo.tr = trace.New("grpc.Recv."+methodFamily(stream.Method()), stream.Method())
+		defer traceInfo.tr.Finish()
+		traceInfo.firstLine.client = false
+		traceInfo.tr.LazyLog(&traceInfo.firstLine, false)
+		defer func() {
+			if err != nil && err != io.EOF {
+				traceInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
+				traceInfo.tr.SetError()
+			}
+		}()
+	}
 	p := &parser{s: stream}
 	for {
 		pf, req, err := p.recvMsg()
 		if err == io.EOF {
 			// The entire stream is done (for unary RPC only).
-			return
+			return err
 		}
 		if err != nil {
 			switch err := err.(type) {
@@ -263,7 +281,10 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 			default:
 				panic(fmt.Sprintf("grpc: Unexpected error (%T) from recvMsg: %v", err, err))
 			}
-			return
+			return err
+		}
+		if traceInfo.tr != nil {
+			traceInfo.tr.LazyLog(&payload{sent: false, msg: req}, true)
 		}
 		switch pf {
 		case compressionNone:
@@ -280,38 +301,59 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 				}
 				if err := t.WriteStatus(stream, statusCode, statusDesc); err != nil {
 					grpclog.Printf("grpc: Server.processUnaryRPC failed to write status: %v", err)
+					return err
 				}
-				return
+				return nil
 			}
 			opts := &transport.Options{
 				Last:  true,
 				Delay: false,
 			}
 			if err := s.sendResponse(t, stream, reply, compressionNone, opts); err != nil {
-				if _, ok := err.(transport.ConnectionError); ok {
-					return
-				}
-				if e, ok := err.(transport.StreamError); ok {
-					statusCode = e.Code
-					statusDesc = e.Desc
-				} else {
+				switch err := err.(type) {
+				case transport.ConnectionError:
+					// Nothing to do here.
+				case transport.StreamError:
+					statusCode = err.Code
+					statusDesc = err.Desc
+				default:
 					statusCode = codes.Unknown
 					statusDesc = err.Error()
 				}
+				return err
 			}
-			t.WriteStatus(stream, statusCode, statusDesc)
+			if traceInfo.tr != nil {
+				traceInfo.tr.LazyLog(&payload{sent: true, msg: reply}, true)
+			}
+			return t.WriteStatus(stream, statusCode, statusDesc)
 		default:
 			panic(fmt.Sprintf("payload format to be supported: %d", pf))
 		}
 	}
 }
 
-func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transport.Stream, srv *service, sd *StreamDesc) {
+func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transport.Stream, srv *service, sd *StreamDesc) (err error) {
 	ss := &serverStream{
-		t:     t,
-		s:     stream,
-		p:     &parser{s: stream},
-		codec: s.opts.codec,
+		t:       t,
+		s:       stream,
+		p:       &parser{s: stream},
+		codec:   s.opts.codec,
+		tracing: EnableTracing,
+	}
+	if ss.tracing {
+		ss.traceInfo.tr = trace.New("grpc.Recv."+methodFamily(stream.Method()), stream.Method())
+		ss.traceInfo.firstLine.client = false
+		ss.traceInfo.tr.LazyLog(&ss.traceInfo.firstLine, false)
+		defer func() {
+			ss.mu.Lock()
+			if err != nil && err != io.EOF {
+				ss.traceInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
+				ss.traceInfo.tr.SetError()
+			}
+			ss.traceInfo.tr.Finish()
+			ss.traceInfo.tr = nil
+			ss.mu.Unlock()
+		}()
 	}
 	if appErr := sd.Handler(srv.server, ss); appErr != nil {
 		if err, ok := appErr.(rpcError); ok {
@@ -322,7 +364,8 @@ func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transp
 			ss.statusDesc = appErr.Error()
 		}
 	}
-	t.WriteStatus(ss.s, ss.statusCode, ss.statusDesc)
+	return t.WriteStatus(ss.s, ss.statusCode, ss.statusDesc)
+
 }
 
 func (s *Server) handleStream(t transport.ServerTransport, stream *transport.Stream) {

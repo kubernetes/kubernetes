@@ -61,8 +61,8 @@ func (windowUpdate) isItem() bool {
 }
 
 type settings struct {
-	ack     bool
-	setting []http2.Setting
+	ack bool
+	ss  []http2.Setting
 }
 
 func (settings) isItem() bool {
@@ -104,8 +104,14 @@ type quotaPool struct {
 
 // newQuotaPool creates a quotaPool which has quota q available to consume.
 func newQuotaPool(q int) *quotaPool {
-	qb := &quotaPool{c: make(chan int, 1)}
-	qb.c <- q
+	qb := &quotaPool{
+		c: make(chan int, 1),
+	}
+	if q > 0 {
+		qb.c <- q
+	} else {
+		qb.quota = q
+	}
 	return qb
 }
 

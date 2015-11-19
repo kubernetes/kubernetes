@@ -301,6 +301,11 @@
 			"Rev": "fa94270d4bac0d8ae5dc6b71894e251aada93f74"
 		},
 		{
+			"ImportPath": "github.com/coreos/rkt/api/v1alpha",
+			"Comment": "v0.11.0-22-g71d7331",
+			"Rev": "71d7331e46f20aaa41bed05e861bfeca92249968"
+		},
+		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
 			"Comment": "v1.0.4",
 			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
@@ -748,6 +753,14 @@
 			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
 		},
 		{
+			"ImportPath": "golang.org/x/net/internal/timeseries",
+			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
+		},
+		{
+			"ImportPath": "golang.org/x/net/trace",
+			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
+		},
+		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
 		},
@@ -789,7 +802,7 @@
 		},
 		{
 			"ImportPath": "google.golang.org/grpc",
-			"Rev": "f5ebd86be717593ab029545492c93ddf8914832b"
+			"Rev": "4bd040ce23a624ff9a1d07b0e729ee189bddd51c"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
