@@ -93,7 +93,7 @@ function main() {
   local -r release_umask=${release_umask:-022}
   umask "${release_umask}"
 
-  local -r github="git@github.com:kubernetes/kubernetes.git"
+  local -r github="https://github.com/kubernetes/kubernetes.git"
   declare -r DIR=$(mktemp -d "/tmp/kubernetes-${release_type}-release-${new_version}-XXXXXXX")
 
   # Start a tmp file that will hold instructions for the user.
@@ -148,8 +148,8 @@ EOM
     git-push ${release_branch}
   elif [[ "${release_type}" == 'official' ]]; then
     local -r release_branch="release-${version_major}.${version_minor}"
-    local -r beta_version="v${version_major}.${version_minor}.$((${version_patch}+1))-beta"
-    local -r ancestor="${new_version}-beta"
+    local -r beta_version="v${version_major}.${version_minor}.$((${version_patch}+1))-beta.0"
+    local -r ancestor="${new_version}-beta.0"
 
     git checkout "${release_branch}"
     verify-at-git-commit "${git_commit}"
@@ -162,7 +162,7 @@ EOM
   else # [[ "${release_type}" == 'series' ]]
     local -r release_branch="release-${version_major}.${version_minor}"
     local -r alpha_version="v${version_major}.$((${version_minor}+1)).0-alpha.0"
-    local -r beta_version="v${version_major}.${version_minor}.0-beta"
+    local -r beta_version="v${version_major}.${version_minor}.0-beta.0"
     # NOTE: We check the second alpha version, ...-alpha.1, because ...-alpha.0
     # is the branch point for the previous release cycle, so could provide a
     # false positive if we accidentally try to release off of the old release
