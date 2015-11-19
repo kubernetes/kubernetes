@@ -88,7 +88,7 @@ It can be configured to give services externally-reachable urls, load balance tr
 ## Prerequisites
 
 Before you start using the Ingress resource, there are a few things you should understand:
-* The Ingress resource is not available in any Kubernetes release prior to 1.1
+* The Ingress is a beta resource, not available in any Kubernetes release prior to 1.1.
 * You need an Ingress controller to satisfy an Ingress. Simply creating the resource will have no effect.
 * On GCE/GKE there should be a [L7 cluster addon](../../cluster/addons/cluster-loadbalancing/glbc/README.md#prerequisites), on other platforms you either need to write your own or [deploy an existing controller](https://github.com/kubernetes/contrib/tree/master/Ingress) as a pod.
 * The resource currently does not support HTTPS, but will do so before it leaves beta.
