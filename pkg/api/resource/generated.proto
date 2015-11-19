@@ -100,7 +100,7 @@ message Quantity {
   option (gogoproto.sizer) = false;
   option (gogoproto.unmarshaler) = false;
 
-  required QuantityProto QuantityProto = 1;
+  optional QuantityProto QuantityProto = 1;
 }
 
 // QuantityProto is a struct that is equivalent to Quantity, but intended for
@@ -110,12 +110,12 @@ message Quantity {
 // +genprotoidl=true
 message QuantityProto {
   // The format of the quantity
-  required string format = 1 [(gogoproto.casttype) = "Format", (gogoproto.nullable) = false, (gogoproto.customname) = "Format"];
+  optional string format = 1 [(gogoproto.casttype) = "Format", (gogoproto.nullable) = false, (gogoproto.customname) = "Format"];
 
   // The scale dimension of the value
-  required int32 scale = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Scale"];
+  optional int32 scale = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Scale"];
 
   // Bigint is serialized as a raw bytes array
-  required bytes bigint = 3 [(gogoproto.customname) = "Bigint"];
+  optional bytes bigint = 3 [(gogoproto.customname) = "Bigint"];
 }
 

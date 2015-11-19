@@ -60,15 +60,14 @@ package v1beta1
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 import k8s_io_kubernetes_pkg_util_intstr "k8s.io/kubernetes/pkg/util/intstr"
 
 // discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto"
 // discarding unused import k8s_io_kubernetes_pkg_api_resource "k8s.io/kubernetes/pkg/api/resource"
+import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 
 import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
-import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
 
 import io "io"
 
@@ -494,9 +493,7 @@ func (m *DaemonSetSpec) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Selector == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("selector")
-	} else {
+	if m.Selector != nil {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Selector.Size()))
@@ -506,9 +503,7 @@ func (m *DaemonSetSpec) MarshalTo(data []byte) (int, error) {
 		}
 		i += n12
 	}
-	if m.Template == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("template")
-	} else {
+	if m.Template != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
@@ -659,9 +654,7 @@ func (m *DeploymentSpec) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Replicas == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("replicas")
-	} else {
+	if m.Replicas != nil {
 		data[i] = 0x8
 		i++
 		i = encodeVarintGenerated(data, i, uint64(*m.Replicas))
@@ -704,9 +697,7 @@ func (m *DeploymentSpec) MarshalTo(data []byte) (int, error) {
 		return 0, err
 	}
 	i += n21
-	if m.UniqueLabelKey == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("uniqueLabelKey")
-	} else {
+	if m.UniqueLabelKey != nil {
 		data[i] = 0x2a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(len(*m.UniqueLabelKey)))
@@ -758,9 +749,7 @@ func (m *DeploymentStrategy) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.Type)))
 	i += copy(data[i:], m.Type)
-	if m.RollingUpdate == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("rollingUpdate")
-	} else {
+	if m.RollingUpdate != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.RollingUpdate.Size()))
@@ -952,9 +941,7 @@ func (m *HorizontalPodAutoscalerSpec) MarshalTo(data []byte) (int, error) {
 		return 0, err
 	}
 	i += n30
-	if m.MinReplicas == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("minReplicas")
-	} else {
+	if m.MinReplicas != nil {
 		data[i] = 0x10
 		i++
 		i = encodeVarintGenerated(data, i, uint64(*m.MinReplicas))
@@ -962,9 +949,7 @@ func (m *HorizontalPodAutoscalerSpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x18
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.MaxReplicas))
-	if m.CPUUtilization == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("cpuUtilization")
-	} else {
+	if m.CPUUtilization != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.CPUUtilization.Size()))
@@ -992,16 +977,12 @@ func (m *HorizontalPodAutoscalerStatus) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.ObservedGeneration == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("observedGeneration")
-	} else {
+	if m.ObservedGeneration != nil {
 		data[i] = 0x8
 		i++
 		i = encodeVarintGenerated(data, i, uint64(*m.ObservedGeneration))
 	}
-	if m.LastScaleTime == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("lastScaleTime")
-	} else {
+	if m.LastScaleTime != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.LastScaleTime.Size()))
@@ -1017,9 +998,7 @@ func (m *HorizontalPodAutoscalerStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x20
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.DesiredReplicas))
-	if m.CurrentCPUUtilizationPercentage == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("currentCPUUtilizationPercentage")
-	} else {
+	if m.CurrentCPUUtilizationPercentage != nil {
 		data[i] = 0x28
 		i++
 		i = encodeVarintGenerated(data, i, uint64(*m.CurrentCPUUtilizationPercentage))
@@ -1198,9 +1177,7 @@ func (m *IngressRuleValue) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.HTTP == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("http")
-	} else {
+	if m.HTTP != nil {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.HTTP.Size()))
@@ -1228,9 +1205,7 @@ func (m *IngressSpec) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Backend == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("backend")
-	} else {
+	if m.Backend != nil {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Backend.Size()))
@@ -1442,23 +1417,17 @@ func (m *JobSpec) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Parallelism == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("parallelism")
-	} else {
+	if m.Parallelism != nil {
 		data[i] = 0x8
 		i++
 		i = encodeVarintGenerated(data, i, uint64(*m.Parallelism))
 	}
-	if m.Completions == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("completions")
-	} else {
+	if m.Completions != nil {
 		data[i] = 0x10
 		i++
 		i = encodeVarintGenerated(data, i, uint64(*m.Completions))
 	}
-	if m.Selector == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("selector")
-	} else {
+	if m.Selector != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Selector.Size()))
@@ -1506,9 +1475,7 @@ func (m *JobStatus) MarshalTo(data []byte) (int, error) {
 			i += n
 		}
 	}
-	if m.StartTime == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("startTime")
-	} else {
+	if m.StartTime != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.StartTime.Size()))
@@ -1518,9 +1485,7 @@ func (m *JobStatus) MarshalTo(data []byte) (int, error) {
 		}
 		i += n54
 	}
-	if m.CompletionTime == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("completionTime")
-	} else {
+	if m.CompletionTime != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.CompletionTime.Size()))
@@ -1701,9 +1666,7 @@ func (m *RollingUpdateDeployment) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.MaxUnavailable == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("maxUnavailable")
-	} else {
+	if m.MaxUnavailable != nil {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.MaxUnavailable.Size()))
@@ -1713,9 +1676,7 @@ func (m *RollingUpdateDeployment) MarshalTo(data []byte) (int, error) {
 		}
 		i += n57
 	}
-	if m.MaxSurge == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("maxSurge")
-	} else {
+	if m.MaxSurge != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.MaxSurge.Size()))
@@ -1960,9 +1921,7 @@ func (m *ThirdPartyResourceData) MarshalTo(data []byte) (int, error) {
 		return 0, err
 	}
 	i += n66
-	if m.Data == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
-	} else {
+	if m.Data != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(len(m.Data)))
@@ -2732,7 +2691,6 @@ func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
 func (m *APIVersion) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2790,7 +2748,6 @@ func (m *APIVersion) Unmarshal(data []byte) error {
 			}
 			m.Name = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field APIGroup", wireType)
@@ -2820,7 +2777,6 @@ func (m *APIVersion) Unmarshal(data []byte) error {
 			}
 			m.APIGroup = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -2836,12 +2792,6 @@ func (m *APIVersion) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("apiGroup")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -2849,7 +2799,6 @@ func (m *APIVersion) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *CPUTargetUtilization) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2897,7 +2846,6 @@ func (m *CPUTargetUtilization) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000001)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -2913,9 +2861,6 @@ func (m *CPUTargetUtilization) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("targetPercentage")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -2923,7 +2868,6 @@ func (m *CPUTargetUtilization) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2982,7 +2926,6 @@ func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -3013,7 +2956,6 @@ func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -3044,7 +2986,6 @@ func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -3060,15 +3001,6 @@ func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3076,7 +3008,6 @@ func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ClusterAutoscalerList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3135,7 +3066,6 @@ func (m *ClusterAutoscalerList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -3166,7 +3096,6 @@ func (m *ClusterAutoscalerList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -3213,12 +3142,6 @@ func (m *ClusterAutoscalerList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3226,7 +3149,6 @@ func (m *ClusterAutoscalerList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ClusterAutoscalerSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3274,7 +3196,6 @@ func (m *ClusterAutoscalerSpec) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field MaxNodes", wireType)
@@ -3294,7 +3215,6 @@ func (m *ClusterAutoscalerSpec) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field TargetUtilization", wireType)
@@ -3341,12 +3261,6 @@ func (m *ClusterAutoscalerSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("minNodes")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("maxNodes")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3354,7 +3268,6 @@ func (m *ClusterAutoscalerSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DaemonSet) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3413,7 +3326,6 @@ func (m *DaemonSet) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -3444,7 +3356,6 @@ func (m *DaemonSet) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -3475,7 +3386,6 @@ func (m *DaemonSet) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -3506,7 +3416,6 @@ func (m *DaemonSet) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -3522,18 +3431,6 @@ func (m *DaemonSet) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3541,7 +3438,6 @@ func (m *DaemonSet) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DaemonSetList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3600,7 +3496,6 @@ func (m *DaemonSetList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -3631,7 +3526,6 @@ func (m *DaemonSetList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -3678,12 +3572,6 @@ func (m *DaemonSetList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3691,7 +3579,6 @@ func (m *DaemonSetList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DaemonSetSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3753,7 +3640,6 @@ func (m *DaemonSetSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Template", wireType)
@@ -3787,7 +3673,6 @@ func (m *DaemonSetSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -3803,12 +3688,6 @@ func (m *DaemonSetSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("selector")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("template")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3816,7 +3695,6 @@ func (m *DaemonSetSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DaemonSetStatus) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3864,7 +3742,6 @@ func (m *DaemonSetStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field NumberMisscheduled", wireType)
@@ -3884,7 +3761,6 @@ func (m *DaemonSetStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DesiredNumberScheduled", wireType)
@@ -3904,7 +3780,6 @@ func (m *DaemonSetStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000004)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -3920,15 +3795,6 @@ func (m *DaemonSetStatus) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("currentNumberScheduled")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("numberMisscheduled")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("desiredNumberScheduled")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -3936,7 +3802,6 @@ func (m *DaemonSetStatus) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *Deployment) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3995,7 +3860,6 @@ func (m *Deployment) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -4026,7 +3890,6 @@ func (m *Deployment) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -4057,7 +3920,6 @@ func (m *Deployment) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -4088,7 +3950,6 @@ func (m *Deployment) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -4104,18 +3965,6 @@ func (m *Deployment) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -4123,7 +3972,6 @@ func (m *Deployment) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DeploymentList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4182,7 +4030,6 @@ func (m *DeploymentList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -4213,7 +4060,6 @@ func (m *DeploymentList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -4260,12 +4106,6 @@ func (m *DeploymentList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -4273,7 +4113,6 @@ func (m *DeploymentList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DeploymentSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4322,7 +4161,6 @@ func (m *DeploymentSpec) Unmarshal(data []byte) error {
 				}
 			}
 			m.Replicas = &v
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
@@ -4464,7 +4302,6 @@ func (m *DeploymentSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Strategy", wireType)
@@ -4495,7 +4332,6 @@ func (m *DeploymentSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field UniqueLabelKey", wireType)
@@ -4526,7 +4362,6 @@ func (m *DeploymentSpec) Unmarshal(data []byte) error {
 			s := string(data[iNdEx:postIndex])
 			m.UniqueLabelKey = &s
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -4542,18 +4377,6 @@ func (m *DeploymentSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("replicas")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("template")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("strategy")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("uniqueLabelKey")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -4561,7 +4384,6 @@ func (m *DeploymentSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DeploymentStatus) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4609,7 +4431,6 @@ func (m *DeploymentStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedReplicas", wireType)
@@ -4629,7 +4450,6 @@ func (m *DeploymentStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -4645,12 +4465,6 @@ func (m *DeploymentStatus) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("replicas")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("updatedReplicas")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -4658,7 +4472,6 @@ func (m *DeploymentStatus) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *DeploymentStrategy) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4716,7 +4529,6 @@ func (m *DeploymentStrategy) Unmarshal(data []byte) error {
 			}
 			m.Type = DeploymentStrategyType(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RollingUpdate", wireType)
@@ -4750,7 +4562,6 @@ func (m *DeploymentStrategy) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -4766,12 +4577,6 @@ func (m *DeploymentStrategy) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("rollingUpdate")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -4779,7 +4584,6 @@ func (m *DeploymentStrategy) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *HTTPIngressPath) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4837,7 +4641,6 @@ func (m *HTTPIngressPath) Unmarshal(data []byte) error {
 			}
 			m.Path = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Backend", wireType)
@@ -4868,7 +4671,6 @@ func (m *HTTPIngressPath) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -4883,12 +4685,6 @@ func (m *HTTPIngressPath) Unmarshal(data []byte) error {
 			}
 			iNdEx += skippy
 		}
-	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("path")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("backend")
 	}
 
 	if iNdEx > l {
@@ -4978,7 +4774,6 @@ func (m *HTTPIngressRuleValue) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5037,7 +4832,6 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -5068,7 +4862,6 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -5099,7 +4892,6 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -5130,7 +4922,6 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -5146,18 +4937,6 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -5165,7 +4944,6 @@ func (m *HorizontalPodAutoscaler) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5224,7 +5002,6 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -5255,7 +5032,6 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -5302,12 +5078,6 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -5315,7 +5085,6 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5374,7 +5143,6 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field MinReplicas", wireType)
@@ -5395,7 +5163,6 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				}
 			}
 			m.MinReplicas = &v
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field MaxReplicas", wireType)
@@ -5415,7 +5182,6 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CPUUtilization", wireType)
@@ -5449,7 +5215,6 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -5465,18 +5230,6 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("scaleRef")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("minReplicas")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("maxReplicas")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("cpuUtilization")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -5484,7 +5237,6 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5533,7 +5285,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				}
 			}
 			m.ObservedGeneration = &v
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastScaleTime", wireType)
@@ -5567,7 +5318,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CurrentReplicas", wireType)
@@ -5587,7 +5337,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DesiredReplicas", wireType)
@@ -5607,7 +5356,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000008)
 		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CurrentCPUUtilizationPercentage", wireType)
@@ -5628,7 +5376,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				}
 			}
 			m.CurrentCPUUtilizationPercentage = &v
-			hasFields[0] |= uint64(0x00000010)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -5644,21 +5391,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("observedGeneration")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("lastScaleTime")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("currentReplicas")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("desiredReplicas")
-	}
-	if hasFields[0]&uint64(0x00000010) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("currentCPUUtilizationPercentage")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -5666,7 +5398,6 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *Ingress) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5725,7 +5456,6 @@ func (m *Ingress) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -5756,7 +5486,6 @@ func (m *Ingress) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -5787,7 +5516,6 @@ func (m *Ingress) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -5818,7 +5546,6 @@ func (m *Ingress) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -5834,18 +5561,6 @@ func (m *Ingress) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -5853,7 +5568,6 @@ func (m *Ingress) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *IngressBackend) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5911,7 +5625,6 @@ func (m *IngressBackend) Unmarshal(data []byte) error {
 			}
 			m.ServiceName = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ServicePort", wireType)
@@ -5942,7 +5655,6 @@ func (m *IngressBackend) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -5958,12 +5670,6 @@ func (m *IngressBackend) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("serviceName")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("servicePort")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -5971,7 +5677,6 @@ func (m *IngressBackend) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *IngressList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6030,7 +5735,6 @@ func (m *IngressList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -6061,7 +5765,6 @@ func (m *IngressList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -6108,12 +5811,6 @@ func (m *IngressList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6121,7 +5818,6 @@ func (m *IngressList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *IngressRule) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6179,7 +5875,6 @@ func (m *IngressRule) Unmarshal(data []byte) error {
 			}
 			m.Host = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field IngressRuleValue", wireType)
@@ -6210,7 +5905,6 @@ func (m *IngressRule) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -6226,12 +5920,6 @@ func (m *IngressRule) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("host")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("ingressRuleValue")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6239,7 +5927,6 @@ func (m *IngressRule) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *IngressRuleValue) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6301,7 +5988,6 @@ func (m *IngressRuleValue) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -6317,9 +6003,6 @@ func (m *IngressRuleValue) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("http")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6327,7 +6010,6 @@ func (m *IngressRuleValue) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *IngressSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6389,7 +6071,6 @@ func (m *IngressSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Rules", wireType)
@@ -6436,9 +6117,6 @@ func (m *IngressSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("backend")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6446,7 +6124,6 @@ func (m *IngressSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *IngressStatus) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6505,7 +6182,6 @@ func (m *IngressStatus) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -6521,9 +6197,6 @@ func (m *IngressStatus) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("loadBalancer")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6531,7 +6204,6 @@ func (m *IngressStatus) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *Job) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6590,7 +6262,6 @@ func (m *Job) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -6621,7 +6292,6 @@ func (m *Job) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -6652,7 +6322,6 @@ func (m *Job) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -6683,7 +6352,6 @@ func (m *Job) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -6699,18 +6367,6 @@ func (m *Job) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6718,7 +6374,6 @@ func (m *Job) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *JobCondition) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6776,7 +6431,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 			}
 			m.Type = JobConditionType(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -6806,7 +6460,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 			}
 			m.Status = k8s_io_kubernetes_pkg_api_v1.ConditionStatus(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastProbeTime", wireType)
@@ -6837,7 +6490,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastTransitionTime", wireType)
@@ -6868,7 +6520,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
@@ -6898,7 +6549,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 			}
 			m.Reason = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000010)
 		case 6:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
@@ -6928,7 +6578,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 			}
 			m.Message = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000020)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -6944,24 +6593,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("type")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("lastProbeTime")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("lastTransitionTime")
-	}
-	if hasFields[0]&uint64(0x00000010) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("reason")
-	}
-	if hasFields[0]&uint64(0x00000020) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("message")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -6969,7 +6600,6 @@ func (m *JobCondition) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *JobList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7028,7 +6658,6 @@ func (m *JobList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -7059,7 +6688,6 @@ func (m *JobList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -7106,12 +6734,6 @@ func (m *JobList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -7119,7 +6741,6 @@ func (m *JobList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *JobSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7168,7 +6789,6 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 				}
 			}
 			m.Parallelism = &v
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Completions", wireType)
@@ -7189,7 +6809,6 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 				}
 			}
 			m.Completions = &v
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
@@ -7223,7 +6842,6 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Template", wireType)
@@ -7254,7 +6872,6 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -7270,18 +6887,6 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("parallelism")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("completions")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("selector")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("template")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -7289,7 +6894,6 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *JobStatus) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7382,7 +6986,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CompletionTime", wireType)
@@ -7416,7 +7019,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 4:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Active", wireType)
@@ -7436,7 +7038,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000004)
 		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Succeeded", wireType)
@@ -7456,7 +7057,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000008)
 		case 6:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Failed", wireType)
@@ -7476,7 +7076,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000010)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -7492,21 +7091,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("startTime")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("completionTime")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("active")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("succeeded")
-	}
-	if hasFields[0]&uint64(0x00000010) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("failed")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -7514,7 +7098,6 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *NodeUtilization) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7572,7 +7155,6 @@ func (m *NodeUtilization) Unmarshal(data []byte) error {
 			}
 			m.Resource = NodeResource(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 1 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Value", wireType)
@@ -7591,7 +7173,6 @@ func (m *NodeUtilization) Unmarshal(data []byte) error {
 			v |= uint64(data[iNdEx-2]) << 48
 			v |= uint64(data[iNdEx-1]) << 56
 			m.Value = float64(math.Float64frombits(v))
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -7606,12 +7187,6 @@ func (m *NodeUtilization) Unmarshal(data []byte) error {
 			}
 			iNdEx += skippy
 		}
-	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("resource")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("value")
 	}
 
 	if iNdEx > l {
@@ -7812,7 +7387,6 @@ func (m *PodSelector) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *PodSelectorRequirement) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7870,7 +7444,6 @@ func (m *PodSelectorRequirement) Unmarshal(data []byte) error {
 			}
 			m.Key = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Operator", wireType)
@@ -7900,7 +7473,6 @@ func (m *PodSelectorRequirement) Unmarshal(data []byte) error {
 			}
 			m.Operator = PodSelectorOperator(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Values", wireType)
@@ -7945,12 +7517,6 @@ func (m *PodSelectorRequirement) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("key")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("operator")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -7958,7 +7524,6 @@ func (m *PodSelectorRequirement) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ReplicationControllerDummy) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8017,7 +7582,6 @@ func (m *ReplicationControllerDummy) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -8033,9 +7597,6 @@ func (m *ReplicationControllerDummy) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -8043,7 +7604,6 @@ func (m *ReplicationControllerDummy) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *RollingUpdateDeployment) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8105,7 +7665,6 @@ func (m *RollingUpdateDeployment) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field MaxSurge", wireType)
@@ -8139,7 +7698,6 @@ func (m *RollingUpdateDeployment) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field MinReadySeconds", wireType)
@@ -8159,7 +7717,6 @@ func (m *RollingUpdateDeployment) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000004)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -8175,15 +7732,6 @@ func (m *RollingUpdateDeployment) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("maxUnavailable")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("maxSurge")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("minReadySeconds")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -8191,7 +7739,6 @@ func (m *RollingUpdateDeployment) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *Scale) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8250,7 +7797,6 @@ func (m *Scale) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -8281,7 +7827,6 @@ func (m *Scale) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
@@ -8312,7 +7857,6 @@ func (m *Scale) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -8343,7 +7887,6 @@ func (m *Scale) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -8359,18 +7902,6 @@ func (m *Scale) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("spec")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("status")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -8378,7 +7909,6 @@ func (m *Scale) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ScaleSpec) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8426,7 +7956,6 @@ func (m *ScaleSpec) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000001)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -8442,9 +7971,6 @@ func (m *ScaleSpec) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("replicas")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -8452,7 +7978,6 @@ func (m *ScaleSpec) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ScaleStatus) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8500,7 +8025,6 @@ func (m *ScaleStatus) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
@@ -8627,9 +8151,6 @@ func (m *ScaleStatus) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("replicas")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -8637,7 +8158,6 @@ func (m *ScaleStatus) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *SubresourceReference) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8695,7 +8215,6 @@ func (m *SubresourceReference) Unmarshal(data []byte) error {
 			}
 			m.Kind = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
@@ -8725,7 +8244,6 @@ func (m *SubresourceReference) Unmarshal(data []byte) error {
 			}
 			m.Name = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field APIVersion", wireType)
@@ -8755,7 +8273,6 @@ func (m *SubresourceReference) Unmarshal(data []byte) error {
 			}
 			m.APIVersion = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Subresource", wireType)
@@ -8785,7 +8302,6 @@ func (m *SubresourceReference) Unmarshal(data []byte) error {
 			}
 			m.Subresource = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -8801,18 +8317,6 @@ func (m *SubresourceReference) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("kind")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("apiVersion")
-	}
-	if hasFields[0]&uint64(0x00000008) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("subresource")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -8820,7 +8324,6 @@ func (m *SubresourceReference) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ThirdPartyResource) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8879,7 +8382,6 @@ func (m *ThirdPartyResource) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -8910,7 +8412,6 @@ func (m *ThirdPartyResource) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Description", wireType)
@@ -8940,7 +8441,6 @@ func (m *ThirdPartyResource) Unmarshal(data []byte) error {
 			}
 			m.Description = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Versions", wireType)
@@ -8987,15 +8487,6 @@ func (m *ThirdPartyResource) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("description")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -9003,7 +8494,6 @@ func (m *ThirdPartyResource) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ThirdPartyResourceData) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -9062,7 +8552,6 @@ func (m *ThirdPartyResourceData) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
@@ -9093,7 +8582,6 @@ func (m *ThirdPartyResourceData) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
@@ -9122,7 +8610,6 @@ func (m *ThirdPartyResourceData) Unmarshal(data []byte) error {
 			}
 			m.Data = append([]byte{}, data[iNdEx:postIndex]...)
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -9138,15 +8625,6 @@ func (m *ThirdPartyResourceData) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("name")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -9154,7 +8632,6 @@ func (m *ThirdPartyResourceData) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ThirdPartyResourceDataList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -9213,7 +8690,6 @@ func (m *ThirdPartyResourceDataList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -9244,7 +8720,6 @@ func (m *ThirdPartyResourceDataList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -9291,12 +8766,6 @@ func (m *ThirdPartyResourceDataList) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -9304,7 +8773,6 @@ func (m *ThirdPartyResourceDataList) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *ThirdPartyResourceList) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -9363,7 +8831,6 @@ func (m *ThirdPartyResourceList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
@@ -9394,7 +8861,6 @@ func (m *ThirdPartyResourceList) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
@@ -9440,12 +8906,6 @@ func (m *ThirdPartyResourceList) Unmarshal(data []byte) error {
 			}
 			iNdEx += skippy
 		}
-	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("metadata")
 	}
 
 	if iNdEx > l {

@@ -42,10 +42,10 @@ option go_package = "intstr";
 // 
 // +genprotoidl=true
 message IntOrString {
-  required int64 type = 1 [(gogoproto.casttype) = "Type", (gogoproto.nullable) = false, (gogoproto.customname) = "Type"];
+  optional int64 type = 1 [(gogoproto.casttype) = "Type", (gogoproto.nullable) = false, (gogoproto.customname) = "Type"];
 
-  required int32 intVal = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "IntVal"];
+  optional int32 intVal = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "IntVal"];
 
-  required string strVal = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "StrVal"];
+  optional string strVal = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "StrVal"];
 }
 

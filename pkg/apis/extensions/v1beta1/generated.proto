@@ -22,11 +22,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.extensions.v1beta1;
 
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
-import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
+import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
 option (gogoproto.marshaler_all) = true;
@@ -41,38 +41,38 @@ option go_package = "v1beta1";
 // An APIVersion represents a single concrete version of an object model.
 message APIVersion {
   // Name of this version (e.g. 'v1').
-  required string name = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Name"];
+  optional string name = 1 [(gogoproto.customname) = "Name", (gogoproto.nullable) = false];
 
   // The API group to add this object into, default 'experimental'.
-  required string apiGroup = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "APIGroup"];
+  optional string apiGroup = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "APIGroup"];
 }
 
 message CPUTargetUtilization {
   // fraction of the requested CPU that should be utilized/used,
   // e.g. 70 means that 70% of the requested CPU should be in use.
-  required int32 targetPercentage = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TargetPercentage"];
+  optional int32 targetPercentage = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TargetPercentage"];
 }
 
 message ClusterAutoscaler {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // For now (experimental api) it is required that the name is set to "ClusterAutoscaler" and namespace is "default".
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // Spec defines the desired behavior of this daemon set.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required ClusterAutoscalerSpec spec = 3 [(gogoproto.customname) = "Spec", (gogoproto.nullable) = false];
+  optional ClusterAutoscalerSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 }
 
 // There will be just one (or none) ClusterAutoscaler.
 message ClusterAutoscalerList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   repeated ClusterAutoscaler items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
 }
@@ -80,10 +80,10 @@ message ClusterAutoscalerList {
 // Configuration of the Cluster Autoscaler
 message ClusterAutoscalerSpec {
   // Minimum number of nodes that the cluster should have.
-  required int32 minNodes = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "MinNodes"];
+  optional int32 minNodes = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "MinNodes"];
 
   // Maximum number of nodes that the cluster should have.
-  required int32 maxNodes = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "MaxNodes"];
+  optional int32 maxNodes = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "MaxNodes"];
 
   // Target average utilization of the cluster nodes. New nodes will be added if one of the
   // targets is exceeded. Cluster size will be decreased if the current utilization is too low
@@ -93,31 +93,31 @@ message ClusterAutoscalerSpec {
 
 // DaemonSet represents the configuration of a daemon set.
 message DaemonSet {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // Spec defines the desired behavior of this daemon set.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required DaemonSetSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
+  optional DaemonSetSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 
   // Status is the current status of this daemon set. This data may be
   // out of date by some window of time.
   // Populated by the system.
   // Read-only.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required DaemonSetStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional DaemonSetStatus status = 4 [(gogoproto.customname) = "Status", (gogoproto.nullable) = false];
 }
 
 // DaemonSetList is a collection of daemon sets.
 message DaemonSetList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.customname) = "ListMeta", (gogoproto.nullable) = false];
 
   // Items is a list of daemon sets.
   repeated DaemonSet items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
@@ -129,14 +129,14 @@ message DaemonSetSpec {
   // Must match in order to be controlled.
   // If empty, defaulted to labels on Pod template.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-  required PodSelector selector = 1 [(gogoproto.customname) = "Selector"];
+  optional PodSelector selector = 1 [(gogoproto.customname) = "Selector"];
 
   // Template is the object that describes the pod that will be created.
   // The DaemonSet will create exactly one copy of this pod on every node
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
-  required k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2 [(gogoproto.customname) = "Template"];
+  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2 [(gogoproto.customname) = "Template"];
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -144,59 +144,59 @@ message DaemonSetStatus {
   // CurrentNumberScheduled is the number of nodes that are running at least 1
   // daemon pod and are supposed to run the daemon pod.
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
-  required int32 currentNumberScheduled = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "CurrentNumberScheduled"];
+  optional int32 currentNumberScheduled = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "CurrentNumberScheduled"];
 
   // NumberMisscheduled is the number of nodes that are running the daemon pod, but are
   // not supposed to run the daemon pod.
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
-  required int32 numberMisscheduled = 2 [(gogoproto.customname) = "NumberMisscheduled", (gogoproto.nullable) = false];
+  optional int32 numberMisscheduled = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "NumberMisscheduled"];
 
   // DesiredNumberScheduled is the total number of nodes that should be running the daemon
   // pod (including nodes correctly running the daemon pod).
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
-  required int32 desiredNumberScheduled = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "DesiredNumberScheduled"];
+  optional int32 desiredNumberScheduled = 3 [(gogoproto.customname) = "DesiredNumberScheduled", (gogoproto.nullable) = false];
 }
 
 // Deployment enables declarative updates for Pods and ReplicationControllers.
 message Deployment {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object metadata.
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // Specification of the desired behavior of the Deployment.
-  required DeploymentSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
+  optional DeploymentSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 
   // Most recently observed status of the Deployment.
-  required DeploymentStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional DeploymentStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
 }
 
 // DeploymentList is a list of Deployments.
 message DeploymentList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard list metadata.
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.customname) = "ListMeta", (gogoproto.nullable) = false];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   // Items is the list of Deployments.
-  repeated Deployment items = 3 [(gogoproto.customname) = "Items", (gogoproto.nullable) = false];
+  repeated Deployment items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
 }
 
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 message DeploymentSpec {
   // Number of desired pods. This is a pointer to distinguish between explicit
   // zero and not specified. Defaults to 1.
-  required int32 replicas = 1 [(gogoproto.customname) = "Replicas"];
+  optional int32 replicas = 1 [(gogoproto.customname) = "Replicas"];
 
   // Label selector for pods. Existing ReplicationControllers whose pods are
   // selected by this will be the ones affected by this deployment.
-  map<string, string> selector = 2 [(gogoproto.customname) = "Selector", (gogoproto.nullable) = false];
+  map<string, string> selector = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Selector"];
 
   // Template describes the pods that will be created.
-  required k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Template"];
+  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Template"];
 
   // The deployment strategy to use to replace existing pods with new ones.
-  required DeploymentStrategy strategy = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Strategy"];
+  optional DeploymentStrategy strategy = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Strategy"];
 
   // Key of the selector that is added to existing RCs (and label key that is
   // added to its pods) to prevent the existing RCs to select new pods (and old
@@ -206,29 +206,29 @@ message DeploymentSpec {
   // "deployment.kubernetes.io/podTemplateHash".
   // Value of this key is hash of DeploymentSpec.PodTemplateSpec.
   // No label is added if this is set to empty string.
-  required string uniqueLabelKey = 5 [(gogoproto.customname) = "UniqueLabelKey"];
+  optional string uniqueLabelKey = 5 [(gogoproto.customname) = "UniqueLabelKey"];
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.
 message DeploymentStatus {
   // Total number of non-terminated pods targeted by this deployment (their labels match the selector).
-  required int32 replicas = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Replicas"];
+  optional int32 replicas = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Replicas"];
 
   // Total number of non-terminated pods targeted by this deployment that have the desired template spec.
-  required int32 updatedReplicas = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "UpdatedReplicas"];
+  optional int32 updatedReplicas = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "UpdatedReplicas"];
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
 message DeploymentStrategy {
   // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
-  required string type = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Type", (gogoproto.casttype) = "DeploymentStrategyType"];
+  optional string type = 1 [(gogoproto.casttype) = "DeploymentStrategyType", (gogoproto.nullable) = false, (gogoproto.customname) = "Type"];
 
   // Rolling update config params. Present only if DeploymentStrategyType =
   // RollingUpdate.
   // ---
   // TODO: Update this to follow our convention for oneOf, whatever we decide it
   // to be.
-  required RollingUpdateDeployment rollingUpdate = 2 [(gogoproto.customname) = "RollingUpdate"];
+  optional RollingUpdateDeployment rollingUpdate = 2 [(gogoproto.customname) = "RollingUpdate"];
 }
 
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
@@ -241,11 +241,11 @@ message HTTPIngressPath {
   // part of a URL as defined by RFC 3986. Paths must begin with
   // a '/'. If unspecified, the path defaults to a catch all sending
   // traffic to the backend.
-  required string path = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Path"];
+  optional string path = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Path"];
 
   // Backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
-  required IngressBackend backend = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Backend"];
+  optional IngressBackend backend = 2 [(gogoproto.customname) = "Backend", (gogoproto.nullable) = false];
 }
 
 // HTTPIngressRuleValue is a list of http selectors pointing to backends.
@@ -260,24 +260,24 @@ message HTTPIngressRuleValue {
 
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
-  required HorizontalPodAutoscalerSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
+  optional HorizontalPodAutoscalerSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 
   // current information about the autoscaler.
-  required HorizontalPodAutoscalerStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional HorizontalPodAutoscalerStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
 }
 
 // list of horizontal pod autoscaler objects.
 message HorizontalPodAutoscalerList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.customname) = "TypeMeta", (gogoproto.nullable) = false];
 
   // Standard list metadata.
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   // list of horizontal pod autoscaler objects.
   repeated HorizontalPodAutoscaler items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
@@ -287,37 +287,37 @@ message HorizontalPodAutoscalerList {
 message HorizontalPodAutoscalerSpec {
   // reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status,
   // and will set the desired number of pods by modifying its spec.
-  required SubresourceReference scaleRef = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ScaleRef"];
+  optional SubresourceReference scaleRef = 1 [(gogoproto.customname) = "ScaleRef", (gogoproto.nullable) = false];
 
   // lower limit for the number of pods that can be set by the autoscaler, default 1.
-  required int32 minReplicas = 2 [(gogoproto.customname) = "MinReplicas"];
+  optional int32 minReplicas = 2 [(gogoproto.customname) = "MinReplicas"];
 
   // upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
-  required int32 maxReplicas = 3 [(gogoproto.customname) = "MaxReplicas", (gogoproto.nullable) = false];
+  optional int32 maxReplicas = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "MaxReplicas"];
 
   // target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
   // if not specified it defaults to the target CPU utilization at 80% of the requested resources.
-  required CPUTargetUtilization cpuUtilization = 4 [(gogoproto.customname) = "CPUUtilization"];
+  optional CPUTargetUtilization cpuUtilization = 4 [(gogoproto.customname) = "CPUUtilization"];
 }
 
 // current status of a horizontal pod autoscaler
 message HorizontalPodAutoscalerStatus {
   // most recent generation observed by this autoscaler.
-  required int64 observedGeneration = 1 [(gogoproto.customname) = "ObservedGeneration"];
+  optional int64 observedGeneration = 1 [(gogoproto.customname) = "ObservedGeneration"];
 
   // last time the HorizontalPodAutoscaler scaled the number of pods;
   // used by the autoscaler to control how often the number of pods is changed.
-  required k8s.io.kubernetes.pkg.api.unversioned.Time lastScaleTime = 2 [(gogoproto.customname) = "LastScaleTime"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastScaleTime = 2 [(gogoproto.customname) = "LastScaleTime"];
 
   // current number of replicas of pods managed by this autoscaler.
-  required int32 currentReplicas = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "CurrentReplicas"];
+  optional int32 currentReplicas = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "CurrentReplicas"];
 
   // desired number of replicas of pods managed by this autoscaler.
-  required int32 desiredReplicas = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "DesiredReplicas"];
+  optional int32 desiredReplicas = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "DesiredReplicas"];
 
   // current average CPU utilization over all pods, represented as a percentage of requested CPU,
   // e.g. 70 means that an average pod is using now 70% of its requested CPU.
-  required int32 currentCPUUtilizationPercentage = 5 [(gogoproto.customname) = "CurrentCPUUtilizationPercentage"];
+  optional int32 currentCPUUtilizationPercentage = 5 [(gogoproto.customname) = "CurrentCPUUtilizationPercentage"];
 }
 
 // Ingress is a collection of rules that allow inbound connections to reach the
@@ -325,37 +325,37 @@ message HorizontalPodAutoscalerStatus {
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
 message Ingress {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // Spec is the desired state of the Ingress.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required IngressSpec spec = 3 [(gogoproto.customname) = "Spec", (gogoproto.nullable) = false];
+  optional IngressSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 
   // Status is the current state of the Ingress.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required IngressStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional IngressStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
 }
 
 // IngressBackend describes all endpoints for a given service and port.
 message IngressBackend {
   // Specifies the name of the referenced service.
-  required string serviceName = 1 [(gogoproto.customname) = "ServiceName", (gogoproto.nullable) = false];
+  optional string serviceName = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ServiceName"];
 
   // Specifies the port of the referenced service.
-  required k8s.io.kubernetes.pkg.util.intstr.IntOrString servicePort = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ServicePort"];
+  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString servicePort = 2 [(gogoproto.customname) = "ServicePort", (gogoproto.nullable) = false];
 }
 
 // IngressList is a collection of Ingress.
 message IngressList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   // Items is the list of Ingress.
   repeated Ingress items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
@@ -377,14 +377,14 @@ message IngressRule {
   // Incoming requests are matched against the host before the IngressRuleValue.
   // If the host is unspecified, the Ingress routes all traffic based on the
   // specified IngressRuleValue.
-  required string host = 1 [(gogoproto.customname) = "Host", (gogoproto.nullable) = false];
+  optional string host = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Host"];
 
   // IngressRuleValue represents a rule to route requests for this IngressRule.
   // If unspecified, the rule defaults to a http catch-all. Whether that sends
   // just traffic matching the host to the default backend or all traffic to the
   // default backend, is left to the controller fulfilling the Ingress. Http is
   // currently the only supported IngressRuleValue.
-  required IngressRuleValue ingressRuleValue = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "IngressRuleValue"];
+  optional IngressRuleValue ingressRuleValue = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "IngressRuleValue"];
 }
 
 // IngressRuleValue represents a rule to apply against incoming requests. If the
@@ -392,7 +392,7 @@ message IngressRule {
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
 message IngressRuleValue {
-  required HTTPIngressRuleValue http = 1 [(gogoproto.customname) = "HTTP"];
+  optional HTTPIngressRuleValue http = 1 [(gogoproto.customname) = "HTTP"];
 }
 
 // IngressSpec describes the Ingress the user wishes to exist.
@@ -401,64 +401,64 @@ message IngressSpec {
   // rule. At least one of 'backend' or 'rules' must be specified. This field
   // is optional to allow the loadbalancer controller or defaulting logic to
   // specify a global default.
-  required IngressBackend backend = 1 [(gogoproto.customname) = "Backend"];
+  optional IngressBackend backend = 1 [(gogoproto.customname) = "Backend"];
 
   // A list of host rules used to configure the Ingress. If unspecified, or
   // no rule matches, all traffic is sent to the default backend.
-  repeated IngressRule rules = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Rules"];
+  repeated IngressRule rules = 2 [(gogoproto.customname) = "Rules", (gogoproto.nullable) = false];
 }
 
 // IngressStatus describe the current state of the Ingress.
 message IngressStatus {
   // LoadBalancer contains the current status of the load-balancer.
-  required k8s.io.kubernetes.pkg.api.v1.LoadBalancerStatus loadBalancer = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "LoadBalancer"];
+  optional k8s.io.kubernetes.pkg.api.v1.LoadBalancerStatus loadBalancer = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "LoadBalancer"];
 }
 
 // Job represents the configuration of a single job.
 message Job {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.customname) = "TypeMeta", (gogoproto.nullable) = false];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.customname) = "ObjectMeta", (gogoproto.nullable) = false];
 
   // Spec is a structure defining the expected behavior of a job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required JobSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
+  optional JobSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 
   // Status is a structure describing current status of a job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-  required JobStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional JobStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
 }
 
 // JobCondition describes current state of a job.
 message JobCondition {
   // Type of job condition, currently only Complete.
-  required string type = 1 [(gogoproto.casttype) = "JobConditionType", (gogoproto.nullable) = false, (gogoproto.customname) = "Type"];
+  optional string type = 1 [(gogoproto.casttype) = "JobConditionType", (gogoproto.nullable) = false, (gogoproto.customname) = "Type"];
 
   // Status of the condition, one of True, False, Unknown.
-  required string status = 2 [(gogoproto.casttype) = "k8s.io/kubernetes/pkg/api/v1.ConditionStatus", (gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional string status = 2 [(gogoproto.casttype) = "k8s.io/kubernetes/pkg/api/v1.ConditionStatus", (gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
 
   // Last time the condition was checked.
-  required k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "LastProbeTime"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3 [(gogoproto.customname) = "LastProbeTime", (gogoproto.nullable) = false];
 
   // Last time the condition transit from one status to another.
-  required k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "LastTransitionTime"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4 [(gogoproto.customname) = "LastTransitionTime", (gogoproto.nullable) = false];
 
   // (brief) reason for the condition's last transition.
-  required string reason = 5 [(gogoproto.nullable) = false, (gogoproto.customname) = "Reason"];
+  optional string reason = 5 [(gogoproto.nullable) = false, (gogoproto.customname) = "Reason"];
 
   // Human readable message indicating details about last transition.
-  required string message = 6 [(gogoproto.nullable) = false, (gogoproto.customname) = "Message"];
+  optional string message = 6 [(gogoproto.nullable) = false, (gogoproto.customname) = "Message"];
 }
 
 // JobList is a collection of jobs.
 message JobList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   // Items is the list of Job.
   repeated Job items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
@@ -471,21 +471,21 @@ message JobSpec {
   // be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
   // i.e. when the work left to do is less than max parallelism.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
-  required int32 parallelism = 1 [(gogoproto.customname) = "Parallelism"];
+  optional int32 parallelism = 1 [(gogoproto.customname) = "Parallelism"];
 
   // Completions specifies the desired number of successfully finished pods the
   // job should be run with. Defaults to 1.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
-  required int32 completions = 2 [(gogoproto.customname) = "Completions"];
+  optional int32 completions = 2 [(gogoproto.customname) = "Completions"];
 
   // Selector is a label query over pods that should match the pod count.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-  required PodSelector selector = 3 [(gogoproto.customname) = "Selector"];
+  optional PodSelector selector = 3 [(gogoproto.customname) = "Selector"];
 
   // Template is the object that describes the pod that will be created when
   // executing a job.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
-  required k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Template"];
+  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Template"];
 }
 
 // JobStatus represents the current state of a Job.
@@ -497,29 +497,29 @@ message JobStatus {
   // StartTime represents time when the job was acknowledged by the Job Manager.
   // It is not guaranteed to be set in happens-before order across separate operations.
   // It is represented in RFC3339 form and is in UTC.
-  required k8s.io.kubernetes.pkg.api.unversioned.Time startTime = 2 [(gogoproto.customname) = "StartTime"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time startTime = 2 [(gogoproto.customname) = "StartTime"];
 
   // CompletionTime represents time when the job was completed. It is not guaranteed to
   // be set in happens-before order across separate operations.
   // It is represented in RFC3339 form and is in UTC.
-  required k8s.io.kubernetes.pkg.api.unversioned.Time completionTime = 3 [(gogoproto.customname) = "CompletionTime"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time completionTime = 3 [(gogoproto.customname) = "CompletionTime"];
 
   // Active is the number of actively running pods.
-  required int32 active = 4 [(gogoproto.customname) = "Active", (gogoproto.nullable) = false];
+  optional int32 active = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Active"];
 
   // Succeeded is the number of pods which reached Phase Succeeded.
-  required int32 succeeded = 5 [(gogoproto.nullable) = false, (gogoproto.customname) = "Succeeded"];
+  optional int32 succeeded = 5 [(gogoproto.nullable) = false, (gogoproto.customname) = "Succeeded"];
 
   // Failed is the number of pods which reached Phase Failed.
-  required int32 failed = 6 [(gogoproto.customname) = "Failed", (gogoproto.nullable) = false];
+  optional int32 failed = 6 [(gogoproto.nullable) = false, (gogoproto.customname) = "Failed"];
 }
 
 // NodeUtilization describes what percentage of a particular resource is used on a node.
 message NodeUtilization {
-  required string resource = 1 [(gogoproto.customname) = "Resource", (gogoproto.casttype) = "NodeResource", (gogoproto.nullable) = false];
+  optional string resource = 1 [(gogoproto.casttype) = "NodeResource", (gogoproto.nullable) = false, (gogoproto.customname) = "Resource"];
 
   // The accepted values are from 0 to 1.
-  required double value = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Value"];
+  optional double value = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Value"];
 }
 
 // A pod selector is a label query over a set of pods. The result of matchLabels and
@@ -539,11 +539,11 @@ message PodSelector {
 // relates the key and values.
 message PodSelectorRequirement {
   // key is the label key that the selector applies to.
-  required string key = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Key"];
+  optional string key = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Key"];
 
   // operator represents a key's relationship to a set of values.
   // Valid operators ard In, NotIn, Exists and DoesNotExist.
-  required string operator = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Operator", (gogoproto.casttype) = "PodSelectorOperator"];
+  optional string operator = 2 [(gogoproto.casttype) = "PodSelectorOperator", (gogoproto.nullable) = false, (gogoproto.customname) = "Operator"];
 
   // values is an array of string values. If the operator is In or NotIn,
   // the values array must be non-empty. If the operator is Exists or DoesNotExist,
@@ -554,7 +554,7 @@ message PodSelectorRequirement {
 
 // Dummy definition
 message ReplicationControllerDummy {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 }
 
 // Spec to control the desired behavior of rolling update.
@@ -569,7 +569,7 @@ message RollingUpdateDeployment {
   // can be scaled down further, followed by scaling up the new RC, ensuring
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
-  required k8s.io.kubernetes.pkg.util.intstr.IntOrString maxUnavailable = 1 [(gogoproto.customname) = "MaxUnavailable"];
+  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxUnavailable = 1 [(gogoproto.customname) = "MaxUnavailable"];
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
@@ -582,68 +582,68 @@ message RollingUpdateDeployment {
   // 130% of desired pods. Once old pods have been killed,
   // new RC can be scaled up further, ensuring that total number of pods running
   // at any time during the update is atmost 130% of desired pods.
-  required k8s.io.kubernetes.pkg.util.intstr.IntOrString maxSurge = 2 [(gogoproto.customname) = "MaxSurge"];
+  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxSurge = 2 [(gogoproto.customname) = "MaxSurge"];
 
   // Minimum number of seconds for which a newly created pod should be ready
   // without any of its container crashing, for it to be considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
-  required int32 minReadySeconds = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "MinReadySeconds"];
+  optional int32 minReadySeconds = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "MinReadySeconds"];
 }
 
 // represents a scaling request for a resource.
 message Scale {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
-  required ScaleSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
+  optional ScaleSpec spec = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Spec"];
 
   // current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
-  required ScaleStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
+  optional ScaleStatus status = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Status"];
 }
 
 // describes the attributes of a scale subresource
 message ScaleSpec {
   // desired number of instances for the scaled object.
-  required int32 replicas = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Replicas"];
+  optional int32 replicas = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Replicas"];
 }
 
 // represents the current status of a scale subresource.
 message ScaleStatus {
   // actual number of observed instances of the scaled object.
-  required int32 replicas = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Replicas"];
+  optional int32 replicas = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Replicas"];
 
   // label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-  map<string, string> selector = 2 [(gogoproto.customname) = "Selector", (gogoproto.nullable) = false];
+  map<string, string> selector = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Selector"];
 }
 
 // SubresourceReference contains enough information to let you inspect or modify the referred subresource.
 message SubresourceReference {
   // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-  required string kind = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Kind"];
+  optional string kind = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "Kind"];
 
   // Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
-  required string name = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Name"];
+  optional string name = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Name"];
 
   // API version of the referent
-  required string apiVersion = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "APIVersion"];
+  optional string apiVersion = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "APIVersion"];
 
   // Subresource name of the referent
-  required string subresource = 4 [(gogoproto.customname) = "Subresource", (gogoproto.nullable) = false];
+  optional string subresource = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Subresource"];
 }
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
 message ThirdPartyResource {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object metadata
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // Description is the description of this object.
-  required string description = 3 [(gogoproto.customname) = "Description", (gogoproto.nullable) = false];
+  optional string description = 3 [(gogoproto.customname) = "Description", (gogoproto.nullable) = false];
 
   // Versions are versions for this third party object
   repeated APIVersion versions = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "Versions"];
@@ -651,33 +651,33 @@ message ThirdPartyResource {
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 message ThirdPartyResourceData {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard object metadata.
-  required k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ObjectMeta"];
 
   // Data is the raw JSON data for this data.
-  required bytes name = 3 [(gogoproto.customname) = "Data"];
+  optional bytes name = 3 [(gogoproto.customname) = "Data"];
 }
 
 // ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
 message ThirdPartyResourceDataList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   // Items is the list of ThirdpartyResourceData.
-  repeated ThirdPartyResourceData items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];
+  repeated ThirdPartyResourceData items = 3 [(gogoproto.customname) = "Items", (gogoproto.nullable) = false];
 }
 
 // ThirdPartyResourceList is a list of ThirdPartyResources.
 message ThirdPartyResourceList {
-  required k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.TypeMeta typeMeta = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "TypeMeta"];
 
   // Standard list metadata.
-  required k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "ListMeta"];
 
   // Items is the list of ThirdPartyResources.
   repeated ThirdPartyResource items = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "Items"];

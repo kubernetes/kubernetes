@@ -82,7 +82,7 @@ option go_package = "runtime";
 // 
 // +genprotoidl=true
 message RawExtension {
-  required bytes rawJSON = 1 [(gogoproto.customname) = "RawJSON"];
+  optional bytes rawJSON = 1 [(gogoproto.customname) = "RawJSON"];
 }
 
 // TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type,
@@ -98,9 +98,9 @@ message RawExtension {
 // 
 // +genprotoidl=true
 message TypeMeta {
-  required string apiVersion = 1 [(gogoproto.customname) = "APIVersion", (gogoproto.nullable) = false];
+  optional string apiVersion = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "APIVersion"];
 
-  required string kind = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Kind"];
+  optional string kind = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "Kind"];
 }
 
 // Unknown allows api objects with unknown types to be passed-through. This can be used
@@ -111,11 +111,11 @@ message TypeMeta {
 // 
 // +genprotoidl=true
 message Unknown {
-  required TypeMeta typeMeta = 1 [(gogoproto.customname) = "TypeMeta", (gogoproto.nullable) = false];
+  optional TypeMeta typeMeta = 1 [(gogoproto.customname) = "TypeMeta", (gogoproto.nullable) = false];
 
   // RawJSON will hold the complete JSON of the object which couldn't be matched
   // with a registered type. Most likely, nothing should be done with this
   // except for passing it through the system.
-  required bytes rawJSON = 2 [(gogoproto.customname) = "RawJSON"];
+  optional bytes rawJSON = 2 [(gogoproto.customname) = "RawJSON"];
 }
 

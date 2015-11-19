@@ -21,8 +21,6 @@ import math "math"
 // discarding unused import gogoproto "github.com/gogo/protobuf/gogoproto"
 // discarding unused import k8s_io_kubernetes_pkg_util_intstr "k8s.io/kubernetes/pkg/util/intstr"
 
-import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
-
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -58,9 +56,7 @@ func (m *QuantityProto) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x10
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Scale))
-	if m.Bigint == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("bigint")
-	} else {
+	if m.Bigint != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(len(m.Bigint)))
@@ -123,7 +119,6 @@ func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
 func (m *QuantityProto) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -181,7 +176,6 @@ func (m *QuantityProto) Unmarshal(data []byte) error {
 			}
 			m.Format = Format(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Scale", wireType)
@@ -201,7 +195,6 @@ func (m *QuantityProto) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Bigint", wireType)
@@ -230,7 +223,6 @@ func (m *QuantityProto) Unmarshal(data []byte) error {
 			}
 			m.Bigint = append([]byte{}, data[iNdEx:postIndex]...)
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000004)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -245,15 +237,6 @@ func (m *QuantityProto) Unmarshal(data []byte) error {
 			}
 			iNdEx += skippy
 		}
-	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("format")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("scale")
-	}
-	if hasFields[0]&uint64(0x00000004) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("bigint")
 	}
 
 	if iNdEx > l {

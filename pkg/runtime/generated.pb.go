@@ -23,8 +23,6 @@ import math "math"
 // discarding unused import k8s_io_kubernetes_pkg_api_resource "k8s.io/kubernetes/pkg/api/resource"
 // discarding unused import k8s_io_kubernetes_pkg_util_intstr "k8s.io/kubernetes/pkg/util/intstr"
 
-import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
-
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -56,9 +54,7 @@ func (m *RawExtension) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.RawJSON == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("rawJSON")
-	} else {
+	if m.RawJSON != nil {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(len(m.RawJSON)))
@@ -116,9 +112,7 @@ func (m *Unknown) MarshalTo(data []byte) (int, error) {
 		return 0, err
 	}
 	i += n1
-	if m.RawJSON == nil {
-		return 0, github_com_gogo_protobuf_proto.NewRequiredNotSetError("rawJSON")
-	} else {
+	if m.RawJSON != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(len(m.RawJSON)))
@@ -200,7 +194,6 @@ func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
 func (m *RawExtension) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -257,7 +250,6 @@ func (m *RawExtension) Unmarshal(data []byte) error {
 			}
 			m.RawJSON = append([]byte{}, data[iNdEx:postIndex]...)
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -273,9 +265,6 @@ func (m *RawExtension) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("rawJSON")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -283,7 +272,6 @@ func (m *RawExtension) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *TypeMeta) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -341,7 +329,6 @@ func (m *TypeMeta) Unmarshal(data []byte) error {
 			}
 			m.APIVersion = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Kind", wireType)
@@ -371,7 +358,6 @@ func (m *TypeMeta) Unmarshal(data []byte) error {
 			}
 			m.Kind = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -387,12 +373,6 @@ func (m *TypeMeta) Unmarshal(data []byte) error {
 			iNdEx += skippy
 		}
 	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("apiVersion")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("kind")
-	}
 
 	if iNdEx > l {
 		return io.ErrUnexpectedEOF
@@ -400,7 +380,6 @@ func (m *TypeMeta) Unmarshal(data []byte) error {
 	return nil
 }
 func (m *Unknown) Unmarshal(data []byte) error {
-	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -459,7 +438,6 @@ func (m *Unknown) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RawJSON", wireType)
@@ -488,7 +466,6 @@ func (m *Unknown) Unmarshal(data []byte) error {
 			}
 			m.RawJSON = append([]byte{}, data[iNdEx:postIndex]...)
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -503,12 +480,6 @@ func (m *Unknown) Unmarshal(data []byte) error {
 			}
 			iNdEx += skippy
 		}
-	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("typeMeta")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("rawJSON")
 	}
 
 	if iNdEx > l {
