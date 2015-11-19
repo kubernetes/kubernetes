@@ -83,6 +83,10 @@ import (
 // This format is intended to make it difficult to use these numbers without
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
+//
+// +genprotoidl=true
+// +genprotoidl.embed=QuantityProto
+// +genprotoidl.options.marshal=false
 type Quantity struct {
 	// Amount is public, so you can manipulate it if the accessor
 	// functions are not sufficient.
@@ -101,6 +105,20 @@ const (
 	BinarySI        = Format("BinarySI")        // e.g., 12Mi (12 * 2^20)
 	DecimalSI       = Format("DecimalSI")       // e.g., 12M  (12 * 10^6)
 )
+
+// QuantityProto is a struct that is equivalent to Quantity, but intended for
+// protobuf marshalling/unmarshalling. It is generated into a serialization
+// that matches Quantity. Do not use in Go structs.
+//
+// +genprotoidl=true
+type QuantityProto struct {
+	// The format of the quantity
+	Format Format
+	// The scale dimension of the value
+	Scale int32
+	// Bigint is serialized as a raw bytes array
+	Bigint []byte
+}
 
 // MustParse turns the given string into a quantity or panics; for tests
 // or others cases where you know the string is valid.
@@ -350,6 +368,47 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	// This copy is safe because parsed will not be referred to again.
 	*q = *parsed
 	return nil
+}
+
+// ProtoTime returns the Time as a new ProtoTime value.
+func (q *Quantity) QuantityProto() *QuantityProto {
+	if q == nil {
+		return &QuantityProto{}
+	}
+	p := &QuantityProto{
+		Format: q.Format,
+	}
+	if q.Amount != nil {
+		p.Scale = int32(q.Amount.Scale())
+		p.Bigint = q.Amount.UnscaledBig().Bytes()
+	}
+	return p
+}
+
+// Size implements the protobuf marshalling interface.
+func (q *Quantity) Size() (n int) { return q.QuantityProto().Size() }
+
+// Reset implements the protobuf marshalling interface.
+func (q *Quantity) Unmarshal(data []byte) error {
+	p := QuantityProto{}
+	if err := p.Unmarshal(data); err != nil {
+		return err
+	}
+	q.Format = p.Format
+	b := big.NewInt(0)
+	b.SetBytes(p.Bigint)
+	q.Amount = inf.NewDecBig(b, inf.Scale(p.Scale))
+	return nil
+}
+
+// Marshal implements the protobuf marshalling interface.
+func (q *Quantity) Marshal() (data []byte, err error) {
+	return q.QuantityProto().Marshal()
+}
+
+// MarshalTo implements the protobuf marshalling interface.
+func (q *Quantity) MarshalTo(data []byte) (int, error) {
+	return q.QuantityProto().MarshalTo(data)
 }
 
 // NewQuantity returns a new Quantity representing the given
