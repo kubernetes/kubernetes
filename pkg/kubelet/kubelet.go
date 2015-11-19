@@ -1194,7 +1194,10 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	if err != nil {
 		return nil, err
 	}
+	// If annotation is present then time the results
+	envVarTime := kubeletutil.RecordStartTimeByAnnotation(pod)
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container)
+	kubeletutil.RecordEndTimeByAnnotation(envVarTime, pod, "makeEnvironmentVariables")
 	if err != nil {
 		return nil, err
 	}
