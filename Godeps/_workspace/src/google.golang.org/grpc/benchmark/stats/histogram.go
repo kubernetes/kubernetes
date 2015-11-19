@@ -251,5 +251,5 @@ func (h *Histogram) findBucket(value int64) (int, error) {
 		}
 		min = b + 1
 	}
-	return 0, fmt.Errorf("no bucket for value: %f", value)
+	return 0, fmt.Errorf("no bucket for value: %d", value)
 }
