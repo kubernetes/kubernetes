@@ -121,6 +121,7 @@ type SchedulerServer struct {
 	runProxy     bool
 	proxyBindall bool
 	proxyLogV    int
+	proxyMode    string
 
 	minionPathOverride    string
 	minionLogMaxSize      resource.Quantity
@@ -185,6 +186,8 @@ func NewSchedulerServer() *SchedulerServer {
 		launchGracePeriod:        execcfg.DefaultLaunchGracePeriod,
 		defaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
 		defaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
+
+		proxyMode: "userspace", // upstream default is "iptables" post-v1.1
 
 		minionLogMaxSize:      minioncfg.DefaultLogMaxSize(),
 		minionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
@@ -271,6 +274,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.proxyBindall, "proxy-bindall", s.proxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.runProxy, "run-proxy", s.runProxy, "Run the kube-proxy as a side process of the executor.")
 	fs.IntVar(&s.proxyLogV, "proxy-logv", s.proxyLogV, "Logging verbosity of spawned minion proxy processes.")
+	fs.StringVar(&s.proxyMode, "proxy-mode", s.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 
 	fs.StringVar(&s.minionPathOverride, "minion-path-override", s.minionPathOverride, "Override the PATH in the environment of the minion sub-processes.")
 	fs.Var(resource.NewQuantityFlagValue(&s.minionLogMaxSize), "minion-max-log-size", "Maximum log file size for the executor and proxy before rotation")
@@ -360,6 +364,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--run-proxy=%v", s.runProxy))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.proxyBindall))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-logv=%d", s.proxyLogV))
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-mode=%v", s.proxyMode))
 
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--path-override=%s", s.minionPathOverride))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--max-log-size=%v", s.minionLogMaxSize.String()))
