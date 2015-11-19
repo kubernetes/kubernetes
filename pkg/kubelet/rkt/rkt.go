@@ -808,6 +808,9 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 				glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
 				continue
 			}
+			for _, c := range pod.Containers {
+				c.Status = status
+			}
 			pods = append(pods, pod)
 		}
 	}
