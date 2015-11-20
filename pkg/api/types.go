@@ -714,7 +714,7 @@ type ExecAction struct {
 }
 
 // Probe describes a health check to be performed against a container to determine whether it is
-// alive or ready to recieve traffic.
+// alive or ready to receive traffic.
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
