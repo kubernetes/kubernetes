@@ -848,7 +848,7 @@ __EOF__
   kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
   # Command
-  kubectl scale rc/redis-master rc/redis-slave --replicas=4
+  kubectl scale rc/redis-master rc/redis-slave --replicas=4 "${kube_flags[@]}"
   # Post-condition: 4 replicas each
   kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '4'
   kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '4'
