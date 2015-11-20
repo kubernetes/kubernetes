@@ -96,7 +96,7 @@ func main() {
 
 	// Wait for the tests to finish
 	w.Wait()
-	glog.Infof("All hosts finished")
+	glog.Infof("Done")
 }
 
 func WaitForUser() {
@@ -148,7 +148,8 @@ func runTests(host string) ([]byte, error) {
 	ginkoTests := filepath.Join(kubeRoot, ginkoTestRelPath)
 	return exec.Command(
 		"ginkgo", ginkoTests, "--",
-		"--kubelet-host", "localhost", "--kubelet-port", kh.LPort,
-		"--api-server-host", "localhost", "--api-server-port", kh.LPort,
+		"--kubelet-address", fmt.Sprintf("http://localhost:%s", kh.LPort),
+		"--api-server-address", fmt.Sprintf("http://localhost:%s", ah.LPort),
+		"--node-name", host,
 		"-logtostderr").CombinedOutput()
 }
