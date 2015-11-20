@@ -100,8 +100,14 @@ comming from other machines, including all the Nodes, not only from outside of t
 To run standard e2e test on your Kubemark cluster created in the previous step you execute `test/kubemark/run-e2e-tests.sh` script. It will configure ginkgo to
 use Kubemark cluster instead of something else and start an e2e test. This script should not need any changes to work on other cloud providers.
 
-By default (if nothig will be passed to it) the script will run a Density '30 test. If you want to run a different e2e test you just need to provide flags you want to be
+By default (if nothing will be passed to it) the script will run a Density '30 test. If you want to run a different e2e test you just need to provide flags you want to be
 passed to `hack/ginkgo-e2e.sh` script, e.g. `--ginkgo.focus="Load"` to run the Load test.
+
+By default, at the end of each test, it will delete namespaces and everything under it (e.g. events, replication controllers) on Kubemark master, which takes a lot of time.
+Such work aren't needed in most cases: if you delete your Kubemark cluster after running `run-e2e-tests.sh`;
+you don't care about namespace deletion performance, specifically related to etcd; etc.
+There is a flag that enables you to avoid namespace deletion: `--delete-namespace=false`.
+Adding the flag should let you see in logs: `Found DeleteNamespace=false, skipping namespace deletion!`
 
 ### Monitoring test execution and debugging problems
 
