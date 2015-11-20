@@ -231,7 +231,7 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
 GCE_RELEASE_SKIP_TESTS=(
     )
 
-TRUSTY_SKIP_TESTS=(
+TRUSTY_DEFAULT_SKIP_TESTS=(
     # TODO(wonderfly): Remove this once
     # https://github.com/kubernetes/kubernetes/issues/12689 is fixed.
     "Services.*should\swork\safter\srestarting\skube-proxy"
@@ -241,6 +241,15 @@ TRUSTY_SKIP_TESTS=(
     # https://github.com/kubernetes/kubernetes/pull/14603
     # TODO(wonderfly): Remove this once v1.1.2 is out.
     "Kubelet\sregular\sresource\susage\stracking\sover\s30m0s\swith\s0\spods\sper\snode"
+)
+
+TRUSTY_SKIP_TESTS=(
+    "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
+    "Monitoring\sshould\sverify\smonitoring\spods\sand\sall\scluster\snodes\sare\savailable\son\sinfluxdb\susing\sheapster"
+)
+
+TRUSTY_BETA_SKIP_TESTS=(
+    "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
 )
 
 # Define environment variables based on the Jenkins project name.
@@ -574,7 +583,7 @@ case ${JOB_NAME} in
           ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
+          ${TRUSTY_BETA_SKIP_TESTS[@]:+${TRUSTY_BETA_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-e2e-gce-trusty-beta"}
@@ -593,7 +602,7 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           ) --ginkgo.skip=$(join_regex_allow_empty \
-          ${TRUSTY_SKIP_TESTS[@]:+${TRUSTY_SKIP_TESTS[@]}} \
+          ${TRUSTY_BETA_SKIP_TESTS[@]:+${TRUSTY_BETA_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-beta-slow"}
     : ${PROJECT:="k8s-e2e-gce-trusty-beta-slow"}
