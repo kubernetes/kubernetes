@@ -1233,6 +1233,70 @@ func TestValidateClusterAutoscaler(t *testing.T) {
 	}
 }
 
+func TestValidateScale(t *testing.T) {
+	successCases := []extensions.Scale{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "frontend",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: 1,
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "frontend",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: 10,
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "frontend",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: 0,
+			},
+		},
+	}
+
+	for _, successCase := range successCases {
+		if errs := ValidateScale(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		scale extensions.Scale
+		msg   string
+	}{
+		{
+			scale: extensions.Scale{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "frontend",
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: extensions.ScaleSpec{
+					Replicas: -1,
+				},
+			},
+			msg: "must be non-negative",
+		},
+	}
+
+	for _, c := range errorCases {
+		if errs := ValidateScale(&c.scale); len(errs) == 0 {
+			t.Errorf("expected failure for %s", c.msg)
+		} else if !strings.Contains(errs[0].Error(), c.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
+		}
+	}
+}
+
 func newInt(val int) *int {
 	p := new(int)
 	*p = val
