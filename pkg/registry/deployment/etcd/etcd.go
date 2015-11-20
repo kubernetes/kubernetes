@@ -30,6 +30,8 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+
+	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
@@ -154,6 +156,11 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
+
+	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid("scale", scale.Name, errs)
+	}
+
 	deployment, err := (*r.registry).GetDeployment(ctx, scale.Name)
 	if err != nil {
 		return nil, false, errors.NewNotFound("scale", scale.Name)

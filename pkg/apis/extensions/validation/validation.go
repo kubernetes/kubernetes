@@ -596,3 +596,14 @@ func ValidatePodSelectorRequirement(sr extensions.PodSelectorRequirement) errs.V
 	allErrs = append(allErrs, apivalidation.ValidateLabelName(sr.Key, "key")...)
 	return allErrs
 }
+
+func ValidateScale(scale *extensions.Scale) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain).Prefix("metadata")...)
+
+	if scale.Spec.Replicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.replicas", scale.Spec.Replicas, "must be non-negative"))
+	}
+
+	return allErrs
+}
