@@ -71,7 +71,7 @@ The DaemonSet supports standard API features:
   - YAML example:
 
 ```YAML
-  apiVersion: v1
+  apiVersion: extensions/v1beta1
   kind: DaemonSet
   metadata:
     labels:
