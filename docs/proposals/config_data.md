@@ -173,7 +173,36 @@ type ConfigDataSelector struct {
 
 ### Volume Source
 
-The volume source will be addressed in a follow-up PR.
+A new `ConfigDataVolumeSource` type of volume source containing the `ConfigData` object will be
+added to the `VolumeSource` struct in the API:
+
+```go
+package api
+
+type VolumeSource struct {
+  // other fields omitted
+  ConfigData *ConfigDataVolumeSource `json:"configData,omitempty"`
+}
+
+// ConfigDataVolumeSource represents a volume that holds configuration data
+type ConfigDataVolumeSource struct {
+  // A list of config data keys to project into the volume in files
+  Files []ConfigDataVolumeFile `json:"files"`
+}
+
+// ConfigDataVolumeFile represents a single file containing config data
+type ConfigDataVolumeFile struct {
+  ConfigDataSelector `json:",inline"`
+
+  // The relative path name of the file to be created.
+  // Must not be absolute or contain the '..' path. Must be utf-8 encoded.
+  // The first item of the relative path must not start with '..'
+  Path string `json:"path"`
+}
+```
+
+**Note:** The update logic used in the downward API volume plug-in will be extracted and re-used in
+the volume plug-in for `ConfigData`.
 
 ## Examples
 
@@ -235,6 +264,45 @@ spec:
         configData:
           configDataName: etcd-env-config
           key: etcdctl_peers
+```
+
+### Consuming `ConfigData` as Volumes
+
+`redis-volume-config` is intended to be used as a volume containing a config file:
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: ConfigData
+metadata:
+  name: redis-volume-config
+data:
+  redis.conf: "pidfile /var/run/redis.pid\nport6379\ntcp-backlog 511\n databases 1\ntimeout 0\n"
+```
+
+The following pod consumes the `redis-volume-config` in a volume:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-volume-example
+spec:
+  containers:
+    - name: redis
+      image: kubernetes/redis
+      command: "redis-server /mnt/config-data/etc/redis.conf"
+      ports:
+        - containerPort: 6379
+      volumeMounts:
+        - name: config-data-volume
+          mountPath: /mnt/config-data
+  volumes:
+  - name: config-data-volume
+    configData:
+      files:
+        - path: "etc/redis.conf"
+          configDataName: redis-volume-config
+          key: redis.conf
 ```
 
 ### Future Improvements
