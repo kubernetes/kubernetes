@@ -25,7 +25,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -134,7 +134,7 @@ func (m *manager) AddPod(pod *api.Pod) {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
 				glog.Errorf("Readiness probe already exists! %v - %v",
-					kubeutil.FormatPodName(pod), c.Name)
+					format.Pod(pod), c.Name)
 				return
 			}
 			w := newWorker(m, readiness, pod, c)
@@ -146,7 +146,7 @@ func (m *manager) AddPod(pod *api.Pod) {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
 				glog.Errorf("Liveness probe already exists! %v - %v",
-					kubeutil.FormatPodName(pod), c.Name)
+					format.Pod(pod), c.Name)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
