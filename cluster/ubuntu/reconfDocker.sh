@@ -46,7 +46,9 @@ function config_etcd {
 }
 
 function restart_docker {
-  
+
+  source ~/kube/config-default.sh
+
   attempt=0
   while [[ ! -f /run/flannel/subnet.env ]]; do 
     if (( attempt > 200 )); then
