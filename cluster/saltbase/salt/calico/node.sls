@@ -58,7 +58,7 @@ calico-ip-pool-reset:
 
 calico-ip-pool:
   cmd.run:
-    - name: calicoctl pool add {{ grains['cbr-cidr'] }}
+    - name: calicoctl pool add {{ grains['cbr-cidr'] }} --nat-outgoing
     - unless: calicoctl pool show | grep {{ grains['cbr-cidr'] }}
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
