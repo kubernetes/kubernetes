@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -33,9 +34,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/evanphx/json-patch"
@@ -280,6 +285,93 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
+}
+
+func AddUploadFlags(cmd *cobra.Command) {
+	cmd.Flags().String("bucket", "", "The bucket to upload an archive file into. Only used if --dir is non-empty")
+	cmd.Flags().String("archive-file", "", "The name of the archive file to upload. Only used if --dir is non-empty")
+	cmd.Flags().String("upload-directory", "", "If specified, upload the contents of this directory to cloud storage and pass that location to the container as an environment variable")
+}
+
+func UploadDirectoryOrFileFromFlags(cmd *cobra.Command, dir string) (bucket, file string, err error) {
+	bucket = GetFlagString(cmd, "bucket")
+	file = GetFlagString(cmd, "archive-file")
+	return bucket, file, UploadDirectory(cmd, dir, bucket, file)
+}
+
+func UploadDirectoryOrFile(cmd *cobra.Command, path, bucket, file string) error {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if stat.IsDir() {
+		return UploadDirectory(cmd, path, bucket, file)
+	}
+	return UploadFile(cmd, path, bucket, file)
+}
+
+func UploadFile(cmd *cobra.Command, pathSpec, bucket, file string) error {
+	data, err := ioutil.ReadFile(pathSpec)
+	if err != nil {
+		return err
+	}
+	if len(file) == 0 {
+		file = path.Base(pathSpec)
+	}
+	return doUpload(cmd, data, bucket, file)
+}
+
+func UploadDirectory(cmd *cobra.Command, dir, bucket, file string) error {
+	if len(file) == 0 {
+		file = "archive.tar.gz"
+	}
+	glog.V(2).Infof("Archiving directory %s", dir)
+	data, err := util.ArchiveDirectory(dir, true)
+	if err != nil {
+		return err
+	}
+	return doUpload(cmd, data, bucket, file)
+}
+
+func doUpload(cmd *cobra.Command, data []byte, bucket, file string) error {
+	cloud, provider, err := GetCloudProvider(cmd)
+	if err != nil {
+		return err
+	}
+	if cloud == nil {
+		return fmt.Errorf("Unable to load cloud provider %s", provider)
+	}
+	storage, ok := cloud.Storage()
+	if !ok {
+		return fmt.Errorf("cloud provider doesn't support storage", provider)
+	}
+	glog.V(2).Infof("Starting to upload file to %s/%s", bucket, file)
+	if err = storage.UploadFile(bucket, file, bytes.NewBuffer(data)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func AddCloudProviderFlags(cmd *cobra.Command) {
+	cmd.Flags().String("cloud-provider", "", "If non-empty, use this provider as the cloud provider for any cloud related calls")
+	cmd.Flags().String("cloud-config-file", "", "If non-empty, load the file as the config for the cloud provider")
+}
+
+func GetCloudProvider(cmd *cobra.Command) (cloudprovider.Interface, string, error) {
+	provider := GetFlagString(cmd, "cloud-provider")
+	var config io.Reader
+	configFile := GetFlagString(cmd, "cloud-config-file")
+	if len(configFile) > 0 {
+		var err error
+		if config, err = os.Open(configFile); err != nil {
+			return nil, provider, err
+		}
+	}
+	cloud, err := cloudprovider.GetCloudProvider(provider, config)
+	if err != nil {
+		return nil, provider, err
+	}
+	return cloud, provider, err
 }
 
 func AddValidateFlags(cmd *cobra.Command) {

@@ -926,3 +926,7 @@ func (os *OpenStack) getComputeIDbyHostname(cClient *gophercloud.ServiceClient) 
 	}
 	return "", fmt.Errorf("No server found matching hostname: %s", hostname)
 }
+
+func (s *OpenStack) Storage() (cloudprovider.Storage, bool) {
+	return nil, false
+}

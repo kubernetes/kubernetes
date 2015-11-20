@@ -270,3 +270,7 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 
 	return instances, nil
 }
+
+func (s *VagrantCloud) Storage() (cloudprovider.Storage, bool) {
+	return nil, false
+}

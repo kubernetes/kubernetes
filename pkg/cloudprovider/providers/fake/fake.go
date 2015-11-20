@@ -19,6 +19,7 @@ package fake
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"regexp"
 	"sync"
@@ -59,6 +60,7 @@ type FakeCloud struct {
 	Balancers     map[string]FakeBalancer
 	UpdateCalls   []FakeUpdateBalancerCall
 	RouteMap      map[string]*FakeRoute
+	Uploads       map[string][]byte
 	Lock          sync.Mutex
 	cloudprovider.Zone
 }
@@ -248,4 +250,16 @@ func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) 
 	}
 	delete(f.RouteMap, name)
 	return nil
+}
+
+func (f *FakeCloud) Storage() (cloudprovider.Storage, error) {
+	return f, nil
+}
+
+func (f *FakeCloud) UploadFile(bucket, file string, stream io.Reader) error {
+	data, err := ioutil.ReadAll(stream)
+	if err != nil {
+		return err
+	}
+	f.Uploads[bucket+file] = data
 }

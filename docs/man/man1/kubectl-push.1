@@ -3,24 +3,30 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl push \- Push a fileset up to storage and image push
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl push\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
-
-.PP
-Find more information at 
-\[la]https://github.com/kubernetes/kubernetes\[ra].
+Gather local files and push them up to storage.
 
 
 .SH OPTIONS
+.PP
+\fB\-\-cloud\-config\-file\fP=""
+    If non\-empty, load the file as the config for the cloud provider
+
+.PP
+\fB\-\-cloud\-provider\fP=""
+    If non\-empty, use this provider as the cloud provider for any cloud related calls
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -114,9 +120,31 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# push a directory up to cloud storage in the bucket my\-files/archive.tgz
+$ kubectl push \-\-cloud\-provider=gce ./some/directory  my\-files
+
+# push a directory up to cloud storage in the bucket my\-files/some\-other\-name.tgz
+$ kubectl push \-\-cloud\-provider=gce ./some/directory  my\-files/some\-other\-name.tgz
+
+# push a file up to cloud storage in the bucket my\-files/file.html
+$ kubectl push \-\-cloud\-provider=gce ./some/file.html my\-files
+
+# push a file up to cloud storage and rename the file
+$ kubectl push \-\-cloud\-provider=gce ./some/file.html my\-files/other\-file.html
+
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-edit(1)\fP, \fBkubectl\-apply(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-attach(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-autoscale(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-annotate(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP, \fBkubectl\-explain(1)\fP, \fBkubectl\-convert(1)\fP, \fBkubectl\-push(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY

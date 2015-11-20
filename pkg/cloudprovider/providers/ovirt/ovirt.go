@@ -284,3 +284,7 @@ func (v *OVirtCloud) CurrentNodeName(hostname string) (string, error) {
 func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
+
+func (s *OVirtCloud) Storage() (cloudprovider.Storage, bool) {
+	return nil, false
+}

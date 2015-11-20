@@ -17,6 +17,7 @@ api-server-port
 api-servers
 api-token
 api-version
+archive-file
 authorization-mode
 authorization-policy-file
 auth-path
@@ -38,6 +39,7 @@ client-ca-file
 client-certificate
 client-key
 cloud-config
+cloud-config-file
 cloud-provider
 cluster-cidr
 cluster-dns
@@ -314,6 +316,7 @@ udp-timeout
 unix-socket
 update-period
 upgrade-target
+upload-directory
 use-kubernetes-cluster-service
 user-whitelist
 watch-cache

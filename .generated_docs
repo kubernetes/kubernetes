@@ -34,6 +34,7 @@ docs/man/man1/kubectl-namespace.1
 docs/man/man1/kubectl-patch.1
 docs/man/man1/kubectl-port-forward.1
 docs/man/man1/kubectl-proxy.1
+docs/man/man1/kubectl-push.1
 docs/man/man1/kubectl-replace.1
 docs/man/man1/kubectl-rolling-update.1
 docs/man/man1/kubectl-run.1
@@ -71,6 +72,7 @@ docs/user-guide/kubectl/kubectl_namespace.md
 docs/user-guide/kubectl/kubectl_patch.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
+docs/user-guide/kubectl/kubectl_push.md
 docs/user-guide/kubectl/kubectl_replace.md
 docs/user-guide/kubectl/kubectl_rolling-update.md
 docs/user-guide/kubectl/kubectl_run.md

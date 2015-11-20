@@ -19,8 +19,24 @@ Creates a replication controller to manage the created container(s).
 
 .SH OPTIONS
 .PP
+\fB\-\-archive\-file\fP=""
+    The name of the archive file to upload. Only used if \-\-dir is non\-empty
+
+.PP
 \fB\-\-attach\fP=false
     If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '\-i/\-\-interactive' is set, in which case the default is true.
+
+.PP
+\fB\-\-bucket\fP=""
+    The bucket to upload an archive file into. Only used if \-\-dir is non\-empty
+
+.PP
+\fB\-\-cloud\-config\-file\fP=""
+    If non\-empty, load the file as the config for the cloud provider
+
+.PP
+\fB\-\-cloud\-provider\fP=""
+    If non\-empty, use this provider as the cloud provider for any cloud related calls
 
 .PP
 \fB\-\-command\fP=false
@@ -128,6 +144,10 @@ Creates a replication controller to manage the created container(s).
 .PP
 \fB\-\-tty\fP=false
     Allocated a TTY for each container in the pod.  Because \-t is currently shorthand for \-\-template, \-t is not supported for \-\-tty. This shorthand is deprecated and we expect to adopt \-t for \-\-tty soon.
+
+.PP
+\fB\-\-upload\-directory\fP=""
+    If specified, upload the contents of this directory to cloud storage and pass that location to the container as an environment variable
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

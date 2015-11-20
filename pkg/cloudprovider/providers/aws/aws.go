@@ -2109,3 +2109,7 @@ func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 	}
 	return filters
 }
+
+func (s *AWSCloud) Storage() (cloudprovider.Storage, bool) {
+	return nil, false
+}

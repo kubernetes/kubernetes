@@ -386,3 +386,7 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 
 	return cloudprovider.Zone{Region: os.region}, nil
 }
+
+func (s *Rackspace) Storage() (cloudprovider.Storage, bool) {
+	return nil, false
+}

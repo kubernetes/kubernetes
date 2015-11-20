@@ -77,6 +77,8 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddCloudProviderFlags(cmd)
+	cmdutil.AddUploadFlags(cmd)
 	addRunFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
@@ -150,11 +152,21 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generatorName))
 	}
+
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	params["name"] = args[0]
 	if len(args) > 1 {
 		params["args"] = args[1:]
+	}
+
+	dir := cmdutil.GetFlagString(cmd, "upload-directory")
+	if len(dir) != 0 {
+		bucket, file, err := cmdutil.UploadDirectoryOrFileFromFlags(cmd, dir)
+		if err != nil {
+			return err
+		}
+		params["archive"] = bucket + "/" + file
 	}
 
 	params["env"] = cmdutil.GetFlagStringSlice(cmd, "env")
