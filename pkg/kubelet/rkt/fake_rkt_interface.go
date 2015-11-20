@@ -31,6 +31,7 @@ import (
 type fakeRktInterface struct {
 	sync.Mutex
 	info   rktapi.Info
+	images []*rktapi.Image
 	called []string
 	err    error
 }
@@ -62,7 +63,11 @@ func (f *fakeRktInterface) InspectPod(ctx context.Context, in *rktapi.InspectPod
 }
 
 func (f *fakeRktInterface) ListImages(ctx context.Context, in *rktapi.ListImagesRequest, opts ...grpc.CallOption) (*rktapi.ListImagesResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+	f.Lock()
+	defer f.Unlock()
+
+	f.called = append(f.called, "ListImages")
+	return &rktapi.ListImagesResponse{f.images}, f.err
 }
 
 func (f *fakeRktInterface) InspectImage(ctx context.Context, in *rktapi.InspectImageRequest, opts ...grpc.CallOption) (*rktapi.InspectImageResponse, error) {
