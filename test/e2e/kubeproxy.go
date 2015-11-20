@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -40,7 +41,6 @@ import (
 const (
 	endpointHttpPort        = 8080
 	endpointUdpPort         = 8081
-	endpointHostPort        = 8082
 	testContainerHttpPort   = 8080
 	clusterHttpPort         = 80
 	clusterUdpPort          = 90
@@ -49,19 +49,21 @@ const (
 	loadBalancerHttpPort    = 100
 	netexecImageName        = "gcr.io/google_containers/netexec:1.0"
 	testPodName             = "test-container-pod"
+	hostTestPodName         = "host-test-container-pod"
 	nodePortServiceName     = "node-port-service"
 	loadBalancerServiceName = "load-balancer-service"
 	enableLoadBalancerTest  = false
 )
 
 type KubeProxyTestConfig struct {
-	testContainerPod    *api.Pod
-	testHostPod         *api.Pod
-	endpointPods        []*api.Pod
-	f                   *Framework
-	nodePortService     *api.Service
-	loadBalancerService *api.Service
-	nodes               []string
+	testContainerPod     *api.Pod
+	hostTestContainerPod *api.Pod
+	endpointPods         []*api.Pod
+	f                    *Framework
+	nodePortService      *api.Service
+	loadBalancerService  *api.Service
+	externalAddrs        []string
+	nodes                []api.Node
 }
 
 var _ = Describe("KubeProxy", func() {
@@ -71,8 +73,6 @@ var _ = Describe("KubeProxy", func() {
 	}
 
 	It("should test kube-proxy", func() {
-		SkipUnlessProviderIs(providersWithSSH...)
-
 		By("cleaning up any pre-existing namespaces used by this test")
 		config.cleanup()
 
@@ -168,7 +168,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 }
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
-	node1_IP := config.nodes[0]
+	node1_IP := config.externalAddrs[0]
 	tries := epCount*epCount + 5 // + 10 if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
@@ -177,7 +177,7 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 
 	By("dialing(udp) test container --> node1:nodeUdpPort")
 	config.dialFromTestContainer("udp", node1_IP, nodeUdpPort, tries, epCount)
-	By("dialing(http) container --> node1:nodeHttpPort")
+	By("dialing(http) test container --> node1:nodeHttpPort")
 	config.dialFromTestContainer("http", node1_IP, nodeHttpPort, tries, epCount)
 
 	By("dialing(udp) endpoint container --> node1:nodeUdpPort")
@@ -192,7 +192,7 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	By("Test disabled. dialing(http) node --> 127.0.0.1:nodeHttpPort")
 	//config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
 
-	node2_IP := config.nodes[1]
+	node2_IP := config.externalAddrs[1]
 	By("dialing(udp) node1 --> node2:nodeUdpPort")
 	config.dialFromNode("udp", node2_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1 --> node2:nodeHttpPort")
@@ -231,7 +231,7 @@ func (config *KubeProxyTestConfig) dialFromContainer(protocol, containerIP, targ
 		tries)
 
 	By(fmt.Sprintf("Dialing from container. Running command:%s", cmd))
-	stdout := config.ssh(cmd)
+	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, cmd)
 	var output map[string][]string
 	err := json.Unmarshal([]byte(stdout), &output)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Could not unmarshal curl response: %s", stdout))
@@ -242,24 +242,17 @@ func (config *KubeProxyTestConfig) dialFromContainer(protocol, containerIP, targ
 func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targetPort, tries, expectedCount int) {
 	var cmd string
 	if protocol == "udp" {
-		cmd = fmt.Sprintf("echo 'hostName' | nc -w 1 -u %s %d", targetIP, targetPort)
+		cmd = fmt.Sprintf("echo 'hostName' | timeout -t 3 nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
 		cmd = fmt.Sprintf("curl -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
 	}
 	forLoop := fmt.Sprintf("for i in $(seq 1 %d); do %s; echo; done | grep -v '^\\s*$' |sort | uniq -c | wc -l", tries, cmd)
 	By(fmt.Sprintf("Dialing from node. command:%s", forLoop))
-	stdout := config.ssh(forLoop)
+	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, forLoop)
 	Expect(strconv.Atoi(strings.TrimSpace(stdout))).To(BeNumerically("==", expectedCount))
 }
 
-func (config *KubeProxyTestConfig) ssh(cmd string) string {
-	stdout, _, code, err := SSH(cmd, config.nodes[0]+":22", testContext.Provider)
-	Expect(err).NotTo(HaveOccurred(), "error while SSH-ing to node: %v (code %v)", err, code)
-	Expect(code).Should(BeZero(), "command exited with non-zero code %v. cmd:%s", code, cmd)
-	return stdout
-}
-
-func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string) *api.Pod {
+func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
@@ -288,15 +281,12 @@ func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string) *api.Po
 						{
 							Name:          "udp",
 							ContainerPort: endpointUdpPort,
-						},
-						{
-							Name:          "host",
-							ContainerPort: endpointHttpPort,
-							HostPort:      endpointHostPort,
+							Protocol:      api.ProtocolUDP,
 						},
 					},
 				},
 			},
+			NodeName: node,
 		},
 	}
 	return pod
@@ -344,8 +334,8 @@ func (config *KubeProxyTestConfig) createNodePortService(selector map[string]str
 		Spec: api.ServiceSpec{
 			Type: api.ServiceTypeNodePort,
 			Ports: []api.ServicePort{
-				{Port: clusterHttpPort, Name: "http", Protocol: "TCP", NodePort: nodeHttpPort, TargetPort: intstr.FromInt(endpointHttpPort)},
-				{Port: clusterUdpPort, Name: "udp", Protocol: "UDP", NodePort: nodeUdpPort, TargetPort: intstr.FromInt(endpointUdpPort)},
+				{Port: clusterHttpPort, Name: "http", Protocol: api.ProtocolTCP, NodePort: nodeHttpPort, TargetPort: intstr.FromInt(endpointHttpPort)},
+				{Port: clusterUdpPort, Name: "udp", Protocol: api.ProtocolUDP, NodePort: nodeUdpPort, TargetPort: intstr.FromInt(endpointUdpPort)},
 			},
 			Selector: selector,
 		},
@@ -397,9 +387,26 @@ func (config *KubeProxyTestConfig) waitForLoadBalancerIngressSetup() {
 	config.loadBalancerService, _ = config.getServiceClient().Get(loadBalancerServiceName)
 }
 
-func (config *KubeProxyTestConfig) createTestPod() {
+func (config *KubeProxyTestConfig) createTestPods() {
 	testContainerPod := config.createTestPodSpec()
-	config.testContainerPod = config.createPod(testContainerPod)
+	hostTestContainerPod := NewHostExecPodSpec(config.f.Namespace.Name, hostTestPodName)
+
+	config.createPod(testContainerPod)
+	config.createPod(hostTestContainerPod)
+
+	expectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
+	expectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
+
+	var err error
+	config.testContainerPod, err = config.getPodClient().Get(testContainerPod.Name)
+	if err != nil {
+		Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
+	}
+
+	config.hostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name)
+	if err != nil {
+		Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
+	}
 }
 
 func (config *KubeProxyTestConfig) createService(serviceSpec *api.Service) *api.Service {
@@ -422,13 +429,16 @@ func (config *KubeProxyTestConfig) setup() {
 		selectorName: "true",
 	}
 
-	By("Getting ssh-able hosts")
-	hosts, err := NodeSSHHosts(config.f.Client)
-	Expect(err).NotTo(HaveOccurred())
-	config.nodes = make([]string, 0, len(hosts))
-	for _, h := range hosts {
-		config.nodes = append(config.nodes, strings.TrimSuffix(h, ":22"))
+	By("Getting two nodes")
+	nodeList, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get node list: %v", err))
+	config.externalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
+	if len(config.externalAddrs) < 2 {
+		// fall back to legacy IPs
+		config.externalAddrs = NodeAddresses(nodeList, api.NodeLegacyHostIP)
 	}
+	Expect(len(config.externalAddrs)).To(BeNumerically(">=", 2), fmt.Sprintf("At least two nodes necessary with an external or LegacyHostIP"))
+	config.nodes = nodeList.Items
 
 	if enableLoadBalancerTest {
 		By("Creating the LoadBalancer Service on top of the pods in kubernetes")
@@ -437,13 +447,13 @@ func (config *KubeProxyTestConfig) setup() {
 
 	By("Creating the service pods in kubernetes")
 	podName := "netserver"
-	config.endpointPods = config.createNetProxyPods(podName, serviceSelector, testContext.CloudConfig.NumNodes)
+	config.endpointPods = config.createNetProxyPods(podName, serviceSelector)
 
 	By("Creating the service on top of the pods in kubernetes")
 	config.createNodePortService(serviceSelector)
 
 	By("Creating test pods")
-	config.createTestPod()
+	config.createTestPods()
 }
 
 func (config *KubeProxyTestConfig) cleanup() {
@@ -458,23 +468,35 @@ func (config *KubeProxyTestConfig) cleanup() {
 	}
 }
 
-func (config *KubeProxyTestConfig) createNetProxyPods(podName string, selector map[string]string, nodeCount int) []*api.Pod {
-	//testContext.CloudConfig.NumNodes
-	pods := make([]*api.Pod, 0)
+func (config *KubeProxyTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
+	nodes, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
 
-	for i := 0; i < nodeCount; i++ {
+	// create pods, one for each node
+	createdPods := make([]*api.Pod, 0, len(nodes.Items))
+	for i, n := range nodes.Items {
 		podName := fmt.Sprintf("%s-%d", podName, i)
-		pod := config.createNetShellPodSpec(podName)
+		pod := config.createNetShellPodSpec(podName, n.Name)
 		pod.ObjectMeta.Labels = selector
 		createdPod := config.createPod(pod)
-		pods = append(pods, createdPod)
+		createdPods = append(createdPods, createdPod)
 	}
-	return pods
+
+	// wait that all of them are up
+	runningPods := make([]*api.Pod, 0, len(nodes.Items))
+	for _, p := range createdPods {
+		expectNoError(config.f.WaitForPodRunning(p.Name))
+		rp, err := config.getPodClient().Get(p.Name)
+		expectNoError(err)
+		runningPods = append(runningPods, rp)
+	}
+
+	return runningPods
 }
 
 func (config *KubeProxyTestConfig) deleteNetProxyPod() {
 	pod := config.endpointPods[0]
-	config.getPodClient().Delete(pod.Name, nil)
+	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
 	config.endpointPods = config.endpointPods[1:]
 	// wait for pod being deleted.
 	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, util.ForeverTestTimeout)
@@ -494,11 +516,6 @@ func (config *KubeProxyTestConfig) createPod(pod *api.Pod) *api.Pod {
 	createdPod, err := config.getPodClient().Create(pod)
 	if err != nil {
 		Failf("Failed to create %s pod: %v", pod.Name, err)
-	}
-	expectNoError(config.f.WaitForPodRunning(pod.Name))
-	createdPod, err = config.getPodClient().Get(pod.Name)
-	if err != nil {
-		Failf("Failed to retrieve %s pod: %v", pod.Name, err)
 	}
 	return createdPod
 }
