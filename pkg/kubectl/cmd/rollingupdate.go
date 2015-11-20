@@ -216,8 +216,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		}
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
-			if _, kind, err := typer.ObjectVersionAndKind(obj); err == nil {
-				return cmdutil.UsageError(cmd, "%s contains a %s not a ReplicationController", filename, kind)
+			if gvk, err := typer.ObjectKind(obj); err == nil {
+				return cmdutil.UsageError(cmd, "%s contains a %v not a ReplicationController", filename, gvk)
 			}
 			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
 			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
@@ -358,11 +358,11 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if outputFormat != "" {
 		return f.PrintObject(cmd, newRc, out)
 	}
-	_, kind, err := api.Scheme.ObjectVersionAndKind(newRc)
+	gvk, err := api.Scheme.ObjectKind(newRc)
 	if err != nil {
 		return err
 	}
-	_, res := meta.KindToResource(kind, false)
+	_, res := meta.KindToResource(gvk.Kind, false)
 	cmdutil.PrintSuccess(mapper, false, out, res, oldName, message)
 	return nil
 }

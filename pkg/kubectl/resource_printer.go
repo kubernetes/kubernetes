@@ -213,7 +213,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 			for i := 0; i < items.Len(); i++ {
 				rawObj := items.Index(i).FieldByName("RawJSON").Interface().([]byte)
 				scheme := api.Scheme
-				version, kind, err := scheme.DataVersionAndKind(rawObj)
+				groupVersionKind, err := scheme.DataKind(rawObj)
 				if err != nil {
 					return err
 				}
@@ -222,8 +222,8 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 					return err
 				}
 				tpmeta := unversioned.TypeMeta{
-					APIVersion: version,
-					Kind:       kind,
+					APIVersion: groupVersionKind.GroupVersion().String(),
+					Kind:       groupVersionKind.Kind,
 				}
 				s := reflect.ValueOf(decodedObj).Elem()
 				s.FieldByName("TypeMeta").Set(reflect.ValueOf(tpmeta))

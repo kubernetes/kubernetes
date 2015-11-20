@@ -53,10 +53,11 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	// if we are building an object reference to something not yet persisted, we should fallback to scheme
 	kind := meta.Kind()
 	if kind == "" {
-		_, kind, err = Scheme.ObjectVersionAndKind(obj)
+		gvk, err := Scheme.ObjectKind(obj)
 		if err != nil {
 			return nil, err
 		}
+		kind = gvk.Kind
 	}
 
 	// if the object referenced is actually persisted, we can also get version from meta
