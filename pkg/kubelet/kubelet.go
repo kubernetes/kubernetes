@@ -1086,7 +1086,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		// If the volume supports SELinux and it has not been
 		// relabeled already and it is not a read-only volume,
 		// relabel it and mark it as labeled
-		if vol.Builder.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled && !vol.Builder.GetAttributes().Managed {
+		if vol.Builder.GetAttributes().Managed && vol.Builder.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
