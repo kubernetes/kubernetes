@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"math"
 	"net"
 	"regexp"
 	"strings"
@@ -103,6 +104,25 @@ func IsCIdentifier(value string) bool {
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
 func IsValidPortNum(port int) bool {
 	return 0 < port && port < 65536
+}
+
+// Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
+// TODO: once we have a type for UID/GID we should make these that type.
+const (
+	minUserID  = 0
+	maxUserID  = math.MaxInt32
+	minGroupID = 0
+	maxGroupID = math.MaxInt32
+)
+
+// IsValidGroupId tests that the argument is a valid gids.
+func IsValidGroupId(gid int64) bool {
+	return minGroupID <= gid && gid <= maxGroupID
+}
+
+// IsValidUserId tests that the argument is a valid uids.
+func IsValidUserId(uid int64) bool {
+	return minUserID <= uid && uid <= maxUserID
 }
 
 const doubleHyphensFmt string = ".*(--).*"
