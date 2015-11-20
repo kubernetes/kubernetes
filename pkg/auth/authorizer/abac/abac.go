@@ -21,50 +21,35 @@ package abac
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 
+	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/abac/latest"
+	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	_ "k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
-// TODO: make this into a real API object.  Note that when that happens, it
-// will get MetaData.  However, the Kind and Namespace in the struct below
-// will be separate from the Kind and Namespace in the Metadata.  Obviously,
-// meta.Kind will be something like policy, and policy.Kind has to be allowed
-// to be different.  Less obviously, namespace needs to be different as well.
-// This will allow wildcard matching strings to be used in the future for the
-// body.Namespace, if we want to add that feature, without affecting the
-// meta.Namespace.
-type policy struct {
-	User  string `json:"user,omitempty"`
-	Group string `json:"group,omitempty"`
-	// TODO: add support for robot accounts as well as human user accounts.
-	// TODO: decide how to namespace user names when multiple authentication
-	// providers are in use. Either add "Realm", or assume "user@example.com"
-	// format.
-
-	// TODO: Make the "cluster" Kinds be one API group (nodes, bindings,
-	// events, endpoints).  The "user" Kinds are another (pods, services,
-	// replicationControllers, operations) Make a "plugin", e.g. build
-	// controller, be another group.  That way when we add a new object to a
-	// the API, we don't have to add lots of policy?
-
-	// TODO: make this a proper REST object with its own registry.
-	Readonly  bool   `json:"readonly,omitempty"`
-	Resource  string `json:"resource,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-
-	// TODO: "expires" string in RFC3339 format.
-
-	// TODO: want a way to allow some users to restart containers of a pod but
-	// not delete or modify it.
-
-	// TODO: want a way to allow a controller to create a pod based only on a
-	// certain podTemplates.
+type policyLoadError struct {
+	path string
+	line int
+	data []byte
+	err  error
 }
 
-type policyList []policy
+func (p policyLoadError) Error() string {
+	if p.line >= 0 {
+		return fmt.Sprintf("error reading policy file %s, line %d: %s: %v", p.path, p.line, string(p.data), p.err)
+	}
+	return fmt.Sprintf("error reading policy file %s: %v", p.path, p.err)
+}
+
+type policyList []*api.Policy
 
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
@@ -79,29 +64,151 @@ func NewFromFile(path string) (policyList, error) {
 	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
 
+	i := 0
+	unversionedLines := 0
 	for scanner.Scan() {
-		var p policy
+		i++
+		p := &api.Policy{}
 		b := scanner.Bytes()
-		// TODO: skip comment lines.
-		err = json.Unmarshal(b, &p)
-		if err != nil {
-			// TODO: line number in errors.
-			return nil, err
+
+		// skip comment lines and blank lines
+		trimmed := strings.TrimSpace(string(b))
+		if len(trimmed) == 0 || strings.HasPrefix(trimmed, "#") {
+			continue
 		}
+
+		version, kind, err := api.Scheme.DataVersionAndKind(b)
+		if err != nil {
+			return nil, policyLoadError{path, i, b, err}
+		}
+
+		if version == "" && kind == "" {
+			unversionedLines++
+			// Migrate unversioned policy object
+			oldPolicy := &v0.Policy{}
+			if err := latest.Codec.DecodeInto(b, oldPolicy); err != nil {
+				return nil, policyLoadError{path, i, b, err}
+			}
+			if err := api.Scheme.Convert(oldPolicy, p); err != nil {
+				return nil, policyLoadError{path, i, b, err}
+			}
+		} else {
+			decodedObj, err := latest.Codec.Decode(b)
+			if err != nil {
+				return nil, policyLoadError{path, i, b, err}
+			}
+			decodedPolicy, ok := decodedObj.(*api.Policy)
+			if !ok {
+				return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}
+			}
+			p = decodedPolicy
+		}
+
 		pl = append(pl, p)
 	}
 
+	if unversionedLines > 0 {
+		glog.Warningf(`Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.`, path)
+	}
+
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, policyLoadError{path, -1, nil, err}
 	}
 	return pl, nil
 }
 
-func (p policy) matches(a authorizer.Attributes) bool {
-	if p.subjectMatches(a) {
-		if p.Readonly == false || (p.Readonly == a.IsReadOnly()) {
-			if p.Resource == "" || (p.Resource == a.GetResource()) {
-				if p.Namespace == "" || (p.Namespace == a.GetNamespace()) {
+func matches(p api.Policy, a authorizer.Attributes) bool {
+	if subjectMatches(p, a) {
+		if verbMatches(p, a) {
+			// Resource and non-resource requests are mutually exclusive, at most one will match a policy
+			if resourceMatches(p, a) {
+				return true
+			}
+			if nonResourceMatches(p, a) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// subjectMatches returns true if specified user and group properties in the policy match the attributes
+func subjectMatches(p api.Policy, a authorizer.Attributes) bool {
+	matched := false
+
+	// If the policy specified a user, ensure it matches
+	if len(p.Spec.User) > 0 {
+		if p.Spec.User == "*" {
+			matched = true
+		} else {
+			matched = p.Spec.User == a.GetUserName()
+			if !matched {
+				return false
+			}
+		}
+	}
+
+	// If the policy specified a group, ensure it matches
+	if len(p.Spec.Group) > 0 {
+		if p.Spec.Group == "*" {
+			matched = true
+		} else {
+			matched = false
+			for _, group := range a.GetGroups() {
+				if p.Spec.Group == group {
+					matched = true
+				}
+			}
+			if !matched {
+				return false
+			}
+		}
+	}
+
+	return matched
+}
+
+func verbMatches(p api.Policy, a authorizer.Attributes) bool {
+	// TODO: match on verb
+
+	// All policies allow read only requests
+	if a.IsReadOnly() {
+		return true
+	}
+
+	// Allow if policy is not readonly
+	if !p.Spec.Readonly {
+		return true
+	}
+
+	return false
+}
+
+func nonResourceMatches(p api.Policy, a authorizer.Attributes) bool {
+	// A non-resource policy cannot match a resource request
+	if !a.IsResourceRequest() {
+		// Allow wildcard match
+		if p.Spec.NonResourcePath == "*" {
+			return true
+		}
+		// Allow exact match
+		if p.Spec.NonResourcePath == a.GetPath() {
+			return true
+		}
+		// Allow a trailing * subpath match
+		if strings.HasSuffix(p.Spec.NonResourcePath, "*") && strings.HasPrefix(a.GetPath(), strings.TrimRight(p.Spec.NonResourcePath, "*")) {
+			return true
+		}
+	}
+	return false
+}
+
+func resourceMatches(p api.Policy, a authorizer.Attributes) bool {
+	// A resource policy cannot match a non-resource request
+	if a.IsResourceRequest() {
+		if p.Spec.Namespace == "*" || p.Spec.Namespace == a.GetNamespace() {
+			if p.Spec.Resource == "*" || p.Spec.Resource == a.GetResource() {
+				if p.Spec.APIGroup == "*" || p.Spec.APIGroup == a.GetAPIGroup() {
 					return true
 				}
 			}
@@ -110,31 +217,10 @@ func (p policy) matches(a authorizer.Attributes) bool {
 	return false
 }
 
-func (p policy) subjectMatches(a authorizer.Attributes) bool {
-	if p.User != "" {
-		// Require user match
-		if p.User != a.GetUserName() {
-			return false
-		}
-	}
-
-	if p.Group != "" {
-		// Require group match
-		for _, group := range a.GetGroups() {
-			if p.Group == group {
-				return true
-			}
-		}
-		return false
-	}
-
-	return true
-}
-
 // Authorizer implements authorizer.Authorize
 func (pl policyList) Authorize(a authorizer.Attributes) error {
 	for _, p := range pl {
-		if p.matches(a) {
+		if matches(*p, a) {
 			return nil
 		}
 	}
