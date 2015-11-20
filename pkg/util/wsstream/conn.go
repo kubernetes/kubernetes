@@ -106,15 +106,17 @@ func ignoreReceives(ws *websocket.Conn, timeout time.Duration) {
 // no error if no protocol is specified.
 func handshake(config *websocket.Config, req *http.Request, allowed []string) error {
 	protocols := config.Protocol
-	if len(protocols) == 0 {
+	if len(protocols) == 0 || len(allowed) == 0 {
 		return nil
 	}
+	isallow := map[string]bool{}
+	for _, v := range allowed {
+		isallow[v] = true
+	}
 	for _, protocol := range protocols {
-		for _, allow := range allowed {
-			if allow == protocol {
-				config.Protocol = []string{protocol}
-				return nil
-			}
+		if isallow[protocol] {
+			config.Protocol = []string{protocol}
+			return nil
 		}
 	}
 	return fmt.Errorf("requested protocol(s) are not supported: %v; supports %v", config.Protocol, allowed)
