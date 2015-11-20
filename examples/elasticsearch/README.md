@@ -745,15 +745,14 @@ So we have a 3-node Elasticsearch cluster ready to handle more work.
 
 ```
 $ kubectl get service elasticsearch
-NAME            LABELS                    SELECTOR                  IP(S)           PORT(S)
-elasticsearch   component=elasticsearch   component=elasticsearch   10.100.108.94   9200/TCP
-                                                                                    9300/TCP
+NAME            CLUSTER_IP      EXTERNAL_IP      PORT(S)             SELECTOR                  AGE
+elasticsearch   10.59.241.197                    9200/TCP,9300/TCP   component=elasticsearch   14m
 ```
 
 From any host on your cluster (that's running `kube-proxy`), run:
 
 ```
-$ curl 10.100.108.94:9200
+$ curl 10.59.241.197:9200
 ```
 
 You should see something similar to the following:
@@ -761,15 +760,14 @@ You should see something similar to the following:
 
 ```json
 {
-  "status" : 200,
-  "name" : "Hammerhead",
+  "name" : "Yuriko Oyama",
   "cluster_name" : "myesdb",
   "version" : {
-    "number" : "1.7.1",
-    "build_hash" : "b88f43fc40b0bcd7f173a1f9ee2e97816de80b19",
-    "build_timestamp" : "2015-07-29T09:54:16Z",
+    "number" : "2.0.0",
+    "build_hash" : "de54438d6af8f9340d50c5c786151783ce7d6be5",
+    "build_timestamp" : "2015-10-22T08:09:48Z",
     "build_snapshot" : false,
-    "lucene_version" : "4.10.4"
+    "lucene_version" : "5.2.1"
   },
   "tagline" : "You Know, for Search"
 }
@@ -785,12 +783,12 @@ curl 10.100.108.94:9200/_cluster/health?pretty
 You should see something similar to the following:
 
 ```json
-{
+
   "cluster_name" : "myesdb",
   "status" : "green",
   "timed_out" : false,
-  "number_of_nodes" : 3,
-  "number_of_data_nodes" : 3,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
   "active_primary_shards" : 0,
   "active_shards" : 0,
   "relocating_shards" : 0,
@@ -798,7 +796,9 @@ You should see something similar to the following:
   "unassigned_shards" : 0,
   "delayed_unassigned_shards" : 0,
   "number_of_pending_tasks" : 0,
-  "number_of_in_flight_fetch" : 0
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 100.0
 }
 ```
 
