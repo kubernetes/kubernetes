@@ -76,30 +76,30 @@ Now, I leave up to you how to validate the cluster, but a first step is to wait 
 
 ```
 $ kubectl get pods
-NAME              READY     STATUS    RESTARTS   AGE
-es-client-2ep9o   1/1       Running   0          2m
-es-data-r9tgv     1/1       Running   0          1m
-es-master-vxl6c   1/1       Running   0          6m
+NAME                      READY     STATUS    RESTARTS   AGE
+es-client-foqvh           1/1       Running   0          27s
+es-data-5qo1f             1/1       Running   0          14s
+es-master-iwwzq           1/1       Running   0          2m
 ```
 
 ```
-$ kubectl logs es-master-vxl6c
+$ kubectl logs es-master-iwwzq
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
-[2015-08-21 10:58:51,324][INFO ][node                     ] [Arc] version[1.7.1], pid[8], build[b88f43f/2015-07-29T09:54:16Z]
-[2015-08-21 10:58:51,328][INFO ][node                     ] [Arc] initializing ...
-[2015-08-21 10:58:51,542][INFO ][plugins                  ] [Arc] loaded [cloud-kubernetes], sites []
-[2015-08-21 10:58:51,624][INFO ][env                      ] [Arc] using [1] data paths, mounts [[/data (/dev/sda9)]], net usable_space [14.4gb], net total_space [15.5gb], types [ext4]
-[2015-08-21 10:58:57,439][INFO ][node                     ] [Arc] initialized
-[2015-08-21 10:58:57,439][INFO ][node                     ] [Arc] starting ...
-[2015-08-21 10:58:57,782][INFO ][transport                ] [Arc] bound_address {inet[/0:0:0:0:0:0:0:0:9300]}, publish_address {inet[/10.244.15.2:9300]}
-[2015-08-21 10:58:57,847][INFO ][discovery                ] [Arc] myesdb/-x16XFUzTCC8xYqWoeEOYQ
-[2015-08-21 10:59:05,167][INFO ][cluster.service          ] [Arc] new_master [Arc][-x16XFUzTCC8xYqWoeEOYQ][es-master-vxl6c][inet[/10.244.15.2:9300]]{data=false, master=true}, reason: zen-disco-join (elected_as_master)
-[2015-08-21 10:59:05,202][INFO ][node                     ] [Arc] started
-[2015-08-21 10:59:05,238][INFO ][gateway                  ] [Arc] recovered [0] indices into cluster_state
-[2015-08-21 11:02:28,797][INFO ][cluster.service          ] [Arc] added {[Gideon][4EfhWSqaTqikbK4tI7bODA][es-data-r9tgv][inet[/10.244.59.4:9300]]{master=false},}, reason: zen-disco-receive(join from node[[Gideon][4EfhWSqaTqikbK4tI7bODA][es-data-r9tgv][inet[/10.244.59.4:9300]]{master=false}])
-[2015-08-21 11:03:16,822][INFO ][cluster.service          ] [Arc] added {[Venomm][tFYxwgqGSpOejHLG4umRqg][es-client-2ep9o][inet[/10.244.53.2:9300]]{data=false, master=false},}, reason: zen-disco-receive(join from node[[Venomm][tFYxwgqGSpOejHLG4umRqg][es-client-2ep9o][inet[/10.244.53.2:9300]]{data=false, master=false}])
+[2015-11-20 17:11:16,586][INFO ][node                     ] [Dragon Lord] version[2.0.0], pid[13], build[de54438/2015-10-22T08:09:48Z]
+[2015-11-20 17:11:16,586][INFO ][node                     ] [Dragon Lord] initializing ...
+[2015-11-20 17:11:16,938][INFO ][plugins                  ] [Dragon Lord] loaded [cloud-kubernetes], sites []
+[2015-11-20 17:11:16,973][INFO ][env                      ] [Dragon Lord] using [1] data paths, mounts [[/data (/dev/disk/by-uuid/7c2ba6f8-3e2f-49da-9d24-211659759bdb)]], net usable_space [90.1gb], net total_space [98.3gb], spins? [possibly], types [ext4]
+[2015-11-20 17:11:19,545][INFO ][node                     ] [Dragon Lord] initialized
+[2015-11-20 17:11:19,545][INFO ][node                     ] [Dragon Lord] starting ...
+[2015-11-20 17:11:19,614][INFO ][transport                ] [Dragon Lord] publish_address {10.56.0.18:9300}, bound_addresses {10.56.0.18:9300}
+[2015-11-20 17:11:19,622][INFO ][discovery                ] [Dragon Lord] myesdb/7j08TLoRRDa5pnZiGfN9sA
+[2015-11-20 17:11:23,881][INFO ][cluster.service          ] [Dragon Lord] new_master {Dragon Lord}{7j08TLoRRDa5pnZiGfN9sA}{10.56.0.18}{10.56.0.18:9300}{data=false, master=true}, reason: zen-disco-join(elected_as_master, [0] joins received)
+[2015-11-20 17:11:23,898][INFO ][node                     ] [Dragon Lord] started
+[2015-11-20 17:11:23,935][INFO ][gateway                  ] [Dragon Lord] recovered [0] indices into cluster_state
+[2015-11-20 17:13:16,171][INFO ][cluster.service          ] [Dragon Lord] added {{Gog}{R2t5vWTRTYCjwdPWAvOt7A}{10.56.0.19}{10.56.0.19:9300}{data=false, master=false},}, reason: zen-disco-join(join from node[{Gog}{R2t5vWTRTYCjwdPWAvOt7A}{10.56.0.19}{10.56.0.19:9300}{data=false, master=false}])
+[2015-11-20 17:13:30,052][INFO ][cluster.service          ] [Dragon Lord] added {{Stryfe}{lzrKBd4RTxuBY5SxcQOstg}{10.56.0.20}{10.56.0.20:9300}{master=false},}, reason: zen-disco-join(join from node[{Stryfe}{lzrKBd4RTxuBY5SxcQOstg}{10.56.0.20}{10.56.0.20:9300}{master=false}])
 ```
 
 As you can assert, the cluster is up and running. Easy, wasn't it?
@@ -118,40 +118,40 @@ Did it work?
 
 ```
 $ kubectl get pods
-NAME              READY     STATUS    RESTARTS   AGE
-es-client-2ep9o   1/1       Running   0          4m
-es-client-ye5s1   1/1       Running   0          50s
-es-data-8az22     1/1       Running   0          47s
-es-data-r9tgv     1/1       Running   0          3m
-es-master-57h7k   1/1       Running   0          52s
-es-master-kuwse   1/1       Running   0          52s
-es-master-vxl6c   1/1       Running   0          8m
+NAME                      READY     STATUS    RESTARTS   AGE
+es-client-foqvh           1/1       Running   0          2m
+es-client-oqfjk           1/1       Running   0          14s
+es-data-5qo1f             1/1       Running   0          2m
+es-data-75pic             1/1       Running   0          6s
+es-master-00e41           1/1       Running   0          24s
+es-master-4elbk           1/1       Running   0          24s
+es-master-iwwzq           1/1       Running   0          4m
 ```
 
 Let's take another look of the Elasticsearch master logs:
 
 ```
-$ kubectl logs es-master-vxl6c
+$ kubectl logs es-master-iwwzq
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
-[2015-08-21 10:58:51,324][INFO ][node                     ] [Arc] version[1.7.1], pid[8], build[b88f43f/2015-07-29T09:54:16Z]
-[2015-08-21 10:58:51,328][INFO ][node                     ] [Arc] initializing ...
-[2015-08-21 10:58:51,542][INFO ][plugins                  ] [Arc] loaded [cloud-kubernetes], sites []
-[2015-08-21 10:58:51,624][INFO ][env                      ] [Arc] using [1] data paths, mounts [[/data (/dev/sda9)]], net usable_space [14.4gb], net total_space [15.5gb], types [ext4]
-[2015-08-21 10:58:57,439][INFO ][node                     ] [Arc] initialized
-[2015-08-21 10:58:57,439][INFO ][node                     ] [Arc] starting ...
-[2015-08-21 10:58:57,782][INFO ][transport                ] [Arc] bound_address {inet[/0:0:0:0:0:0:0:0:9300]}, publish_address {inet[/10.244.15.2:9300]}
-[2015-08-21 10:58:57,847][INFO ][discovery                ] [Arc] myesdb/-x16XFUzTCC8xYqWoeEOYQ
-[2015-08-21 10:59:05,167][INFO ][cluster.service          ] [Arc] new_master [Arc][-x16XFUzTCC8xYqWoeEOYQ][es-master-vxl6c][inet[/10.244.15.2:9300]]{data=false, master=true}, reason: zen-disco-join (elected_as_master)
-[2015-08-21 10:59:05,202][INFO ][node                     ] [Arc] started
-[2015-08-21 10:59:05,238][INFO ][gateway                  ] [Arc] recovered [0] indices into cluster_state
-[2015-08-21 11:02:28,797][INFO ][cluster.service          ] [Arc] added {[Gideon][4EfhWSqaTqikbK4tI7bODA][es-data-r9tgv][inet[/10.244.59.4:9300]]{master=false},}, reason: zen-disco-receive(join from node[[Gideon][4EfhWSqaTqikbK4tI7bODA][es-data-r9tgv][inet[/10.244.59.4:9300]]{master=false}])
-[2015-08-21 11:03:16,822][INFO ][cluster.service          ] [Arc] added {[Venomm][tFYxwgqGSpOejHLG4umRqg][es-client-2ep9o][inet[/10.244.53.2:9300]]{data=false, master=false},}, reason: zen-disco-receive(join from node[[Venomm][tFYxwgqGSpOejHLG4umRqg][es-client-2ep9o][inet[/10.244.53.2:9300]]{data=false, master=false}])
-[2015-08-21 11:04:40,781][INFO ][cluster.service          ] [Arc] added {[Erik Josten][QUJlahfLTi-MsxzM6_Da0g][es-master-kuwse][inet[/10.244.59.5:9300]]{data=false, master=true},}, reason: zen-disco-receive(join from node[[Erik Josten][QUJlahfLTi-MsxzM6_Da0g][es-master-kuwse][inet[/10.244.59.5:9300]]{data=false, master=true}])
-[2015-08-21 11:04:41,076][INFO ][cluster.service          ] [Arc] added {[Power Princess][V4qnR-6jQOS5ovXQsPgo7g][es-master-57h7k][inet[/10.244.53.3:9300]]{data=false, master=true},}, reason: zen-disco-receive(join from node[[Power Princess][V4qnR-6jQOS5ovXQsPgo7g][es-master-57h7k][inet[/10.244.53.3:9300]]{data=false, master=true}])
-[2015-08-21 11:04:53,966][INFO ][cluster.service          ] [Arc] added {[Cagliostro][Wpfx5fkBRiG2qCEWd8laaQ][es-client-ye5s1][inet[/10.244.15.3:9300]]{data=false, master=false},}, reason: zen-disco-receive(join from node[[Cagliostro][Wpfx5fkBRiG2qCEWd8laaQ][es-client-ye5s1][inet[/10.244.15.3:9300]]{data=false, master=false}])
-[2015-08-21 11:04:56,803][INFO ][cluster.service          ] [Arc] added {[Thog][vkdEtX3ESfWmhXXf-Wi0_Q][es-data-8az22][inet[/10.244.15.4:9300]]{master=false},}, reason: zen-disco-receive(join from node[[Thog][vkdEtX3ESfWmhXXf-Wi0_Q][es-data-8az22][inet[/10.244.15.4:9300]]{master=false}])
+[2015-11-20 17:11:16,586][INFO ][node                     ] [Dragon Lord] version[2.0.0], pid[13], build[de54438/2015-10-22T08:09:48Z]
+[2015-11-20 17:11:16,586][INFO ][node                     ] [Dragon Lord] initializing ...
+[2015-11-20 17:11:16,938][INFO ][plugins                  ] [Dragon Lord] loaded [cloud-kubernetes], sites []
+[2015-11-20 17:11:16,973][INFO ][env                      ] [Dragon Lord] using [1] data paths, mounts [[/data (/dev/disk/by-uuid/7c2ba6f8-3e2f-49da-9d24-211659759bdb)]], net usable_space [90.1gb], net total_space [98.3gb], spins? [possibly], types [ext4]
+[2015-11-20 17:11:19,545][INFO ][node                     ] [Dragon Lord] initialized
+[2015-11-20 17:11:19,545][INFO ][node                     ] [Dragon Lord] starting ...
+[2015-11-20 17:11:19,614][INFO ][transport                ] [Dragon Lord] publish_address {10.56.0.18:9300}, bound_addresses {10.56.0.18:9300}
+[2015-11-20 17:11:19,622][INFO ][discovery                ] [Dragon Lord] myesdb/7j08TLoRRDa5pnZiGfN9sA
+[2015-11-20 17:11:23,881][INFO ][cluster.service          ] [Dragon Lord] new_master {Dragon Lord}{7j08TLoRRDa5pnZiGfN9sA}{10.56.0.18}{10.56.0.18:9300}{data=false, master=true}, reason: zen-disco-join(elected_as_master, [0] joins received)
+[2015-11-20 17:11:23,898][INFO ][node                     ] [Dragon Lord] started
+[2015-11-20 17:11:23,935][INFO ][gateway                  ] [Dragon Lord] recovered [0] indices into cluster_state
+[2015-11-20 17:13:16,171][INFO ][cluster.service          ] [Dragon Lord] added {{Gog}{R2t5vWTRTYCjwdPWAvOt7A}{10.56.0.19}{10.56.0.19:9300}{data=false, master=false},}, reason: zen-disco-join(join from node[{Gog}{R2t5vWTRTYCjwdPWAvOt7A}{10.56.0.19}{10.56.0.19:9300}{data=false, master=false}])
+[2015-11-20 17:13:30,052][INFO ][cluster.service          ] [Dragon Lord] added {{Stryfe}{lzrKBd4RTxuBY5SxcQOstg}{10.56.0.20}{10.56.0.20:9300}{master=false},}, reason: zen-disco-join(join from node[{Stryfe}{lzrKBd4RTxuBY5SxcQOstg}{10.56.0.20}{10.56.0.20:9300}{master=false}])
+[2015-11-20 17:15:39,365][INFO ][cluster.service          ] [Dragon Lord] added {{Bird-Brain}{ZlwQuV8fSWqvbeU6vcvnQw}{10.56.2.12}{10.56.2.12:9300}{data=false, master=true},}, reason: zen-disco-join(join from node[{Bird-Brain}{ZlwQuV8fSWqvbeU6vcvnQw}{10.56.2.12}{10.56.2.12:9300}{data=false, master=true}])
+[2015-11-20 17:15:39,873][INFO ][cluster.service          ] [Dragon Lord] added {{Captain Barracuda}{PMJ1PTLYR5i8NGShUfHZqA}{10.56.1.10}{10.56.1.10:9300}{data=false, master=true},}, reason: zen-disco-join(join from node[{Captain Barracuda}{PMJ1PTLYR5i8NGShUfHZqA}{10.56.1.10}{10.56.1.10:9300}{data=false, master=true}])
+[2015-11-20 17:15:49,514][INFO ][cluster.service          ] [Dragon Lord] added {{Windshear}{cZ7n8MPdQDKDR4vaq97p8Q}{10.56.2.13}{10.56.2.13:9300}{data=false, master=false},}, reason: zen-disco-join(join from node[{Windshear}{cZ7n8MPdQDKDR4vaq97p8Q}{10.56.2.13}{10.56.2.13:9300}{data=false, master=false}])
+[2015-11-20 17:15:58,818][INFO ][cluster.service          ] [Dragon Lord] added {{Spirit of '76}{ckJzSSd6T0-0p2rDU1cIew}{10.56.1.11}{10.56.1.11:9300}{master=false},}, reason: zen-disco-join(join from node[{Spirit of '76}{ckJzSSd6T0-0p2rDU1cIew}{10.56.1.11}{10.56.1.11:9300}{master=false}])
 ```
 
 ## Access the service
@@ -160,14 +160,14 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 
 ```
 $ kubectl get service elasticsearch
-NAME            LABELS                                SELECTOR                              IP(S)          PORT(S)
-elasticsearch   component=elasticsearch,role=client   component=elasticsearch,role=client   10.100.134.2   9200/TCP
+NAME            CLUSTER_IP     EXTERNAL_IP      PORT(S)    SELECTOR                              AGE
+elasticsearch   10.59.250.92                    9200/TCP   component=elasticsearch,role=client   5m
 ```
 
 From any host on your cluster (that's running `kube-proxy`), run:
 
 ```
-curl http://10.100.134.2:9200
+curl http://10.59.250.92:9200
 ```
 
 You should see something similar to the following:
@@ -175,15 +175,14 @@ You should see something similar to the following:
 
 ```json
 {
-  "status" : 200,
-  "name" : "Cagliostro",
+  "name" : "Gog",
   "cluster_name" : "myesdb",
   "version" : {
-    "number" : "1.7.1",
-    "build_hash" : "b88f43fc40b0bcd7f173a1f9ee2e97816de80b19",
-    "build_timestamp" : "2015-07-29T09:54:16Z",
+    "number" : "2.0.0",
+    "build_hash" : "de54438d6af8f9340d50c5c786151783ce7d6be5",
+    "build_timestamp" : "2015-10-22T08:09:48Z",
     "build_snapshot" : false,
-    "lucene_version" : "4.10.4"
+    "lucene_version" : "5.2.1"
   },
   "tagline" : "You Know, for Search"
 }
@@ -193,7 +192,7 @@ Or if you want to check cluster information:
 
 
 ```
-curl http://10.100.134.2:9200/_cluster/health?pretty
+curl http://10.59.250.92:9200/_cluster/health?pretty
 ```
 
 You should see something similar to the following:
@@ -212,7 +211,9 @@ You should see something similar to the following:
   "unassigned_shards" : 0,
   "delayed_unassigned_shards" : 0,
   "number_of_pending_tasks" : 0,
-  "number_of_in_flight_fetch" : 0
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 100.0
 }
 ```
 
