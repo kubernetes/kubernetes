@@ -17,10 +17,11 @@ spec:
       containers:
       - name: es-data
         securityContext:
+          privileged: true
           capabilities:
             add:
               - IPC_LOCK
-        image: quay.io/pires/docker-elasticsearch-kubernetes:1.7.1-4
+        image: quay.io/pires/docker-elasticsearch-kubernetes:2.0.0
         env:
         - name: KUBERNETES_CA_CERTIFICATE_FILE
           value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -43,5 +44,3 @@ spec:
           name: storage
       volumes:
       - name: storage
-        source:
-          emptyDir: {}
