@@ -16,7 +16,6 @@ base:
     - helpers
     - cadvisor
     - kube-client-tools
-    - kube-node-unpacker
     - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-minion
