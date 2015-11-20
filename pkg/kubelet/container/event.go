@@ -35,7 +35,7 @@ const (
 
 	// kubelet event reason list
 	NodeReady               = "NodeReady"
-	NodeNotReady            = "NodeReady"
+	NodeNotReady            = "NodeNotReady"
 	NodeSchedulable         = "NodeSchedulable"
 	NodeNotSchedulable      = "NodeNotSchedulable"
 	StartingKubelet         = "Starting"
