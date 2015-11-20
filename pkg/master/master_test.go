@@ -44,15 +44,17 @@ import (
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	thirdpartyresourcedatastorage "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/emicklei/go-restful"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -527,13 +529,12 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 	}
 	for _, test := range tests {
 		func() {
-			_, etcdserver, server, assert := initThirdParty(t, version)
+			master, etcdserver, server, assert := initThirdParty(t, version)
 			defer server.Close()
 			defer etcdserver.Terminate(t)
 
-			client := etcdserver.Client
 			if test.items != nil {
-				setupEtcdList(client, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
 			}
 
 			resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos")
@@ -587,7 +588,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 	}
 }
 
-func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
+func encodeToThirdParty(name string, obj interface{}) (runtime.Object, error) {
 	serial, err := json.Marshal(obj)
 	if err != nil {
 		return nil, err
@@ -596,23 +597,20 @@ func encodeToThirdParty(name string, obj interface{}) ([]byte, error) {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Data:       serial,
 	}
-	return testapi.Extensions.Codec().Encode(&thirdPartyData)
+	return &thirdPartyData, nil
 }
 
-// TODO: Convert to storage.Interface.
-func storeToEtcd(client tools.EtcdClient, path, name string, obj interface{}) error {
+func storeThirdPartyObject(s storage.Interface, path, name string, obj interface{}) error {
 	data, err := encodeToThirdParty(name, obj)
 	if err != nil {
 		return err
 	}
-	_, err = client.Set(etcdtest.PathPrefix()+path, string(data), 0)
-	return err
+	return s.Set(context.TODO(), etcdtest.AddPrefix(path), data, nil, 0)
 }
 
-// TODO: Convert to storage.Interface.
-func setupEtcdList(client tools.EtcdClient, path string, list []Foo) error {
+func storeThirdPartyList(s storage.Interface, path string, list []Foo) error {
 	for _, obj := range list {
-		if err := storeToEtcd(client, path+"/"+obj.Name, obj.Name, obj); err != nil {
+		if err := storeThirdPartyObject(s, path+"/"+obj.Name, obj.Name, obj); err != nil {
 			return err
 		}
 	}
@@ -640,11 +638,10 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 }
 
 func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
-	_, etcdserver, server, assert := initThirdParty(t, version)
+	master, etcdserver, server, assert := initThirdParty(t, version)
 	defer server.Close()
 	defer etcdserver.Terminate(t)
 
-	client := etcdserver.Client
 	expectedObj := Foo{
 		ObjectMeta: api.ObjectMeta{
 			Name: "test",
@@ -656,7 +653,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeToEtcd(client, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
@@ -688,11 +685,10 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 }
 
 func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
-	_, etcdserver, server, assert := initThirdParty(t, version)
+	master, etcdserver, server, assert := initThirdParty(t, version)
 	defer server.Close()
 	defer etcdserver.Terminate(t)
 
-	client := etcdserver.Client
 	inputObj := Foo{
 		ObjectMeta: api.ObjectMeta{
 			Name: "test",
@@ -731,19 +727,14 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	etcdResp, err := client.Get(etcdtest.PathPrefix()+"/ThirdPartyResourceData/company.com/foos/default/test", false, false)
+	thirdPartyObj := extensions.ThirdPartyResourceData{}
+	err = master.thirdPartyStorage.Get(
+		context.TODO(), etcdtest.AddPrefix("/ThirdPartyResourceData/company.com/foos/default/test"),
+		&thirdPartyObj, false)
 	if !assert.NoError(err) {
 		t.FailNow()
 	}
 
-	obj, err := testapi.Extensions.Codec().Decode([]byte(etcdResp.Node.Value))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	thirdPartyObj, ok := obj.(*extensions.ThirdPartyResourceData)
-	if !ok {
-		t.Errorf("unexpected object: %v", obj)
-	}
 	item = Foo{}
 	assert.NoError(json.Unmarshal(thirdPartyObj.Data, &item))
 
@@ -759,11 +750,10 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 }
 
 func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
-	_, etcdserver, server, assert := initThirdParty(t, version)
+	master, etcdserver, server, assert := initThirdParty(t, version)
 	defer server.Close()
 	defer etcdserver.Terminate(t)
 
-	client := etcdserver.Client
 	expectedObj := Foo{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "test",
@@ -775,7 +765,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeToEtcd(client, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
@@ -813,7 +803,9 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
 	expectedDeletedKey := etcdtest.AddPrefix("ThirdPartyResourceData/company.com/foos/default/test")
-	_, err = client.Get(expectedDeletedKey, false, false)
+	thirdPartyObj := extensions.ThirdPartyResourceData{}
+	err = master.thirdPartyStorage.Get(
+		context.TODO(), expectedDeletedKey, &thirdPartyObj, false)
 	if !etcdstorage.IsEtcdNotFound(err) {
 		t.Errorf("expected deletion didn't happen: %v", err)
 	}
@@ -839,7 +831,6 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	defer server.Close()
 	defer etcdserver.Terminate(t)
 
-	client := etcdserver.Client
 	expectedObj := Foo{
 		ObjectMeta: api.ObjectMeta{
 			Name: "test",
@@ -850,13 +841,13 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeToEtcd(client, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
 	secondObj := expectedObj
 	secondObj.Name = "bar"
-	if !assert.NoError(storeToEtcd(client, "/ThirdPartyResourceData/company.com/foos/default/bar", "bar", secondObj)) {
+	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/bar", "bar", secondObj)) {
 		t.FailNow()
 		return
 	}
@@ -900,7 +891,8 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		etcdtest.AddPrefix("/ThirdPartyResourceData/company.com/foos/default/bar"),
 	}
 	for _, key := range expectedDeletedKeys {
-		_, err := client.Get(key, false, false)
+		thirdPartyObj := extensions.ThirdPartyResourceData{}
+		err := master.thirdPartyStorage.Get(context.TODO(), key, &thirdPartyObj, false)
 		if !etcdstorage.IsEtcdNotFound(err) {
 			t.Errorf("expected deletion didn't happen: %v", err)
 		}
