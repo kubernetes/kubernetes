@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 
@@ -103,6 +104,68 @@ func TestGetEnv(t *testing.T) {
 	envStrings := cmdutil.GetFlagStringSlice(cmd, "env")
 	if len(envStrings) != 2 || !reflect.DeepEqual(envStrings, test.expected) {
 		t.Errorf("expected: %s, saw: %s", test.expected, envStrings)
+	}
+}
+
+func TestRunArgsFollowDashRules(t *testing.T) {
+	_, _, rc := testData()
+
+	tests := []struct {
+		args          []string
+		argsLenAtDash int
+		expectError   bool
+		name          string
+	}{
+		{
+			args:          []string{},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "empty",
+		},
+		{
+			args:          []string{"foo"},
+			argsLenAtDash: -1,
+			expectError:   false,
+			name:          "no cmd",
+		},
+		{
+			args:          []string{"foo", "sleep"},
+			argsLenAtDash: -1,
+			expectError:   false,
+			name:          "cmd no dash",
+		},
+		{
+			args:          []string{"foo", "sleep"},
+			argsLenAtDash: 1,
+			expectError:   false,
+			name:          "cmd has dash",
+		},
+		{
+			args:          []string{"foo", "sleep"},
+			argsLenAtDash: 0,
+			expectError:   true,
+			name:          "no name",
+		},
+	}
+	for _, test := range tests {
+		f, tf, codec := NewAPIFactory()
+		tf.Client = &fake.RESTClient{
+			Codec: codec,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = &client.Config{}
+		cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+		cmd.Flags().Set("image", "nginx")
+		err := Run(f, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
+		if test.expectError && err == nil {
+			t.Errorf("unexpected non-error (%s)", test.name)
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("unexpected error: %v (%s)", err, test.name)
+		}
 	}
 }
 
