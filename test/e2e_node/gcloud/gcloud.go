@@ -72,13 +72,14 @@ func (gc *gCloudClientImpl) Command(cmd string, moreargs ...string) ([]byte, err
 	return exec.Command("gcloud", args...).CombinedOutput()
 }
 
-func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string, cmd string, moreargs ...string) ([]byte, error) {
+func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string, dir string, cmd string, moreargs ...string) ([]byte, error) {
 	tunnelStr := fmt.Sprintf("-L %s:localhost:%s", lPort, rPort)
 	args := []string{"compute", "ssh"}
 	if gc.zone != "" {
 		args = append(args, "--zone", gc.zone)
 	}
 	args = append(args, "--ssh-flag", tunnelStr, gc.host, "--")
+	args = append(args, "cd", dir, ";")
 	if sudo {
 		args = append(args, "sudo")
 	}
@@ -143,10 +144,10 @@ func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string,
 	// Do the setup
 	go func() {
 		// Start the process
-		out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, cmd, args...)
+		out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, tDir, fmt.Sprintf("./%s", f), args...)
 		if err != nil {
 			glog.Errorf("command failed %v", err)
-			h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))}
+			h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", f, strings.Join(args, " "))}
 			return
 		}
 	}()
