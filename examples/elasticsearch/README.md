@@ -58,28 +58,27 @@ Let's see if it worked:
 
 ```
 $ kubectl get pods
-NAME             READY     STATUS    RESTARTS   AGE
-es-kfymw         1/1       Running   0          7m
-kube-dns-p3v1u   3/3       Running   0          19m
+NAME                      READY     STATUS    RESTARTS   AGE
+es-v8fzi                  1/1       Running   0          13s
 ```
 
 ```
-$ kubectl logs es-kfymw
+$ kubectl logs es-v8fzi
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
 log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
-[2015-08-30 10:01:31,946][INFO ][node                     ] [Hammerhead] version[1.7.1], pid[7], build[b88f43f/2015-07-29T09:54:16Z]
-[2015-08-30 10:01:31,946][INFO ][node                     ] [Hammerhead] initializing ...
-[2015-08-30 10:01:32,110][INFO ][plugins                  ] [Hammerhead] loaded [cloud-kubernetes], sites []
-[2015-08-30 10:01:32,153][INFO ][env                      ] [Hammerhead] using [1] data paths, mounts [[/data (/dev/sda9)]], net usable_space [14.4gb], net total_space [15.5gb], types [ext4]
-[2015-08-30 10:01:37,188][INFO ][node                     ] [Hammerhead] initialized
-[2015-08-30 10:01:37,189][INFO ][node                     ] [Hammerhead] starting ...
-[2015-08-30 10:01:37,499][INFO ][transport                ] [Hammerhead] bound_address {inet[/0:0:0:0:0:0:0:0:9300]}, publish_address {inet[/10.244.48.2:9300]}
-[2015-08-30 10:01:37,550][INFO ][discovery                ] [Hammerhead] myesdb/n2-6uu_UT3W5XNrjyqBPiA
-[2015-08-30 10:01:43,966][INFO ][cluster.service          ] [Hammerhead] new_master [Hammerhead][n2-6uu_UT3W5XNrjyqBPiA][es-kfymw][inet[/10.244.48.2:9300]]{master=true}, reason: zen-disco-join (elected_as_master)
-[2015-08-30 10:01:44,010][INFO ][http                     ] [Hammerhead] bound_address {inet[/0:0:0:0:0:0:0:0:9200]}, publish_address {inet[/10.244.48.2:9200]}
-[2015-08-30 10:01:44,011][INFO ][node                     ] [Hammerhead] started
-[2015-08-30 10:01:44,042][INFO ][gateway                  ] [Hammerhead] recovered [0] indices into cluster_state
+[2015-11-20 18:27:53,449][INFO ][node                     ] [Danielle Moonstar] version[2.0.0], pid[13], build[de54438/2015-10-22T08:09:48Z]
+[2015-11-20 18:27:53,456][INFO ][node                     ] [Danielle Moonstar] initializing ...
+[2015-11-20 18:27:53,786][INFO ][plugins                  ] [Danielle Moonstar] loaded [cloud-kubernetes], sites []
+[2015-11-20 18:27:53,823][INFO ][env                      ] [Danielle Moonstar] using [1] data paths, mounts [[/data (/dev/disk/by-uuid/7c2ba6f8-3e2f-49da-9d24-211659759bdb)]], net usable_space [90gb], net total_space [98.3gb], spins? [possibly], types [ext4]
+[2015-11-20 18:27:56,545][INFO ][node                     ] [Danielle Moonstar] initialized
+[2015-11-20 18:27:56,551][INFO ][node                     ] [Danielle Moonstar] starting ...
+[2015-11-20 18:27:56,612][INFO ][transport                ] [Danielle Moonstar] publish_address {10.56.0.21:9300}, bound_addresses {10.56.0.21:9300}
+[2015-11-20 18:27:56,622][INFO ][discovery                ] [Danielle Moonstar] myesdb/C9nmBJw3TJ22JcAVQmdNeg
+[2015-11-20 18:28:01,571][INFO ][cluster.service          ] [Danielle Moonstar] new_master {Danielle Moonstar}{C9nmBJw3TJ22JcAVQmdNeg}{10.56.0.21}{10.56.0.21:9300}{master=true}, reason: zen-disco-join(elected_as_master, [0] joins received)
+[2015-11-20 18:28:01,614][INFO ][http                     ] [Danielle Moonstar] publish_address {10.56.0.21:9200}, bound_addresses {10.56.0.21:9200}
+[2015-11-20 18:28:01,615][INFO ][node                     ] [Danielle Moonstar] started
+[2015-11-20 18:28:01,652][INFO ][gateway                  ] [Danielle Moonstar] recovered [0] indices into cluster_state
 ```
 
 So we have a 1-node Elasticsearch cluster ready to handle some work.
