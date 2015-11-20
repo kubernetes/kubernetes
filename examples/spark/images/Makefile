@@ -1,4 +1,4 @@
-all: push
+all: spark zeppelin
 push: push-spark push-zeppelin
 .PHONY: push push-spark push-zeppelin spark zeppelin zeppelin-build
 
