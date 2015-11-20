@@ -125,6 +125,7 @@ __custom_func() {
    * componentstatuses (aka 'cs')
    * endpoints (aka 'ep')
    * quota
+   * horizontalpodautoscalers (aka 'hpa')
 `
 )
 
