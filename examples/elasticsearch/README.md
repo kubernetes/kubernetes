@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 # Elasticsearch for Kubernetes
 
 Kubernetes makes it trivial for anyone to easily build and scale [Elasticsearch](http://www.elasticsearch.org/) clusters. Here, you'll find how to do so.
-Current Elasticsearch version is `1.7.1`.
+Current Elasticsearch version is `2.0.0`.
 
 [A more robust example that follows Elasticsearch best-practices of separating nodes concern is also available](production_cluster/README.md).
 
@@ -83,50 +83,6 @@ log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFil
 ```
 
 So we have a 1-node Elasticsearch cluster ready to handle some work.
-
-## Scale
-
-Scaling is as easy as:
-
-```
-kubectl scale --replicas=3 rc es
-```
-
-Did it work?
-
-```
-$ kubectl get pods
-NAME             READY     STATUS    RESTARTS   AGE
-es-78e0s         1/1       Running   0          8m
-es-kfymw         1/1       Running   0          17m
-es-rjmer         1/1       Running   0          8m
-kube-dns-p3v1u   3/3       Running   0          30m
-```
-
-Let's take a look at logs:
-
-```
-$ kubectl logs es-kfymw
-log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
-log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
-log4j:WARN No such property [maxBackupIndex] in org.apache.log4j.DailyRollingFileAppender.
-[2015-08-30 10:01:31,946][INFO ][node                     ] [Hammerhead] version[1.7.1], pid[7], build[b88f43f/2015-07-29T09:54:16Z]
-[2015-08-30 10:01:31,946][INFO ][node                     ] [Hammerhead] initializing ...
-[2015-08-30 10:01:32,110][INFO ][plugins                  ] [Hammerhead] loaded [cloud-kubernetes], sites []
-[2015-08-30 10:01:32,153][INFO ][env                      ] [Hammerhead] using [1] data paths, mounts [[/data (/dev/sda9)]], net usable_space [14.4gb], net total_space [15.5gb], types [ext4]
-[2015-08-30 10:01:37,188][INFO ][node                     ] [Hammerhead] initialized
-[2015-08-30 10:01:37,189][INFO ][node                     ] [Hammerhead] starting ...
-[2015-08-30 10:01:37,499][INFO ][transport                ] [Hammerhead] bound_address {inet[/0:0:0:0:0:0:0:0:9300]}, publish_address {inet[/10.244.48.2:9300]}
-[2015-08-30 10:01:37,550][INFO ][discovery                ] [Hammerhead] myesdb/n2-6uu_UT3W5XNrjyqBPiA
-[2015-08-30 10:01:43,966][INFO ][cluster.service          ] [Hammerhead] new_master [Hammerhead][n2-6uu_UT3W5XNrjyqBPiA][es-kfymw][inet[/10.244.48.2:9300]]{master=true}, reason: zen-disco-join (elected_as_master)
-[2015-08-30 10:01:44,010][INFO ][http                     ] [Hammerhead] bound_address {inet[/0:0:0:0:0:0:0:0:9200]}, publish_address {inet[/10.244.48.2:9200]}
-[2015-08-30 10:01:44,011][INFO ][node                     ] [Hammerhead] started
-[2015-08-30 10:01:44,042][INFO ][gateway                  ] [Hammerhead] recovered [0] indices into cluster_state
-[2015-08-30 10:08:02,517][INFO ][cluster.service          ] [Hammerhead] added {[Tenpin][2gv5MiwhRiOSsrTOF3DhuA][es-78e0s][inet[/10.244.54.4:9300]]{master=true},}, reason: zen-disco-receive(join from node[[Tenpin][2gv5MiwhRiOSsrTOF3DhuA][es-78e0s][inet[/10.244.54.4:9300]]{master=true}])
-[2015-08-30 10:10:10,645][INFO ][cluster.service          ] [Hammerhead] added {[Evilhawk][ziTq2PzYRJys43rNL2tbyg][es-rjmer][inet[/10.244.33.3:9300]]{master=true},}, reason: zen-disco-receive(join from node[[Evilhawk][ziTq2PzYRJys43rNL2tbyg][es-rjmer][inet[/10.244.33.3:9300]]{master=true}])
-```
-
-So we have a 3-node Elasticsearch cluster ready to handle more work.
 
 ## Access the service
 
