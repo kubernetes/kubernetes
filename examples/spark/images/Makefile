@@ -51,3 +51,14 @@ push-zeppelin: zeppelin
 	gcloud docker push gcr.io/google_containers/zeppelin:$(ZEPPELIN_TAG)
 
 clean:
+	docker rmi gcr.io/google_containers/spark-worker:$(TAG) || :
+	docker rmi gcr.io/google_containers/spark-worker || :
+	docker rmi gcr.io/google_containers/spark-master:$(TAG)  || :
+	docker rmi gcr.io/google_containers/spark-master || :
+	docker rmi gcr.io/google_containers/spark-driver:$(TAG) || :
+	docker rmi gcr.io/google_containers/spark-driver || :
+	docker rmi gcr.io/google_containers/spark-base:$(TAG) || :
+	docker rmi gcr.io/google_containers/spark-base || :
+
+	docker rmi gcr.io/google_containers/zeppelin:$(ZEPPELIN_TAG) || :
+	docker rmi gcr.io/google_containers/zeppelin || :
