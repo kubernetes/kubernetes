@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/client/transport"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
@@ -99,22 +100,11 @@ func NewStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.Rou
 // connection. Upon success, it returns the connection and the protocol
 // selected by the server.
 func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, string, error) {
-	transport := e.transport
-	// TODO consider removing this and reusing client.TransportFor above to get this for free
-	switch {
-	case bool(glog.V(9)):
-		transport = client.NewDebuggingRoundTripper(transport, client.CurlCommand, client.URLTiming, client.ResponseHeaders)
-	case bool(glog.V(8)):
-		transport = client.NewDebuggingRoundTripper(transport, client.JustURL, client.RequestHeaders, client.ResponseStatus, client.ResponseHeaders)
-	case bool(glog.V(7)):
-		transport = client.NewDebuggingRoundTripper(transport, client.JustURL, client.RequestHeaders, client.ResponseStatus)
-	case bool(glog.V(6)):
-		transport = client.NewDebuggingRoundTripper(transport, client.URLTiming)
-	}
+	rt := transport.DebugWrappers(e.transport)
 
 	// TODO the client probably shouldn't be created here, as it doesn't allow
 	// flexibility to allow callers to configure it.
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: rt}
 
 	req, err := http.NewRequest(e.method, e.url.String(), nil)
 	if err != nil {
