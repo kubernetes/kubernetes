@@ -26,6 +26,13 @@ RUN mkdir -p /opt && \
 # Add the GCS connector.
 RUN wget -O /opt/spark/lib/gcs-connector-latest-hadoop2.jar https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop2.jar
 
+# if numpy is installed on a driver it needs to be installed on all
+# workers, so install it everywhere
+RUN apt-get update && \
+    apt-get install -y python-numpy && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 ADD log4j.properties /opt/spark/conf/log4j.properties
 ADD start-common.sh /
 ADD core-site.xml /opt/spark/conf/core-site.xml
