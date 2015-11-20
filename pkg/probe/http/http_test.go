@@ -17,6 +17,7 @@ limitations under the License.
 package http
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -28,6 +29,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/probe"
 )
+
+const FailureCode int = -1
 
 func containsAny(s string, substrs []string) bool {
 	for _, substr := range substrs {
@@ -61,9 +64,9 @@ func TestHTTPProbeChecker(t *testing.T) {
 			[]string{"ok body"},
 		},
 		{
-			handleReq(-1, "fail body"),
+			handleReq(FailureCode, "fail body"),
 			probe.Failure,
-			[]string{"fail body"},
+			[]string{fmt.Sprintf("HTTP probe failed with statuscode: %d", FailureCode)},
 		},
 		{
 			func(w http.ResponseWriter) {
