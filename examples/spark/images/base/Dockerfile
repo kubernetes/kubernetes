@@ -8,23 +8,22 @@ ENV spark_ver 1.5.1
 # is all we need.)
 RUN mkdir -p /opt && \
     cd /opt && \
-    wget http://www.us.apache.org/dist/hadoop/common/hadoop-${hadoop_ver}/hadoop-${hadoop_ver}.tar.gz && \
-    tar -zvxf hadoop-${hadoop_ver}.tar.gz hadoop-${hadoop_ver}/lib/native && \
-    rm hadoop-${hadoop_ver}.tar.gz && \
+    curl http://www.us.apache.org/dist/hadoop/common/hadoop-${hadoop_ver}/hadoop-${hadoop_ver}.tar.gz | \
+        tar -zx hadoop-${hadoop_ver}/lib/native && \
     ln -s hadoop-${hadoop_ver} hadoop && \
     echo Hadoop ${hadoop_ver} native libraries installed in /opt/hadoop/lib/native
 
 # Get Spark from US Apache mirror.
 RUN mkdir -p /opt && \
     cd /opt && \
-    wget http://www.us.apache.org/dist/spark/spark-${spark_ver}/spark-${spark_ver}-bin-hadoop2.6.tgz && \
-    tar -zvxf spark-${spark_ver}-bin-hadoop2.6.tgz && \
-    rm spark-${spark_ver}-bin-hadoop2.6.tgz && \
+    curl http://www.us.apache.org/dist/spark/spark-${spark_ver}/spark-${spark_ver}-bin-hadoop2.6.tgz | \
+        tar -zx && \
     ln -s spark-${spark_ver}-bin-hadoop2.6 spark && \
     echo Spark ${spark_ver} installed in /opt
 
 # Add the GCS connector.
-RUN wget -O /opt/spark/lib/gcs-connector-latest-hadoop2.jar https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop2.jar
+RUN cd /opt/spark/lib && \
+    curl -O https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop2.jar
 
 # if numpy is installed on a driver it needs to be installed on all
 # workers, so install it everywhere
