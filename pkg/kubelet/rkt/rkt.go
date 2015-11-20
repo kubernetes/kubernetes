@@ -1413,3 +1413,11 @@ func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	}
 	return nil
 }
+
+func (r *Runtime) GetRawPodStatus(uid types.UID, name, namespace string) (*kubecontainer.RawPodStatus, error) {
+	return nil, fmt.Errorf("Not implemented yet")
+}
+
+func (r *Runtime) ConvertRawToPodStatus(_ *api.Pod, _ *kubecontainer.RawPodStatus) (*api.PodStatus, error) {
+	return nil, fmt.Errorf("Not implemented yet")
+}
