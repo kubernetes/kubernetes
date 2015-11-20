@@ -234,6 +234,26 @@ func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	}
 }
 
+func SkipIfMajorMinorVersionIs(c client.VersionInterface, major, minor string) {
+	info, err := c.ServerVersion()
+	if err != nil {
+		Skipf("Cowardly skipping due to error determining version: %v", err)
+	}
+	if info.Major == major && info.Minor == minor {
+		Skipf("Skipping version %s, which matches (%s, %s)", info.String(), major, minor)
+	}
+}
+
+func SkipIfMajorMinorVersionIsNot(c client.VersionInterface, major, minor string) {
+	info, err := c.ServerVersion()
+	if err != nil {
+		Skipf("Cowardly skipping due to error determining version: %v", err)
+	}
+	if info.Major != major || info.Minor != minor {
+		Skipf("Skipping version %s, which doesn't match (%s, %s)", info.String(), major, minor)
+	}
+}
+
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if providerIs(unsupportedProviders...) {
 		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, testContext.Provider)

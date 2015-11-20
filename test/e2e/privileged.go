@@ -52,6 +52,9 @@ var _ = Describe("PrivilegedPod", func() {
 		f: f,
 	}
 	It("should test privileged pod", func() {
+		// Privilieged not supported by default in 1.0
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
+
 		SkipUnlessProviderIs(providersWithSSH...)
 
 		By("Getting ssh-able hosts")

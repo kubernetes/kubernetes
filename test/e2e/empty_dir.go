@@ -83,6 +83,8 @@ var _ = Describe("EmptyDir volumes", func() {
 	})
 
 	It("volume on default medium should have the correct mode [Conformance]", func() {
+		// Modes not implemented in 1.0
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
 		doTestVolumeMode(f, testImageRootUid, api.StorageMediumDefault)
 	})
 
@@ -99,14 +101,20 @@ var _ = Describe("EmptyDir volumes", func() {
 	})
 
 	It("should support (non-root,0644,default) [Conformance]", func() {
+		// Modes not implemented in 1.0
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
 		doTest0644(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 
 	It("should support (non-root,0666,default) [Conformance]", func() {
+		// Modes not implemented in 1.0
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
 		doTest0666(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 
 	It("should support (non-root,0777,default) [Conformance]", func() {
+		// Modes not implemented in 1.0
+		SkipIfMajorMinorVersionIs(f.Client, "1", "0")
 		doTest0777(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 })
