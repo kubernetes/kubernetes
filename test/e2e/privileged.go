@@ -43,7 +43,7 @@ const (
 type PrivilegedPodTestConfig struct {
 	privilegedPod *api.Pod
 	f             *Framework
-	nodes         []string
+	hostExecPod   *api.Pod
 }
 
 var _ = Describe("PrivilegedPod", func() {
@@ -52,15 +52,10 @@ var _ = Describe("PrivilegedPod", func() {
 		f: f,
 	}
 	It("should test privileged pod", func() {
-		SkipUnlessProviderIs(providersWithSSH...)
-
-		By("Getting ssh-able hosts")
-		hosts, err := NodeSSHHosts(config.f.Client)
-		Expect(err).NotTo(HaveOccurred())
-		if len(hosts) == 0 {
-			Failf("No ssh-able nodes")
-		}
-		config.nodes = hosts
+		hostExecPod := NewHostExecPodSpec(f.Namespace.Name, "hostexec")
+		pod, err := config.getPodClient().Create(hostExecPod)
+		expectNoError(err)
+		config.hostExecPod = pod
 
 		By("Creating a privileged pod")
 		config.createPrivilegedPod()
@@ -96,8 +91,7 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 		v.Encode())
 
 	By(fmt.Sprintf("Exec-ing into container over http. Running command:%s", cmd))
-	stdout := config.ssh(cmd)
-	Logf("Output is %q", stdout)
+	stdout := RunHostCmdOrDie(config.hostExecPod.Namespace, config.hostExecPod.Name, cmd)
 	var output map[string]string
 	err := json.Unmarshal([]byte(stdout), &output)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Could not unmarshal curl response: %s", stdout))
@@ -171,11 +165,4 @@ func (config *PrivilegedPodTestConfig) getPodClient() client.PodInterface {
 
 func (config *PrivilegedPodTestConfig) getNamespaceClient() client.NamespaceInterface {
 	return config.f.Client.Namespaces()
-}
-
-func (config *PrivilegedPodTestConfig) ssh(cmd string) string {
-	stdout, _, code, err := SSH(cmd, config.nodes[0], testContext.Provider)
-	Expect(err).NotTo(HaveOccurred(), "error while SSH-ing to node: %v (code %v)", err, code)
-	Expect(code).Should(BeZero(), "command exited with non-zero code %v. cmd:%s", code, cmd)
-	return stdout
 }

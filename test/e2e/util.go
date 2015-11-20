@@ -22,6 +22,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1080,7 +1081,8 @@ func (b kubectlBuilder) exec() (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
-	Logf(stdout.String())
+	Logf("stdout: %q", stdout.String())
+	Logf("stderr: %q", stderr.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String()), nil
 }
@@ -1886,27 +1888,35 @@ func BadEvents(events []*api.Event) int {
 	return badEvents
 }
 
-// NodeSSHHosts returns SSH-able host names for all nodes. It returns an error
-// if it can't find an external IP for every node, though it still returns all
-// hosts that it found in that case.
-func NodeSSHHosts(c *client.Client) ([]string, error) {
-	var hosts []string
-	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return hosts, fmt.Errorf("error getting nodes: %v", err)
-	}
+// NodeAddresses returns the first address of the given type of each node.
+func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []string {
+	hosts := []string{}
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
 			// Use the first external IP address we find on the node, and
 			// use at most one per node.
 			// TODO(roberthbailey): Use the "preferred" address for the node, once
 			// such a thing is defined (#2462).
-			if addr.Type == api.NodeExternalIP {
-				hosts = append(hosts, addr.Address+":22")
+			if addr.Type == addrType {
+				hosts = append(hosts, addr.Address)
 				break
 			}
 		}
 	}
+	return hosts
+}
+
+// NodeSSHHosts returns SSH-able host names for all nodes. It returns an error
+// if it can't find an external IP for every node, though it still returns all
+// hosts that it found in that case.
+func NodeSSHHosts(c *client.Client) ([]string, error) {
+	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error getting nodes: %v", err)
+	}
+
+	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
+	hosts := NodeAddresses(nodelist, api.NodeExternalIP)
 
 	// Error if any node didn't have an external IP.
 	if len(hosts) != len(nodelist.Items) {
@@ -1914,7 +1924,12 @@ func NodeSSHHosts(c *client.Client) ([]string, error) {
 			"only found %d external IPs on nodes, but found %d nodes. Nodelist: %v",
 			len(hosts), len(nodelist.Items), nodelist)
 	}
-	return hosts, nil
+
+	sshHosts := make([]string, 0, len(hosts))
+	for _, h := range hosts {
+		sshHosts = append(sshHosts, net.JoinHostPort(h, "22"))
+	}
+	return sshHosts, nil
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -1985,8 +2000,15 @@ func NewHostExecPodSpec(ns, name string) *api.Pod {
 
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
-func RunHostCmd(ns, name, cmd string) string {
-	return runKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+func RunHostCmd(ns, name, cmd string) (string, error) {
+	return runKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+}
+
+// RunHostCmdOrDie calls RunHostCmd and dies on error.
+func RunHostCmdOrDie(ns, name, cmd string) string {
+	stdout, err := RunHostCmd(ns, name, cmd)
+	expectNoError(err)
+	return stdout
 }
 
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
