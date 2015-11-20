@@ -25,10 +25,9 @@ SALT_ROOT=$(dirname "${BASH_SOURCE}")
 readonly SALT_ROOT
 
 readonly KUBE_DOCKER_WRAPPED_BINARIES=(
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
-  kube-proxy
+      kube-apiserver
+      kube-controller-manager
+      kube-scheduler
 )
     
 readonly SERVER_BIN_TAR=${1-}
