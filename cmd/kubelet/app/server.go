@@ -183,6 +183,8 @@ func NewKubeletServer() *KubeletServer {
 		CPUCFSQuota:                 false,
 		DockerDaemonContainer:       "/docker-daemon",
 		DockerExecHandlerName:       "native",
+		EventBurst:                  10,
+		EventRecordQPS:              5.0,
 		EnableDebuggingHandlers:     true,
 		EnableServer:                true,
 		FileCheckFrequency:          20 * time.Second,
@@ -287,7 +289,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. [default=\"*\"]")
 	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	fs.IntVar(&s.RegistryBurst, "registry-burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0")
-	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited. [default=0.0]")
+	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited.")
 	fs.IntVar(&s.EventBurst, "event-burst", s.EventBurst, "Maximum size of a bursty event records, temporarily allows event records to burst to this number, while still not exceeding event-qps. Only used if --event-qps > 0")
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server")
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable-debugging-handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
@@ -495,6 +497,12 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		clientConfig, err := s.CreateAPIServerClientConfig()
 		if err == nil {
 			kcfg.KubeClient, err = client.New(clientConfig)
+
+			// make a separate client for events
+			eventClientConfig := *clientConfig
+			eventClientConfig.QPS = s.EventRecordQPS
+			eventClientConfig.Burst = s.EventBurst
+			kcfg.EventClient, err = client.New(&eventClientConfig)
 		}
 		if err != nil && len(s.APIServerList) > 0 {
 			glog.Warningf("No API client: %v", err)
@@ -780,15 +788,9 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	eventBroadcaster := record.NewBroadcaster()
 	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.NodeName})
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
-	if kcfg.KubeClient != nil {
+	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
-		if kcfg.EventRecordQPS == 0.0 {
-			eventBroadcaster.StartRecordingToSink(kcfg.KubeClient.Events(""))
-		} else {
-			eventClient := *kcfg.KubeClient
-			eventClient.Throttle = util.NewTokenBucketRateLimiter(kcfg.EventRecordQPS, kcfg.EventBurst)
-			eventBroadcaster.StartRecordingToSink(eventClient.Events(""))
-		}
+		eventBroadcaster.StartRecordingToSink(kcfg.EventClient.Events(""))
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
@@ -891,6 +893,7 @@ type KubeletConfig struct {
 	DockerExecHandler              dockertools.ExecHandler
 	EnableDebuggingHandlers        bool
 	EnableServer                   bool
+	EventClient                    *client.Client
 	EventBurst                     int
 	EventRecordQPS                 float32
 	FileCheckFrequency             time.Duration
