@@ -106,7 +106,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 			&EmbeddedTest{ID: "foo"},
 			&EmbeddedTest{ID: "bar"},
 			// TODO: until YAML is removed, this JSON must be in ascending key order to ensure consistent roundtrip serialization
-			&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown","foo":"bar","kind":"OtherTest"}`)},
+			&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown.group/unknown","foo":"bar","kind":"OtherTest"}`)},
 			&ObjectTest{
 				Items: []runtime.Object{
 					&EmbeddedTest{ID: "baz"},
@@ -150,7 +150,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	}
 
 	internal.Items[2].(*runtime.Unknown).Kind = "OtherTest"
-	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown"
+	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown.group/unknown"
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
 		t.Errorf("mismatched decoded: %s", util.ObjectDiff(e, a))
 	}

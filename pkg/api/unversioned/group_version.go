@@ -78,7 +78,7 @@ func (gvk GroupVersionKind) GroupVersion() GroupVersion {
 	return GroupVersion{Group: gvk.Group, Version: gvk.Version}
 }
 
-func (gvk *GroupVersionKind) String() string {
+func (gvk GroupVersionKind) String() string {
 	return gvk.Group + "/" + gvk.Version + ", Kind=" + gvk.Kind
 }
 

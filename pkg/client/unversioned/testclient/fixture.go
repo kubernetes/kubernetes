@@ -210,10 +210,11 @@ func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Ob
 }
 
 func (o objects) Add(obj runtime.Object) error {
-	_, kind, err := o.scheme.ObjectVersionAndKind(obj)
+	gvk, err := o.scheme.ObjectKind(obj)
 	if err != nil {
 		return err
 	}
+	kind := gvk.Kind
 
 	switch {
 	case meta.IsListType(obj):
