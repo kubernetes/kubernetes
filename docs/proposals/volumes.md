@@ -236,12 +236,29 @@ setting arbitrary supplemental groups).
 An admission controller could handle allocating groups for each pod and setting the group in the
 pod's security context.
 
+#### Supporting boutique ownership and permissions
+
+Certain applications need specific ownership and permissions on volumes and our design must allow
+for this.  For example, postgresql requires permissions 0700 on its data directory.  Users should be
+able to set their own permissions on files within volumes; the starting point that pods work with
+permissions from should be those which we have described here: `root:<fsgroup> 0660 g+s`.  In order
+to get special permissions on the contents of the volume, containers should be able to unset the
+volume's `setgid` bit, `chmod` and `chown` the contents of a volume into their required ownership
+and not have those permissions altered by the kubelet.  In order to accomplish this, the ownership
+management facility must be idempotent, and implement the following contract:
+
+1.  An ownership-managed volume will, by default, have the ownership and permissions set exactly
+    once, before the pod is started
+2.  Pods should be able to alter the permissions of managed volumes and those permissions should not
+    be altered by the kubelet
+
 #### A note on the root group
 
-Today, by default, all docker containers are run in the root group (GID 0).  This is relied on by
-image authors that make images to run with a range of UIDs: they set the group ownership for
-important paths to be the root group, so that containers running as GID 0 *and* an arbitrary UID
-can read and write to those paths normally.
+Today, by default, all docker containers are run in the root group (GID 0).  Note that the root
+group does not carry any notion of special privileges or capabilities -- it is a placeholder for not
+having a group.  This is relied on by image authors that make images to run with a range of UIDs:
+they set the group ownership for important paths to be the root group, so that containers running as
+GID 0 *and* an arbitrary UID can read and write to those paths normally.
 
 It is important to note that the changes proposed here will not affect the primary GID of
 containers in pods.  Setting the `pod.Spec.SecurityContext.FSGroup` field will not
@@ -362,7 +379,7 @@ The Kubelet should be modified to perform ownership and label management when re
 For ownership management the criteria are:
 
 1.  The `pod.Spec.SecurityContext.FSGroup` field is populated
-2.  The volume builder returns `true` from `SupportsOwnershipManagement`
+2.  The volume builder `GetAttributes` returns `true` for `SupportsOwnershipManagement`
 
 Logic should be added to the `mountExternalVolumes` method that runs a local `chgrp` and `chmod` if
 the pod-level supplemental group is set and the volume supports ownership management:
@@ -384,16 +401,15 @@ type Kubelet struct {
 }
 
 func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, error) {
-    podFSGroup = pod.Spec.PodSecurityContext.FSGroup
-    podFSGroupSet := false
-    if podFSGroup != 0 {
-        podFSGroupSet = true
-    }
-
     podVolumes := make(kubecontainer.VolumeMap)
-
     for i := range pod.Spec.Volumes {
         volSpec := &pod.Spec.Volumes[i]
+        hasFSGroup := false
+        var fsGroup int64 = 0
+        if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
+            hasFSGroup = true
+            fsGroup = *pod.Spec.SecurityContext.FSGroup
+        }
 
         rootContext, err := kl.getRootDirContext()
         if err != nil {
@@ -402,7 +418,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 
         // Try to use a plugin for this volume.
         internal := volume.NewSpecFromVolume(volSpec)
-        builder, err := kl.newVolumeBuilderFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext}, kl.mounter)
+        builder, err := kl.newVolumeBuilderFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
         if err != nil {
             glog.Errorf("Could not create volume builder for pod %s: %v", pod.UID, err)
             return nil, err
@@ -414,25 +430,64 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
         if err != nil {
             return nil, err
         }
-
-        if builder.SupportsOwnershipManagement() &&
-           podFSGroupSet {
-            err = kl.chgrpRunner.Chgrp(builder.GetPath(), podFSGroup)
+        if hasFSGroup &&
+            builder.GetAttributes().Managed &&
+            builder.GetAttributes().SupportsOwnershipManagement {
+            err := kl.manageVolumeOwnership(pod, internal, builder, fsGroup)
             if err != nil {
+                glog.Errorf("Error managing ownership of volume %v for pod %v/%v: %v", internal.Name(), pod.Namespace, pod.Name, err)
                 return nil, err
-            }
-
-            err = kl.chmodRunner.Chmod(builder.GetPath(), os.FileMode(1770))
-            if err != nil {
-                return nil, err
+            } else {
+                glog.V(3).Infof("Managed ownership of volume %v for pod %v/%v", internal.Name(), pod.Namespace, pod.Name)
             }
         }
-
-        podVolumes[volSpec.Name] = builder
+        podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}
     }
-
     return podVolumes, nil
 }
+
+// Bitmasks to OR with current ownership of volumes that allow ownership management by the Kubelet
+const (
+    rwMask = os.FileMode(0660)
+    roMask = os.FileMode(0440)
+)
+
+// manageVolumeOwnership modifies the given volume to be owned by fsGroup.
+func (kl *Kubelet) manageVolumeOwnership(pod *api.Pod, volSpec *volume.Spec, builder volume.Builder, fsGroup int64) error {
+    return filepath.Walk(builder.GetPath(), func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+
+        stat, ok := info.Sys().(*syscall.Stat_t)
+        if !ok {
+            return nil
+        }
+
+        if stat == nil {
+            glog.Errorf("Got nil stat_t for path %v while managing ownership of volume %v for pod %s/%s", path, volSpec.Name, pod.Namespace, pod.Name)
+            return nil
+        }
+
+        err = kl.chownRunner.Chown(path, int(stat.Uid), int(fsGroup))
+        if err != nil {
+            glog.Errorf("Chown failed on %v: %v", path, err)
+        }
+
+        mask := rwMask
+        if builder.GetAttributes().ReadOnly {
+            mask = roMask
+        }
+
+        err = kl.chmodRunner.Chmod(path, info.Mode()|mask|os.ModeSetgid)
+        if err != nil {
+            glog.Errorf("Chmod failed on %v: %v", path, err)
+        }
+
+        return nil
+    })
+}
+
 ```
 
 This allows the volume plugins to determine when they do and don't want this type of support from
