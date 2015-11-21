@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.5.1",
 	"Packages": [
 		"./..."
 	],
@@ -508,6 +508,11 @@
 			"ImportPath": "github.com/rackspace/gophercloud",
 			"Comment": "v1.0.0-665-gf928634",
 			"Rev": "f92863476c034f851073599c09d90cd61ee95b3d"
+		},
+		{
+			"ImportPath": "github.com/renstrom/dedent",
+			"Comment": "v1.0.0-3-g020d11c",
+			"Rev": "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"
 		},
 		{
 			"ImportPath": "github.com/russross/blackfriday",
