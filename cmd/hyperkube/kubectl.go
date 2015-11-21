@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,15 +18,22 @@ package main
 
 import (
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kubectl/app"
 )
 
-func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	if err := app.Run(); err != nil {
-		os.Exit(1)
+func NewKubectlServer() *Server {
+	return &Server{
+		name:        "kubectl",
+		SimpleUsage: "Kubernetes command line client",
+		Long:        "Kubernetes command line client",
+		Run: func(s *Server, args []string) error {
+			os.Args = os.Args[1:]
+			if err := app.Run(); err != nil {
+				os.Exit(1)
+			}
+			os.Exit(0)
+			return nil
+		},
 	}
-	os.Exit(0)
 }
