@@ -1361,7 +1361,7 @@ func TestGetRestartCount(t *testing.T) {
 		runSyncPod(t, dm, fakeDocker, pod, nil, false)
 		status, err := dm.GetPodStatus(pod)
 		if err != nil {
-			t.Fatalf("unexpected error %v", err)
+			t.Fatalf("Unexpected error %v", err)
 		}
 		restartCount := status.ContainerStatuses[0].RestartCount
 		if restartCount != expectedCount {
@@ -1373,7 +1373,7 @@ func TestGetRestartCount(t *testing.T) {
 	killOneContainer := func(pod *api.Pod) {
 		status, err := dm.GetPodStatus(pod)
 		if err != nil {
-			t.Fatalf("unexpected error %v", err)
+			t.Fatalf("Unexpected error %v", err)
 		}
 		containerID := kubecontainer.ParseContainerID(status.ContainerStatuses[0].ContainerID)
 		dm.KillContainerInPod(containerID, &pod.Spec.Containers[0], pod, "test container restart count.")
@@ -1439,13 +1439,18 @@ func TestGetTerminationMessagePath(t *testing.T) {
 	containerList := fakeDocker.ContainerList
 	if len(containerList) != 2 {
 		// One for infra container, one for container "bar"
-		t.Fatalf("unexpected container list length %d", len(containerList))
+		t.Fatalf("Unexpected container list length %d", len(containerList))
 	}
 	inspectResult, err := dm.client.InspectContainer(containerList[0].ID)
 	if err != nil {
-		t.Fatalf("unexpected inspect error %v", err)
+		t.Fatalf("Unexpected inspect error: %v", err)
 	}
-	terminationMessagePath := getTerminationMessagePathFromLabel(inspectResult.Config.Labels)
+	var containerInfo *labelledContainerInfo
+	containerInfo, err = getContainerInfoFromLabel(inspectResult.Config.Labels)
+	if err != nil {
+		t.Fatalf("Unexpected error when getContainerInfoFromLabel: %v", err)
+	}
+	terminationMessagePath := containerInfo.TerminationMessagePath
 	if terminationMessagePath != containers[0].TerminationMessagePath {
 		t.Errorf("expected termination message path %s, got %s", containers[0].TerminationMessagePath, terminationMessagePath)
 	}
