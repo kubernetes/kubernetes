@@ -53,7 +53,7 @@ fi
 cp $ETCD/etcd $ETCD/etcdctl binaries/master
 
 # k8s
-KUBE_VERSION=${KUBE_VERSION:-"1.0.6"}
+KUBE_VERSION=${KUBE_VERSION:-"1.1.2"}
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."
 if [ ! -f kubernetes.tar.gz ] ; then
   curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
