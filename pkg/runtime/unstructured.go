@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -29,6 +30,8 @@ import (
 var UnstructuredJSONScheme ObjectDecoder = unstructuredJSONScheme{}
 
 type unstructuredJSONScheme struct{}
+
+var _ Decoder = unstructuredJSONScheme{}
 
 // Recognizes returns true for any version or kind that is specified (internal
 // versions are specifically excluded).
@@ -74,11 +77,11 @@ func (unstructuredJSONScheme) DecodeInto(data []byte, obj Object) error {
 	return nil
 }
 
-func (unstructuredJSONScheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error {
+func (unstructuredJSONScheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, gvk unversioned.GroupVersionKind) error {
 	return nil
 }
 
-func (unstructuredJSONScheme) DecodeToVersion(data []byte, version string) (Object, error) {
+func (unstructuredJSONScheme) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (Object, error) {
 	return nil, nil
 }
 

@@ -72,10 +72,11 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource    string
-	Subresource string
-	Kind        string
-	APIVersion  string
+	Resource        string
+	Subresource     string
+	Kind            string
+	APIVersion      string
+	InternalVersion unversioned.GroupVersion
 
 	// The version of apiserver resources to use
 	ServerAPIVersion string
@@ -328,7 +329,8 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
+		// TODO this cleans up with proper typing
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind(scope.Kind)); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -561,7 +563,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind(scope.Kind)); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -684,15 +686,29 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 // to use it.
 // TODO: add appropriate structured error responses
 func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
-	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
+	// TODO Options a mess.  Basically the intent is:
+	// 1. try to decode using the expected external GroupVersion
+	// 2. if that fails, fall back to the old external serialization being used before, which was
+	//    "v1" and decode into the unversioned/legacykube group
+	gvString := scope.APIVersion
+	internalGVString := scope.InternalVersion.String()
+
+	versioned, err := scope.Creater.New(gvString, kind)
 	if err != nil {
-		// programmer error
-		return nil, err
+		gvString = "v1"
+		internalGVString = ""
+
+		var secondErr error
+		versioned, secondErr = scope.Creater.New(gvString, kind)
+		// if we have an error, return the original failure
+		if secondErr != nil {
+			return nil, err
+		}
 	}
 	if err := scope.Convertor.Convert(&query, versioned); err != nil {
 		return nil, errors.NewBadRequest(err.Error())
 	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, "")
+	out, err := scope.Convertor.ConvertToVersion(versioned, internalGVString)
 	if err != nil {
 		// programmer error
 		return nil, err

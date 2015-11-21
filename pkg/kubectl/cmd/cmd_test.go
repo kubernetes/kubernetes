@@ -84,7 +84,8 @@ var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVe
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName(internalGV.Version, "Type", &internalType{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.String(), "Type", &internalType{})
 	scheme.AddKnownTypeWithName(unlikelyGV.String(), "Type", &externalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(validVersionGV.String(), "Type", &ExternalType2{})
