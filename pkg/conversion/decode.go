@@ -19,6 +19,7 @@ package conversion
 import (
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/ugorji/go/codec"
 )
@@ -150,4 +151,12 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 
 	// Version and Kind should be blank in memory.
 	return s.SetVersionAndKind("", "", obj)
+}
+
+func (s *Scheme) DecodeParametersInto(parameters url.Values, obj interface{}) error {
+	if err := s.Convert(&parameters, obj); err != nil {
+		return err
+	}
+	// TODO: Should we do any convertion here?
+	return nil
 }

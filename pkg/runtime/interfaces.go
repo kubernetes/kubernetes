@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"io"
+	"net/url"
 )
 
 // Codec defines methods for serializing and deserializing API objects.
@@ -35,8 +36,7 @@ type Decoder interface {
 	// TODO: Remove this method?
 	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
 
-	// TODO: Add method for processing url parameters.
-	// DecodeParametersInto(parameters url.Values, obj Object) error
+	DecodeParametersInto(parameters url.Values, obj Object) error
 }
 
 // Encoder defines methods for serializing API objects into bytes
