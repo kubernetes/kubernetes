@@ -393,7 +393,7 @@ function provision-master() {
       cp ~/kube/init_scripts/* /etc/init.d/
       
       groupadd -f -r kube-cert
-      \"${PROXY_SETTING}\" ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
@@ -502,7 +502,7 @@ function provision-masterandnode() {
       cp ~/kube/init_scripts/* /etc/init.d/
       
       groupadd -f -r kube-cert
-      \"${PROXY_SETTING}\" ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/ 
       cp ~/kube/master/* /opt/bin/
       cp ~/kube/minion/* /opt/bin/
