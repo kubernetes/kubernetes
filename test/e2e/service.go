@@ -298,12 +298,13 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
 
 		By("Removing iptable rules")
-		_, _, code, err := SSH(`
+		result, err := SSH(`
 					sudo iptables -t nat -F KUBE-SERVICES || true;
 					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
 					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
-		if err != nil || code != 0 {
-			Failf("couldn't remove iptable rules: %v (code %v)", err, code)
+		if err != nil || result.Code != 0 {
+			LogSSHResult(result)
+			Failf("couldn't remove iptable rules: %v", err)
 		}
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
@@ -1304,11 +1305,12 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 	for _, cmd := range commands {
 		passed := false
 		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5) {
-			stdout, _, code, err := SSH(cmd, host, testContext.Provider)
-			if err != nil || code != 0 {
-				Logf("error while SSH-ing to node: %v (code %v)", err, code)
+			result, err := SSH(cmd, host, testContext.Provider)
+			if err != nil || result.Code != 0 {
+				LogSSHResult(result)
+				Logf("error while SSH-ing to node: %v", err)
 			}
-			pods := strings.Split(strings.TrimSpace(stdout), "\n")
+			pods := strings.Split(strings.TrimSpace(result.Stdout), "\n")
 			sort.StringSlice(pods).Sort()
 			if api.Semantic.DeepEqual(pods, expectedPods) {
 				passed = true
@@ -1328,11 +1330,12 @@ func verifyServeHostnameServiceDown(c *client.Client, host string, serviceIP str
 		"curl -s --connect-timeout 2 http://%s:%d && exit 99", serviceIP, servicePort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		_, _, code, err := SSH(command, host, testContext.Provider)
+		result, err := SSH(command, host, testContext.Provider)
 		if err != nil {
+			LogSSHResult(result)
 			Logf("error while SSH-ing to node: %v", err)
 		}
-		if code != 99 {
+		if result.Code != 99 {
 			return nil
 		}
 		Logf("service still alive - still waiting")

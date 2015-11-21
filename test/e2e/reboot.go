@@ -162,8 +162,9 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
 	}
 	Logf("Calling %s on %s", cmd, node.Name)
-	if _, _, code, err := SSH(cmd, host, provider); code != 0 || err != nil {
-		return fmt.Errorf("when running %s on %s, got %d and %v", cmd, node.Name, code, err)
+	if result, err := SSH(cmd, host, provider); result.Code != 0 || err != nil {
+		LogSSHResult(result)
+		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
 	}
 	return nil
 }

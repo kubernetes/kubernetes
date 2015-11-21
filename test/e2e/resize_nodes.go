@@ -338,14 +338,15 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		// may fail). Manual intervention is required in such case (recreating the
 		// cluster solves the problem too).
 		err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-			_, _, code, err := SSHVerbose(undropCmd, host, testContext.Provider)
-			if code == 0 && err == nil {
+			result, err := SSH(undropCmd, host, testContext.Provider)
+			if result.Code == 0 && err == nil {
 				return true, nil
-			} else {
-				Logf("Expected 0 exit code and nil error when running '%s' on %s, got %d and %v",
-					undropCmd, node.Name, code, err)
-				return false, nil
 			}
+			LogSSHResult(result)
+			if err != nil {
+				Logf("Unexpected error: %v", err)
+			}
+			return false, nil
 		})
 		if err != nil {
 			Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
@@ -364,9 +365,9 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// We could also block network traffic from the master(s) to this node,
 	// but blocking it one way is sufficient for this test.
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if _, _, code, err := SSHVerbose(dropCmd, host, testContext.Provider); code != 0 || err != nil {
-		Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
-			dropCmd, node.Name, code, err)
+	if result, err := SSH(dropCmd, host, testContext.Provider); result.Code != 0 || err != nil {
+		LogSSHResult(result)
+		Failf("Unexpected error: %v", err)
 	}
 
 	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)

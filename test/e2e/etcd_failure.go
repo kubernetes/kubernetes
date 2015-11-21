@@ -93,10 +93,11 @@ func doEtcdFailure(failCommand, fixCommand string) {
 }
 
 func masterExec(cmd string) {
-	stdout, stderr, code, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
+	result, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
-	if code != 0 {
-		Failf("master exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v", cmd, code, stdout, stderr)
+	if result.Code != 0 {
+		LogSSHResult(result)
+		Failf("master exec command returned non-zero")
 	}
 }
 
