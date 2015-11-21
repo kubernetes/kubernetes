@@ -4,16 +4,16 @@ flannel-tar:
     - user: root
     - name: /usr/local/src
     - makedirs: True
-    - source: https://github.com/coreos/flannel/releases/download/v0.5.3/flannel-0.5.3-linux-amd64.tar.gz
+    - source: https://github.com/coreos/flannel/releases/download/v0.5.5/flannel-0.5.5-linux-amd64.tar.gz
     - tar_options: v
-    - source_hash: md5=2a82ed82a37d71c85586977f0e475b70
+    - source_hash: md5=972c717254775bef528f040af804f2cc
     - archive_format: tar
-    - if_missing: /usr/local/src/flannel/flannel-0.5.3/
+    - if_missing: /usr/local/src/flannel/flannel-0.5.5/
 
 flannel-symlink:
   file.symlink:
     - name: /usr/local/bin/flanneld
-    - target: /usr/local/src/flannel-0.5.3/flanneld
+    - target: /usr/local/src/flannel-0.5.5/flanneld
     - force: true
     - watch:
         - archive: flannel-tar
