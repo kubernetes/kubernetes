@@ -37,9 +37,6 @@ func addDefaultingFuncs() {
 				temp := qos.KubeProxyOOMScoreAdj
 				obj.OOMScoreAdj = &temp
 			}
-			if obj.ResourceContainer == "" {
-				obj.ResourceContainer = "/kube-proxy"
-			}
 			if obj.IPTablesSyncePeriodSeconds == 0 {
 				obj.IPTablesSyncePeriodSeconds = 5
 			}

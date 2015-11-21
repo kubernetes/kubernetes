@@ -186,7 +186,6 @@ func targetContainers() []string {
 			"/",
 			"/docker-daemon",
 			"/kubelet",
-			"/kube-proxy",
 			"/system",
 		}
 	} else {
@@ -339,7 +338,6 @@ func formatResourceUsageStats(nodeName string, containerStats resourceUsagePerCo
 	// "/"              0.363       2942.09
 	// "/docker-daemon" 0.088       521.80
 	// "/kubelet"       0.086       424.37
-	// "/kube-proxy"    0.011       4.66
 	// "/system"        0.007       119.88
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
@@ -690,7 +688,6 @@ func (r *resourceMonitor) LogCPUSummary() {
 	// "/"              0.051 0.159 0.387 0.455
 	// "/docker-daemon" 0.000 0.000 0.146 0.166
 	// "/kubelet"       0.036 0.053 0.091 0.154
-	// "/kube-proxy"    0.017 0.000 0.000 0.000
 	// "/system"        0.001 0.001 0.001 0.002
 	var header []string
 	header = append(header, "container")
