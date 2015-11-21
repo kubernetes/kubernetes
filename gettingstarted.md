@@ -34,6 +34,8 @@ hostedservices:
 installguides:
   - label: Google Compute Engine
     url: /v1.1/docs/getting-started-guides/gce.html
+  - label: Docker
+    url: /v1.1/docs/getting-started-guides/docker.html
   - label: Vagrant
     url: /v1.1/docs/getting-started-guides/vagrant.html
   - label: Fedora (Ansible)
