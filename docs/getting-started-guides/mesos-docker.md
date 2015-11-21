@@ -84,6 +84,8 @@ Required:
 Optional:
 - [Virtual Box](https://www.virtualbox.org/wiki/Downloads)
   - Free x86 virtualization engine with a Docker Machine driver
+- [VMware Fusion](https://www.vmware.com/products/fusion)
+  - Proprietary x86 virtualization engine with a Docker Machine driver
 - [Golang](https://golang.org/doc/install) - Go programming language
   - Required to build Kubernetes locally
 - [Make](https://en.wikipedia.org/wiki/Make_(software))  - Utility for building executables from source
@@ -118,7 +120,7 @@ See the docker docs for [instructions](https://docs.docker.com/installation/ubun
 
 #### Docker Machine Config (Mac)
 
-If on a mac using docker-machine, the following steps will make the docker IPs (in the virtualbox VM) reachable from the
+If on a mac using docker-machine, the following steps will make the docker IPs (in the virtualbox/vmware VM) reachable from the
 host machine (mac).
 
 1. Create VM
@@ -129,12 +131,25 @@ host machine (mac).
    eval "$(docker-machine env kube-dev)"
    ```
 
+   vmware-fusion
+   ```
+   docker-machine create --driver vmwarefusion kube-dev
+   eval "$(docker-machine env kube-dev)"
+   ```
+
 2. Set the VM's host-only network to "promiscuous mode":
 
     oracle-virtualbox  
     ```
     docker-machine stop kube-dev
     VBoxManage modifyvm kube-dev --nicpromisc2 allow-all
+    docker-machine start kube-dev
+    ```
+
+    vmware-fusion
+    ```
+    docker-machine stop kube-dev
+    sudo touch “/Library/Preferences/VMware Fusion/promiscAuthorized”
     docker-machine start kube-dev
     ```
 
@@ -206,7 +221,7 @@ host machine (mac).
 
     If the configured resources are not available on the host, you may want to increase the resources available to Docker Engine.
     You may have to increase you VM disk, memory, or cpu allocation. See the Docker Machine docs for details
-    ([Virtualbox](https://docs.docker.com/machine/drivers/virtualbox))
+    ([Virtualbox](https://docs.docker.com/machine/drivers/virtualbox), [VMware](https://docs.docker.com/machine/drivers/vm-fusion/))
 
 
 1. Configure provider
