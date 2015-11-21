@@ -1932,43 +1932,48 @@ func NodeSSHHosts(c *client.Client) ([]string, error) {
 	return sshHosts, nil
 }
 
+type SSHResult struct {
+	User   string
+	Host   string
+	Cmd    string
+	Stdout string
+	Stderr string
+	Code   int
+}
+
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
-func SSH(cmd, host, provider string) (string, string, int, error) {
-	return sshCore(cmd, host, provider, false)
-}
+func SSH(cmd, host, provider string) (SSHResult, error) {
+	result := SSHResult{Host: host, Cmd: cmd}
 
-// SSHVerbose is just like SSH, but it logs the command, user, host, stdout,
-// stderr, exit code, and error.
-func SSHVerbose(cmd, host, provider string) (string, string, int, error) {
-	return sshCore(cmd, host, provider, true)
-}
-
-func sshCore(cmd, host, provider string, verbose bool) (string, string, int, error) {
 	// Get a signer for the provider.
 	signer, err := getSigner(provider)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
 	}
 
 	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
 	// defaulting here as well for logging clarity.
-	user := os.Getenv("KUBE_SSH_USER")
-	if user == "" {
-		user = os.Getenv("USER")
+	result.User = os.Getenv("KUBE_SSH_USER")
+	if result.User == "" {
+		result.User = os.Getenv("USER")
 	}
 
-	stdout, stderr, code, err := util.RunSSHCommand(cmd, user, host, signer)
-	if verbose {
-		remote := fmt.Sprintf("%s@%s", user, host)
-		Logf("[%s] Running    `%s`", remote, cmd)
-		Logf("[%s] stdout:    %q", remote, stdout)
-		Logf("[%s] stderr:    %q", remote, stderr)
-		Logf("[%s] exit code: %d", remote, code)
-		Logf("[%s] error:     %v", remote, err)
-	}
-	return stdout, stderr, code, err
+	stdout, stderr, code, err := util.RunSSHCommand(cmd, result.User, host, signer)
+	result.Stdout = stdout
+	result.Stderr = stderr
+	result.Code = code
+
+	return result, err
+}
+
+func LogSSHResult(result SSHResult) {
+	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
+	Logf("ssh %s: command:   %s", remote, result.Cmd)
+	Logf("ssh %s: stdout:    %q", remote, result.Stdout)
+	Logf("ssh %s: stderr:    %q", remote, result.Stderr)
+	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
 // NewHostExecPodSpec returns the pod spec of hostexec pod
@@ -2194,20 +2199,22 @@ func restartKubeProxy(host string) error {
 		return fmt.Errorf("unsupported provider: %s", testContext.Provider)
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
-	_, _, code, err := SSH("sudo pkill kube-proxy", host, testContext.Provider)
-	if err != nil || code != 0 {
-		return fmt.Errorf("couldn't restart kube-proxy: %v (code %v)", err, code)
+	result, err := SSH("sudo pkill kube-proxy", host, testContext.Provider)
+	if err != nil || result.Code != 0 {
+		LogSSHResult(result)
+		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
 	}
 	// wait for kube-proxy to come back up
 	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		stdout, stderr, code, err := SSH("sudo /bin/sh -c 'pgrep kube-proxy | wc -l'", host, testContext.Provider)
+		result, err := SSH("sudo /bin/sh -c 'pgrep kube-proxy | wc -l'", host, testContext.Provider)
 		if err != nil {
 			return false, err
 		}
-		if code != 0 {
-			return false, fmt.Errorf("failed to run command, exited %v: %v", code, stderr)
+		if result.Code != 0 {
+			LogSSHResult(result)
+			return false, fmt.Errorf("failed to run command, exited %d", result.Code)
 		}
-		if stdout == "0\n" {
+		if result.Stdout == "0\n" {
 			return false, nil
 		}
 		Logf("kube-proxy is back up.")
@@ -2230,9 +2237,10 @@ func restartApiserver() error {
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
-	_, _, code, err := SSH(command, getMasterHost()+":22", testContext.Provider)
-	if err != nil || code != 0 {
-		return fmt.Errorf("couldn't restart apiserver: %v (code %v)", err, code)
+	result, err := SSH(command, getMasterHost()+":22", testContext.Provider)
+	if err != nil || result.Code != 0 {
+		LogSSHResult(result)
+		return fmt.Errorf("couldn't restart apiserver: %v", err)
 	}
 	return nil
 }

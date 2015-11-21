@@ -58,10 +58,10 @@ const (
 // nodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
 // eg: the name returned by getMasterHost(). This is also not guaranteed to work across
 // cloud providers since it involves ssh.
-func nodeExec(nodeName, cmd string) (string, string, int, error) {
-	stdout, stderr, code, err := SSH(cmd, fmt.Sprintf("%v:%v", nodeName, sshPort), testContext.Provider)
+func nodeExec(nodeName, cmd string) (SSHResult, error) {
+	result, err := SSH(cmd, fmt.Sprintf("%v:%v", nodeName, sshPort), testContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
-	return stdout, stderr, code, err
+	return result, err
 }
 
 // restartDaemonConfig is a config to restart a running daemon on a node, and wait till
@@ -99,10 +99,10 @@ func (r *restartDaemonConfig) waitUp() {
 		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
 
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
-		stdout, stderr, code, err := nodeExec(r.nodeName, healthzCheck)
+		result, err := nodeExec(r.nodeName, healthzCheck)
 		expectNoError(err)
-		if code == 0 {
-			httpCode, err := strconv.Atoi(stdout)
+		if result.Code == 0 {
+			httpCode, err := strconv.Atoi(result.Stdout)
 			if err != nil {
 				Logf("Unable to parse healthz http return code: %v", err)
 			} else if httpCode == 200 {
@@ -110,7 +110,7 @@ func (r *restartDaemonConfig) waitUp() {
 			}
 		}
 		Logf("node %v exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v",
-			r.nodeName, healthzCheck, code, stdout, stderr)
+			r.nodeName, healthzCheck, result.Code, result.Stdout, result.Stderr)
 		return false, nil
 	})
 	expectNoError(err, "%v did not respond with a 200 via %v within %v", r, healthzCheck, r.pollTimeout)
