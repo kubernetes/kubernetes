@@ -44,6 +44,7 @@ Running Kubernetes locally via Docker
 - [Run an application](#run-an-application)
 - [Expose it as a service](#expose-it-as-a-service)
 - [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
+- [Appendix: Determining valid hyperkube versions](#Appendix:-Determining-valid-hyperkube-versions)
 
 ### Overview
 
@@ -56,7 +57,7 @@ Here's a diagram of what the final result will look like:
 
 1. You need to have docker installed on one machine.
 2. Your kernel should support memory and swap accounting. Ensure that the
-following configs are turned on in your linux kernel:
+following configs are turned on in your linux kernel (skip this step on windows):
 
     ```console
     CONFIG_RESOURCE_COUNTERS=y
@@ -66,8 +67,9 @@ following configs are turned on in your linux kernel:
     CONFIG_MEMCG_KMEM=y
     ```
 
+
 3. Enable the memory and swap accounting in the kernel, at boot, as command line
-parameters as follows:
+parameters as follows (skip this step on windows):
 
     ```console
     GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
@@ -84,7 +86,8 @@ parameters as follows:
     ```
 
 4. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
-   a value such as "1.1.1".
+   a value such as "1.1.1".  To get a list of valid version numbers for use with 
+   this guide see [Appendix: Determining valid hyperkube versions](#Appendix:-Determining-valid-hyperkube-versions)
 
 ### Step One: Run etcd
 
@@ -225,6 +228,29 @@ Many of these containers run under the management of the `kubelet` binary, which
 the cluster, you need to first kill the kubelet container, and then any other containers.
 
 You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
+
+### Appendix: Determining valid hyperkube versions
+   Not all releases have images available to get a list of 
+   available K8S version tags:
+
+1. Obtain an `authorization token` by pasting the following URL in a web browser   
+   `https://gcr.io/v2/token?service=gcr.io&scope=repository:google_containers/hyperkube:pull`
+
+2. The result will look like the following, copy the value of the token key below    
+    ```
+    {"expires_in":43200,"issued_at":"2015-11-21T13:15:45.643802004-08:00","token":"AOR7SmExIINGsbUORS2fuqpY2O7r3JPiLJqX54l4eBqbCIivHYEbXN08/NB/BEtMHNuA9ZI5j7Zgg+9ES+H1b1/RsHnrt8YmV8Fo26jTEB+aDHQmMMjciKuKkL/Y8YdImhba9RKMKVtAyMlFJLweYcUN6fq1PLaejX4x760fCNGW2nlfGnNqnj851alZIEmW8pIIknr4n7ConRluNQWeXlOw7DyW132Nmf+UYtgWP3aYu9Y2wRqoB40t6r7ElMQZXjIbz/uawQc4k+3WIVsYYyYS7ax5ofGfudnfdfRxGLfh8fo8LbQlMbA7gA=="}
+    ```    
+    
+3. Run a CURL request on a bash command line with the authorization header set. For example:   
+   ```   
+    curl https://gcr.io/v2/google_containers/hyperkube/tags/list -H "Authorization: Bearer AOR7SmExIINGsbUORS2fuqpY2O7r3JPiLJqX54l4eBqbCIivHYEbXN08/NB/BEtMHNuA9ZI5j7Zgg+9ES+H1b1/RsHnrt8YmV8Fo26jTEB+aDHQmMMjciKuKkL/Y8YdImhba9RKMKVtAyMlFJLweYcUN6fq1PLaejX4x760fCNGW2nlfGnNqnj851alZIEmW8pIIknr4n7ConRluNQWeXlOw7DyW132Nmf+UYtgWP3aYu9Y2wRqoB40t6r7ElMQZXjIbz/uawQc4k+3WIVsYYyYS7ax5ofGfudnfdfRxGLfh8fo8LbQlMbA7gA=="
+   ```   
+   
+4. The resulting array will have a list of current valid entries for ${K8S_VERSION} as of this writing v1.1.1 is the latest available result:   
+   ```   
+    {"name":"google_containers/hyperkube","tags":["0.14.1","dev","v0.14.1","v0.14.2","v0.15.0","v0.16.1","v0.16.2","v0.17.0","v0.18.2","v0.19.3","v0.21.2","v1.0.1","v1.0.2","v1.0.3","v1.0.5","v1.0.6","v1.0.7","v1.1.0-alpha.1","v1.1.1","v1.1.1-beta.1"]}
+   ```
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()
