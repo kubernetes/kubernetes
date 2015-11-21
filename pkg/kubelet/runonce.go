@@ -115,7 +115,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 
-		if err = kl.syncPod(pod, mirrorPod, p, kubetypes.SyncPodUpdate); err != nil {
+		if err = kl.syncPod(pod, mirrorPod, p, SyncPodUpdate); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
