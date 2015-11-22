@@ -295,8 +295,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		CanBeAutoscaled: func(kind string) error {
 			switch kind {
-			// TODO: support autoscale for deployments
-			case "ReplicationController":
+			case "ReplicationController", "Deployment":
 				// nothing to do here
 			default:
 				return fmt.Errorf("cannot autoscale a %s", kind)
