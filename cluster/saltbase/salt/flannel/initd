@@ -15,9 +15,9 @@
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="Flannel overlay network daemon"
-NAME=flanneld
+NAME=flannel
 DAEMON=/usr/local/bin/flanneld
-DAEMON_ARGS="-etcd-endpoints http://e2e-test-beeps-master:4001 -etcd-prefix /kubernetes.io/network"
+DAEMON_ARGS=""
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME

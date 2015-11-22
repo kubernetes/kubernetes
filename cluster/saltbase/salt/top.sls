@@ -44,6 +44,7 @@ base:
     - match: grain
     - generate-cert
     - etcd
+    - flannel-server
     - flannel
     - kube-apiserver
     - kube-controller-manager

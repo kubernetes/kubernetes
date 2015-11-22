@@ -18,17 +18,17 @@ flannel-symlink:
     - watch:
         - archive: flannel-tar
 
+/etc/default/flannel:
+  file.managed:
+    - source: salt://flannel/default
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+
 /etc/init.d/flannel:
   file.managed:
     - source: salt://flannel/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-/var/run/flannel/network.json:
-  file.managed:
-    - source: salt://flannel/network.json
-    - makedirs: True
     - user: root
     - group: root
     - mode: 755
@@ -39,3 +39,4 @@ flannel:
     - watch:
       - file: /usr/local/bin/flanneld
       - file: /etc/init.d/flannel
+      - file: /etc/default/flannel

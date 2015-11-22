@@ -331,7 +331,7 @@ func NewMainKubelet(
 
 		// Flannel options
 		// TODO: This is currently a dummy server.
-		flannelServer:     NewFlannelServer(),
+		flannelHelper:     NewFlannelHelper(),
 		useDefaultOverlay: useDefaultOverlay,
 	}
 	if klet.kubeClient == nil {
@@ -661,7 +661,7 @@ type Kubelet struct {
 
 	// Flannel options.
 	useDefaultOverlay bool
-	flannelServer     *FlannelServer
+	flannelHelper     *FlannelHelper
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -2635,7 +2635,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 	if kl.configureCBR0 {
 		if kl.useDefaultOverlay {
 			glog.Infof("(kubelet) handshaking")
-			podCIDR, err := kl.flannelServer.Handshake()
+			podCIDR, err := kl.flannelHelper.Handshake()
 			if err != nil {
 				glog.Infof("Flannel server handshake failed %v", err)
 				return
