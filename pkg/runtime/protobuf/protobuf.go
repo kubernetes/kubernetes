@@ -17,11 +17,13 @@ limitations under the License.
 package protobuf
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"reflect"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -48,7 +50,10 @@ var _ runtime.Codec = codec{}
 
 func (c codec) Decode(data []byte) (runtime.Object, error) {
 	unknown := &runtime.Unknown{}
-	obj, err := c.creater.New(unknown.Kind, unknown.APIVersion)
+	if err := proto.Unmarshal(data, unknown); err != nil {
+		return nil, err
+	}
+	obj, err := c.creater.New(unknown.APIVersion, unknown.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +61,8 @@ func (c codec) Decode(data []byte) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("runtime object is not a proto.Message: %v", reflect.TypeOf(obj))
 	}
-	if err := proto.Unmarshal(data, pobj); err != nil {
+	glog.Infof("hex for %s %s: %s", unknown.APIVersion, unknown.Kind, hex.Dump(unknown.RawJSON))
+	if err := proto.Unmarshal(unknown.RawJSON, pobj); err != nil {
 		return nil, err
 	}
 	return obj, nil
@@ -98,6 +104,7 @@ func (c codec) Encode(obj runtime.Object) (data []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+	glog.Infof("marshaled %#v\ninto\n%s", obj, hex.Dump(b))
 	return (&runtime.Unknown{
 		TypeMeta: runtime.TypeMeta{
 			Kind:       kind,

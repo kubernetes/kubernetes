@@ -17,27 +17,29 @@ limitations under the License.
 package api_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
-
 	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	flag "github.com/spf13/pflag"
+	"github.com/ugorji/go/codec"
+
+	"github.com/gogo/protobuf/proto"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/protobuf"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	_ "k8s.io/kubernetes/pkg/apis/extensions"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-
-	flag "github.com/spf13/pflag"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
@@ -246,56 +248,188 @@ func TestUnversionedTypes(t *testing.T) {
 	}
 }
 
+func TestProtobufRoundTrip(t *testing.T) {
+	obj := &v1.Pod{}
+	apitesting.FuzzerFor(t, "v1", rand.NewSource(benchmarkSeed)).Fuzz(obj)
+	data, err := obj.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := &v1.Pod{}
+	if err := out.Unmarshal(data); err != nil {
+		t.Fatal(err)
+	}
+	if !api.Semantic.Equalities.DeepEqual(out, obj) {
+		t.Logf("marshal\n%s", hex.Dump(data))
+		t.Fatalf("Unmarshal is unequal\n%s", util.ObjectGoPrintSideBySide(out, obj))
+	}
+}
+
 const benchmarkSeed = 100
 
-func BenchmarkEncode(b *testing.B) {
-	pod := api.Pod{}
+func benchmarkItems() []v1.Pod {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
-	apiObjectFuzzer.Fuzz(&pod)
-	for i := 0; i < b.N; i++ {
-		testapi.Default.Codec().Encode(&pod)
+	items := make([]v1.Pod, 2)
+	for i := range items {
+		apiObjectFuzzer.Fuzz(&items[i])
 	}
+	return items
 }
 
-// BenchmarkEncodeJSON provides a baseline for regular JSON encode performance
-func BenchmarkEncodeJSON(b *testing.B) {
-	pod := api.Pod{}
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
-	apiObjectFuzzer.Fuzz(&pod)
+// BenchmarkEncodeCodec measures the cost of performing a codec encode, which includes
+// reflection (to clear APIVersion and Kind)
+func BenchmarkEncodeCodec(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(&pod)
+		if _, err := testapi.Default.Codec().Encode(&items[i%width]); err != nil {
+			b.Fatal(err)
+		}
 	}
+	b.StopTimer()
 }
 
-func BenchmarkDecode(b *testing.B) {
-	pod := api.Pod{}
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
-	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := testapi.Default.Codec().Encode(&pod)
+// BenchmarkEncodeJSONMarshal provides a baseline for regular JSON encode performance
+func BenchmarkEncodeJSONMarshal(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		testapi.Default.Codec().Decode(data)
+		if _, err := json.Marshal(&items[i%width]); err != nil {
+			b.Fatal(err)
+		}
 	}
+	b.StopTimer()
 }
 
-func BenchmarkDecodeInto(b *testing.B) {
-	pod := api.Pod{}
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
-	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := testapi.Default.Codec().Encode(&pod)
+func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		obj := api.Pod{}
-		testapi.Default.Codec().DecodeInto(data, &obj)
+		if _, err := items[i%width].Marshal(); err != nil {
+			b.Fatal(err)
+		}
 	}
+	b.StopTimer()
+}
+
+func BenchmarkDecodeCodec(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := codec.Encode(&items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := codec.Decode(encoded[i%width]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkDecodeIntoCodec(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := codec.Encode(&items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := codec.DecodeInto(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
 }
 
 // BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
-func BenchmarkDecodeJSON(b *testing.B) {
-	pod := api.Pod{}
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
-	apiObjectFuzzer.Fuzz(&pod)
-	data, _ := testapi.Default.Codec().Encode(&pod)
+func BenchmarkDecodeIntoJSON(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := codec.Encode(&items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		obj := api.Pod{}
-		json.Unmarshal(data, &obj)
+		obj := v1.Pod{}
+		if err := json.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
+func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
+	kcodec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := kcodec.Encode(&items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+	handler := &codec.JsonHandle{}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := codec.NewDecoderBytes(encoded[i%width], handler).Decode(&obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
+func BenchmarkDecodeIntoProtobuf(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := (&items[i]).Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+		validate := &v1.Pod{}
+		if err := proto.Unmarshal(data, validate); err != nil {
+			b.Fatalf("Failed to unmarshal %d: %v\n%#v", i, err, items[i])
+		}
+	}
+
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := proto.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

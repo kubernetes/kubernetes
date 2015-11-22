@@ -120,7 +120,8 @@ type Unknown struct {
 	RawJSON []byte
 }
 
-func (*Unknown) IsAnAPIObject() {}
+func (*Unknown) IsAnAPIObject()   {}
+func (u *Unknown) String() string { return u.TypeMeta.Kind }
 
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
 // generically. This can be used to deal with the API objects from a plug-in. Unstructured

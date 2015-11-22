@@ -143,7 +143,6 @@ import k8s_io_kubernetes_pkg_api_resource "k8s.io/kubernetes/pkg/api/resource"
 import k8s_io_kubernetes_pkg_types "k8s.io/kubernetes/pkg/types"
 
 import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
-import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
 
 import io "io"
 
@@ -14717,15 +14716,15 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			if postmsgIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapvalue := &k8s_io_kubernetes_pkg_api_resource.Quantity{}
+			mapvalue := k8s_io_kubernetes_pkg_api_resource.Quantity{}
 			if err := mapvalue.Unmarshal(data[iNdEx:postmsgIndex]); err != nil {
 				return err
 			}
 			iNdEx = postmsgIndex
 			if m.Max == nil {
-				m.Max = make(map[string]*k8s_io_kubernetes_pkg_api_resource.Quantity)
+				m.Max = make(ResourceList)
 			}
-			m.Max[mapkey] = mapvalue
+			m.Max[ResourceName(mapkey)] = mapvalue
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {

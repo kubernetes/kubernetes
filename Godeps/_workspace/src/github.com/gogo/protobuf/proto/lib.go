@@ -270,7 +270,6 @@ import (
 // Message is implemented by generated protocol buffer messages.
 type Message interface {
 	Reset()
-	String() string
 	ProtoMessage()
 }
 
