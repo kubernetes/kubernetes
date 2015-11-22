@@ -168,7 +168,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
-  --runtime_config="extensions/v1beta1=true" \
+  --runtime_config="extensions/v1beta1/deployments=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -956,6 +956,19 @@ __EOF__
   ! kubectl autoscale rc frontend "${kube_flags[@]}"
   # Clean up
   kubectl delete rc frontend "${kube_flags[@]}"
+
+  ### Auto scale deployment 
+  # Pre-condition: no deployment is running
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  # autoscale 2~3 pods, default CPU utilization (80%)
+  kubectl autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
+  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  # Clean up
+  kubectl delete hpa nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
 
   ######################
   # Multiple Resources #
