@@ -142,10 +142,10 @@ limitrange "limits" created
 $ kubectl describe limits limits --namespace=quota-example
 Name:		limits
 Namespace:	quota-example
-Type		Resource	Min	Max	Request	Limit	Limit/Request
-----		--------	---	---	-------	-----	-------------
-Container	memory		-	-	256Mi	512Mi	-
-Container	cpu		-	-	100m	200m	-
+Type        Resource      Min      Max      Default Request      Default Limit      Max Limit/Request Ratio
+----        --------      ---      ---      ---------------      -------------      -----------------------
+Container	  memory    		-	       -      	256Mi                512Mi             	-
+Container	  cpu       		-	       -      	100m                 200m             	-
 ```
 
 Now any time a pod is created in this namespace, if it has not specified any resource request/limit, the default
