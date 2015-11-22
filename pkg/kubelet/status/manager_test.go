@@ -63,7 +63,7 @@ func getRandomPodStatus() api.PodStatus {
 func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []testclient.Action) {
 	actions := kubeClient.(*testclient.Fake).Actions()
 	if len(actions) != len(expectedActions) {
-		t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
+		t.Fatalf("unexpected actions, got: %s expected: %s", actions, expectedActions)
 		return
 	}
 	for i := 0; i < len(actions); i++ {
@@ -484,21 +484,25 @@ func TestStaticPodStatus(t *testing.T) {
 	assert.True(t, isStatusEqual(&status, &updatedPod.Status), "Expected: %+v, Got: %+v", status, updatedPod.Status)
 	client.ClearActions()
 
-	otherPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "other-87654321",
-			Name:      "other",
-			Namespace: "new",
-		},
-	}
-	m.podManager.AddPod(otherPod)
-	m.SetPodStatus(otherPod, getRandomPodStatus())
+	// No changes.
+	m.syncBatch()
+	verifyActions(t, m.kubeClient, []testclient.Action{})
+
+	// Mirror pod identity changes.
+	m.podManager.DeletePod(&mirrorPod)
+	mirrorPod.UID = "new-mirror-pod"
+	mirrorPod.Status = api.PodStatus{}
+	m.podManager.AddPod(&mirrorPod)
+	// Expect update to new mirrorPod.
 	m.syncBatch()
 	verifyActions(t, m.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
 	})
-	_, found := m.GetPodStatus(otherPod.UID)
-	assert.False(t, found, "otherPod status should have been deleted")
+	updateAction = client.Actions()[1].(testclient.UpdateActionImpl)
+	updatedPod = updateAction.Object.(*api.Pod)
+	assert.Equal(t, mirrorPod.UID, updatedPod.UID, "Expected mirrorPod (%q), but got %q", mirrorPod.UID, updatedPod.UID)
+	assert.True(t, isStatusEqual(&status, &updatedPod.Status), "Expected: %+v, Got: %+v", status, updatedPod.Status)
 }
 
 func TestSetContainerReadiness(t *testing.T) {

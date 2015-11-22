@@ -59,6 +59,7 @@ type Manager interface {
 
 	DeleteOrphanedMirrorPods()
 	TranslatePodUID(uid types.UID) types.UID
+	GetUIDTranslations() (podToMirror, mirrorToPod map[types.UID]types.UID)
 	IsMirrorPodOf(mirrorPod, pod *api.Pod) bool
 	MirrorClient
 }
@@ -79,6 +80,9 @@ type basicManager struct {
 	podByFullName       map[string]*api.Pod
 	mirrorPodByFullName map[string]*api.Pod
 
+	// Mirror pod UID to pod UID map.
+	translationByUID map[types.UID]types.UID
+
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
@@ -94,30 +98,14 @@ func NewBasicPodManager(client MirrorClient) Manager {
 func (pm *basicManager) SetPods(newPods []*api.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	pm.setPods(newPods)
-}
 
-func (pm *basicManager) setPods(newPods []*api.Pod) {
-	podByUID := make(map[types.UID]*api.Pod)
-	mirrorPodByUID := make(map[types.UID]*api.Pod)
-	podByFullName := make(map[string]*api.Pod)
-	mirrorPodByFullName := make(map[string]*api.Pod)
+	pm.podByUID = make(map[types.UID]*api.Pod)
+	pm.podByFullName = make(map[string]*api.Pod)
+	pm.mirrorPodByUID = make(map[types.UID]*api.Pod)
+	pm.mirrorPodByFullName = make(map[string]*api.Pod)
+	pm.translationByUID = make(map[types.UID]types.UID)
 
-	for _, pod := range newPods {
-		podFullName := kubecontainer.GetPodFullName(pod)
-		if IsMirrorPod(pod) {
-			mirrorPodByUID[pod.UID] = pod
-			mirrorPodByFullName[podFullName] = pod
-		} else {
-			podByUID[pod.UID] = pod
-			podByFullName[podFullName] = pod
-		}
-	}
-
-	pm.podByUID = podByUID
-	pm.podByFullName = podByFullName
-	pm.mirrorPodByUID = mirrorPodByUID
-	pm.mirrorPodByFullName = mirrorPodByFullName
+	pm.updatePodsInternal(newPods...)
 }
 
 func (pm *basicManager) AddPod(pod *api.Pod) {
@@ -127,13 +115,22 @@ func (pm *basicManager) AddPod(pod *api.Pod) {
 func (pm *basicManager) UpdatePod(pod *api.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	podFullName := kubecontainer.GetPodFullName(pod)
-	if IsMirrorPod(pod) {
-		pm.mirrorPodByUID[pod.UID] = pod
-		pm.mirrorPodByFullName[podFullName] = pod
-	} else {
-		pm.podByUID[pod.UID] = pod
-		pm.podByFullName[podFullName] = pod
+	pm.updatePodsInternal(pod)
+}
+
+func (pm *basicManager) updatePodsInternal(pods ...*api.Pod) {
+	for _, pod := range pods {
+		podFullName := kubecontainer.GetPodFullName(pod)
+		if IsMirrorPod(pod) {
+			pm.mirrorPodByUID[pod.UID] = pod
+			pm.mirrorPodByFullName[podFullName] = pod
+			if p, ok := pm.podByFullName[podFullName]; ok {
+				pm.translationByUID[pod.UID] = p.UID
+			}
+		} else {
+			pm.podByUID[pod.UID] = pod
+			pm.podByFullName[podFullName] = pod
+		}
 	}
 }
 
@@ -144,6 +141,7 @@ func (pm *basicManager) DeletePod(pod *api.Pod) {
 	if IsMirrorPod(pod) {
 		delete(pm.mirrorPodByUID, pod.UID)
 		delete(pm.mirrorPodByFullName, podFullName)
+		delete(pm.translationByUID, pod.UID)
 	} else {
 		delete(pm.podByUID, pod.UID)
 		delete(pm.podByFullName, podFullName)
@@ -207,13 +205,23 @@ func (pm *basicManager) TranslatePodUID(uid types.UID) types.UID {
 
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	if mirrorPod, ok := pm.mirrorPodByUID[uid]; ok {
-		podFullName := kubecontainer.GetPodFullName(mirrorPod)
-		if pod, ok := pm.podByFullName[podFullName]; ok {
-			return pod.UID
-		}
+	if translated, ok := pm.translationByUID[uid]; ok {
+		return translated
 	}
 	return uid
+}
+
+func (pm *basicManager) GetUIDTranslations() (podToMirror, mirrorToPod map[types.UID]types.UID) {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+
+	podToMirror = make(map[types.UID]types.UID, len(pm.translationByUID))
+	mirrorToPod = make(map[types.UID]types.UID, len(pm.translationByUID))
+	for k, v := range pm.translationByUID {
+		podToMirror[k] = v
+		mirrorToPod[v] = k
+	}
+	return podToMirror, mirrorToPod
 }
 
 func (pm *basicManager) getOrphanedMirrorPodNames() []string {
