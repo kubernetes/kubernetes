@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	podResourceName string = "pods"
+)
+
 // FakePods implements PodsInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakePods struct {
@@ -31,7 +35,7 @@ type FakePods struct {
 }
 
 func (c *FakePods) Get(name string) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("pods", c.Namespace, name), &api.Pod{})
+	obj, err := c.Fake.Invokes(NewGetAction(podResourceName, c.Namespace, name), &api.Pod{})
 	if obj == nil {
 		return nil, err
 	}
@@ -40,7 +44,7 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 }
 
 func (c *FakePods) List(opts api.ListOptions) (*api.PodList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, opts), &api.PodList{})
+	obj, err := c.Fake.Invokes(NewListAction(podResourceName, c.Namespace, opts), &api.PodList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -58,7 +62,7 @@ func (c *FakePods) List(opts api.ListOptions) (*api.PodList, error) {
 }
 
 func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("pods", c.Namespace, pod), pod)
+	obj, err := c.Fake.Invokes(NewCreateAction(podResourceName, c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}
@@ -67,7 +71,7 @@ func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
 }
 
 func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("pods", c.Namespace, pod), pod)
+	obj, err := c.Fake.Invokes(NewUpdateAction(podResourceName, c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}
@@ -76,18 +80,18 @@ func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
 }
 
 func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("pods", c.Namespace, name), &api.Pod{})
+	_, err := c.Fake.Invokes(NewDeleteAction(podResourceName, c.Namespace, name), &api.Pod{})
 	return err
 }
 
 func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("pods", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(podResourceName, c.Namespace, opts))
 }
 
 func (c *FakePods) Bind(binding *api.Binding) error {
 	action := CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "pods"
+	action.Resource = podResourceName
 	action.Subresource = "bindings"
 	action.Object = binding
 
@@ -96,7 +100,7 @@ func (c *FakePods) Bind(binding *api.Binding) error {
 }
 
 func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("pods", "status", c.Namespace, pod), pod)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(podResourceName, "status", c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}

@@ -29,16 +29,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func getDSResourceName() string {
-	return "daemonsets"
-}
+const (
+	daemonSetResourceName string = "daemonsets"
+)
 
 func TestListDaemonSets(t *testing.T) {
 	ns := api.NamespaceAll
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(daemonSetResourceName, ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.DaemonSetList{
@@ -67,7 +67,7 @@ func TestListDaemonSets(t *testing.T) {
 func TestGetDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(daemonSetResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -105,7 +105,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(daemonSetResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -132,7 +132,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(daemonSetResourceName, ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -157,7 +157,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 func TestDeleteDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(daemonSetResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().DaemonSets(ns).Delete("foo")
@@ -170,7 +170,7 @@ func TestCreateDaemonSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(daemonSetResourceName, ns, ""), Body: requestDaemonSet, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{

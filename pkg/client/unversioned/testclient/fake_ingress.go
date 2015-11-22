@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	ingressResourceName string = "ingresses"
+)
+
 // FakeIngress implements IngressInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeIngress struct {
@@ -30,7 +34,7 @@ type FakeIngress struct {
 }
 
 func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("ingresses", c.Namespace, name), &extensions.Ingress{})
+	obj, err := c.Fake.Invokes(NewGetAction(ingressResourceName, c.Namespace, name), &extensions.Ingress{})
 	if obj == nil {
 		return nil, err
 	}
@@ -39,7 +43,7 @@ func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
 }
 
 func (c *FakeIngress) List(opts api.ListOptions) (*extensions.IngressList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("ingresses", c.Namespace, opts), &extensions.IngressList{})
+	obj, err := c.Fake.Invokes(NewListAction(ingressResourceName, c.Namespace, opts), &extensions.IngressList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,7 +52,7 @@ func (c *FakeIngress) List(opts api.ListOptions) (*extensions.IngressList, error
 }
 
 func (c *FakeIngress) Create(ingress *extensions.Ingress) (*extensions.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("ingresses", c.Namespace, ingress), ingress)
+	obj, err := c.Fake.Invokes(NewCreateAction(ingressResourceName, c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
@@ -57,7 +61,7 @@ func (c *FakeIngress) Create(ingress *extensions.Ingress) (*extensions.Ingress, 
 }
 
 func (c *FakeIngress) Update(ingress *extensions.Ingress) (*extensions.Ingress, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("ingresses", c.Namespace, ingress), ingress)
+	obj, err := c.Fake.Invokes(NewUpdateAction(ingressResourceName, c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}
@@ -66,16 +70,16 @@ func (c *FakeIngress) Update(ingress *extensions.Ingress) (*extensions.Ingress, 
 }
 
 func (c *FakeIngress) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("ingresses", c.Namespace, name), &extensions.Ingress{})
+	_, err := c.Fake.Invokes(NewDeleteAction(ingressResourceName, c.Namespace, name), &extensions.Ingress{})
 	return err
 }
 
 func (c *FakeIngress) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("ingresses", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(ingressResourceName, c.Namespace, opts))
 }
 
 func (c *FakeIngress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("ingresses", "status", c.Namespace, ingress), ingress)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(ingressResourceName, "status", c.Namespace, ingress), ingress)
 	if obj == nil {
 		return nil, err
 	}

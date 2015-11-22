@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	daemonSetResourceName string = "daemonsets"
+)
+
 // DaemonsSetsNamespacer has methods to work with DaemonSet resources in a namespace
 type DaemonSetsNamespacer interface {
 	DaemonSets(namespace string) DaemonSetInterface
@@ -52,41 +56,41 @@ var _ DaemonSetInterface = &daemonSets{}
 
 func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(daemonSetResourceName).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular daemon set.
 func (c *daemonSets) Get(name string) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(daemonSetResourceName).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new daemon set.
 func (c *daemonSets) Create(daemon *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Post().Namespace(c.ns).Resource("daemonsets").Body(daemon).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(daemonSetResourceName).Body(daemon).Do().Into(result)
 	return
 }
 
 // Update updates an existing daemon set.
 func (c *daemonSets) Update(daemon *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Put().Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).Body(daemon).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(daemonSetResourceName).Name(daemon.Name).Body(daemon).Do().Into(result)
 	return
 }
 
 // UpdateStatus updates an existing daemon set status
 func (c *daemonSets) UpdateStatus(daemon *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Put().Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).SubResource("status").Body(daemon).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(daemonSetResourceName).Name(daemon.Name).SubResource("status").Body(daemon).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing daemon set.
 func (c *daemonSets) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("daemonsets").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(daemonSetResourceName).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested daemon sets.
@@ -94,7 +98,7 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("daemonsets").
+		Resource(daemonSetResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

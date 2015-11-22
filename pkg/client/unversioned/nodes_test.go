@@ -32,15 +32,15 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getNodesResourceName() string {
-	return "nodes"
-}
+const (
+	nodeResourceName string = "nodes"
+)
 
 func TestListNodes(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(nodeResourceName, "", ""),
 		},
 		Response: simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
@@ -53,7 +53,7 @@ func TestListNodesLabels(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(nodeResourceName, "", ""),
 			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: simple.Response{
 			StatusCode: 200,
@@ -83,7 +83,7 @@ func TestGetNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "1"),
+			Path:   testapi.Default.ResourcePath(nodeResourceName, "", "1"),
 		},
 		Response: simple.Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
 	}
@@ -119,7 +119,7 @@ func TestCreateNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(nodeResourceName, "", ""),
 			Body:   requestNode},
 		Response: simple.Response{
 			StatusCode: 200,
@@ -134,7 +134,7 @@ func TestDeleteNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(nodeResourceName, "", "foo"),
 		},
 		Response: simple.Response{StatusCode: 200},
 	}
@@ -161,7 +161,7 @@ func TestUpdateNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(nodeResourceName, "", "foo"),
 		},
 		Response: simple.Response{StatusCode: 200, Body: requestNode},
 	}

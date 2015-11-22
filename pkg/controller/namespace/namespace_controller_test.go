@@ -103,15 +103,15 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 	// TODO: Reuse the constants for all these strings from testclient
 	pendingActionSet := sets.NewString(
 		strings.Join([]string{"get", "namespaces", ""}, "-"),
-		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
+		strings.Join([]string{"list", "replicationControllers", ""}, "-"),
 		strings.Join([]string{"list", "services", ""}, "-"),
 		strings.Join([]string{"list", "pods", ""}, "-"),
-		strings.Join([]string{"list", "resourcequotas", ""}, "-"),
+		strings.Join([]string{"list", "resourceQuotas", ""}, "-"),
 		strings.Join([]string{"list", "secrets", ""}, "-"),
-		strings.Join([]string{"list", "limitranges", ""}, "-"),
+		strings.Join([]string{"list", "limitRanges", ""}, "-"),
 		strings.Join([]string{"delete-collection", "events", ""}, "-"),
 		strings.Join([]string{"list", "serviceaccounts", ""}, "-"),
-		strings.Join([]string{"list", "persistentvolumeclaims", ""}, "-"),
+		strings.Join([]string{"list", "persistentVolumeClaims", ""}, "-"),
 		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
 	)
 
@@ -120,7 +120,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 			strings.Join([]string{"list", "daemonsets", ""}, "-"),
 			strings.Join([]string{"list", "deployments", ""}, "-"),
 			strings.Join([]string{"list", "jobs", ""}, "-"),
-			strings.Join([]string{"list", "horizontalpodautoscalers", ""}, "-"),
+			strings.Join([]string{"list", "horizontalPodAutoscalers", ""}, "-"),
 			strings.Join([]string{"list", "ingresses", ""}, "-"),
 			strings.Join([]string{"get", "resource", ""}, "-"),
 		)
@@ -147,7 +147,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		mockClient := testclient.NewSimpleFake(testInput.testNamespace)
 		if containsVersion(versions, "extensions/v1beta1") {
 			resources := []unversioned.APIResource{}
-			for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalpodautoscalers", "ingresses"} {
+			for _, resource := range []string{"daemonsets", "deployments", "jobs", "horizontalPodAutoscalers", "ingresses"} {
 				resources = append(resources, unversioned.APIResource{Name: resource})
 			}
 			mockClient.Resources = map[string]*unversioned.APIResourceList{

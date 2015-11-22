@@ -20,6 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+const (
+	componentStatusResourceName string = "componentStatuses"
+)
+
 type ComponentStatusesInterface interface {
 	ComponentStatuses() ComponentStatusInterface
 }
@@ -45,7 +49,7 @@ func newComponentStatuses(c *Client) *componentStatuses {
 func (c *componentStatuses) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
-		Resource("componentStatuses").
+		Resource(componentStatusResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -55,6 +59,6 @@ func (c *componentStatuses) List(opts api.ListOptions) (result *api.ComponentSta
 
 func (c *componentStatuses) Get(name string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
-	err = c.client.Get().Resource("componentStatuses").Name(name).Do().Into(result)
+	err = c.client.Get().Resource(componentStatusResourceName).Name(name).Do().Into(result)
 	return
 }

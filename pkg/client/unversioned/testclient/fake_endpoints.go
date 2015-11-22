@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	endpointResourceName string = "endpoints"
+)
+
 // FakeEndpoints implements EndpointInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeEndpoints struct {
@@ -29,7 +33,7 @@ type FakeEndpoints struct {
 }
 
 func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("endpoints", c.Namespace, name), &api.Endpoints{})
+	obj, err := c.Fake.Invokes(NewGetAction(endpointResourceName, c.Namespace, name), &api.Endpoints{})
 	if obj == nil {
 		return nil, err
 	}
@@ -38,7 +42,7 @@ func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
 }
 
 func (c *FakeEndpoints) List(opts api.ListOptions) (*api.EndpointsList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("endpoints", c.Namespace, opts), &api.EndpointsList{})
+	obj, err := c.Fake.Invokes(NewListAction(endpointResourceName, c.Namespace, opts), &api.EndpointsList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func (c *FakeEndpoints) List(opts api.ListOptions) (*api.EndpointsList, error) {
 }
 
 func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("endpoints", c.Namespace, endpoints), endpoints)
+	obj, err := c.Fake.Invokes(NewCreateAction(endpointResourceName, c.Namespace, endpoints), endpoints)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error)
 }
 
 func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("endpoints", c.Namespace, endpoints), endpoints)
+	obj, err := c.Fake.Invokes(NewUpdateAction(endpointResourceName, c.Namespace, endpoints), endpoints)
 	if obj == nil {
 		return nil, err
 	}
@@ -65,10 +69,10 @@ func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error)
 }
 
 func (c *FakeEndpoints) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("endpoints", c.Namespace, name), &api.Endpoints{})
+	_, err := c.Fake.Invokes(NewDeleteAction(endpointResourceName, c.Namespace, name), &api.Endpoints{})
 	return err
 }
 
 func (c *FakeEndpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("endpoints", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(endpointResourceName, c.Namespace, opts))
 }

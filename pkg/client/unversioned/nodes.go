@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	nodeResourceName string = "nodes"
+)
+
 type NodesInterface interface {
 	Nodes() NodeInterface
 }
@@ -47,35 +51,30 @@ func newNodes(c *Client) *nodes {
 	return &nodes{c}
 }
 
-// resourceName returns node's URL resource name.
-func (c *nodes) resourceName() string {
-	return "nodes"
-}
-
 // Create creates a new node.
 func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 	result := &api.Node{}
-	err := c.r.Post().Resource(c.resourceName()).Body(node).Do().Into(result)
+	err := c.r.Post().Resource(nodeResourceName).Body(node).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of nodes that match that selector in the cluster.
 func (c *nodes) List(opts api.ListOptions) (*api.NodeList, error) {
 	result := &api.NodeList{}
-	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err := c.r.Get().Resource(nodeResourceName).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return result, err
 }
 
 // Get gets an existing node.
 func (c *nodes) Get(name string) (*api.Node, error) {
 	result := &api.Node{}
-	err := c.r.Get().Resource(c.resourceName()).Name(name).Do().Into(result)
+	err := c.r.Get().Resource(nodeResourceName).Name(name).Do().Into(result)
 	return result, err
 }
 
 // Delete deletes an existing node.
 func (c *nodes) Delete(name string) error {
-	return c.r.Delete().Resource(c.resourceName()).Name(name).Do().Error()
+	return c.r.Delete().Resource(nodeResourceName).Name(name).Do().Error()
 }
 
 // Update updates an existing node.
@@ -85,7 +84,7 @@ func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
 	}
-	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
+	err := c.r.Put().Resource(nodeResourceName).Name(node.Name).Body(node).Do().Into(result)
 	return result, err
 }
 
@@ -95,7 +94,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
 	}
-	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
+	err := c.r.Put().Resource(nodeResourceName).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
 	return result, err
 }
 
@@ -104,7 +103,7 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(api.NamespaceAll).
-		Resource(c.resourceName()).
+		Resource(nodeResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

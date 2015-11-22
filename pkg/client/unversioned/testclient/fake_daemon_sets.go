@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	daemonSetResourceName string = "daemonsets"
+)
+
 // FakeDaemonSet implements DaemonInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeDaemonSets struct {
@@ -34,7 +38,7 @@ type FakeDaemonSets struct {
 var _ kclientlib.DaemonSetInterface = &FakeDaemonSets{}
 
 func (c *FakeDaemonSets) Get(name string) (*extensions.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("daemonsets", c.Namespace, name), &extensions.DaemonSet{})
+	obj, err := c.Fake.Invokes(NewGetAction(daemonSetResourceName, c.Namespace, name), &extensions.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
@@ -42,7 +46,7 @@ func (c *FakeDaemonSets) Get(name string) (*extensions.DaemonSet, error) {
 }
 
 func (c *FakeDaemonSets) List(opts api.ListOptions) (*extensions.DaemonSetList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, opts), &extensions.DaemonSetList{})
+	obj, err := c.Fake.Invokes(NewListAction(daemonSetResourceName, c.Namespace, opts), &extensions.DaemonSetList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -50,7 +54,7 @@ func (c *FakeDaemonSets) List(opts api.ListOptions) (*extensions.DaemonSetList, 
 }
 
 func (c *FakeDaemonSets) Create(daemon *extensions.DaemonSet) (*extensions.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("daemonsets", c.Namespace, daemon), &extensions.DaemonSet{})
+	obj, err := c.Fake.Invokes(NewCreateAction(daemonSetResourceName, c.Namespace, daemon), &extensions.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
@@ -58,7 +62,7 @@ func (c *FakeDaemonSets) Create(daemon *extensions.DaemonSet) (*extensions.Daemo
 }
 
 func (c *FakeDaemonSets) Update(daemon *extensions.DaemonSet) (*extensions.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("daemonsets", c.Namespace, daemon), &extensions.DaemonSet{})
+	obj, err := c.Fake.Invokes(NewUpdateAction(daemonSetResourceName, c.Namespace, daemon), &extensions.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
@@ -66,7 +70,7 @@ func (c *FakeDaemonSets) Update(daemon *extensions.DaemonSet) (*extensions.Daemo
 }
 
 func (c *FakeDaemonSets) UpdateStatus(daemon *extensions.DaemonSet) (*extensions.DaemonSet, error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("daemonsets", "status", c.Namespace, daemon), &extensions.DaemonSet{})
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(daemonSetResourceName, "status", c.Namespace, daemon), &extensions.DaemonSet{})
 	if obj == nil {
 		return nil, err
 	}
@@ -74,10 +78,10 @@ func (c *FakeDaemonSets) UpdateStatus(daemon *extensions.DaemonSet) (*extensions
 }
 
 func (c *FakeDaemonSets) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("daemonsets", c.Namespace, name), &extensions.DaemonSet{})
+	_, err := c.Fake.Invokes(NewDeleteAction(daemonSetResourceName, c.Namespace, name), &extensions.DaemonSet{})
 	return err
 }
 
 func (c *FakeDaemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(daemonSetResourceName, c.Namespace, opts))
 }

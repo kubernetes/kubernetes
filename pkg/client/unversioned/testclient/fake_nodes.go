@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	nodeResourceName string = "nodes"
+)
+
 // FakeNodes implements NodeInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeNodes struct {
@@ -28,7 +32,7 @@ type FakeNodes struct {
 }
 
 func (c *FakeNodes) Get(name string) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(NewRootGetAction("nodes", name), &api.Node{})
+	obj, err := c.Fake.Invokes(NewRootGetAction(nodeResourceName, name), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}
@@ -37,7 +41,7 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 }
 
 func (c *FakeNodes) List(opts api.ListOptions) (*api.NodeList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("nodes", opts), &api.NodeList{})
+	obj, err := c.Fake.Invokes(NewRootListAction(nodeResourceName, opts), &api.NodeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -46,7 +50,7 @@ func (c *FakeNodes) List(opts api.ListOptions) (*api.NodeList, error) {
 }
 
 func (c *FakeNodes) Create(node *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(NewRootCreateAction("nodes", node), node)
+	obj, err := c.Fake.Invokes(NewRootCreateAction(nodeResourceName, node), node)
 	if obj == nil {
 		return nil, err
 	}
@@ -55,7 +59,7 @@ func (c *FakeNodes) Create(node *api.Node) (*api.Node, error) {
 }
 
 func (c *FakeNodes) Update(node *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(NewRootUpdateAction("nodes", node), node)
+	obj, err := c.Fake.Invokes(NewRootUpdateAction(nodeResourceName, node), node)
 	if obj == nil {
 		return nil, err
 	}
@@ -64,18 +68,18 @@ func (c *FakeNodes) Update(node *api.Node) (*api.Node, error) {
 }
 
 func (c *FakeNodes) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewRootDeleteAction("nodes", name), &api.Node{})
+	_, err := c.Fake.Invokes(NewRootDeleteAction(nodeResourceName, name), &api.Node{})
 	return err
 }
 
 func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", opts))
+	return c.Fake.InvokesWatch(NewRootWatchAction(nodeResourceName, opts))
 }
 
 func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 	action := CreateActionImpl{}
 	action.Verb = "update"
-	action.Resource = "nodes"
+	action.Resource = nodeResourceName
 	action.Subresource = "status"
 	action.Object = node
 

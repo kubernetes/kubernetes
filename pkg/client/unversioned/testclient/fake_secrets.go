@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	secretResourceName string = "secrets"
+)
+
 // Fake implements SecretInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeSecrets struct {
@@ -29,7 +33,7 @@ type FakeSecrets struct {
 }
 
 func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("secrets", c.Namespace, name), &api.Secret{})
+	obj, err := c.Fake.Invokes(NewGetAction(secretResourceName, c.Namespace, name), &api.Secret{})
 	if obj == nil {
 		return nil, err
 	}
@@ -38,7 +42,7 @@ func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
 }
 
 func (c *FakeSecrets) List(opts api.ListOptions) (*api.SecretList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("secrets", c.Namespace, opts), &api.SecretList{})
+	obj, err := c.Fake.Invokes(NewListAction(secretResourceName, c.Namespace, opts), &api.SecretList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func (c *FakeSecrets) List(opts api.ListOptions) (*api.SecretList, error) {
 }
 
 func (c *FakeSecrets) Create(secret *api.Secret) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("secrets", c.Namespace, secret), secret)
+	obj, err := c.Fake.Invokes(NewCreateAction(secretResourceName, c.Namespace, secret), secret)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func (c *FakeSecrets) Create(secret *api.Secret) (*api.Secret, error) {
 }
 
 func (c *FakeSecrets) Update(secret *api.Secret) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("secrets", c.Namespace, secret), secret)
+	obj, err := c.Fake.Invokes(NewUpdateAction(secretResourceName, c.Namespace, secret), secret)
 	if obj == nil {
 		return nil, err
 	}
@@ -65,10 +69,10 @@ func (c *FakeSecrets) Update(secret *api.Secret) (*api.Secret, error) {
 }
 
 func (c *FakeSecrets) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("secrets", c.Namespace, name), &api.Secret{})
+	_, err := c.Fake.Invokes(NewDeleteAction(secretResourceName, c.Namespace, name), &api.Secret{})
 	return err
 }
 
 func (c *FakeSecrets) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("secrets", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(secretResourceName, c.Namespace, opts))
 }

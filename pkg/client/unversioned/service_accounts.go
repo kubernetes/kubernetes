@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	serviceAccountResourceName string = "serviceaccounts"
+)
+
 type ServiceAccountsNamespacer interface {
 	ServiceAccounts(namespace string) ServiceAccountsInterface
 }
@@ -52,7 +56,7 @@ func (s *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.Servi
 	result := &api.ServiceAccount{}
 	err := s.client.Post().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(serviceAccountResourceName).
 		Body(serviceAccount).
 		Do().
 		Into(result)
@@ -66,7 +70,7 @@ func (s *serviceAccounts) List(opts api.ListOptions) (*api.ServiceAccountList, e
 
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(serviceAccountResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -79,7 +83,7 @@ func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
 	result := &api.ServiceAccount{}
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(serviceAccountResourceName).
 		Name(name).
 		Do().
 		Into(result)
@@ -92,7 +96,7 @@ func (s *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(serviceAccountResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
@@ -100,7 +104,7 @@ func (s *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 func (s *serviceAccounts) Delete(name string) error {
 	return s.client.Delete().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(serviceAccountResourceName).
 		Name(name).
 		Do().
 		Error()
@@ -110,7 +114,7 @@ func (s *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 	result = &api.ServiceAccount{}
 	err = s.client.Put().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(serviceAccountResourceName).
 		Name(serviceAccount.Name).
 		Body(serviceAccount).
 		Do().

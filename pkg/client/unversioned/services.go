@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	serviceResourceName string = "services"
+)
+
 // ServicesNamespacer has methods to work with Service resources in a namespace
 type ServicesNamespacer interface {
 	Services(namespace string) ServiceInterface
@@ -54,7 +58,7 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 	result = &api.ServiceList{}
 	err = c.r.Get().
 		Namespace(c.ns).
-		Resource("services").
+		Resource(serviceResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -64,27 +68,27 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 // Get returns information about a particular service.
 func (c *services) Get(name string) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Get().Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(serviceResourceName).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(serviceResourceName).Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
 func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(serviceResourceName).Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(serviceResourceName).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
@@ -92,7 +96,7 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("services").
+		Resource(serviceResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
@@ -102,7 +106,7 @@ func (c *services) ProxyGet(scheme, name, port, path string, params map[string]s
 	request := c.r.Get().
 		Prefix("proxy").
 		Namespace(c.ns).
-		Resource("services").
+		Resource(serviceResourceName).
 		Name(util.JoinSchemeNamePort(scheme, name, port)).
 		Suffix(path)
 	for k, v := range params {

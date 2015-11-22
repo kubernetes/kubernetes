@@ -31,12 +31,16 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
+const (
+	serviceResourceName string = "services"
+)
+
 func TestListServices(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("services", ns, ""),
+			Path:   testapi.Default.ResourcePath(serviceResourceName, ns, ""),
 			Query:  simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200,
 			Body: &api.ServiceList{
@@ -70,7 +74,7 @@ func TestListServicesLabels(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("services", ns, ""),
+			Path:   testapi.Default.ResourcePath(serviceResourceName, ns, ""),
 			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: simple.Response{StatusCode: 200,
 			Body: &api.ServiceList{
@@ -106,7 +110,7 @@ func TestGetService(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("services", ns, "1"),
+			Path:   testapi.Default.ResourcePath(serviceResourceName, ns, "1"),
 			Query:  simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
@@ -130,7 +134,7 @@ func TestCreateService(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath("services", ns, ""),
+			Path:   testapi.Default.ResourcePath(serviceResourceName, ns, ""),
 			Body:   &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}},
 			Query:  simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
@@ -143,7 +147,7 @@ func TestUpdateService(t *testing.T) {
 	ns := api.NamespaceDefault
 	svc := &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1", ResourceVersion: "1"}}
 	c := &simple.Client{
-		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath("services", ns, "service-1"), Body: svc, Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(serviceResourceName, ns, "service-1"), Body: svc, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200, Body: svc},
 	}
 	response, err := c.Setup(t).Services(ns).Update(svc)
@@ -153,7 +157,7 @@ func TestUpdateService(t *testing.T) {
 func TestDeleteService(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath("services", ns, "1"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(serviceResourceName, ns, "1"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Services(ns).Delete("1")
@@ -166,7 +170,7 @@ func TestServiceProxyGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("proxy", "services", ns, "service-1") + "/foo",
+			Path:   testapi.Default.ResourcePathWithPrefix("proxy", serviceResourceName, ns, "service-1") + "/foo",
 			Query:  simple.BuildQueryValues(url.Values{"param-name": []string{"param-value"}}),
 		},
 		Response: simple.Response{StatusCode: 200, RawBody: &body},
@@ -178,7 +182,7 @@ func TestServiceProxyGet(t *testing.T) {
 	c = &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("proxy", "services", ns, "https:service-1:my-port") + "/foo",
+			Path:   testapi.Default.ResourcePathWithPrefix("proxy", serviceResourceName, ns, "https:service-1:my-port") + "/foo",
 			Query:  simple.BuildQueryValues(url.Values{"param-name": []string{"param-value"}}),
 		},
 		Response: simple.Response{StatusCode: 200, RawBody: &body},

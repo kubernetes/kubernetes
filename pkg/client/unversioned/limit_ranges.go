@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	limitRangeResourceName string = "limitRanges"
+)
+
 // LimitRangesNamespacer has methods to work with LimitRange resources in a namespace
 type LimitRangesNamespacer interface {
 	LimitRanges(namespace string) LimitRangeInterface
@@ -55,26 +59,26 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 // List takes a selector, and returns the list of limitRanges that match that selector.
 func (c *limitRanges) List(opts api.ListOptions) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(limitRangeResourceName).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
 // Get takes the name of the limitRange, and returns the corresponding Pod object, and an error if it occurs
 func (c *limitRanges) Get(name string) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(limitRangeResourceName).Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the limitRange, and returns an error if one occurs
 func (c *limitRanges) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(limitRangeResourceName).Name(name).Do().Error()
 }
 
 // Create takes the representation of a limitRange.  Returns the server's representation of the limitRange, and an error, if it occurs.
 func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
-	err = c.r.Post().Namespace(c.ns).Resource("limitRanges").Body(limitRange).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(limitRangeResourceName).Body(limitRange).Do().Into(result)
 	return
 }
 
@@ -85,7 +89,7 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 		err = fmt.Errorf("invalid update object, missing resource version: %v", limitRange)
 		return
 	}
-	err = c.r.Put().Namespace(c.ns).Resource("limitRanges").Name(limitRange.Name).Body(limitRange).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(limitRangeResourceName).Name(limitRange.Name).Body(limitRange).Do().Into(result)
 	return
 }
 
@@ -94,7 +98,7 @@ func (c *limitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("limitRanges").
+		Resource(limitRangeResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

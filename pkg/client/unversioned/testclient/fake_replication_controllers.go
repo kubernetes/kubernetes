@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	replicationControllerResourceName string = "replicationControllers"
+)
+
 // FakeReplicationControllers implements ReplicationControllerInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeReplicationControllers struct {
@@ -29,7 +33,7 @@ type FakeReplicationControllers struct {
 }
 
 func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("replicationcontrollers", c.Namespace, name), &api.ReplicationController{})
+	obj, err := c.Fake.Invokes(NewGetAction(replicationControllerResourceName, c.Namespace, name), &api.ReplicationController{})
 	if obj == nil {
 		return nil, err
 	}
@@ -38,7 +42,7 @@ func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationControlle
 }
 
 func (c *FakeReplicationControllers) List(opts api.ListOptions) (*api.ReplicationControllerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, opts), &api.ReplicationControllerList{})
+	obj, err := c.Fake.Invokes(NewListAction(replicationControllerResourceName, c.Namespace, opts), &api.ReplicationControllerList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func (c *FakeReplicationControllers) List(opts api.ListOptions) (*api.Replicatio
 }
 
 func (c *FakeReplicationControllers) Create(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("replicationcontrollers", c.Namespace, controller), controller)
+	obj, err := c.Fake.Invokes(NewCreateAction(replicationControllerResourceName, c.Namespace, controller), controller)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func (c *FakeReplicationControllers) Create(controller *api.ReplicationControlle
 }
 
 func (c *FakeReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("replicationcontrollers", c.Namespace, controller), controller)
+	obj, err := c.Fake.Invokes(NewUpdateAction(replicationControllerResourceName, c.Namespace, controller), controller)
 	if obj == nil {
 		return nil, err
 	}
@@ -65,7 +69,7 @@ func (c *FakeReplicationControllers) Update(controller *api.ReplicationControlle
 }
 
 func (c *FakeReplicationControllers) UpdateStatus(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("replicationcontrollers", "status", c.Namespace, controller), &api.ReplicationController{})
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(replicationControllerResourceName, "status", c.Namespace, controller), &api.ReplicationController{})
 	if obj == nil {
 		return nil, err
 	}
@@ -73,10 +77,10 @@ func (c *FakeReplicationControllers) UpdateStatus(controller *api.ReplicationCon
 }
 
 func (c *FakeReplicationControllers) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("replicationcontrollers", c.Namespace, name), &api.ReplicationController{})
+	_, err := c.Fake.Invokes(NewDeleteAction(replicationControllerResourceName, c.Namespace, name), &api.ReplicationController{})
 	return err
 }
 
 func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(replicationControllerResourceName, c.Namespace, opts))
 }

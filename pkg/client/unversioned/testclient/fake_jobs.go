@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	jobResourceName string = "jobs"
+)
+
 // FakeJobs implements JobInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeJobs struct {
@@ -30,7 +34,7 @@ type FakeJobs struct {
 }
 
 func (c *FakeJobs) Get(name string) (*extensions.Job, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("jobs", c.Namespace, name), &extensions.Job{})
+	obj, err := c.Fake.Invokes(NewGetAction(jobResourceName, c.Namespace, name), &extensions.Job{})
 	if obj == nil {
 		return nil, err
 	}
@@ -39,7 +43,7 @@ func (c *FakeJobs) Get(name string) (*extensions.Job, error) {
 }
 
 func (c *FakeJobs) List(opts api.ListOptions) (*extensions.JobList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, opts), &extensions.JobList{})
+	obj, err := c.Fake.Invokes(NewListAction(jobResourceName, c.Namespace, opts), &extensions.JobList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,7 +52,7 @@ func (c *FakeJobs) List(opts api.ListOptions) (*extensions.JobList, error) {
 }
 
 func (c *FakeJobs) Create(job *extensions.Job) (*extensions.Job, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("jobs", c.Namespace, job), job)
+	obj, err := c.Fake.Invokes(NewCreateAction(jobResourceName, c.Namespace, job), job)
 	if obj == nil {
 		return nil, err
 	}
@@ -57,7 +61,7 @@ func (c *FakeJobs) Create(job *extensions.Job) (*extensions.Job, error) {
 }
 
 func (c *FakeJobs) Update(job *extensions.Job) (*extensions.Job, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("jobs", c.Namespace, job), job)
+	obj, err := c.Fake.Invokes(NewUpdateAction(jobResourceName, c.Namespace, job), job)
 	if obj == nil {
 		return nil, err
 	}
@@ -66,16 +70,16 @@ func (c *FakeJobs) Update(job *extensions.Job) (*extensions.Job, error) {
 }
 
 func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("jobs", c.Namespace, name), &extensions.Job{})
+	_, err := c.Fake.Invokes(NewDeleteAction(jobResourceName, c.Namespace, name), &extensions.Job{})
 	return err
 }
 
 func (c *FakeJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("jobs", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(jobResourceName, c.Namespace, opts))
 }
 
 func (c *FakeJobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("jobs", "status", c.Namespace, job), job)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(jobResourceName, "status", c.Namespace, job), job)
 	if obj == nil {
 		return nil, err
 	}

@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	namespaceResourceName string = "namespaces"
+)
+
 // FakeNamespaces implements NamespacesInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakeNamespaces struct {
@@ -28,7 +32,7 @@ type FakeNamespaces struct {
 }
 
 func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(NewRootGetAction("namespaces", name), &api.Namespace{})
+	obj, err := c.Fake.Invokes(NewRootGetAction(namespaceResourceName, name), &api.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -37,7 +41,7 @@ func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
 }
 
 func (c *FakeNamespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("namespaces", opts), &api.NamespaceList{})
+	obj, err := c.Fake.Invokes(NewRootListAction(namespaceResourceName, opts), &api.NamespaceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -46,7 +50,7 @@ func (c *FakeNamespaces) List(opts api.ListOptions) (*api.NamespaceList, error) 
 }
 
 func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(NewRootCreateAction("namespaces", namespace), namespace)
+	obj, err := c.Fake.Invokes(NewRootCreateAction(namespaceResourceName, namespace), namespace)
 	if obj == nil {
 		return nil, err
 	}
@@ -55,7 +59,7 @@ func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error
 }
 
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(NewRootUpdateAction("namespaces", namespace), namespace)
+	obj, err := c.Fake.Invokes(NewRootUpdateAction(namespaceResourceName, namespace), namespace)
 	if obj == nil {
 		return nil, err
 	}
@@ -64,18 +68,18 @@ func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error
 }
 
 func (c *FakeNamespaces) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewRootDeleteAction("namespaces", name), &api.Namespace{})
+	_, err := c.Fake.Invokes(NewRootDeleteAction(namespaceResourceName, name), &api.Namespace{})
 	return err
 }
 
 func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", opts))
+	return c.Fake.InvokesWatch(NewRootWatchAction(namespaceResourceName, opts))
 }
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
 	action := CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "namespaces"
+	action.Resource = namespaceResourceName
 	action.Subresource = "finalize"
 	action.Object = namespace
 
@@ -90,7 +94,7 @@ func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, err
 func (c *FakeNamespaces) Status(namespace *api.Namespace) (*api.Namespace, error) {
 	action := CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "namespaces"
+	action.Resource = namespaceResourceName
 	action.Subresource = "status"
 	action.Object = namespace
 

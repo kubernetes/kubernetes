@@ -20,13 +20,17 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+const (
+	componentStatusResourceName string = "componentStatuses"
+)
+
 // Fake implements ComponentStatusInterface.
 type FakeComponentStatuses struct {
 	Fake *Fake
 }
 
 func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
-	obj, err := c.Fake.Invokes(NewRootGetAction("componentstatuses", name), &api.ComponentStatus{})
+	obj, err := c.Fake.Invokes(NewRootGetAction(componentStatusResourceName, name), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -35,7 +39,7 @@ func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
 }
 
 func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("componentstatuses", opts), &api.ComponentStatusList{})
+	obj, err := c.Fake.Invokes(NewRootListAction(componentStatusResourceName, opts), &api.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}
