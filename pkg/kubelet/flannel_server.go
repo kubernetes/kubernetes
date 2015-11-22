@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
+
+	utildbus "k8s.io/kubernetes/pkg/util/dbus"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 
 	"github.com/golang/glog"
 )
 
+// TODO: Move all this to a network plugin.
 const (
-	networkType       = "vxlan"
 	dockerOptsFile    = "/etc/default/docker"
 	flannelSubnetKey  = "FLANNEL_SUBNET"
 	flannelNetworkKey = "FLANNEL_NETWORK"
@@ -21,27 +24,46 @@ const (
 	flannelSubnetFile = "/var/run/flannel/subnet.env"
 )
 
-type FlannelServer struct {
-	subnetFile string
-	// TODO: Manage subnet file.
+// A Kubelet to flannel bridging helper.
+type FlannelHelper struct {
+	subnetFile     string
+	iptablesHelper utiliptables.Interface
 }
 
-func NewFlannelServer() *FlannelServer {
-	return &FlannelServer{flannelSubnetFile}
+// NewFlannelHelper creates a new flannel helper.
+func NewFlannelHelper() *FlannelHelper {
+	return &FlannelHelper{
+		subnetFile:     flannelSubnetFile,
+		iptablesHelper: utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4),
+	}
 }
 
-func (f *FlannelServer) Handshake() (podCIDR string, err error) {
-	// Flannel daemon will hang till the server comes up, kubelet will hang until
-	// flannel daemon has written subnet env variables. This is the kubelet handshake.
-	// To improve performance, we could defer just the configuration of the container
-	// bridge till after subnet.env is written. Keeping it local is clearer for now.
+// Ensure the required MASQUERADE rules exist for the given network/cidr.
+func (f *FlannelHelper) ensureFlannelMasqRule(kubeNetwork, podCIDR string) error {
+	// TODO: Investigate delegation to flannel via -ip-masq=true once flannel
+	// issue #374 is resolved.
+	comment := "Flannel masquerade facilitates pod<->node traffic."
+	args := []string{
+		"-m", "comment", "--comment", comment,
+		"!", "-d", kubeNetwork, "-s", podCIDR, "-j", "MASQUERADE",
+	}
+	_, err := f.iptablesHelper.EnsureRule(
+		utiliptables.Append,
+		utiliptables.TableNAT,
+		utiliptables.ChainPostrouting,
+		args...)
+	return err
+}
+
+// Handshake waits for the flannel subnet file and installs a few IPTables
+// rules, returning the pod CIDR allocated for this node.
+func (f *FlannelHelper) Handshake() (podCIDR string, err error) {
 	// TODO: Using a file to communicate is brittle
 	if _, err = os.Stat(f.subnetFile); err != nil {
 		return "", fmt.Errorf("Waiting for subnet file %v", f.subnetFile)
 	}
 	glog.Infof("(kubelet)Found flannel subnet file %v", f.subnetFile)
 
-	// TODO: Rest of this function is a hack.
 	config, err := parseKVConfig(f.subnetFile)
 	if err != nil {
 		return "", err
@@ -57,13 +79,8 @@ func (f *FlannelServer) Handshake() (podCIDR string, err error) {
 	if !ok {
 		return "", fmt.Errorf("No flannel network, config %+v", config)
 	}
-	if err := exec.Command("iptables",
-		"-t", "nat",
-		"-A", "POSTROUTING",
-		"!", "-d", kubeNetwork,
-		"-s", podCIDR,
-		"-j", "MASQUERADE").Run(); err != nil {
-		return "", fmt.Errorf("Unable to install iptables rule for flannel.")
+	if f.ensureFlannelMasqRule(kubeNetwork, podCIDR); err != nil {
+		return "", fmt.Errorf("Unable to install flannel masquerade %v", err)
 	}
 	return podCIDR, nil
 }

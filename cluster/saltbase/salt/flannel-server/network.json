@@ -1,6 +1,6 @@
 {
-    "Network": "18.16.0.0/16",
-    "SubnetLen": 24,
+    "Network": "192.168.0.0/16",
+    "SubnetLen": 26,
     "Backend": {
         "Type": "vxlan",
         "VNI": 1
