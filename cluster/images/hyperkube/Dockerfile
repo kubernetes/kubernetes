@@ -8,6 +8,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     file \
     util-linux \
     socat \
+    curl \
     && DEBIAN_FRONTEND=noninteractive apt-get autoremove -y \
     && DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -21,3 +22,9 @@ COPY master.json /etc/kubernetes/manifests/master.json
 
 COPY safe_format_and_mount /usr/share/google/safe_format_and_mount
 RUN chmod a+rx /usr/share/google/safe_format_and_mount
+
+COPY setup-files.sh /setup-files.sh
+RUN chmod a+rx /setup-files.sh
+
+COPY make-ca-cert.sh /make-ca-cert.sh
+RUN chmod a+x /make-ca-cert.sh
