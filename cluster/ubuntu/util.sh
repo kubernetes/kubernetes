@@ -188,8 +188,8 @@ function create-etcd-opts() {
   cat <<EOF > ~/kube/default/etcd
 ETCD_OPTS="\
  -name infra\
- -listen-client-urls http://0.0.0.0:4001\
- -advertise-client-urls http://127.0.0.1:4001"
+ -listen-client-urls http://127.0.0.1:4001,http://${1}:4001\
+ -advertise-client-urls http://${1}:4001"
 EOF
 }
 
@@ -379,7 +379,7 @@ function provision-master() {
     source ~/kube/util.sh
 
     setClusterInfo
-    create-etcd-opts
+    create-etcd-opts '${MASTER_IP}'
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
@@ -481,7 +481,7 @@ function provision-masterandnode() {
     source ~/kube/util.sh
      
     setClusterInfo
-    create-etcd-opts
+    create-etcd-opts '${MASTER_IP}'
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
