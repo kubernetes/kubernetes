@@ -93,11 +93,6 @@ func (vh *volumeHost) GetWriter() io.Writer {
 	return vh.kubelet.writer
 }
 
-// Returns the hostname of the host kubelet is running on
-func (vh *volumeHost) GetHostName() string {
-	return vh.kubelet.hostname
-}
-
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
