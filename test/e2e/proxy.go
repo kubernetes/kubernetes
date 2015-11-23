@@ -145,13 +145,19 @@ func proxyContext(version string) {
 		}
 		expectations := map[string]string{
 			svcProxyURL("", "portname1") + "/": "foo",
+			svcProxyURL("", "80") + "/":        "foo",
 			svcProxyURL("", "portname2") + "/": "bar",
+			svcProxyURL("", "81") + "/":        "bar",
 
 			svcProxyURL("http", "portname1") + "/": "foo",
+			svcProxyURL("http", "80") + "/":        "foo",
 			svcProxyURL("http", "portname2") + "/": "bar",
+			svcProxyURL("http", "81") + "/":        "bar",
 
 			svcProxyURL("https", "tlsportname1") + "/": "tls baz",
+			svcProxyURL("https", "443") + "/":          "tls baz",
 			svcProxyURL("https", "tlsportname2") + "/": "tls qux",
+			svcProxyURL("https", "444") + "/":          "tls qux",
 
 			podProxyURL("", "80") + "/":  `<a href="` + podProxyURL("", "80") + `/rewriteme">test</a>`,
 			podProxyURL("", "160") + "/": "foo",
@@ -172,9 +178,8 @@ func proxyContext(version string) {
 			subresourcePodProxyURL("https", "443") + "/": `<a href="` + subresourcePodProxyURL("https", "443") + `/tlsrewriteme">test</a>`,
 			subresourcePodProxyURL("https", "460") + "/": "tls baz",
 			subresourcePodProxyURL("https", "462") + "/": "tls qux",
+
 			// TODO: below entries don't work, but I believe we should make them work.
-			// svcPrefix + ":80": "foo",
-			// svcPrefix + ":81": "bar",
 			// podPrefix + ":dest1": "foo",
 			// podPrefix + ":dest2": "bar",
 		}
@@ -231,6 +236,8 @@ func doProxy(f *Framework, path string) (body []byte, statusCode int, d time.Dur
 	d = time.Since(start)
 	if len(body) > 0 {
 		Logf("%v: %s (%v; %v)", path, truncate(body, maxDisplayBodyLen), statusCode, d)
+	} else {
+		Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
 	return
 }
