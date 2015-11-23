@@ -304,7 +304,7 @@ function create-static-ip {
         echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
         exit 2
       fi
-      attempt=$(($attempt+1))
+      attempt=$(($attempt+1)) 
       echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
       sleep $(($attempt * 5))
     else
@@ -603,27 +603,12 @@ function kube-up {
       --allow "tcp:22" &
   fi
 
+  echo "Starting master and configuring firewalls"
   gcloud compute firewall-rules create "${MASTER_NAME}-https" \
     --project "${PROJECT}" \
     --network "${NETWORK}" \
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
-
-  if [[ "${OVERLAY_NETWORK}" == "true" ]]; then
-    # TODO: Where to put this? Scope it to flannel setup.
-    if ! "${GCLOUD}" compute firewall-rules --project "${PROJECT}" describe "${FIREWALL_ETCD}" &>/dev/null; then
-      "${GCLOUD}" compute firewall-rules create "${FIREWALL_ETCD}" \
-        --network="${NETWORK}" \
-        --project="${PROJECT}" \
-        --source-ranges="10.0.0.0/8" \
-        --target-tags "${MINION_TAG}" \
-        --allow tcp:4001 &
-    else
-      echo "... Using etcd firewall-rule: ${FIREWALL_ETCD}" >&2
-    fi
-  else
-    echo "Not opening etcd up to the cluster: ${OVERLAY_NETWORK} ${FIREWALL_ETCD}"
-  fi
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
@@ -687,7 +672,7 @@ function kube-up {
   write-node-env
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
-
+  
   create-node-instance-template $template_name
 
   gcloud compute instance-groups managed \
