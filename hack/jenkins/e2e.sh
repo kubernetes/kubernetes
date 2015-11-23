@@ -141,6 +141,7 @@ GKE_REQUIRED_SKIP_TESTS=(
 
 # Specialized tests which should be skipped by default for GKE.
 GKE_DEFAULT_SKIP_TESTS=(
+    "Autoscaling\sSuite"
     # Perf test, slow by design
     "resource\susage\stracking"
     "${GKE_REQUIRED_SKIP_TESTS[@]}"
