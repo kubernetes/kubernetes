@@ -13,6 +13,7 @@ allow-privileged
 api-burst
 api-prefix
 api-rate
+api-server-host
 api-server-port
 api-servers
 api-token
@@ -144,6 +145,7 @@ kubelet-certificate-authority
 kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
+kubelet-host
 kubelet-host-network-sources
 kubelet-https
 kubelet-network-plugin
@@ -155,6 +157,7 @@ kubelet-sync-frequency
 kubelet-timeout
 kube-master
 kubernetes-service-node-port
+k8s-build-output
 label-columns
 last-release-pr
 leave-stdin-open
