@@ -17,9 +17,12 @@ limitations under the License.
 package v1_test
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -65,6 +68,36 @@ func TestPodSpecConversion(t *testing.T) {
 		}
 		if got.ServiceAccountName != name {
 			t.Fatalf("want api.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
+		}
+	}
+}
+
+func TestListOptionsConversion(t *testing.T) {
+	testCases := []versioned.ListOptions{
+		{},
+		{ResourceVersion: "1"},
+		{LabelSelector: "a=b,c=d", FieldSelector: "a=b,c!=d", ResourceVersion: "5"},
+	}
+
+	for _, test := range testCases {
+		marshalled, err := json.Marshal(test)
+		if err != nil {
+			t.Errorf("unexpected error: %#v", err)
+		}
+		newRep := unversioned.ListOptions{}
+		if err := json.Unmarshal(marshalled, &newRep); err != nil {
+			t.Errorf("unexpected error: %#v", err)
+		}
+		unversionedMarshalled, err := json.Marshal(newRep)
+		if err != nil {
+			t.Errorf("unexpected error: %#", err)
+		}
+		base := versioned.ListOptions{}
+		if err := json.Unmarshal(unversionedMarshalled, &base); err != nil {
+			t.Errorf("unexpected error: %#v", err)
+		}
+		if !reflect.DeepEqual(test, base) {
+			t.Errorf("expected: %#v, got: %#v", test, base)
 		}
 	}
 }

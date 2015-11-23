@@ -30,6 +30,9 @@ type FieldSelector struct {
 }
 
 func (sh FieldSelector) MarshalJSON() ([]byte, error) {
+	if sh.Selector == nil {
+		return json.Marshal("")
+	}
 	return json.Marshal(sh.Selector.String())
 }
 
@@ -53,6 +56,9 @@ type LabelSelector struct {
 }
 
 func (sh LabelSelector) MarshalJSON() ([]byte, error) {
+	if sh.Selector == nil {
+		return json.Marshal("")
+	}
 	return json.Marshal(sh.Selector.String())
 }
 
