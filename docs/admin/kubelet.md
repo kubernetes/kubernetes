@@ -122,7 +122,7 @@ kubelet
       --register-node[=true]: Register the node with the apiserver (defaults to true if --api-servers is set)
       --register-schedulable[=true]: Register the node as schedulable. No-op if register-node is false. [default=true]
       --registry-burst=10: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0
-      --registry-qps=0: If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]
+      --registry-qps=5: If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=5.0]
       --resolv-conf="/etc/resolv.conf": Resolver configuration file used as the basis for the container DNS resolution configuration.
       --resource-container="/kubelet": Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).
       --rkt-path="": Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'
