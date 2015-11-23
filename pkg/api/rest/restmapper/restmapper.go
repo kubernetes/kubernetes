@@ -14,25 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: move everything in this file to pkg/api/rest
-package meta
+package restmapper
 
 import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Implements RESTScope interface
 type restScope struct {
-	name             RESTScopeName
+	name             meta.RESTScopeName
 	paramName        string
 	argumentName     string
 	paramDescription string
 }
 
-func (r *restScope) Name() RESTScopeName {
+func (r *restScope) Name() meta.RESTScopeName {
 	return r.name
 }
 func (r *restScope) ParamName() string {
@@ -46,14 +46,14 @@ func (r *restScope) ParamDescription() string {
 }
 
 var RESTScopeNamespace = &restScope{
-	name:             RESTScopeNameNamespace,
+	name:             meta.RESTScopeNameNamespace,
 	paramName:        "namespaces",
 	argumentName:     "namespace",
 	paramDescription: "object name and auth scope, such as for teams and projects",
 }
 
 var RESTScopeRoot = &restScope{
-	name: RESTScopeNameRoot,
+	name: meta.RESTScopeNameRoot,
 }
 
 // typeMeta is used as a key for lookup in the mapping between REST path and
@@ -78,7 +78,7 @@ type typeMeta struct {
 type DefaultRESTMapper struct {
 	mapping        map[string]typeMeta
 	reverse        map[typeMeta]string
-	scopes         map[typeMeta]RESTScope
+	scopes         map[typeMeta]meta.RESTScope
 	groupVersions  []unversioned.GroupVersion
 	plurals        map[string]string
 	singulars      map[string]string
@@ -87,7 +87,7 @@ type DefaultRESTMapper struct {
 
 // VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
-type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
+type VersionInterfacesFunc func(apiVersion string) (*meta.VersionInterfaces, error)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
@@ -102,7 +102,7 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
 func NewDefaultRESTMapper(group string, gvStrings []string, f VersionInterfacesFunc) *DefaultRESTMapper {
 	mapping := make(map[string]typeMeta)
 	reverse := make(map[typeMeta]string)
-	scopes := make(map[typeMeta]RESTScope)
+	scopes := make(map[typeMeta]meta.RESTScope)
 	plurals := make(map[string]string)
 	singulars := make(map[string]string)
 	// TODO: verify name mappings work correctly when versions differ
@@ -123,7 +123,7 @@ func NewDefaultRESTMapper(group string, gvStrings []string, f VersionInterfacesF
 	}
 }
 
-func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, gvString string, mixedCase bool) {
+func (m *DefaultRESTMapper) Add(scope meta.RESTScope, kind string, gvString string, mixedCase bool) {
 	gv := unversioned.ParseGroupVersionOrDie(gvString)
 
 	plural, singular := KindToResource(kind, mixedCase)
@@ -210,7 +210,7 @@ func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
 // So this API is broken.  The RESTMapper test made it clear that versions here were API versions, but the code tries to use
 // them with group/version tuples.
 // TODO this should probably become RESTMapping(GroupKind, versions ...string)
-func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTMapping, error) {
+func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
 	// Pick an appropriate version
 	var groupVersion *unversioned.GroupVersion
 	hadVersion := false
@@ -270,7 +270,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", gvk.GroupVersion().String())
 	}
 
-	retVal := &RESTMapping{
+	retVal := &meta.RESTMapping{
 		Resource:         resource,
 		GroupVersionKind: gvk,
 		Scope:            scope,
@@ -309,7 +309,7 @@ func (m *DefaultRESTMapper) ResourceIsValid(resource string) bool {
 }
 
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
-type MultiRESTMapper []RESTMapper
+type MultiRESTMapper []meta.RESTMapper
 
 // ResourceSingularizer converts a REST resource name from plural to singular (e.g., from pods to pod)
 // This implementation supports multiple REST schemas and return the first match.
@@ -351,7 +351,7 @@ func (m MultiRESTMapper) GroupForResource(resource string) (group string, err er
 // RESTMapping provides the REST mapping for the resource based on the resource
 // kind and version. This implementation supports multiple REST schemas and
 // return the first match.
-func (m MultiRESTMapper) RESTMapping(kind string, versions ...string) (mapping *RESTMapping, err error) {
+func (m MultiRESTMapper) RESTMapping(kind string, versions ...string) (mapping *meta.RESTMapping, err error) {
 	for _, t := range m {
 		mapping, err = t.RESTMapping(kind, versions...)
 		if err == nil {

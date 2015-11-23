@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -362,7 +362,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	_, res := meta.KindToResource(kind, false)
+	_, res := restmapper.KindToResource(kind, false)
 	cmdutil.PrintSuccess(mapper, false, out, res, oldName, message)
 	return nil
 }
