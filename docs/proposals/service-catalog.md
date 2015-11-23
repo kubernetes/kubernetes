@@ -31,12 +31,9 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Service Catalog
-
-## Abstract
+# Abstract
 
 Kubernetes has Services but they are scoped per namespace, and (assuming eventual support for RBAC) you may not want everyone to be able to see and use all the services in your namespace.
-
 
 This proposal is about:
 
@@ -45,35 +42,52 @@ This proposal is about:
 - adding support for dynamic provisioning of resources from the catalog
 - making it easier to link Services (and their configuration data) to Pods
 
-## Service configuration data
+# Use cases
+
+## Shared development database
+
+A development team is working on an application that uses a database. The IT department manages the database (i.e., it's lives off-cluster). All developers share the same credentials to access the database, but these credentials are managed by IT. Rather than having each developer create his or her own `Service` and `Secret` to connect to the database, IT creates a "db-app-xyz" `Service` and a "db-app-xyz" `Secret` in the "info-tech" namespace. IT also has lots of other `Service` resources in their namespace and they don't want to expose all of them to the development team. Therefore, they publish "db-app-xyz" to a service catalog. To use this service, a developer searches for it in the service catalog and adds it to their namespace.
+
+## Dynamic provisioning of cluster resources
+
+A user creates a "template" (e.g. if something similar to [OpenShift Templates](https://docs.openshift.org/latest/dev_guide/templates.html) exists) that makes it easy to create everything needed to spin up a new PostgreSQL database (customizable username/password, Service, Deployment, etc.). The user wants to share only this template in the service catalog so others can find it and use it, while keeping other templates in the namespace private.
+
+
+## Custom dynamic provisioning
+
+The IT department manages an off-cluster database. Each developer wanting to access the database is required to use a unique username and password to access the database. Additionally, each developer accesses a unique tablespace that no other team members can access. The IT department used to create database accounts and tablespaces by hand in response to individual developer requests.
+
+Moving forward, IT wants to automate the process. They create a web service that implements the "service broker" API (such as the one from [Cloud Foundry](http://docs.cloudfoundry.org/services/api.html#api-overview)). They add an entry to the service catalog for their database service, pointing at their web service. When a developer consumes the entry from the catalog, IT's web service is contacted, resulting in a new username, password, and tablespace.
+
+# Service configuration data
 
 The only data currently associated with a service is a list of zero or more endpoints. Many services also have configuration data associated with them. These include things such as logins, passwords, and additional connection parameters. To tie configuration data to a service, we propose adding information to the Service type to be able to express a relationship between the Service and its relevant configuration data. This could be accomplished by adding new field(s) or by using annotations. Potential configuration data target reference types include Secrets and ConfigData.
 
 Just creating the reference association by itself does not accomplish much; to be useful, that data needs to be available to the processes executing in containers. More on this process is below in the sections on service claims and linking.
 
-## Service catalogs
+# Service catalogs
 
 A service catalog is a listing of "services". Examples might include an external database that is deployed outside of the cluster, an actual Kubernetes Service, a template of cluster primitives to be created, and custom provisioners that can perform tasks such as creating users in external systems.
 
-The catalog is not meant to include every service in the cluster. Instead, it should contain those services that users with to highlight and make available to other users. For example, your namespace might contain "etcd", "etcd-discovery", and "postgresql" services, and the only one you want to share with others is the postgresql service.
+The catalog is not meant to include every service in the cluster. Instead, it should contain those services that users wish to highlight and make available to other users. For example, your namespace might contain "etcd", "etcd-discovery", and "postgresql" services, and the only one you want to share with others is the postgresql service.
 
-### Publishing to a catalog
+## Publishing to a catalog
 
 Users should be able to publish entries to a service catalog. One means of accomplishing could be by adding annotations to the resources that can go into a catalog (e.g, Services). Another option would be to create `ServiceCatalogEntry` resources that reference the appropriate resources.
 
 An entry in the service catalog has a "type", which indicates the behavior that occurs when it is claimed by a user. We have thought of the following potential types:
 
 - reference: "I want to use this entry as-is, including its configuration data"
-- template: "I want to create items from the specified template"
-- provision: "I want the creation to be goverened by some other entity that implements the 'service broker' HTTP interface"
+- template: "I want to create items from the specified template" (see "Dynamic provisioning of cluster resources" above)
+- provision: "I want the creation to be goverened by some other entity that implements the 'service broker' HTTP interface" (see "Custom dynamic provisioning" above)
 
 We see the type as an arbitrary `string`; one or more controllers could run to process each claim type, performing whatever logic is appropriate to fulfill the specific type in question.
 
-### Viewing a catalog
+## Viewing a catalog
 
 Users should be able to list the entries in a service catalog. Users should be able to select an entry and "consume" it. We call this consumption "claiming" a service from a service catalog.
 
-### Claiming a service
+## Claiming a service
 
 When you want to use an entry from the service catalog, you create a `ServiceClaim` that references the desired entry. A controller processes new claims for admission. This determines if the user who created the claim is allowed to consume the entry from the catalog. This decision can be flexible: it could be automated based on policy, or it could support manual intervention and workflow.
 
@@ -89,7 +103,7 @@ Additional fulfillment types are possible as long as there is a controller that 
 
 TODO poking holes in cluster firewall for cross-namespace connections
 
-## Linking services
+# Linking services
 
 Claiming a service catalog entry only creates resources in the user's namespace. If all you need is a service and its DNS entry, this may be sufficient for your pods to function. But if you need the configuration data injected into your pod, it would be nice to make that easier to do.
 
@@ -102,7 +116,13 @@ We want to add the ability to link a service to a deployable resource such as a 
 
 This command would automatically inject the ConfigData and Secret objects as volumes into the Deployment. This could be flexible as well, allowing you instead to expose these items as environment variables.
 
-## Cross-namespace networking
+In the example above, the volumes could potentially be mounted as:
+
+/var/run/kubernetes.io/links/configdata/postgresql-options
+/var/run/kubernetes.io/links/secrets/postgresql-credentials
+
+
+# Cross-namespace networking
 
 If the cluster has multi-tenant network isolation enabled, then a pod in namespace A won't be able to talk to a service in namespace B. We should look into ways to automatically manipulate the isolation rules to "poke holes" when claims are provisioned, to make the desired connectivity work, and to "unpoke" when the connectivity is no longer needed.
 
