@@ -17,9 +17,7 @@ limitations under the License.
 // Package unversioned contains API types that are common to all versions.
 package unversioned
 
-import (
-	"strings"
-)
+import "strings"
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
