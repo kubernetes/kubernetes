@@ -1636,6 +1636,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			return err
 		}
 	}
+
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
 	// The kubelet is the source of truth for pod status. It ignores the status sent from
