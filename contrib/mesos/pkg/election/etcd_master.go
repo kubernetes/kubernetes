@@ -22,7 +22,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
@@ -91,10 +91,10 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 	// We don't handle the TTL delete w/o a write case here, it's handled in the next loop
 	// iteration.
 	_, err := e.etcd.CompareAndSwap(path, id, ttl, "", res.Node.ModifiedIndex)
-	if err != nil && !etcdstorage.IsEtcdTestFailed(err) {
+	if err != nil && !etcdutil.IsEtcdTestFailed(err) {
 		return "", err
 	}
-	if err != nil && etcdstorage.IsEtcdTestFailed(err) {
+	if err != nil && etcdutil.IsEtcdTestFailed(err) {
 		return "", nil
 	}
 	return id, nil
@@ -106,11 +106,11 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 // returns "", err if an error occurred
 func (e *etcdMasterElector) becomeMaster(path, id string, ttl uint64) (string, error) {
 	_, err := e.etcd.Create(path, id, ttl)
-	if err != nil && !etcdstorage.IsEtcdNodeExist(err) {
+	if err != nil && !etcdutil.IsEtcdNodeExist(err) {
 		// unexpected error
 		return "", err
 	}
-	if err != nil && etcdstorage.IsEtcdNodeExist(err) {
+	if err != nil && etcdutil.IsEtcdNodeExist(err) {
 		return "", nil
 	}
 	return id, nil
@@ -125,12 +125,12 @@ func (e *etcdMasterElector) handleMaster(path, id string, ttl uint64) (string, e
 	res, err := e.etcd.Get(path, false, false)
 
 	// Unexpected error, bail out
-	if err != nil && !etcdstorage.IsEtcdNotFound(err) {
+	if err != nil && !etcdutil.IsEtcdNotFound(err) {
 		return "", err
 	}
 
 	// There is no master, try to become the master.
-	if err != nil && etcdstorage.IsEtcdNotFound(err) {
+	if err != nil && etcdutil.IsEtcdNotFound(err) {
 		return e.becomeMaster(path, id, ttl)
 	}
 
