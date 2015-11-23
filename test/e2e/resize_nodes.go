@@ -388,12 +388,16 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 
 var _ = Describe("Nodes", func() {
 	framework := NewFramework("resize-nodes")
+	var systemPodsNo int
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
+		systemPods, err := c.Pods(api.NamespaceSystem).List(labels.Everything(), fields.Everything())
+		Expect(err).NotTo(HaveOccurred())
+		systemPodsNo = len(systemPods.Items)
 	})
 
 	Describe("Resize", func() {
@@ -424,10 +428,8 @@ var _ = Describe("Nodes", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
-			pods, err := framework.Client.Pods(api.NamespaceSystem).List(labels.Everything(), fields.Everything())
-			Expect(err).NotTo(HaveOccurred())
 
-			err = waitForPodsRunningReady(api.NamespaceSystem, len(pods.Items), podReadyBeforeTimeout)
+			err := waitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, podReadyBeforeTimeout)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
