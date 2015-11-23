@@ -789,7 +789,7 @@ func validatePorts(ports []api.ContainerPort) validation.ErrorList {
 		if len(port.Protocol) == 0 {
 			pErrs = append(pErrs, validation.NewFieldRequired("protocol"))
 		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
-			pErrs = append(pErrs, validation.NewFieldValueNotSupported("protocol", port.Protocol, supportedPortProtocols.List()))
+			pErrs = append(pErrs, validation.NewFieldNotSupported("protocol", port.Protocol, supportedPortProtocols.List()))
 		}
 		allErrs = append(allErrs, pErrs.PrefixIndex(i)...)
 	}
@@ -848,7 +848,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 		if err != nil {
 			allErrs = append(allErrs, validation.NewFieldInvalid("fieldPath", fs.FieldPath, "error converting fieldPath"))
 		} else if !expressions.Has(internalFieldPath) {
-			allErrs = append(allErrs, validation.NewFieldValueNotSupported("fieldPath", internalFieldPath, expressions.List()))
+			allErrs = append(allErrs, validation.NewFieldNotSupported("fieldPath", internalFieldPath, expressions.List()))
 		}
 	}
 
@@ -996,7 +996,7 @@ func validatePullPolicy(ctr *api.Container) validation.ErrorList {
 		allErrors = append(allErrors, validation.NewFieldRequired(""))
 	default:
 		validValues := []string{string(api.PullAlways), string(api.PullIfNotPresent), string(api.PullNever)}
-		allErrors = append(allErrors, validation.NewFieldValueNotSupported("", ctr.ImagePullPolicy, validValues))
+		allErrors = append(allErrors, validation.NewFieldNotSupported("", ctr.ImagePullPolicy, validValues))
 	}
 
 	return allErrors
@@ -1057,7 +1057,7 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy) validation.ErrorLis
 		allErrors = append(allErrors, validation.NewFieldRequired(""))
 	default:
 		validValues := []string{string(api.RestartPolicyAlways), string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}
-		allErrors = append(allErrors, validation.NewFieldValueNotSupported("", *restartPolicy, validValues))
+		allErrors = append(allErrors, validation.NewFieldNotSupported("", *restartPolicy, validValues))
 	}
 
 	return allErrors
@@ -1072,7 +1072,7 @@ func validateDNSPolicy(dnsPolicy *api.DNSPolicy) validation.ErrorList {
 		allErrors = append(allErrors, validation.NewFieldRequired(""))
 	default:
 		validValues := []string{string(api.DNSClusterFirst), string(api.DNSDefault)}
-		allErrors = append(allErrors, validation.NewFieldValueNotSupported("", dnsPolicy, validValues))
+		allErrors = append(allErrors, validation.NewFieldNotSupported("", dnsPolicy, validValues))
 	}
 	return allErrors
 }
@@ -1250,7 +1250,7 @@ func ValidateService(service *api.Service) validation.ErrorList {
 	if service.Spec.SessionAffinity == "" {
 		allErrs = append(allErrs, validation.NewFieldRequired("spec.sessionAffinity"))
 	} else if !supportedSessionAffinityType.Has(string(service.Spec.SessionAffinity)) {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity, supportedSessionAffinityType.List()))
+		allErrs = append(allErrs, validation.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity, supportedSessionAffinityType.List()))
 	}
 
 	if api.IsServiceIPSet(service) {
@@ -1269,7 +1269,7 @@ func ValidateService(service *api.Service) validation.ErrorList {
 	if service.Spec.Type == "" {
 		allErrs = append(allErrs, validation.NewFieldRequired("spec.type"))
 	} else if !supportedServiceType.Has(string(service.Spec.Type)) {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("spec.type", service.Spec.Type, supportedServiceType.List()))
+		allErrs = append(allErrs, validation.NewFieldNotSupported("spec.type", service.Spec.Type, supportedServiceType.List()))
 	}
 
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
@@ -1330,7 +1330,7 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, validation.NewFieldRequired("protocol"))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("protocol", sp.Protocol, supportedPortProtocols.List()))
+		allErrs = append(allErrs, validation.NewFieldNotSupported("protocol", sp.Protocol, supportedPortProtocols.List()))
 	}
 
 	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntVal) {
@@ -1411,7 +1411,7 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 		}
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
-			allErrs = append(allErrs, validation.NewFieldValueNotSupported(fieldName+".spec.restartPolicy", template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+			allErrs = append(allErrs, validation.NewFieldNotSupported(fieldName+".spec.restartPolicy", template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 		}
 	}
 	return allErrs
@@ -1974,7 +1974,7 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool) validation.E
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, validation.NewFieldRequired("protocol"))
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
-		allErrs = append(allErrs, validation.NewFieldValueNotSupported("protocol", port.Protocol, supportedPortProtocols.List()))
+		allErrs = append(allErrs, validation.NewFieldNotSupported("protocol", port.Protocol, supportedPortProtocols.List()))
 	}
 	return allErrs
 }

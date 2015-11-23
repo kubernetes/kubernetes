@@ -125,7 +125,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewFieldValueNotSupported("field[0].name", "bar", nil),
+			validation.NewFieldNotSupported("field[0].name", "bar", nil),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
