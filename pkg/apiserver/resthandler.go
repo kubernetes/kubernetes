@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -793,7 +794,7 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
 // on all child objects returned.
 func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) error {
-	if !runtime.IsListType(obj) {
+	if !meta.IsListType(obj) {
 		return nil
 	}
 
@@ -812,7 +813,7 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 	}
 
 	// Set self-link of objects in the list.
-	items, err := runtime.ExtractList(obj)
+	items, err := meta.ExtractList(obj)
 	if err != nil {
 		return err
 	}
@@ -821,7 +822,7 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 			return err
 		}
 	}
-	return runtime.SetList(obj, items)
+	return meta.SetList(obj, items)
 
 }
 

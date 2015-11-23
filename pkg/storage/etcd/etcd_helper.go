@@ -26,6 +26,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -273,7 +274,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 		glog.Errorf("Context is nil")
 	}
 	trace := util.NewTrace("GetToList " + getTypeName(listObj))
-	listPtr, err := runtime.GetItemsPtr(listObj)
+	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
@@ -356,7 +357,7 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion uint6
 	}
 	trace := util.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
-	listPtr, err := runtime.GetItemsPtr(listObj)
+	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}

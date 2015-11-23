@@ -335,7 +335,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if info.Object == nil {
 			return fn(info, nil)
 		}
-		items, err := runtime.ExtractList(info.Object)
+		items, err := meta.ExtractList(info.Object)
 		if err != nil {
 			return fn(info, nil)
 		}
@@ -564,7 +564,7 @@ func RetrieveLatest(info *Info, err error) error {
 	if err != nil {
 		return err
 	}
-	if runtime.IsListType(info.Object) {
+	if meta.IsListType(info.Object) {
 		return fmt.Errorf("watch is only supported on individual resources and resource collections, but a list of resources is found")
 	}
 	if len(info.Name) == 0 {

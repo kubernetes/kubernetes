@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
@@ -136,7 +137,7 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 		list = append(list, objCopy.(runtime.Object))
 	}
 	listObj := &api.List{}
-	if err := runtime.SetList(listObj, list); err != nil {
+	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
 	objMeta, err := api.ListMetaFor(listObj)

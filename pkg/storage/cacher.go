@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -276,7 +277,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion uint64, f
 	c.usable.RUnlock()
 
 	// List elements from cache, with at least 'resourceVersion'.
-	listPtr, err := runtime.GetItemsPtr(listObj)
+	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
