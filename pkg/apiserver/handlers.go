@@ -502,7 +502,7 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 		switch req.Method {
 		case "POST":
 			requestInfo.Verb = "create"
-		case "GET":
+		case "GET", "HEAD":
 			requestInfo.Verb = "get"
 		case "PUT":
 			requestInfo.Verb = "update"
