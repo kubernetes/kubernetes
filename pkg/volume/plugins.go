@@ -156,9 +156,6 @@ type VolumeHost interface {
 
 	// Get writer interface for writing data to disk.
 	GetWriter() io.Writer
-
-	// Returns the hostname of the host kubelet is running on
-	GetHostName() string
 }
 
 // VolumePluginMgr tracks registered plugins.
