@@ -30,8 +30,8 @@ import (
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // PodConfigNotificationMode describes how changes are sent to the update channel.
@@ -318,7 +318,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 		} else {
 			name := kubecontainer.GetPodFullName(pod)
 			if names.Has(name) {
-				errlist = append(errlist, fielderrors.NewFieldDuplicate("name", pod.Name))
+				errlist = append(errlist, utilvalidation.NewFieldDuplicate("name", pod.Name))
 			} else {
 				names.Insert(name)
 			}
