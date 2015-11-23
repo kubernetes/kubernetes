@@ -328,11 +328,8 @@ func NewMainKubelet(
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
 		containerManager:               containerManager,
-
-		// Flannel options
-		// TODO: This is currently a dummy server.
-		flannelHelper:     NewFlannelHelper(),
-		useDefaultOverlay: useDefaultOverlay,
+		flannelHelper:                  NewFlannelHelper(),
+		useDefaultOverlay:              useDefaultOverlay,
 	}
 	if klet.kubeClient == nil {
 		glog.Infof("Master not setting up flannel overlay")
@@ -659,7 +656,6 @@ type Kubelet struct {
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
 
-	// Flannel options.
 	useDefaultOverlay bool
 	flannelHelper     *FlannelHelper
 }
@@ -1129,7 +1125,6 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	if kl.registerNode {
 		// This will exit immediately if it doesn't need to do anything.
-		glog.Infof("(kubelet) registering node with apiserver")
 		kl.registerWithApiserver()
 	}
 	if err := kl.updateNodeStatus(); err != nil {
@@ -2588,10 +2583,10 @@ func (kl *Kubelet) updateRuntimeUp() {
 
 func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	if podCIDR == "" {
-		glog.V(1).Info("(kubelet) PodCIDR not set. Will not configure cbr0.")
+		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
 		return nil
 	}
-	glog.V(1).Infof("(kubelet) PodCIDR is set to %q", podCIDR)
+	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
 	_, cidr, err := net.ParseCIDR(podCIDR)
 	if err != nil {
 		return err
@@ -2634,13 +2629,12 @@ func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	if kl.configureCBR0 {
 		if kl.useDefaultOverlay {
-			glog.Infof("(kubelet) handshaking")
 			podCIDR, err := kl.flannelHelper.Handshake()
 			if err != nil {
 				glog.Infof("Flannel server handshake failed %v", err)
 				return
 			}
-			glog.Infof("(kubelet) setting cidr, currently: %v -> %v",
+			glog.Infof("Setting cidr: %v -> %v",
 				kl.runtimeState.podCIDR(), podCIDR)
 			kl.runtimeState.setPodCIDR(podCIDR)
 		}
@@ -2915,7 +2909,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	} else if kl.reconcileCIDR {
 		kl.runtimeState.setPodCIDR(node.Spec.PodCIDR)
 	}
-	glog.Infof("(kubelet) updating node in apiserver with cidr %v", node.Spec.PodCIDR)
+	glog.Infof("Updating node in apiserver with cidr %v", node.Spec.PodCIDR)
 
 	if err := kl.setNodeStatus(node); err != nil {
 		return err

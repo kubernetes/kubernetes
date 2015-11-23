@@ -14,9 +14,6 @@ base:
     - match: grain
     - docker
     - flannel
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn-client
-{% endif %}
     - helpers
     - cadvisor
     - kube-client-tools

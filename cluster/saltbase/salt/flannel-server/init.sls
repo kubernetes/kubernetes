@@ -8,7 +8,7 @@ touch /var/log/etcd_flannel.log:
 
 /etc/kubernetes/network.json:
   file.managed:
-    - source: salt://flannel/network.json
+    - source: salt://flannel-server/network.json
     - makedirs: True
     - user: root
     - group: root
