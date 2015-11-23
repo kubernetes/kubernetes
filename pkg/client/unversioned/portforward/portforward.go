@@ -244,8 +244,6 @@ func (pf *PortForwarder) nextRequestID() int {
 func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	defer conn.Close()
 
-	glog.Infof("Handling connection for %d", port.Local)
-
 	requestID := pf.nextRequestID()
 
 	// create error stream
