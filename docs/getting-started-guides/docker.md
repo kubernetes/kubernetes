@@ -35,7 +35,7 @@ Running Kubernetes locally via Docker
 
 **Table of Contents**
 
-- [Overview](#setting-up-a-cluster)
+- [Overview](#overview)
 - [Prerequisites](#prerequisites)
 - [Step One: Run etcd](#step-one-run-etcd)
 - [Step Two: Run the master](#step-two-run-the-master)
