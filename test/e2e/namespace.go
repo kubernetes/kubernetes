@@ -32,17 +32,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func countRemaining(c *client.Client, withName string) (int, error) {
-	var cnt = 0
-	nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
-	for _, item := range nsList.Items {
-		if strings.Contains(item.Name, "nslifetest") {
-			cnt++
-		}
-	}
-	return cnt, err
-}
-
 func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
 	var err error
 
@@ -59,40 +48,33 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	}
 	wg.Wait()
 
-	By("Waiting 10 seconds")
 	//Wait 10 seconds, then SEND delete requests for all the namespaces.
+	By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
-	By("Deleting namespaces")
-	nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+	deleted, err := deleteNamespaces(c, []string{"nslifetest"}, nil /* skipFilter */)
 	Expect(err).NotTo(HaveOccurred())
-	var nsCount = 0
-	for _, item := range nsList.Items {
-		if strings.Contains(item.Name, "nslifetest") {
-			wg.Add(1)
-			nsCount++
-			go func(nsName string) {
-				defer wg.Done()
-				defer GinkgoRecover()
-				Expect(c.Namespaces().Delete(nsName)).To(Succeed())
-				Logf("namespace : %v api call to delete is complete ", nsName)
-			}(item.Name)
-		}
-	}
-	Expect(nsCount).To(Equal(totalNS))
-	wg.Wait()
+	Expect(len(deleted)).To(Equal(totalNS))
 
 	By("Waiting for namespaces to vanish")
 	//Now POLL until all namespaces have been eradicated.
 	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
-			if rem, err := countRemaining(c, "nslifetest"); err != nil || rem > maxAllowedAfterDel {
-				Logf("Remaining namespaces : %v", rem)
+			var cnt = 0
+			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+			if err != nil {
 				return false, err
-			} else {
-				return true, nil
 			}
+			for _, item := range nsList.Items {
+				if strings.Contains(item.Name, "nslifetest") {
+					cnt++
+				}
+			}
+			if cnt > maxAllowedAfterDel {
+				Logf("Remaining namespaces : %v", cnt)
+				return false, nil
+			}
+			return true, nil
 		}))
-
 }
 
 var _ = Describe("Namespaces", func() {
