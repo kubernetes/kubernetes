@@ -50,10 +50,10 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	})
 
 	// CPU tests via replication controllers
-	It(fmt.Sprintf(titleUp, "[Autoscaling Suite]", kindRC), func() {
+	It(fmt.Sprintf(titleUp, "[Skipped][Autoscaling Suite]", kindRC), func() {
 		scaleUp("rc", kindRC, rc, f)
 	})
-	It(fmt.Sprintf(titleDown, "[Autoscaling Suite]", kindRC), func() {
+	It(fmt.Sprintf(titleDown, "[Skipped][Autoscaling Suite]", kindRC), func() {
 		scaleDown("rc", kindRC, rc, f)
 	})
 })

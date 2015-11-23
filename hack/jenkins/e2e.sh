@@ -126,7 +126,6 @@ REBOOT_SKIP_TESTS=(
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
-    "Autoscaling\sSuite"
     "Reboot"
     "ServiceLoadBalancer"
     )
@@ -161,7 +160,6 @@ AWS_REQUIRED_SKIP_TESTS=(
 
 # Tests which kills or restarts components and/or nodes.
 DISRUPTIVE_TESTS=(
-    "Autoscaling\sSuite.*scale\scluster"
     "DaemonRestart"
     "Etcd\sfailure"
     "Nodes\sResize"
@@ -185,8 +183,6 @@ GCE_FLAKY_TESTS=(
 # comments below, and for poorly implemented tests, please quote the
 # issue number tracking speed improvements.
 GCE_SLOW_TESTS=(
-    # TODO: add deployment test here once it will become stable
-    "Autoscaling\sSuite.*via\sreplicationController"
     # Before enabling this loadbalancer test in any other test list you must
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
