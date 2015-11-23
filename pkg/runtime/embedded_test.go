@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -119,7 +120,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	list, err := runtime.ExtractList(decoded)
+	list, err := meta.ExtractList(decoded)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -127,14 +128,14 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", errs)
 	}
 
-	list2, err := runtime.ExtractList(list[3])
+	list2, err := meta.ExtractList(list[3])
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if errs := runtime.DecodeList(list2, s); len(errs) > 0 {
 		t.Fatalf("unexpected error: %v", errs)
 	}
-	if err := runtime.SetList(list[3], list2); err != nil {
+	if err := meta.SetList(list[3], list2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

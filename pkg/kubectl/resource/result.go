@@ -138,7 +138,7 @@ func (r *Result) Object() (runtime.Object, error) {
 			return objects[0], nil
 		}
 		// if the item is a list already, don't create another list
-		if runtime.IsListType(objects[0]) {
+		if meta.IsListType(objects[0]) {
 			return objects[0], nil
 		}
 	}

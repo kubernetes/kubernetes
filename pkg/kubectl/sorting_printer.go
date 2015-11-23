@@ -23,6 +23,7 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
@@ -38,7 +39,7 @@ type SortingPrinter struct {
 }
 
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	if !runtime.IsListType(obj) {
+	if !meta.IsListType(obj) {
 		return s.Delegate.PrintObj(obj, out)
 	}
 
@@ -54,7 +55,7 @@ func (p *SortingPrinter) HandledResources() []string {
 }
 
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {
-	objs, err := runtime.ExtractList(obj)
+	objs, err := meta.ExtractList(obj)
 	if err != nil {
 		return err
 	}
@@ -76,7 +77,7 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 		list.Items = outputList
 		return nil
 	}
-	return runtime.SetList(obj, objs)
+	return meta.SetList(obj, objs)
 }
 
 func SortObjects(objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
