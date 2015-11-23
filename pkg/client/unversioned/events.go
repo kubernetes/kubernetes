@@ -61,6 +61,11 @@ func newEvents(c *Client, ns string) *events {
 	}
 }
 
+// resourceName returns events's URL resource name.
+func (e *events) resourceName() string {
+	return "events"
+}
+
 // Create makes a new event. Returns the copy of the event the server returns,
 // or an error. The namespace to create the event within is deduced from the
 // event; it must either match this event client's namespace, or this event
@@ -72,7 +77,7 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Post().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		Body(event).
 		Do().
 		Into(result)
@@ -91,7 +96,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		Name(event.Name).
 		Body(event).
 		Do().
@@ -107,7 +112,7 @@ func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, err
 	result := &api.Event{}
 	err := e.client.Patch(api.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		Name(incompleteEvent.Name).
 		Body(data).
 		Do().
@@ -120,7 +125,7 @@ func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventL
 	result := &api.EventList{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -133,7 +138,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		Name(name).
 		Do().
 		Into(result)
@@ -145,7 +150,7 @@ func (e *events) Watch(label labels.Selector, field fields.Selector, opts api.Li
 	return e.client.Get().
 		Prefix("watch").
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -181,7 +186,7 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 func (e *events) Delete(name string) error {
 	return e.client.Delete().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(e.resourceName()).
 		Name(name).
 		Do().
 		Error()

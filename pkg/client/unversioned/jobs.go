@@ -52,48 +52,53 @@ func newJobs(c *ExtensionsClient, namespace string) *jobs {
 	return &jobs{c, namespace}
 }
 
+// resourceName returns jobs's URL resource name.
+func (c *jobs) resourceName() string {
+	return "jobs"
+}
+
 // Ensure statically that jobs implements JobInterface.
 var _ JobInterface = &jobs{}
 
 // List returns a list of jobs that match the label and field selectors.
 func (c *jobs) List(label labels.Selector, field fields.Selector) (result *extensions.JobList, err error) {
 	result = &extensions.JobList{}
-	err = c.r.Get().Namespace(c.ns).Resource("jobs").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular job.
 func (c *jobs) Get(name string) (result *extensions.Job, err error) {
 	result = &extensions.Job{}
-	err = c.r.Get().Namespace(c.ns).Resource("jobs").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new job.
 func (c *jobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
 	result = &extensions.Job{}
-	err = c.r.Post().Namespace(c.ns).Resource("jobs").Body(job).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(job).Do().Into(result)
 	return
 }
 
 // Update updates an existing job.
 func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 	result = &extensions.Job{}
-	err = c.r.Put().Namespace(c.ns).Resource("jobs").Name(job.Name).Body(job).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(job.Name).Body(job).Do().Into(result)
 	return
 }
 
 // Delete deletes a job, returns error if one occurs.
 func (c *jobs) Delete(name string, options *api.DeleteOptions) (err error) {
 	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Do().Error()
+		return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 	}
 
 	body, err := api.Scheme.EncodeToVersion(options, latest.GroupOrDie("").GroupVersion)
 	if err != nil {
 		return err
 	}
-	return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Body(body).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
@@ -101,7 +106,7 @@ func (c *jobs) Watch(label labels.Selector, field fields.Selector, opts api.List
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("jobs").
+		Resource(c.resourceName()).
 		Param("resourceVersion", opts.ResourceVersion).
 		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
@@ -112,6 +117,6 @@ func (c *jobs) Watch(label labels.Selector, field fields.Selector, opts api.List
 // UpdateStatus takes the name of the job and the new status.  Returns the server's representation of the job, and an error, if it occurs.
 func (c *jobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
 	result = &extensions.Job{}
-	err = c.r.Put().Namespace(c.ns).Resource("jobs").Name(job.Name).SubResource("status").Body(job).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(job.Name).SubResource("status").Body(job).Do().Into(result)
 	return
 }

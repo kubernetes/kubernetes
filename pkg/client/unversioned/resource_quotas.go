@@ -53,43 +53,48 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 	}
 }
 
+// resourceName returns resourceQuotas's URL resource name.
+func (c *resourceQuotas) resourceName() string {
+	return "resourceQuotas"
+}
+
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
 func (c *resourceQuotas) List(label labels.Selector, field fields.Selector) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the resourceQuota, and returns the corresponding ResourceQuota object, and an error if it occurs
 func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the resourceQuota, and returns an error if one occurs
 func (c *resourceQuotas) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("resourceQuotas").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Create takes the representation of a resourceQuota.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
 func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
-	err = c.r.Post().Namespace(c.ns).Resource("resourceQuotas").Body(resourceQuota).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(resourceQuota).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a resourceQuota to update spec.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
 func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
-	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).Body(resourceQuota).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(resourceQuota.Name).Body(resourceQuota).Do().Into(result)
 	return
 }
 
 // Status takes the representation of a resourceQuota to update status.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
 func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
-	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
 	return
 }
 
@@ -98,7 +103,7 @@ func (c *resourceQuotas) Watch(label labels.Selector, field fields.Selector, opt
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).

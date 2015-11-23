@@ -51,10 +51,15 @@ func newEndpoints(c *Client, namespace string) *endpoints {
 	return &endpoints{c, namespace}
 }
 
+// resourceName returns endpoints's URL resource name.
+func (c *endpoints) resourceName() string {
+	return "endpoints"
+}
+
 // Create creates a new endpoint.
 func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	err := c.r.Post().Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
+	err := c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(endpoints).Do().Into(result)
 	return result, err
 }
 
@@ -63,7 +68,7 @@ func (c *endpoints) List(label labels.Selector, field fields.Selector) (result *
 	result = &api.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
-		Resource("endpoints").
+		Resource(c.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -74,13 +79,13 @@ func (c *endpoints) List(label labels.Selector, field fields.Selector) (result *
 // Get returns information about the endpoints for a particular service.
 func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.r.Get().Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the endpoint, and returns an error if one occurs
 func (c *endpoints) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("endpoints").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
@@ -88,7 +93,7 @@ func (c *endpoints) Watch(label labels.Selector, field fields.Selector, opts api
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("endpoints").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -102,7 +107,7 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	}
 	err := c.r.Put().
 		Namespace(c.ns).
-		Resource("endpoints").
+		Resource(c.resourceName()).
 		Name(endpoints.Name).
 		Body(endpoints).
 		Do().

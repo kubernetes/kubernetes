@@ -50,10 +50,15 @@ func newNamespaces(c *Client) *namespaces {
 	return &namespaces{r: c}
 }
 
+// resourceName returns namespaces's URL resource name.
+func (c *namespaces) resourceName() string {
+	return "namespaces"
+}
+
 // Create creates a new namespace.
 func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 	result := &api.Namespace{}
-	err := c.r.Post().Resource("namespaces").Body(namespace).Do().Into(result)
+	err := c.r.Post().Resource(c.resourceName()).Body(namespace).Do().Into(result)
 	return result, err
 }
 
@@ -61,7 +66,7 @@ func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 func (c *namespaces) List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
 	err := c.r.Get().
-		Resource("namespaces").
+		Resource(c.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().Into(result)
@@ -75,7 +80,7 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
 		return
 	}
-	err = c.r.Put().Resource("namespaces").Name(namespace.Name).Body(namespace).Do().Into(result)
+	err = c.r.Put().Resource(c.resourceName()).Name(namespace.Name).Body(namespace).Do().Into(result)
 	return
 }
 
@@ -86,7 +91,7 @@ func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, 
 		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
 		return
 	}
-	err = c.r.Put().Resource("namespaces").Name(namespace.Name).SubResource("finalize").Body(namespace).Do().Into(result)
+	err = c.r.Put().Resource(c.resourceName()).Name(namespace.Name).SubResource("finalize").Body(namespace).Do().Into(result)
 	return
 }
 
@@ -97,27 +102,27 @@ func (c *namespaces) Status(namespace *api.Namespace) (result *api.Namespace, er
 		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
 		return
 	}
-	err = c.r.Put().Resource("namespaces").Name(namespace.Name).SubResource("status").Body(namespace).Do().Into(result)
+	err = c.r.Put().Resource(c.resourceName()).Name(namespace.Name).SubResource("status").Body(namespace).Do().Into(result)
 	return
 }
 
 // Get gets an existing namespace
 func (c *namespaces) Get(name string) (*api.Namespace, error) {
 	result := &api.Namespace{}
-	err := c.r.Get().Resource("namespaces").Name(name).Do().Into(result)
+	err := c.r.Get().Resource(c.resourceName()).Name(name).Do().Into(result)
 	return result, err
 }
 
 // Delete deletes an existing namespace.
 func (c *namespaces) Delete(name string) error {
-	return c.r.Delete().Resource("namespaces").Name(name).Do().Error()
+	return c.r.Delete().Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
 func (c *namespaces) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
-		Resource("namespaces").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).

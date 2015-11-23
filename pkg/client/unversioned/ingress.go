@@ -51,45 +51,50 @@ func newIngress(c *ExtensionsClient, namespace string) *ingress {
 	return &ingress{c, namespace}
 }
 
+// resourceName returns ingress's URL resource name.
+func (c *ingress) resourceName() string {
+	return "ingresses"
+}
+
 // List returns a list of ingress that match the label and field selectors.
 func (c *ingress) List(label labels.Selector, field fields.Selector) (result *extensions.IngressList, err error) {
 	result = &extensions.IngressList{}
-	err = c.r.Get().Namespace(c.ns).Resource("ingresses").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular ingress.
 func (c *ingress) Get(name string) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
-	err = c.r.Get().Namespace(c.ns).Resource("ingresses").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new ingress.
 func (c *ingress) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
-	err = c.r.Post().Namespace(c.ns).Resource("ingresses").Body(ingress).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(ingress).Do().Into(result)
 	return
 }
 
 // Update updates an existing ingress.
 func (c *ingress) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
-	err = c.r.Put().Namespace(c.ns).Resource("ingresses").Name(ingress.Name).Body(ingress).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(ingress.Name).Body(ingress).Do().Into(result)
 	return
 }
 
 // Delete deletes a ingress, returns error if one occurs.
 func (c *ingress) Delete(name string, options *api.DeleteOptions) (err error) {
 	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Do().Error()
+		return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 	}
 
 	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
 	if err != nil {
 		return err
 	}
-	return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Body(body).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested ingress.
@@ -97,7 +102,7 @@ func (c *ingress) Watch(label labels.Selector, field fields.Selector, opts api.L
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("ingresses").
+		Resource(c.resourceName()).
 		Param("resourceVersion", opts.ResourceVersion).
 		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).
@@ -108,6 +113,6 @@ func (c *ingress) Watch(label labels.Selector, field fields.Selector, opts api.L
 // UpdateStatus takes the name of the ingress and the new status.  Returns the server's representation of the ingress, and an error, if it occurs.
 func (c *ingress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
-	err = c.r.Put().Namespace(c.ns).Resource("ingresses").Name(ingress.Name).SubResource("status").Body(ingress).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(ingress.Name).SubResource("status").Body(ingress).Do().Into(result)
 	return
 }

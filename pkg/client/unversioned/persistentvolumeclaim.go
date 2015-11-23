@@ -52,12 +52,17 @@ func newPersistentVolumeClaims(c *Client, namespace string) *persistentVolumeCla
 	return &persistentVolumeClaims{c, namespace}
 }
 
+// resourceName returns persistentVolumeClaims's URL resource name.
+func (c *persistentVolumeClaims) resourceName() string {
+	return "persistentVolumeClaims"
+}
+
 func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector) (result *api.PersistentVolumeClaimList, err error) {
 	result = &api.PersistentVolumeClaimList{}
 
 	err = c.client.Get().
 		Namespace(c.namespace).
-		Resource("persistentVolumeClaims").
+		Resource(c.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -68,13 +73,13 @@ func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Select
 
 func (c *persistentVolumeClaims) Get(name string) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
-	err = c.client.Get().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(name).Do().Into(result)
+	err = c.client.Get().Namespace(c.namespace).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumeClaims) Create(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
-	err = c.client.Post().Namespace(c.namespace).Resource("persistentVolumeClaims").Body(claim).Do().Into(result)
+	err = c.client.Post().Namespace(c.namespace).Resource(c.resourceName()).Body(claim).Do().Into(result)
 	return
 }
 
@@ -84,25 +89,25 @@ func (c *persistentVolumeClaims) Update(claim *api.PersistentVolumeClaim) (resul
 		err = fmt.Errorf("invalid update object, missing resource version: %v", claim)
 		return
 	}
-	err = c.client.Put().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(claim.Name).Body(claim).Do().Into(result)
+	err = c.client.Put().Namespace(c.namespace).Resource(c.resourceName()).Name(claim.Name).Body(claim).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
-	err = c.client.Put().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(claim.Name).SubResource("status").Body(claim).Do().Into(result)
+	err = c.client.Put().Namespace(c.namespace).Resource(c.resourceName()).Name(claim.Name).SubResource("status").Body(claim).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumeClaims) Delete(name string) error {
-	return c.client.Delete().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(name).Do().Error()
+	return c.client.Delete().Namespace(c.namespace).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 func (c *persistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.namespace).
-		Resource("persistentVolumeClaims").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
