@@ -33,7 +33,7 @@ is restarted.
 ## Tuning
 
 The scheduler configuration can be fine-tuned using an ini-style configuration file.
-The filename is passed via `--scheduler_config` to the `km scheduler` command.
+The filename is passed via `--scheduler-config` to the `km scheduler` command.
 
 Be warned though that some them are pretty low-level and one has to know the inner
 workings of k8sm to find sensible values. Moreover, these settings may change or
