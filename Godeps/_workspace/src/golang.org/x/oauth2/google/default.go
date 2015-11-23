@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/jwt"
@@ -59,6 +60,7 @@ func DefaultClient(ctx context.Context, scope ...string) (*http.Client, error) {
 func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSource, error) {
 	// First, try the environment variable.
 	const envVar = "GOOGLE_APPLICATION_CREDENTIALS"
+	glog.Infof("Trying to get OAuth Default Token Source from Environment Variable. GOOGLE_APPLICATION_CREDENTIALS=%q", envVar)
 	if filename := os.Getenv(envVar); filename != "" {
 		ts, err := tokenSourceFromFile(ctx, filename, scope)
 		if err != nil {
@@ -69,6 +71,7 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 
 	// Second, try a well-known file.
 	filename := wellKnownFile()
+	glog.Infof("Trying to get OAuth Default Token Source from well known file. filename=%q", filename)
 	_, err := os.Stat(filename)
 	if err == nil {
 		ts, err2 := tokenSourceFromFile(ctx, filename, scope)
@@ -84,12 +87,14 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 	}
 
 	// Third, if we're on Google App Engine use those credentials.
+	glog.Infof("Trying to get OAuth Default Token Source from app engine token func. appengineTokenFunc=%#v", appengineTokenFunc)
 	if appengineTokenFunc != nil {
 		return AppEngineTokenSource(ctx, scope...), nil
 	}
 
 	// Fourth, if we're on Google Compute Engine use the metadata server.
 	if metadata.OnGCE() {
+		glog.Infof("Trying to get OAuth Default Token Source from metadata server. ComputeTokenSource.")
 		return ComputeTokenSource(""), nil
 	}
 
