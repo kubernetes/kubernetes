@@ -210,6 +210,7 @@ func NewKubeletServer() *KubeletServer {
 		RegisterNode:                   true, // will be ignored if no apiserver is configured
 		RegisterSchedulable:            true,
 		RegistryBurst:                  10,
+		RegistryPullQPS:                5.0,
 		ResourceContainer:              "/kubelet",
 		RktPath:                        "",
 		RktStage1Image:                 "",
@@ -281,7 +282,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. [default=\"*\"]")
 	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. [default=\"*\"]")
 	fs.StringVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. [default=\"*\"]")
-	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
+	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=5.0]")
 	fs.IntVar(&s.RegistryBurst, "registry-burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0")
 	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited. [default=0.0]")
 	fs.IntVar(&s.EventBurst, "event-burst", s.EventBurst, "Maximum size of a bursty event records, temporarily allows event records to burst to this number, while still not exceeding event-qps. Only used if --event-qps > 0")
@@ -727,6 +728,8 @@ func SimpleKubelet(client *client.Client,
 		ReadOnlyPort:        readOnlyPort,
 		RegisterNode:        true,
 		RegisterSchedulable: true,
+		RegistryBurst:       10,
+		RegistryPullQPS:     5.0,
 		ResolverConfig:      kubelet.ResolvConfDefault,
 		ResourceContainer:   "/kubelet",
 		RootDirectory:       rootDir,
