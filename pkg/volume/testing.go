@@ -92,11 +92,6 @@ func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleane
 	return plug.NewCleaner(spec.Name(), podUID)
 }
 
-// Returns the hostname of the host kubelet is running on
-func (f *fakeVolumeHost) GetHostName() string {
-	return "fakeHostName"
-}
-
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{
