@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -100,16 +99,6 @@ func TestE2E(t *testing.T) {
 
 	if testContext.Provider == "" {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-	}
-
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
-		var err error
-		Logf("Fetching cloud provider for %q\r\n", testContext.Provider)
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, testContext.CloudConfig.Zone, "" /* networkUrl */, nil /* tokenSource */, false /* useMetadataServer */)
-		if err != nil {
-			glog.Fatal("Error building GCE provider: ", err)
-		}
-
 	}
 
 	if testContext.Provider == "aws" {

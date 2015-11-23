@@ -62,12 +62,13 @@ const (
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
-	service           *compute.Service
-	containerService  *container.Service
-	projectID         string
-	zone              string
-	networkURL        string
-	useMetadataServer bool
+	service          *compute.Service
+	containerService *container.Service
+	projectID        string
+	zone             string
+	instanceID       string
+	externalID       string
+	networkURL       string
 }
 
 type Config struct {
@@ -100,7 +101,7 @@ func getProjectAndZone() (string, string, error) {
 	return projectID, zone, nil
 }
 
-func getInstanceIDViaMetadata() (string, error) {
+func getInstanceID() (string, error) {
 	result, err := metadata.Get("instance/hostname")
 	if err != nil {
 		return "", err
@@ -112,7 +113,7 @@ func getInstanceIDViaMetadata() (string, error) {
 	return parts[0], nil
 }
 
-func getCurrentExternalIDViaMetadata() (string, error) {
+func getCurrentExternalID() (string, error) {
 	externalID, err := metadata.Get("instance/id")
 	if err != nil {
 		return "", fmt.Errorf("couldn't get external ID: %v", err)
@@ -120,7 +121,7 @@ func getCurrentExternalIDViaMetadata() (string, error) {
 	return externalID, nil
 }
 
-func getNetworkNameViaMetadata() (string, error) {
+func getNetworkName() (string, error) {
 	result, err := metadata.Get("instance/network-interfaces/0/network")
 	if err != nil {
 		return "", err
@@ -132,32 +133,28 @@ func getNetworkNameViaMetadata() (string, error) {
 	return parts[3], nil
 }
 
-func getNetworkNameViaAPICall(svc *compute.Service, projectID string) (string, error) {
-	networkList, err := svc.Networks.List(projectID).Do()
-	if err != nil {
-		return "", err
-	}
-
-	if networkList == nil || len(networkList.Items) <= 0 {
-		return "", fmt.Errorf("GCE Network List call returned no networks for project %q.", projectID)
-	}
-
-	return networkList.Items[0].Name, nil
-}
-
 // newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
 	}
-
-	networkName, err := getNetworkNameViaMetadata()
+	// TODO: if we want to use this on a machine that doesn't have the http://metadata server
+	// e.g. on a user's machine (not VM) somewhere, we need to have an alternative for
+	// instance id lookup.
+	instanceID, err := getInstanceID()
+	if err != nil {
+		return nil, err
+	}
+	externalID, err := getCurrentExternalID()
+	if err != nil {
+		return nil, err
+	}
+	networkName, err := getNetworkName()
 	if err != nil {
 		return nil, err
 	}
 	networkURL := gceNetworkURL(projectID, networkName)
-
 	tokenSource := google.ComputeTokenSource("")
 	if config != nil {
 		var cfg Config
@@ -179,51 +176,23 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
 	}
-
-	return CreateGCECloud(projectID, zone, networkURL, tokenSource, true /* useMetadataServer */)
-}
-
-// Creates a GCECloud object using the specified parameters.
-// If no networkUrl is specified, loads networkName via rest call.
-// If no tokenSource is specified, uses oauth2.DefaultTokenSource.
-func CreateGCECloud(projectID, zone, networkURL string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
-	if tokenSource == nil {
-		var err error
-		tokenSource, err = google.DefaultTokenSource(
-			oauth2.NoContext,
-			compute.CloudPlatformScope,
-			compute.ComputeScope)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
 	svc, err := compute.New(client)
 	if err != nil {
 		return nil, err
 	}
-
 	containerSvc, err := container.New(client)
 	if err != nil {
 		return nil, err
 	}
-
-	if networkURL == "" {
-		networkName, err := getNetworkNameViaAPICall(svc, projectID)
-		if err != nil {
-			return nil, err
-		}
-		networkURL = gceNetworkURL(projectID, networkName)
-	}
-
 	return &GCECloud{
-		service:           svc,
-		containerService:  containerSvc,
-		projectID:         projectID,
-		zone:              zone,
-		networkURL:        networkURL,
-		useMetadataServer: useMetadataServer,
+		service:          svc,
+		containerService: containerSvc,
+		projectID:        projectID,
+		zone:             zone,
+		instanceID:       instanceID,
+		externalID:       externalID,
+		networkURL:       networkURL,
 	}, nil
 }
 
@@ -1399,31 +1368,16 @@ func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
 	}, nil
 }
 
-// isCurrentInstance uses metadata server to check if specified instanceID matches current machine's instanceID
-func (gce *GCECloud) isCurrentInstance(instanceID string) bool {
-	currentInstanceID, err := getInstanceIDViaMetadata()
-	if err != nil {
-		// Log and swallow error
-		glog.Errorf("Failed to fetch instanceID via Metadata: %v", err)
-		return false
-	}
-
-	return currentInstanceID == canonicalizeInstanceName(instanceID)
+func (gce *GCECloud) isCurrentInstance(instance string) bool {
+	return gce.instanceID == canonicalizeInstanceName(instance)
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
-	if gce.useMetadataServer {
-		// Use metadata, if possible, to fetch ID. See issue #12000
-		if gce.isCurrentInstance(instance) {
-			externalInstanceID, err := getCurrentExternalIDViaMetadata()
-			if err == nil {
-				return externalInstanceID, nil
-			}
-		}
+	// if we are asking about the current instance, just go to metadata
+	if gce.isCurrentInstance(instance) {
+		return gce.externalID, nil
 	}
-
-	// Fallback to GCE API call if metadata server fails to retrieve ID
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return "", err
@@ -1540,29 +1494,7 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 	}, nil
 }
 
-func (gce *GCECloud) CreateDisk(name string, sizeGb int64) error {
-	diskToCreate := &compute.Disk{
-		Name:   name,
-		SizeGb: sizeGb,
-	}
-	createOp, err := gce.service.Disks.Insert(gce.projectID, gce.zone, diskToCreate).Do()
-	if err != nil {
-		return err
-	}
-
-	return gce.waitForZoneOp(createOp)
-}
-
-func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
-	deleteOp, err := gce.service.Disks.Delete(gce.projectID, gce.zone, diskToDelete).Do()
-	if err != nil {
-		return err
-	}
-
-	return gce.waitForZoneOp(deleteOp)
-}
-
-func (gce *GCECloud) AttachDisk(diskName, instanceID string, readOnly bool) error {
+func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 	disk, err := gce.getDisk(diskName)
 	if err != nil {
 		return err
@@ -1573,7 +1505,7 @@ func (gce *GCECloud) AttachDisk(diskName, instanceID string, readOnly bool) erro
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
 
-	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, gce.zone, instanceID, attachedDisk).Do()
+	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
 	if err != nil {
 		return err
 	}
@@ -1581,29 +1513,13 @@ func (gce *GCECloud) AttachDisk(diskName, instanceID string, readOnly bool) erro
 	return gce.waitForZoneOp(attachOp)
 }
 
-func (gce *GCECloud) DetachDisk(devicePath, instanceID string) error {
-	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, instanceID, devicePath).Do()
+func (gce *GCECloud) DetachDisk(devicePath string) error {
+	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
 	if err != nil {
 		return err
 	}
 
 	return gce.waitForZoneOp(detachOp)
-}
-
-func (gce *GCECloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
-	instance, err := gce.service.Instances.Get(gce.projectID, gce.zone, instanceID).Do()
-	if err != nil {
-		return false, err
-	}
-
-	for _, disk := range instance.Disks {
-		if disk.DeviceName == diskName {
-			// Disk is still attached to node
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func (gce *GCECloud) getDisk(diskName string) (*compute.Disk, error) {
