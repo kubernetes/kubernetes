@@ -1587,8 +1587,18 @@ func deepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 	} else {
 		out.NodeSelector = nil
 	}
-	out.ServiceAccountName = in.ServiceAccountName
-	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
+	if in.ServiceAccountName != nil {
+		out.ServiceAccountName = new(string)
+		*out.ServiceAccountName = *in.ServiceAccountName
+	} else {
+		out.ServiceAccountName = nil
+	}
+	if in.DeprecatedServiceAccount != nil {
+		out.DeprecatedServiceAccount = new(string)
+		*out.DeprecatedServiceAccount = *in.DeprecatedServiceAccount
+	} else {
+		out.DeprecatedServiceAccount = nil
+	}
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
 	out.HostPID = in.HostPID

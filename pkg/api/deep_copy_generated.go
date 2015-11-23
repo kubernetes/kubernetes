@@ -1572,7 +1572,12 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	} else {
 		out.NodeSelector = nil
 	}
-	out.ServiceAccountName = in.ServiceAccountName
+	if in.ServiceAccountName != nil {
+		out.ServiceAccountName = new(string)
+		*out.ServiceAccountName = *in.ServiceAccountName
+	} else {
+		out.ServiceAccountName = nil
+	}
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {
 		out.SecurityContext = new(PodSecurityContext)

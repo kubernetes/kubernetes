@@ -707,7 +707,12 @@ func autoconvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s c
 	} else {
 		out.NodeSelector = nil
 	}
-	out.ServiceAccountName = in.ServiceAccountName
+	if in.ServiceAccountName != nil {
+		out.ServiceAccountName = new(string)
+		*out.ServiceAccountName = *in.ServiceAccountName
+	} else {
+		out.ServiceAccountName = nil
+	}
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {
 		if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
@@ -1766,7 +1771,12 @@ func autoconvert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s c
 	} else {
 		out.NodeSelector = nil
 	}
-	out.ServiceAccountName = in.ServiceAccountName
+	if in.ServiceAccountName != nil {
+		out.ServiceAccountName = new(string)
+		*out.ServiceAccountName = *in.ServiceAccountName
+	} else {
+		out.ServiceAccountName = nil
+	}
 	// in.DeprecatedServiceAccount has no peer in out
 	out.NodeName = in.NodeName
 	// in.HostNetwork has no peer in out

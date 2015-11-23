@@ -289,9 +289,16 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	} else {
 		out.NodeSelector = nil
 	}
-	out.ServiceAccountName = in.ServiceAccountName
-	// DeprecatedServiceAccount is an alias for ServiceAccountName.
-	out.DeprecatedServiceAccount = in.ServiceAccountName
+	if in.ServiceAccountName != nil {
+		out.ServiceAccountName = new(string)
+		*out.ServiceAccountName = *in.ServiceAccountName
+		// DeprecatedServiceAccount is an alias for ServiceAccountName.
+		out.DeprecatedServiceAccount = new(string)
+		*out.DeprecatedServiceAccount = *in.ServiceAccountName
+	} else {
+		out.ServiceAccountName = nil
+		out.DeprecatedServiceAccount = nil
+	}
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {
 		out.SecurityContext = new(PodSecurityContext)
@@ -365,10 +372,15 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		out.NodeSelector = nil
 	}
 	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
-	// If both are specified, ServiceAccountName (the new field) wins.
-	out.ServiceAccountName = in.ServiceAccountName
-	if in.ServiceAccountName == "" {
-		out.ServiceAccountName = in.DeprecatedServiceAccount
+	// If ServiceAccountName is unspecified, then use the old field.
+	if in.ServiceAccountName != nil {
+		out.ServiceAccountName = new(string)
+		*out.ServiceAccountName = *in.ServiceAccountName
+	} else {
+		if in.DeprecatedServiceAccount != nil {
+			out.ServiceAccountName = new(string)
+			*out.ServiceAccountName = *in.DeprecatedServiceAccount
+		}
 	}
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {

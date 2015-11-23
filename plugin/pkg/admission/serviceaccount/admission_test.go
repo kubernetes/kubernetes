@@ -86,6 +86,7 @@ func TestIgnoresMirrorPod(t *testing.T) {
 }
 
 func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
+	defaultStr := "default"
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Annotations: map[string]string{
@@ -93,7 +94,7 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 			},
 		},
 		Spec: api.PodSpec{
-			ServiceAccountName: "default",
+			ServiceAccountName: &defaultStr,
 		},
 	}
 	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", "myname", string(api.ResourcePods), "", admission.Create, nil)
@@ -144,8 +145,11 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	if pod.Spec.ServiceAccountName == nil {
+		t.Errorf("Expected service account non-nil, got nil")
+	}
+	if *pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, *pod.Spec.ServiceAccountName)
 	}
 }
 
@@ -172,6 +176,39 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	}
 }
 
+func TestDoesNotOverrideEmptyString(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount(nil)
+	admit.MountServiceAccountToken = true
+	admit.RequireAPIToken = false
+
+	// Add the default service account for the ns into the cache
+	admit.serviceAccounts.Add(&api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+	})
+	// empty string means no service account please.
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			ServiceAccountName: new(string),
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, "myname", string(api.ResourcePods), "", admission.Create, nil)
+	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if pod.Spec.ServiceAccountName == nil {
+		t.Errorf("Expected service account non-nil, got nil")
+	}
+	if *pod.Spec.ServiceAccountName != "" {
+		t.Errorf("Expected service account '%s' assigned, got %s", "", *pod.Spec.ServiceAccountName)
+	}
+}
+
 func TestFetchesUncachedServiceAccount(t *testing.T) {
 	ns := "myns"
 
@@ -192,8 +229,11 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	if pod.Spec.ServiceAccountName == nil {
+		t.Errorf("Expected service account non-nil, got nil")
+	}
+	if *pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, *pod.Spec.ServiceAccountName)
 	}
 }
 
@@ -274,8 +314,11 @@ func TestAutomountsAPIToken(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	if pod.Spec.ServiceAccountName == nil {
+		t.Errorf("Expected service account non-nil, got nil")
+	}
+	if *pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, *pod.Spec.ServiceAccountName)
 	}
 	if len(pod.Spec.Volumes) != 1 {
 		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
@@ -353,8 +396,11 @@ func TestRespectsExistingMount(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	if pod.Spec.ServiceAccountName == nil {
+		t.Errorf("Expected service account non-nil, got nil")
+	}
+	if *pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, *pod.Spec.ServiceAccountName)
 	}
 	if len(pod.Spec.Volumes) != 0 {
 		t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))
