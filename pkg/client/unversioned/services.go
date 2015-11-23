@@ -51,12 +51,17 @@ func newServices(c *Client, namespace string) *services {
 	return &services{c, namespace}
 }
 
+// resourceName returns services's URL resource name.
+func (c *services) resourceName() string {
+	return "services"
+}
+
 // List takes a selector, and returns the list of services that match that selector
 func (c *services) List(label labels.Selector, field fields.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.r.Get().
 		Namespace(c.ns).
-		Resource("services").
+		Resource(c.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -67,27 +72,27 @@ func (c *services) List(label labels.Selector, field fields.Selector) (result *a
 // Get returns information about a particular service.
 func (c *services) Get(name string) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Get().Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
 func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
@@ -95,7 +100,7 @@ func (c *services) Watch(label labels.Selector, field fields.Selector, opts api.
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("services").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -107,7 +112,7 @@ func (c *services) ProxyGet(scheme, name, port, path string, params map[string]s
 	request := c.r.Get().
 		Prefix("proxy").
 		Namespace(c.ns).
-		Resource("services").
+		Resource(c.resourceName()).
 		Name(util.JoinSchemeNamePort(scheme, name, port)).
 		Suffix(path)
 	for k, v := range params {

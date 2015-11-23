@@ -50,11 +50,16 @@ func newSecrets(c *Client, ns string) *secrets {
 	}
 }
 
+// resourceName returns secrets's URL resource name.
+func (s *secrets) resourceName() string {
+	return "secrets"
+}
+
 func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Post().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(s.resourceName()).
 		Body(secret).
 		Do().
 		Into(result)
@@ -68,7 +73,7 @@ func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.Secre
 
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(s.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -82,7 +87,7 @@ func (s *secrets) Get(name string) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(s.resourceName()).
 		Name(name).
 		Do().
 		Into(result)
@@ -95,7 +100,7 @@ func (s *secrets) Watch(label labels.Selector, field fields.Selector, opts api.L
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(s.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -105,7 +110,7 @@ func (s *secrets) Watch(label labels.Selector, field fields.Selector, opts api.L
 func (s *secrets) Delete(name string) error {
 	return s.client.Delete().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(s.resourceName()).
 		Name(name).
 		Do().
 		Error()
@@ -115,7 +120,7 @@ func (s *secrets) Update(secret *api.Secret) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = s.client.Put().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(s.resourceName()).
 		Name(secret.Name).
 		Body(secret).
 		Do().

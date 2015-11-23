@@ -55,17 +55,22 @@ func newPods(c *Client, namespace string) *pods {
 	}
 }
 
+// resourceName returns pods's URL resource name.
+func (c *pods) resourceName() string {
+	return "pods"
+}
+
 // List takes label and field selectors, and returns the list of pods that match those selectors.
 func (c *pods) List(label labels.Selector, field fields.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
 func (c *pods) Get(name string) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
@@ -73,26 +78,26 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 func (c *pods) Delete(name string, options *api.DeleteOptions) error {
 	// TODO: to make this reusable in other client libraries
 	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
+		return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 	}
 	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
 	if err != nil {
 		return err
 	}
-	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.r.Post().Namespace(c.ns).Resource("pods").Body(pod).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(pod).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).Body(pod).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(pod.Name).Body(pod).Do().Into(result)
 	return
 }
 
@@ -101,7 +106,7 @@ func (c *pods) Watch(label labels.Selector, field fields.Selector, opts api.List
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("pods").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -110,17 +115,17 @@ func (c *pods) Watch(label labels.Selector, field fields.Selector, opts api.List
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
 func (c *pods) Bind(binding *api.Binding) error {
-	return c.r.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
+	return c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }
 
 // UpdateStatus takes the name of the pod and the new status.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
 	return
 }
 
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *Request {
-	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.Scheme)
+	return c.r.Get().Namespace(c.ns).Name(name).Resource(c.resourceName()).SubResource("log").VersionedParams(opts, api.Scheme)
 }

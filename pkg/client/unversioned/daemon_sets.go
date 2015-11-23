@@ -49,46 +49,51 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	return &daemonSets{c, namespace}
 }
 
+// resourceName returns daemonset's URL resource name.
+func (c *daemonSets) resourceName() string {
+	return "daemonsets"
+}
+
 // Ensure statically that daemonSets implements DaemonSetsInterface.
 var _ DaemonSetInterface = &daemonSets{}
 
 func (c *daemonSets) List(label labels.Selector, field fields.Selector) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular daemon set.
 func (c *daemonSets) Get(name string) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new daemon set.
 func (c *daemonSets) Create(daemon *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Post().Namespace(c.ns).Resource("daemonsets").Body(daemon).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(daemon).Do().Into(result)
 	return
 }
 
 // Update updates an existing daemon set.
 func (c *daemonSets) Update(daemon *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Put().Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).Body(daemon).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(daemon.Name).Body(daemon).Do().Into(result)
 	return
 }
 
 // UpdateStatus updates an existing daemon set status
 func (c *daemonSets) UpdateStatus(daemon *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
-	err = c.r.Put().Namespace(c.ns).Resource("daemonsets").Name(daemon.Name).SubResource("status").Body(daemon).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(daemon.Name).SubResource("status").Body(daemon).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing daemon set.
 func (c *daemonSets) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("daemonsets").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested daemon sets.
@@ -96,7 +101,7 @@ func (c *daemonSets) Watch(label labels.Selector, field fields.Selector, opts ap
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("daemonsets").
+		Resource(c.resourceName()).
 		Param("resourceVersion", opts.ResourceVersion).
 		TimeoutSeconds(TimeoutFromListOptions(opts)).
 		LabelsSelectorParam(label).

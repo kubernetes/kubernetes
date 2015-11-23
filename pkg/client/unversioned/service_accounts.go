@@ -50,11 +50,16 @@ func newServiceAccounts(c *Client, ns string) ServiceAccountsInterface {
 	}
 }
 
+// resourceName returns serviceAccounts's URL resource name.
+func (s *serviceAccounts) resourceName() string {
+	return "serviceAccounts"
+}
+
 func (s *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
 	result := &api.ServiceAccount{}
 	err := s.client.Post().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(s.resourceName()).
 		Body(serviceAccount).
 		Do().
 		Into(result)
@@ -68,7 +73,7 @@ func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*a
 
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(s.resourceName()).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -82,7 +87,7 @@ func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
 	result := &api.ServiceAccount{}
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(s.resourceName()).
 		Name(name).
 		Do().
 		Into(result)
@@ -95,7 +100,7 @@ func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, op
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(s.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
@@ -105,7 +110,7 @@ func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, op
 func (s *serviceAccounts) Delete(name string) error {
 	return s.client.Delete().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(s.resourceName()).
 		Name(name).
 		Do().
 		Error()
@@ -115,7 +120,7 @@ func (s *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 	result = &api.ServiceAccount{}
 	err = s.client.Put().
 		Namespace(s.namespace).
-		Resource("serviceAccounts").
+		Resource(s.resourceName()).
 		Name(serviceAccount.Name).
 		Body(serviceAccount).
 		Do().

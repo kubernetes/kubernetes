@@ -54,29 +54,34 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 	}
 }
 
+// resourceName returns limitRanges's URL resource name.
+func (c *limitRanges) resourceName() string {
+	return "limitRanges"
+}
+
 // List takes a selector, and returns the list of limitRanges that match that selector.
 func (c *limitRanges) List(label labels.Selector, field fields.Selector) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the limitRange, and returns the corresponding Pod object, and an error if it occurs
 func (c *limitRanges) Get(name string) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the limitRange, and returns an error if one occurs
 func (c *limitRanges) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(c.resourceName()).Name(name).Do().Error()
 }
 
 // Create takes the representation of a limitRange.  Returns the server's representation of the limitRange, and an error, if it occurs.
 func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
-	err = c.r.Post().Namespace(c.ns).Resource("limitRanges").Body(limitRange).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(c.resourceName()).Body(limitRange).Do().Into(result)
 	return
 }
 
@@ -87,7 +92,7 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 		err = fmt.Errorf("invalid update object, missing resource version: %v", limitRange)
 		return
 	}
-	err = c.r.Put().Namespace(c.ns).Resource("limitRanges").Name(limitRange.Name).Body(limitRange).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(c.resourceName()).Name(limitRange.Name).Body(limitRange).Do().Into(result)
 	return
 }
 
@@ -96,7 +101,7 @@ func (c *limitRanges) Watch(label labels.Selector, field fields.Selector, opts a
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("limitRanges").
+		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
