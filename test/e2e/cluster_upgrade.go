@@ -144,144 +144,142 @@ func nodeUpgradeGKE(v string) error {
 	return err
 }
 
-var _ = Describe("Skipped", func() {
+var _ = Describe("Cluster Upgrade [Skipped]", func() {
 
-	Describe("Cluster upgrade", func() {
-		svcName, replicas := "baz", 2
-		var rcName, ip, v string
-		var ingress api.LoadBalancerIngress
+	svcName, replicas := "baz", 2
+	var rcName, ip, v string
+	var ingress api.LoadBalancerIngress
 
+	BeforeEach(func() {
+		// The version is determined once at the beginning of the test so that
+		// the master and nodes won't be skewed if the value changes during the
+		// test.
+		By(fmt.Sprintf("Getting real version for %q", testContext.UpgradeTarget))
+		var err error
+		v, err = realVersion(testContext.UpgradeTarget)
+		expectNoError(err)
+		Logf("Version for %q is %q", testContext.UpgradeTarget, v)
+	})
+
+	f := NewFramework("cluster-upgrade")
+	var w *WebserverTest
+	BeforeEach(func() {
+		By("Setting up the service, RC, and pods")
+		w = NewWebserverTest(f.Client, f.Namespace.Name, svcName)
+		rc := w.CreateWebserverRC(replicas)
+		rcName = rc.ObjectMeta.Name
+		svc := w.BuildServiceSpec()
+		svc.Spec.Type = api.ServiceTypeLoadBalancer
+		w.CreateService(svc)
+
+		By("Waiting for the service to become reachable")
+		result, err := waitForLoadBalancerIngress(f.Client, svcName, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+		ingresses := result.Status.LoadBalancer.Ingress
+		if len(ingresses) != 1 {
+			Failf("Was expecting only 1 ingress IP but got %d (%v): %v", len(ingresses), ingresses, result)
+		}
+		ingress = ingresses[0]
+		Logf("Got load balancer ingress point %v", ingress)
+		ip = ingress.IP
+		if ip == "" {
+			ip = ingress.Hostname
+		}
+		testLoadBalancerReachable(ingress, 80)
+
+		// TODO(mikedanese): Add setup, validate, and teardown for:
+		//  - secrets
+		//  - volumes
+		//  - persistent volumes
+	})
+	AfterEach(func() {
+		w.Cleanup()
+	})
+
+	Describe("kube-push", func() {
 		BeforeEach(func() {
-			// The version is determined once at the beginning of the test so that
-			// the master and nodes won't be skewed if the value changes during the
-			// test.
-			By(fmt.Sprintf("Getting real version for %q", testContext.UpgradeTarget))
-			var err error
-			v, err = realVersion(testContext.UpgradeTarget)
-			expectNoError(err)
-			Logf("Version for %q is %q", testContext.UpgradeTarget, v)
+			SkipUnlessProviderIs("gce")
 		})
 
-		f := NewFramework("cluster-upgrade")
-		var w *WebserverTest
-		BeforeEach(func() {
-			By("Setting up the service, RC, and pods")
-			w = NewWebserverTest(f.Client, f.Namespace.Name, svcName)
-			rc := w.CreateWebserverRC(replicas)
-			rcName = rc.ObjectMeta.Name
-			svc := w.BuildServiceSpec()
-			svc.Spec.Type = api.ServiceTypeLoadBalancer
-			w.CreateService(svc)
-
-			By("Waiting for the service to become reachable")
-			result, err := waitForLoadBalancerIngress(f.Client, svcName, f.Namespace.Name)
-			Expect(err).NotTo(HaveOccurred())
-			ingresses := result.Status.LoadBalancer.Ingress
-			if len(ingresses) != 1 {
-				Failf("Was expecting only 1 ingress IP but got %d (%v): %v", len(ingresses), ingresses, result)
-			}
-			ingress = ingresses[0]
-			Logf("Got load balancer ingress point %v", ingress)
-			ip = ingress.IP
-			if ip == "" {
-				ip = ingress.Hostname
-			}
-			testLoadBalancerReachable(ingress, 80)
-
-			// TODO(mikedanese): Add setup, validate, and teardown for:
-			//  - secrets
-			//  - volumes
-			//  - persistent volumes
+		It("of master should maintain responsive services", func() {
+			By("Validating cluster before master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a master upgrade")
+			testMasterUpgrade(ip, v, masterPush)
+			By("Validating cluster after master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 		})
+	})
+
+	Describe("upgrade-master", func() {
+		BeforeEach(func() {
+			SkipUnlessProviderIs("gce", "gke")
+		})
+
+		It("should maintain responsive services", func() {
+			By("Validating cluster before master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a master upgrade")
+			testMasterUpgrade(ip, v, masterUpgrade)
+			By("Checking master version")
+			expectNoError(checkMasterVersion(f.Client, v))
+			By("Validating cluster after master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+		})
+	})
+
+	Describe("upgrade-cluster", func() {
+		var tmplBefore, tmplAfter string
+		BeforeEach(func() {
+			if providerIs("gce") {
+				By("Getting the node template before the upgrade")
+				var err error
+				tmplBefore, err = migTemplate()
+				expectNoError(err)
+			}
+		})
+
 		AfterEach(func() {
-			w.Cleanup()
-		})
-
-		Describe("kube-push", func() {
-			BeforeEach(func() {
-				SkipUnlessProviderIs("gce")
-			})
-
-			It("of master should maintain responsive services", func() {
-				By("Validating cluster before master upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-				By("Performing a master upgrade")
-				testMasterUpgrade(ip, v, masterPush)
-				By("Validating cluster after master upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-			})
-		})
-
-		Describe("upgrade-master", func() {
-			BeforeEach(func() {
-				SkipUnlessProviderIs("gce", "gke")
-			})
-
-			It("should maintain responsive services", func() {
-				By("Validating cluster before master upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-				By("Performing a master upgrade")
-				testMasterUpgrade(ip, v, masterUpgrade)
-				By("Checking master version")
-				expectNoError(checkMasterVersion(f.Client, v))
-				By("Validating cluster after master upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-			})
-		})
-
-		Describe("upgrade-cluster", func() {
-			var tmplBefore, tmplAfter string
-			BeforeEach(func() {
-				if providerIs("gce") {
-					By("Getting the node template before the upgrade")
-					var err error
-					tmplBefore, err = migTemplate()
-					expectNoError(err)
+			if providerIs("gce") {
+				By("Cleaning up any unused node templates")
+				var err error
+				tmplAfter, err = migTemplate()
+				if err != nil {
+					Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
+					return
 				}
-			})
-
-			AfterEach(func() {
-				if providerIs("gce") {
-					By("Cleaning up any unused node templates")
-					var err error
-					tmplAfter, err = migTemplate()
-					if err != nil {
-						Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
-						return
-					}
-					if tmplBefore == tmplAfter {
-						// The node upgrade failed so there's no need to delete
-						// anything.
-						Logf("Node template %s is still in use; not cleaning up", tmplBefore)
-						return
-					}
-					Logf("Deleting node template %s", tmplBefore)
-					if _, _, err := retryCmd("gcloud", "compute", "instance-templates",
-						fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-						"delete",
-						tmplBefore); err != nil {
-						Logf("gcloud compute instance-templates delete %s call failed with err: %v", tmplBefore, err)
-						Logf("May have leaked instance template %q", tmplBefore)
-					}
+				if tmplBefore == tmplAfter {
+					// The node upgrade failed so there's no need to delete
+					// anything.
+					Logf("Node template %s is still in use; not cleaning up", tmplBefore)
+					return
 				}
-			})
+				Logf("Deleting node template %s", tmplBefore)
+				if _, _, err := retryCmd("gcloud", "compute", "instance-templates",
+					fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+					"delete",
+					tmplBefore); err != nil {
+					Logf("gcloud compute instance-templates delete %s call failed with err: %v", tmplBefore, err)
+					Logf("May have leaked instance template %q", tmplBefore)
+				}
+			}
+		})
 
-			It("should maintain a functioning cluster", func() {
-				SkipUnlessProviderIs("gce", "gke")
+		It("should maintain a functioning cluster", func() {
+			SkipUnlessProviderIs("gce", "gke")
 
-				By("Validating cluster before master upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-				By("Performing a master upgrade")
-				testMasterUpgrade(ip, v, masterUpgrade)
-				By("Checking master version")
-				expectNoError(checkMasterVersion(f.Client, v))
-				By("Validating cluster after master upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-				By("Performing a node upgrade")
-				testNodeUpgrade(f, nodeUpgrade, replicas, v)
-				By("Validating cluster after node upgrade")
-				expectNoError(validate(f, svcName, rcName, ingress, replicas))
-			})
+			By("Validating cluster before master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a master upgrade")
+			testMasterUpgrade(ip, v, masterUpgrade)
+			By("Checking master version")
+			expectNoError(checkMasterVersion(f.Client, v))
+			By("Validating cluster after master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a node upgrade")
+			testNodeUpgrade(f, nodeUpgrade, replicas, v)
+			By("Validating cluster after node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 		})
 	})
 })
