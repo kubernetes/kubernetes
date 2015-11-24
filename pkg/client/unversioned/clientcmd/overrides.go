@@ -122,7 +122,7 @@ const (
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 	return AuthOverrideFlags{
-		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client key file for TLS."},
+		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS."},
 		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS."},
 		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server."},
 		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server."},
