@@ -52,10 +52,7 @@ var _ = Describe("PrivilegedPod", func() {
 		f: f,
 	}
 	It("should test privileged pod", func() {
-		hostExecPod := NewHostExecPodSpec(f.Namespace.Name, "hostexec")
-		pod, err := config.getPodClient().Create(hostExecPod)
-		expectNoError(err)
-		config.hostExecPod = pod
+		config.hostExecPod = LaunchHostExecPod(config.f.Client, config.f.Namespace.Name, "hostexec")
 
 		By("Creating a privileged pod")
 		config.createPrivilegedPod()
