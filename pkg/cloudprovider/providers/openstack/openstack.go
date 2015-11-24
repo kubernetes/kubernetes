@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
-	ossys "os"
 	"regexp"
 	"strings"
 	"time"
@@ -52,6 +52,7 @@ var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
 var ErrAttrNotFound = errors.New("Expected attribute not found")
+var ErrHttpError = errors.New("HTTP server returned non-200 response")
 
 const (
 	MiB = 1024 * 1024
@@ -86,6 +87,7 @@ type OpenStack struct {
 	provider *gophercloud.ProviderClient
 	region   string
 	lbOpts   LoadBalancerOpts
+	myID     string
 }
 
 type Config struct {
@@ -150,6 +152,7 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		provider: provider,
 		region:   cfg.Global.Region,
 		lbOpts:   cfg.LoadBalancer,
+		myID:     "",
 	}
 	return &os, nil
 }
@@ -321,9 +324,15 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 	return s, nil
 }
 
-// Implementation of Instances.CurrentNodeName
+// Implementation of Instances.CurrentNodeName.
+// Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+	md, err := getMetadata()
+	if err != nil {
+		return "", err
+	}
+
+	return md.Name, nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -786,9 +795,9 @@ func (os *OpenStack) AttachDisk(diskName string) (string, error) {
 		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
 		return "", err
 	}
-	compute_id, err := os.getComputeIDbyHostname(cClient)
+	compute_id, err := os.localComputeID()
 	if err != nil || len(compute_id) == 0 {
-		glog.Errorf("Unable to get minion's id by minion's hostname")
+		glog.Errorf("Unable to get minion's instance id: %v", err)
 		return "", err
 	}
 
@@ -827,9 +836,9 @@ func (os *OpenStack) DetachDisk(partialDiskId string) error {
 		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
 		return err
 	}
-	compute_id, err := os.getComputeIDbyHostname(cClient)
+	compute_id, err := os.localComputeID()
 	if err != nil || len(compute_id) == 0 {
-		glog.Errorf("Unable to get compute id while detaching disk")
+		glog.Errorf("Unable to get instance id while detaching disk")
 		return err
 	}
 	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && compute_id == disk.Attachments[0]["server_id"] {
@@ -886,43 +895,30 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 	return volume, err
 }
 
-func (os *OpenStack) getComputeIDbyHostname(cClient *gophercloud.ServiceClient) (string, error) {
-
-	hostname, err := ossys.Hostname()
-
-	if err != nil {
-		glog.Errorf("Failed to get Minion's hostname: %v", err)
-		return "", err
+func (os *OpenStack) localComputeID() (string, error) {
+	if os.myID != "" {
+		return os.myID, nil
 	}
 
-	i, ok := os.Instances()
-	if !ok {
-		glog.Errorf("Unable to get instances")
-		return "", errors.New("Unable to get instances")
+	// Try to read /var/lib/cloud/data/instance-id, in case
+	// cloud-init has already done the hard work for us.
+	const instanceIDFile = "/var/lib/cloud/data/instance-id"
+	idBytes, err := ioutil.ReadFile(instanceIDFile)
+	if err == nil {
+		id := strings.TrimSpace(string(idBytes))
+		glog.V(3).Infof("Found instance id %s from %s",
+			id, instanceIDFile)
+		return id, nil
+	}
+	glog.V(4).Infof("Unable to read instance id from %s: %v",
+		instanceIDFile, err)
+
+	// Lookup config drive / metadata service our selves.
+	md, err := getMetadata()
+	if err == nil {
+		glog.V(3).Infof("Found instance id %s from Metadata", md.Uuid)
+		return md.Uuid, nil
 	}
 
-	srvs, err := i.List(".")
-	if err != nil {
-		glog.Errorf("Failed to list servers: %v", err)
-		return "", err
-	}
-
-	if len(srvs) == 0 {
-		glog.Errorf("Found no servers in the region")
-		return "", errors.New("Found no servers in the region")
-	}
-	glog.V(4).Infof("Found servers: %v", srvs)
-
-	for _, srvname := range srvs {
-		server, err := getServerByName(cClient, srvname)
-		if err != nil {
-			return "", err
-		} else {
-			if (server.Metadata["hostname"] != nil && server.Metadata["hostname"] == hostname) || (len(server.Name) > 0 && server.Name == hostname) {
-				glog.V(4).Infof("Found server: %s with host :%s", server.Name, hostname)
-				return server.ID, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("No server found matching hostname: %s", hostname)
+	return "", ErrNotFound
 }
