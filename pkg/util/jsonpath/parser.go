@@ -359,7 +359,7 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
-// parseQuote scans array index selection
+// parseQuote unquotes string inside double quote
 func (p *Parser) parseQuote(cur *ListNode) error {
 Loop:
 	for {
@@ -371,7 +371,11 @@ Loop:
 		}
 	}
 	value := p.consumeText()
-	cur.append(newText(value[1 : len(value)-1]))
+	s, err := strconv.Unquote(value)
+	if err != nil {
+		return fmt.Errorf("unquote string %s error %v", value, err)
+	}
+	cur.append(newText(s))
 	return p.parseInsideAction(cur)
 }
 
