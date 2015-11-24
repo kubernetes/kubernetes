@@ -39,7 +39,7 @@ Run a particular image on the cluster.
 
 
 Create and run a particular image, possibly replicated.
-Creates a replication controller to manage the created container(s).
+Creates a replication controller or job to manage the created container(s).
 
 ```
 kubectl run NAME --image=image [--env="key=value"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]
@@ -66,14 +66,17 @@ $ kubectl run nginx --image=nginx --dry-run
 # Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
 $ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
-# Start a single instance of nginx and keep it in the foreground, don't restart it if it exits.
-$ kubectl run -i --tty nginx --image=nginx --restart=Never
+# Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
+$ kubectl run -i --tty busybox --image=busybox --restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
 $ kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
 
-# Start the nginx container using a different command and custom arguments
+# Start the nginx container using a different command and custom arguments.
 $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
+
+# Start the perl container to compute π to 2000 places and print it out.
+$ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
 ```
 
 ### Options
@@ -84,7 +87,7 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
       --dry-run[=false]: If true, only print the object that would be sent, without sending it.
       --env=[]: Environment variables to set in the container
       --expose[=false]: If true, a public, external service is created for the container(s) which are run
-      --generator="": The name of the API generator to use.  Default is 'run/v1' if --restart=Always, otherwise the default is 'run-pod/v1'.
+      --generator="": The name of the API generator to use.  Default is 'run/v1' if --restart=Always, otherwise the default is 'job/v1beta1'.
       --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s).
@@ -97,7 +100,7 @@ $ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
       --port=-1: The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.
   -r, --replicas=1: Number of replicas to create for this container. Default is 1.
       --requests="": The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'
-      --restart="Always": The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and --replicas must be 1.  Default 'Always'
+      --restart="Always": The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, a job is created for this pod and --replicas must be 1.  Default 'Always'
       --save-config[=false]: If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
       --service-generator="service/v2": The name of the generator to use for creating a service.  Only used if --expose is true
       --service-overrides="": An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.
