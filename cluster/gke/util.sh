@@ -163,7 +163,7 @@ function kube-up() {
 #   GCLOUD
 #   ZONE
 # Vars set:
-#   MINION_TAG
+#   NODE_TAG
 function test-setup() {
   echo "... in gke:test-setup()" >&2
   # Detect the project into $PROJECT if it isn't set
@@ -171,22 +171,22 @@ function test-setup() {
   detect-minions >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
-  OLD_MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
+  OLD_NODE_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   "${GCLOUD}" compute firewall-rules create \
     "${CLUSTER_NAME}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
+    --target-tags "${NODE_TAG},${OLD_NODE_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
     "${CLUSTER_NAME}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
+    --target-tags "${NODE_TAG},${OLD_NODE_TAG}" \
     --network="${NETWORK}"
 }
 
