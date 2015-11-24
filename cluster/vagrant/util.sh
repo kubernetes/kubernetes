@@ -25,10 +25,10 @@ function detect-master () {
   echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 function detect-minions {
   echo "Minions already detected" 1>&2
-  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
+  KUBE_NODE_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so

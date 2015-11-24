@@ -47,19 +47,19 @@ function detect-master {
 # Assumed vars:
 #   MINION_NAMES
 # Vars set:
-#   KUBE_MINION_IP_ADDRESS (array)
+#   KUBE_NODE_IP_ADDRESS (array)
 function detect-minions {
-  KUBE_MINION_IP_ADDRESSES=()
+  KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(govc vm.ip ${MINION_NAMES[$i]})
     if [[ -z "${minion_ip-}" ]] ; then
       echo "Did not find ${MINION_NAMES[$i]}" >&2
     else
       echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-      KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+      KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
     fi
   done
-  if [[ -z "${KUBE_MINION_IP_ADDRESSES-}" ]]; then
+  if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
     echo "Could not detect Kubernetes minion nodes. Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
@@ -315,7 +315,7 @@ function kube-up {
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     printf "Waiting for ${MINION_NAMES[$i]} to become available..."
     until curl --max-time 5 \
-            --fail --output /dev/null --silent "http://${KUBE_MINION_IP_ADDRESSES[$i]}:10250/healthz"; do
+            --fail --output /dev/null --silent "http://${KUBE_NODE_IP_ADDRESSES[$i]}:10250/healthz"; do
         printf "."
         sleep 2
     done
@@ -349,7 +349,7 @@ function kube-up {
   local i
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
       # Make sure docker is installed
-      kube-ssh "${KUBE_MINION_IP_ADDRESSES[$i]}" which docker > /dev/null || {
+      kube-ssh "${KUBE_NODE_IP_ADDRESSES[$i]}" which docker > /dev/null || {
         echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
         echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
         echo "cluster. (sorry!)" >&2

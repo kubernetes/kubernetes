@@ -229,11 +229,11 @@ function detect-minion-names {
 #   ZONE
 # Vars set:
 #   MINION_NAMES
-#   KUBE_MINION_IP_ADDRESSES (array)
+#   KUBE_NODE_IP_ADDRESSES (array)
 function detect-minions () {
   detect-project
   detect-minion-names
-  KUBE_MINION_IP_ADDRESSES=()
+  KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${MINION_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
@@ -242,10 +242,10 @@ function detect-minions () {
       echo "Did not find ${MINION_NAMES[$i]}" >&2
     else
       echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-      KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+      KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
     fi
   done
-  if [[ -z "${KUBE_MINION_IP_ADDRESSES-}" ]]; then
+  if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
