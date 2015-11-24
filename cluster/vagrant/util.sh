@@ -124,7 +124,7 @@ function create-provision-scripts {
     echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
     echo "MASTER_IP='${MASTER_IP}'"
-    echo "MINION_NAMES=(${MINION_NAMES[@]})"
+    echo "NODE_NAMES=(${NODE_NAMES[@]})"
     echo "NODE_IPS=(${NODE_IPS[@]})"
     echo "NODE_IP='${MASTER_IP}'"
     echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
@@ -163,13 +163,13 @@ function create-provision-scripts {
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MASTER_IP='${MASTER_IP}'"
-      echo "MINION_NAMES=(${MINION_NAMES[@]})"
-      echo "MINION_NAME=(${MINION_NAMES[$i]})"
+      echo "NODE_NAMES=(${NODE_NAMES[@]})"
+      echo "NODE_NAME=(${NODE_NAMES[$i]})"
       echo "NODE_IPS=(${NODE_IPS[@]})"
       echo "NODE_IP='${NODE_IPS[$i]}'"
       echo "NODE_ID='$i'"
@@ -222,7 +222,7 @@ function verify-cluster {
 
   # verify each minion has all required daemons
   local i
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     echo "Validating ${VAGRANT_NODE_NAMES[$i]}"
     local machine=${VAGRANT_NODE_NAMES[$i]}
     local -a required_daemon=("salt-minion" "kubelet" "docker")

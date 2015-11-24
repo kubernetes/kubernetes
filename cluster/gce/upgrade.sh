@@ -121,15 +121,15 @@ function prepare-upgrade() {
 }
 
 
-# Reads kube-env metadata from first node in MINION_NAMES.
+# Reads kube-env metadata from first node in NODE_NAMES.
 #
 # Assumed vars:
-#   MINION_NAMES
+#   NODE_NAMES
 #   PROJECT
 #   ZONE
 function get-node-env() {
   # TODO(zmerlynn): Make this more reliable with retries.
-  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${MINION_NAMES[0]} --command \
+  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${NODE_NAMES[0]} --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
 }

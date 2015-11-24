@@ -30,7 +30,7 @@ KUBE_LOG_LEVEL="--v=4"
 NODE_ADDRESS="--address=${NODE_ADDRESS}"
 
 # --port=10250: The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
-MINION_PORT="--port=10250"
+NODE_PORT="--port=10250"
 
 # --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
 NODE_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
@@ -49,7 +49,7 @@ EOF
 KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
                     \${KUBE_LOG_LEVEL}       \\
                     \${NODE_ADDRESS}       \\
-                    \${MINION_PORT}          \\
+                    \${NODE_PORT}          \\
                     \${NODE_HOSTNAME}      \\
                     \${KUBELET_API_SERVER}   \\
                     \${KUBE_ALLOW_PRIV}      \\
