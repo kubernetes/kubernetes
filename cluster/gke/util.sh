@@ -113,7 +113,7 @@ function verify-prereqs() {
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
-#   MINION_SCOPES
+#   NODE_SCOPES
 #   MACHINE_TYPE
 function kube-up() {
   echo "... in gke:kube-up()" >&2
@@ -145,7 +145,7 @@ function kube-up() {
     "--project=${PROJECT}"
     "--num-nodes=${NUM_MINIONS}"
     "--network=${NETWORK}"
-    "--scopes=${MINION_SCOPES}"
+    "--scopes=${NODE_SCOPES}"
     "--cluster-version=${CLUSTER_API_VERSION}"
     "--machine-type=${MACHINE_TYPE}"
   )
