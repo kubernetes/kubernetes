@@ -53,6 +53,9 @@ sed -i -e 's|<<any>>|link:definitions.html#_any[any]|g' ./paths.adoc
 # change the title of paths.adoc from "paths" to "operations"
 sed -i 's|== Paths|== Operations|g' ./paths.adoc
 
+# $$ has special meaning in asciidoc, we need to escape it
+sed -i 's|\$\$|+++$$+++|g' ./definitions.adoc
+
 echo -e "=== any\nRepresents an untyped JSON map - see the description of the field for more info about the structure of this object." >> ./definitions.adoc
 
 asciidoctor definitions.adoc
