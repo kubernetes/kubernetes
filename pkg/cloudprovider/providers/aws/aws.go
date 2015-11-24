@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -333,19 +332,6 @@ func (self *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([
 	}
 
 	return results, nil
-}
-
-type awsSdkMetadata struct {
-	metadata *ec2metadata.EC2Metadata
-}
-
-var metadataClient = http.Client{
-	Timeout: time.Second * 10,
-}
-
-// Implements EC2Metadata.GetMetadata
-func (self *awsSdkMetadata) GetMetadata(path string) (string, error) {
-	return self.metadata.GetMetadata(path)
 }
 
 // Implements EC2.DescribeSecurityGroups
