@@ -85,7 +85,7 @@ So we have a 1-node Elasticsearch cluster ready to handle some work.
 
 ## Scale
 
-Please see [production_cluster](./production_cluster/) for examples scaling Elasticsearch in Kubernetes.
+Please see [production_cluster](production_cluster/) for examples scaling Elasticsearch in Kubernetes.
 
 ## Access the service
 
