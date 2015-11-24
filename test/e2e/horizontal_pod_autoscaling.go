@@ -49,7 +49,7 @@ var _ = Describe("Horizontal pod autoscaling (scale resource: CPU) [Skipped]", f
 		})
 	})
 
-	Describe("ReplicationController", func() {
+	Describe("[Autoscaling] ReplicationController", func() {
 		// CPU tests via replication controllers
 		It(titleUp, func() {
 			scaleUp("rc", kindRC, rc, f)
