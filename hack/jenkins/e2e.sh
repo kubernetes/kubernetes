@@ -500,6 +500,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="soak-1.1"}
     : ${PROJECT:="kubernetes-jenkins"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs tests on GCE soak cluster for latest 1.1 ci release.
@@ -1685,9 +1686,11 @@ fi
 ### Set up ###
 if [[ "${E2E_UP,,}" == "true" ]]; then
     go run ./hack/e2e.go ${E2E_OPT} -v --down
-    if [[ "${gcp_list_resources}" == "true" ]]; then
-      ${gcp_list_resources_script} > "${gcp_resources_before}"
-    fi
+fi
+if [[ "${gcp_list_resources}" == "true" ]]; then
+  ${gcp_list_resources_script} > "${gcp_resources_before}"
+fi
+if [[ "${E2E_UP,,}" == "true" ]]; then
     go run ./hack/e2e.go ${E2E_OPT} -v --up
     go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
     if [[ "${gcp_list_resources}" == "true" ]]; then
@@ -1735,12 +1738,15 @@ if [[ "${E2E_DOWN,,}" == "true" ]]; then
     # for the wait between attempts.
     sleep 30
     go run ./hack/e2e.go ${E2E_OPT} -v --down
-    if [[ "${gcp_list_resources}" == "true" ]]; then
-      ${gcp_list_resources_script} > "${gcp_resources_after}"
-    fi
+fi
+if [[ "${gcp_list_resources}" == "true" ]]; then
+  ${gcp_list_resources_script} > "${gcp_resources_after}"
 fi
 
-if [[ -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
+# Compare resources if either the cluster was
+# * started and destroyed (normal e2e)
+# * neither started nor destroyed (soak test)
+if [[ "${E2E_UP:-}" == "${E2E_DOWN:-}" && -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
   if ! diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}" && [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-}" == "true" ]]; then
     echo "!!! FAIL: Google Cloud Platform resources leaked while running tests!"
     exit 1
