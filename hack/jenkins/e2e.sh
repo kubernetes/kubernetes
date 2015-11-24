@@ -553,8 +553,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="kubekins-e2e-gce-trusty-rls"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_GCE_NODE_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_NODE_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
     : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
@@ -571,8 +571,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-slow"}
     : ${PROJECT:="k8s-e2e-gce-trusty-slow"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_GCE_NODE_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_NODE_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
     : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
@@ -594,8 +594,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-e2e-gce-trusty-beta"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_GCE_NODE_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_NODE_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
     : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
@@ -613,8 +613,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-beta-slow"}
     : ${PROJECT:="k8s-e2e-gce-trusty-beta-slow"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+    : ${KUBE_GCE_NODE_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+    : ${KUBE_GCE_NODE_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
     : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
@@ -1419,7 +1419,7 @@ case ${JOB_NAME} in
     MASTER_SIZE="n1-standard-2"
     MINION_SIZE="n1-standard-1"
     KUBEMARK_MASTER_SIZE="n1-standard-4"
-    KUBEMARK_NUM_MINIONS="100"
+    KUBEMARK_NUM_NODES="100"
     ;;
 
   # Run Kubemark test on a fake 500 node cluster to test for regressions on
@@ -1439,7 +1439,7 @@ case ${JOB_NAME} in
     KUBE_GCE_INSTANCE_PREFIX="kubemark500"
     E2E_ZONE="asia-east1-a"
     KUBEMARK_MASTER_SIZE="n1-standard-16"
-    KUBEMARK_NUM_MINIONS="500"
+    KUBEMARK_NUM_NODES="500"
     ;;
 
   # Run big Kubemark test, this currently means a 1000 node cluster and 16 core master
@@ -1461,7 +1461,7 @@ case ${JOB_NAME} in
     KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
     E2E_ZONE="asia-east1-a"
     KUBEMARK_MASTER_SIZE="n1-standard-16"
-    KUBEMARK_NUM_MINIONS="1000"
+    KUBEMARK_NUM_NODES="1000"
     ;;
 esac
 
@@ -1475,8 +1475,8 @@ export KUBE_GCE_ZONE=${E2E_ZONE}
 export KUBE_GCE_NETWORK=${E2E_NETWORK}
 export KUBE_GCE_INSTANCE_PREFIX=${KUBE_GCE_INSTANCE_PREFIX:-}
 export KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX:-}
-export KUBE_GCE_MINION_PROJECT=${KUBE_GCE_MINION_PROJECT:-}
-export KUBE_GCE_MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-}
+export KUBE_GCE_NODE_PROJECT=${KUBE_GCE_NODE_PROJECT:-}
+export KUBE_GCE_NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-}
 export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
 
 # GKE variables
@@ -1718,7 +1718,7 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   NUM_MINIONS_BKP=${NUM_MINIONS}
   MASTER_SIZE_BKP=${MASTER_SIZE}
   ./test/kubemark/stop-kubemark.sh
-  NUM_MINIONS=${KUBEMARK_NUM_MINIONS:-$NUM_MINIONS}
+  NUM_MINIONS=${KUBEMARK_NUM_NODES:-$NUM_MINIONS}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="should\sallow\sstarting\s30\spods\sper\snode" --delete-namespace="false" --gather-resource-usage="false"
