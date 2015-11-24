@@ -187,28 +187,28 @@ function query-running-minions () {
 
 function find-running-minions () {
   NODE_IDS=()
-  MINION_NAMES=()
+  NODE_NAMES=()
   for id in $(query-running-minions "Reservations[].Instances[].InstanceId"); do
     NODE_IDS+=("${id}")
 
     # We use the minion ids as the name
-    MINION_NAMES+=("${id}")
+    NODE_NAMES+=("${id}")
   done
 }
 
 function detect-minions () {
   find-running-minions
 
-  # This is inefficient, but we want MINION_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
+  # This is inefficient, but we want NODE_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
   KUBE_NODE_IP_ADDRESSES=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip
     if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
-      minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
+      minion_ip=$(get_instance_public_ip ${NODE_NAMES[$i]})
     else
-      minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
+      minion_ip=$(get_instance_private_ip ${NODE_NAMES[$i]})
     fi
-    echo "Found minion ${i}: ${MINION_NAMES[$i]} @ ${minion_ip}"
+    echo "Found minion ${i}: ${NODE_NAMES[$i]} @ ${minion_ip}"
     KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
   done
 

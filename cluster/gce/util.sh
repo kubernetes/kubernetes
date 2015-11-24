@@ -214,13 +214,13 @@ function upload-server-tars() {
 # Assumed vars:
 #   NODE_INSTANCE_PREFIX
 # Vars set:
-#   MINION_NAMES
+#   NODE_NAMES
 function detect-minion-names {
   detect-project
-  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+  NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
     "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
     --format=yaml | grep instance: | cut -d ' ' -f 2))
-  echo "MINION_NAMES=${MINION_NAMES[*]}" >&2
+  echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
 }
 
 # Detect the information about the minions
@@ -228,20 +228,20 @@ function detect-minion-names {
 # Assumed vars:
 #   ZONE
 # Vars set:
-#   MINION_NAMES
+#   NODE_NAMES
 #   KUBE_NODE_IP_ADDRESSES (array)
 function detect-minions () {
   detect-project
   detect-minion-names
   KUBE_NODE_IP_ADDRESSES=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-      "${MINION_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
+      "${NODE_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
     if [[ -z "${minion_ip-}" ]] ; then
-      echo "Did not find ${MINION_NAMES[$i]}" >&2
+      echo "Did not find ${NODE_NAMES[$i]}" >&2
     else
-      echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
+      echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
       KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
     fi
   done
@@ -1105,8 +1105,8 @@ function kube-push {
 
   push-master
 
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    push-node "${MINION_NAMES[$i]}" &
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    push-node "${NODE_NAMES[$i]}" &
   done
   wait-for-jobs
 
