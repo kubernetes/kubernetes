@@ -123,7 +123,7 @@ func TestE2E(t *testing.T) {
 
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = "Skipped"
+		config.GinkgoConfig.SkipString = `\[Skipped\]`
 	}
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
