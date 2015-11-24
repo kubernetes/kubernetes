@@ -378,10 +378,10 @@ function create-node-template {
     if ! gcloud compute instance-templates create "$template_name" \
       --project "${PROJECT}" \
       --machine-type "${MINION_SIZE}" \
-      --boot-disk-type "${MINION_DISK_TYPE}" \
-      --boot-disk-size "${MINION_DISK_SIZE}" \
-      --image-project="${MINION_IMAGE_PROJECT}" \
-      --image "${MINION_IMAGE}" \
+      --boot-disk-type "${NODE_DISK_TYPE}" \
+      --boot-disk-size "${NODE_DISK_SIZE}" \
+      --image-project="${NODE_IMAGE_PROJECT}" \
+      --image "${NODE_IMAGE}" \
       --tags "${MINION_TAG}" \
       --network "${NETWORK}" \
       ${preemptible_minions} \

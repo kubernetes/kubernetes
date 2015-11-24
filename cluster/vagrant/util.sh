@@ -172,7 +172,7 @@ function create-provision-scripts {
       echo "MINION_NAME=(${MINION_NAMES[$i]})"
       echo "MINION_IPS=(${MINION_IPS[@]})"
       echo "MINION_IP='${MINION_IPS[$i]}'"
-      echo "MINION_ID='$i'"
+      echo "NODE_ID='$i'"
       echo "NODE_IP='${MINION_IPS[$i]}'"
       echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
       echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"

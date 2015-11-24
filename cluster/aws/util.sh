@@ -186,10 +186,10 @@ function query-running-minions () {
 }
 
 function find-running-minions () {
-  MINION_IDS=()
+  NODE_IDS=()
   MINION_NAMES=()
   for id in $(query-running-minions "Reservations[].Instances[].InstanceId"); do
-    MINION_IDS+=("${id}")
+    NODE_IDS+=("${id}")
 
     # We use the minion ids as the name
     MINION_NAMES+=("${id}")
@@ -199,7 +199,7 @@ function find-running-minions () {
 function detect-minions () {
   find-running-minions
 
-  # This is inefficient, but we want MINION_NAMES / MINION_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
+  # This is inefficient, but we want MINION_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip
@@ -1022,8 +1022,8 @@ function start-minions() {
   attempt=0
   while true; do
     find-running-minions > $LOG
-    if [[ ${#MINION_IDS[@]} == ${NUM_MINIONS} ]]; then
-      echo -e " ${color_green}${#MINION_IDS[@]} minions started; ready${color_norm}"
+    if [[ ${#NODE_IDS[@]} == ${NUM_MINIONS} ]]; then
+      echo -e " ${color_green}${#NODE_IDS[@]} minions started; ready${color_norm}"
       break
     fi
 
@@ -1037,7 +1037,7 @@ function start-minions() {
       exit 1
     fi
 
-    echo -e " ${color_yellow}${#MINION_IDS[@]} minions started; waiting${color_norm}"
+    echo -e " ${color_yellow}${#NODE_IDS[@]} minions started; waiting${color_norm}"
     attempt=$(($attempt+1))
     sleep 10
   done
