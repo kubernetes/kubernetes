@@ -1,3 +1,5 @@
+# TODO: Run flannel daemon in a static pod once we've moved the overlay network
+# setup into a network plugin.
 flannel-tar:
   archive:
     - extracted

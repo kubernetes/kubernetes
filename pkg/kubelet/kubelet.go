@@ -217,7 +217,7 @@ func NewMainKubelet(
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
 	containerManager cm.ContainerManager,
-	useDefaultOverlay bool,
+	flannelExperimentalOverlay bool,
 ) (*Kubelet, error) {
 
 	if rootDirectory == "" {
@@ -328,12 +328,19 @@ func NewMainKubelet(
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
 		containerManager:               containerManager,
+		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
-		useDefaultOverlay:              useDefaultOverlay,
+	}
+	if klet.flannelExperimentalOverlay {
+		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
 	}
 	if klet.kubeClient == nil {
-		glog.Infof("Master not setting up flannel overlay")
-		klet.useDefaultOverlay = false
+		// The master kubelet cannot wait for the flannel daemon because it is responsible
+		// for starting up the flannel server in a static pod. So even though the flannel
+		// daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
+		// on the master run with host networking, so the master flannel doesn't care
+		// even if the network changes. We only need it for the master proxy.
+		klet.flannelExperimentalOverlay = false
 	}
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
@@ -656,8 +663,12 @@ type Kubelet struct {
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
 
-	useDefaultOverlay bool
-	flannelHelper     *FlannelHelper
+	flannelExperimentalOverlay bool
+
+	// TODO: Flannelhelper doesn't store any state, we can instantiate it
+	// on the fly if we're confident the dbus connetions it opens doesn't
+	// put the system under duress.
+	flannelHelper *FlannelHelper
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -2628,7 +2639,7 @@ var oldNodeUnschedulable bool
 func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	if kl.configureCBR0 {
-		if kl.useDefaultOverlay {
+		if kl.flannelExperimentalOverlay {
 			podCIDR, err := kl.flannelHelper.Handshake()
 			if err != nil {
 				glog.Infof("Flannel server handshake failed %v", err)
@@ -2903,13 +2914,24 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
-	// TODO: Actually update the node spec with pod cidr, this is currently a no-op.
-	if kl.useDefaultOverlay {
-		node.Spec.PodCIDR = kl.runtimeState.podCIDR()
+	// Flannel is the authoritative source of pod CIDR, if it's running.
+	// This is a short term compromise till we get flannel working in
+	// reservation mode.
+	if kl.flannelExperimentalOverlay {
+		flannelPodCIDR := kl.runtimeState.podCIDR()
+		if node.Spec.PodCIDR != flannelPodCIDR {
+			node.Spec.PodCIDR = flannelPodCIDR
+			glog.Infof("Updating podcidr to %v", node.Spec.PodCIDR)
+			if updatedNode, err := kl.kubeClient.Nodes().Update(node); err != nil {
+				glog.Warningf("Failed to update podCIDR: %v", err)
+			} else {
+				// Update the node resourceVersion so the status update doesn't fail.
+				node = updatedNode
+			}
+		}
 	} else if kl.reconcileCIDR {
 		kl.runtimeState.setPodCIDR(node.Spec.PodCIDR)
 	}
-	glog.Infof("Updating node in apiserver with cidr %v", node.Spec.PodCIDR)
 
 	if err := kl.setNodeStatus(node); err != nil {
 		return err

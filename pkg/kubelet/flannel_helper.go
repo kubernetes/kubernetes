@@ -32,6 +32,9 @@ import (
 
 // TODO: Move all this to a network plugin.
 const (
+	// TODO: The location of default docker options is distro specific, so this
+	// probably won't work on anything other than debian/ubuntu. This is a
+	// short-term compromise till we've moved overlay setup into a plugin.
 	dockerOptsFile    = "/etc/default/docker"
 	flannelSubnetKey  = "FLANNEL_SUBNET"
 	flannelNetworkKey = "FLANNEL_NETWORK"
@@ -78,7 +81,7 @@ func (f *FlannelHelper) Handshake() (podCIDR string, err error) {
 	if _, err = os.Stat(f.subnetFile); err != nil {
 		return "", fmt.Errorf("Waiting for subnet file %v", f.subnetFile)
 	}
-	glog.Infof("(kubelet)Found flannel subnet file %v", f.subnetFile)
+	glog.Infof("Found flannel subnet file %v", f.subnetFile)
 
 	config, err := parseKVConfig(f.subnetFile)
 	if err != nil {
@@ -115,7 +118,7 @@ func writeDockerOptsFromFlannelConfig(flannelConfig map[string]string) error {
 	}
 	opts, ok := dockerOpts[dockerOptsKey]
 	if !ok {
-		glog.Errorf("(kubelet)Did not find docker opts, writing them")
+		glog.Errorf("Did not find docker opts, writing them")
 		opts = fmt.Sprintf(
 			" --bridge=cbr0 --iptables=false --ip-masq=false")
 	} else {
@@ -139,7 +142,7 @@ func parseKVConfig(filename string) (map[string]string, error) {
 		return config, err
 	}
 	str := string(buff)
-	glog.Infof("(kubelet) Read kv options %+v from %v", str, filename)
+	glog.Infof("Read kv options %+v from %v", str, filename)
 	for _, line := range strings.Split(str, "\n") {
 		kv := strings.Split(line, "=")
 		if len(kv) != 2 {
@@ -160,6 +163,6 @@ func writeKVConfig(filename string, kv map[string]string) error {
 	for k, v := range kv {
 		content += fmt.Sprintf("%v=%v\n", k, v)
 	}
-	glog.Warningf("(kubelet)Writing kv options %+v to %v", content, filename)
+	glog.Warningf("Writing kv options %+v to %v", content, filename)
 	return ioutil.WriteFile(filename, []byte(content), 0644)
 }
