@@ -39,6 +39,7 @@ type AnnotateOptions struct {
 	removeAnnotations []string
 	builder           *resource.Builder
 	filenames         []string
+	selector          string
 
 	overwrite       bool
 	all             bool
@@ -103,6 +104,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
+	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
@@ -153,6 +155,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.filenames...).
+		SelectorParam(o.selector).
 		ResourceTypeOrNameArgs(o.all, o.resources...).
 		Flatten().
 		Latest()
