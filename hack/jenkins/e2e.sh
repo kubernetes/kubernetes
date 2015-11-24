@@ -940,22 +940,22 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  # kubernetes-upgrade-gke-stable-latest
+  # kubernetes-upgrade-gke-stable-current-release
   #
   # This suite:
   #
   # 1. launches a cluster at release/stable,
-  # 2. upgrades the master to release/latest,
+  # 2. upgrades the master to CURRENT_RELEASE_PUBLISHED_VERSION,
   # 3. runs release/stable e2es,
   # 4. upgrades the rest of the cluster,
   # 5. runs release/stable e2es again, then
-  # 6. runs release/latest e2es and tears down the cluster.
+  # 6. runs CURRENT_RELEASE_PUBLISHED_VERSION e2es and tears down the cluster.
 
-  kubernetes-upgrade-stable-latest-gke-step1-deploy)
+  kubernetes-upgrade-stable-current-release-gke-step1-deploy)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
-    : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-current-release"}
+    : ${E2E_NETWORK:="gke-upgrade-stable-current-release"}
     : ${JENKINS_PUBLISHED_VERSION:="release/stable"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
@@ -964,27 +964,27 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     ;;
 
-  kubernetes-upgrade-stable-latest-gke-step2-upgrade-master)
+  kubernetes-upgrade-stable-current-release-gke-step2-upgrade-master)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
-    : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-current-release"}
+    : ${E2E_NETWORK:="gke-upgrade-stable-current-release"}
     : ${E2E_OPT:="--check_version_skew=false"}
     # Use upgrade logic of version we're upgrading to.
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
+    : ${JENKINS_PUBLISHED_VERSION:="${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=release/latest"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     ;;
 
-  kubernetes-upgrade-stable-latest-gke-step3-e2e-old)
+  kubernetes-upgrade-stable-current-release-gke-step3-e2e-old)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
-    : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-current-release"}
+    : ${E2E_NETWORK:="gke-upgrade-stable-current-release"}
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
@@ -1000,27 +1000,27 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-upgrade-stable-latest-gke-step4-upgrade-cluster)
+  kubernetes-upgrade-stable-current-release-gke-step4-upgrade-cluster)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
-    : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-current-release"}
+    : ${E2E_NETWORK:="gke-upgrade-stable-current-release"}
     : ${E2E_OPT:="--check_version_skew=false"}
     # Use upgrade logic of version we're upgrading to.
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
+    : ${JENKINS_PUBLISHED_VERSION:="${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=release/latest"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     ;;
 
-  kubernetes-upgrade-stable-latest-gke-step5-e2e-old)
+  kubernetes-upgrade-stable-current-release-gke-step5-e2e-old)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
-    : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-current-release"}
+    : ${E2E_NETWORK:="gke-upgrade-stable-current-release"}
     : ${E2E_OPT:="--check_version_skew=false"}
     : ${JENKINS_FORCE_GET_TARS:=y}
     # Run old e2es
@@ -1036,13 +1036,13 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-upgrade-stable-latest-gke-step6-e2e-new)
+  kubernetes-upgrade-stable-current-release-gke-step6-e2e-new)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-latest"}
-    : ${E2E_NETWORK:="gke-upgrade-stable-latest"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade-stable-current-release"}
+    : ${E2E_NETWORK:="gke-upgrade-stable-current-release"}
     : ${JENKINS_FORCE_GET_TARS:=y}
-    : ${JENKINS_PUBLISHED_VERSION:="release/latest"}
+    : ${JENKINS_PUBLISHED_VERSION:="${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${PROJECT:="k8s-jkns-upgrade-fixed-1"}
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
