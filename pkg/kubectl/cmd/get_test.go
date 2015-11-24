@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -331,7 +332,7 @@ func TestGetListObjects(t *testing.T) {
 func extractResourceList(objs []runtime.Object) ([]runtime.Object, error) {
 	finalObjs := []runtime.Object{}
 	for _, obj := range objs {
-		items, err := runtime.ExtractList(obj)
+		items, err := meta.ExtractList(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -477,14 +478,14 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	list, err := runtime.ExtractList(out)
+	list, err := meta.ExtractList(out)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if errs := runtime.DecodeList(list, api.Scheme); len(errs) > 0 {
 		t.Fatalf("unexpected error: %v", errs)
 	}
-	if err := runtime.SetList(out, list); err != nil {
+	if err := meta.SetList(out, list); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

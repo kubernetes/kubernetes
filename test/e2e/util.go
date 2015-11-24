@@ -22,6 +22,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -66,6 +68,11 @@ const (
 	// Initial pod start can be delayed O(minutes) by slow docker pulls
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
+
+	// If there are any orphaned namespaces to clean up, this test is running
+	// on a long lived cluster. A long wait here is preferably to spurious test
+	// failures caused by leaked resources from a previous test run.
+	namespaceCleanupTimeout = 15 * time.Minute
 
 	// Some pods can take much longer to get ready due to volume attach/detach latency.
 	slowPodStartTimeout = 15 * time.Minute
@@ -127,6 +134,7 @@ type TestContextType struct {
 	PrometheusPushGateway             string
 	VerifyServiceAccount              bool
 	DeleteNamespace                   bool
+	CleanStart                        bool
 	GatherKubeSystemResourceUsageData bool
 }
 
@@ -399,6 +407,71 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 	}
 	return nil
+}
+
+// deleteNamespaces deletes all namespaces that match the given delete and skip filters.
+// Filter is by simple strings.Contains; first skip filter, then delete filter.
+// Returns the list of deleted namespaces or an error.
+func deleteNamespaces(c *client.Client, deleteFilter, skipFilter []string) ([]string, error) {
+	By("Deleting namespaces")
+	nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	var deleted []string
+	var wg sync.WaitGroup
+OUTER:
+	for _, item := range nsList.Items {
+		if skipFilter != nil {
+			for _, pattern := range skipFilter {
+				if strings.Contains(item.Name, pattern) {
+					continue OUTER
+				}
+			}
+		}
+		if deleteFilter != nil {
+			var shouldDelete bool
+			for _, pattern := range deleteFilter {
+				if strings.Contains(item.Name, pattern) {
+					shouldDelete = true
+					break
+				}
+			}
+			if !shouldDelete {
+				continue OUTER
+			}
+		}
+		wg.Add(1)
+		deleted = append(deleted, item.Name)
+		go func(nsName string) {
+			defer wg.Done()
+			defer GinkgoRecover()
+			Expect(c.Namespaces().Delete(nsName)).To(Succeed())
+			Logf("namespace : %v api call to delete is complete ", nsName)
+		}(item.Name)
+	}
+	wg.Wait()
+	return deleted, nil
+}
+
+func waitForNamespacesDeleted(c *client.Client, namespaces []string, timeout time.Duration) error {
+	By("Waiting for namespaces to vanish")
+	nsMap := map[string]bool{}
+	for _, ns := range namespaces {
+		nsMap[ns] = true
+	}
+	//Now POLL until all namespaces have been eradicated.
+	return wait.Poll(2*time.Second, timeout,
+		func() (bool, error) {
+			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+			if err != nil {
+				return false, err
+			}
+			for _, item := range nsList.Items {
+				if _, ok := nsMap[item.Name]; ok {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
 }
 
 func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, timeout time.Duration) error {
@@ -878,13 +951,13 @@ func serviceResponding(c *client.Client, ns, name string) error {
 func loadConfig() (*client.Config, error) {
 	switch {
 	case testContext.KubeConfig != "":
-		fmt.Printf(">>> testContext.KubeConfig: %s\n", testContext.KubeConfig)
+		Logf(">>> testContext.KubeConfig: %s\n", testContext.KubeConfig)
 		c, err := clientcmd.LoadFromFile(testContext.KubeConfig)
 		if err != nil {
 			return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 		}
 		if testContext.KubeContext != "" {
-			fmt.Printf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
+			Logf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
 			c.CurrentContext = testContext.KubeContext
 		}
 		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: testContext.Host}}).ClientConfig()
@@ -1080,7 +1153,8 @@ func (b kubectlBuilder) exec() (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
-	Logf(stdout.String())
+	Logf("stdout: %q", stdout.String())
+	Logf("stderr: %q", stderr.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String()), nil
 }
@@ -1886,27 +1960,35 @@ func BadEvents(events []*api.Event) int {
 	return badEvents
 }
 
-// NodeSSHHosts returns SSH-able host names for all nodes. It returns an error
-// if it can't find an external IP for every node, though it still returns all
-// hosts that it found in that case.
-func NodeSSHHosts(c *client.Client) ([]string, error) {
-	var hosts []string
-	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return hosts, fmt.Errorf("error getting nodes: %v", err)
-	}
+// NodeAddresses returns the first address of the given type of each node.
+func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []string {
+	hosts := []string{}
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
 			// Use the first external IP address we find on the node, and
 			// use at most one per node.
 			// TODO(roberthbailey): Use the "preferred" address for the node, once
 			// such a thing is defined (#2462).
-			if addr.Type == api.NodeExternalIP {
-				hosts = append(hosts, addr.Address+":22")
+			if addr.Type == addrType {
+				hosts = append(hosts, addr.Address)
 				break
 			}
 		}
 	}
+	return hosts
+}
+
+// NodeSSHHosts returns SSH-able host names for all nodes. It returns an error
+// if it can't find an external IP for every node, though it still returns all
+// hosts that it found in that case.
+func NodeSSHHosts(c *client.Client) ([]string, error) {
+	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error getting nodes: %v", err)
+	}
+
+	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
+	hosts := NodeAddresses(nodelist, api.NodeExternalIP)
 
 	// Error if any node didn't have an external IP.
 	if len(hosts) != len(nodelist.Items) {
@@ -1914,46 +1996,56 @@ func NodeSSHHosts(c *client.Client) ([]string, error) {
 			"only found %d external IPs on nodes, but found %d nodes. Nodelist: %v",
 			len(hosts), len(nodelist.Items), nodelist)
 	}
-	return hosts, nil
+
+	sshHosts := make([]string, 0, len(hosts))
+	for _, h := range hosts {
+		sshHosts = append(sshHosts, net.JoinHostPort(h, "22"))
+	}
+	return sshHosts, nil
+}
+
+type SSHResult struct {
+	User   string
+	Host   string
+	Cmd    string
+	Stdout string
+	Stderr string
+	Code   int
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
-func SSH(cmd, host, provider string) (string, string, int, error) {
-	return sshCore(cmd, host, provider, false)
-}
+func SSH(cmd, host, provider string) (SSHResult, error) {
+	result := SSHResult{Host: host, Cmd: cmd}
 
-// SSHVerbose is just like SSH, but it logs the command, user, host, stdout,
-// stderr, exit code, and error.
-func SSHVerbose(cmd, host, provider string) (string, string, int, error) {
-	return sshCore(cmd, host, provider, true)
-}
-
-func sshCore(cmd, host, provider string, verbose bool) (string, string, int, error) {
 	// Get a signer for the provider.
 	signer, err := getSigner(provider)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
 	}
 
 	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
 	// defaulting here as well for logging clarity.
-	user := os.Getenv("KUBE_SSH_USER")
-	if user == "" {
-		user = os.Getenv("USER")
+	result.User = os.Getenv("KUBE_SSH_USER")
+	if result.User == "" {
+		result.User = os.Getenv("USER")
 	}
 
-	stdout, stderr, code, err := util.RunSSHCommand(cmd, user, host, signer)
-	if verbose {
-		remote := fmt.Sprintf("%s@%s", user, host)
-		Logf("[%s] Running    `%s`", remote, cmd)
-		Logf("[%s] stdout:    %q", remote, stdout)
-		Logf("[%s] stderr:    %q", remote, stderr)
-		Logf("[%s] exit code: %d", remote, code)
-		Logf("[%s] error:     %v", remote, err)
-	}
-	return stdout, stderr, code, err
+	stdout, stderr, code, err := util.RunSSHCommand(cmd, result.User, host, signer)
+	result.Stdout = stdout
+	result.Stderr = stderr
+	result.Code = code
+
+	return result, err
+}
+
+func LogSSHResult(result SSHResult) {
+	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
+	Logf("ssh %s: command:   %s", remote, result.Cmd)
+	Logf("ssh %s: stdout:    %q", remote, result.Stdout)
+	Logf("ssh %s: stderr:    %q", remote, result.Stderr)
+	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
 // NewHostExecPodSpec returns the pod spec of hostexec pod
@@ -1985,8 +2077,15 @@ func NewHostExecPodSpec(ns, name string) *api.Pod {
 
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
-func RunHostCmd(ns, name, cmd string) string {
-	return runKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+func RunHostCmd(ns, name, cmd string) (string, error) {
+	return runKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+}
+
+// RunHostCmdOrDie calls RunHostCmd and dies on error.
+func RunHostCmdOrDie(ns, name, cmd string) string {
+	stdout, err := RunHostCmd(ns, name, cmd)
+	expectNoError(err)
+	return stdout
 }
 
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
@@ -2171,9 +2270,30 @@ func restartKubeProxy(host string) error {
 	if !providerIs("gce", "gke", "aws") {
 		return fmt.Errorf("unsupported provider: %s", testContext.Provider)
 	}
-	_, _, code, err := SSH("sudo /etc/init.d/kube-proxy restart", host, testContext.Provider)
-	if err != nil || code != 0 {
-		return fmt.Errorf("couldn't restart kube-proxy: %v (code %v)", err, code)
+	// kubelet will restart the kube-proxy since it's running in a static pod
+	result, err := SSH("sudo pkill kube-proxy", host, testContext.Provider)
+	if err != nil || result.Code != 0 {
+		LogSSHResult(result)
+		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
+	}
+	// wait for kube-proxy to come back up
+	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		result, err := SSH("sudo /bin/sh -c 'pgrep kube-proxy | wc -l'", host, testContext.Provider)
+		if err != nil {
+			return false, err
+		}
+		if result.Code != 0 {
+			LogSSHResult(result)
+			return false, fmt.Errorf("failed to run command, exited %d", result.Code)
+		}
+		if result.Stdout == "0\n" {
+			return false, nil
+		}
+		Logf("kube-proxy is back up.")
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("kube-proxy didn't recover: %v", err)
 	}
 	return nil
 }
@@ -2189,9 +2309,10 @@ func restartApiserver() error {
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
-	_, _, code, err := SSH(command, getMasterHost()+":22", testContext.Provider)
-	if err != nil || code != 0 {
-		return fmt.Errorf("couldn't restart apiserver: %v (code %v)", err, code)
+	result, err := SSH(command, getMasterHost()+":22", testContext.Provider)
+	if err != nil || result.Code != 0 {
+		LogSSHResult(result)
+		return fmt.Errorf("couldn't restart apiserver: %v", err)
 	}
 	return nil
 }

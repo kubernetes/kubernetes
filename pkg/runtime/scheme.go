@@ -480,6 +480,10 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, ver
 	return s.raw.DecodeIntoWithSpecifiedVersionKind(data, obj, version, kind)
 }
 
+func (s *Scheme) DecodeParametersInto(parameters url.Values, obj Object) error {
+	return s.raw.DecodeParametersInto(parameters, obj)
+}
+
 // Copy does a deep copy of an API object.  Useful mostly for tests.
 func (s *Scheme) Copy(src Object) (Object, error) {
 	dst, err := s.raw.DeepCopy(src)

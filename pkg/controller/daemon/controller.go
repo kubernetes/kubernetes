@@ -352,27 +352,13 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 		glog.Errorf("Couldn't get list of nodes when syncing daemon set %+v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
-	for i, node := range nodeList.Items {
-		// Check if the node satisfies the daemon set's node selector.
-		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-		shouldRun := nodeSelector.Matches(labels.Set(nodeList.Items[i].Labels))
-		// If the daemon set specifies a node name, check that it matches with nodeName.
-		nodeName := nodeList.Items[i].Name
-		shouldRun = shouldRun && (ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == nodeName)
+	for _, node := range nodeList.Items {
+		shouldRun := nodeShouldRunDaemonPod(&node, ds)
+		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
-		// If the node is not ready, don't run on it.
-		// TODO(mikedanese): remove this once daemonpods forgive nodes
-		shouldRun = shouldRun && api.IsNodeReady(&node)
-
-		// If the node is unschedulable, don't run it
-		// TODO(mikedanese): remove this once we have the right node admitance levels.
-		// See https://github.com/kubernetes/kubernetes/issues/17297#issuecomment-156857375.
-		shouldRun = shouldRun && !node.Spec.Unschedulable
-
-		daemonPods, isRunning := nodeToDaemonPods[nodeName]
 		if shouldRun && !isRunning {
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
-			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodeName)
+			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
 		} else if shouldRun && len(daemonPods) > 1 {
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
@@ -455,10 +441,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int
 	for _, node := range nodeList.Items {
-		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-		nameMatch := ds.Spec.Template.Name == "" || ds.Spec.Template.Name == node.Name
-		labelMatch := nodeSelector.Matches(labels.Set(node.Labels))
-		shouldRun := nameMatch && labelMatch
+		shouldRun := nodeShouldRunDaemonPod(&node, ds)
 
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 
@@ -521,6 +504,25 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	dsc.updateDaemonSetStatus(ds)
 	return nil
+}
+
+func nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
+	// Check if the node satisfies the daemon set's node selector.
+	nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
+	shouldRun := nodeSelector.Matches(labels.Set(node.Labels))
+	// If the daemon set specifies a node name, check that it matches with node.Name.
+	shouldRun = shouldRun && (ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name)
+
+	// If the node is not ready, don't run on it.
+	// TODO(mikedanese): remove this once daemonpods forgive nodes
+	shouldRun = shouldRun && api.IsNodeReady(node)
+
+	// If the node is unschedulable, don't run it
+	// TODO(mikedanese): remove this once we have the right node admitance levels.
+	// See https://github.com/kubernetes/kubernetes/issues/17297#issuecomment-156857375.
+	shouldRun = shouldRun && !node.Spec.Unschedulable
+
+	return shouldRun
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

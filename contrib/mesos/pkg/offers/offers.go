@@ -242,7 +242,7 @@ func (s *offerStorage) Add(offers []*mesos.Offer) {
 			offerId := offer.Id.GetValue()
 			log.V(3).Infof("Declining incompatible offer %v", offerId)
 			s.declineOffer(offerId, offer.GetHostname(), metrics.OfferCompat)
-			return
+			continue
 		}
 		timed := &liveOffer{
 			Offer:      offer,

@@ -12,8 +12,17 @@
               "/hyperkube",
               "controller-manager",
               "--master=127.0.0.1:8080",
+              "--min-resync-period=3m",
+              "--service-account-private-key-file=/srv/kubernetes/server.key",
+              "--root-ca-file=/srv/kubernetes/ca.crt",
               "--v=2"
-        ]
+        ],
+      "volumeMounts": [
+        {
+          "name": "data",
+          "mountPath": "/srv/kubernetes"
+        }
+      ]
     },
     {
       "name": "apiserver",
@@ -25,8 +34,22 @@
               "--address=127.0.0.1",
               "--etcd-servers=http://127.0.0.1:4001",
               "--cluster-name=kubernetes",
-              "--v=2"
-        ]
+              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ResourceQuota",
+              "--client-ca-file=/srv/kubernetes/ca.crt",
+              "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
+              "--min-request-timeout=300",
+              "--tls-cert-file=/srv/kubernetes/server.cert",
+              "--tls-private-key-file=/srv/kubernetes/server.key",
+              "--token-auth-file=/srv/kubernetes/known_tokens.csv",
+              "--allow-privileged=True",
+              "--v=4"
+        ],
+      "volumeMounts": [
+        {
+          "name": "data",
+          "mountPath": "/srv/kubernetes"
+        }
+      ]
     },
     {
       "name": "scheduler",
@@ -37,6 +60,25 @@
               "--master=127.0.0.1:8080",
               "--v=2"
         ]
+    },
+    {
+      "name": "setup",
+      "image": "gcr.io/google_containers/hyperkube:VERSION",
+      "command": [
+              "/setup-files.sh"
+      ],
+      "volumeMounts": [
+        {
+          "name": "data",
+          "mountPath": "/data"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "data",
+      "emptyDir": {}
     }
   ]
  }

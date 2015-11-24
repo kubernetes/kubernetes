@@ -355,14 +355,14 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName string, pod *a
 
 	glog.V(4).Infof("Container inspect result: %+v", *inspectResult)
 
-	var restartCount int
-	if restartCount, err = getRestartCountFromLabel(inspectResult.Config.Labels); err != nil {
-		glog.Errorf("Get restart count error for container %v: %v", dockerID, err)
+	var containerInfo *labelledContainerInfo
+	if containerInfo, err = getContainerInfoFromLabel(inspectResult.Config.Labels); err != nil {
+		glog.Errorf("Get labelled container info error for container %v: %v", dockerID, err)
 	}
 
 	result.status = api.ContainerStatus{
 		Name:         containerName,
-		RestartCount: restartCount,
+		RestartCount: containerInfo.RestartCount,
 		Image:        inspectResult.Config.Image,
 		ImageID:      DockerPrefix + inspectResult.Image,
 		ContainerID:  DockerPrefix + dockerID,
@@ -406,7 +406,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName string, pod *a
 			FinishedAt:  finishedAt,
 			ContainerID: DockerPrefix + dockerID,
 		}
-		terminationMessagePath := getTerminationMessagePathFromLabel(inspectResult.Config.Labels)
+		terminationMessagePath := containerInfo.TerminationMessagePath
 		if terminationMessagePath != "" {
 			path, found := inspectResult.Volumes[terminationMessagePath]
 			if found {
@@ -2094,4 +2094,12 @@ func (dm *DockerManager) GetNetNs(containerID kubecontainer.ContainerID) (string
 // Garbage collection of dead containers
 func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
 	return dm.containerGC.GarbageCollect(gcPolicy)
+}
+
+func (dm *DockerManager) GetRawPodStatus(uid types.UID, name, namespace string) (*kubecontainer.RawPodStatus, error) {
+	return nil, fmt.Errorf("Not implemented yet")
+}
+
+func (dm *DockerManager) ConvertRawToPodStatus(_ *api.Pod, _ *kubecontainer.RawPodStatus) (*api.PodStatus, error) {
+	return nil, fmt.Errorf("Not implemented yet")
 }

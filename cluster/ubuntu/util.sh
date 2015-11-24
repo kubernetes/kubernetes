@@ -188,8 +188,8 @@ function create-etcd-opts() {
   cat <<EOF > ~/kube/default/etcd
 ETCD_OPTS="\
  -name infra\
- -listen-client-urls http://0.0.0.0:4001\
- -advertise-client-urls http://127.0.0.1:4001"
+ -listen-client-urls http://127.0.0.1:4001,http://${1}:4001\
+ -advertise-client-urls http://${1}:4001"
 EOF
 }
 
@@ -379,7 +379,7 @@ function provision-master() {
     source ~/kube/util.sh
 
     setClusterInfo
-    create-etcd-opts
+    create-etcd-opts '${MASTER_IP}'
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
@@ -393,7 +393,7 @@ function provision-master() {
       cp ~/kube/init_scripts/* /etc/init.d/
       
       groupadd -f -r kube-cert
-      \"${PROXY_SETTING}\" ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
@@ -481,7 +481,7 @@ function provision-masterandnode() {
     source ~/kube/util.sh
      
     setClusterInfo
-    create-etcd-opts
+    create-etcd-opts '${MASTER_IP}'
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
@@ -502,7 +502,7 @@ function provision-masterandnode() {
       cp ~/kube/init_scripts/* /etc/init.d/
       
       groupadd -f -r kube-cert
-      \"${PROXY_SETTING}\" ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/ 
       cp ~/kube/master/* /opt/bin/
       cp ~/kube/minion/* /opt/bin/
@@ -515,6 +515,20 @@ function provision-masterandnode() {
   }    
 }
 
+# check whether kubelet has torn down all of the pods
+function check-pods-torn-down() {
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local attempt=0
+  while [[ ! -z "$(kubectl get pods | tail -n +2)" ]]; do
+    if (( attempt > 120 )); then
+      echo "timeout waiting for tearing down pods" >> ~/kube/err.log
+    fi
+    echo "waiting for tearing down pods"
+    attempt=$((attempt+1))
+    sleep 5
+  done
+}
+
 # Delete a kubernetes cluster
 function kube-down() {
   
@@ -523,7 +537,8 @@ function kube-down() {
   source "${KUBE_ROOT}/cluster/common.sh"
 
   tear_down_alive_resources
-
+  check-pods-torn-down 
+  
   local ii=0
   for i in ${nodes}; do
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
@@ -543,12 +558,18 @@ function kube-down() {
             rm -rf /srv/kubernetes
             '
         " || echo "Cleaning on master ${i#*@} failed"
+
+        if [[ "${roles[${ii}]}" == "ai" ]]; then
+          ssh $SSH_OPTS -t "$i" "sudo rm -rf /var/lib/kubelet"
+        fi
+        
       elif [[ "${roles[${ii}]}" == "i" ]]; then
         echo "Cleaning on node ${i#*@}"
         ssh $SSH_OPTS -t "$i" "
           pgrep flanneld && \
           sudo -p '[sudo] password to stop node: ' -- /bin/bash -c '
-            service flanneld stop            
+            service flanneld stop
+            rm -rf /var/lib/kubelet            
             '
           " || echo "Cleaning on node ${i#*@} failed"
       else
@@ -567,10 +588,8 @@ function kube-down() {
           /etc/default/flanneld
         
         rm -rf ~/kube
-        rm -rf /var/lib/kubelet 
         rm -f /run/flannel/subnet.env
       '" || echo "cleaning legacy files on ${i#*@} failed"
-
     ((ii=ii+1))
   done
 }

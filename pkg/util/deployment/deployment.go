@@ -43,13 +43,13 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
+	newRCTemplate := GetNewRCTemplate(deployment)
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rc := range rcList.Items {
 			rcLabelsSelector := labels.SelectorFromSet(rc.Spec.Selector)
 			if rcLabelsSelector.Matches(podLabelsSelector) {
 				// Filter out RC that has the same pod template spec as the deployment - that is the new RC.
-				newRCTemplate := GetNewRCTemplate(deployment)
 				if api.Semantic.DeepEqual(rc.Spec.Template, &newRCTemplate) {
 					continue
 				}

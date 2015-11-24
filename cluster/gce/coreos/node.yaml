@@ -75,10 +75,13 @@ coreos:
         [Service]
         Type=oneshot
         RemainAfterExit=yes
-        ExecStart=/usr/bin/curl --fail --silent --show-error \
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error \
         -H "X-Google-Metadata-Request: True" \
-        -o /etc/kube-env \
+        -o /etc/kube-env.yaml \
         http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+        # Transform the yaml to env file.
+        ExecStartPre=/usr/bin/cp /etc/kube-env.yaml /etc/kube-env
+        ExecStart=/usr/bin/sed -i "s/: '/=/;s/'$//" /etc/kube-env
 
     - name: kubernetes-install-rkt.service
       command: start
@@ -145,16 +148,19 @@ coreos:
         ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/run/setup-auth.sh
         ExecStart=/opt/kubernetes/server/bin/kubelet \
-        --api-servers=https://${KUBERNETES_MASTER_NAME}.c.${PROJECT_ID}.internal \
+        --api-servers=https://${INSTANCE_PREFIX}-master \
+        --enable-debugging-handlers=true \
+        --cloud-provider=gce \
         --config=/etc/kubernetes/manifests \
-        --allow-privileged=False \
+        --allow-privileged=true \
         --v=2 \
-        --cluster-dns=10.0.0.10 \
-        --cluster-domain=cluster.local \
+        --cluster-dns=${DNS_SERVER_IP} \
+        --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
         --rkt-path=/opt/rkt/rkt/rkt \
-        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0}
+        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
+        --pod-cidr=${MASTER_IP_RANGE} \
         Restart=always
         RestartSec=10
 

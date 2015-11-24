@@ -42,18 +42,18 @@ var _ = Describe("Horizontal pod autoscaling", func() {
 	titleDown := "%s should scale from 5 pods to 3 pods and from 3 to 1 (via %s, with scale resource: CPU)"
 
 	// CPU tests via deployments
-	It(fmt.Sprintf(titleUp, "[Autoscaling Suite]", kindDeployment), func() {
+	It(fmt.Sprintf(titleUp, "[Skipped]", kindDeployment), func() {
 		scaleUp("deployment", kindDeployment, rc, f)
 	})
-	It(fmt.Sprintf(titleDown, "[Autoscaling Suite]", kindDeployment), func() {
+	It(fmt.Sprintf(titleDown, "[Skipped]", kindDeployment), func() {
 		scaleDown("deployment", kindDeployment, rc, f)
 	})
 
 	// CPU tests via replication controllers
-	It(fmt.Sprintf(titleUp, "[Autoscaling Suite]", kindRC), func() {
+	It(fmt.Sprintf(titleUp, "[Skipped][Autoscaling Suite]", kindRC), func() {
 		scaleUp("rc", kindRC, rc, f)
 	})
-	It(fmt.Sprintf(titleDown, "[Autoscaling Suite]", kindRC), func() {
+	It(fmt.Sprintf(titleDown, "[Skipped][Autoscaling Suite]", kindRC), func() {
 		scaleDown("rc", kindRC, rc, f)
 	})
 })

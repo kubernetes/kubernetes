@@ -231,12 +231,12 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
-	meta, err := meta.Accessor(list)
+	metaInterface, err := meta.Accessor(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v", r.name, list)
 	}
-	resourceVersion = meta.ResourceVersion()
-	items, err := runtime.ExtractList(list)
+	resourceVersion = metaInterface.ResourceVersion()
+	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
 	}

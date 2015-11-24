@@ -61,8 +61,8 @@ func TestMaxInFlight(t *testing.T) {
 	const Iterations = 3
 	block := sync.WaitGroup{}
 	block.Add(1)
-	oneFinished := sync.WaitGroup{}
-	oneFinished.Add(1)
+	oneAccountedFinished := sync.WaitGroup{}
+	oneAccountedFinished.Add(1)
 	var once sync.Once
 	sem := make(chan bool, Iterations)
 
@@ -88,15 +88,14 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
-			once.Do(oneFinished.Done)
 		}()
 	}
 
+	// These should hang, but not affect accounting.
 	for i := 0; i < Iterations; i++ {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL+"/proxy/foo/bar", http.StatusOK, t)
-			once.Do(oneFinished.Done)
 		}()
 	}
 	expectHTTP(server.URL+"/dontwait", http.StatusOK, t)
@@ -105,7 +104,7 @@ func TestMaxInFlight(t *testing.T) {
 		// These should hang waiting on block...
 		go func() {
 			expectHTTP(server.URL, http.StatusOK, t)
-			once.Do(oneFinished.Done)
+			once.Do(oneAccountedFinished.Done)
 		}()
 	}
 	calls.Wait()
@@ -123,7 +122,7 @@ func TestMaxInFlight(t *testing.T) {
 
 	// Show that we recover from being blocked up.
 	// However, we should until at least one of the requests really finishes.
-	oneFinished.Wait()
+	oneAccountedFinished.Wait()
 	expectHTTP(server.URL, http.StatusOK, t)
 }
 
@@ -222,7 +221,9 @@ func TestGetAPIRequestInfo(t *testing.T) {
 
 		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{"HEAD", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1/pods", "list", "api", "", "v1", api.NamespaceAll, "pods", "", "", []string{"pods"}},
+		{"HEAD", "/api/v1/pods", "list", "api", "", "v1", api.NamespaceAll, "pods", "", "", []string{"pods"}},
 		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 

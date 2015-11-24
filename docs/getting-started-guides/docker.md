@@ -35,7 +35,7 @@ Running Kubernetes locally via Docker
 
 **Table of Contents**
 
-- [Overview](#setting-up-a-cluster)
+- [Overview](#overview)
 - [Prerequisites](#prerequisites)
 - [Step One: Run etcd](#step-one-run-etcd)
 - [Step Two: Run the master](#step-two-run-the-master)
@@ -84,12 +84,12 @@ parameters as follows:
     ```
 
 4. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
-   a value such as "1.0.7".
+   a value such as "1.1.1".
 
 ### Step One: Run etcd
 
 ```sh
-docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --listen-client-urls=http://127.0.0.1:4001 --advertise-client-urls=http://127.0.0.1:4001 --data-dir=/var/etcd/data
 ```
 
 ### Step Two: Run the master
@@ -124,8 +124,8 @@ At this point you should have a running Kubernetes cluster.  You can test this
 by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
 following links) and make it available by editing your PATH environment
 variable.
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/linux/amd64/kubectl))
 
 For example, OS X:
 

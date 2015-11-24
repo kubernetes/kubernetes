@@ -288,19 +288,26 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 // syncBatch syncs pods statuses with the apiserver.
 func (m *manager) syncBatch() {
 	var updatedStatuses []podStatusSyncRequest
+	podToMirror, mirrorToPod := m.podManager.GetUIDTranslations()
 	func() { // Critical section
 		m.podStatusesLock.RLock()
 		defer m.podStatusesLock.RUnlock()
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
-			if _, ok := m.podStatuses[uid]; !ok {
+			_, hasPod := m.podStatuses[uid]
+			_, hasMirror := podToMirror[uid]
+			if !hasPod && !hasMirror {
 				delete(m.apiStatusVersions, uid)
 			}
 		}
 
 		for uid, status := range m.podStatuses {
-			if m.needsUpdate(uid, status) {
+			syncedUID := uid
+			if translated, ok := mirrorToPod[uid]; ok {
+				syncedUID = translated
+			}
+			if m.needsUpdate(syncedUID, status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
 			}
 		}
@@ -313,11 +320,6 @@ func (m *manager) syncBatch() {
 
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
-	if !m.needsUpdate(uid, status) {
-		glog.Warningf("Status is up-to-date; skipping: %q %+v", uid, status)
-		return
-	}
-
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
@@ -332,12 +334,16 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			m.deletePodStatus(uid)
 			return
 		}
+		if !m.needsUpdate(pod.UID, status) {
+			glog.Warningf("Status is up-to-date; skipping: %q %+v", uid, status)
+			return
+		}
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully", kubeletutil.FormatPodName(pod))
-			m.apiStatusVersions[uid] = status.version
+			m.apiStatusVersions[pod.UID] = status.version
 
 			if pod.DeletionTimestamp == nil {
 				return
