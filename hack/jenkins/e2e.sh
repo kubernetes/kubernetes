@@ -87,7 +87,7 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
-  : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
+  : ${NUM_NODES_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
 
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
   KUBERNETES_PROVIDER="gke"
@@ -96,7 +96,7 @@ elif [[ ${JOB_NAME} =~ ^kubernetes-.*-aws ]]; then
   KUBERNETES_PROVIDER="aws"
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-east-1a"}
-  : ${NUM_MINIONS_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
+  : ${NUM_NODES_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -354,7 +354,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins-pull"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
-    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
+    NUM_MINIONS=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs all non-flaky tests on GCE in parallel.
@@ -373,7 +373,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
-    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
+    NUM_MINIONS=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs all non-flaky tests on AWS in parallel.
@@ -390,7 +390,7 @@ case ${JOB_NAME} in
           )"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
-    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
+    NUM_MINIONS=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs the flaky tests on GCE in parallel.
@@ -409,7 +409,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     # Override GCE defaults.
-    NUM_MINIONS=${NUM_MINIONS_PARALLEL}
+    NUM_MINIONS=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs only the reboot tests on GCE.
@@ -1715,7 +1715,7 @@ fi
 ### Start Kubemark ###
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   export RUN_FROM_DISTRO=true
-  NUM_MINIONS_BKP=${NUM_MINIONS}
+  NUM_NODES_BKP=${NUM_MINIONS}
   MASTER_SIZE_BKP=${MASTER_SIZE}
   ./test/kubemark/stop-kubemark.sh
   NUM_MINIONS=${KUBEMARK_NUM_NODES:-$NUM_MINIONS}
@@ -1723,10 +1723,10 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="should\sallow\sstarting\s30\spods\sper\snode" --delete-namespace="false" --gather-resource-usage="false"
   ./test/kubemark/stop-kubemark.sh
-  NUM_MINIONS=${NUM_MINIONS_BKP}
+  NUM_MINIONS=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
   unset RUN_FROM_DISTRO
-  unset NUM_MINIONS_BKP
+  unset NUM_NODES_BKP
   unset MASTER_SIZE_BKP
 fi
 
