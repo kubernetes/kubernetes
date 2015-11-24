@@ -118,7 +118,6 @@ CURRENT_RELEASE_PUBLISHED_VERSION="ci/latest-1.1"
 
 # Specialized to skip when running reboot tests.
 REBOOT_SKIP_TESTS=(
-    "\[Skipped\]"
     "Restart\sshould\srestart\sall\snodes"
     "\[Example\]"
     )
@@ -126,6 +125,7 @@ REBOOT_SKIP_TESTS=(
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
+    "\[Skipped\]"
     "Reboot"
     "ServiceLoadBalancer"
     )
@@ -650,6 +650,7 @@ case ${JOB_NAME} in
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
+          # This test is not disruptive, however there is no better suite to run it.
           "\[Autoscaling\]\sReplicationController" \
           "GCE\sL7\sLoadBalancer\sController"
           )"}
@@ -753,6 +754,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          "\[Skipped\]" \
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
