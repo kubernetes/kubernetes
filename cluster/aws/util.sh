@@ -79,7 +79,7 @@ if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
 fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
-MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
+NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
@@ -228,13 +228,13 @@ function detect-security-groups {
       echo "Using master security group: ${MASTER_SG_NAME} ${MASTER_SG_ID}"
     fi
   fi
-  if [[ -z "${MINION_SG_ID-}" ]]; then
-    MINION_SG_ID=$(get_security_group_id "${MINION_SG_NAME}")
-    if [[ -z "${MINION_SG_ID}" ]]; then
+  if [[ -z "${NODE_SG_ID-}" ]]; then
+    NODE_SG_ID=$(get_security_group_id "${NODE_SG_NAME}")
+    if [[ -z "${NODE_SG_ID}" ]]; then
       echo "Could not detect Kubernetes minion security group.  Make sure you've launched a cluster with 'kube-up.sh'"
       exit 1
     else
-      echo "Using minion security group: ${MINION_SG_NAME} ${MINION_SG_ID}"
+      echo "Using minion security group: ${NODE_SG_NAME} ${NODE_SG_ID}"
     fi
   fi
 }
@@ -768,10 +768,10 @@ function kube-up {
     echo "Creating master security group."
     create-security-group "${MASTER_SG_NAME}" "Kubernetes security group applied to master nodes"
   fi
-  MINION_SG_ID=$(get_security_group_id "${MINION_SG_NAME}")
-  if [[ -z "${MINION_SG_ID}" ]]; then
+  NODE_SG_ID=$(get_security_group_id "${NODE_SG_NAME}")
+  if [[ -z "${NODE_SG_ID}" ]]; then
     echo "Creating minion security group."
-    create-security-group "${MINION_SG_NAME}" "Kubernetes security group applied to minion nodes"
+    create-security-group "${NODE_SG_NAME}" "Kubernetes security group applied to minion nodes"
   fi
 
   detect-security-groups
@@ -780,17 +780,17 @@ function kube-up {
   authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
   # Minions can talk to minions
-  authorize-security-group-ingress "${MINION_SG_ID}" "--source-group ${MINION_SG_ID} --protocol all"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--source-group ${NODE_SG_ID} --protocol all"
 
   # Masters and minions can talk to each other
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MINION_SG_ID} --protocol all"
-  authorize-security-group-ingress "${MINION_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${NODE_SG_ID} --protocol all"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
   # TODO(justinsb): Would be fairly easy to replace 0.0.0.0/0 in these rules
 
   # SSH is open to the world
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
 
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
@@ -1001,7 +1001,7 @@ function start-minions() {
       --iam-instance-profile ${IAM_PROFILE_NODE} \
       --instance-type $MINION_SIZE \
       --key-name ${AWS_SSH_KEY_NAME} \
-      --security-groups ${MINION_SG_ID} \
+      --security-groups ${NODE_SG_ID} \
       ${public_ip_option} \
       --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
       --user-data "file://${KUBE_TEMP}/minion-user-data"
@@ -1330,12 +1330,12 @@ function test-setup {
 
   # Open up port 80 & 8080 so common containers on minions can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 80 --cidr 0.0.0.0/0"
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 8080 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 80 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 8080 --cidr 0.0.0.0/0"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol all --port 30000-32767 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol all --port 30000-32767 --cidr 0.0.0.0/0"
 
   echo "test-setup complete"
 }
