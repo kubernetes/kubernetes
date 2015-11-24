@@ -302,14 +302,14 @@ type FakeRateLimiter struct {
 	acceptValues []bool
 }
 
-func (fr *FakeRateLimiter) CanAccept() bool {
+func (fr *FakeRateLimiter) TryAccept() bool {
 	return true
 }
 
 func (fr *FakeRateLimiter) Stop() {}
 
 func (fr *FakeRateLimiter) Accept() {
-	fr.acceptValues = append(fr.acceptValues, fr.r.CanAccept())
+	fr.acceptValues = append(fr.acceptValues, fr.r.TryAccept())
 }
 
 func TestSchedulerRateLimitsBinding(t *testing.T) {

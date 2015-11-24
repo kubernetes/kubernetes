@@ -24,28 +24,28 @@ import (
 func TestBasicThrottle(t *testing.T) {
 	r := NewTokenBucketRateLimiter(1, 3)
 	for i := 0; i < 3; i++ {
-		if !r.CanAccept() {
+		if !r.TryAccept() {
 			t.Error("unexpected false accept")
 		}
 	}
-	if r.CanAccept() {
+	if r.TryAccept() {
 		t.Error("unexpected true accept")
 	}
 }
 
 func TestIncrementThrottle(t *testing.T) {
 	r := NewTokenBucketRateLimiter(1, 1)
-	if !r.CanAccept() {
+	if !r.TryAccept() {
 		t.Error("unexpected false accept")
 	}
-	if r.CanAccept() {
+	if r.TryAccept() {
 		t.Error("unexpected true accept")
 	}
 
 	// Allow to refill
 	time.Sleep(2 * time.Second)
 
-	if !r.CanAccept() {
+	if !r.TryAccept() {
 		t.Error("unexpected false accept")
 	}
 }
