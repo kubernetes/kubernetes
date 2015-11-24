@@ -81,6 +81,60 @@ func init() {
 			*out = (*in).String()
 			return nil
 		},
+		func(in *string, out *unversioned.LabelSelector, s conversion.Scope) error {
+			selector, err := labels.Parse(*in)
+			if err != nil {
+				return err
+			}
+			*out = unversioned.LabelSelector{selector}
+			return nil
+		},
+		func(in *string, out *unversioned.FieldSelector, s conversion.Scope) error {
+			selector, err := fields.ParseSelector(*in)
+			if err != nil {
+				return err
+			}
+			*out = unversioned.FieldSelector{selector}
+			return nil
+		},
+		func(in *[]string, out *unversioned.LabelSelector, s conversion.Scope) error {
+			selectorString := ""
+			if len(*in) > 0 {
+				selectorString = (*in)[0]
+			}
+			selector, err := labels.Parse(selectorString)
+			if err != nil {
+				return err
+			}
+			*out = unversioned.LabelSelector{selector}
+			return nil
+		},
+		func(in *[]string, out *unversioned.FieldSelector, s conversion.Scope) error {
+			selectorString := ""
+			if len(*in) > 0 {
+				selectorString = (*in)[0]
+			}
+			selector, err := fields.ParseSelector(selectorString)
+			if err != nil {
+				return err
+			}
+			*out = unversioned.FieldSelector{selector}
+			return nil
+		},
+		func(in *unversioned.LabelSelector, out *string, s conversion.Scope) error {
+			if in.Selector == nil {
+				return nil
+			}
+			*out = in.Selector.String()
+			return nil
+		},
+		func(in *unversioned.FieldSelector, out *string, s conversion.Scope) error {
+			if in.Selector == nil {
+				return nil
+			}
+			*out = in.Selector.String()
+			return nil
+		},
 		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
 			// Cannot deep copy these, because inf.Dec has unexported fields.
 			*out = *in.Copy()

@@ -91,6 +91,13 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.LabelSelector, _ = labels.Parse("a=b")
 			j.FieldSelector, _ = fields.ParseSelector("a=b")
 		},
+		func(j *unversioned.ListOptions, c fuzz.Continue) {
+			// TODO: add some parsing
+			label, _ := labels.Parse("a=b")
+			j.LabelSelector = unversioned.LabelSelector{label}
+			field, _ := fields.ParseSelector("a=b")
+			j.FieldSelector = unversioned.FieldSelector{field}
+		},
 		func(s *api.PodSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			// has a default value
