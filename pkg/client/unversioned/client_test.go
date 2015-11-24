@@ -61,7 +61,6 @@ type testClient struct {
 	Response Response
 	Error    bool
 	Created  bool
-	Version  string
 	server   *httptest.Server
 	handler  *util.FakeHandler
 	// For query args, an optional function to validate the contents
@@ -80,24 +79,16 @@ func (c *testClient) Setup(t *testing.T) *testClient {
 	}
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
-		version := c.Version
-		if len(version) == 0 {
-			version = testapi.Default.Version()
-		}
 		c.Client = NewOrDie(&Config{
-			Host:    c.server.URL,
-			Version: version,
+			Host:         c.server.URL,
+			GroupVersion: testapi.Default.GroupVersion(),
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 		// We will fix this by supporting multiple group versions in Config
-		version = c.Version
-		if len(version) == 0 {
-			version = testapi.Extensions.Version()
-		}
 		c.ExtensionsClient = NewExtensionsOrDie(&Config{
-			Host:    c.server.URL,
-			Version: version,
+			Host:         c.server.URL,
+			GroupVersion: testapi.Extensions.GroupVersion(),
 		})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}

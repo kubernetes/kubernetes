@@ -149,7 +149,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 	windowsLineEndings := cmdutil.GetFlagBool(cmd, "windows-line-endings")
 	edit := editor.NewDefaultEditor()
-	defaultVersion := cmdutil.OutputVersion(cmd, clientConfig.Version)
+	defaultVersion := cmdutil.OutputVersionFromGroupVersion(cmd, clientConfig.GroupVersion)
 	results := editResults{}
 	for {
 		objs, err := resource.AsVersionedObjects(infos, defaultVersion)
