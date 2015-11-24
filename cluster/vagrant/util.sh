@@ -28,7 +28,7 @@ function detect-master () {
 # Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 function detect-minions {
   echo "Minions already detected" 1>&2
-  KUBE_NODE_IP_ADDRESSES=("${MINION_IPS[@]}")
+  KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
 
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
@@ -125,7 +125,7 @@ function create-provision-scripts {
     echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
     echo "MASTER_IP='${MASTER_IP}'"
     echo "MINION_NAMES=(${MINION_NAMES[@]})"
-    echo "MINION_IPS=(${MINION_IPS[@]})"
+    echo "NODE_IPS=(${NODE_IPS[@]})"
     echo "NODE_IP='${MASTER_IP}'"
     echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
     echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
@@ -170,10 +170,10 @@ function create-provision-scripts {
       echo "MASTER_IP='${MASTER_IP}'"
       echo "MINION_NAMES=(${MINION_NAMES[@]})"
       echo "MINION_NAME=(${MINION_NAMES[$i]})"
-      echo "MINION_IPS=(${MINION_IPS[@]})"
-      echo "MINION_IP='${MINION_IPS[$i]}'"
+      echo "NODE_IPS=(${NODE_IPS[@]})"
+      echo "NODE_IP='${NODE_IPS[$i]}'"
       echo "NODE_ID='$i'"
-      echo "NODE_IP='${MINION_IPS[$i]}'"
+      echo "NODE_IP='${NODE_IPS[$i]}'"
       echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
       echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
       echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
@@ -242,13 +242,13 @@ function verify-cluster {
 
   echo
   echo "Waiting for each minion to be registered with cloud provider"
-  for (( i=0; i<${#MINION_IPS[@]}; i++)); do
-    local machine="${MINION_IPS[$i]}"
+  for (( i=0; i<${#NODE_IPS[@]}; i++)); do
+    local machine="${NODE_IPS[$i]}"
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
       minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o go-template='{{range.items}}{{.metadata.name}}:{{end}}' --api-version=v1)
-      count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
+      count=$(echo $minions | grep -c "${NODE_IPS[i]}") || {
         printf "."
         sleep 2
         count="0"
@@ -339,7 +339,7 @@ function test-teardown {
 # Find the minion name based on the IP address
 function find-vagrant-name-by-ip {
   local ip="$1"
-  local ip_pattern="${MINION_IP_BASE}(.*)"
+  local ip_pattern="${NODE_IP_BASE}(.*)"
 
   # This is subtle.  We map 10.245.2.2 -> minion-1.  We do this by matching a
   # regexp and using the capture to construct the name.
