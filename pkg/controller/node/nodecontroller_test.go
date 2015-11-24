@@ -595,6 +595,157 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 }
 
+func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
+	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	table := []struct {
+		fakeNodeHandler         *FakeNodeHandler
+		timeToPass              time.Duration
+		newNodeStatus           api.NodeStatus
+		expectedPodStatusUpdate bool
+	}{
+		// Node created recently, without status.
+		// Expect no action from node controller (within startup grace period).
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: fakeNow,
+						},
+					},
+				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, with status updated recently.
+		// Expect no action from node controller (within monitor grace period).
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:   api.NodeReady,
+									Status: api.ConditionTrue,
+									// Node status has just been updated.
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+						},
+					},
+				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// Expect pods status updated and Unknown node status posted from node controller
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:   api.NodeReady,
+									Status: api.ConditionTrue,
+									// Node status hasn't been updated for 1hr.
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+								{
+									Type:   api.NodeOutOfDisk,
+									Status: api.ConditionFalse,
+									// Node status hasn't been updated for 1hr.
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+						},
+					},
+				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			timeToPass: 1 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionTrue,
+						// Node status hasn't been updated for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:   api.NodeOutOfDisk,
+						Status: api.ConditionFalse,
+						// Node status hasn't been updated for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			expectedPodStatusUpdate: true,
+		},
+	}
+
+	for i, item := range table {
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+		nodeController.now = func() unversioned.Time { return fakeNow }
+		if err := nodeController.monitorNodeStatus(); err != nil {
+			t.Errorf("Case[%d] unexpected error: %v", i, err)
+		}
+		if item.timeToPass > 0 {
+			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
+			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+			if err := nodeController.monitorNodeStatus(); err != nil {
+				t.Errorf("Case[%d] unexpected error: %v", i, err)
+			}
+		}
+
+		podStatusUpdated := false
+		for _, action := range item.fakeNodeHandler.Actions() {
+			if action.GetVerb() == "update" && action.GetResource() == "pods" && action.GetSubresource() == "status" {
+				podStatusUpdated = true
+			}
+		}
+		if podStatusUpdated != item.expectedPodStatusUpdate {
+			t.Errorf("Case[%d] expect pod status updated to be %v, but got %v", i, item.expectedPodStatusUpdate, podStatusUpdated)
+		}
+	}
+}
+
 func TestNodeDeletion(t *testing.T) {
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	fakeNodeHandler := &FakeNodeHandler{
@@ -831,7 +982,8 @@ func newNode(name string) *api.Node {
 }
 
 func newPod(name, host string) *api.Pod {
-	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{NodeName: host}}
+	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{NodeName: host},
+		Status: api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}}}
 }
 
 func contains(node *api.Node, nodes []*api.Node) bool {
