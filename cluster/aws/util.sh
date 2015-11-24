@@ -997,7 +997,7 @@ function start-minions() {
   fi
   ${AWS_ASG_CMD} create-launch-configuration \
       --launch-configuration-name ${ASG_NAME} \
-      --image-id $KUBE_MINION_IMAGE \
+      --image-id $KUBE_NODE_IMAGE \
       --iam-instance-profile ${IAM_PROFILE_NODE} \
       --instance-type $MINION_SIZE \
       --key-name ${AWS_SSH_KEY_NAME} \
