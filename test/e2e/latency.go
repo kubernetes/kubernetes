@@ -39,7 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[Performance] Latency [Skipped]", func() {
+var _ = Describe("Latency [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var additionalPodsPrefix string
