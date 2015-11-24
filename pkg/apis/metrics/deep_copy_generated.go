@@ -91,6 +91,16 @@ func deepCopy_metrics_AggregateSample(in AggregateSample, out *AggregateSample, 
 	} else {
 		out.Network = nil
 	}
+	if in.Filesystem != nil {
+		out.Filesystem = make([]FilesystemMetrics, len(in.Filesystem))
+		for i := range in.Filesystem {
+			if err := deepCopy_metrics_FilesystemMetrics(in.Filesystem[i], &out.Filesystem[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Filesystem = nil
+	}
 	return nil
 }
 
@@ -134,6 +144,16 @@ func deepCopy_metrics_ContainerSample(in ContainerSample, out *ContainerSample, 
 	} else {
 		out.Memory = nil
 	}
+	if in.Filesystem != nil {
+		out.Filesystem = make([]FilesystemMetrics, len(in.Filesystem))
+		for i := range in.Filesystem {
+			if err := deepCopy_metrics_FilesystemMetrics(in.Filesystem[i], &out.Filesystem[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Filesystem = nil
+	}
 	return nil
 }
 
@@ -166,6 +186,27 @@ func deepCopy_metrics_CustomMetricSample(in CustomMetricSample, out *CustomMetri
 	}
 	if err := deepCopy_resource_Quantity(in.Value, &out.Value, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func deepCopy_metrics_FilesystemMetrics(in FilesystemMetrics, out *FilesystemMetrics, c *conversion.Cloner) error {
+	out.Device = in.Device
+	if in.UsageBytes != nil {
+		out.UsageBytes = new(resource.Quantity)
+		if err := deepCopy_resource_Quantity(*in.UsageBytes, out.UsageBytes, c); err != nil {
+			return err
+		}
+	} else {
+		out.UsageBytes = nil
+	}
+	if in.LimitBytes != nil {
+		out.LimitBytes = new(resource.Quantity)
+		if err := deepCopy_resource_Quantity(*in.LimitBytes, out.LimitBytes, c); err != nil {
+			return err
+		}
+	} else {
+		out.LimitBytes = nil
 	}
 	return nil
 }
@@ -437,6 +478,7 @@ func init() {
 		deepCopy_metrics_ContainerSample,
 		deepCopy_metrics_CustomMetric,
 		deepCopy_metrics_CustomMetricSample,
+		deepCopy_metrics_FilesystemMetrics,
 		deepCopy_metrics_MemoryMetrics,
 		deepCopy_metrics_MetricsMeta,
 		deepCopy_metrics_NetworkMetrics,

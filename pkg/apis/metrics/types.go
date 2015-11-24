@@ -119,6 +119,8 @@ type AggregateSample struct {
 	Memory *MemoryMetrics `json:"memory,omitempty"`
 	// Metrics pertaining to network resources.
 	Network *NetworkMetrics `json:"network,omitempty"`
+	// Metrics pertaining to filesystem resources. Reported per-device.
+	Filesystem []FilesystemMetrics `json:"filesystem,omitempty" patchStrategy:"merge" patchMergeKey:"device"`
 }
 
 // PodSample contains a metric sample point of pod-level resources.
@@ -135,6 +137,8 @@ type ContainerSample struct {
 	CPU *CPUMetrics `json:"cpu,omitempty"`
 	// Metrics pertaining to memory (RAM) resources.
 	Memory *MemoryMetrics `json:"memory,omitempty"`
+	// Metrics pertaining to filesystem resources. Reported per-device.
+	Filesystem []FilesystemMetrics `json:"filesystem,omitempty" patchStrategy:"merge" patchMergeKey:"device"`
 }
 
 // NetworkMetrics contains data about network resources.
@@ -170,6 +174,16 @@ type MemoryMetrics struct {
 	PageFaults *int64 `json:"pageFaults,omitempty"`
 	// Cumulative number of major page faults.
 	MajorPageFaults *int64 `json:"majorPageFaults,omitempty"`
+}
+
+// FilesystemMetrics contains data about filesystem usage.
+type FilesystemMetrics struct {
+	// The block device name associated with the filesystem.
+	Device string `json:"device"`
+	// Number of bytes that is consumed by the container on this filesystem.
+	UsageBytes *resource.Quantity `json:"usageBytes,omitempty"`
+	// Number of bytes that can be consumed by the container on this filesystem.
+	LimitBytes *resource.Quantity `json:"limitBytes,omitempty"`
 }
 
 // CustomMetricType specifies the type of metric being exported.
