@@ -126,6 +126,7 @@ __custom_func() {
    * endpoints (aka 'ep')
    * quota
    * horizontalpodautoscalers (aka 'hpa')
+   * serviceaccounts
 `
 )
 
