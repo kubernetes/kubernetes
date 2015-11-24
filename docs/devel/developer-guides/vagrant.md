@@ -301,7 +301,7 @@ Congratulations!
 The following will run all of the end-to-end testing scenarios assuming you set your environment in `cluster/kube-env.sh`:
 
 ```sh
-NUM_MINIONS=3 hack/e2e-test.sh
+NUM_NODES=3 hack/e2e-test.sh
 ```
 
 ### Troubleshooting
@@ -350,10 +350,10 @@ Are you sure you built a release first? Did you install `net-tools`? For more cl
 
 #### I want to change the number of nodes!
 
-You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single node. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of nodes that are instantiated via the environment variable `NUM_NODES` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single node. You do this, by setting `NUM_NODES` to 1 like so:
 
 ```sh
-export NUM_MINIONS=1
+export NUM_NODES=1
 ```
 
 #### I want my VMs to have more memory!

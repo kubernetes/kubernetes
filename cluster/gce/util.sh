@@ -680,7 +680,7 @@ function kube-up {
       --project "${PROJECT}" \
       --zone "${ZONE}" \
       --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-      --size "${NUM_MINIONS}" \
+      --size "${NUM_NODES}" \
       --template "$template_name" || true;
   gcloud compute instance-groups managed wait-until-stable \
       "${NODE_INSTANCE_PREFIX}-group" \
@@ -1333,7 +1333,7 @@ KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
 ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
-NUM_MINIONS: $(yaml-quote ${NUM_MINIONS})
+NUM_NODES: $(yaml-quote ${NUM_NODES})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF

@@ -38,7 +38,7 @@ export MASTER_SIZE=c4.large
 export NODE_SIZE=r3.large
 ```
 
-If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_MINIONS}`.
+If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_NODES}`.
 In particular for clusters less than 50 nodes it will 
 use a `t2.micro` for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with greater than 150 nodes it will use a `t2.medium`.
 

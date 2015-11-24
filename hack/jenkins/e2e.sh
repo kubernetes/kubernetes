@@ -102,12 +102,12 @@ fi
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
   if [[ "${PERFORMANCE:-}" == "true" ]]; then
     : ${MASTER_SIZE:="m3.xlarge"}
-    : ${NUM_MINIONS:="100"}
+    : ${NUM_NODES:="100"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
   else
     : ${MASTER_SIZE:="m3.large"}
     : ${NODE_SIZE:="m3.large"}
-    : ${NUM_MINIONS:="3"}
+    : ${NUM_NODES:="3"}
   fi
 fi
 
@@ -354,7 +354,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins-pull"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
-    NUM_MINIONS=${NUM_NODES_PARALLEL}
+    NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs all non-flaky tests on GCE in parallel.
@@ -373,7 +373,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override GCE defaults
-    NUM_MINIONS=${NUM_NODES_PARALLEL}
+    NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs all non-flaky tests on AWS in parallel.
@@ -390,7 +390,7 @@ case ${JOB_NAME} in
           )"}
     : ${ENABLE_DEPLOYMENTS:=true}
     # Override AWS defaults.
-    NUM_MINIONS=${NUM_NODES_PARALLEL}
+    NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs the flaky tests on GCE in parallel.
@@ -409,7 +409,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     # Override GCE defaults.
-    NUM_MINIONS=${NUM_NODES_PARALLEL}
+    NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
   # Runs only the reboot tests on GCE.
@@ -432,7 +432,7 @@ case ${JOB_NAME} in
     MASTER_SIZE="n1-standard-4"
     NODE_SIZE="n1-standard-2"
     NODE_DISK_SIZE="50GB"
-    NUM_MINIONS="100"
+    NUM_NODES="100"
     # Reduce logs verbosity
     TEST_CLUSTER_LOG_LEVEL="--v=2"
     # Increase resync period to simulate production
@@ -454,7 +454,7 @@ case ${JOB_NAME} in
     MASTER_SIZE="n1-standard-4"
     NODE_SIZE="n1-standard-2"
     NODE_DISK_SIZE="50GB"
-    NUM_MINIONS="100"
+    NUM_NODES="100"
     # Reduce logs verbosity
     TEST_CLUSTER_LOG_LEVEL="--v=2"
     # Increase resync period to simulate production
@@ -1195,7 +1195,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="true"}
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   kubernetes-upgrade-gce-step2-upgrade-master)
@@ -1208,7 +1208,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
@@ -1230,7 +1230,7 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   kubernetes-upgrade-gce-step4-upgrade-cluster)
@@ -1243,7 +1243,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
@@ -1263,7 +1263,7 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   kubernetes-upgrade-gce-step6-e2e-new)
@@ -1282,7 +1282,7 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   # kubernetes-upgrade-gce-1.0-current-release
@@ -1305,7 +1305,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${E2E_DOWN:="false"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   kubernetes-upgrade-1.0-current-release-gce-step2-upgrade-master)
@@ -1321,7 +1321,7 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
@@ -1342,7 +1342,7 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   kubernetes-upgrade-1.0-current-release-gce-step4-upgrade-cluster)
@@ -1358,7 +1358,7 @@ case ${JOB_NAME} in
     : ${E2E_DOWN:="false"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
     ;;
@@ -1379,7 +1379,7 @@ case ${JOB_NAME} in
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   kubernetes-upgrade-1.0-current-release-gce-step6-e2e-new)
@@ -1400,7 +1400,7 @@ case ${JOB_NAME} in
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
-    : ${NUM_MINIONS:=5}
+    : ${NUM_NODES:=5}
     ;;
 
   # Run Kubemark test on a fake 100 node cluster to have a comparison
@@ -1415,7 +1415,7 @@ case ${JOB_NAME} in
     : ${USE_KUBEMARK:="true"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     KUBE_GCE_INSTANCE_PREFIX="kubemark100"
-    NUM_MINIONS="10"
+    NUM_NODES="10"
     MASTER_SIZE="n1-standard-2"
     NODE_SIZE="n1-standard-1"
     KUBEMARK_MASTER_SIZE="n1-standard-4"
@@ -1433,7 +1433,7 @@ case ${JOB_NAME} in
     : ${E2E_TEST:="false"}
     : ${USE_KUBEMARK:="true"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
-    NUM_MINIONS="6"
+    NUM_NODES="6"
     MASTER_SIZE="n1-standard-4"
     NODE_SIZE="n1-standard-8"
     KUBE_GCE_INSTANCE_PREFIX="kubemark500"
@@ -1453,10 +1453,10 @@ case ${JOB_NAME} in
     : ${USE_KUBEMARK:="true"}
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
-    NUM_MINIONS="11"
+    NUM_NODES="11"
     MASTER_SIZE="n1-standard-4"
     NODE_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
-    #                                     so NUM_MINIONS x cores_per_minion should
+    #                                     so NUM_NODES x cores_per_minion should
     #                                     be set accordingly.
     KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
     E2E_ZONE="asia-east1-a"
@@ -1502,7 +1502,7 @@ export KUBE_ENABLE_EXPERIMENTAL_API=${ENABLE_EXPERIMENTAL_API:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
 export NODE_SIZE=${NODE_SIZE:-}
 export NODE_DISK_SIZE=${NODE_DISK_SIZE:-}
-export NUM_MINIONS=${NUM_MINIONS:-}
+export NUM_NODES=${NUM_NODES:-}
 export TEST_CLUSTER_LOG_LEVEL=${TEST_CLUSTER_LOG_LEVEL:-}
 export TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:-}
 export PROJECT=${PROJECT:-}
@@ -1715,15 +1715,15 @@ fi
 ### Start Kubemark ###
 if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   export RUN_FROM_DISTRO=true
-  NUM_NODES_BKP=${NUM_MINIONS}
+  NUM_NODES_BKP=${NUM_NODES}
   MASTER_SIZE_BKP=${MASTER_SIZE}
   ./test/kubemark/stop-kubemark.sh
-  NUM_MINIONS=${KUBEMARK_NUM_NODES:-$NUM_MINIONS}
+  NUM_NODES=${KUBEMARK_NUM_NODES:-$NUM_NODES}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
   ./test/kubemark/start-kubemark.sh
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="should\sallow\sstarting\s30\spods\sper\snode" --delete-namespace="false" --gather-resource-usage="false"
   ./test/kubemark/stop-kubemark.sh
-  NUM_MINIONS=${NUM_NODES_BKP}
+  NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
   unset RUN_FROM_DISTRO
   unset NUM_NODES_BKP

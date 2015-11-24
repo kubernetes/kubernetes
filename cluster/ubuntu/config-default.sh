@@ -27,7 +27,7 @@ role=${role:-"ai i i"}
 export roles=($role)
 
 # Define minion numbers
-export NUM_MINIONS=${NUM_MINIONS:-3}
+export NUM_NODES=${NUM_NODES:-3}
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
 export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-192.168.3.0/24}  # formerly PORTAL_NET

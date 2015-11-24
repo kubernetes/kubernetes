@@ -83,7 +83,7 @@ You can override the variables defined in [config-default.sh](http://releases.k8
 
 ```bash
 export KUBE_AWS_ZONE=eu-west-1c
-export NUM_MINIONS=2
+export NUM_NODES=2
 export NODE_SIZE=m3.medium
 export AWS_S3_REGION=eu-west-1
 export AWS_S3_BUCKET=mycompany-kubernetes-artifacts
@@ -91,7 +91,7 @@ export INSTANCE_PREFIX=k8s
 ...
 ```
 
-The scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_MINIONS}`, in particular for clusters less than 50 nodes it will
+The scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_NODES}`, in particular for clusters less than 50 nodes it will
 use a `t2.micro` for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with greater than 150 nodes it will use a `t2.medium`.
 
 It will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".

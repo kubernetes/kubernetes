@@ -116,7 +116,7 @@ export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
 export role="ai i i"
 
-export NUM_MINIONS=${NUM_MINIONS:-3}
+export NUM_NODES=${NUM_NODES:-3}
 
 export SERVICE_CLUSTER_IP_RANGE=192.168.3.0/24
 
@@ -129,7 +129,7 @@ separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
 Then the `role` variable defines the role of above machine in the same order, "ai" stands for machine
 acts as both master and node, "a" stands for master, "i" stands for node.
 
-The `NUM_MINIONS` variable defines the total number of nodes.
+The `NUM_NODES` variable defines the total number of nodes.
 
 The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service IP range. Please make sure
 that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips.

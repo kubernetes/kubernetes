@@ -283,8 +283,8 @@ function kube-up {
 
   echo "Starting ${KUBERNETES_PROVIDER} cluster" 1>&2
   cluster::mesos::docker::docker_compose up -d
-  echo "Scaling ${KUBERNETES_PROVIDER} cluster to ${NUM_MINIONS} slaves"
-  cluster::mesos::docker::docker_compose scale mesosslave=${NUM_MINIONS}
+  echo "Scaling ${KUBERNETES_PROVIDER} cluster to ${NUM_NODES} slaves"
+  cluster::mesos::docker::docker_compose scale mesosslave=${NUM_NODES}
 
   # await-health-check requires GNU timeout
   # apiserver hostname resolved by docker

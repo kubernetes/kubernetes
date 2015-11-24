@@ -205,7 +205,7 @@ contexts:
 current-context: kubemark-context
 EOF
 
-sed "s/##numreplicas##/${NUM_MINIONS:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-node_template.json > ${KUBE_ROOT}/test/kubemark/hollow-node.json
+sed "s/##numreplicas##/${NUM_NODES:-10}/g" ${KUBE_ROOT}/test/kubemark/hollow-node_template.json > ${KUBE_ROOT}/test/kubemark/hollow-node.json
 sed -i'' -e "s/##project##/${PROJECT}/g" ${KUBE_ROOT}/test/kubemark/hollow-node.json
 kubectl create -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json
 kubectl create -f ${KUBECONFIG_SECRET} --namespace="kubemark"
@@ -215,7 +215,7 @@ rm ${KUBECONFIG_SECRET}
 
 echo "Waiting for all HollowNodes to become Running..."
 echo "This can loop forever if something crashed."
-until [[ "$(kubectl --kubeconfig=${KUBE_ROOT}/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_MINIONS}" ]]; do
+until [[ "$(kubectl --kubeconfig=${KUBE_ROOT}/test/kubemark/kubeconfig.loc get node | grep Ready | wc -l)" == "${NUM_NODES}" ]]; do
   echo -n .
   sleep 1
 done

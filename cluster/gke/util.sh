@@ -112,7 +112,7 @@ function verify-prereqs() {
 #   CLUSTER_NAME
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
-#   NUM_MINIONS
+#   NUM_NODES
 #   NODE_SCOPES
 #   MACHINE_TYPE
 function kube-up() {
@@ -143,7 +143,7 @@ function kube-up() {
   local create_args=(
     "--zone=${ZONE}"
     "--project=${PROJECT}"
-    "--num-nodes=${NUM_MINIONS}"
+    "--num-nodes=${NUM_NODES}"
     "--network=${NETWORK}"
     "--scopes=${NODE_SCOPES}"
     "--cluster-version=${CLUSTER_API_VERSION}"

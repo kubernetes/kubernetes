@@ -73,7 +73,7 @@ To start a Kubemark cluster on GCE you need to create an external cluster (it ca
 `make quick-release`) and run `test/kubemark/start-kubemark.sh` script. This script will create a VM for master components, Pods for HollowNodes and do all the setup necessary
 to let them talk to each other. It will use the configuration stored in `cluster/kubemark/config-default.sh` - you can tweak it however you want, but note that some features
 may not be implemented yet, as implementation of Hollow components/mocks will probably be lagging behind ‘real’ one. For performance tests interesting variables are
-`NUM_MINIONS` and `MASTER_SIZE`. After start-kubemark script is finished you’ll have a ready Kubemark cluster, a kubeconfig file for talking to the Kubemark
+`NUM_NODES` and `MASTER_SIZE`. After start-kubemark script is finished you’ll have a ready Kubemark cluster, a kubeconfig file for talking to the Kubemark
 cluster is stored in `test/kubemark/kubeconfig.loc`.
 
 Currently we're running HollowNode with limit of 0.05 a CPU core and ~60MB or memory, which taking into account default cluster addons and fluentD running on an 'external'
