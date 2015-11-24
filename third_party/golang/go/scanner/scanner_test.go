@@ -5,12 +5,13 @@
 package scanner
 
 import (
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 var fset = token.NewFileSet()

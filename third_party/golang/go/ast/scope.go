@@ -9,6 +9,7 @@ package ast
 import (
 	"bytes"
 	"fmt"
+
 	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
