@@ -53,11 +53,6 @@ var _ = Describe("Latency [Skipped]", func() {
 			c.Pods(ns).Delete(name, nil)
 		}
 
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
