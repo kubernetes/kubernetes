@@ -46,7 +46,7 @@ Please note: `kube-up` utilizes ephemeral storage available on instances for doc
 support ephemeral storage and will default to docker storage on the root disk which is usually only 8GB.
 EBS-only instance types include `t2`, `c4`, and `m4`.
 
-**KUBE_ENABLE_MINION_PUBLIC_IP**
+**KUBE_ENABLE_NODE_PUBLIC_IP**
 
 Should a public IP automatically assigned to the minions? "true" or "false"  
 Defaults to: "true"

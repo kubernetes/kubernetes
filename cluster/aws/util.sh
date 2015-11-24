@@ -609,9 +609,9 @@ function ensure-iam-profiles {
     echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
     create-iam-profile ${IAM_PROFILE_MASTER}
   }
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MINION} || {
-    echo "Creating minion IAM profile: ${IAM_PROFILE_MINION}"
-    create-iam-profile ${IAM_PROFILE_MINION}
+  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_NODE} || {
+    echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
+    create-iam-profile ${IAM_PROFILE_NODE}
   }
 }
 
@@ -998,7 +998,7 @@ function start-minions() {
   ${AWS_ASG_CMD} create-launch-configuration \
       --launch-configuration-name ${ASG_NAME} \
       --image-id $KUBE_MINION_IMAGE \
-      --iam-instance-profile ${IAM_PROFILE_MINION} \
+      --iam-instance-profile ${IAM_PROFILE_NODE} \
       --instance-type $MINION_SIZE \
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${MINION_SG_ID} \
