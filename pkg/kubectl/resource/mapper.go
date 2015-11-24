@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
@@ -48,8 +49,12 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
-	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredVersions)
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse group/version from %q: %v", version, err)
+	}
+	if ok := registered.IsRegisteredAPIGroupVersion(gv); !ok {
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredGroupVersions)
 	}
 	if kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)
