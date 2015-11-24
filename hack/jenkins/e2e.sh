@@ -641,7 +641,7 @@ case ${JOB_NAME} in
           ${TRUSTY_DEV_SKIP_TESTS[@]:+${TRUSTY_DEV_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
-    : ${PROJECT:="k8s-e2e-gce-trusty-dev"}
+    : ${PROJECT:="k8s-e2e-gce-trusty-dev2"}
     : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
