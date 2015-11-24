@@ -30,11 +30,41 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("metrics/v1alpha1",
-		&RawNode{},
-		&RawPod{},
+	api.Scheme.AddKnownTypes("",
+		&MetricsMeta{},
+		&RawNodeMetrics{},
+		&RawNodeMetricsList{},
+		&RawPodMetrics{},
+		&RawPodMetricsList{},
+		&RawContainerMetrics{},
+		&NonLocalObjectReference{},
+		&Sample{},
+		&AggregateSample{},
+		&PodSample{},
+		&ContainerSample{},
+		&NetworkMetrics{},
+		&CPUMetrics{},
+		&MemoryMetrics{},
+		&CustomMetric{},
+		&CustomMetricSample{},
+		&RawMetricsOptions{},
 	)
 }
 
-func (*RawNode) IsAnAPIObject() {}
-func (*RawPod) IsAnAPIObject()  {}
+func (*MetricsMeta) IsAnAPIObject()             {}
+func (*RawNodeMetrics) IsAnAPIObject()          {}
+func (*RawNodeMetricsList) IsAnAPIObject()      {}
+func (*RawPodMetrics) IsAnAPIObject()           {}
+func (*RawPodMetricsList) IsAnAPIObject()       {}
+func (*RawContainerMetrics) IsAnAPIObject()     {}
+func (*NonLocalObjectReference) IsAnAPIObject() {}
+func (*Sample) IsAnAPIObject()                  {}
+func (*AggregateSample) IsAnAPIObject()         {}
+func (*PodSample) IsAnAPIObject()               {}
+func (*ContainerSample) IsAnAPIObject()         {}
+func (*NetworkMetrics) IsAnAPIObject()          {}
+func (*CPUMetrics) IsAnAPIObject()              {}
+func (*MemoryMetrics) IsAnAPIObject()           {}
+func (*CustomMetric) IsAnAPIObject()            {}
+func (*CustomMetricSample) IsAnAPIObject()      {}
+func (*RawMetricsOptions) IsAnAPIObject()       {}
