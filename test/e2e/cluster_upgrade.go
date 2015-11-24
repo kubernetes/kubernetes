@@ -190,7 +190,7 @@ func nodeUpgradeGKE(v string) error {
 	return err
 }
 
-var _ = Describe("Skipped", func() {
+var _ = Describe("[Skipped]", func() {
 
 	Describe("Cluster upgrade", func() {
 		svcName, replicas := "baz", 2
