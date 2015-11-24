@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestGenerate(t *testing.T) {
@@ -622,6 +623,191 @@ func TestGeneratePod(t *testing.T) {
 		}
 		if !reflect.DeepEqual(obj.(*api.Pod), test.expected) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Pod))
+		}
+	}
+}
+
+func TestGenerateDeployment(t *testing.T) {
+	tests := []struct {
+		params    map[string]interface{}
+		expected  *extensions.Deployment
+		expectErr bool
+	}{
+		{
+			params: map[string]interface{}{
+				"labels":   "foo=bar,baz=blah",
+				"name":     "foo",
+				"replicas": "3",
+				"image":    "someimage",
+				"port":     "80",
+				"hostport": "80",
+				"stdin":    "true",
+				"command":  "true",
+				"args":     []string{"bar", "baz", "blah"},
+				"env":      []string{"a=b", "c=d"},
+				"requests": "cpu=100m,memory=100Mi",
+				"limits":   "cpu=400m,memory=200Mi",
+			},
+			expected: &extensions.Deployment{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: extensions.DeploymentSpec{
+					Replicas:       3,
+					Selector:       map[string]string{"foo": "bar", "baz": "blah"},
+					UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+					Template: api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"foo": "bar", "baz": "blah"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "foo",
+									Image: "someimage",
+									Stdin: true,
+									Ports: []api.ContainerPort{
+										{
+											ContainerPort: 80,
+											HostPort:      80,
+										},
+									},
+									Command: []string{"bar", "baz", "blah"},
+									Env: []api.EnvVar{
+										{
+											Name:  "a",
+											Value: "b",
+										},
+										{
+											Name:  "c",
+											Value: "d",
+										},
+									},
+									Resources: api.ResourceRequirements{
+										Requests: api.ResourceList{
+											api.ResourceCPU:    resource.MustParse("100m"),
+											api.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: api.ResourceList{
+											api.ResourceCPU:    resource.MustParse("400m"),
+											api.ResourceMemory: resource.MustParse("200Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	generator := DeploymentV1Beta1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*extensions.Deployment), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensions.Deployment))
+		}
+	}
+}
+
+func TestGenerateJob(t *testing.T) {
+	tests := []struct {
+		params    map[string]interface{}
+		expected  *extensions.Job
+		expectErr bool
+	}{
+		{
+			params: map[string]interface{}{
+				"labels":           "foo=bar,baz=blah",
+				"name":             "foo",
+				"image":            "someimage",
+				"port":             "80",
+				"hostport":         "80",
+				"stdin":            "true",
+				"leave-stdin-open": "true",
+				"command":          "true",
+				"args":             []string{"bar", "baz", "blah"},
+				"env":              []string{"a=b", "c=d"},
+				"requests":         "cpu=100m,memory=100Mi",
+				"limits":           "cpu=400m,memory=200Mi",
+				"restart":          "OnFailure",
+			},
+			expected: &extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: extensions.JobSpec{
+					Selector: &extensions.PodSelector{
+						MatchLabels: map[string]string{"foo": "bar", "baz": "blah"},
+					},
+					Template: api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"foo": "bar", "baz": "blah"},
+						},
+						Spec: api.PodSpec{
+							RestartPolicy: api.RestartPolicyOnFailure,
+							Containers: []api.Container{
+								{
+									Name:      "foo",
+									Image:     "someimage",
+									Stdin:     true,
+									StdinOnce: false,
+									Ports: []api.ContainerPort{
+										{
+											ContainerPort: 80,
+											HostPort:      80,
+										},
+									},
+									Command: []string{"bar", "baz", "blah"},
+									Env: []api.EnvVar{
+										{
+											Name:  "a",
+											Value: "b",
+										},
+										{
+											Name:  "c",
+											Value: "d",
+										},
+									},
+									Resources: api.ResourceRequirements{
+										Requests: api.ResourceList{
+											api.ResourceCPU:    resource.MustParse("100m"),
+											api.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: api.ResourceList{
+											api.ResourceCPU:    resource.MustParse("400m"),
+											api.ResourceMemory: resource.MustParse("200Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	generator := JobV1Beta1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*extensions.Job), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensions.Job))
 		}
 	}
 }

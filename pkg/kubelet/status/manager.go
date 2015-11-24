@@ -335,14 +335,14 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			return
 		}
 		if !m.needsUpdate(pod.UID, status) {
-			glog.Warningf("Status is up-to-date; skipping: %q %+v", uid, status)
+			glog.V(1).Infof("Status for pod %q is up-to-date; skipping", kubeletutil.FormatPodName(pod))
 			return
 		}
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully", kubeletutil.FormatPodName(pod))
+			glog.V(3).Infof("Status for pod %q updated successfully: %+v", kubeletutil.FormatPodName(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
 
 			if pod.DeletionTimestamp == nil {

@@ -105,7 +105,7 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
   if [[ "${PERFORMANCE:-}" == "true" ]]; then
     : ${MASTER_SIZE:="m3.xlarge"}
     : ${NUM_MINIONS:="100"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\ssuite\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
   else
     : ${MASTER_SIZE:="m3.large"}
     : ${MINION_SIZE:="m3.large"}
@@ -120,14 +120,14 @@ CURRENT_RELEASE_PUBLISHED_VERSION="ci/latest-1.1"
 
 # Specialized to skip when running reboot tests.
 REBOOT_SKIP_TESTS=(
-    "Skipped"
     "Restart\sshould\srestart\sall\snodes"
-    "Example"
+    "\[Example\]"
     )
 
 # Specialized tests which should be skipped by default for projects.
 GCE_DEFAULT_SKIP_TESTS=(
     "${REBOOT_SKIP_TESTS[@]}"
+    "\[Skipped\]"
     "Reboot"
     "ServiceLoadBalancer"
     )
@@ -298,7 +298,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-examples)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
     : ${E2E_NETWORK:="e2e-examples"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Example"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Example\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-examples"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
@@ -307,7 +307,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-autoscaling)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-autoscaling"}
     : ${E2E_NETWORK:="e2e-autoscaling"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Autoscaling\sSuite"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Autoscaling\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-autoscaling"}
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
@@ -432,7 +432,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-scalability)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability"}
     : ${E2E_NETWORK:="e2e-scalability"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
@@ -451,7 +451,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-scalability-1.1)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability-1.1"}
     : ${E2E_NETWORK:="e2e-scalability-1-1"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
     : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability-1-1"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="scalability-1.1"}
@@ -507,6 +507,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="soak-1.1"}
     : ${PROJECT:="kubernetes-jenkins"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs tests on GCE soak cluster for latest 1.1 ci release.
@@ -699,7 +700,8 @@ case ${JOB_NAME} in
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          "Autoscaling\sSuite.*via\sreplicationController" \
+          # This test is not disruptive, however there is no better suite to run it.
+          "\[Autoscaling\]\sReplicationController" \
           "GCE\sL7\sLoadBalancer\sController"
           )"}
     : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
@@ -802,6 +804,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          "\[Skipped\]" \
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
@@ -911,7 +914,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master"}
     ;;
 
   kubernetes-upgrade-gke-step3-e2e-old)
@@ -945,7 +948,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster"}
     ;;
 
   kubernetes-upgrade-gke-step5-e2e-old)
@@ -1026,7 +1029,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=release/latest"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=release/latest"}
     ;;
 
   kubernetes-upgrade-stable-latest-gke-step3-e2e-old)
@@ -1062,7 +1065,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=release/latest"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=release/latest"}
     ;;
 
   kubernetes-upgrade-stable-latest-gke-step5-e2e-old)
@@ -1141,7 +1144,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     ;;
 
   kubernetes-upgrade-1.0-current-release-gke-step3-e2e-old)
@@ -1177,7 +1180,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     ;;
 
   kubernetes-upgrade-1.0-current-release-gke-step5-e2e-old)
@@ -1253,7 +1256,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master"}
     : ${NUM_MINIONS:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
@@ -1288,7 +1291,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster"}
     : ${NUM_MINIONS:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
     : ${KUBE_ENABLE_DAEMONSETS:=true}
@@ -1365,7 +1368,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
@@ -1402,7 +1405,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     : ${E2E_TEST:="true"}
     : ${E2E_DOWN:="false"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${CURRENT_RELEASE_PUBLISHED_VERSION}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-upgrade-1-0"}
     : ${NUM_MINIONS:=5}
     : ${KUBE_ENABLE_DEPLOYMENTS:=true}
@@ -1734,9 +1737,11 @@ fi
 ### Set up ###
 if [[ "${E2E_UP,,}" == "true" ]]; then
     go run ./hack/e2e.go ${E2E_OPT} -v --down
-    if [[ "${gcp_list_resources}" == "true" ]]; then
-      ${gcp_list_resources_script} > "${gcp_resources_before}"
-    fi
+fi
+if [[ "${gcp_list_resources}" == "true" ]]; then
+  ${gcp_list_resources_script} > "${gcp_resources_before}"
+fi
+if [[ "${E2E_UP,,}" == "true" ]]; then
     go run ./hack/e2e.go ${E2E_OPT} -v --up
     go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
     if [[ "${gcp_list_resources}" == "true" ]]; then
@@ -1784,12 +1789,15 @@ if [[ "${E2E_DOWN,,}" == "true" ]]; then
     # for the wait between attempts.
     sleep 30
     go run ./hack/e2e.go ${E2E_OPT} -v --down
-    if [[ "${gcp_list_resources}" == "true" ]]; then
-      ${gcp_list_resources_script} > "${gcp_resources_after}"
-    fi
+fi
+if [[ "${gcp_list_resources}" == "true" ]]; then
+  ${gcp_list_resources_script} > "${gcp_resources_after}"
 fi
 
-if [[ -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
+# Compare resources if either the cluster was
+# * started and destroyed (normal e2e)
+# * neither started nor destroyed (soak test)
+if [[ "${E2E_UP:-}" == "${E2E_DOWN:-}" && -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
   if ! diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}" && [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-}" == "true" ]]; then
     echo "!!! FAIL: Google Cloud Platform resources leaked while running tests!"
     exit 1

@@ -83,5 +83,5 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 
 declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_MINIONS=4
-hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]'
+hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]' -ginkgo.skip='\[Skipped\]'
 exit $?

@@ -240,31 +240,24 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		versioned, err := scope.Creater.New(scope.ServerAPIVersion, "ListOptions")
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
-		}
-		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), versioned); err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
-		}
-		opts := api.ListOptions{}
-		if err := scope.Convertor.Convert(versioned, &opts); err != nil {
+		opts := unversioned.ListOptions{}
+		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &opts); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
 		// transform fields
-		// TODO: Should this be done as part of convertion?
-		fn := func(label, value string) (newLabel, newValue string, err error) {
-			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
-		}
-		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
-			// TODO: allow bad request to set field causes based on query parameters
-			err = errors.NewBadRequest(err.Error())
-			errorJSON(err, scope.Codec, w)
-			return
+		// TODO: DecodeParametersInto should do this.
+		if opts.FieldSelector.Selector != nil {
+			fn := func(label, value string) (newLabel, newValue string, err error) {
+				return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
+			}
+			if opts.FieldSelector.Selector, err = opts.FieldSelector.Selector.Transform(fn); err != nil {
+				// TODO: allow bad request to set field causes based on query parameters
+				err = errors.NewBadRequest(err.Error())
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		if hasName {
@@ -273,7 +266,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			// a request for a single object and optimize the
 			// storage query accordingly.
 			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
-			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
+			if opts.FieldSelector.Selector != nil && !opts.FieldSelector.Selector.Empty() {
 				// It doesn't make sense to ask for both a name
 				// and a field selector, since just the name is
 				// sufficient to narrow down the request to a
@@ -285,7 +278,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				)
 				return
 			}
-			opts.FieldSelector = nameSelector
+			opts.FieldSelector.Selector = nameSelector
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {

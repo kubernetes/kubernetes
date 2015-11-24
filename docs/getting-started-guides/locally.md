@@ -40,6 +40,7 @@ Getting started locally
     - [Docker](#docker)
     - [etcd](#etcd)
     - [go](#go)
+- [Clone the repository](#clone-the-repository)
 - [Starting the cluster](#starting-the-cluster)
 - [Running a container](#running-a-container)
 - [Running a user defined pod](#running-a-user-defined-pod)
@@ -70,6 +71,14 @@ You need an [etcd](https://github.com/coreos/etcd/releases) in your path, please
 #### go
 
 You need [go](https://golang.org/doc/install) at least 1.3+ in your path, please make sure it is installed and in your ``$PATH``.
+
+### Clone the repository
+
+In order to run kubernetes you must have the kubernetes code on the local machine. Cloning this repository is sufficient.
+
+```$ git clone --depth=1 https://github.com/kubernetes/kubernetes.git```
+
+The `--depth=1` parameter is optional and will ensure a smaller download.
 
 ### Starting the cluster
 

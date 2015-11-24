@@ -1210,5 +1210,5 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		}
 	}
 	baseURL.Path = testapi.Default.ResourcePath("", "", "")
-	return NewRESTClient(baseURL, testapi.Default.Version(), testapi.Default.Codec(), 0, 0)
+	return NewRESTClient(baseURL, testapi.Default.GroupVersion().String(), testapi.Default.Codec(), 0, 0)
 }

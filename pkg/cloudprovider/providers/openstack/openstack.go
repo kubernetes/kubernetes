@@ -17,12 +17,13 @@ limitations under the License.
 package openstack
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
-	ossys "os"
 	"regexp"
 	"strings"
 	"time"
@@ -47,6 +48,12 @@ import (
 )
 
 const ProviderName = "openstack"
+
+// metadataUrl is URL to OpenStack metadata server. It's hadrcoded IPv4
+// link-local address as documented in "OpenStack Cloud Administrator Guide",
+// chapter Compute - Networking with nova-network.
+// http://docs.openstack.org/admin-guide-cloud/compute-networking-nova.html#metadata-service
+const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
 
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
@@ -86,6 +93,8 @@ type OpenStack struct {
 	provider *gophercloud.ProviderClient
 	region   string
 	lbOpts   LoadBalancerOpts
+	// InstanceID of the server where this OpenStack object is instantiated.
+	localInstanceID string
 }
 
 type Config struct {
@@ -140,17 +149,89 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
+// parseMetadataUUID reads JSON from OpenStack metadata server and parses
+// instance ID out of it.
+func parseMetadataUUID(jsonData []byte) (string, error) {
+	// We should receive an object with { 'uuid': '<uuid>' } and couple of other
+	// properties (which we ignore).
+
+	obj := struct{ UUID string }{}
+	err := json.Unmarshal(jsonData, &obj)
+	if err != nil {
+		return "", err
+	}
+
+	uuid := obj.UUID
+	if uuid == "" {
+		err = fmt.Errorf("cannot parse OpenStack metadata, got empty uuid")
+		return "", err
+	}
+
+	return uuid, nil
+}
+
+func readInstanceID() (string, error) {
+	// Try to find instance ID on the local filesystem (created by cloud-init)
+	const instanceIDFile = "/var/lib/cloud/data/instance-id"
+	idBytes, err := ioutil.ReadFile(instanceIDFile)
+	if err == nil {
+		instanceID := string(idBytes)
+		instanceID = strings.TrimSpace(instanceID)
+		glog.V(3).Infof("Got instance id from %s: %s", instanceIDFile, instanceID)
+		if instanceID != "" {
+			return instanceID, nil
+		}
+		// Fall through with empty instanceID and try metadata server.
+	}
+	glog.V(5).Infof("Cannot read %s: '%v', trying metadata server", instanceIDFile, err)
+
+	// Try to get JSON from metdata server.
+	resp, err := http.Get(metadataUrl)
+	if err != nil {
+		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
+		return "", err
+	}
+
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("got unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
+		glog.V(3).Infof("%v", err)
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		glog.V(3).Infof("Cannot get HTTP response body from %s: %v", metadataUrl, err)
+		return "", err
+	}
+	instanceID, err := parseMetadataUUID(bodyBytes)
+	if err != nil {
+		glog.V(3).Infof("Cannot parse instance ID from metadata from %s: %v", metadataUrl, err)
+		return "", err
+	}
+
+	glog.V(3).Infof("Got instance id from %s: %s", metadataUrl, instanceID)
+	return instanceID, nil
+}
+
 func newOpenStack(cfg Config) (*OpenStack, error) {
 	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
 	if err != nil {
 		return nil, err
 	}
 
-	os := OpenStack{
-		provider: provider,
-		region:   cfg.Global.Region,
-		lbOpts:   cfg.LoadBalancer,
+	id, err := readInstanceID()
+	if err != nil {
+		return nil, err
 	}
+
+	os := OpenStack{
+		provider:        provider,
+		region:          cfg.Global.Region,
+		lbOpts:          cfg.LoadBalancer,
+		localInstanceID: id,
+	}
+
 	return &os, nil
 }
 
@@ -786,15 +867,10 @@ func (os *OpenStack) AttachDisk(diskName string) (string, error) {
 		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
 		return "", err
 	}
-	compute_id, err := os.getComputeIDbyHostname(cClient)
-	if err != nil || len(compute_id) == 0 {
-		glog.Errorf("Unable to get minion's id by minion's hostname")
-		return "", err
-	}
 
 	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil {
-		if compute_id == disk.Attachments[0]["server_id"] {
-			glog.V(4).Infof("Disk: %q is already attached to compute: %q", diskName, compute_id)
+		if os.localInstanceID == disk.Attachments[0]["server_id"] {
+			glog.V(4).Infof("Disk: %q is already attached to compute: %q", diskName, os.localInstanceID)
 			return disk.ID, nil
 		} else {
 			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
@@ -803,14 +879,14 @@ func (os *OpenStack) AttachDisk(diskName string) (string, error) {
 		}
 	}
 	// add read only flag here if possible spothanis
-	_, err = volumeattach.Create(cClient, compute_id, &volumeattach.CreateOpts{
+	_, err = volumeattach.Create(cClient, os.localInstanceID, &volumeattach.CreateOpts{
 		VolumeID: disk.ID,
 	}).Extract()
 	if err != nil {
-		glog.Errorf("Failed to attach %s volume to %s compute", diskName, compute_id)
+		glog.Errorf("Failed to attach %s volume to %s compute", diskName, os.localInstanceID)
 		return "", err
 	}
-	glog.V(2).Infof("Successfully attached %s volume to %s compute", diskName, compute_id)
+	glog.V(2).Infof("Successfully attached %s volume to %s compute", diskName, os.localInstanceID)
 	return disk.ID, nil
 }
 
@@ -827,22 +903,17 @@ func (os *OpenStack) DetachDisk(partialDiskId string) error {
 		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
 		return err
 	}
-	compute_id, err := os.getComputeIDbyHostname(cClient)
-	if err != nil || len(compute_id) == 0 {
-		glog.Errorf("Unable to get compute id while detaching disk")
-		return err
-	}
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && compute_id == disk.Attachments[0]["server_id"] {
+	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && os.localInstanceID == disk.Attachments[0]["server_id"] {
 		// This is a blocking call and effects kubelet's performance directly.
 		// We should consider kicking it out into a separate routine, if it is bad.
-		err = volumeattach.Delete(cClient, compute_id, disk.ID).ExtractErr()
+		err = volumeattach.Delete(cClient, os.localInstanceID, disk.ID).ExtractErr()
 		if err != nil {
-			glog.Errorf("Failed to delete volume %s from compute %s attached %v", disk.ID, compute_id, err)
+			glog.Errorf("Failed to delete volume %s from compute %s attached %v", disk.ID, os.localInstanceID, err)
 			return err
 		}
-		glog.V(2).Infof("Successfully detached volume: %s from compute: %s", disk.ID, compute_id)
+		glog.V(2).Infof("Successfully detached volume: %s from compute: %s", disk.ID, os.localInstanceID)
 	} else {
-		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", disk.Name, compute_id)
+		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", disk.Name, os.localInstanceID)
 		glog.Errorf(errMsg)
 		return errors.New(errMsg)
 	}
@@ -884,45 +955,4 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 		return volume, err
 	}
 	return volume, err
-}
-
-func (os *OpenStack) getComputeIDbyHostname(cClient *gophercloud.ServiceClient) (string, error) {
-
-	hostname, err := ossys.Hostname()
-
-	if err != nil {
-		glog.Errorf("Failed to get Minion's hostname: %v", err)
-		return "", err
-	}
-
-	i, ok := os.Instances()
-	if !ok {
-		glog.Errorf("Unable to get instances")
-		return "", errors.New("Unable to get instances")
-	}
-
-	srvs, err := i.List(".")
-	if err != nil {
-		glog.Errorf("Failed to list servers: %v", err)
-		return "", err
-	}
-
-	if len(srvs) == 0 {
-		glog.Errorf("Found no servers in the region")
-		return "", errors.New("Found no servers in the region")
-	}
-	glog.V(4).Infof("Found servers: %v", srvs)
-
-	for _, srvname := range srvs {
-		server, err := getServerByName(cClient, srvname)
-		if err != nil {
-			return "", err
-		} else {
-			if (server.Metadata["hostname"] != nil && server.Metadata["hostname"] == hostname) || (len(server.Name) > 0 && server.Name == hostname) {
-				glog.V(4).Infof("Found server: %s with host :%s", server.Name, hostname)
-				return server.ID, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("No server found matching hostname: %s", hostname)
 }

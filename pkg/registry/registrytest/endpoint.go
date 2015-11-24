@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -34,7 +35,7 @@ type EndpointRegistry struct {
 	lock sync.Mutex
 }
 
-func (e *EndpointRegistry) ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error) {
+func (e *EndpointRegistry) ListEndpoints(ctx api.Context, options *unversioned.ListOptions) (*api.EndpointsList, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -59,7 +60,7 @@ func (e *EndpointRegistry) GetEndpoints(ctx api.Context, name string) (*api.Endp
 	return nil, errors.NewNotFound("Endpoints", name)
 }
 
-func (e *EndpointRegistry) WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (e *EndpointRegistry) WatchEndpoints(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }
 

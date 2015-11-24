@@ -39,7 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[Performance Suite] Latency", func() {
+var _ = Describe("Latency [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var additionalPodsPrefix string
@@ -51,11 +51,6 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		for i := 1; i <= nodeCount; i++ {
 			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 			c.Pods(ns).Delete(name, nil)
-		}
-
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
 		}
 
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
@@ -100,8 +95,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		}
 	})
 
-	// Skipped to avoid running in e2e
-	It("[Skipped] pod start latency should be acceptable", func() {
+	It("pod start latency should be acceptable", func() {
 		runLatencyTest(nodeCount, c, ns)
 	})
 })

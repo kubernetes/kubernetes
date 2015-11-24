@@ -31,7 +31,7 @@ import (
 // Marked with [Skipped] to skip the test by default (see driver.go),
 // the test needs privileged containers, which are disabled by default.
 // Run the test with "go run hack/e2e.go ... --ginkgo.focus=PersistentVolume"
-var _ = Describe("[Skipped] persistentVolumes", func() {
+var _ = Describe("PersistentVolumes [Skipped]", func() {
 	framework := NewFramework("pv")
 	var c *client.Client
 	var ns string
@@ -41,7 +41,7 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 		ns = framework.Namespace.Name
 	})
 
-	It("PersistentVolume", func() {
+	It("NFS volume can be created, bound, retrieved, unbound, and used by a pod", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",

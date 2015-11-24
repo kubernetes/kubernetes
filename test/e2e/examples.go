@@ -36,18 +36,9 @@ import (
 const (
 	podListTimeout     = time.Minute
 	serverStartTimeout = podStartTimeout + 3*time.Minute
-	dnsReadyTimeout    = time.Minute
 )
 
-const queryDnsPythonTemplate string = `
-import socket
-try:
-	socket.gethostbyname('%s')
-	print 'ok'
-except:
-	print 'err'`
-
-var _ = Describe("Examples e2e", func() {
+var _ = Describe("[Example] [Skipped]", func() {
 	framework := NewFramework("examples")
 	var c *client.Client
 	var ns string
@@ -56,7 +47,7 @@ var _ = Describe("Examples e2e", func() {
 		ns = framework.Namespace.Name
 	})
 
-	Describe("[Skipped][Example]Redis", func() {
+	Describe("Redis", func() {
 		It("should create and stop redis servers", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/redis", file)
@@ -118,7 +109,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Celery-RabbitMQ", func() {
+	Describe("Celery-RabbitMQ", func() {
 		It("should create and stop celery+rabbitmq servers", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples", "celery-rabbitmq", file)
@@ -161,7 +152,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Spark", func() {
+	Describe("Spark", func() {
 		It("should start spark master, driver and workers", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples", "spark", file)
@@ -197,7 +188,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Cassandra", func() {
+	Describe("Cassandra", func() {
 		It("should create and scale cassandra", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples", "cassandra", file)
@@ -239,7 +230,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Storm", func() {
+	Describe("Storm", func() {
 		It("should create and stop Zookeeper, Nimbus and Storm worker servers", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples", "storm", file)
@@ -293,7 +284,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Liveness", func() {
+	Describe("Liveness", func() {
 		It("liveness pods should be automatically restarted", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "liveness", file)
@@ -325,7 +316,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Secret", func() {
+	Describe("Secret", func() {
 		It("should create a pod that reads a secret", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "secrets", file)
@@ -344,7 +335,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Downward API", func() {
+	Describe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "downward-api", file)
@@ -364,7 +355,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]RethinkDB", func() {
+	Describe("RethinkDB", func() {
 		It("should create and stop rethinkdb servers", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples", "rethinkdb", file)
@@ -406,7 +397,7 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
-	Describe("[Skipped][Example]Hazelcast", func() {
+	Describe("Hazelcast", func() {
 		It("should create and scale hazelcast", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples", "hazelcast", file)
@@ -436,113 +427,6 @@ var _ = Describe("Examples e2e", func() {
 			})
 		})
 	})
-
-	Describe("[Example]ClusterDns", func() {
-		It("should create pod that uses dns [Conformance]", func() {
-			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/cluster-dns", file)
-			}
-
-			// contrary to the example, this test does not use contexts, for simplicity
-			// namespaces are passed directly.
-			// Also, for simplicity, we don't use yamls with namespaces, but we
-			// create testing namespaces instead.
-
-			backendRcYaml := mkpath("dns-backend-rc.yaml")
-			backendRcName := "dns-backend"
-			backendSvcYaml := mkpath("dns-backend-service.yaml")
-			backendSvcName := "dns-backend"
-			backendPodName := "dns-backend"
-			frontendPodYaml := mkpath("dns-frontend-pod.yaml")
-			frontendPodName := "dns-frontend"
-			frontendPodContainerName := "dns-frontend"
-
-			podOutput := "Hello World!"
-
-			// we need two namespaces anyway, so let's forget about
-			// the one created in BeforeEach and create two new ones.
-			namespaces := []*api.Namespace{nil, nil}
-			for i := range namespaces {
-				var err error
-				namespaces[i], err = createTestingNS(fmt.Sprintf("dnsexample%d", i), c)
-				if testContext.DeleteNamespace {
-					if namespaces[i] != nil {
-						defer deleteNS(c, namespaces[i].Name, 5*time.Minute /* namespace deletion timeout */)
-					}
-					Expect(err).NotTo(HaveOccurred())
-				} else {
-					Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-				}
-			}
-
-			for _, ns := range namespaces {
-				runKubectlOrDie("create", "-f", backendRcYaml, getNsCmdFlag(ns))
-			}
-
-			for _, ns := range namespaces {
-				runKubectlOrDie("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
-			}
-
-			// wait for objects
-			for _, ns := range namespaces {
-				waitForRCPodsRunning(c, ns.Name, backendRcName)
-				waitForService(c, ns.Name, backendSvcName, true, poll, serviceStartTimeout)
-			}
-			// it is not enough that pods are running because they may be set to running, but
-			// the application itself may have not been initialized. Just query the application.
-			for _, ns := range namespaces {
-				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
-				pods, err := c.Pods(ns.Name).List(label, fields.Everything())
-				Expect(err).NotTo(HaveOccurred())
-				err = podsResponding(c, ns.Name, backendPodName, false, pods)
-				Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
-				Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
-
-				err = serviceResponding(c, ns.Name, backendSvcName)
-				Expect(err).NotTo(HaveOccurred(), "waiting for the service to respond")
-			}
-
-			// Now another tricky part:
-			// It may happen that the service name is not yet in DNS.
-			// So if we start our pod, it will fail. We must make sure
-			// the name is already resolvable. So let's try to query DNS from
-			// the pod we have, until we find our service name.
-			// This complicated code may be removed if the pod itself retried after
-			// dns error or timeout.
-			// This code is probably unnecessary, but let's stay on the safe side.
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
-			pods, err := c.Pods(namespaces[0].Name).List(label, fields.Everything())
-
-			if err != nil || pods == nil || len(pods.Items) == 0 {
-				Failf("no running pods found")
-			}
-			podName := pods.Items[0].Name
-
-			queryDns := fmt.Sprintf(queryDnsPythonTemplate, backendSvcName+"."+namespaces[0].Name)
-			_, err = lookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDns}, "ok", dnsReadyTimeout)
-			Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
-
-			updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, "dns-backend.development.cluster.local", fmt.Sprintf("dns-backend.%s.cluster.local", namespaces[0].Name))
-
-			// create a pod in each namespace
-			for _, ns := range namespaces {
-				newKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).withStdinData(updatedPodYaml).execOrDie()
-			}
-
-			// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
-			// that we cannot wait for the pods to be running because our pods terminate by themselves.
-			for _, ns := range namespaces {
-				err := waitForPodNotPending(c, ns.Name, frontendPodName)
-				expectNoError(err)
-			}
-
-			// wait for pods to print their result
-			for _, ns := range namespaces {
-				_, err := lookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, podStartTimeout)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		})
-	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string, timeout time.Duration) (string, error) {
@@ -562,10 +446,6 @@ func makeHttpRequestToService(c *client.Client, ns, service, path string, timeou
 		}
 	}
 	return string(result), err
-}
-
-func getNsCmdFlag(ns *api.Namespace) string {
-	return fmt.Sprintf("--namespace=%v", ns.Name)
 }
 
 // pass enough context with the 'old' parameter so that it replaces what your really intended.
@@ -601,39 +481,4 @@ func forEachPod(c *client.Client, ns, selectorKey, selectorValue string, fn func
 		Expect(err).NotTo(HaveOccurred())
 		fn(*pod)
 	}
-}
-
-func lookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		return runKubectlOrDie("log", podName, container, fmt.Sprintf("--namespace=%v", ns))
-	})
-}
-
-func lookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		return runKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
-	})
-}
-
-func lookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		// use the first container
-		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
-		args = append(args, command...)
-		return runKubectlOrDie(args...)
-	})
-}
-
-// Looks for the given string in the output of fn, repeatedly calling fn until
-// the timeout is reached or the string is found. Returns last log and possibly
-// error if the string was not found.
-func lookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
-	for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
-		result = fn()
-		if strings.Contains(result, expectedString) {
-			return
-		}
-	}
-	err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedString, result)
-	return
 }
