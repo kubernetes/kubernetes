@@ -114,6 +114,7 @@ type CloudConfig struct {
 	NodeInstanceGroup string
 	NumNodes          int
 	ClusterTag        string
+	ServiceAccount    string
 
 	Provider cloudprovider.Interface
 }
