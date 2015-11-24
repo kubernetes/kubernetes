@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/validation"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -476,7 +477,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if ok := registered.IsRegisteredAPIVersion(version); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
 	}
-	resource, _ := meta.KindToResource(kind, false)
+	resource, _ := restmapper.KindToResource(kind, false)
 	group, err := c.mapper.GroupForResource(resource)
 	if err != nil {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
