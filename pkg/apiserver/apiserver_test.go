@@ -112,50 +112,23 @@ func newMapper() *meta.DefaultRESTMapper {
 }
 
 func addGrouplessTypes() {
-	type ListOptions struct {
-		runtime.Object
-		unversioned.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(
 		grouplessGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessGroupVersion.String(), &api.Pod{})
 }
 
 func addTestTypes() {
-	type ListOptions struct {
-		runtime.Object
-		unversioned.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labels,omitempty"`
-		FieldSelector        string `json:"fields,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(
 		testGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(testGroupVersion.String(), &api.Pod{})
 }
 
 func addNewTestTypes() {
-	type ListOptions struct {
-		runtime.Object
-		unversioned.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(
 		newGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
 func init() {
@@ -165,7 +138,7 @@ func init() {
 	// "internal" version
 	api.Scheme.AddKnownTypes(
 		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&api.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&unversioned.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	addGrouplessTypes()
 	addTestTypes()
 	addNewTestTypes()
@@ -363,18 +336,18 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &apiservertesting.SimpleList{
 		Items: storage.list,
 	}
 	storage.requestedLabelSelector = labels.Everything()
-	if options != nil && options.LabelSelector != nil {
-		storage.requestedLabelSelector = options.LabelSelector
+	if options != nil && options.LabelSelector.Selector != nil {
+		storage.requestedLabelSelector = options.LabelSelector.Selector
 	}
 	storage.requestedFieldSelector = fields.Everything()
-	if options != nil && options.FieldSelector != nil {
-		storage.requestedFieldSelector = options.FieldSelector
+	if options != nil && options.FieldSelector.Selector != nil {
+		storage.requestedFieldSelector = options.FieldSelector.Selector
 	}
 	return result, storage.errors["list"]
 }
@@ -472,15 +445,15 @@ func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (r
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
 	storage.checkContext(ctx)
 	storage.requestedLabelSelector = labels.Everything()
-	if options != nil && options.LabelSelector != nil {
-		storage.requestedLabelSelector = options.LabelSelector
+	if options != nil && options.LabelSelector.Selector != nil {
+		storage.requestedLabelSelector = options.LabelSelector.Selector
 	}
 	storage.requestedFieldSelector = fields.Everything()
-	if options != nil && options.FieldSelector != nil {
-		storage.requestedFieldSelector = options.FieldSelector
+	if options != nil && options.FieldSelector.Selector != nil {
+		storage.requestedFieldSelector = options.FieldSelector.Selector
 	}
 	storage.requestedResourceVersion = ""
 	if options != nil {
@@ -931,7 +904,7 @@ func TestList(t *testing.T) {
 			legacy:    true,
 		},
 		{
-			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other&labels=a%3Db&fields=c%3Dd",
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "",
 			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
@@ -952,7 +925,7 @@ func TestList(t *testing.T) {
 			legacy:    true,
 		},
 		{
-			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple?labels=a%3Db&fields=c%3Dd",
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
 			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
