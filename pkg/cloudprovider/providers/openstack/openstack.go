@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/storage"
 )
 
 const ProviderName = "openstack"
@@ -925,4 +926,8 @@ func (os *OpenStack) getComputeIDbyHostname(cClient *gophercloud.ServiceClient) 
 		}
 	}
 	return "", fmt.Errorf("No server found matching hostname: %s", hostname)
+}
+
+func (s *OpenStack) Storage() (storage.Interface, bool) {
+	return nil, false
 }

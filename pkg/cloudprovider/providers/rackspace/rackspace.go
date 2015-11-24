@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/storage"
 )
 
 const ProviderName = "rackspace"
@@ -385,4 +386,8 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
 	return cloudprovider.Zone{Region: os.region}, nil
+}
+
+func (s *Rackspace) Storage() (storage.Interface, bool) {
+	return nil, false
 }

@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/storage"
 )
 
 const ProviderName = "vagrant"
@@ -269,4 +270,8 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 	}
 
 	return instances, nil
+}
+
+func (s *VagrantCloud) Storage() (storage.Interface, bool) {
+	return nil, false
 }

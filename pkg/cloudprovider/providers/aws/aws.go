@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/storage"
 
 	"github.com/golang/glog"
 )
@@ -2108,4 +2109,8 @@ func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 		filters = append(filters, newEc2Filter("tag:"+k, v))
 	}
 	return filters
+}
+
+func (s *AWSCloud) Storage() (storage.Interface, bool) {
+	return nil, false
 }
