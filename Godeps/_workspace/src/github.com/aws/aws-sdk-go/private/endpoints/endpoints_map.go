@@ -30,6 +30,10 @@ var endpointsMap = endpointStruct{
 			Endpoint:      "",
 			SigningRegion: "us-east-1",
 		},
+		"*/ec2metadata": {
+			Endpoint:      "http://169.254.169.254/latest",
+			SigningRegion: "us-east-1",
+		},
 		"*/iam": {
 			Endpoint:      "iam.amazonaws.com",
 			SigningRegion: "us-east-1",
@@ -44,6 +48,10 @@ var endpointsMap = endpointStruct{
 		},
 		"*/sts": {
 			Endpoint:      "sts.amazonaws.com",
+			SigningRegion: "us-east-1",
+		},
+		"*/waf": {
+			Endpoint:      "waf.amazonaws.com",
 			SigningRegion: "us-east-1",
 		},
 		"ap-northeast-1/s3": {

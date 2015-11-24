@@ -15,7 +15,7 @@ import (
 func Build(r *request.Request) {
 	body := url.Values{
 		"Action":  {r.Operation.Name},
-		"Version": {r.Service.APIVersion},
+		"Version": {r.ClientInfo.APIVersion},
 	}
 	if err := queryutil.Parse(body, r.Params, false); err != nil {
 		r.Error = awserr.New("SerializationError", "failed encoding Query request", err)
