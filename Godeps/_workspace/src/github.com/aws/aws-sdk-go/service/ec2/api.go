@@ -71,6 +71,35 @@ func (c *EC2) AllocateAddress(input *AllocateAddressInput) (*AllocateAddressOutp
 	return out, err
 }
 
+const opAllocateHosts = "AllocateHosts"
+
+// AllocateHostsRequest generates a request for the AllocateHosts operation.
+func (c *EC2) AllocateHostsRequest(input *AllocateHostsInput) (req *request.Request, output *AllocateHostsOutput) {
+	op := &request.Operation{
+		Name:       opAllocateHosts,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &AllocateHostsInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &AllocateHostsOutput{}
+	req.Data = output
+	return
+}
+
+// Allocates a Dedicated host to your account. At minimum you need to specify
+// the instance size type, Availability Zone, and quantity of hosts you want
+// to allocate.
+func (c *EC2) AllocateHosts(input *AllocateHostsInput) (*AllocateHostsOutput, error) {
+	req, out := c.AllocateHostsRequest(input)
+	err := req.Send()
+	return out, err
+}
+
 const opAssignPrivateIpAddresses = "AssignPrivateIpAddresses"
 
 // AssignPrivateIpAddressesRequest generates a request for the AssignPrivateIpAddresses operation.
@@ -664,7 +693,7 @@ func (c *EC2) CancelReservedInstancesListingRequest(input *CancelReservedInstanc
 	return
 }
 
-// Cancels the specified Reserved Instance listing in the Reserved Instance
+// Cancels the specified Reserved instance listing in the Reserved Instance
 // Marketplace.
 //
 // For more information, see Reserved Instance Marketplace (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ri-market-general.html)
@@ -871,7 +900,7 @@ func (c *EC2) CreateCustomerGatewayRequest(input *CreateCustomerGatewayInput) (r
 // gateway is the appliance at your end of the VPN connection. (The device on
 // the AWS side of the VPN connection is the virtual private gateway.) You must
 // provide the Internet-routable IP address of the customer gateway's external
-// interface. The IP address must be static and can't be behind a device performing
+// interface. The IP address must be static and may be behind a device performing
 // network address translation (NAT).
 //
 // For devices that use Border Gateway Protocol (BGP), you can also provide
@@ -924,10 +953,10 @@ func (c *EC2) CreateDhcpOptionsRequest(input *CreateDhcpOptionsInput) (req *requ
 // individual DHCP options you can specify. For more information about the options,
 // see RFC 2132 (http://www.ietf.org/rfc/rfc2132.txt).
 //
-//   domain-name-servers - The IP addresses of up to four domain name servers,
+//  domain-name-servers - The IP addresses of up to four domain name servers,
 // or AmazonProvidedDNS. The default DHCP option set specifies AmazonProvidedDNS.
 // If specifying more than one domain name server, specify the IP addresses
-// in a single parameter, separated by commas.  domain-name - If you're using
+// in a single parameter, separated by commas. domain-name - If you're using
 // AmazonProvidedDNS in us-east-1, specify ec2.internal. If you're using AmazonProvidedDNS
 // in another region, specify region.compute.internal (for example, ap-northeast-1.compute.internal).
 // Otherwise, specify a domain name (for example, MyCompany.com). Important:
@@ -935,9 +964,9 @@ func (c *EC2) CreateDhcpOptionsRequest(input *CreateDhcpOptionsInput) (req *requ
 // However, Windows and other Linux operating systems treat the value as a single
 // domain, which results in unexpected behavior. If your DHCP options set is
 // associated with a VPC that has instances with multiple operating systems,
-// specify only one domain name.  ntp-servers - The IP addresses of up to four
-// Network Time Protocol (NTP) servers.  netbios-name-servers - The IP addresses
-// of up to four NetBIOS name servers.  netbios-node-type - The NetBIOS node
+// specify only one domain name. ntp-servers - The IP addresses of up to four
+// Network Time Protocol (NTP) servers. netbios-name-servers - The IP addresses
+// of up to four NetBIOS name servers. netbios-node-type - The NetBIOS node
 // type (1, 2, 4, or 8). We recommend that you specify 2 (broadcast and multicast
 // are not currently supported). For more information about these node types,
 // see RFC 2132 (http://www.ietf.org/rfc/rfc2132.txt).   Your VPC automatically
@@ -1283,22 +1312,22 @@ func (c *EC2) CreateReservedInstancesListingRequest(input *CreateReservedInstanc
 	return
 }
 
-// Creates a listing for Amazon EC2 Reserved Instances to be sold in the Reserved
-// Instance Marketplace. You can submit one Reserved Instance listing at a time.
-// To get a list of your Reserved Instances, you can use the DescribeReservedInstances
+// Creates a listing for Amazon EC2 Reserved instances to be sold in the Reserved
+// Instance Marketplace. You can submit one Reserved instance listing at a time.
+// To get a list of your Reserved instances, you can use the DescribeReservedInstances
 // operation.
 //
 // The Reserved Instance Marketplace matches sellers who want to resell Reserved
-// Instance capacity that they no longer need with buyers who want to purchase
-// additional capacity. Reserved Instances bought and sold through the Reserved
-// Instance Marketplace work like any other Reserved Instances.
+// instance capacity that they no longer need with buyers who want to purchase
+// additional capacity. Reserved instances bought and sold through the Reserved
+// Instance Marketplace work like any other Reserved instances.
 //
-// To sell your Reserved Instances, you must first register as a seller in
+// To sell your Reserved instances, you must first register as a seller in
 // the Reserved Instance Marketplace. After completing the registration process,
 // you can create a Reserved Instance Marketplace listing of some or all of
 // your Reserved Instances, and specify the upfront price to receive for them.
-// Your Reserved Instance listings then become available for purchase. To view
-// the details of your Reserved Instance listing, you can use the DescribeReservedInstancesListings
+// Your Reserved instance listings then become available for purchase. To view
+// the details of your Reserved instance listing, you can use the DescribeReservedInstancesListings
 // operation.
 //
 // For more information, see Reserved Instance Marketplace (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ri-market-general.html)
@@ -1598,6 +1627,9 @@ func (c *EC2) CreateTagsRequest(input *CreateTagsInput) (req *request.Request, o
 // of a key and optional value. Tag keys must be unique per resource.
 //
 // For more information about tags, see Tagging Your Resources (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html)
+// in the Amazon Elastic Compute Cloud User Guide. For more information about
+// creating IAM policies that control users' access to resources based on tags,
+// see Supported Resource-Level Permissions for Amazon EC2 API Actions (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-supported-iam-actions-resources.html)
 // in the Amazon Elastic Compute Cloud User Guide.
 func (c *EC2) CreateTags(input *CreateTagsInput) (*CreateTagsOutput, error) {
 	req, out := c.CreateTagsRequest(input)
@@ -2899,6 +2931,78 @@ func (c *EC2) DescribeFlowLogs(input *DescribeFlowLogsInput) (*DescribeFlowLogsO
 	return out, err
 }
 
+const opDescribeHosts = "DescribeHosts"
+
+// DescribeHostsRequest generates a request for the DescribeHosts operation.
+func (c *EC2) DescribeHostsRequest(input *DescribeHostsInput) (req *request.Request, output *DescribeHostsOutput) {
+	op := &request.Operation{
+		Name:       opDescribeHosts,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &DescribeHostsInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &DescribeHostsOutput{}
+	req.Data = output
+	return
+}
+
+// Describes one or more of your Dedicated hosts.
+//
+// The results describe only the Dedicated hosts in the region you're currently
+// using. All listed instances consume capacity on your Dedicated host. Dedicated
+// hosts that have recently been released will be listed with the status "released".
+func (c *EC2) DescribeHosts(input *DescribeHostsInput) (*DescribeHostsOutput, error) {
+	req, out := c.DescribeHostsRequest(input)
+	err := req.Send()
+	return out, err
+}
+
+const opDescribeIdFormat = "DescribeIdFormat"
+
+// DescribeIdFormatRequest generates a request for the DescribeIdFormat operation.
+func (c *EC2) DescribeIdFormatRequest(input *DescribeIdFormatInput) (req *request.Request, output *DescribeIdFormatOutput) {
+	op := &request.Operation{
+		Name:       opDescribeIdFormat,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &DescribeIdFormatInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &DescribeIdFormatOutput{}
+	req.Data = output
+	return
+}
+
+// Important: This command is reserved for future use, and is currently not
+// available for you to use.
+//
+// Describes the ID format settings for your resources, for example, to view
+// which resource types are enabled for longer IDs. This request only returns
+// information about resource types whose ID formats can be modified; it does
+// not return information about other resource types.
+//
+// The following resource types support longer IDs: instance | reservation.
+//
+// These settings apply to the IAM user who makes the request; they do not
+// apply to the entire AWS account. By default, an IAM user defaults to the
+// same settings as the root user, unless they explicitly override the settings
+// by running the ModifyIdFormat command. These settings are applied on a per-region
+// basis.
+func (c *EC2) DescribeIdFormat(input *DescribeIdFormatInput) (*DescribeIdFormatOutput, error) {
+	req, out := c.DescribeIdFormatRequest(input)
+	err := req.Send()
+	return out, err
+}
+
 const opDescribeImageAttribute = "DescribeImageAttribute"
 
 // DescribeImageAttributeRequest generates a request for the DescribeImageAttribute operation.
@@ -3082,7 +3186,7 @@ func (c *EC2) DescribeInstanceStatusRequest(input *DescribeInstanceStatusInput) 
 // and Troubleshooting Instances with Failed Status Checks (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/TroubleshootingInstances.html)
 // in the Amazon Elastic Compute Cloud User Guide.
 //
-//   Scheduled events - Amazon EC2 can schedule events (such as reboot, stop,
+//  Scheduled events - Amazon EC2 can schedule events (such as reboot, stop,
 // or terminate) for your instances related to hardware issues, software updates,
 // or system maintenance. For more information, see Scheduled Events for Your
 // Instances (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-instances-status-check_sched.html)
@@ -3100,6 +3204,7 @@ func (c *EC2) DescribeInstanceStatus(input *DescribeInstanceStatusInput) (*Descr
 
 func (c *EC2) DescribeInstanceStatusPages(input *DescribeInstanceStatusInput, fn func(p *DescribeInstanceStatusOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeInstanceStatusRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeInstanceStatusOutput), lastPage)
 	})
@@ -3149,6 +3254,7 @@ func (c *EC2) DescribeInstances(input *DescribeInstancesInput) (*DescribeInstanc
 
 func (c *EC2) DescribeInstancesPages(input *DescribeInstancesInput, fn func(p *DescribeInstancesOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeInstancesRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeInstancesOutput), lastPage)
 	})
@@ -3435,9 +3541,9 @@ func (c *EC2) DescribeReservedInstancesRequest(input *DescribeReservedInstancesI
 	return
 }
 
-// Describes one or more of the Reserved Instances that you purchased.
+// Describes one or more of the Reserved instances that you purchased.
 //
-// For more information about Reserved Instances, see Reserved Instances (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts-on-demand-reserved-instances.html)
+// For more information about Reserved instances, see Reserved Instances (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts-on-demand-reserved-instances.html)
 // in the Amazon Elastic Compute Cloud User Guide.
 func (c *EC2) DescribeReservedInstances(input *DescribeReservedInstancesInput) (*DescribeReservedInstancesOutput, error) {
 	req, out := c.DescribeReservedInstancesRequest(input)
@@ -3465,22 +3571,22 @@ func (c *EC2) DescribeReservedInstancesListingsRequest(input *DescribeReservedIn
 	return
 }
 
-// Describes your account's Reserved Instance listings in the Reserved Instance
+// Describes your account's Reserved instance listings in the Reserved Instance
 // Marketplace.
 //
 // The Reserved Instance Marketplace matches sellers who want to resell Reserved
-// Instance capacity that they no longer need with buyers who want to purchase
-// additional capacity. Reserved Instances bought and sold through the Reserved
+// instance capacity that they no longer need with buyers who want to purchase
+// additional capacity. Reserved instances bought and sold through the Reserved
 // Instance Marketplace work like any other Reserved Instances.
 //
-// As a seller, you choose to list some or all of your Reserved Instances,
-// and you specify the upfront price to receive for them. Your Reserved Instances
+// As a seller, you choose to list some or all of your Reserved instances,
+// and you specify the upfront price to receive for them. Your Reserved instances
 // are then listed in the Reserved Instance Marketplace and are available for
 // purchase.
 //
-// As a buyer, you specify the configuration of the Reserved Instance to purchase,
+// As a buyer, you specify the configuration of the Reserved instance to purchase,
 // and the Marketplace matches what you're searching for with what's available.
-// The Marketplace first sells the lowest priced Reserved Instances to you,
+// The Marketplace first sells the lowest priced Reserved instances to you,
 // and continues to sell available Reserved Instance listings to you until your
 // demand is met. You are charged based on the total price of all of the listings
 // that you purchase.
@@ -3519,7 +3625,7 @@ func (c *EC2) DescribeReservedInstancesModificationsRequest(input *DescribeReser
 	return
 }
 
-// Describes the modifications made to your Reserved Instances. If no parameter
+// Describes the modifications made to your Reserved instances. If no parameter
 // is specified, information about all your Reserved Instances modification
 // requests is returned. If a modification ID is specified, only information
 // about the specific modification is returned.
@@ -3534,6 +3640,7 @@ func (c *EC2) DescribeReservedInstancesModifications(input *DescribeReservedInst
 
 func (c *EC2) DescribeReservedInstancesModificationsPages(input *DescribeReservedInstancesModificationsInput, fn func(p *DescribeReservedInstancesModificationsOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeReservedInstancesModificationsRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeReservedInstancesModificationsOutput), lastPage)
 	})
@@ -3565,8 +3672,8 @@ func (c *EC2) DescribeReservedInstancesOfferingsRequest(input *DescribeReservedI
 	return
 }
 
-// Describes Reserved Instance offerings that are available for purchase. With
-// Reserved Instances, you purchase the right to launch instances for a period
+// Describes Reserved instance offerings that are available for purchase. With
+// Reserved instances, you purchase the right to launch instances for a period
 // of time. During that time period, you do not receive insufficient capacity
 // errors, and you pay a lower usage rate than the rate charged for On-Demand
 // instances for the actual time used.
@@ -3581,6 +3688,7 @@ func (c *EC2) DescribeReservedInstancesOfferings(input *DescribeReservedInstance
 
 func (c *EC2) DescribeReservedInstancesOfferingsPages(input *DescribeReservedInstancesOfferingsInput, fn func(p *DescribeReservedInstancesOfferingsOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeReservedInstancesOfferingsRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeReservedInstancesOfferingsOutput), lastPage)
 	})
@@ -3697,7 +3805,7 @@ func (c *EC2) DescribeSnapshotsRequest(input *DescribeSnapshotsInput) (req *requ
 		Paginator: &request.Paginator{
 			InputTokens:     []string{"NextToken"},
 			OutputTokens:    []string{"NextToken"},
-			LimitToken:      "",
+			LimitToken:      "MaxResults",
 			TruncationToken: "",
 		},
 	}
@@ -3719,13 +3827,13 @@ func (c *EC2) DescribeSnapshotsRequest(input *DescribeSnapshotsInput) (req *requ
 //
 // The create volume permissions fall into the following categories:
 //
-//   public: The owner of the snapshot granted create volume permissions for
+//  public: The owner of the snapshot granted create volume permissions for
 // the snapshot to the all group. All AWS accounts have create volume permissions
-// for these snapshots.  explicit: The owner of the snapshot granted create
-// volume permissions to a specific AWS account.  implicit: An AWS account has
-// implicit create volume permissions for all snapshots it owns.  The list of
-// snapshots returned can be modified by specifying snapshot IDs, snapshot owners,
-// or AWS accounts with create volume permissions. If no options are specified,
+// for these snapshots. explicit: The owner of the snapshot granted create volume
+// permissions to a specific AWS account. implicit: An AWS account has implicit
+// create volume permissions for all snapshots it owns.  The list of snapshots
+// returned can be modified by specifying snapshot IDs, snapshot owners, or
+// AWS accounts with create volume permissions. If no options are specified,
 // Amazon EC2 returns all snapshots for which you have create volume permissions.
 //
 // If you specify one or more snapshot IDs, only snapshots that have the specified
@@ -3760,6 +3868,7 @@ func (c *EC2) DescribeSnapshots(input *DescribeSnapshotsInput) (*DescribeSnapsho
 
 func (c *EC2) DescribeSnapshotsPages(input *DescribeSnapshotsInput, fn func(p *DescribeSnapshotsOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeSnapshotsRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeSnapshotsOutput), lastPage)
 	})
@@ -3961,6 +4070,7 @@ func (c *EC2) DescribeSpotPriceHistory(input *DescribeSpotPriceHistoryInput) (*D
 
 func (c *EC2) DescribeSpotPriceHistoryPages(input *DescribeSpotPriceHistoryInput, fn func(p *DescribeSpotPriceHistoryOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeSpotPriceHistoryRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeSpotPriceHistoryOutput), lastPage)
 	})
@@ -4004,6 +4114,12 @@ func (c *EC2) DescribeTagsRequest(input *DescribeTagsInput) (req *request.Reques
 		Name:       opDescribeTags,
 		HTTPMethod: "POST",
 		HTTPPath:   "/",
+		Paginator: &request.Paginator{
+			InputTokens:     []string{"NextToken"},
+			OutputTokens:    []string{"NextToken"},
+			LimitToken:      "MaxResults",
+			TruncationToken: "",
+		},
 	}
 
 	if input == nil {
@@ -4024,6 +4140,14 @@ func (c *EC2) DescribeTags(input *DescribeTagsInput) (*DescribeTagsOutput, error
 	req, out := c.DescribeTagsRequest(input)
 	err := req.Send()
 	return out, err
+}
+
+func (c *EC2) DescribeTagsPages(input *DescribeTagsInput, fn func(p *DescribeTagsOutput, lastPage bool) (shouldContinue bool)) error {
+	page, _ := c.DescribeTagsRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
+	return page.EachPage(func(p interface{}, lastPage bool) bool {
+		return fn(p.(*DescribeTagsOutput), lastPage)
+	})
 }
 
 const opDescribeVolumeAttribute = "DescribeVolumeAttribute"
@@ -4126,6 +4250,7 @@ func (c *EC2) DescribeVolumeStatus(input *DescribeVolumeStatusInput) (*DescribeV
 
 func (c *EC2) DescribeVolumeStatusPages(input *DescribeVolumeStatusInput, fn func(p *DescribeVolumeStatusOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeVolumeStatusRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeVolumeStatusOutput), lastPage)
 	})
@@ -4176,6 +4301,7 @@ func (c *EC2) DescribeVolumes(input *DescribeVolumesInput) (*DescribeVolumesOutp
 
 func (c *EC2) DescribeVolumesPages(input *DescribeVolumesInput, fn func(p *DescribeVolumesOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeVolumesRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeVolumesOutput), lastPage)
 	})
@@ -5015,6 +5141,76 @@ func (c *EC2) ImportVolume(input *ImportVolumeInput) (*ImportVolumeOutput, error
 	return out, err
 }
 
+const opModifyHosts = "ModifyHosts"
+
+// ModifyHostsRequest generates a request for the ModifyHosts operation.
+func (c *EC2) ModifyHostsRequest(input *ModifyHostsInput) (req *request.Request, output *ModifyHostsOutput) {
+	op := &request.Operation{
+		Name:       opModifyHosts,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &ModifyHostsInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &ModifyHostsOutput{}
+	req.Data = output
+	return
+}
+
+// Modify the auto-placement setting of a Dedicated host. When auto-placement
+// is enabled, AWS will place instances that you launch with a tenancy of host,
+// but without targeting a specific host ID, onto any available Dedicated host
+// in your account which has auto-placement enabled. When auto-placement is
+// disabled, you need to provide a host ID if you want the instance to launch
+// onto a specific host. If no host ID is provided, the instance will be launched
+// onto a suitable host which has auto-placement enabled.
+func (c *EC2) ModifyHosts(input *ModifyHostsInput) (*ModifyHostsOutput, error) {
+	req, out := c.ModifyHostsRequest(input)
+	err := req.Send()
+	return out, err
+}
+
+const opModifyIdFormat = "ModifyIdFormat"
+
+// ModifyIdFormatRequest generates a request for the ModifyIdFormat operation.
+func (c *EC2) ModifyIdFormatRequest(input *ModifyIdFormatInput) (req *request.Request, output *ModifyIdFormatOutput) {
+	op := &request.Operation{
+		Name:       opModifyIdFormat,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &ModifyIdFormatInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &ModifyIdFormatOutput{}
+	req.Data = output
+	return
+}
+
+// Important: This command is reserved for future use, and is currently not
+// available for you to use.
+//
+// Modifies the ID format for the specified resource. You can specify that
+// resources should receive longer IDs (17-character IDs) when they are created.
+// The following resource types support longer IDs: instance | reservation.
+//
+// This setting applies to the IAM user who makes the request; it does not
+// apply to the entire AWS account. By default, an IAM user defaults to the
+// same settings as the root user, unless they explicitly override the settings
+// by running this request. These settings are applied on a per-region basis.
+func (c *EC2) ModifyIdFormat(input *ModifyIdFormatInput) (*ModifyIdFormatOutput, error) {
+	req, out := c.ModifyIdFormatRequest(input)
+	err := req.Send()
+	return out, err
+}
+
 const opModifyImageAttribute = "ModifyImageAttribute"
 
 // ModifyImageAttributeRequest generates a request for the ModifyImageAttribute operation.
@@ -5074,6 +5270,51 @@ func (c *EC2) ModifyInstanceAttributeRequest(input *ModifyInstanceAttributeInput
 // in the Amazon Elastic Compute Cloud User Guide.
 func (c *EC2) ModifyInstanceAttribute(input *ModifyInstanceAttributeInput) (*ModifyInstanceAttributeOutput, error) {
 	req, out := c.ModifyInstanceAttributeRequest(input)
+	err := req.Send()
+	return out, err
+}
+
+const opModifyInstancePlacement = "ModifyInstancePlacement"
+
+// ModifyInstancePlacementRequest generates a request for the ModifyInstancePlacement operation.
+func (c *EC2) ModifyInstancePlacementRequest(input *ModifyInstancePlacementInput) (req *request.Request, output *ModifyInstancePlacementOutput) {
+	op := &request.Operation{
+		Name:       opModifyInstancePlacement,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &ModifyInstancePlacementInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &ModifyInstancePlacementOutput{}
+	req.Data = output
+	return
+}
+
+// Set the instance affinity value for a specific stopped instance and modify
+// the instance tenancy setting.
+//
+// Instance affinity is disabled by default. When instance affinity is host
+// and it is not associated with a specific Dedicated host, the next time it
+// is launched it will automatically be associated with the host it lands on.
+// This relationship will persist if the instance is stopped/started, or rebooted.
+//
+// You can modify the host ID associated with a stopped instance. If a stopped
+// instance has a new host ID association, the instance will target that host
+// when restarted.
+//
+// You can modify the tenancy of a stopped instance with a tenancy of host
+// or dedicated.
+//
+// Affinity, hostID, and tenancy are not required parameters, but at least
+// one of them must be specified in the request. Affinity and tenancy can be
+// modified in the same request, but tenancy can only be modified on instances
+// that are stopped.
+func (c *EC2) ModifyInstancePlacement(input *ModifyInstancePlacementInput) (*ModifyInstancePlacementOutput, error) {
+	req, out := c.ModifyInstancePlacementRequest(input)
 	err := req.Send()
 	return out, err
 }
@@ -5423,14 +5664,14 @@ func (c *EC2) PurchaseReservedInstancesOfferingRequest(input *PurchaseReservedIn
 	return
 }
 
-// Purchases a Reserved Instance for use with your account. With Amazon EC2
-// Reserved Instances, you obtain a capacity reservation for a certain instance
+// Purchases a Reserved instance for use with your account. With Amazon EC2
+// Reserved instances, you obtain a capacity reservation for a certain instance
 // configuration over a specified period of time and pay a lower hourly rate
-// compared to on-Demand Instance pricing.
+// compared to On-Demand Instance pricing.
 //
-// Use DescribeReservedInstancesOfferings to get a list of Reserved Instance
+// Use DescribeReservedInstancesOfferings to get a list of Reserved instance
 // offerings that match your specifications. After you've purchased a Reserved
-// Instance, you can check for your new Reserved Instance with DescribeReservedInstances.
+// instance, you can check for your new Reserved instance with DescribeReservedInstances.
 //
 // For more information, see Reserved Instances (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts-on-demand-reserved-instances.html)
 // and Reserved Instance Marketplace (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ri-market-general.html)
@@ -5605,6 +5846,44 @@ func (c *EC2) ReleaseAddressRequest(input *ReleaseAddressInput) (req *request.Re
 // error (InvalidIPAddress.InUse).
 func (c *EC2) ReleaseAddress(input *ReleaseAddressInput) (*ReleaseAddressOutput, error) {
 	req, out := c.ReleaseAddressRequest(input)
+	err := req.Send()
+	return out, err
+}
+
+const opReleaseHosts = "ReleaseHosts"
+
+// ReleaseHostsRequest generates a request for the ReleaseHosts operation.
+func (c *EC2) ReleaseHostsRequest(input *ReleaseHostsInput) (req *request.Request, output *ReleaseHostsOutput) {
+	op := &request.Operation{
+		Name:       opReleaseHosts,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &ReleaseHostsInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &ReleaseHostsOutput{}
+	req.Data = output
+	return
+}
+
+// When you no longer want to use a Dedicated host it can be released. On-Demand
+// billing is stopped and the host goes into "released" state. The host ID of
+// Dedicated hosts that have been released can no longer be specified in another
+// request, e.g., ModifyHosts. You must stop or terminate all instances on a
+// host before it can be released.
+//
+// When Dedicated hosts are released, it make take some time for them to stop
+// counting toward your limit and you may receive capacity errors when trying
+// to allocate new Dedicated hosts. Try waiting a few minutes, and then try
+// again.
+//
+// Released hosts will still appear in a DescribeHosts response.
+func (c *EC2) ReleaseHosts(input *ReleaseHostsInput) (*ReleaseHostsOutput, error) {
+	req, out := c.ReleaseHostsRequest(input)
 	err := req.Send()
 	return out, err
 }
@@ -6204,7 +6483,7 @@ func (c *EC2) StopInstancesRequest(input *StopInstancesInput) (req *request.Requ
 // from stopped to started, Amazon EC2 charges a full instance hour, even if
 // transitions happen multiple times within a single hour.
 //
-// You can't start or stop Spot Instances.
+// You can't start or stop Spot instances.
 //
 // Instances that use Amazon EBS volumes as their root devices can be quickly
 // stopped and started. When an instance is stopped, the compute resources are
@@ -6567,6 +6846,70 @@ func (s AllocateAddressOutput) GoString() string {
 	return s.String()
 }
 
+type AllocateHostsInput struct {
+	// This is enabled by default. This property allows instances to be automatically
+	// placed onto available Dedicated hosts, when you are launching instances without
+	// specifying a host ID.
+	//
+	// Default: Enabled
+	AutoPlacement *string `locationName:"autoPlacement" type:"string" enum:"AutoPlacement"`
+
+	// The Availability Zone for the Dedicated hosts.
+	AvailabilityZone *string `locationName:"availabilityZone" type:"string" required:"true"`
+
+	// Unique, case-sensitive identifier you provide to ensure idempotency of the
+	// request. For more information, see How to Ensure Idempotency (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Run_Instance_Idempotency.html)
+	// in the Amazon Elastic Compute Cloud User Guide.
+	ClientToken *string `locationName:"clientToken" type:"string"`
+
+	// Specify the instance type that you want your Dedicated hosts to be configured
+	// for. When you specify the instance type, that is the only instance type that
+	// you can launch onto that host.
+	InstanceType *string `locationName:"instanceType" type:"string" required:"true"`
+
+	// The number of Dedicated hosts you want to allocate to your account with these
+	// parameters.
+	Quantity *int64 `locationName:"quantity" type:"integer" required:"true"`
+
+	metadataAllocateHostsInput `json:"-" xml:"-"`
+}
+
+type metadataAllocateHostsInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s AllocateHostsInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s AllocateHostsInput) GoString() string {
+	return s.String()
+}
+
+type AllocateHostsOutput struct {
+	// The ID of the allocated Dedicated host. This is used when you want to launch
+	// an instance onto a specific host.
+	HostIds []*string `locationName:"hostIdSet" locationNameList:"item" type:"list"`
+
+	metadataAllocateHostsOutput `json:"-" xml:"-"`
+}
+
+type metadataAllocateHostsOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s AllocateHostsOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s AllocateHostsOutput) GoString() string {
+	return s.String()
+}
+
 type AssignPrivateIpAddressesInput struct {
 	// Indicates whether to allow an IP address that is already assigned to another
 	// network interface or instance to be reassigned to the specified network interface.
@@ -6626,11 +6969,12 @@ type AssociateAddressInput struct {
 	// [EC2-VPC] The allocation ID. This is required for EC2-VPC.
 	AllocationId *string `type:"string"`
 
-	// [EC2-VPC] Allows an Elastic IP address that is already associated with an
-	// instance or network interface to be re-associated with the specified instance
-	// or network interface. Otherwise, the operation fails.
-	//
-	// Default: false
+	// [EC2-VPC] For a VPC in an EC2-Classic account, specify true to allow an Elastic
+	// IP address that is already associated with an instance or network interface
+	// to be reassociated with the specified instance or network interface. Otherwise,
+	// the operation fails. In a VPC in an EC2-VPC-only account, reassociation is
+	// automatic, therefore you can specify false to ensure the operation fails
+	// if the Elastic IP address is already associated with another resource.
 	AllowReassociation *bool `locationName:"allowReassociation" type:"boolean"`
 
 	// Checks whether you have the required permissions for the action, without
@@ -7294,6 +7638,30 @@ func (s AvailabilityZoneMessage) GoString() string {
 	return s.String()
 }
 
+type AvailableCapacity struct {
+	// The total number of instances that the Dedicated host supports.
+	AvailableInstanceCapacity []*InstanceCapacity `locationName:"availableInstanceCapacity" locationNameList:"item" type:"list"`
+
+	// The number of vCPUs available on the Dedicated host.
+	AvailableVCpus *int64 `locationName:"availableVCpus" type:"integer"`
+
+	metadataAvailableCapacity `json:"-" xml:"-"`
+}
+
+type metadataAvailableCapacity struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s AvailableCapacity) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s AvailableCapacity) GoString() string {
+	return s.String()
+}
+
 type BlobAttributeValue struct {
 	Value []byte `locationName:"value" type:"blob"`
 
@@ -7676,7 +8044,7 @@ func (s CancelImportTaskOutput) GoString() string {
 }
 
 type CancelReservedInstancesListingInput struct {
-	// The ID of the Reserved Instance listing.
+	// The ID of the Reserved instance listing.
 	ReservedInstancesListingId *string `locationName:"reservedInstancesListingId" type:"string" required:"true"`
 
 	metadataCancelReservedInstancesListingInput `json:"-" xml:"-"`
@@ -7697,7 +8065,7 @@ func (s CancelReservedInstancesListingInput) GoString() string {
 }
 
 type CancelReservedInstancesListingOutput struct {
-	// The Reserved Instance listing.
+	// The Reserved instance listing.
 	ReservedInstancesListings []*ReservedInstancesListing `locationName:"reservedInstancesListingsSet" locationNameList:"item" type:"list"`
 
 	metadataCancelReservedInstancesListingOutput `json:"-" xml:"-"`
@@ -8889,17 +9257,17 @@ type CreateReservedInstancesListingInput struct {
 	// Ensuring Idempotency (http://docs.aws.amazon.com/AWSEC2/latest/APIReference/Run_Instance_Idempotency.html).
 	ClientToken *string `locationName:"clientToken" type:"string" required:"true"`
 
-	// The number of instances that are a part of a Reserved Instance account to
+	// The number of instances that are a part of a Reserved instance account to
 	// be listed in the Reserved Instance Marketplace. This number should be less
-	// than or equal to the instance count associated with the Reserved Instance
+	// than or equal to the instance count associated with the Reserved instance
 	// ID specified in this call.
 	InstanceCount *int64 `locationName:"instanceCount" type:"integer" required:"true"`
 
-	// A list specifying the price of the Reserved Instance for each month remaining
-	// in the Reserved Instance term.
+	// A list specifying the price of the Reserved instance for each month remaining
+	// in the Reserved instance term.
 	PriceSchedules []*PriceScheduleSpecification `locationName:"priceSchedules" locationNameList:"item" type:"list" required:"true"`
 
-	// The ID of the active Reserved Instance.
+	// The ID of the active Reserved instance.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string" required:"true"`
 
 	metadataCreateReservedInstancesListingInput `json:"-" xml:"-"`
@@ -8920,7 +9288,7 @@ func (s CreateReservedInstancesListingInput) GoString() string {
 }
 
 type CreateReservedInstancesListingOutput struct {
-	// Information about the Reserved Instances listing.
+	// Information about the Reserved instance listing.
 	ReservedInstancesListings []*ReservedInstancesListing `locationName:"reservedInstancesListingsSet" locationNameList:"item" type:"list"`
 
 	metadataCreateReservedInstancesListingOutput `json:"-" xml:"-"`
@@ -9061,7 +9429,7 @@ type CreateSecurityGroupInput struct {
 	//
 	// Constraints for EC2-Classic: ASCII characters
 	//
-	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=;{}!$*
 	Description *string `locationName:"GroupDescription" type:"string" required:"true"`
 
 	// Checks whether you have the required permissions for the action, without
@@ -9076,7 +9444,7 @@ type CreateSecurityGroupInput struct {
 	//
 	// Constraints for EC2-Classic: ASCII characters
 	//
-	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+	// Constraints for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=;{}!$*
 	GroupName *string `type:"string" required:"true"`
 
 	// [EC2-VPC] The ID of the VPC. Required for EC2-VPC.
@@ -9206,7 +9574,8 @@ func (s CreateSpotDatafeedSubscriptionOutput) GoString() string {
 type CreateSubnetInput struct {
 	// The Availability Zone for the subnet.
 	//
-	// Default: Amazon EC2 selects one for you (recommended).
+	// Default: AWS selects one for you. If you create more than one subnet in
+	// your VPC, we may not necessarily select a different zone for each subnet.
 	AvailabilityZone *string `type:"string"`
 
 	// The network range for the subnet, in CIDR notation. For example, 10.0.0.0/24.
@@ -9519,6 +9888,9 @@ type CreateVpcInput struct {
 	// of dedicated means all instances launched into the VPC are launched as dedicated
 	// tenancy instances regardless of the tenancy assigned to the instance at launch.
 	// Dedicated tenancy instances run on single-tenant hardware.
+	//
+	// Important: The host value cannot be used with this parameter. Use the default
+	// or dedicated values only.
 	//
 	// Default: default
 	InstanceTenancy *string `locationName:"instanceTenancy" type:"string" enum:"Tenancy"`
@@ -11568,6 +11940,122 @@ func (s DescribeFlowLogsOutput) GoString() string {
 	return s.String()
 }
 
+type DescribeHostsInput struct {
+	// One or more filters.
+	//
+	//  instance-type - The instance type size that the Dedicated host is configured
+	// to support.
+	//
+	// auto-placement - Whether auto-placement is enabled or disabled (on | off).
+	//
+	// host-reservation-id - The ID of the reservation associated with this host.
+	//
+	// client-token - The idempotency token you provided when you launched the
+	// instance
+	//
+	// state- The allocation state of the Dedicated host (available | under-assessment
+	// | permanent-failure | released | released-permanent-failure).
+	//
+	// availability-zone - The Availability Zone of the host.
+	Filter []*Filter `locationName:"filter" locationNameList:"Filter" type:"list"`
+
+	// The IDs of the Dedicated hosts. The IDs are used for targeted instance launches.
+	HostIds []*string `locationName:"hostId" locationNameList:"item" type:"list"`
+
+	// The maximum number of results to return for the request in a single page.
+	// The remaining results can be seen by sending another request with the returned
+	// nextToken value. This value can be between 5 and 500; if maxResults is given
+	// a larger value than 500, you will receive an error. You cannot specify this
+	// parameter and the host IDs parameter in the same request.
+	MaxResults *int64 `locationName:"maxResults" type:"integer"`
+
+	// The token to retrieve the next page of results.
+	NextToken *string `locationName:"nextToken" type:"string"`
+
+	metadataDescribeHostsInput `json:"-" xml:"-"`
+}
+
+type metadataDescribeHostsInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeHostsInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeHostsInput) GoString() string {
+	return s.String()
+}
+
+type DescribeHostsOutput struct {
+	// Information about the Dedicated hosts.
+	Hosts []*Host `locationName:"hostSet" locationNameList:"item" type:"list"`
+
+	// The token to use to retrieve the next page of results. This value is null
+	// when there are no more results to return.
+	NextToken *string `locationName:"nextToken" type:"string"`
+
+	metadataDescribeHostsOutput `json:"-" xml:"-"`
+}
+
+type metadataDescribeHostsOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeHostsOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeHostsOutput) GoString() string {
+	return s.String()
+}
+
+type DescribeIdFormatInput struct {
+	// The type of resource.
+	Resource *string `type:"string"`
+
+	metadataDescribeIdFormatInput `json:"-" xml:"-"`
+}
+
+type metadataDescribeIdFormatInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeIdFormatInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeIdFormatInput) GoString() string {
+	return s.String()
+}
+
+type DescribeIdFormatOutput struct {
+	// Information about the ID format for the resource.
+	Statuses []*IdFormat `locationName:"statusSet" locationNameList:"item" type:"list"`
+
+	metadataDescribeIdFormatOutput `json:"-" xml:"-"`
+}
+
+type metadataDescribeIdFormatOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeIdFormatOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeIdFormatOutput) GoString() string {
+	return s.String()
+}
+
 type DescribeImageAttributeInput struct {
 	// The AMI attribute.
 	//
@@ -12228,7 +12716,7 @@ type DescribeInstancesInput struct {
 	// checking is disabled. The value must be false for the instance to perform
 	// network address translation (NAT) in your VPC.
 	//
-	//   spot-instance-request-id - The ID of the Spot Instance request.
+	//   spot-instance-request-id - The ID of the Spot instance request.
 	//
 	//   state-reason-code - The reason code for the state change.
 	//
@@ -12262,7 +12750,7 @@ type DescribeInstancesInput struct {
 	//
 	//   network-interface.vpc-id - The ID of the VPC for the network interface.
 	//
-	//   network-interface.network-interface.id - The ID of the network interface.
+	//   network-interface.network-interface-id - The ID of the network interface.
 	//
 	//   network-interface.owner-id - The ID of the owner of the network interface.
 	//
@@ -12376,7 +12864,7 @@ type DescribeInstancesOutput struct {
 	// when there are no more results to return.
 	NextToken *string `locationName:"nextToken" type:"string"`
 
-	// One or more reservations.
+	// Zero or more reservations.
 	Reservations []*Reservation `locationName:"reservationSet" locationNameList:"item" type:"list"`
 
 	metadataDescribeInstancesOutput `json:"-" xml:"-"`
@@ -13101,21 +13589,21 @@ type DescribeReservedInstancesInput struct {
 
 	// One or more filters.
 	//
-	//   availability-zone - The Availability Zone where the Reserved Instance
+	//   availability-zone - The Availability Zone where the Reserved instance
 	// can be used.
 	//
-	//   duration - The duration of the Reserved Instance (one year or three years),
+	//   duration - The duration of the Reserved instance (one year or three years),
 	// in seconds (31536000 | 94608000).
 	//
-	//   end - The time when the Reserved Instance expires (for example, 2015-08-07T11:54:42.000Z).
+	//   end - The time when the Reserved instance expires (for example, 2015-08-07T11:54:42.000Z).
 	//
-	//   fixed-price - The purchase price of the Reserved Instance (for example,
+	//   fixed-price - The purchase price of the Reserved instance (for example,
 	// 9800.0).
 	//
-	//   instance-type - The instance type on which the Reserved Instance can be
+	//   instance-type - The instance type on which the Reserved instance can be
 	// used.
 	//
-	//   product-description - The Reserved Instance product platform description.
+	//   product-description - The Reserved instance product platform description.
 	// Instances that include (Amazon VPC) in the product platform description will
 	// only be displayed to EC2-Classic account holders and are for use with Amazon
 	// VPC. (Linux/UNIX | Linux/UNIX (Amazon VPC) | SUSE Linux | SUSE Linux (Amazon
@@ -13125,12 +13613,12 @@ type DescribeReservedInstancesInput struct {
 	// with SQL Server Web (Amazon VPC) | Windows with SQL Server Enterprise | Windows
 	// with SQL Server Enterprise (Amazon VPC)).
 	//
-	//   reserved-instances-id - The ID of the Reserved Instance.
+	//   reserved-instances-id - The ID of the Reserved instance.
 	//
-	//   start - The time at which the Reserved Instance purchase request was placed
+	//   start - The time at which the Reserved instance purchase request was placed
 	// (for example, 2014-08-07T11:54:42.000Z).
 	//
-	//   state - The state of the Reserved Instance (payment-pending | active |
+	//   state - The state of the Reserved instance (payment-pending | active |
 	// payment-failed | retired).
 	//
 	//   tag:key=value - The key/value combination of a tag assigned to the resource.
@@ -13145,18 +13633,18 @@ type DescribeReservedInstancesInput struct {
 	//   tag-value - The value of a tag assigned to the resource. This filter is
 	// independent of the tag-key filter.
 	//
-	//   usage-price - The usage price of the Reserved Instance, per hour (for
+	//   usage-price - The usage price of the Reserved instance, per hour (for
 	// example, 0.84).
 	Filters []*Filter `locationName:"Filter" locationNameList:"Filter" type:"list"`
 
-	// The Reserved Instance offering type. If you are using tools that predate
+	// The Reserved instance offering type. If you are using tools that predate
 	// the 2011-11-01 API version, you only have access to the Medium Utilization
-	// Reserved Instance offering type.
+	// Reserved instance offering type.
 	OfferingType *string `locationName:"offeringType" type:"string" enum:"OfferingTypeValues"`
 
-	// One or more Reserved Instance IDs.
+	// One or more Reserved instance IDs.
 	//
-	// Default: Describes all your Reserved Instances, or only those otherwise
+	// Default: Describes all your Reserved instances, or only those otherwise
 	// specified.
 	ReservedInstancesIds []*string `locationName:"ReservedInstancesId" locationNameList:"ReservedInstancesId" type:"list"`
 
@@ -13180,20 +13668,20 @@ func (s DescribeReservedInstancesInput) GoString() string {
 type DescribeReservedInstancesListingsInput struct {
 	// One or more filters.
 	//
-	//   reserved-instances-id - The ID of the Reserved Instances.
+	//   reserved-instances-id - The ID of the Reserved instances.
 	//
-	//   reserved-instances-listing-id - The ID of the Reserved Instances listing.
+	//   reserved-instances-listing-id - The ID of the Reserved instances listing.
 	//
-	//   status - The status of the Reserved Instance listing (pending | active
+	//   status - The status of the Reserved instance listing (pending | active
 	// | cancelled | closed).
 	//
 	//   status-message - The reason for the status.
 	Filters []*Filter `locationName:"filters" locationNameList:"Filter" type:"list"`
 
-	// One or more Reserved Instance IDs.
+	// One or more Reserved instance IDs.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string"`
 
-	// One or more Reserved Instance Listing IDs.
+	// One or more Reserved instance Listing IDs.
 	ReservedInstancesListingId *string `locationName:"reservedInstancesListingId" type:"string"`
 
 	metadataDescribeReservedInstancesListingsInput `json:"-" xml:"-"`
@@ -13214,7 +13702,7 @@ func (s DescribeReservedInstancesListingsInput) GoString() string {
 }
 
 type DescribeReservedInstancesListingsOutput struct {
-	// Information about the Reserved Instance listing.
+	// Information about the Reserved instance listing.
 	ReservedInstancesListings []*ReservedInstancesListing `locationName:"reservedInstancesListingsSet" locationNameList:"item" type:"list"`
 
 	metadataDescribeReservedInstancesListingsOutput `json:"-" xml:"-"`
@@ -13243,27 +13731,27 @@ type DescribeReservedInstancesModificationsInput struct {
 	//
 	//   effective-date - The time when the modification becomes effective.
 	//
-	//   modification-result.reserved-instances-id - The ID for the Reserved Instances
+	//   modification-result.reserved-instances-id - The ID for the Reserved instances
 	// created as part of the modification request. This ID is only available when
 	// the status of the modification is fulfilled.
 	//
 	//   modification-result.target-configuration.availability-zone - The Availability
-	// Zone for the new Reserved Instances.
+	// Zone for the new Reserved instances.
 	//
 	//   modification-result.target-configuration.instance-count  - The number
-	// of new Reserved Instances.
+	// of new Reserved instances.
 	//
 	//   modification-result.target-configuration.instance-type - The instance
-	// type of the new Reserved Instances.
+	// type of the new Reserved instances.
 	//
 	//   modification-result.target-configuration.platform - The network platform
-	// of the new Reserved Instances (EC2-Classic | EC2-VPC).
+	// of the new Reserved instances (EC2-Classic | EC2-VPC).
 	//
-	//   reserved-instances-id - The ID of the Reserved Instances modified.
+	//   reserved-instances-id - The ID of the Reserved instances modified.
 	//
 	//   reserved-instances-modification-id - The ID of the modification request.
 	//
-	//   status - The status of the Reserved Instances modification request (processing
+	//   status - The status of the Reserved instances modification request (processing
 	// | fulfilled | failed).
 	//
 	//   status-message - The reason for the status.
@@ -13299,7 +13787,7 @@ type DescribeReservedInstancesModificationsOutput struct {
 	// when there are no more results to return.
 	NextToken *string `locationName:"nextToken" type:"string"`
 
-	// The Reserved Instance modification information.
+	// The Reserved instance modification information.
 	ReservedInstancesModifications []*ReservedInstancesModification `locationName:"reservedInstancesModificationsSet" locationNameList:"item" type:"list"`
 
 	metadataDescribeReservedInstancesModificationsOutput `json:"-" xml:"-"`
@@ -13320,7 +13808,7 @@ func (s DescribeReservedInstancesModificationsOutput) GoString() string {
 }
 
 type DescribeReservedInstancesOfferingsInput struct {
-	// The Availability Zone in which the Reserved Instance can be used.
+	// The Availability Zone in which the Reserved instance can be used.
 	AvailabilityZone *string `type:"string"`
 
 	// Checks whether you have the required permissions for the action, without
@@ -13331,23 +13819,23 @@ type DescribeReservedInstancesOfferingsInput struct {
 
 	// One or more filters.
 	//
-	//   availability-zone - The Availability Zone where the Reserved Instance
+	//   availability-zone - The Availability Zone where the Reserved instance
 	// can be used.
 	//
-	//   duration - The duration of the Reserved Instance (for example, one year
+	//   duration - The duration of the Reserved instance (for example, one year
 	// or three years), in seconds (31536000 | 94608000).
 	//
-	//   fixed-price - The purchase price of the Reserved Instance (for example,
+	//   fixed-price - The purchase price of the Reserved instance (for example,
 	// 9800.0).
 	//
-	//   instance-type - The instance type on which the Reserved Instance can be
+	//   instance-type - The instance type on which the Reserved instance can be
 	// used.
 	//
 	//   marketplace - Set to true to show only Reserved Instance Marketplace offerings.
 	// When this filter is not used, which is the default behavior, all offerings
 	// from AWS and Reserved Instance Marketplace are listed.
 	//
-	//   product-description - The Reserved Instance product platform description.
+	//   product-description - The Reserved instance product platform description.
 	// Instances that include (Amazon VPC) in the product platform description will
 	// only be displayed to EC2-Classic account holders and are for use with Amazon
 	// VPC. (Linux/UNIX | Linux/UNIX (Amazon VPC) | SUSE Linux | SUSE Linux (Amazon
@@ -13357,23 +13845,23 @@ type DescribeReservedInstancesOfferingsInput struct {
 	// with SQL Server Web (Amazon VPC) | Windows with SQL Server Enterprise | Windows
 	// with SQL Server Enterprise (Amazon VPC))
 	//
-	//   reserved-instances-offering-id - The Reserved Instances offering ID.
+	//   reserved-instances-offering-id - The Reserved instances offering ID.
 	//
-	//   usage-price - The usage price of the Reserved Instance, per hour (for
+	//   usage-price - The usage price of the Reserved instance, per hour (for
 	// example, 0.84).
 	Filters []*Filter `locationName:"Filter" locationNameList:"Filter" type:"list"`
 
-	// Include Marketplace offerings in the response.
+	// Include Reserved Instance Marketplace offerings in the response.
 	IncludeMarketplace *bool `type:"boolean"`
 
-	// The tenancy of the Reserved Instance offering. A Reserved Instance with dedicated
-	// tenancy runs on single-tenant hardware and can only be launched within a
-	// VPC.
+	// The tenancy of the Reserved instance offering. A Reserved instance with dedicated
+	// tenancy is applied to instances that run on single-tenant hardware and can
+	// only be launched within a VPC.
 	//
 	// Default: default
 	InstanceTenancy *string `locationName:"instanceTenancy" type:"string" enum:"Tenancy"`
 
-	// The instance type on which the Reserved Instance can be used. For more information,
+	// The instance type on which the Reserved instance can be used. For more information,
 	// see Instance Types (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html)
 	// in the Amazon Elastic Compute Cloud User Guide.
 	InstanceType *string `type:"string" enum:"InstanceType"`
@@ -13403,16 +13891,16 @@ type DescribeReservedInstancesOfferingsInput struct {
 	// The token to retrieve the next page of results.
 	NextToken *string `locationName:"nextToken" type:"string"`
 
-	// The Reserved Instance offering type. If you are using tools that predate
+	// The Reserved instance offering type. If you are using tools that predate
 	// the 2011-11-01 API version, you only have access to the Medium Utilization
-	// Reserved Instance offering type.
+	// Reserved instance offering type.
 	OfferingType *string `locationName:"offeringType" type:"string" enum:"OfferingTypeValues"`
 
-	// The Reserved Instance product platform description. Instances that include
+	// The Reserved instance product platform description. Instances that include
 	// (Amazon VPC) in the description are for use with Amazon VPC.
 	ProductDescription *string `type:"string" enum:"RIProductDescription"`
 
-	// One or more Reserved Instances offering IDs.
+	// One or more Reserved instances offering IDs.
 	ReservedInstancesOfferingIds []*string `locationName:"ReservedInstancesOfferingId" type:"list"`
 
 	metadataDescribeReservedInstancesOfferingsInput `json:"-" xml:"-"`
@@ -13437,7 +13925,7 @@ type DescribeReservedInstancesOfferingsOutput struct {
 	// when there are no more results to return.
 	NextToken *string `locationName:"nextToken" type:"string"`
 
-	// A list of Reserved Instances offerings.
+	// A list of Reserved instances offerings.
 	ReservedInstancesOfferings []*ReservedInstancesOffering `locationName:"reservedInstancesOfferingsSet" locationNameList:"item" type:"list"`
 
 	metadataDescribeReservedInstancesOfferingsOutput `json:"-" xml:"-"`
@@ -13458,7 +13946,7 @@ func (s DescribeReservedInstancesOfferingsOutput) GoString() string {
 }
 
 type DescribeReservedInstancesOutput struct {
-	// A list of Reserved Instances.
+	// A list of Reserved instances.
 	ReservedInstances []*ReservedInstances `locationName:"reservedInstancesSet" locationNameList:"item" type:"list"`
 
 	metadataDescribeReservedInstancesOutput `json:"-" xml:"-"`
@@ -13496,7 +13984,7 @@ type DescribeRouteTablesInput struct {
 	//   association.subnet-id - The ID of the subnet involved in the association.
 	//
 	//   association.main - Indicates whether the route table is the main route
-	// table for the VPC.
+	// table for the VPC (true | false).
 	//
 	//   route-table-id - The ID of the route table.
 	//
@@ -14153,7 +14641,7 @@ type DescribeSpotInstanceRequestsInput struct {
 	//
 	//   launch.image-id - The ID of the AMI.
 	//
-	//   launch.instance-type - The type of instance (for example, m1.small).
+	//   launch.instance-type - The type of instance (for example, m3.medium).
 	//
 	//   launch.kernel-id - The kernel ID.
 	//
@@ -14291,7 +14779,7 @@ type DescribeSpotPriceHistoryInput struct {
 	//
 	//   availability-zone - The Availability Zone for which prices should be returned.
 	//
-	//   instance-type - The type of instance (for example, m1.small).
+	//   instance-type - The type of instance (for example, m3.medium).
 	//
 	//   product-description - The product description for the Spot price (Linux/UNIX
 	// | SUSE Linux | Windows | Linux/UNIX (Amazon VPC) | SUSE Linux (Amazon VPC)
@@ -16675,6 +17163,108 @@ func (s HistoryRecord) GoString() string {
 	return s.String()
 }
 
+type Host struct {
+	// Whether auto-placement is on or off.
+	AutoPlacement *string `locationName:"autoPlacement" type:"string" enum:"AutoPlacement"`
+
+	// The Availability Zone of the Dedicated host.
+	AvailabilityZone *string `locationName:"availabilityZone" type:"string"`
+
+	// The number of new instances that can be launched onto the Dedicated host.
+	AvailableCapacity *AvailableCapacity `locationName:"availableCapacity" type:"structure"`
+
+	// Unique, case-sensitive identifier you provide to ensure idempotency of the
+	// request. For more information, see How to Ensure Idempotency (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Run_Instance_Idempotency.html)
+	// in the Amazon Elastic Compute Cloud User Guide.
+	ClientToken *string `locationName:"clientToken" type:"string"`
+
+	// The ID of the Dedicated host.
+	HostId *string `locationName:"hostId" type:"string"`
+
+	// The hardware specifications of the Dedicated host.
+	HostProperties *HostProperties `locationName:"hostProperties" type:"structure"`
+
+	// The reservation ID of the Dedicated host. This returns a "null" response
+	// if the Dedicated host doesn't have an associated reservation.
+	HostReservationId *string `locationName:"hostReservationId" type:"string"`
+
+	// The IDs and instance type that are currently running on the Dedicated host.
+	Instances []*HostInstance `locationName:"instances" locationNameList:"item" type:"list"`
+
+	// The Dedicated host's state. Can be "available", "under assessment, or "released".
+	State *string `locationName:"state" type:"string" enum:"AllocationState"`
+
+	metadataHost `json:"-" xml:"-"`
+}
+
+type metadataHost struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s Host) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s Host) GoString() string {
+	return s.String()
+}
+
+type HostInstance struct {
+	// the IDs of instances that are running on the Dedicated host.
+	InstanceId *string `locationName:"instanceId" type:"string"`
+
+	// The instance type size (e.g., m3.medium) of the running instance.
+	InstanceType *string `locationName:"instanceType" type:"string"`
+
+	metadataHostInstance `json:"-" xml:"-"`
+}
+
+type metadataHostInstance struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s HostInstance) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s HostInstance) GoString() string {
+	return s.String()
+}
+
+type HostProperties struct {
+	// The number of cores on the Dedicated host.
+	Cores *int64 `locationName:"cores" type:"integer"`
+
+	// The instance type size that the Dedicated host supports (e.g., m3.medium).
+	InstanceType *string `locationName:"instanceType" type:"string"`
+
+	// The number of sockets on the Dedicated host.
+	Sockets *int64 `locationName:"sockets" type:"integer"`
+
+	// The number of vCPUs on the Dedicated host.
+	TotalVCpus *int64 `locationName:"totalVCpus" type:"integer"`
+
+	metadataHostProperties `json:"-" xml:"-"`
+}
+
+type metadataHostProperties struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s HostProperties) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s HostProperties) GoString() string {
+	return s.String()
+}
+
 // Describes an IAM instance profile.
 type IamInstanceProfile struct {
 	// The Amazon Resource Name (ARN) of the instance profile.
@@ -16747,6 +17337,35 @@ func (s IcmpTypeCode) String() string {
 
 // GoString returns the string representation
 func (s IcmpTypeCode) GoString() string {
+	return s.String()
+}
+
+// Describes the ID format for a resource.
+type IdFormat struct {
+	// The date in UTC at which you are permanently switched over to using longer
+	// IDs.
+	Deadline *time.Time `locationName:"deadline" type:"timestamp" timestampFormat:"iso8601"`
+
+	// The type of resource.
+	Resource *string `locationName:"resource" type:"string"`
+
+	// Indicates whether longer IDs (17-character IDs) are enabled for the resource.
+	UseLongIds *bool `locationName:"useLongIds" type:"boolean"`
+
+	metadataIdFormat `json:"-" xml:"-"`
+}
+
+type metadataIdFormat struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s IdFormat) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s IdFormat) GoString() string {
 	return s.String()
 }
 
@@ -17491,7 +18110,7 @@ type Instance struct {
 	// Any block device mapping entries for the instance.
 	BlockDeviceMappings []*InstanceBlockDeviceMapping `locationName:"blockDeviceMapping" locationNameList:"item" type:"list"`
 
-	// The idempotency token you provided when you launched the instance.
+	// The idempotency token you provided when you launched the instance, if applicable.
 	ClientToken *string `locationName:"clientToken" type:"string"`
 
 	// Indicates whether the instance is optimized for EBS I/O. This optimization
@@ -17504,7 +18123,7 @@ type Instance struct {
 	// The hypervisor type of the instance.
 	Hypervisor *string `locationName:"hypervisor" type:"string" enum:"HypervisorType"`
 
-	// The IAM instance profile associated with the instance.
+	// The IAM instance profile associated with the instance, if applicable.
 	IamInstanceProfile *IamInstanceProfile `locationName:"iamInstanceProfile" type:"structure"`
 
 	// The ID of the AMI used to launch the instance.
@@ -17513,13 +18132,13 @@ type Instance struct {
 	// The ID of the instance.
 	InstanceId *string `locationName:"instanceId" type:"string"`
 
-	// Indicates whether this is a Spot Instance.
+	// Indicates whether this is a Spot instance.
 	InstanceLifecycle *string `locationName:"instanceLifecycle" type:"string" enum:"InstanceLifecycleType"`
 
 	// The instance type.
 	InstanceType *string `locationName:"instanceType" type:"string" enum:"InstanceType"`
 
-	// The kernel associated with this instance.
+	// The kernel associated with this instance, if applicable.
 	KernelId *string `locationName:"kernelId" type:"string"`
 
 	// The name of the key pair, if this instance was launched with an associated
@@ -17535,7 +18154,7 @@ type Instance struct {
 	// [EC2-VPC] One or more network interfaces for the instance.
 	NetworkInterfaces []*InstanceNetworkInterface `locationName:"networkInterfaceSet" locationNameList:"item" type:"list"`
 
-	// The location where the instance launched.
+	// The location where the instance launched, if applicable.
 	Placement *Placement `locationName:"placement" type:"structure"`
 
 	// The value is Windows for Windows instances; otherwise blank.
@@ -17543,23 +18162,25 @@ type Instance struct {
 
 	// The private DNS name assigned to the instance. This DNS name can only be
 	// used inside the Amazon EC2 network. This name is not available until the
-	// instance enters the running state.
+	// instance enters the running state. For EC2-VPC, this name is only available
+	// if you've enabled DNS hostnames for your VPC.
 	PrivateDnsName *string `locationName:"privateDnsName" type:"string"`
 
 	// The private IP address assigned to the instance.
 	PrivateIpAddress *string `locationName:"privateIpAddress" type:"string"`
 
-	// The product codes attached to this instance.
+	// The product codes attached to this instance, if applicable.
 	ProductCodes []*ProductCode `locationName:"productCodes" locationNameList:"item" type:"list"`
 
 	// The public DNS name assigned to the instance. This name is not available
-	// until the instance enters the running state.
+	// until the instance enters the running state. For EC2-VPC, this name is only
+	// available if you've enabled DNS hostnames for your VPC.
 	PublicDnsName *string `locationName:"dnsName" type:"string"`
 
-	// The public IP address assigned to the instance.
+	// The public IP address assigned to the instance, if applicable.
 	PublicIpAddress *string `locationName:"ipAddress" type:"string"`
 
-	// The RAM disk associated with this instance.
+	// The RAM disk associated with this instance, if applicable.
 	RamdiskId *string `locationName:"ramdiskId" type:"string"`
 
 	// The root device name (for example, /dev/sda1 or /dev/xvda).
@@ -17580,7 +18201,7 @@ type Instance struct {
 	// in the Amazon Virtual Private Cloud User Guide.
 	SourceDestCheck *bool `locationName:"sourceDestCheck" type:"boolean"`
 
-	// The ID of the Spot Instance request.
+	// If the request is a Spot instance request, the ID of the request.
 	SpotInstanceRequestId *string `locationName:"spotInstanceRequestId" type:"string"`
 
 	// Specifies whether enhanced networking is enabled.
@@ -17595,7 +18216,7 @@ type Instance struct {
 	// The reason for the most recent state transition. This might be an empty string.
 	StateTransitionReason *string `locationName:"reason" type:"string"`
 
-	// The ID of the subnet in which the instance is running.
+	// [EC2-VPC] The ID of the subnet in which the instance is running.
 	SubnetId *string `locationName:"subnetId" type:"string"`
 
 	// Any tags assigned to the instance.
@@ -17604,7 +18225,7 @@ type Instance struct {
 	// The virtualization type of the instance.
 	VirtualizationType *string `locationName:"virtualizationType" type:"string" enum:"VirtualizationType"`
 
-	// The ID of the VPC in which the instance is running.
+	// [EC2-VPC] The ID of the VPC in which the instance is running.
 	VpcId *string `locationName:"vpcId" type:"string"`
 
 	metadataInstance `json:"-" xml:"-"`
@@ -17682,12 +18303,39 @@ func (s InstanceBlockDeviceMappingSpecification) GoString() string {
 	return s.String()
 }
 
-// Describes a Reserved Instance listing state.
+type InstanceCapacity struct {
+	// The number of instances that can still be launched onto the Dedicated host.
+	AvailableCapacity *int64 `locationName:"availableCapacity" type:"integer"`
+
+	// The instance type size supported by the Dedicated host.
+	InstanceType *string `locationName:"instanceType" type:"string"`
+
+	// The total number of instances that can be launched onto the Dedicated host.
+	TotalCapacity *int64 `locationName:"totalCapacity" type:"integer"`
+
+	metadataInstanceCapacity `json:"-" xml:"-"`
+}
+
+type metadataInstanceCapacity struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s InstanceCapacity) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s InstanceCapacity) GoString() string {
+	return s.String()
+}
+
+// Describes a Reserved instance listing state.
 type InstanceCount struct {
-	// The number of listed Reserved Instances in the state specified by the state.
+	// The number of listed Reserved instances in the state specified by the state.
 	InstanceCount *int64 `locationName:"instanceCount" type:"integer"`
 
-	// The states of the listed Reserved Instances.
+	// The states of the listed Reserved instances.
 	State *string `locationName:"state" type:"string" enum:"ListingState"`
 
 	metadataInstanceCount `json:"-" xml:"-"`
@@ -18449,6 +19097,97 @@ func (s LaunchSpecification) GoString() string {
 	return s.String()
 }
 
+type ModifyHostsInput struct {
+	// Specify whether to enable or disable auto-placement.
+	AutoPlacement *string `locationName:"autoPlacement" type:"string" required:"true" enum:"AutoPlacement"`
+
+	// The host IDs of the Dedicated hosts you want to modify.
+	HostIds []*string `locationName:"hostId" locationNameList:"item" type:"list" required:"true"`
+
+	metadataModifyHostsInput `json:"-" xml:"-"`
+}
+
+type metadataModifyHostsInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ModifyHostsInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ModifyHostsInput) GoString() string {
+	return s.String()
+}
+
+type ModifyHostsOutput struct {
+	// The IDs of the Dedicated hosts that were successfully modified.
+	Successful []*string `locationName:"successful" locationNameList:"item" type:"list"`
+
+	// The IDs of the Dedicated hosts that could not be modified. Check whether
+	// the setting you requested can be used.
+	Unsuccessful []*UnsuccessfulItem `locationName:"unsuccessful" locationNameList:"item" type:"list"`
+
+	metadataModifyHostsOutput `json:"-" xml:"-"`
+}
+
+type metadataModifyHostsOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ModifyHostsOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ModifyHostsOutput) GoString() string {
+	return s.String()
+}
+
+type ModifyIdFormatInput struct {
+	// The type of resource.
+	Resource *string `type:"string" required:"true"`
+
+	// Indicate whether the resource should use longer IDs (17-character IDs).
+	UseLongIds *bool `type:"boolean" required:"true"`
+
+	metadataModifyIdFormatInput `json:"-" xml:"-"`
+}
+
+type metadataModifyIdFormatInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ModifyIdFormatInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ModifyIdFormatInput) GoString() string {
+	return s.String()
+}
+
+type ModifyIdFormatOutput struct {
+	metadataModifyIdFormatOutput `json:"-" xml:"-"`
+}
+
+type metadataModifyIdFormatOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ModifyIdFormatOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ModifyIdFormatOutput) GoString() string {
+	return s.String()
+}
+
 type ModifyImageAttributeInput struct {
 	// The name of the attribute to modify.
 	Attribute *string `type:"string"`
@@ -18637,6 +19376,57 @@ func (s ModifyInstanceAttributeOutput) GoString() string {
 	return s.String()
 }
 
+type ModifyInstancePlacementInput struct {
+	// The new affinity setting for the instance.
+	Affinity *string `locationName:"affinity" type:"string" enum:"Affinity"`
+
+	// The ID of the Dedicated host that the instance will have affinity with.
+	HostId *string `locationName:"hostId" type:"string"`
+
+	// The ID of the instance that you are modifying.
+	InstanceId *string `locationName:"instanceId" type:"string" required:"true"`
+
+	// The tenancy of the instance that you are modifying.
+	Tenancy *string `locationName:"tenancy" type:"string" enum:"HostTenancy"`
+
+	metadataModifyInstancePlacementInput `json:"-" xml:"-"`
+}
+
+type metadataModifyInstancePlacementInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ModifyInstancePlacementInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ModifyInstancePlacementInput) GoString() string {
+	return s.String()
+}
+
+type ModifyInstancePlacementOutput struct {
+	// Is true if the request succeeds, and an error otherwise.
+	Return *bool `locationName:"return" type:"boolean"`
+
+	metadataModifyInstancePlacementOutput `json:"-" xml:"-"`
+}
+
+type metadataModifyInstancePlacementOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ModifyInstancePlacementOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ModifyInstancePlacementOutput) GoString() string {
+	return s.String()
+}
+
 type ModifyNetworkInterfaceAttributeInput struct {
 	// Information about the interface attachment. If modifying the 'delete on termination'
 	// attribute, you must specify the ID of the interface attachment.
@@ -18707,10 +19497,10 @@ type ModifyReservedInstancesInput struct {
 	// modification request. For more information, see Ensuring Idempotency (http://docs.aws.amazon.com/AWSEC2/latest/APIReference/Run_Instance_Idempotency.html).
 	ClientToken *string `locationName:"clientToken" type:"string"`
 
-	// The IDs of the Reserved Instances to modify.
+	// The IDs of the Reserved instances to modify.
 	ReservedInstancesIds []*string `locationName:"ReservedInstancesId" locationNameList:"ReservedInstancesId" type:"list" required:"true"`
 
-	// The configuration settings for the Reserved Instances to modify.
+	// The configuration settings for the Reserved instances to modify.
 	TargetConfigurations []*ReservedInstancesConfiguration `locationName:"ReservedInstancesConfigurationSetItemType" locationNameList:"item" type:"list" required:"true"`
 
 	metadataModifyReservedInstancesInput `json:"-" xml:"-"`
@@ -18960,7 +19750,9 @@ type ModifyVpcAttributeInput struct {
 	// Indicates whether the instances launched in the VPC get DNS hostnames. If
 	// enabled, instances in the VPC get DNS hostnames; otherwise, they do not.
 	//
-	// You can only enable DNS hostnames if you also enable DNS support.
+	// You cannot modify the DNS resolution and DNS hostnames attributes in the
+	// same request. Use separate requests for each attribute. You can only enable
+	// DNS hostnames if you've enabled DNS support.
 	EnableDnsHostnames *AttributeBooleanValue `type:"structure"`
 
 	// Indicates whether the DNS resolution is supported for the VPC. If enabled,
@@ -18968,6 +19760,9 @@ type ModifyVpcAttributeInput struct {
 	// or the reserved IP address at the base of the VPC network range "plus two"
 	// will succeed. If disabled, the Amazon provided DNS service in the VPC that
 	// resolves public DNS hostnames to IP addresses is not enabled.
+	//
+	// You cannot modify the DNS resolution and DNS hostnames attributes in the
+	// same request. Use separate requests for each attribute.
 	EnableDnsSupport *AttributeBooleanValue `type:"structure"`
 
 	// The ID of the VPC.
@@ -19555,14 +20350,23 @@ func (s NewDhcpConfiguration) GoString() string {
 
 // Describes the placement for the instance.
 type Placement struct {
+	// The affinity setting for the instance on the Dedicated host. This parameter
+	// is not supported for the ImportInstance command.
+	Affinity *string `locationName:"affinity" type:"string"`
+
 	// The Availability Zone of the instance.
 	AvailabilityZone *string `locationName:"availabilityZone" type:"string"`
 
 	// The name of the placement group the instance is in (for cluster compute instances).
 	GroupName *string `locationName:"groupName" type:"string"`
 
+	// The ID of the Dedicted host on which the instance resides. This parameter
+	// is not support for the ImportInstance command.
+	HostId *string `locationName:"hostId" type:"string"`
+
 	// The tenancy of the instance (if the instance is running in a VPC). An instance
-	// with a tenancy of dedicated runs on single-tenant hardware.
+	// with a tenancy of dedicated runs on single-tenant hardware. The host tenancy
+	// is not supported for the ImportInstance command.
 	Tenancy *string `locationName:"tenancy" type:"string" enum:"Tenancy"`
 
 	metadataPlacement `json:"-" xml:"-"`
@@ -19685,7 +20489,7 @@ func (s PrefixListId) GoString() string {
 	return s.String()
 }
 
-// Describes the price for a Reserved Instance.
+// Describes the price for a Reserved instance.
 type PriceSchedule struct {
 	// The current price schedule, as determined by the term remaining for the Reserved
 	// Instance in the listing.
@@ -19699,7 +20503,7 @@ type PriceSchedule struct {
 	// be active for months 2 and 1.
 	Active *bool `locationName:"active" type:"boolean"`
 
-	// The currency for transacting the Reserved Instance resale. At this time,
+	// The currency for transacting the Reserved instance resale. At this time,
 	// the only supported currency is USD.
 	CurrencyCode *string `locationName:"currencyCode" type:"string" enum:"CurrencyCodeValues"`
 
@@ -19727,9 +20531,9 @@ func (s PriceSchedule) GoString() string {
 	return s.String()
 }
 
-// Describes the price for a Reserved Instance.
+// Describes the price for a Reserved instance.
 type PriceScheduleSpecification struct {
-	// The currency for transacting the Reserved Instance resale. At this time,
+	// The currency for transacting the Reserved instance resale. At this time,
 	// the only supported currency is USD.
 	CurrencyCode *string `locationName:"currencyCode" type:"string" enum:"CurrencyCodeValues"`
 
@@ -19757,7 +20561,7 @@ func (s PriceScheduleSpecification) GoString() string {
 	return s.String()
 }
 
-// Describes a Reserved Instance offering.
+// Describes a Reserved instance offering.
 type PricingDetail struct {
 	// The number of instances available for the price.
 	Count *int64 `locationName:"count" type:"integer"`
@@ -19862,15 +20666,15 @@ type PurchaseReservedInstancesOfferingInput struct {
 	// it is UnauthorizedOperation.
 	DryRun *bool `locationName:"dryRun" type:"boolean"`
 
-	// The number of Reserved Instances to purchase.
+	// The number of Reserved instances to purchase.
 	InstanceCount *int64 `type:"integer" required:"true"`
 
 	// Specified for Reserved Instance Marketplace offerings to limit the total
-	// order and ensure that the Reserved Instances are not purchased at unexpected
+	// order and ensure that the Reserved instances are not purchased at unexpected
 	// prices.
 	LimitPrice *ReservedInstanceLimitPrice `locationName:"limitPrice" type:"structure"`
 
-	// The ID of the Reserved Instance offering to purchase.
+	// The ID of the Reserved instance offering to purchase.
 	ReservedInstancesOfferingId *string `type:"string" required:"true"`
 
 	metadataPurchaseReservedInstancesOfferingInput `json:"-" xml:"-"`
@@ -19891,7 +20695,7 @@ func (s PurchaseReservedInstancesOfferingInput) GoString() string {
 }
 
 type PurchaseReservedInstancesOfferingOutput struct {
-	// The IDs of the purchased Reserved Instances.
+	// The IDs of the purchased Reserved instances.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string"`
 
 	metadataPurchaseReservedInstancesOfferingOutput `json:"-" xml:"-"`
@@ -20189,6 +20993,52 @@ func (s ReleaseAddressOutput) String() string {
 
 // GoString returns the string representation
 func (s ReleaseAddressOutput) GoString() string {
+	return s.String()
+}
+
+type ReleaseHostsInput struct {
+	// The IDs of the Dedicated hosts you want to release.
+	HostIds []*string `locationName:"hostId" locationNameList:"item" type:"list" required:"true"`
+
+	metadataReleaseHostsInput `json:"-" xml:"-"`
+}
+
+type metadataReleaseHostsInput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ReleaseHostsInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ReleaseHostsInput) GoString() string {
+	return s.String()
+}
+
+type ReleaseHostsOutput struct {
+	// The IDs of the Dedicated hosts that were successfully released.
+	Successful []*string `locationName:"successful" locationNameList:"item" type:"list"`
+
+	// The IDs of the Dedicated hosts that could not be released, including an error
+	// message.
+	Unsuccessful []*UnsuccessfulItem `locationName:"unsuccessful" locationNameList:"item" type:"list"`
+
+	metadataReleaseHostsOutput `json:"-" xml:"-"`
+}
+
+type metadataReleaseHostsOutput struct {
+	SDKShapeTraits bool `type:"structure"`
+}
+
+// String returns the string representation
+func (s ReleaseHostsOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ReleaseHostsOutput) GoString() string {
 	return s.String()
 }
 
@@ -20589,7 +21439,7 @@ type RequestSpotInstancesInput struct {
 	// the instance a two-minute warning before it terminates.
 	//
 	// Note that you can't specify an Availability Zone group or a launch group
-	// if you specify a required duration.
+	// if you specify a duration.
 	BlockDurationMinutes *int64 `locationName:"blockDurationMinutes" type:"integer"`
 
 	// Unique, case-sensitive identifier that you provide to ensure the idempotency
@@ -20788,7 +21638,7 @@ func (s Reservation) GoString() string {
 	return s.String()
 }
 
-// Describes the limit price of a Reserved Instance offering.
+// Describes the limit price of a Reserved instance offering.
 type ReservedInstanceLimitPrice struct {
 	// Used for Reserved Instance Marketplace offerings. Specifies the limit price
 	// on the total order (instanceCount * price).
@@ -20815,55 +21665,55 @@ func (s ReservedInstanceLimitPrice) GoString() string {
 	return s.String()
 }
 
-// Describes a Reserved Instance.
+// Describes a Reserved instance.
 type ReservedInstances struct {
-	// The Availability Zone in which the Reserved Instance can be used.
+	// The Availability Zone in which the Reserved instance can be used.
 	AvailabilityZone *string `locationName:"availabilityZone" type:"string"`
 
-	// The currency of the Reserved Instance. It's specified using ISO 4217 standard
+	// The currency of the Reserved instance. It's specified using ISO 4217 standard
 	// currency codes. At this time, the only supported currency is USD.
 	CurrencyCode *string `locationName:"currencyCode" type:"string" enum:"CurrencyCodeValues"`
 
-	// The duration of the Reserved Instance, in seconds.
+	// The duration of the Reserved instance, in seconds.
 	Duration *int64 `locationName:"duration" type:"long"`
 
-	// The time when the Reserved Instance expires.
+	// The time when the Reserved instance expires.
 	End *time.Time `locationName:"end" type:"timestamp" timestampFormat:"iso8601"`
 
-	// The purchase price of the Reserved Instance.
+	// The purchase price of the Reserved instance.
 	FixedPrice *float64 `locationName:"fixedPrice" type:"float"`
 
-	// The number of Reserved Instances purchased.
+	// The number of Reserved instances purchased.
 	InstanceCount *int64 `locationName:"instanceCount" type:"integer"`
 
 	// The tenancy of the reserved instance.
 	InstanceTenancy *string `locationName:"instanceTenancy" type:"string" enum:"Tenancy"`
 
-	// The instance type on which the Reserved Instance can be used.
+	// The instance type on which the Reserved instance can be used.
 	InstanceType *string `locationName:"instanceType" type:"string" enum:"InstanceType"`
 
-	// The Reserved Instance offering type.
+	// The Reserved instance offering type.
 	OfferingType *string `locationName:"offeringType" type:"string" enum:"OfferingTypeValues"`
 
-	// The Reserved Instance product platform description.
+	// The Reserved instance product platform description.
 	ProductDescription *string `locationName:"productDescription" type:"string" enum:"RIProductDescription"`
 
 	// The recurring charge tag assigned to the resource.
 	RecurringCharges []*RecurringCharge `locationName:"recurringCharges" locationNameList:"item" type:"list"`
 
-	// The ID of the Reserved Instance.
+	// The ID of the Reserved instance.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string"`
 
-	// The date and time the Reserved Instance started.
+	// The date and time the Reserved instance started.
 	Start *time.Time `locationName:"start" type:"timestamp" timestampFormat:"iso8601"`
 
-	// The state of the Reserved Instance purchase.
+	// The state of the Reserved instance purchase.
 	State *string `locationName:"state" type:"string" enum:"ReservedInstanceState"`
 
 	// Any tags assigned to the resource.
 	Tags []*Tag `locationName:"tagSet" locationNameList:"item" type:"list"`
 
-	// The usage price of the Reserved Instance, per hour.
+	// The usage price of the Reserved instance, per hour.
 	UsagePrice *float64 `locationName:"usagePrice" type:"float"`
 
 	metadataReservedInstances `json:"-" xml:"-"`
@@ -20883,18 +21733,18 @@ func (s ReservedInstances) GoString() string {
 	return s.String()
 }
 
-// Describes the configuration settings for the modified Reserved Instances.
+// Describes the configuration settings for the modified Reserved instances.
 type ReservedInstancesConfiguration struct {
-	// The Availability Zone for the modified Reserved Instances.
+	// The Availability Zone for the modified Reserved instances.
 	AvailabilityZone *string `locationName:"availabilityZone" type:"string"`
 
-	// The number of modified Reserved Instances.
+	// The number of modified Reserved instances.
 	InstanceCount *int64 `locationName:"instanceCount" type:"integer"`
 
-	// The instance type for the modified Reserved Instances.
+	// The instance type for the modified Reserved instances.
 	InstanceType *string `locationName:"instanceType" type:"string" enum:"InstanceType"`
 
-	// The network platform of the modified Reserved Instances, which is either
+	// The network platform of the modified Reserved instances, which is either
 	// EC2-Classic or EC2-VPC.
 	Platform *string `locationName:"platform" type:"string"`
 
@@ -20915,9 +21765,9 @@ func (s ReservedInstancesConfiguration) GoString() string {
 	return s.String()
 }
 
-// Describes the ID of a Reserved Instance.
+// Describes the ID of a Reserved instance.
 type ReservedInstancesId struct {
-	// The ID of the Reserved Instance.
+	// The ID of the Reserved instance.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string"`
 
 	metadataReservedInstancesId `json:"-" xml:"-"`
@@ -20937,7 +21787,7 @@ func (s ReservedInstancesId) GoString() string {
 	return s.String()
 }
 
-// Describes a Reserved Instance listing.
+// Describes a Reserved instance listing.
 type ReservedInstancesListing struct {
 	// A unique, case-sensitive key supplied by the client to ensure that the request
 	// is idempotent. For more information, see Ensuring Idempotency (http://docs.aws.amazon.com/AWSEC2/latest/APIReference/Run_Instance_Idempotency.html).
@@ -20949,19 +21799,19 @@ type ReservedInstancesListing struct {
 	// The number of instances in this state.
 	InstanceCounts []*InstanceCount `locationName:"instanceCounts" locationNameList:"item" type:"list"`
 
-	// The price of the Reserved Instance listing.
+	// The price of the Reserved instance listing.
 	PriceSchedules []*PriceSchedule `locationName:"priceSchedules" locationNameList:"item" type:"list"`
 
-	// The ID of the Reserved Instance.
+	// The ID of the Reserved instance.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string"`
 
-	// The ID of the Reserved Instance listing.
+	// The ID of the Reserved instance listing.
 	ReservedInstancesListingId *string `locationName:"reservedInstancesListingId" type:"string"`
 
-	// The status of the Reserved Instance listing.
+	// The status of the Reserved instance listing.
 	Status *string `locationName:"status" type:"string" enum:"ListingStatus"`
 
-	// The reason for the current status of the Reserved Instance listing. The response
+	// The reason for the current status of the Reserved instance listing. The response
 	// can be blank.
 	StatusMessage *string `locationName:"statusMessage" type:"string"`
 
@@ -20988,7 +21838,7 @@ func (s ReservedInstancesListing) GoString() string {
 	return s.String()
 }
 
-// Describes a Reserved Instance modification.
+// Describes a Reserved instance modification.
 type ReservedInstancesModification struct {
 	// A unique, case-sensitive key supplied by the client to ensure that the request
 	// is idempotent. For more information, see Ensuring Idempotency (http://docs.aws.amazon.com/AWSEC2/latest/APIReference/Run_Instance_Idempotency.html).
@@ -21001,16 +21851,16 @@ type ReservedInstancesModification struct {
 	EffectiveDate *time.Time `locationName:"effectiveDate" type:"timestamp" timestampFormat:"iso8601"`
 
 	// Contains target configurations along with their corresponding new Reserved
-	// Instance IDs.
+	// instance IDs.
 	ModificationResults []*ReservedInstancesModificationResult `locationName:"modificationResultSet" locationNameList:"item" type:"list"`
 
-	// The IDs of one or more Reserved Instances.
+	// The IDs of one or more Reserved instances.
 	ReservedInstancesIds []*ReservedInstancesId `locationName:"reservedInstancesSet" locationNameList:"item" type:"list"`
 
-	// A unique ID for the Reserved Instance modification.
+	// A unique ID for the Reserved instance modification.
 	ReservedInstancesModificationId *string `locationName:"reservedInstancesModificationId" type:"string"`
 
-	// The status of the Reserved Instances modification request.
+	// The status of the Reserved instances modification request.
 	Status *string `locationName:"status" type:"string"`
 
 	// The reason for the status.
@@ -21037,11 +21887,11 @@ func (s ReservedInstancesModification) GoString() string {
 }
 
 type ReservedInstancesModificationResult struct {
-	// The ID for the Reserved Instances that were created as part of the modification
+	// The ID for the Reserved instances that were created as part of the modification
 	// request. This field is only available when the modification is fulfilled.
 	ReservedInstancesId *string `locationName:"reservedInstancesId" type:"string"`
 
-	// The target Reserved Instances configurations supplied as part of the modification
+	// The target Reserved instances configurations supplied as part of the modification
 	// request.
 	TargetConfiguration *ReservedInstancesConfiguration `locationName:"targetConfiguration" type:"structure"`
 
@@ -21062,26 +21912,26 @@ func (s ReservedInstancesModificationResult) GoString() string {
 	return s.String()
 }
 
-// Describes a Reserved Instance offering.
+// Describes a Reserved instance offering.
 type ReservedInstancesOffering struct {
-	// The Availability Zone in which the Reserved Instance can be used.
+	// The Availability Zone in which the Reserved instance can be used.
 	AvailabilityZone *string `locationName:"availabilityZone" type:"string"`
 
-	// The currency of the Reserved Instance offering you are purchasing. It's specified
+	// The currency of the Reserved instance offering you are purchasing. It's specified
 	// using ISO 4217 standard currency codes. At this time, the only supported
 	// currency is USD.
 	CurrencyCode *string `locationName:"currencyCode" type:"string" enum:"CurrencyCodeValues"`
 
-	// The duration of the Reserved Instance, in seconds.
+	// The duration of the Reserved instance, in seconds.
 	Duration *int64 `locationName:"duration" type:"long"`
 
-	// The purchase price of the Reserved Instance.
+	// The purchase price of the Reserved instance.
 	FixedPrice *float64 `locationName:"fixedPrice" type:"float"`
 
 	// The tenancy of the reserved instance.
 	InstanceTenancy *string `locationName:"instanceTenancy" type:"string" enum:"Tenancy"`
 
-	// The instance type on which the Reserved Instance can be used.
+	// The instance type on which the Reserved instance can be used.
 	InstanceType *string `locationName:"instanceType" type:"string" enum:"InstanceType"`
 
 	// Indicates whether the offering is available through the Reserved Instance
@@ -21089,22 +21939,22 @@ type ReservedInstancesOffering struct {
 	// this is true.
 	Marketplace *bool `locationName:"marketplace" type:"boolean"`
 
-	// The Reserved Instance offering type.
+	// The Reserved instance offering type.
 	OfferingType *string `locationName:"offeringType" type:"string" enum:"OfferingTypeValues"`
 
-	// The pricing details of the Reserved Instance offering.
+	// The pricing details of the Reserved instance offering.
 	PricingDetails []*PricingDetail `locationName:"pricingDetailsSet" locationNameList:"item" type:"list"`
 
-	// The Reserved Instance product platform description.
+	// The Reserved instance product platform description.
 	ProductDescription *string `locationName:"productDescription" type:"string" enum:"RIProductDescription"`
 
 	// The recurring charge tag assigned to the resource.
 	RecurringCharges []*RecurringCharge `locationName:"recurringCharges" locationNameList:"item" type:"list"`
 
-	// The ID of the Reserved Instance offering.
+	// The ID of the Reserved instance offering.
 	ReservedInstancesOfferingId *string `locationName:"reservedInstancesOfferingId" type:"string"`
 
-	// The usage price of the Reserved Instance, per hour.
+	// The usage price of the Reserved instance, per hour.
 	UsagePrice *float64 `locationName:"usagePrice" type:"float"`
 
 	metadataReservedInstancesOffering `json:"-" xml:"-"`
@@ -21550,9 +22400,9 @@ type Route struct {
 
 	// Describes how the route was created.
 	//
-	//   CreateRouteTable indicates that route was automatically created when the
-	// route table was created.  CreateRoute indicates that the route was manually
-	// added to the route table.  EnableVgwRoutePropagation indicates that the route
+	//  CreateRouteTable indicates that route was automatically created when the
+	// route table was created. CreateRoute indicates that the route was manually
+	// added to the route table. EnableVgwRoutePropagation indicates that the route
 	// was propagated by route propagation.
 	Origin *string `locationName:"origin" type:"string" enum:"RouteOrigin"`
 
@@ -22348,8 +23198,8 @@ func (s SpotFleetRequestConfigData) GoString() string {
 
 // Describes a Spot instance request.
 type SpotInstanceRequest struct {
-	// If you specified a required duration and your request was fulfilled, this
-	// is the fixed hourly price in effect for the Spot instance while it runs.
+	// If you specified a duration and your Spot instance request was fulfilled,
+	// this is the fixed hourly price in effect for the Spot instance while it runs.
 	ActualBlockHourlyPrice *string `locationName:"actualBlockHourlyPrice" type:"string"`
 
 	// The Availability Zone group. If you specify the same Availability Zone group
@@ -22357,7 +23207,7 @@ type SpotInstanceRequest struct {
 	// Availability Zone.
 	AvailabilityZoneGroup *string `locationName:"availabilityZoneGroup" type:"string"`
 
-	// The required duration for the Spot instance, in minutes.
+	// The duration for the Spot instance, in minutes.
 	BlockDurationMinutes *int64 `locationName:"blockDurationMinutes" type:"integer"`
 
 	// The date and time when the Spot instance request was created, in UTC format
@@ -22460,7 +23310,8 @@ func (s SpotInstanceStateFault) GoString() string {
 
 // Describes the status of a Spot instance request.
 type SpotInstanceStatus struct {
-	// The status code.
+	// The status code. For a list of status codes, see Spot Bid Status Codes (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-bid-status.html#spot-instance-bid-status-understand)
+	// in the Amazon Elastic Compute Cloud User Guide.
 	Code *string `locationName:"code" type:"string"`
 
 	// The description for the status code.
@@ -22605,7 +23456,7 @@ type StateReason struct {
 
 	// The message for the state change.
 	//
-	//  Server.SpotInstanceTermination: A Spot Instance was terminated due to an
+	//  Server.SpotInstanceTermination: A Spot instance was terminated due to an
 	// increase in the market price.
 	//
 	// Server.InternalError: An internal error occurred during instance launch,
@@ -23831,6 +24682,26 @@ const (
 )
 
 const (
+	// @enum Affinity
+	AffinityDefault = "default"
+	// @enum Affinity
+	AffinityHost = "host"
+)
+
+const (
+	// @enum AllocationState
+	AllocationStateAvailable = "available"
+	// @enum AllocationState
+	AllocationStateUnderAssessment = "under-assessment"
+	// @enum AllocationState
+	AllocationStatePermanentFailure = "permanent-failure"
+	// @enum AllocationState
+	AllocationStateReleased = "released"
+	// @enum AllocationState
+	AllocationStateReleasedPermanentFailure = "released-permanent-failure"
+)
+
+const (
 	// @enum AllocationStrategy
 	AllocationStrategyLowestPrice = "lowestPrice"
 	// @enum AllocationStrategy
@@ -23853,6 +24724,13 @@ const (
 	AttachmentStatusDetaching = "detaching"
 	// @enum AttachmentStatus
 	AttachmentStatusDetached = "detached"
+)
+
+const (
+	// @enum AutoPlacement
+	AutoPlacementOn = "on"
+	// @enum AutoPlacement
+	AutoPlacementOff = "off"
 )
 
 const (
@@ -24036,6 +24914,13 @@ const (
 const (
 	// @enum GatewayType
 	GatewayTypeIpsec1 = "ipsec.1"
+)
+
+const (
+	// @enum HostTenancy
+	HostTenancyDedicated = "dedicated"
+	// @enum HostTenancy
+	HostTenancyHost = "host"
 )
 
 const (
@@ -24594,6 +25479,8 @@ const (
 	TenancyDefault = "default"
 	// @enum Tenancy
 	TenancyDedicated = "dedicated"
+	// @enum Tenancy
+	TenancyHost = "host"
 )
 
 const (

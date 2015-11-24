@@ -49,53 +49,58 @@
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/endpoints",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/ec2query",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/query",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/rest",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/signer/v4",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/private/waiter",
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/autoscaling",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/ec2",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/elb",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.2",
+			"Rev": "9d7bc2d6ca2ada0468f705f0e9725ca97f8550c8"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
@@ -412,6 +417,11 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
+			"ImportPath": "github.com/go-ini/ini",
+			"Comment": "v0-54-g2e44421",
+			"Rev": "2e44421e256d82ebbf3d4d4fcabe8930b905eff3"
+		},
+		{
 			"ImportPath": "github.com/godbus/dbus",
 			"Comment": "v3",
 			"Rev": "c7fdd8b5cd55e87b4e1f4e372cdb1db61dd6c66f"
@@ -552,6 +562,11 @@
 			"ImportPath": "github.com/influxdb/influxdb/client",
 			"Comment": "v0.8.8",
 			"Rev": "afde71eb1740fd763ab9450e1f700ba0e53c36d0"
+		},
+		{
+			"ImportPath": "github.com/jmespath/go-jmespath",
+			"Comment": "0.2.2",
+			"Rev": "3433f3ea46d9f8019119e7dd41274e112a2359a9"
 		},
 		{
 			"ImportPath": "github.com/jonboulle/clockwork",
@@ -732,10 +747,6 @@
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
 			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
-		},
-		{
-			"ImportPath": "github.com/vaughan0/go-ini",
-			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink",
