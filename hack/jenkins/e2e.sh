@@ -106,7 +106,7 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
   else
     : ${MASTER_SIZE:="m3.large"}
-    : ${MINION_SIZE:="m3.large"}
+    : ${NODE_SIZE:="m3.large"}
     : ${NUM_MINIONS:="3"}
   fi
 fi
@@ -430,7 +430,7 @@ case ${JOB_NAME} in
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
     MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-standard-2"
+    NODE_SIZE="n1-standard-2"
     NODE_DISK_SIZE="50GB"
     NUM_MINIONS="100"
     # Reduce logs verbosity
@@ -452,7 +452,7 @@ case ${JOB_NAME} in
     # Override GCE defaults.
     E2E_ZONE="us-east1-b"
     MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-standard-2"
+    NODE_SIZE="n1-standard-2"
     NODE_DISK_SIZE="50GB"
     NUM_MINIONS="100"
     # Reduce logs verbosity
@@ -793,7 +793,7 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=GCE\sL7\sLoadBalancer\sController|Job|Horizontal\spod\sautoscaling"}
     # At least n1-standard-2 nodes are required for the cluster to
     # have enough cpu/ram to run the Horizontal pod autoscaling tests.
-    MINION_SIZE="n1-standard-2"
+    NODE_SIZE="n1-standard-2"
     ;;
 
   # Sets up the GKE soak cluster weekly using the latest CI release.
@@ -808,7 +808,7 @@ case ${JOB_NAME} in
     : ${E2E_UP:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Need at least n1-standard-2 nodes to run kubelet_perf tests
-    MINION_SIZE="n1-standard-2"
+    NODE_SIZE="n1-standard-2"
     ;;
 
   # Runs tests on GKE soak cluster.
@@ -1417,7 +1417,7 @@ case ${JOB_NAME} in
     KUBE_GCE_INSTANCE_PREFIX="kubemark100"
     NUM_MINIONS="10"
     MASTER_SIZE="n1-standard-2"
-    MINION_SIZE="n1-standard-1"
+    NODE_SIZE="n1-standard-1"
     KUBEMARK_MASTER_SIZE="n1-standard-4"
     KUBEMARK_NUM_NODES="100"
     ;;
@@ -1435,7 +1435,7 @@ case ${JOB_NAME} in
     # Override defaults to be indpendent from GCE defaults and set kubemark parameters
     NUM_MINIONS="6"
     MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-standard-8"
+    NODE_SIZE="n1-standard-8"
     KUBE_GCE_INSTANCE_PREFIX="kubemark500"
     E2E_ZONE="asia-east1-a"
     KUBEMARK_MASTER_SIZE="n1-standard-16"
@@ -1455,7 +1455,7 @@ case ${JOB_NAME} in
     # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
     NUM_MINIONS="11"
     MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
+    NODE_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
     #                                     so NUM_MINIONS x cores_per_minion should
     #                                     be set accordingly.
     KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
@@ -1486,7 +1486,7 @@ export KUBE_GKE_NETWORK=${E2E_NETWORK}
 export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
 export DOGFOOD_GCLOUD=${DOGFOOD_GCLOUD:-}
 export CMD_GROUP=${CMD_GROUP:-}
-export MACHINE_TYPE=${MINION_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
+export MACHINE_TYPE=${NODE_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
 
 if [[ ! -z "${GKE_API_ENDPOINT:-}" ]]; then
   export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER=${GKE_API_ENDPOINT}
@@ -1500,7 +1500,7 @@ export KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER=${ENABLE_HORIZONTAL_POD_AUTOSCALER:
 export KUBE_ENABLE_DEPLOYMENTS=${ENABLE_DEPLOYMENTS:-}
 export KUBE_ENABLE_EXPERIMENTAL_API=${ENABLE_EXPERIMENTAL_API:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
-export MINION_SIZE=${MINION_SIZE:-}
+export NODE_SIZE=${NODE_SIZE:-}
 export NODE_DISK_SIZE=${NODE_DISK_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
 export TEST_CLUSTER_LOG_LEVEL=${TEST_CLUSTER_LOG_LEVEL:-}
