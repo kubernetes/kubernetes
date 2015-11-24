@@ -17,8 +17,8 @@
 ## Contains configuration values for interacting with the Vagrant cluster
 
 # Number of minions in the cluster
-NUM_MINIONS=${NUM_MINIONS-"1"}
-export NUM_MINIONS
+NUM_NODES=${NUM_NODES-"1"}
+export NUM_NODES
 
 # The IP of the master
 export MASTER_IP=${MASTER_IP-"10.245.1.2"}
@@ -37,7 +37,7 @@ MASTER_CONTAINER_NETMASK="255.255.255.0"
 MASTER_CONTAINER_ADDR="${NODE_CONTAINER_SUBNET_BASE}.0.1"
 MASTER_CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.1/24"
 CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.0/16"
-for ((i=0; i < NUM_MINIONS; i++)) do
+for ((i=0; i < NUM_NODES; i++)) do
   NODE_IPS[$i]="${NODE_IP_BASE}$((i+3))"
   NODE_NAMES[$i]="${INSTANCE_PREFIX}-minion-$((i+1))"
   NODE_CONTAINER_SUBNETS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"

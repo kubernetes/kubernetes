@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NUM_MINIONS=4
+NUM_NODES=4
 DISK=./kube/kube.vmdk
 GUEST_ID=debian7_64Guest
 
@@ -26,8 +26,8 @@ MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_MEMORY_MB=1024
 MASTER_CPU=1
 
-NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
-NODE_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
+NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_NODES}}))
+NODE_IP_RANGES=($(eval echo "10.244.{1..${NUM_NODES}}.0/24"))
 NODE_MEMORY_MB=2048
 NODE_CPU=1
 

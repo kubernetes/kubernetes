@@ -250,7 +250,7 @@ cross-AZ-clusters are more convenient.
 * For auto-scaling, on each nodes it creates a launch configuration and group.
   The name for both is <*KUBE_AWS_INSTANCE_PREFIX*>-minion-group. The default
   name is kubernetes-minion-group. The auto-scaling group has a min and max size
-  that are both set to NUM_MINIONS. You can change the size of the auto-scaling
+  that are both set to NUM_NODES. You can change the size of the auto-scaling
   group to add or remove the total number of nodes from within the AWS API or
   Console. Each nodes self-configures, meaning that they come up; run Salt with
   the stored configuration; connect to the master; are assigned an internal CIDR;

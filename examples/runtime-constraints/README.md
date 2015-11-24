@@ -43,7 +43,7 @@ of compute resources easier to follow by starting with an empty cluster.
 
 ```
 $ export KUBERNETES_PROVIDER=vagrant
-$ export NUM_MINIONS=1
+$ export NUM_NODES=1
 $ export KUBE_ENABLE_CLUSTER_MONITORING=none
 $ export KUBE_ENABLE_CLUSTER_DNS=false
 $ export KUBE_ENABLE_CLUSTER_UI=false

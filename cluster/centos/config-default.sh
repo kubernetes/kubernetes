@@ -27,8 +27,8 @@ export NODES=${NODES:-"centos@172.10.0.12 centos@172.10.0.13"}
 # Number of nodes in your cluster.
 export NUM_NODES=${NUM_NODES:-2}
 
-# Should be removed when NUM_MINIONS is deprecated in validate-cluster.sh
-export NUM_MINIONS=${NUM_NODES}
+# Should be removed when NUM_NODES is deprecated in validate-cluster.sh
+export NUM_NODES=${NUM_NODES}
 
 # By default, the cluster will use the etcd installed on master.
 export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:4001"}

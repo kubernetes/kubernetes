@@ -17,13 +17,13 @@
 ZONE=${KUBE_AWS_ZONE:-us-west-2a}
 MASTER_SIZE=${MASTER_SIZE:-}
 NODE_SIZE=${NODE_SIZE:-}
-NUM_MINIONS=${NUM_MINIONS:-4}
+NUM_NODES=${NUM_NODES:-4}
 
 # Dynamically set node sizes so that Heapster has enough space to run
 if [[ -z ${NODE_SIZE} ]]; then
-  if (( ${NUM_MINIONS} < 50 )); then
+  if (( ${NUM_NODES} < 50 )); then
     NODE_SIZE="t2.micro"
-  elif (( ${NUM_MINIONS} < 150 )); then
+  elif (( ${NUM_NODES} < 150 )); then
     NODE_SIZE="t2.small"
   else
     NODE_SIZE="t2.medium"
@@ -33,9 +33,9 @@ fi
 # Dynamically set the master size by the number of nodes, these are guesses
 # TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_MINIONS} < 50 )); then
+  if (( ${NUM_NODES} < 50 )); then
     MASTER_SIZE="t2.micro"
-  elif (( ${NUM_MINIONS} < 150 )); then
+  elif (( ${NUM_NODES} < 150 )); then
     MASTER_SIZE="t2.small"
   else
     MASTER_SIZE="t2.medium"
@@ -121,7 +121,7 @@ ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
 if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   # TODO: actually configure ASG or similar
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
-  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
+  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_NODES}}"
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
 fi
 

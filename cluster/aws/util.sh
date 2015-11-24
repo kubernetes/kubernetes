@@ -1010,8 +1010,8 @@ function start-minions() {
   ${AWS_ASG_CMD} create-auto-scaling-group \
       --auto-scaling-group-name ${ASG_NAME} \
       --launch-configuration-name ${ASG_NAME} \
-      --min-size ${NUM_MINIONS} \
-      --max-size ${NUM_MINIONS} \
+      --min-size ${NUM_NODES} \
+      --max-size ${NUM_NODES} \
       --vpc-zone-identifier ${SUBNET_ID} \
       --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${NODE_TAG} \
@@ -1022,7 +1022,7 @@ function start-minions() {
   attempt=0
   while true; do
     find-running-minions > $LOG
-    if [[ ${#NODE_IDS[@]} == ${NUM_MINIONS} ]]; then
+    if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
       echo -e " ${color_green}${#NODE_IDS[@]} minions started; ready${color_norm}"
       break
     fi
