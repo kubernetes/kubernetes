@@ -70,13 +70,16 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 		},
 	}
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
+	cmd.Flags().MarkShorthandDeprecated("www", "please use --www instead")
 	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
+	cmd.Flags().MarkShorthandDeprecated("www-prefix", "please use --www-prefix instead")
 	cmd.Flags().StringP("api-prefix", "", "/", "Prefix to serve the proxied API under.")
 	cmd.Flags().String("accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
 	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
 	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
 	cmd.Flags().IntP("port", "p", default_port, "The port on which to run the proxy. Set to 0 to pick a random port.")
+	cmd.Flags().MarkShorthandDeprecated("port", "please use --port instead")
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
