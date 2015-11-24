@@ -8,10 +8,11 @@ package ast
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io"
 	"os"
 	"reflect"
+
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 // A FieldFilter may be provided to Fprint to control the output.

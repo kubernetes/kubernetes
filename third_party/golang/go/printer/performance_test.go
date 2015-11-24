@@ -9,10 +9,11 @@ package printer
 
 import (
 	"bytes"
-	"k8s.io/kubernetes/third_party/golang/go/ast"
-	"k8s.io/kubernetes/third_party/golang/go/parser"
 	"io"
 	"io/ioutil"
+
+	"k8s.io/kubernetes/third_party/golang/go/ast"
+	"k8s.io/kubernetes/third_party/golang/go/parser"
 	"log"
 	"testing"
 )

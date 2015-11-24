@@ -8,10 +8,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"k8s.io/kubernetes/third_party/golang/go/ast"
-	"k8s.io/kubernetes/third_party/golang/go/doc"
-	"k8s.io/kubernetes/third_party/golang/go/parser"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io"
 	"io/ioutil"
 	"log"
@@ -24,6 +20,11 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"k8s.io/kubernetes/third_party/golang/go/ast"
+	"k8s.io/kubernetes/third_party/golang/go/doc"
+	"k8s.io/kubernetes/third_party/golang/go/parser"
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 // A Context specifies the supporting context for a build.
