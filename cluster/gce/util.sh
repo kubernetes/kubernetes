@@ -370,7 +370,7 @@ function create-node-template {
 
   local attempt=1
   local preemptible_minions=""
-  if [[ "${PREEMPTIBLE_MINION}" == "true" ]]; then
+  if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
   fi
   while true; do
