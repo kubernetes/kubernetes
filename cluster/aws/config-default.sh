@@ -130,7 +130,7 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAcco
 
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
-ENABLE_MINION_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
+ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
 # OS options for minions
 KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-vivid}"

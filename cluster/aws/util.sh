@@ -86,7 +86,7 @@ MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 #  only affects the big storage instance types, which aren't a typical use case right now.
 BLOCK_DEVICE_MAPPINGS_BASE="{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
 MASTER_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MASTER_ROOT_DISK_SIZE},\"VolumeType\":\"${MASTER_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
-MINION_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MINION_ROOT_DISK_SIZE},\"VolumeType\":\"${MINION_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
+NODE_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MINION_ROOT_DISK_SIZE},\"VolumeType\":\"${MINION_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
 
 # TODO (bburns) Parameterize this for multiple cluster per project
 
@@ -203,7 +203,7 @@ function detect-minions () {
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip
-    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
+    if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
       minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
     else
       minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
@@ -990,7 +990,7 @@ function start-minions() {
   echo "Creating minion configuration"
   generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
   local public_ip_option
-  if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
     public_ip_option="--associate-public-ip-address"
   else
     public_ip_option="--no-associate-public-ip-address"
@@ -1003,7 +1003,7 @@ function start-minions() {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${MINION_SG_ID} \
       ${public_ip_option} \
-      --block-device-mappings "${MINION_BLOCK_DEVICE_MAPPINGS}" \
+      --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
       --user-data "file://${KUBE_TEMP}/minion-user-data"
 
   echo "Creating autoscaling group"

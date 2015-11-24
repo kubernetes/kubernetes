@@ -278,7 +278,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
     (
-      kube-up-vm "${MINION_NAMES[$i]}" -c ${MINION_CPU-1} -m ${MINION_MEMORY_MB-1024}
+      kube-up-vm "${MINION_NAMES[$i]}" -c ${NODE_CPU-1} -m ${MINION_MEMORY_MB-1024}
       kube-run "${MINION_NAMES[$i]}" "${KUBE_TEMP}/minion-start-${i}.sh"
     ) &
   done
