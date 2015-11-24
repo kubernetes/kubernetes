@@ -1,6 +1,7 @@
 
 accept-hosts
 accept-paths
+addon-check
 admission-control
 admission-control-config-file
 advertise-address

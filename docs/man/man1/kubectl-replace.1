@@ -27,6 +27,11 @@ Please refer to the models in
 
 .SH OPTIONS
 .PP
+\fB\-\-addon\-check\fP=true
+    If true, prevents the users from manipulating add\-ons / cluster services. See 
+\[la]http://releases.k8s.io/HEAD/cluster/addons\[ra] for more info. Default true.
+
+.PP
 \fB\-\-cascade\fP=false
     Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).
 

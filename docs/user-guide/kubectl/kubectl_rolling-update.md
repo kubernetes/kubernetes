@@ -72,6 +72,7 @@ $ kubectl rolling-update frontend-v1 frontend-v2 --rollback
 ### Options
 
 ```
+      --addon-check[=true]: If true, prevents the users from manipulating add-ons / cluster services. See http://releases.k8s.io/HEAD/cluster/addons for more info. Default true.
       --container="": Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod
       --deployment-label-key="deployment": The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise
       --dry-run[=false]: If true, print out the changes that would be made, but don't actually make them.

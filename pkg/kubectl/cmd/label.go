@@ -226,7 +226,6 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err != nil {
 			return err
 		}
-
 		var outputObj runtime.Object
 		dataChangeMsg := "not labeled"
 		if cmdutil.GetFlagBool(cmd, "dry-run") {

@@ -38,7 +38,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				// Ensures no GET is performed when deleting by name
@@ -70,7 +70,7 @@ func TestDeleteNamedObject(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				// Ensures no GET is performed when deleting by name
@@ -347,13 +347,13 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/baz" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/baz" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers/foo" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/foo" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/services/baz" && m == "DELETE":
+			case p == "/namespaces/test/services/baz" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/namespaces/test/services/foo" && m == "DELETE":
+			case p == "/namespaces/test/services/foo" && (m == "DELETE" || m == "GET"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				// Ensures no GET is performed when deleting by name

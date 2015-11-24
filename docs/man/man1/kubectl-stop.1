@@ -26,6 +26,11 @@ If the resource is scalable it will be scaled to 0 before deletion.
 
 .SH OPTIONS
 .PP
+\fB\-\-addon\-check\fP=true
+    If true, prevents the users from manipulating add\-ons / cluster services. See 
+\[la]http://releases.k8s.io/HEAD/cluster/addons\[ra] for more info. Default true.
+
+.PP
 \fB\-\-all\fP=false
     [\-all] to select all the specified resources.
 
@@ -51,7 +56,7 @@ If the resource is scalable it will be scaled to 0 before deletion.
 
 .PP
 \fB\-\-timeout\fP=0
-    The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
+    The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

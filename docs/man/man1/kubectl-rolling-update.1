@@ -27,6 +27,12 @@ existing replication controller and overwrite at least one (common) label in its
     Container name which will have its image upgraded. Only relevant when \-\-image is specified, ignored otherwise. Required when using \-\-image on a multi\-container pod
 
 .PP
+\fB\-\-addon\-check\fP=true
+    If true, prevents the users from manipulating add\-ons / cluster services. See 
+\[la]http://releases.k8s.io/HEAD/cluster/addons\[ra] for more info. Default true.
+>>>>>>> Error on manipulation for cluster services / add-ons
+
+.PP
 \fB\-\-deployment\-label\-key\fP="deployment"
     The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when \-\-image is specified, ignored otherwise
 
