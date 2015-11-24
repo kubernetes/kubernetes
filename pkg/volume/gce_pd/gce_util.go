@@ -132,7 +132,7 @@ func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (
 			glog.Warningf("Retrying attach for GCE PD %q (retry count=%v).", b.pdName, numRetries)
 		}
 
-		if err := gceCloud.AttachDisk(b.pdName, b.readOnly); err != nil {
+		if err := gceCloud.AttachDisk(b.pdName, b.plugin.host.GetHostName(), b.readOnly); err != nil {
 			glog.Errorf("Error attaching PD %q: %v", b.pdName, err)
 			time.Sleep(errorSleepDuration)
 			continue
@@ -206,7 +206,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 			glog.Warningf("Retrying detach for GCE PD %q (retry count=%v).", c.pdName, numRetries)
 		}
 
-		if err := gceCloud.DetachDisk(c.pdName); err != nil {
+		if err := gceCloud.DetachDisk(c.pdName, c.plugin.host.GetHostName()); err != nil {
 			glog.Errorf("Error detaching PD %q: %v", c.pdName, err)
 			time.Sleep(errorSleepDuration)
 			continue
