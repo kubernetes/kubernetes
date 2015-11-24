@@ -93,7 +93,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		StorageVersions:       storageVersions,
 	})
 
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -344,10 +344,10 @@ func BenchmarkScheduling(b *testing.B) {
 	})
 
 	c := client.NewOrDie(&client.Config{
-		Host:    s.URL,
-		Version: testapi.Default.Version(),
-		QPS:     5000.0,
-		Burst:   5000,
+		Host:         s.URL,
+		GroupVersion: testapi.Default.GroupVersion(),
+		QPS:          5000.0,
+		Burst:        5000,
 	})
 
 	schedulerConfigFactory := factory.NewConfigFactory(c, nil)

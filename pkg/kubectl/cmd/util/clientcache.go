@@ -18,6 +18,7 @@ package util
 
 import (
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
@@ -60,18 +61,37 @@ func (c *ClientCache) ClientConfigForVersion(version string) (*client.Config, er
 	}
 	// TODO: have a better config copy method
 	config := *c.defaultConfig
-	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, version, registered.RegisteredVersions)
+
+	// TODO these fall out when we finish the refactor
+	var preferredGV *unversioned.GroupVersion
+	if len(version) > 0 {
+		gv, err := unversioned.ParseGroupVersion(version)
+		if err != nil {
+			return nil, err
+		}
+		preferredGV = &gv
+	}
+	registeredGVs := []unversioned.GroupVersion{}
+	for _, gvString := range registered.RegisteredVersions {
+		gv, err := unversioned.ParseGroupVersion(gvString)
+		if err != nil {
+			return nil, err
+		}
+		registeredGVs = append(registeredGVs, gv)
+	}
+
+	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registeredGVs)
 	if err != nil {
 		return nil, err
 	}
-	config.Version = negotiatedVersion
+	config.GroupVersion = negotiatedVersion
 	client.SetKubernetesDefaults(&config)
 	c.configs[version] = &config
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
 	// `config.Version`, we should get the the config we've just built.
 	configCopy := config
-	c.configs[config.Version] = &configCopy
+	c.configs[config.GroupVersion.String()] = &configCopy
 
 	return &config, nil
 }
@@ -91,6 +111,6 @@ func (c *ClientCache) ClientForVersion(version string) (*client.Client, error) {
 		return nil, err
 	}
 
-	c.clients[config.Version] = client
+	c.clients[config.GroupVersion.String()] = client
 	return client, nil
 }

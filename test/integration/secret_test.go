@@ -84,7 +84,7 @@ func TestSecrets(t *testing.T) {
 	})
 
 	framework.DeleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Default.Version()})
+	client := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 	DoTestSecrets(t, client, testapi.Default.Version())
 }
 

@@ -140,13 +140,17 @@ func setExtensionsDefaults(config *Config) error {
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	gv, err := unversioned.ParseGroupVersion(g.GroupVersion)
+	if err != nil {
+		return err
+	}
+	config.GroupVersion = &gv
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.Version)
+	versionInterfaces, err := g.InterfacesFor(config.GroupVersion.String())
 	if err != nil {
-		return fmt.Errorf("Extensions API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
+		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %s)",
+			config.GroupVersion, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

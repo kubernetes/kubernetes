@@ -157,7 +157,7 @@ func TestCreateClean(t *testing.T) {
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
 	matchStringArg("", clientConfig.Prefix, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
+	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.GroupVersion.String(), t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -212,7 +212,7 @@ func TestCreateCleanDefault(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
-	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
+	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.GroupVersion.String(), t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }

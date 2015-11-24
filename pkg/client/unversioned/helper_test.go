@@ -90,17 +90,17 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		{
 			Config{},
 			Config{
-				Prefix:  "/api",
-				Version: testapi.Default.Version(),
-				Codec:   testapi.Default.Codec(),
-				QPS:     5,
-				Burst:   10,
+				Prefix:       "/api",
+				GroupVersion: testapi.Default.GroupVersion(),
+				Codec:        testapi.Default.Codec(),
+				QPS:          5,
+				Burst:        10,
 			},
 			false,
 		},
 		{
 			Config{
-				Version: "not_an_api",
+				GroupVersion: &unversioned.GroupVersion{Group: "not.a.group", Version: "not_an_api"},
 			},
 			Config{},
 			true,
@@ -183,7 +183,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	got, err := ServerAPIVersions(&Config{Host: server.URL, Version: "invalid version", Codec: testapi.Default.Codec()})
+	got, err := ServerAPIVersions(&Config{Host: server.URL, GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
