@@ -23,7 +23,7 @@ import (
 
 // Handler for aws-sdk-go that logs all requests
 func awsHandlerLogger(req *request.Request) {
-	service := req.Service.ServiceName
+	service := req.ClientInfo.ServiceName
 
 	name := "?"
 	if req.Operation != nil {
