@@ -134,7 +134,7 @@ Example of GCE's advanced routing rules:
 ```sh
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
-  --destination-range "${MINION_IP_RANGES[$i]}" \
+  --destination-range "${NODE_IP_RANGES[$i]}" \
   --network "${NETWORK}" \
   --next-hop-instance "${MINION_NAMES[$i]}" \
   --next-hop-instance-zone "${ZONE}" &

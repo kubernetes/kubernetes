@@ -273,12 +273,12 @@ function kube-up {
       grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/hostname.sh"
       echo "KUBE_MASTER=${KUBE_MASTER}"
       echo "KUBE_MASTER_IP=${KUBE_MASTER_IP}"
-      echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
+      echo "NODE_IP_RANGE=${NODE_IP_RANGES[$i]}"
       grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
     (
-      kube-up-vm "${MINION_NAMES[$i]}" -c ${NODE_CPU-1} -m ${MINION_MEMORY_MB-1024}
+      kube-up-vm "${MINION_NAMES[$i]}" -c ${NODE_CPU-1} -m ${NODE_MEMORY_MB-1024}
       kube-run "${MINION_NAMES[$i]}" "${KUBE_TEMP}/minion-start-${i}.sh"
     ) &
   done

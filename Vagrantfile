@@ -22,7 +22,7 @@ $num_minion = (ENV['NUM_MINIONS'] || 1).to_i
 
 # ip configuration
 $master_ip = ENV['MASTER_IP']
-$minion_ip_base = ENV['MINION_IP_BASE'] || ""
+$minion_ip_base = ENV['NODE_IP_BASE'] || ""
 $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 
 # Determine the OS platform to use
