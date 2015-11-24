@@ -1067,12 +1067,12 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
 		}
-		privateDnsName, err := s.metadata.GetMetadata("local-hostname")
+		privateIpAddress, err := s.metadata.GetMetadata("local-ipv4")
 		if err != nil {
-			return nil, fmt.Errorf("error fetching local-hostname from ec2 metadata service: %v", err)
+			return nil, fmt.Errorf("error fetching local-ipv4 from ec2 metadata service: %v", err)
 		}
 
-		i = newAWSInstance(s.ec2, instanceId, privateDnsName)
+		i = newAWSInstance(s.ec2, instanceId, privateIpAddress)
 		s.selfAWSInstance = i
 	}
 
@@ -2071,7 +2071,7 @@ func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance,
 // Returns nil if it does not exist
 func (a *AWSCloud) findInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
 	filters := []*ec2.Filter{
-		newEc2Filter("private-dns-name", nodeName),
+		newEc2Filter("private-ip-address", nodeName),
 	}
 	filters = a.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
