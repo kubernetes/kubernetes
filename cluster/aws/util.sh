@@ -181,7 +181,7 @@ function query-running-minions () {
                      Name=vpc-id,Values=${VPC_ID} \
                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                      Name=tag:aws:autoscaling:groupName,Values=${ASG_NAME} \
-                     Name=tag:Role,Values=${MINION_TAG} \
+                     Name=tag:Role,Values=${NODE_TAG} \
            --query ${query}
 }
 
@@ -1014,7 +1014,7 @@ function start-minions() {
       --max-size ${NUM_MINIONS} \
       --vpc-zone-identifier ${SUBNET_ID} \
       --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
-             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MINION_TAG} \
+             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${NODE_TAG} \
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
 
   # Wait for the minions to be running
