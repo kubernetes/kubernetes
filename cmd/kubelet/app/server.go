@@ -68,9 +68,8 @@ import (
 )
 
 const (
-	defaultRootDir    = "/var/lib/kubelet"
-	networkConfig     = "/var/run/flannel/network.json"
-	useDefaultOverlay = true
+	defaultRootDir             = "/var/lib/kubelet"
+	experimentalFlannelOverlay = false
 )
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -158,8 +157,8 @@ type KubeletServer struct {
 	KubeAPIBurst int
 
 	// Pull images one at a time.
-	SerializeImagePulls bool
-	UseDefaultOverlay   bool
+	SerializeImagePulls        bool
+	ExperimentalFlannelOverlay bool
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -232,8 +231,7 @@ func NewKubeletServer() *KubeletServer {
 		ReconcileCIDR:                  true,
 		KubeAPIQPS:                     5.0,
 		KubeAPIBurst:                   10,
-		// Flannel parameters
-		UseDefaultOverlay: useDefaultOverlay,
+		ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
 	}
 }
 
@@ -348,9 +346,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
-
-	// Flannel config parameters
-	fs.BoolVar(&s.UseDefaultOverlay, "use-default-overlay", s.UseDefaultOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
+	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -489,7 +485,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(),
 
-		UseDefaultOverlay: s.UseDefaultOverlay,
+		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
 	}, nil
 }
 
@@ -962,7 +958,7 @@ type KubeletConfig struct {
 	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
 
-	UseDefaultOverlay bool
+	ExperimentalFlannelOverlay bool
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -1045,8 +1041,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.OOMAdjuster,
 		kc.SerializeImagePulls,
 		kc.ContainerManager,
-		// Flannel parameters
-		kc.UseDefaultOverlay,
+		kc.ExperimentalFlannelOverlay,
 	)
 
 	if err != nil {

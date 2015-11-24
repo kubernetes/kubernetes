@@ -327,4 +327,4 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
-use-default-overlay
+experimental-flannel-overlay
