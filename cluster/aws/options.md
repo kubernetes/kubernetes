@@ -27,7 +27,7 @@ It is not a bad idea to set AWS_S3_BUCKET to something more human friendly.
 
 AWS_S3_REGION is useful for people that want to control their data location, because of regulatory restrictions for example.
 
-**MASTER_SIZE**, **MINION_SIZE**
+**MASTER_SIZE**, **NODE_SIZE**
 
 The instance type to use for creating the master/minion.  Defaults to auto-sizing based on the number of nodes (see below).
 
@@ -35,7 +35,7 @@ For production usage, we recommend bigger instances, for example:
 
 ```
 export MASTER_SIZE=c4.large
-export MINION_SIZE=r3.large
+export NODE_SIZE=r3.large
 ```
 
 If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_MINIONS}`.

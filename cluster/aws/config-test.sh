@@ -17,17 +17,17 @@
 ZONE=${KUBE_AWS_ZONE:-us-west-2a}
 
 MASTER_SIZE=${MASTER_SIZE:-}
-MINION_SIZE=${MINION_SIZE:-}
+NODE_SIZE=${NODE_SIZE:-}
 NUM_MINIONS=${NUM_MINIONS:-2}
 
 # Dynamically set node sizes so that Heapster has enough space to run
-if [[ -z ${MINION_SIZE} ]]; then
+if [[ -z ${NODE_SIZE} ]]; then
   if (( ${NUM_MINIONS} < 50 )); then
-    MINION_SIZE="t2.micro"
+    NODE_SIZE="t2.micro"
   elif (( ${NUM_MINIONS} < 150 )); then
-    MINION_SIZE="t2.small"
+    NODE_SIZE="t2.small"
   else
-    MINION_SIZE="t2.medium"
+    NODE_SIZE="t2.medium"
   fi
 fi
 

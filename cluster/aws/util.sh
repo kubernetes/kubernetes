@@ -999,7 +999,7 @@ function start-minions() {
       --launch-configuration-name ${ASG_NAME} \
       --image-id $KUBE_NODE_IMAGE \
       --iam-instance-profile ${IAM_PROFILE_NODE} \
-      --instance-type $MINION_SIZE \
+      --instance-type $NODE_SIZE \
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${NODE_SG_ID} \
       ${public_ip_option} \

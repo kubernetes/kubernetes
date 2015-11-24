@@ -84,7 +84,7 @@ You can override the variables defined in [config-default.sh](http://releases.k8
 ```bash
 export KUBE_AWS_ZONE=eu-west-1c
 export NUM_MINIONS=2
-export MINION_SIZE=m3.medium
+export NODE_SIZE=m3.medium
 export AWS_S3_REGION=eu-west-1
 export AWS_S3_BUCKET=mycompany-kubernetes-artifacts
 export INSTANCE_PREFIX=k8s

@@ -377,7 +377,7 @@ function create-node-template {
     echo "Attempt ${attempt} to create ${1}" >&2
     if ! gcloud compute instance-templates create "$template_name" \
       --project "${PROJECT}" \
-      --machine-type "${MINION_SIZE}" \
+      --machine-type "${NODE_SIZE}" \
       --boot-disk-type "${NODE_DISK_TYPE}" \
       --boot-disk-size "${NODE_DISK_SIZE}" \
       --image-project="${NODE_IMAGE_PROJECT}" \
