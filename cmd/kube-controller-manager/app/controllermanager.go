@@ -292,8 +292,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	if s.AllocateNodeCIDRs {
-		// TODO: Pipe this as a command line flag that corresponds to overlay==true
-		if cloud == nil || true {
+		if cloud == nil {
 			glog.Warning("allocate-node-cidrs is set, but no cloud provider specified. Will not manage routes.")
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
@@ -301,6 +300,8 @@ func (s *CMServer) Run(_ []string) error {
 			routeController := routecontroller.New(routes, kubeClient, s.ClusterName, &s.ClusterCIDR)
 			routeController.Run(s.NodeSyncPeriod)
 		}
+	} else {
+		glog.Infof("allocate-node-cidrs set to %v, node controller not creating routes", s.AllocateNodeCIDRs)
 	}
 
 	resourcequotacontroller.NewResourceQuotaController(kubeClient).Run(s.ResourceQuotaSyncPeriod)
