@@ -199,8 +199,8 @@ function find-running-minions () {
 function detect-minions () {
   find-running-minions
 
-  # This is inefficient, but we want MINION_NAMES / MINION_IDS to be ordered the same as KUBE_MINION_IP_ADDRESSES
-  KUBE_MINION_IP_ADDRESSES=()
+  # This is inefficient, but we want MINION_NAMES / MINION_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
+  KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip
     if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
@@ -209,10 +209,10 @@ function detect-minions () {
       minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
     fi
     echo "Found minion ${i}: ${MINION_NAMES[$i]} @ ${minion_ip}"
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
   done
 
-  if [[ -z "$KUBE_MINION_IP_ADDRESSES" ]]; then
+  if [[ -z "$KUBE_NODE_IP_ADDRESSES" ]]; then
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
@@ -1113,11 +1113,11 @@ function check-cluster() {
   # Basic sanity checking
   # TODO(justinsb): This is really not needed any more
   local rc # Capture return code without exiting because of errexit bash option
-  for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
+  for (( i=0; i<${#KUBE_NODE_IP_ADDRESSES[@]}; i++)); do
       # Make sure docker is installed and working.
       local attempt=0
       while true; do
-        local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
+        local minion_ip=${KUBE_NODE_IP_ADDRESSES[$i]}
         echo -n "Attempt $(($attempt+1)) to check Docker on node @ ${minion_ip} ..."
         local output=`check-minion ${minion_ip}`
         echo $output

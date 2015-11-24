@@ -204,7 +204,7 @@ function detect-master {
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
 function detect-minions {
@@ -215,9 +215,9 @@ function detect-minions {
   fi
   while read -r docker_id; do
     local minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
   done <<< "$docker_ids"
-  echo "KUBE_MINION_IP_ADDRESSES: [${KUBE_MINION_IP_ADDRESSES[*]}]" 1>&2
+  echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
 
 # Verify prereqs on host machine
