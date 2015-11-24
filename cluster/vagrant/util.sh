@@ -131,8 +131,8 @@ function create-provision-scripts {
     echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
     echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
     echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
-    echo "MINION_CONTAINER_NETMASKS='${MINION_CONTAINER_NETMASKS[@]}'"
-    echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
+    echo "NODE_CONTAINER_NETMASKS='${NODE_CONTAINER_NETMASKS[@]}'"
+    echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
     echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
     echo "MASTER_USER='${MASTER_USER}'"
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
@@ -175,9 +175,9 @@ function create-provision-scripts {
       echo "MINION_ID='$i'"
       echo "NODE_IP='${MINION_IPS[$i]}'"
       echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
-      echo "CONTAINER_ADDR='${MINION_CONTAINER_ADDRS[$i]}'"
-      echo "CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
-      echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
+      echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
+      echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
+      echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
@@ -223,8 +223,8 @@ function verify-cluster {
   # verify each minion has all required daemons
   local i
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Validating ${VAGRANT_MINION_NAMES[$i]}"
-    local machine=${VAGRANT_MINION_NAMES[$i]}
+    echo "Validating ${VAGRANT_NODE_NAMES[$i]}"
+    local machine=${VAGRANT_NODE_NAMES[$i]}
     local -a required_daemon=("salt-minion" "kubelet" "docker")
     local validated="1"
     until [[ "$validated" == "0" ]]; do
