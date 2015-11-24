@@ -60,7 +60,7 @@ work, which has been merge into this document.
 Internet to download the necessary files, while worker nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
 Ubuntu 15 which uses systemd instead of upstart.
-4. Dependencies of this guide: etcd-2.2.1, flannel-0.5.3, k8s-1.0.6, may work with higher versions.
+4. Dependencies of this guide: etcd-2.2.1, flannel-0.5.3, k8s-1.1.2, may work with higher versions.
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
 
@@ -77,7 +77,7 @@ $ git clone https://github.com/kubernetes/kubernetes.git
 #### Configure and start the Kubernetes cluster
 
 The startup process will first download all the required binaries automatically.
-By default etcd version is 2.2.1, flannel version is 0.5.3 and k8s version is 1.0.6.
+By default etcd version is 2.2.1, flannel version is 0.5.3 and k8s version is 1.1.2.
 You can customize your etcd version, flannel version, k8s version by changing corresponding variables
 `ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` like following.
 
@@ -92,7 +92,7 @@ $ export ETCD_VERSION=2.2.0
 For users who want to bring up a cluster with k8s version v1.1.1, `controller manager` may fail to start
 due to [a known issue](https://github.com/kubernetes/kubernetes/issues/17109). You could raise it
 up manually by using following command on the remote master server. Note that
-you should do this only after `api-server` is up.
+you should do this only after `api-server` is up. Moreover this issue is fixed in v1.1.2.
 
 ```console
 $ sudo service kube-controller-manager start
