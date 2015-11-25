@@ -10,7 +10,11 @@
 {% if pillar['cluster_cidr'] is defined and pillar['cluster_cidr'] != "" -%}
   {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
 {% endif -%}
-{% if pillar['allocate_node_cidrs'] is defined -%}
+# When we're using flannel it is responsible for cidr allocation.
+# This is expected to be a short-term compromise.
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+  {% set allocate_node_cidrs = "--allocate-node-cidrs=false" -%}
+{% elif pillar['allocate_node_cidrs'] is defined -%}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 {% if pillar['terminated_pod_gc_threshold'] is defined -%}
