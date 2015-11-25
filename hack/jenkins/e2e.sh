@@ -171,6 +171,7 @@ DISRUPTIVE_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
+    "GCE\sL7\sLoadBalancer\sController"
     "DaemonRestart\sController\sManager"
     "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
     "Resource\susage\sof\ssystem\scontainers"
