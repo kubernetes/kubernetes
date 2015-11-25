@@ -40,8 +40,8 @@ import (
 )
 
 func init() {
-	api.Scheme.AddKnownTypes("", &kubectltesting.TestStruct{})
-	api.Scheme.AddKnownTypes(testapi.Default.Version(), &kubectltesting.TestStruct{})
+	api.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &kubectltesting.TestStruct{})
+	api.Scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &kubectltesting.TestStruct{})
 }
 
 var testData = kubectltesting.TestStruct{

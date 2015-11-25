@@ -41,9 +41,8 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, inter
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
 	// our resources.
 	for _, gv := range defaultGroupVersions {
-		for kind, oType := range Scheme.KnownTypes(gv.String()) {
+		for kind, oType := range Scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
-
 			// TODO: Remove import path prefix check.
 			// We check the import path prefix because we currently stuff both "api" and "extensions" objects
 			// into the same group within Scheme since Scheme has no notion of groups yet.

@@ -84,10 +84,11 @@ var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVe
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName(internalGV.Version, "Type", &internalType{})
-	scheme.AddKnownTypeWithName(unlikelyGV.String(), "Type", &externalType{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Type"), &internalType{})
+	scheme.AddKnownTypeWithName(unlikelyGV.WithKind("Type"), &externalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
-	scheme.AddKnownTypeWithName(validVersionGV.String(), "Type", &ExternalType2{})
+	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, unlikelyGV.String())
 	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version string) (*meta.VersionInterfaces, error) {
@@ -98,7 +99,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 		}, versionErrIfFalse(version == validVersionGV.String() || version == unlikelyGV.String())
 	})
 	for _, gv := range []unversioned.GroupVersion{unlikelyGV, validVersionGV} {
-		for kind := range scheme.KnownTypes(gv.String()) {
+		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
 
 			mixedCase := false

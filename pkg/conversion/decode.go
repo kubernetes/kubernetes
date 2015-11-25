@@ -22,20 +22,33 @@ import (
 	"net/url"
 
 	"github.com/ugorji/go/codec"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version, kind string, err error) {
-	version, kind, err = s.DataVersionAndKind(data)
+func (s *Scheme) DecodeToVersionedObject(data []byte) (interface{}, string, string, error) {
+	version, kind, err := s.DataVersionAndKind(data)
 	if err != nil {
-		return
+		return nil, "", "", err
 	}
-	if version == "" && s.InternalVersion != "" {
+
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	internalGV, exists := s.InternalVersions[gv.Group]
+	if !exists {
+		return nil, "", "", fmt.Errorf("no internalVersion specified for %v", gv)
+	}
+
+	if len(gv.Version) == 0 && len(internalGV.Version) != 0 {
 		return nil, "", "", fmt.Errorf("version not set in '%s'", string(data))
 	}
 	if kind == "" {
 		return nil, "", "", fmt.Errorf("kind not set in '%s'", string(data))
 	}
-	obj, err = s.NewObject(version, kind)
+	obj, err := s.NewObject(version, kind)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -43,7 +56,7 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
 		return nil, "", "", err
 	}
-	return
+	return obj, version, kind, nil
 }
 
 // Decode converts a JSON string back into a pointer to an api object.
@@ -52,7 +65,7 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
-	return s.DecodeToVersion(data, s.InternalVersion)
+	return s.DecodeToVersion(data, unversioned.GroupVersion{})
 }
 
 // DecodeToVersion converts a JSON string back into a pointer to an api object.
@@ -60,7 +73,9 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 // technique. The object will be converted, if necessary, into the versioned
 // type before being returned. Decode will not decode objects without version
 // set unless version is also "".
-func (s *Scheme) DecodeToVersion(data []byte, version string) (interface{}, error) {
+// a GroupVersion with .IsEmpty() == true is means "use the internal version for
+// the object's group"
+func (s *Scheme) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (interface{}, error) {
 	obj, sourceVersion, kind, err := s.DecodeToVersionedObject(data)
 	if err != nil {
 		return nil, err
@@ -70,13 +85,28 @@ func (s *Scheme) DecodeToVersion(data []byte, version string) (interface{}, erro
 		return nil, err
 	}
 
+	sourceGV, err := unversioned.ParseGroupVersion(sourceVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	// if the gv is empty, then we want the internal version, but the internal version varies by
+	// group.  We can lookup the group now because we have knowledge of the group
+	if gv.IsEmpty() {
+		exists := false
+		gv, exists = s.InternalVersions[sourceGV.Group]
+		if !exists {
+			return nil, fmt.Errorf("no internalVersion specified for %v", gv)
+		}
+	}
+
 	// Convert if needed.
-	if version != sourceVersion {
-		objOut, err := s.NewObject(version, kind)
+	if gv != sourceGV {
+		objOut, err := s.NewObject(gv.String(), kind)
 		if err != nil {
 			return nil, err
 		}
-		flags, meta := s.generateConvertMeta(sourceVersion, version, obj)
+		flags, meta := s.generateConvertMeta(sourceVersion, gv.String(), obj)
 		if err := s.converter.Convert(obj, objOut, flags, meta); err != nil {
 			return nil, err
 		}
@@ -91,17 +121,17 @@ func (s *Scheme) DecodeToVersion(data []byte, version string) (interface{}, erro
 // If obj's version doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
 func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
-	return s.DecodeIntoWithSpecifiedVersionKind(data, obj, "", "")
+	return s.DecodeIntoWithSpecifiedVersionKind(data, obj, unversioned.GroupVersionKind{})
 }
 
-// DecodeIntoWithSpecifiedVersionKind compares the passed in specifiedVersion and
-// specifiedKind with data.Version and data.Kind, defaulting data.Version and
+// DecodeIntoWithSpecifiedVersionKind compares the passed in requestGroupVersionKind
+// with data.Version and data.Kind, defaulting data.Version and
 // data.Kind to the specified value if they are empty, or generating an error if
 // data.Version and data.Kind are not empty and differ from the specified value.
 // The function then implements the functionality of DecodeInto.
 // If specifiedVersion and specifiedKind are empty, the function degenerates to
 // DecodeInto.
-func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}, specifiedVersion, specifiedKind string) error {
+func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}, requestedGVK unversioned.GroupVersionKind) error {
 	if len(data) == 0 {
 		return errors.New("empty input")
 	}
@@ -110,16 +140,16 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 		return err
 	}
 	if dataVersion == "" {
-		dataVersion = specifiedVersion
+		dataVersion = requestedGVK.GroupVersion().String()
 	}
 	if dataKind == "" {
-		dataKind = specifiedKind
+		dataKind = requestedGVK.Kind
 	}
-	if len(specifiedVersion) > 0 && (dataVersion != specifiedVersion) {
-		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%s)", dataVersion, specifiedVersion))
+	if (len(requestedGVK.Group) > 0 || len(requestedGVK.Version) > 0) && (dataVersion != requestedGVK.GroupVersion().String()) {
+		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%v)", dataVersion, requestedGVK.GroupVersion()))
 	}
-	if len(specifiedKind) > 0 && (dataKind != specifiedKind) {
-		return errors.New(fmt.Sprintf("The kind in the data (%s) does not match the specified kind(%s)", dataKind, specifiedKind))
+	if len(requestedGVK.Kind) > 0 && (dataKind != requestedGVK.Kind) {
+		return errors.New(fmt.Sprintf("The kind in the data (%s) does not match the specified kind(%v)", dataKind, requestedGVK))
 	}
 
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)

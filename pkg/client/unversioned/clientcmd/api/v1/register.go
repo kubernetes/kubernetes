@@ -17,15 +17,20 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// SchemeGroupVersion is group version used to register these objects
+// TODO this should be in the "kubeconfig" group
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+
 // Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
 
 func init() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Config{},
 	)
 }
