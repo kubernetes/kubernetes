@@ -20,24 +20,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-const (
-	EtcdErrorCodeNotFound      = 100
-	EtcdErrorCodeTestFailed    = 101
-	EtcdErrorCodeNodeExist     = 105
-	EtcdErrorCodeValueRequired = 200
-	EtcdErrorCodeWatchExpired  = 401
-	EtcdErrorCodeUnreachable   = 501
-)
-
-var (
-	EtcdErrorNotFound      = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNotFound}
-	EtcdErrorTestFailed    = &etcd.EtcdError{ErrorCode: EtcdErrorCodeTestFailed}
-	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
-	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
-	EtcdErrorWatchExpired  = &etcd.EtcdError{ErrorCode: EtcdErrorCodeWatchExpired}
-	EtcdErrorUnreachable   = &etcd.EtcdError{ErrorCode: EtcdErrorCodeUnreachable}
-)
-
 // EtcdClient is an injectable interface for testing.
 type EtcdClient interface {
 	GetCluster() []string
