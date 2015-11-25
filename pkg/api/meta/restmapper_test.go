@@ -115,7 +115,7 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 		if len(testCase.ExpectedGVK.Kind) != 0 {
 			mapper.Add(testCase.ExpectedGVK, RESTScopeNamespace, testCase.MixedCase)
 		}
-		v, k, err := mapper.VersionAndKindForResource(testCase.Resource)
+		actualGVK, err := mapper.KindFor(testCase.Resource)
 
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -125,13 +125,6 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 		if err != nil {
 			continue
 		}
-
-		actualGV, err := unversioned.ParseGroupVersion(v)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		actualGVK := unversioned.NewGroupVersionKind(actualGV, k)
 
 		if actualGVK != testCase.ExpectedGVK {
 			t.Errorf("%d: unexpected version and kind: e=%s a=%s", i, testCase.ExpectedGVK, actualGVK)
@@ -153,15 +146,15 @@ func TestRESTMapperGroupForResource(t *testing.T) {
 	for i, testCase := range testCases {
 		mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{testCase.GroupVersionKind.GroupVersion()}, fakeInterfaces)
 		mapper.Add(testCase.GroupVersionKind, RESTScopeNamespace, false)
-		g, err := mapper.GroupForResource(testCase.Resource)
+		actualGVK, err := mapper.KindFor(testCase.Resource)
 		if testCase.Err {
 			if err == nil {
 				t.Errorf("%d: expected error", i)
 			}
 		} else if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
-		} else if g != testCase.GroupVersionKind.Group {
-			t.Errorf("%d: expected group %q, got %q", i, testCase.GroupVersionKind.Group, g)
+		} else if actualGVK != testCase.GroupVersionKind {
+			t.Errorf("%d: expected group %q, got %q", i, testCase.GroupVersionKind, actualGVK)
 		}
 	}
 }
@@ -268,12 +261,13 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
 		mapper.Add(internalGroupVersion.WithKind("InternalObject"), RESTScopeNamespace, testCase.MixedCase)
 
-		deprecatedGroupVersionStrings := []string{}
+		preferredVersions := []string{}
 		for _, gv := range testCase.APIGroupVersions {
-			deprecatedGroupVersionStrings = append(deprecatedGroupVersionStrings, gv.String())
+			preferredVersions = append(preferredVersions, gv.Version)
 		}
+		gk := unversioned.GroupKind{Group: testGroup, Kind: testCase.Kind}
 
-		mapping, err := mapper.RESTMapping(testCase.Kind, deprecatedGroupVersionStrings...)
+		mapping, err := mapper.RESTMapping(gk, preferredVersions...)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
@@ -304,13 +298,15 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	expectedGroupVersion1 := unversioned.GroupVersion{Group: "tgroup", Version: "test1"}
 	expectedGroupVersion2 := unversioned.GroupVersion{Group: "tgroup", Version: "test2"}
 	expectedGroupVersion3 := unversioned.GroupVersion{Group: "tgroup", Version: "test3"}
+	internalObjectGK := unversioned.GroupKind{Group: "tgroup", Kind: "InternalObject"}
+	otherObjectGK := unversioned.GroupKind{Group: "tgroup", Kind: "OtherObject"}
 
 	mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, fakeInterfaces)
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace, false)
 	mapper.Add(expectedGroupVersion2.WithKind("OtherObject"), RESTScopeNamespace, false)
 
 	// pick default matching object kind based on search order
-	mapping, err := mapper.RESTMapping("OtherObject")
+	mapping, err := mapper.RESTMapping(otherObjectGK)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,7 +314,7 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 
-	mapping, err = mapper.RESTMapping("InternalObject")
+	mapping, err = mapper.RESTMapping(internalObjectGK)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -327,28 +323,28 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	}
 
 	// mismatch of version
-	mapping, err = mapper.RESTMapping("InternalObject", expectedGroupVersion2.String())
+	mapping, err = mapper.RESTMapping(internalObjectGK, expectedGroupVersion2.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion1.String())
+	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion1.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// not in the search versions
-	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion3.String())
+	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// explicit search order
-	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion3.String(), expectedGroupVersion1.String())
+	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version, expectedGroupVersion1.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
-	mapping, err = mapper.RESTMapping("OtherObject", expectedGroupVersion3.String(), expectedGroupVersion2.String())
+	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version, expectedGroupVersion2.Version)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,10 +356,11 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 	expectedGroupVersion1 := unversioned.GroupVersion{Group: "tgroup", Version: "test1"}
 	expectedGroupVersion2 := unversioned.GroupVersion{Group: "tgroup", Version: "test2"}
+	internalObjectGK := unversioned.GroupKind{Group: "tgroup", Kind: "InternalObject"}
 
 	mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, unmatchedVersionInterfaces)
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace, false)
-	_, err := mapper.RESTMapping("InternalObject", expectedGroupVersion1.String())
+	_, err := mapper.RESTMapping(internalObjectGK, expectedGroupVersion1.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}

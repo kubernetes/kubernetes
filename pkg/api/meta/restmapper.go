@@ -80,6 +80,8 @@ type DefaultRESTMapper struct {
 	interfacesFunc VersionInterfacesFunc
 }
 
+var _ RESTMapper = &DefaultRESTMapper{}
+
 // VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
 type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
@@ -163,95 +165,69 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resource string) (singular stri
 }
 
 // VersionAndKindForResource implements RESTMapper
-func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (gvString, kind string, err error) {
+func (m *DefaultRESTMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	gvk, ok := m.resourceToKind[strings.ToLower(resource)]
 	if !ok {
-		return "", "", fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
+		return gvk, fmt.Errorf("in version and kind for resource, no resource %q has been defined", resource)
 	}
-	return gvk.GroupVersion().String(), gvk.Kind, nil
-}
-
-func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
-	gvk, exists := m.resourceToKind[strings.ToLower(resource)]
-	if !exists {
-		return "", fmt.Errorf("in group for resource, no resource %q has been defined", resource)
-	}
-
-	return gvk.Group, nil
+	return gvk, nil
 }
 
 // RESTMapping returns a struct representing the resource path and conversion interfaces a
-// RESTClient should use to operate on the provided kind in order of versions. If a version search
+// RESTClient should use to operate on the provided group/kind in order of versions. If a version search
 // order is not provided, the search order provided to DefaultRESTMapper will be used to resolve which
-// APIVersion should be used to access the named kind.
-// TODO version here in this RESTMapper means just APIVersion, but the RESTMapper API is intended to handle multiple groups
-// So this API is broken.  The RESTMapper test made it clear that versions here were API versions, but the code tries to use
-// them with group/version tuples.
-// TODO this should probably become RESTMapping(GroupKind, versions ...string)
-func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTMapping, error) {
-	// TODO, this looks really strange, but once this API is update, the version detection becomes clean again
-	// because you won't be able to request cross-group kinds
-	hadVersion := false
-	for _, gvString := range versions {
-		currGroupVersion, err := unversioned.ParseGroupVersion(gvString)
-		if err != nil {
-			return nil, err
-		}
-		if len(currGroupVersion.Version) != 0 {
-			hadVersion = true
-		}
-	}
-
+// version should be used to access the named group/kind.
+func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error) {
 	// Pick an appropriate version
-	var groupVersion *unversioned.GroupVersion
-	for _, v := range versions {
-		if len(v) == 0 {
+	var gvk *unversioned.GroupVersionKind
+	hadVersion := false
+	for _, version := range versions {
+		if len(version) == 0 {
 			continue
 		}
-		currGroupVersion, err := unversioned.ParseGroupVersion(v)
-		if err != nil {
-			return nil, err
-		}
 
-		currGVK := currGroupVersion.WithKind(kind)
+		currGVK := gk.WithVersion(version)
+		hadVersion = true
 		if _, ok := m.kindToPluralResource[currGVK]; ok {
-			groupVersion = &currGroupVersion
+			gvk = &currGVK
 			break
 		}
 	}
 	// Use the default preferred versions
-	if !hadVersion && (groupVersion == nil) {
-		for _, currGroupVersion := range m.defaultGroupVersions {
-			currGVK := currGroupVersion.WithKind(kind)
+	if !hadVersion && (gvk == nil) {
+		for _, gv := range m.defaultGroupVersions {
+			if gv.Group != gk.Group {
+				continue
+			}
+
+			currGVK := gk.WithVersion(gv.Version)
 			if _, ok := m.kindToPluralResource[currGVK]; ok {
-				groupVersion = &currGroupVersion
+				gvk = &currGVK
 				break
 			}
 		}
 	}
-	if groupVersion == nil {
-		return nil, fmt.Errorf("no kind named %q is registered in versions %q", kind, versions)
+	if gvk == nil {
+		return nil, fmt.Errorf("no kind named %q is registered in versions %q", gk, versions)
 	}
 
-	gvk := groupVersion.WithKind(kind)
-
 	// Ensure we have a REST mapping
-	resource, ok := m.kindToPluralResource[gvk]
+	resource, ok := m.kindToPluralResource[*gvk]
 	if !ok {
 		found := []unversioned.GroupVersion{}
 		for _, gv := range m.defaultGroupVersions {
-			if _, ok := m.kindToPluralResource[gvk]; ok {
+			if _, ok := m.kindToPluralResource[*gvk]; ok {
 				found = append(found, gv)
 			}
 		}
 		if len(found) > 0 {
-			return nil, fmt.Errorf("object with kind %q exists in versions %v, not %v", kind, found, *groupVersion)
+			return nil, fmt.Errorf("object with kind %q exists in versions %v, not %v", gvk.Kind, found, gvk.GroupVersion().String())
 		}
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", groupVersion, kind)
+		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", gvk.GroupVersion().String(), gvk.Kind)
 	}
 
 	// Ensure we have a REST scope
-	scope, ok := m.kindToScope[gvk]
+	scope, ok := m.kindToScope[*gvk]
 	if !ok {
 		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion().String(), gvk.Kind)
 	}
@@ -263,7 +239,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 
 	retVal := &RESTMapping{
 		Resource:         resource,
-		GroupVersionKind: gvk,
+		GroupVersionKind: *gvk,
 		Scope:            scope,
 
 		Codec:            interfaces.Codec,
@@ -295,7 +271,7 @@ func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource
 func (m *DefaultRESTMapper) ResourceIsValid(resource string) bool {
-	_, _, err := m.VersionAndKindForResource(resource)
+	_, err := m.KindFor(resource)
 	return err == nil
 }
 
@@ -317,9 +293,9 @@ func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string,
 // VersionAndKindForResource provides the Version and Kind  mappings for the
 // REST resources. This implementation supports multiple REST schemas and return
 // the first match.
-func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+func (m MultiRESTMapper) KindFor(resource string) (gvk unversioned.GroupVersionKind, err error) {
 	for _, t := range m {
-		defaultVersion, kind, err = t.VersionAndKindForResource(resource)
+		gvk, err = t.KindFor(resource)
 		if err == nil {
 			return
 		}
@@ -327,24 +303,12 @@ func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVers
 	return
 }
 
-// GroupForResource provides the Group mappings for the REST resources. This
-// implementation supports multiple REST schemas and returns the first match.
-func (m MultiRESTMapper) GroupForResource(resource string) (group string, err error) {
-	for _, t := range m {
-		group, err = t.GroupForResource(resource)
-		if err == nil {
-			return
-		}
-	}
-	return
-}
-
-// RESTMapping provides the REST mapping for the resource based on the resource
+// RESTMapping provides the REST mapping for the resource based on the
 // kind and version. This implementation supports multiple REST schemas and
 // return the first match.
-func (m MultiRESTMapper) RESTMapping(kind string, versions ...string) (mapping *RESTMapping, err error) {
+func (m MultiRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
 	for _, t := range m {
-		mapping, err = t.RESTMapping(kind, versions...)
+		mapping, err = t.RESTMapping(gk, versions...)
 		if err == nil {
 			return
 		}

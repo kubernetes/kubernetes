@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
@@ -50,13 +51,13 @@ type OutputVersionMapper struct {
 }
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
-	mapping, err := m.RESTMapper.RESTMapping(kind, m.OutputVersion)
+func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	mapping, err := m.RESTMapper.RESTMapping(gk, m.OutputVersion)
 	if err == nil {
 		return mapping, nil
 	}
 
-	return m.RESTMapper.RESTMapping(kind, versions...)
+	return m.RESTMapper.RESTMapping(gk, versions...)
 }
 
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes
@@ -65,12 +66,13 @@ type ShortcutExpander struct {
 	meta.RESTMapper
 }
 
-// VersionAndKindForResource implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
+var _ meta.RESTMapper = &ShortcutExpander{}
+
+// KindFor implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
 // mapper.
-func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+func (e ShortcutExpander) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	resource = expandResourceShortcut(resource)
-	defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(resource)
-	return defaultVersion, kind, err
+	return e.RESTMapper.KindFor(resource)
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource.

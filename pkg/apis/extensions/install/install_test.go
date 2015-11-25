@@ -75,20 +75,20 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	expectedGroupVersion := unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
+	gv := unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
+	hpaGVK := gv.WithKind("HorizontalPodAutoscaler")
+	daemonSetGVK := gv.WithKind("DaemonSet")
 
-	if v, k, err := latest.GroupOrDie("extensions").RESTMapper.VersionAndKindForResource("horizontalpodautoscalers"); err != nil || v != expectedGroupVersion.String() || k != "HorizontalPodAutoscaler" {
-		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
+	if gvk, err := latest.GroupOrDie("extensions").RESTMapper.KindFor("horizontalpodautoscalers"); err != nil || gvk != hpaGVK {
+		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("DaemonSet", ""); err != nil || m.GroupVersionKind.GroupVersion() != expectedGroupVersion || m.Resource != "daemonsets" {
+	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, groupVersionString := range latest.GroupOrDie("extensions").GroupVersions {
-		gv, err := unversioned.ParseGroupVersion(groupVersionString)
-
-		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping("HorizontalPodAutoscaler", gv.String())
+	for _, version := range latest.GroupOrDie("extensions").Versions {
+		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping(hpaGVK.GroupKind(), version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

@@ -59,15 +59,10 @@ type ObjectScheme interface {
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 
 	return func(action Action) (bool, runtime.Object, error) {
-		gvString, kind, err := mapper.VersionAndKindForResource(action.GetResource())
+		gvk, err := mapper.KindFor(action.GetResource())
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
-		gv, err := unversioned.ParseGroupVersion(gvString)
-		if err != nil {
-			return false, nil, err
-		}
-		gvk := gv.WithKind(kind)
 
 		// TODO: have mapper return a Kind for a subresource?
 		switch castAction := action.(type) {

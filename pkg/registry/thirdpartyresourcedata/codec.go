@@ -39,28 +39,37 @@ type thirdPartyResourceDataMapper struct {
 	group   string
 }
 
+var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
+
 func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
 	return resource == strings.ToLower(t.kind)+"s"
 }
 
-func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string, error) {
+func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	if t.isThirdPartyResource(resource) {
-		return t.group, nil
+		return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}, nil
 	}
-	return t.mapper.GroupForResource(resource)
+	return t.mapper.KindFor(resource)
 }
 
-func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, groupVersions ...string) (*meta.RESTMapping, error) {
-	if len(groupVersions) != 1 {
-		return nil, fmt.Errorf("unexpected set of groupVersions: %v", groupVersions)
+func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	if len(versions) != 1 {
+		return nil, fmt.Errorf("unexpected set of versions: %v", versions)
 	}
-	if groupVersions[0] != apiutil.GetGroupVersion(t.group, t.version) {
-		return nil, fmt.Errorf("unknown version %s expected %s", groupVersions[0], apiutil.GetGroupVersion(t.group, t.version))
+	if gk.Group != t.group {
+		return nil, fmt.Errorf("unknown group %q expected %s", gk.Group, t.group)
 	}
-	if kind != "ThirdPartyResourceData" {
-		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
+	if gk.Kind != "ThirdPartyResourceData" {
+		return nil, fmt.Errorf("unknown kind %s expected %s", gk.Kind, t.kind)
 	}
-	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("extensions").GroupVersion)
+	if versions[0] != t.version {
+		return nil, fmt.Errorf("unknown version %q expected %q", versions[0], t.version)
+	}
+
+	// TODO figure out why we're doing this rewriting
+	extensionGK := unversioned.GroupKind{Group: "extensions", Kind: "ThirdPartyResourceData"}
+
+	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie("extensions").Version)
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +83,6 @@ func (t *thirdPartyResourceDataMapper) AliasesForResource(resource string) ([]st
 
 func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return t.mapper.ResourceSingularizer(resource)
-}
-
-func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
-	if t.isThirdPartyResource(resource) {
-		return t.version, t.kind, nil
-	}
-	return t.mapper.VersionAndKindForResource(resource)
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource
