@@ -8,7 +8,7 @@
 # plugin at https://github.com/golang/protobuf (after 2015-02-20). If you have
 # not, please install them first.
 #
-# We recommend running this script at $GOPATH or $GOPATH/src.
+# We recommend running this script at $GOPATH/src.
 #
 # If this is not what you need, feel free to make your own scripts. Again, this
 # script is for demonstration purpose.

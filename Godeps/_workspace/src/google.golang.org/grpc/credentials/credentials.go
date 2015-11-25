@@ -47,14 +47,11 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/jwt"
 )
 
 var (
 	// alpnProtoStr are the specified application level protocols for gRPC.
-	alpnProtoStr = []string{"h2-14", "h2-15", "h2-16"}
+	alpnProtoStr = []string{"h2"}
 )
 
 // Credentials defines the common interface all supported credentials must
@@ -63,11 +60,15 @@ type Credentials interface {
 	// GetRequestMetadata gets the current request metadata, refreshing
 	// tokens if required. This should be called by the transport layer on
 	// each request, and the data should be populated in headers or other
-	// context. When supported by the underlying implementation, ctx can
-	// be used for timeout and cancellation.
+	// context. uri is the URI of the entry point for the request. When
+	// supported by the underlying implementation, ctx can be used for
+	// timeout and cancellation.
 	// TODO(zhaoq): Define the set of the qualified keys instead of leaving
 	// it as an arbitrary string.
-	GetRequestMetadata(ctx context.Context) (map[string]string, error)
+	GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error)
+	// RequireTransportSecurity indicates whether the credentails requires
+	// transport security.
+	RequireTransportSecurity() bool
 }
 
 // ProtocolInfo provides information regarding the gRPC wire protocol version,
@@ -81,17 +82,48 @@ type ProtocolInfo struct {
 	SecurityVersion string
 }
 
+// AuthInfo defines the common interface for the auth information the users are interested in.
+type AuthInfo interface {
+	AuthType() string
+}
+
+type authInfoKey struct{}
+
+// NewContext creates a new context with authInfo attached.
+func NewContext(ctx context.Context, authInfo AuthInfo) context.Context {
+	return context.WithValue(ctx, authInfoKey{}, authInfo)
+}
+
+// FromContext returns the authInfo in ctx if it exists.
+func FromContext(ctx context.Context) (authInfo AuthInfo, ok bool) {
+	authInfo, ok = ctx.Value(authInfoKey{}).(AuthInfo)
+	return
+}
+
 // TransportAuthenticator defines the common interface for all the live gRPC wire
 // protocols and supported transport security protocols (e.g., TLS, SSL).
 type TransportAuthenticator interface {
 	// ClientHandshake does the authentication handshake specified by the corresponding
-	// authentication protocol on rawConn for clients.
-	ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (net.Conn, error)
-	// ServerHandshake does the authentication handshake for servers.
-	ServerHandshake(rawConn net.Conn) (net.Conn, error)
+	// authentication protocol on rawConn for clients. It returns the authenticated
+	// connection and the corresponding auth information about the connection.
+	ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (net.Conn, AuthInfo, error)
+	// ServerHandshake does the authentication handshake for servers. It returns
+	// the authenticated connection and the corresponding auth information about
+	// the connection.
+	ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
 	// Info provides the ProtocolInfo of this TransportAuthenticator.
 	Info() ProtocolInfo
 	Credentials
+}
+
+// TLSInfo contains the auth information for a TLS authenticated connection.
+// It implements the AuthInfo interface.
+type TLSInfo struct {
+	state tls.ConnectionState
+}
+
+func (t TLSInfo) AuthType() string {
+	return "tls"
 }
 
 // tlsCreds is the credentials required for authenticating a connection using TLS.
@@ -100,7 +132,7 @@ type tlsCreds struct {
 	config tls.Config
 }
 
-func (c *tlsCreds) Info() ProtocolInfo {
+func (c tlsCreds) Info() ProtocolInfo {
 	return ProtocolInfo{
 		SecurityProtocol: "tls",
 		SecurityVersion:  "1.2",
@@ -109,8 +141,12 @@ func (c *tlsCreds) Info() ProtocolInfo {
 
 // GetRequestMetadata returns nil, nil since TLS credentials does not have
 // metadata.
-func (c *tlsCreds) GetRequestMetadata(ctx context.Context) (map[string]string, error) {
+func (c *tlsCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
 	return nil, nil
+}
+
+func (c *tlsCreds) RequireTransportSecurity() bool {
+	return true
 }
 
 type timeoutError struct{}
@@ -119,7 +155,7 @@ func (timeoutError) Error() string   { return "credentials: Dial timed out" }
 func (timeoutError) Timeout() bool   { return true }
 func (timeoutError) Temporary() bool { return true }
 
-func (c *tlsCreds) ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (_ net.Conn, err error) {
+func (c *tlsCreds) ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (_ net.Conn, _ AuthInfo, err error) {
 	// borrow some code from tls.DialWithDialer
 	var errChannel chan error
 	if timeout != 0 {
@@ -146,18 +182,20 @@ func (c *tlsCreds) ClientHandshake(addr string, rawConn net.Conn, timeout time.D
 	}
 	if err != nil {
 		rawConn.Close()
-		return nil, err
+		return nil, nil, err
 	}
-	return conn, nil
+	// TODO(zhaoq): Omit the auth info for client now. It is more for
+	// information than anything else.
+	return conn, nil, nil
 }
 
-func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, error) {
+func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error) {
 	conn := tls.Server(rawConn, &c.config)
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
-		return nil, err
+		return nil, nil, err
 	}
-	return conn, nil
+	return conn, TLSInfo{conn.ConnectionState()}, nil
 }
 
 // NewTLS uses c to construct a TransportAuthenticator based on TLS.
@@ -198,73 +236,4 @@ func NewServerTLSFromFile(certFile, keyFile string) (TransportAuthenticator, err
 		return nil, err
 	}
 	return NewTLS(&tls.Config{Certificates: []tls.Certificate{cert}}), nil
-}
-
-// TokenSource supplies credentials from an oauth2.TokenSource.
-type TokenSource struct {
-	oauth2.TokenSource
-}
-
-// GetRequestMetadata gets the request metadata as a map from a TokenSource.
-func (ts TokenSource) GetRequestMetadata(ctx context.Context) (map[string]string, error) {
-	token, err := ts.Token()
-	if err != nil {
-		return nil, err
-	}
-	return map[string]string{
-		"authorization": token.TokenType + " " + token.AccessToken,
-	}, nil
-}
-
-// NewComputeEngine constructs the credentials that fetches access tokens from
-// Google Compute Engine (GCE)'s metadata server. It is only valid to use this
-// if your program is running on a GCE instance.
-// TODO(dsymonds): Deprecate and remove this.
-func NewComputeEngine() Credentials {
-	return TokenSource{google.ComputeTokenSource("")}
-}
-
-// serviceAccount represents credentials via JWT signing key.
-type serviceAccount struct {
-	config *jwt.Config
-}
-
-func (s serviceAccount) GetRequestMetadata(ctx context.Context) (map[string]string, error) {
-	token, err := s.config.TokenSource(ctx).Token()
-	if err != nil {
-		return nil, err
-	}
-	return map[string]string{
-		"authorization": token.TokenType + " " + token.AccessToken,
-	}, nil
-}
-
-// NewServiceAccountFromKey constructs the credentials using the JSON key slice
-// from a Google Developers service account.
-func NewServiceAccountFromKey(jsonKey []byte, scope ...string) (Credentials, error) {
-	config, err := google.JWTConfigFromJSON(jsonKey, scope...)
-	if err != nil {
-		return nil, err
-	}
-	return serviceAccount{config: config}, nil
-}
-
-// NewServiceAccountFromFile constructs the credentials using the JSON key file
-// of a Google Developers service account.
-func NewServiceAccountFromFile(keyFile string, scope ...string) (Credentials, error) {
-	jsonKey, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("credentials: failed to read the service account key file: %v", err)
-	}
-	return NewServiceAccountFromKey(jsonKey, scope...)
-}
-
-// NewApplicationDefault returns "Application Default Credentials". For more
-// detail, see https://developers.google.com/accounts/docs/application-default-credentials.
-func NewApplicationDefault(ctx context.Context, scope ...string) (Credentials, error) {
-	t, err := google.DefaultTokenSource(ctx, scope...)
-	if err != nil {
-		return nil, err
-	}
-	return TokenSource{t}, nil
 }
