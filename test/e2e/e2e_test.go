@@ -30,9 +30,12 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -73,6 +76,7 @@ func init() {
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
+	flag.StringVar(&cloudConfig.ServiceAccount, "gce-service-account", "", "GCE service account to use for GCE API calls, if applicable")
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws")
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
@@ -100,6 +104,23 @@ func TestE2E(t *testing.T) {
 
 	if testContext.Provider == "" {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
+	}
+
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		var err error
+		Logf("Fetching cloud provider for %q\r\n", testContext.Provider)
+		var tokenSource oauth2.TokenSource
+		tokenSource = nil
+		if cloudConfig.ServiceAccount != "" {
+			// Use specified service account for auth
+			Logf("Using service account %q as token source.", cloudConfig.ServiceAccount)
+			tokenSource = google.ComputeTokenSource(cloudConfig.ServiceAccount)
+		}
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, testContext.CloudConfig.Zone, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
+		if err != nil {
+			glog.Fatal("Error building GCE provider: ", err)
+		}
+
 	}
 
 	if testContext.Provider == "aws" {
