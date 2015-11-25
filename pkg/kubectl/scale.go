@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -39,13 +40,13 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error
 }
 
-func ScalerFor(kind string, c client.Interface) (Scaler, error) {
+func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 	switch kind {
-	case "ReplicationController":
+	case api.Kind("ReplicationController"):
 		return &ReplicationControllerScaler{c}, nil
-	case "Job":
+	case extensions.Kind("Job"):
 		return &JobScaler{c.Extensions()}, nil
-	case "Deployment":
+	case extensions.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)

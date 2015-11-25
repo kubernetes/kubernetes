@@ -27,6 +27,11 @@ var Scheme = runtime.NewScheme()
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: ""}
 
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) unversioned.GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
 func init() {
 	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},

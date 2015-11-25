@@ -29,6 +29,11 @@ func init() {
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "metrics", Version: ""}
 
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) unversioned.GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
 	// TODO this will get cleaned up with the scheme types are fixed
