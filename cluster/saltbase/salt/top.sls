@@ -13,6 +13,9 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+    - flannel
+{% endif %}
     - helpers
     - cadvisor
     - kube-client-tools
@@ -40,6 +43,10 @@ base:
     - match: grain
     - generate-cert
     - etcd
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+    - flannel-server
+    - flannel
+{% endif %}
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
