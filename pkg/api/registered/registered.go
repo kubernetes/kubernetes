@@ -22,46 +22,60 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // List of registered API versions.
 // The list is in the order of most preferred to the least.
-var RegisteredVersions []string
+var RegisteredGroupVersions []unversioned.GroupVersion
 
 func init() {
-	validGroupVersions := map[string]bool{
-		"v1":                       true,
-		"extensions/v1beta1":       true,
-		"componentconfig/v1alpha1": true,
-		"metrics/v1alpha1":         true,
+	validGroupVersions := map[unversioned.GroupVersion]bool{
+		unversioned.GroupVersion{Group: "", Version: "v1"}:                      true,
+		unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}:       true,
+		unversioned.GroupVersion{Group: "componentconfig", Version: "v1alpha1"}: true,
+		unversioned.GroupVersion{Group: "metrics", Version: "v1alpha1"}:         true,
 	}
 
 	// The default list of supported api versions, in order of most preferred to the least.
-	defaultSupportedVersions := "v1,extensions/v1beta1,componentconfig/v1alpha1"
+	supportedVersions := []unversioned.GroupVersion{
+		{Group: "", Version: "v1"},
+		{Group: "extensions", Version: "v1beta1"},
+		{Group: "componentconfig", Version: "v1alpha1"},
+	}
+
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that should be registered in the scheme.
 	// The versions should be in the order of most preferred to the least.
-	supportedVersions := os.Getenv("KUBE_API_VERSIONS")
-	if supportedVersions == "" {
-		supportedVersions = defaultSupportedVersions
-	}
-	versions := strings.Split(supportedVersions, ",")
-	for _, version := range versions {
-		// Verify that the version is valid.
-		valid, ok := validGroupVersions[version]
-		if !ok || !valid {
-			// Not a valid API version.
-			glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
-				version, os.Getenv("KUBE_API_VERSIONS"), validGroupVersions)
+	userRequestedVersions := os.Getenv("KUBE_API_VERSIONS")
+	if len(userRequestedVersions) != 0 {
+		// reset the supported versions
+		supportedVersions = []unversioned.GroupVersion{}
+		for _, version := range strings.Split(userRequestedVersions, ",") {
+			gv, err := unversioned.ParseGroupVersion(version)
+			if err != nil {
+				glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
+					version, os.Getenv("KUBE_API_VERSIONS"), validGroupVersions)
+			}
+
+			// Verify that the version is valid.
+			valid, ok := validGroupVersions[gv]
+			if !ok || !valid {
+				// Not a valid API version.
+				glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
+					version, os.Getenv("KUBE_API_VERSIONS"), validGroupVersions)
+			}
+
+			supportedVersions = append(supportedVersions, gv)
 		}
-		RegisteredVersions = append(RegisteredVersions, version)
 	}
+
+	RegisteredGroupVersions = supportedVersions
 }
 
 // Returns true if the given api version is one of the registered api versions.
-func IsRegisteredAPIVersion(version string) bool {
-	for _, apiVersion := range RegisteredVersions {
-		if apiVersion == version {
+func IsRegisteredAPIGroupVersion(gv unversioned.GroupVersion) bool {
+	for _, currGV := range RegisteredGroupVersions {
+		if currGV == gv {
 			return true
 		}
 	}
@@ -70,10 +84,10 @@ func IsRegisteredAPIVersion(version string) bool {
 
 // GroupVersionsForGroup returns the registered versions of a group in the form
 // of "group/version".
-func GroupVersionsForGroup(group string) []string {
-	ret := []string{}
-	for _, v := range RegisteredVersions {
-		if apiutil.GetGroup(v) == group {
+func GroupVersionsForGroup(group string) []unversioned.GroupVersion {
+	ret := []unversioned.GroupVersion{}
+	for _, v := range RegisteredGroupVersions {
+		if v.Group == group {
 			ret = append(ret, v)
 		}
 	}

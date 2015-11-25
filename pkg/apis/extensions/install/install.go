@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,19 +45,23 @@ func init() {
 		glog.V(4).Infof("%v", err)
 		return
 	}
+
+	worstToBestGroupVersions := []unversioned.GroupVersion{}
+
 	registeredGroupVersions := registered.GroupVersionsForGroup("extensions")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Group:        apiutil.GetGroup(groupVersion),
-		Version:      apiutil.GetVersion(groupVersion),
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
+		GroupVersion: groupVersion.String(),
+		Group:        groupVersion.Group,
+		Version:      groupVersion.Version,
+		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, apiutil.GetVersion(registeredGroupVersions[i]))
-		groupVersions = append(groupVersions, registeredGroupVersions[i])
+		versions = append(versions, registeredGroupVersions[i].Version)
+		groupVersions = append(groupVersions, registeredGroupVersions[i].String())
+		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
 	}
 	groupMeta.Versions = versions
 	groupMeta.GroupVersions = groupVersions
@@ -70,7 +74,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper("extensions", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 }

@@ -30,6 +30,7 @@ type GroupVersionKind struct {
 	Kind    string
 }
 
+// TODO remove this
 func NewGroupVersionKind(gv GroupVersion, kind string) GroupVersionKind {
 	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
 }
@@ -82,6 +83,10 @@ func ParseGroupVersionOrDie(gv string) GroupVersion {
 	}
 
 	return ret
+}
+
+func (gv GroupVersion) WithKind(kind string) GroupVersionKind {
+	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
 }
 
 // MarshalJSON implements the json.Marshaller interface.
