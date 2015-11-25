@@ -129,7 +129,7 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 		return nil, err
 	}
 
-	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
+	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
 }
 
 // Creates a scheduler from the configuration file
@@ -153,11 +153,22 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
 	}
 
-	return f.CreateFromKeys(predicateKeys, priorityKeys)
+	extenders := make([]algorithm.SchedulerExtender, 0)
+	if len(policy.ExtenderConfigs) != 0 {
+		for ii := range policy.ExtenderConfigs {
+			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
+			if extender, err := scheduler.NewHTTPExtender(&policy.ExtenderConfigs[ii], policy.APIVersion); err != nil {
+				return nil, err
+			} else {
+				extenders = append(extenders, extender)
+			}
+		}
+	}
+	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) (*scheduler.Config, error) {
+func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 	pluginArgs := PluginFactoryArgs{
 		PodLister:        f.PodLister,
@@ -199,7 +210,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String) 
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
+	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, extenders, f.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
