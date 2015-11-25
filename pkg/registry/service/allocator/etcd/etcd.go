@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 
 	"golang.org/x/net/context"
 )
@@ -174,7 +174,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 
 	existing := &api.RangeAllocation{}
 	if err := e.storage.Get(context.TODO(), e.baseKey, existing, false); err != nil {
-		if etcdstorage.IsEtcdNotFound(err) {
+		if etcdutil.IsEtcdNotFound(err) {
 			return nil, nil
 		}
 		return nil, etcderr.InterpretGetError(err, e.kind, "")
