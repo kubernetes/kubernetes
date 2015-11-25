@@ -189,9 +189,21 @@ func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
 // them with group/version tuples.
 // TODO this should probably become RESTMapping(GroupKind, versions ...string)
 func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTMapping, error) {
+	// TODO, this looks really strange, but once this API is update, the version detection becomes clean again
+	// because you won't be able to request cross-group kinds
+	hadVersion := false
+	for _, gvString := range versions {
+		currGroupVersion, err := unversioned.ParseGroupVersion(gvString)
+		if err != nil {
+			return nil, err
+		}
+		if len(currGroupVersion.Version) != 0 {
+			hadVersion = true
+		}
+	}
+
 	// Pick an appropriate version
 	var groupVersion *unversioned.GroupVersion
-	hadVersion := false
 	for _, v := range versions {
 		if len(v) == 0 {
 			continue
@@ -202,7 +214,6 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		}
 
 		currGVK := currGroupVersion.WithKind(kind)
-		hadVersion = true
 		if _, ok := m.kindToPluralResource[currGVK]; ok {
 			groupVersion = &currGroupVersion
 			break

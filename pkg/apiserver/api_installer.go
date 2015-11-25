@@ -375,11 +375,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc:      ctxFn,
-		Creater:          a.group.Creater,
-		Convertor:        a.group.Convertor,
-		Codec:            mapping.Codec,
-		APIVersion:       a.group.GroupVersion.String(),
+		ContextFunc: ctxFn,
+		Creater:     a.group.Creater,
+		Convertor:   a.group.Convertor,
+		Codec:       mapping.Codec,
+		APIVersion:  a.group.GroupVersion.String(),
+		// TODO, this internal version needs to plumbed through from the caller
+		// this works in all the cases we have now
+		InternalVersion:  unversioned.GroupVersion{Group: a.group.GroupVersion.Group},
 		ServerAPIVersion: serverGroupVersion.String(),
 		Resource:         resource,
 		Subresource:      subresource,

@@ -77,7 +77,7 @@ func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stre
 		return err
 	}
 
-	if _, registered := s.typeToVersion[v.Type()]; !registered {
+	if _, registered := s.typeToGVK[v.Type()]; !registered {
 		return fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
 	}
 
