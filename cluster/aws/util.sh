@@ -665,25 +665,7 @@ function assign-elastic-ip {
   fi
 }
 
-
-function kube-up {
-  echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
-
-  get-tokens
-
-  detect-image
-  detect-minion-image
-
-  find-release-tars
-
-  ensure-temp-dir
-
-  upload-server-tars
-
-  ensure-iam-profiles
-
-  load-or-gen-kube-basicauth
-
+function ssh-key-setup {
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
   fi
@@ -696,7 +678,9 @@ function kube-up {
   AWS_SSH_KEY_NAME="kubernetes-${AWS_SSH_KEY_FINGERPRINT//:/}"
 
   import-public-key ${AWS_SSH_KEY_NAME} ${AWS_SSH_KEY}.pub
+}
 
+function vpc-setup {
   if [[ -z "${VPC_ID:-}" ]]; then
     VPC_ID=$(get_vpc_id)
   fi
@@ -710,9 +694,9 @@ function kube-up {
   fi
 
   echo "Using VPC $VPC_ID"
+}
 
-  create-dhcp-option-set
-
+function subnet-setup {
   if [[ -z "${SUBNET_ID:-}" ]]; then
     SUBNET_ID=$(get_subnet_id $VPC_ID $ZONE)
   fi
@@ -732,6 +716,33 @@ function kube-up {
   fi
 
   echo "Using subnet $SUBNET_ID"
+}
+
+function kube-up {
+  echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
+
+  get-tokens
+
+  detect-image
+  detect-minion-image
+
+  find-release-tars
+
+  ensure-temp-dir
+
+  upload-server-tars
+
+  ensure-iam-profiles
+
+  load-or-gen-kube-basicauth
+
+  ssh-key-setup
+
+  vpc-setup
+
+  create-dhcp-option-set
+
+  subnet-setup
 
   IGW_ID=$(get_igw_id $VPC_ID)
   if [[ -z "$IGW_ID" ]]; then
@@ -802,12 +813,14 @@ function kube-up {
 
     # Start minions
     start-minions
+    wait-minions
   else
     # Create the master
     start-master
 
     # Start minions
     start-minions
+    wait-minions
 
     # Wait for the master to be ready
     wait-master
@@ -1016,7 +1029,9 @@ function start-minions() {
       --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MINION_TAG} \
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
+}
 
+function wait-minions {
   # Wait for the minions to be running
   # TODO(justinsb): This is really not needed any more
   attempt=0
