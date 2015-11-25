@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestMatchVolume(t *testing.T) {
@@ -104,17 +105,17 @@ func TestMatchVolume(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		volume, err := volList.FindBestMatchForClaim(scenario.claim)
+		volume, err := volList.findBestMatchForClaim(scenario.claim)
 		if err != nil {
 			t.Errorf("Unexpected error matching volume by claim: %v", err)
 		}
-		if scenario.expectedMatch != "" && volume == nil {
+		if len(scenario.expectedMatch) != 0 && volume == nil {
 			t.Errorf("Expected match but received nil volume for scenario: %s", name)
 		}
-		if scenario.expectedMatch != "" && volume != nil && string(volume.UID) != scenario.expectedMatch {
+		if len(scenario.expectedMatch) != 0 && volume != nil && string(volume.UID) != scenario.expectedMatch {
 			t.Errorf("Expected %s but got volume %s in scenario %s", scenario.expectedMatch, volume.UID, name)
 		}
-		if scenario.expectedMatch == "" && volume != nil {
+		if len(scenario.expectedMatch) == 0 && volume != nil {
 			t.Errorf("Unexpected match for scenario: %s", name)
 		}
 	}
@@ -175,7 +176,7 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 		},
 	}
 
-	volume, err := volumeIndex.FindBestMatchForClaim(claim)
+	volume, err := volumeIndex.findBestMatchForClaim(claim)
 	if err != nil {
 		t.Fatalf("Unexpected error matching volume by claim: %v", err)
 	}
@@ -296,27 +297,27 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	index.Add(ebs)
 	index.Add(nfs)
 
-	volume, _ := index.FindBestMatchForClaim(claim)
+	volume, _ := index.findBestMatchForClaim(claim)
 	if volume.Name != ebs.Name {
 		t.Errorf("Expected %s but got volume %s instead", ebs.Name, volume.Name)
 	}
 
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany}
-	volume, _ = index.FindBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
 
 	// order of the requested modes should not matter
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany, api.ReadWriteOnce, api.ReadOnlyMany}
-	volume, _ = index.FindBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
 
 	// fewer modes requested should still match
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany}
-	volume, _ = index.FindBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
@@ -324,7 +325,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// pretend the exact match is bound.  should get the next level up of modes.
 	ebs.Spec.ClaimRef = &api.ObjectReference{}
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-	volume, _ = index.FindBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
@@ -332,7 +333,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// continue up the levels of modes.
 	gce.Spec.ClaimRef = &api.ObjectReference{}
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-	volume, _ = index.FindBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
@@ -340,7 +341,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// partial mode request
 	gce.Spec.ClaimRef = nil
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadOnlyMany}
-	volume, _ = index.FindBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
@@ -485,53 +486,40 @@ func createTestVolumes() []*api.PersistentVolume {
 	}
 }
 
+func testVolume(name, size string) *api.PersistentVolume {
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:        name,
+			Annotations: map[string]string{},
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(size)},
+			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
+			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		},
+	}
+}
+
 func TestFindingPreboundVolumes(t *testing.T) {
-	pv1 := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			Name:        "pv1",
-			Annotations: map[string]string{},
-		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")},
-			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
-			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-		},
-	}
-
-	pv5 := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			Name:        "pv5",
-			Annotations: map[string]string{},
-		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi")},
-			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
-			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-		},
-	}
-
-	pv8 := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			Name:        "pv8",
-			Annotations: map[string]string{},
-		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi")},
-			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
-			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-		},
-	}
-
 	claim := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
+			SelfLink:  testapi.Default.SelfLink("pvc", ""),
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")}},
 		},
 	}
+	claimRef, err := api.GetReference(claim)
+	if err != nil {
+		t.Errorf("error getting claimRef: %v", err)
+	}
+
+	pv1 := testVolume("pv1", "1Gi")
+	pv5 := testVolume("pv5", "5Gi")
+	pv8 := testVolume("pv8", "8Gi")
 
 	index := NewPersistentVolumeOrderedIndex()
 	index.Add(pv1)
@@ -539,22 +527,22 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	index.Add(pv8)
 
 	// expected exact match on size
-	volume, _ := index.FindBestMatchForClaim(claim)
+	volume, _ := index.findBestMatchForClaim(claim)
 	if volume.Name != pv1.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
 
 	// pretend the exact match is pre-bound.  should get the next size up.
-	pv1.Annotations[createdForKey] = "some/other/claim"
-	volume, _ = index.FindBestMatchForClaim(claim)
+	pv1.Spec.ClaimRef = &api.ObjectReference{Name: "foo", Namespace: "bar"}
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv5.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
 	}
 
 	// pretend the exact match is available but the largest volume is pre-bound to the claim.
-	delete(pv1.Annotations, createdForKey)
-	pv8.Annotations[createdForKey] = "myns/claim01"
-	volume, _ = index.FindBestMatchForClaim(claim)
+	pv1.Spec.ClaimRef = nil
+	pv8.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
 	}

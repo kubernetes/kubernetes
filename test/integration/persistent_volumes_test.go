@@ -19,6 +19,8 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -28,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/volume"
@@ -48,11 +51,11 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	recyclerClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 	testClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 
-	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 1*time.Second)
+	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 10*time.Minute)
 	binder.Run()
 	defer binder.Stop()
 
-	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 1*time.Second, []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", volume.NewFakeVolumeHost("/tmp/fake", nil, nil)}})
+	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 30*time.Minute, []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", volume.NewFakeVolumeHost("/tmp/fake", nil, nil)}})
 	recycler.Run()
 	defer recycler.Stop()
 
@@ -121,6 +124,50 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 		if event.Type == watch.Deleted {
 			break
 		}
+	}
+
+	// test the race between claims and volumes.  ensure only a volume only binds to a single claim.
+	deleteAllEtcdKeys()
+	counter := 0
+	maxClaims := 100
+	claims := []*api.PersistentVolumeClaim{}
+	for counter <= maxClaims {
+		counter += 1
+		clone, _ := conversion.NewCloner().DeepCopy(pvc)
+		newPvc, _ := clone.(*api.PersistentVolumeClaim)
+		newPvc.ObjectMeta = api.ObjectMeta{Name: fmt.Sprintf("fake-pvc-%d", counter)}
+		claim, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(newPvc)
+		if err != nil {
+			t.Fatal("Error creating newPvc: %v", err)
+		}
+		claims = append(claims, claim)
+	}
+
+	// putting a bind manually on a pv should only match the claim it is bound to
+	rand.Seed(time.Now().Unix())
+	claim := claims[rand.Intn(maxClaims-1)]
+	claimRef, err := api.GetReference(claim)
+	if err != nil {
+		t.Fatalf("Unexpected error getting claimRef: %v", err)
+	}
+	pv.Spec.ClaimRef = claimRef
+
+	pv, err = testClient.PersistentVolumes().Create(pv)
+	if err != nil {
+		t.Fatalf("Unexpected error creating pv: %v", err)
+	}
+
+	waitForPersistentVolumePhase(w, api.VolumeBound)
+
+	pv, err = testClient.PersistentVolumes().Get(pv.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef == nil {
+		t.Fatalf("Unexpected nil claimRef")
+	}
+	if pv.Spec.ClaimRef.Namespace != claimRef.Namespace || pv.Spec.ClaimRef.Name != claimRef.Name {
+		t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", claimRef.Namespace, claimRef.Name, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
 	}
 }
 
