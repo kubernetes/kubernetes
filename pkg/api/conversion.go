@@ -31,9 +31,9 @@ var Codec = runtime.CodecFor(Scheme, "")
 
 func init() {
 	Scheme.AddDefaultingFuncs(
-		func(obj *ListOptions) {
-			obj.LabelSelector = labels.Everything()
-			obj.FieldSelector = fields.Everything()
+		func(obj *unversioned.ListOptions) {
+			obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}
+			obj.FieldSelector = unversioned.FieldSelector{fields.Everything()}
 		},
 		// TODO: see about moving this into v1/defaults.go
 		func(obj *PodExecOptions) {

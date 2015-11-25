@@ -113,7 +113,6 @@ func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
 func (*DeleteOptions) IsAnAPIObject()             {}
-func (*ListOptions) IsAnAPIObject()               {}
 func (*PodAttachOptions) IsAnAPIObject()          {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}
