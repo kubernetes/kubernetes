@@ -18,11 +18,6 @@
 # it detects a failure.  It then exits, and supervisord restarts it
 # which in turn restarts the kubelet.
 
-{% set kubelet_port = "10250" -%}
-{% if pillar['kubelet_port'] is defined -%}
-	{% set kubelet_port = pillar['kubelet_port'] -%}
-{% endif -%}
-
 /etc/init.d/kubelet stop
 /etc/init.d/kubelet start
 
@@ -32,7 +27,7 @@ sleep 60
 max_seconds=10
 
 while true; do
-  if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:{{kubelet_port}}/healthz > /dev/null; then
+  if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:10250/healthz > /dev/null; then
     echo "kubelet failed!"
     exit 2
   fi
