@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 func falsePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
@@ -44,9 +45,9 @@ func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (boo
 	return len(existingPods) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
-	result := []algorithm.HostPriority{}
+	result := []schedulerapi.HostPriority{}
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %v", err)
@@ -56,7 +57,7 @@ func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister alg
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, algorithm.HostPriority{
+		result = append(result, schedulerapi.HostPriority{
 			Host:  node.Name,
 			Score: score,
 		})
@@ -64,10 +65,10 @@ func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister alg
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
-	reverseResult := []algorithm.HostPriority{}
+	reverseResult := []schedulerapi.HostPriority{}
 	result, err := numericPriority(pod, podLister, nodeLister)
 	if err != nil {
 		return nil, err
@@ -78,7 +79,7 @@ func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLis
 		minScore = math.Min(minScore, float64(hostPriority.Score))
 	}
 	for _, hostPriority := range result {
-		reverseResult = append(reverseResult, algorithm.HostPriority{
+		reverseResult = append(reverseResult, schedulerapi.HostPriority{
 			Host:  hostPriority.Host,
 			Score: int(maxScore + minScore - float64(hostPriority.Score)),
 		})
@@ -100,12 +101,12 @@ func makeNodeList(nodeNames []string) api.NodeList {
 func TestSelectHost(t *testing.T) {
 	scheduler := genericScheduler{random: rand.New(rand.NewSource(0))}
 	tests := []struct {
-		list          algorithm.HostPriorityList
+		list          schedulerapi.HostPriorityList
 		possibleHosts sets.String
 		expectsErr    bool
 	}{
 		{
-			list: []algorithm.HostPriority{
+			list: []schedulerapi.HostPriority{
 				{Host: "machine1.1", Score: 1},
 				{Host: "machine2.1", Score: 2},
 			},
@@ -114,7 +115,7 @@ func TestSelectHost(t *testing.T) {
 		},
 		// equal scores
 		{
-			list: []algorithm.HostPriority{
+			list: []schedulerapi.HostPriority{
 				{Host: "machine1.1", Score: 1},
 				{Host: "machine1.2", Score: 2},
 				{Host: "machine1.3", Score: 2},
@@ -125,7 +126,7 @@ func TestSelectHost(t *testing.T) {
 		},
 		// out of order scores
 		{
-			list: []algorithm.HostPriority{
+			list: []schedulerapi.HostPriority{
 				{Host: "machine1.1", Score: 3},
 				{Host: "machine1.2", Score: 3},
 				{Host: "machine2.1", Score: 2},
@@ -137,7 +138,7 @@ func TestSelectHost(t *testing.T) {
 		},
 		// empty priorityList
 		{
-			list:          []algorithm.HostPriority{},
+			list:          []schedulerapi.HostPriority{},
 			possibleHosts: sets.NewString(),
 			expectsErr:    true,
 		},
@@ -287,7 +288,7 @@ func TestGenericScheduler(t *testing.T) {
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, algorithm.FakePodLister(test.pods), random)
+		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, algorithm.FakePodLister(test.pods), random)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
@@ -307,7 +308,7 @@ func TestGenericScheduler(t *testing.T) {
 func TestFindFitAllError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate}
-	_, predicateMap, err := findNodesThatFit(&api.Pod{}, algorithm.FakePodLister([]*api.Pod{}), predicates, makeNodeList(nodes))
+	_, predicateMap, err := findNodesThatFit(&api.Pod{}, algorithm.FakePodLister([]*api.Pod{}), predicates, makeNodeList(nodes), nil)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -332,7 +333,7 @@ func TestFindFitSomeError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}}
-	_, predicateMap, err := findNodesThatFit(pod, algorithm.FakePodLister([]*api.Pod{}), predicates, makeNodeList(nodes))
+	_, predicateMap, err := findNodesThatFit(pod, algorithm.FakePodLister([]*api.Pod{}), predicates, makeNodeList(nodes), nil)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

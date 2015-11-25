@@ -190,6 +190,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	algo := NewGenericScheduler(
 		map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts},
 		[]algorithm.PriorityConfig{},
+		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
@@ -322,6 +323,7 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 	algo := NewGenericScheduler(
 		map[string]algorithm.FitPredicate{},
 		[]algorithm.PriorityConfig{},
+		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
