@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 )
 
 func falsePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
@@ -353,5 +355,56 @@ func TestFindFitSomeError(t *testing.T) {
 		if len(failures) != 1 || !failures.Has("match") {
 			t.Errorf("unexpected failures: %v", failures)
 		}
+	}
+}
+
+func BenchmarkPredicates(b *testing.B) {
+	nodes := []string{}
+	pods := []*api.Pod{}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}}
+
+	for i := 0; i < 1000; i++ {
+		nodeName := fmt.Sprintf("node-%d", i)
+		nodes = append(nodes, nodeName)
+		for j := 0; j < 30; j++ {
+			pods = append(pods, &api.Pod{ObjectMeta: api.ObjectMeta{Name: fmt.Sprintf("pod-%d-%d", i, j)}, Spec: api.PodSpec{NodeName: nodeName}})
+		}
+	}
+	nodeList := makeNodeList(nodes)
+	nodeInfo := predicates.StaticNodeInfo{&nodeList}
+
+	rsrcPredicate := predicates.NewResourceFitPredicate(nodeInfo)
+	predicates := map[string]algorithm.FitPredicate{"resource": rsrcPredicate}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, err := findNodesThatFit(pod, algorithm.FakePodLister(pods), predicates, nodeList)
+		if err != nil {
+			b.Errorf("unexpected error: %v", err)
+		}
+	}
+}
+
+func BenchmarkPriorities(b *testing.B) {
+	prioritizers := []algorithm.PriorityConfig{
+		{Function: priorities.BalancedResourceAllocation, Weight: 1},
+		{Function: priorities.LeastRequestedPriority, Weight: 1},
+	}
+	nodes := []string{}
+	pods := []*api.Pod{}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}}
+
+	for i := 0; i < 1000; i++ {
+		nodeName := fmt.Sprintf("node-%d", i)
+		nodes = append(nodes, nodeName)
+		for j := 0; j < 30; j++ {
+			pods = append(pods, &api.Pod{ObjectMeta: api.ObjectMeta{Name: fmt.Sprintf("pod-%d-%d", i, j)}, Spec: api.PodSpec{NodeName: nodeName}})
+		}
+	}
+	nodeList := makeNodeList(nodes)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		PrioritizeNodes(pod, algorithm.FakePodLister(pods), prioritizers, algorithm.FakeNodeLister(nodeList))
 	}
 }
