@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -395,7 +396,7 @@ func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 }
 
 // Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) Watch(options api.ListOptions) (watch.Interface, error) {
+func (lw *cacherListerWatcher) Watch(options unversioned.ListOptions) (watch.Interface, error) {
 	version, err := ParseWatchResourceVersion(options.ResourceVersion, lw.resourcePrefix)
 	if err != nil {
 		return nil, err

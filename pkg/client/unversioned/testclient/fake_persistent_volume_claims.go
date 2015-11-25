@@ -18,6 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -69,7 +70,7 @@ func (c *FakePersistentVolumeClaims) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("persistentvolumeclaims", c.Namespace, label, field, opts))
 }
 

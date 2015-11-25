@@ -36,7 +36,7 @@ type testLW struct {
 }
 
 func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
-func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
+func (t *testLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options.ResourceVersion)
 }
 

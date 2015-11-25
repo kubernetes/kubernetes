@@ -250,11 +250,11 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 type testLW struct {
 	ListFunc  func() (runtime.Object, error)
-	WatchFunc func(options api.ListOptions) (watch.Interface, error)
+	WatchFunc func(options unversioned.ListOptions) (watch.Interface, error)
 }
 
 func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
-func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
+func (t *testLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
 }
 
@@ -269,7 +269,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	}
 
 	lw := &testLW{
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
 			go fw.Stop()
 			return fw, nil

@@ -571,7 +571,7 @@ func DefaultKubernetesUserAgent() string {
 
 // TimeoutFromListOptions returns timeout to be set via TimeoutSeconds() method
 // based on given options.
-func TimeoutFromListOptions(options api.ListOptions) time.Duration {
+func TimeoutFromListOptions(options unversioned.ListOptions) time.Duration {
 	if options.TimeoutSeconds != nil {
 		return time.Duration(*options.TimeoutSeconds) * time.Second
 	}

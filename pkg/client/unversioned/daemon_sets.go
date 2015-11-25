@@ -17,7 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -36,7 +36,7 @@ type DaemonSetInterface interface {
 	Update(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	UpdateStatus(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // daemonSets implements DaemonsSetsNamespacer interface
@@ -92,7 +92,7 @@ func (c *daemonSets) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested daemon sets.
-func (c *daemonSets) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *daemonSets) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

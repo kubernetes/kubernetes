@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -33,7 +34,7 @@ type ServiceAccountsInterface interface {
 	Delete(name string) error
 	List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error)
 	Get(name string) (*api.ServiceAccount, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // serviceAccounts implements ServiceAccounts interface
@@ -91,7 +92,7 @@ func (s *serviceAccounts) Get(name string) (*api.ServiceAccount, error) {
 }
 
 // Watch starts watching for serviceAccounts matching the given selectors.
-func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (s *serviceAccounts) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).

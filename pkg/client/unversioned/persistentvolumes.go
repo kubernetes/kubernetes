@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -37,7 +38,7 @@ type PersistentVolumeInterface interface {
 	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	UpdateStatus(persistentVolume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // persistentVolumes implements PersistentVolumesInterface
@@ -93,7 +94,7 @@ func (c *persistentVolumes) Delete(name string) error {
 	return c.client.Delete().Resource("persistentVolumes").Name(name).Do().Error()
 }
 
-func (c *persistentVolumes) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumes) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentVolumes").
