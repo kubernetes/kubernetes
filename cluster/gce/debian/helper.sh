@@ -16,7 +16,6 @@
 
 # A library of helper functions and constant for debian os distro
 
-
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
 # address for the master. (In the case of upgrade/repair, we re-use

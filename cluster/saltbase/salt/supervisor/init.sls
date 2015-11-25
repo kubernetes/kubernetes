@@ -47,6 +47,7 @@ monit:
   file:
     - managed
     - source: salt://supervisor/kubelet-checker.sh
+    - template: jinja
     - user: root
     - group: root
     - mode: 755
