@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
@@ -180,7 +181,7 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object)
 	startTime := time.Now()
 	response, err := h.client.Delete(key, false)
 	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
-	if !IsEtcdNotFound(err) {
+	if !etcdutil.IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
 		if err != nil || response.PrevNode != nil {
 			_, _, err = h.extractObj(response, err, out, false, true)
@@ -231,7 +232,7 @@ func (h *etcdHelper) bodyAndExtractObj(ctx context.Context, key string, objPtr r
 	response, err := h.client.Get(key, false, false)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
-	if err != nil && !IsEtcdNotFound(err) {
+	if err != nil && !etcdutil.IsEtcdNotFound(err) {
 		return "", nil, nil, err
 	}
 	body, node, err = h.extractObj(response, err, objPtr, ignoreNotFound, false)
@@ -285,7 +286,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node read")
 	if err != nil {
-		if IsEtcdNotFound(err) {
+		if etcdutil.IsEtcdNotFound(err) {
 			return nil
 		}
 		return err
@@ -388,12 +389,12 @@ func (h *etcdHelper) listEtcdNode(ctx context.Context, key string) ([]*etcd.Node
 	}
 	result, err := h.client.Get(key, true, true)
 	if err != nil {
-		index, ok := etcdErrorIndex(err)
-		if !ok {
-			index = 0
+		var index uint64
+		if etcdError, ok := err.(*etcd.EtcdError); ok {
+			index = etcdError.Index
 		}
 		nodes := make([]*etcd.Node, 0)
-		if IsEtcdNotFound(err) {
+		if etcdutil.IsEtcdNotFound(err) {
 			return nodes, index, nil
 		} else {
 			return nodes, index, err
@@ -465,7 +466,7 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 			startTime := time.Now()
 			response, err := h.client.Create(key, string(data), ttl)
 			metrics.RecordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
-			if IsEtcdNodeExist(err) {
+			if etcdutil.IsEtcdNodeExist(err) {
 				continue
 			}
 			_, _, err = h.extractObj(response, err, ptrToType, false, false)
@@ -480,7 +481,7 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		// Swap origBody with data, if origBody is the latest etcd data.
 		response, err := h.client.CompareAndSwap(key, string(data), ttl, origBody, index)
 		metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
-		if IsEtcdTestFailed(err) {
+		if etcdutil.IsEtcdTestFailed(err) {
 			// Try again.
 			continue
 		}
