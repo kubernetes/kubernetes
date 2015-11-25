@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -146,8 +147,30 @@ func (binder *PersistentVolumeClaimBinder) updateClaim(oldObj, newObj interface{
 	}
 }
 
+func copyVolume(in *api.PersistentVolume) (*api.PersistentVolume, error) {
+	if in == nil {
+		return nil, nil
+	}
+
+	clone, err := conversion.NewCloner().DeepCopy(in)
+	if err != nil {
+		return nil, err
+	}
+
+	return clone.(*api.PersistentVolume), nil
+}
+
 func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderClient, volume *api.PersistentVolume) (err error) {
 	glog.V(5).Infof("Synchronizing PersistentVolume[%s], current phase: %s\n", volume.Name, volume.Status.Phase)
+
+	// always ensure that we have the volume in the index
+	_, exists, err := volumeIndex.Get(volume)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		volumeIndex.Add(volume)
+	}
 
 	// volumes can be in one of the following states:
 	//
@@ -167,96 +190,87 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			// to start the volume again at the beginning of this lifecycle.
 			// ClaimRef is the last bind between persistent volume and claim.
 			// The claim has already been deleted by the user at this point
-			oldClaimRef := volume.Spec.ClaimRef
-			volume.Spec.ClaimRef = nil
-			_, err = binderClient.UpdatePersistentVolume(volume)
+			newVolume, err := copyVolume(volume)
 			if err != nil {
-				// rollback on error, keep the ClaimRef until we can successfully update the volume
-				volume.Spec.ClaimRef = oldClaimRef
+				return err
+			}
+			newVolume.Spec.ClaimRef = nil
+			if _, err = binderClient.UpdatePersistentVolume(newVolume); err != nil {
 				return fmt.Errorf("Unexpected error saving PersistentVolume: %+v", err)
 			}
+			volumeIndex.Update(newVolume)
 		}
 
-		_, exists, err := volumeIndex.Get(volume)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			volumeIndex.Add(volume)
-		}
-		glog.V(5).Infof("PersistentVolume[%s] is now available\n", volume.Name)
 		nextPhase = api.VolumeAvailable
 
 	// available volumes await a claim
 	case api.VolumeAvailable:
 		// TODO:  remove api.VolumePending phase altogether
-		_, exists, err := volumeIndex.Get(volume)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			volumeIndex.Add(volume)
-		}
 		if volume.Spec.ClaimRef != nil {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
-			if err == nil {
-				// change of phase will trigger an update event with the newly bound volume
-				glog.V(5).Infof("PersistentVolume[%s] is now bound\n", volume.Name)
-				nextPhase = api.VolumeBound
-			} else {
-				if errors.IsNotFound(err) {
-					nextPhase = api.VolumeReleased
-				}
+			// an available volume should never have ClaimRef.  Stomp it so we end up in a consistent state.
+			newVolume, err := copyVolume(volume)
+			if err != nil {
+				return err
 			}
+			newVolume.Spec.ClaimRef = nil
+			if _, err = binderClient.UpdatePersistentVolume(newVolume); err != nil {
+				return fmt.Errorf("Unexpected error saving PersistentVolume: %+v", err)
+			}
+			volumeIndex.Update(newVolume)
 		}
+		// you only transition out of Available by being Bound.  That happens inside of the syncClaim
 
 	//bound volumes require verification of their bound claims
 	case api.VolumeBound:
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
-		} else {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					nextPhase = api.VolumeReleased
-				} else {
-					return err
-				}
+		}
+
+		if _, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name); err != nil {
+			if errors.IsNotFound(err) {
+				nextPhase = api.VolumeReleased
+				break
 			}
+
+			return err
 		}
 
 	// released volumes require recycling
 	case api.VolumeReleased:
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
-		} else {
-			// another process is watching for released volumes.
-			// PersistentVolumeReclaimPolicy is set per PersistentVolume
-			//  Recycle - sets the PV to Pending and back under this controller's management
-			//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
 		}
+
+		// another process is watching for released volumes.
+		// PersistentVolumeReclaimPolicy is set per PersistentVolume
+		//  Recycle - sets the PV to Pending and back under this controller's management
+		//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
 
 	// volumes are removed by processes external to this binder and must be removed from the cluster
 	case api.VolumeFailed:
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
-		} else {
-			glog.V(5).Infof("PersistentVolume[%s] previously failed recycling.  Skipping.\n", volume.Name)
 		}
+
+		glog.V(5).Infof("PersistentVolume[%s] previously failed recycling.  Skipping.\n", volume.Name)
 	}
 
 	if currentPhase != nextPhase {
-		volume.Status.Phase = nextPhase
+		newVolume, err := copyVolume(volume)
+		if err != nil {
+			return err
+		}
+		newVolume.Status.Phase = nextPhase
 
 		// a change in state will trigger another update through this controller.
 		// each pass through this controller evaluates current phase and decides whether or not to change to the next phase
-		glog.V(5).Infof("PersistentVolume[%s] changing phase from %s to %s\n", volume.Name, currentPhase, nextPhase)
-		volume, err := binderClient.UpdatePersistentVolumeStatus(volume)
+		glog.V(5).Infof("PersistentVolume[%s] changing phase from %s to %s\n", newVolume.Name, currentPhase, nextPhase)
+		newVolume, err = binderClient.UpdatePersistentVolumeStatus(newVolume)
 		if err != nil {
-			// Rollback to previous phase
-			volume.Status.Phase = currentPhase
+			return err
 		}
-		volumeIndex.Update(volume)
+
+		volumeIndex.Update(newVolume)
 	}
 
 	return nil
