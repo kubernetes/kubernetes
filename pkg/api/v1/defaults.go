@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+// useless comment
 func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *ReplicationController) {
