@@ -113,14 +113,6 @@ func deepCopy_metrics_CPUMetrics(in CPUMetrics, out *CPUMetrics, c *conversion.C
 	} else {
 		out.TotalCores = nil
 	}
-	if in.LoadAverage != nil {
-		out.LoadAverage = new(resource.Quantity)
-		if err := deepCopy_resource_Quantity(*in.LoadAverage, out.LoadAverage, c); err != nil {
-			return err
-		}
-	} else {
-		out.LoadAverage = nil
-	}
 	return nil
 }
 

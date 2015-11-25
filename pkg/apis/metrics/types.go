@@ -158,9 +158,6 @@ type CPUMetrics struct {
 	// Total CPU usage (sum of all cores) averaged over the sample window.
 	// The "core" unit can be interpreted as CPU core-seconds per second.
 	TotalCores *resource.Quantity `json:"totalCores,omitempty"`
-	// CPU load that the container is experiencing, represented as a smoothed average of number of
-	// runnable threads.  Load is averaged over the sampling window.
-	LoadAverage *resource.Quantity `json:"loadAverage,omitempty"`
 }
 
 // MemoryMetrics contains data about memory usage.
