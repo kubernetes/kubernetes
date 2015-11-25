@@ -262,7 +262,8 @@ script
 			echo "Docker daemon failed!"
 			pkill docker
 		fi
-		if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:10250/healthz > /dev/null; then
+		. /etc/kube-env
+		if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
 			echo "Kubelet is unhealthy!"
 			pkill kubelet
 		fi
