@@ -86,7 +86,7 @@ func (s *controller) scheduleOne() {
 	dest, err := s.algorithm.Schedule(pod)
 	if err != nil {
 		log.V(1).Infof("Failed to schedule: %+v", pod)
-		s.recorder.Eventf(pod, FailedScheduling, "Error scheduling: %v", err)
+		s.recorder.Eventf(pod, api.EventTypeWarning, FailedScheduling, "Error scheduling: %v", err)
 		s.error(pod, err)
 		return
 	}
@@ -99,9 +99,9 @@ func (s *controller) scheduleOne() {
 	}
 	if err := s.binder.Bind(b); err != nil {
 		log.V(1).Infof("Failed to bind pod: %+v", err)
-		s.recorder.Eventf(pod, FailedScheduling, "Binding rejected: %v", err)
+		s.recorder.Eventf(pod, api.EventTypeWarning, FailedScheduling, "Binding rejected: %v", err)
 		s.error(pod, err)
 		return
 	}
-	s.recorder.Eventf(pod, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
+	s.recorder.Eventf(pod, api.EventTypeNormal, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
 }

@@ -1512,15 +1512,16 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 		return
 	}
 	sort.Sort(SortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tReason\tMessage\n")
-	fmt.Fprint(w, "  ─────────\t────────\t─────\t────\t─────────────\t──────\t───────\n")
+	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tType\tReason\tMessage\n")
+	fmt.Fprint(w, "  ─────────\t────────\t─────\t────\t─────────────\t────────\t──────\t───────\n")
 	for _, e := range el.Items {
-		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\n",
+		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
 			translateTimestamp(e.FirstTimestamp),
 			translateTimestamp(e.LastTimestamp),
 			e.Count,
 			e.Source,
 			e.InvolvedObject.FieldPath,
+			e.Type,
 			e.Reason,
 			e.Message)
 	}

@@ -123,7 +123,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 			minRuntimeCacheTime = time.Now()
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
-				p.recorder.Eventf(newWork.pod, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
+				p.recorder.Eventf(newWork.pod, api.EventTypeWarning, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
 				return err
 			}
 			newWork.updateCompleteFn()

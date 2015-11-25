@@ -313,6 +313,7 @@ func NewTestOffer(id string) *mesos.Offer {
 // Add assertions to reason about event streams
 type Event struct {
 	Object  runtime.Object
+	Type    string
 	Reason  string
 	Message string
 }
@@ -334,15 +335,15 @@ func NewEventObserver() *EventObserver {
 	}
 }
 
-func (o *EventObserver) Event(object runtime.Object, reason, message string) {
-	o.fifo <- Event{Object: object, Reason: reason, Message: message}
+func (o *EventObserver) Event(object runtime.Object, eventtype, reason, message string) {
+	o.fifo <- Event{Object: object, Type: eventtype, Reason: reason, Message: message}
 }
 
-func (o *EventObserver) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
+func (o *EventObserver) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	o.fifo <- Event{Object: object, Type: eventtype, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
-func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
-	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
+func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+	o.fifo <- Event{Object: object, Type: eventtype, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
 
 func (a *EventAssertions) Event(observer *EventObserver, pred EventPredicate, msgAndArgs ...interface{}) bool {

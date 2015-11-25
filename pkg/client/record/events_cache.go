@@ -51,6 +51,7 @@ func getEventKey(event *api.Event) string {
 		event.InvolvedObject.Name,
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
+		event.Type,
 		event.Reason,
 		event.Message,
 	},
@@ -71,7 +72,7 @@ func DefaultEventFilterFunc(event *api.Event) bool {
 // localKey - key that makes this event in the local group
 type EventAggregatorKeyFunc func(event *api.Event) (aggregateKey string, localKey string)
 
-// EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, and event.Reason
+// EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type and event.Reason
 func EventAggregatorByReasonFunc(event *api.Event) (string, string) {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -81,6 +82,7 @@ func EventAggregatorByReasonFunc(event *api.Event) (string, string) {
 		event.InvolvedObject.Name,
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
+		event.Type,
 		event.Reason,
 	},
 		""), event.Message
@@ -179,6 +181,7 @@ func (e *EventAggregator) EventAggregate(newEvent *api.Event) (*api.Event, error
 		InvolvedObject: newEvent.InvolvedObject,
 		LastTimestamp:  now,
 		Message:        e.messageFunc(newEvent),
+		Type:           newEvent.Type,
 		Reason:         newEvent.Reason,
 		Source:         newEvent.Source,
 	}
