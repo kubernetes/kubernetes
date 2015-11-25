@@ -652,7 +652,6 @@ case ${JOB_NAME} in
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          # This test is not disruptive, however there is no better suite to run it.
           "\[Autoscaling\]\sReplicationController" \
           "GCE\sL7\sLoadBalancer\sController"
           )"}
