@@ -190,7 +190,7 @@ GCE_PARALLEL_SKIP_TESTS=(
 GCE_PARALLEL_FLAKY_TESTS=(
     "DaemonRestart"
     "Elasticsearch"
-    "Namespaces.*should\sdelete\sfast"
+    "Namespaces\sDelete\s90\spercent"
     "ServiceAccounts"
     "Services.*identically\snamed" # error waiting for reachability, issue: #16285
     )
