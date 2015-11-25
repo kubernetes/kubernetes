@@ -96,9 +96,8 @@ func main() {
 		cadvisorInterface := new(cadvisor.Fake)
 		containerManager := cm.NewStubContainerManager()
 
-		fakeDockerClient := &dockertools.FakeDockerClient{}
+		fakeDockerClient := dockertools.NewFakeDockerClient()
 		fakeDockerClient.VersionInfo = docker.Env{"ApiVersion=1.18"}
-		fakeDockerClient.ContainerMap = make(map[string]*docker.Container)
 		fakeDockerClient.EnableSleep = true
 
 		hollowKubelet := kubemark.NewHollowKubelet(
