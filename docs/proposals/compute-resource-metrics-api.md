@@ -92,20 +92,21 @@ only be available through the kubelet. The types of metrics are detailed
 `/apis/metrics/v1alpha1/`
 
 - `/` - discovery endpoint; type resource list
-- `/rawNodes` - raw host metrics; type `[]metrics.RawNode`
+- `/rawNodes` - raw host metrics; type `metrics.RawNodeMetricsList`
   - `/rawNodes/localhost` - The only node provided is `localhost`; type
-    metrics.Node
-- `/derivedNodes` - host metrics; type `[]metrics.DerivedNode`
+    `metrics.RawNodeMetrics`
+- `/derivedNodes` - host metrics; type `metrics.DerivedNodeMetricsList`
   - `/derivedNodes/{node}` - derived metrics for a specific node
 - `/rawPods` - All raw pod metrics across all namespaces; type
-  `[]metrics.RawPod`
+  `metrics.RawPodMetricsList`
 - `/derivedPods` - All derived pod metrics across all namespaces; type
-  `[]metrics.DerivedPod`
+  `metrics.DerivedPodMetricsList`
 - `/namespaces/{namespace}/rawPods` - All raw pod metrics within namespace; type
-  `[]metrics.RawPod`
-  - `/namespaces/{namespace}/rawPods/{pod}` - raw metrics for specific pod
+  `metrics.RawPodMetricsList`
+  - `/namespaces/{namespace}/rawPods/{pod}` - raw metrics for specific pod; type
+    `metrics.RawPodMetrics`
 - `/namespaces/{namespace}/derivedPods` - All derived pod metrics within
-  namespace; type `[]metrics.DerivedPod`
+  namespace; type `metrics.DerivedPodMetricsList`
   - `/namespaces/{namespace}/derivedPods/{pod}` - derived metrics for specific
   pod
 - Unsupported paths return status not found (404)
@@ -115,13 +116,11 @@ only be available through the kubelet. The types of metrics are detailed
 Additionally, all endpoints (except root discovery endpoint) support the
 following optional query parameters:
 
-- `start` - start time to return metrics from; type json encoded
-  `time.Time`; since samples are retrieved at discrete intervals, the first
-  sample after the start time is the actual beginning.
-- `end` - end time to return metrics to; type json encoded `time.Time`
-- `step` - the time step between each stats sample; type int (seconds), default
-  10s, must be a multiple of 10s
-- `count` - maximum number of stats to return in each ContainerMetrics instance;
+- `sinceTime` - time to return metrics from; type json encoded
+  `unversioned.Time`; since samples are retrieved at discrete intervals, the first
+  sample after the sinceTime is the actual beginning.
+- `untilTime` - end time to return metrics to; type json encoded `unversioned.Time`
+- `maxSamples` - maximum number of stats to return in each ContainerMetrics instance;
   type int
 
 As well as the common query parameters:
@@ -148,64 +147,10 @@ and metrics for them.
 Types are colocated with other API groups in `/pkg/apis/metrics`, and follow api
 groups conventions there.
 
-```go
-// Raw metrics are only available through the kubelet API.
-type RawNode struct {
-  TypeMeta
-  ObjectMeta              // Should include node name
-  Machine ContainerMetrics
-  SystemContainers []ContainerMetrics
-}
-type RawPod struct {
-  TypeMeta
-  ObjectMeta              // Should include pod name
-  Containers []Container
-}
-type RawContainer struct {
-  TypeMeta
-  ObjectMeta              // Should include container name
-  Spec ContainerSpec      // Mirrors cadvisorv2.ContainerSpec
-  Stats []ContainerStats  // Mirrors cadvisorv2.ContainerStats
-}
-
-// Derived metrics are (initially) only available through the API server.
-type DerivedNode struct {
-  TypeMeta
-  ObjectMeta              // Should include node name
-  Machine MetricsWindow
-  SystemContainers []DerivedContainer
-}
-type DerivedPod struct {
-  TypeMeta
-  ObjectMeta              // Should include pod name
-  Containers []DerivedContainer
-}
-type DerivedContainer struct {
-  TypeMeta
-  ObjectMeta              // Should include container name
-  Metrics DerivedWindows
-}
-
-// Last overlapping 10s, 1m, 1h and 1d as a start
-// Updated every 10s, so the 10s window is sequential and the rest are
-// rolling.
-type DerivedWindows map[time.Duration]DerivedMetrics
-
-type DerivedMetrics struct {
-	// End time of all the time windows in Metrics
-	EndTime unversioned.Time `json:"endtime"`
-
-	Mean       ResourceUsage `json:"mean"`
-	Max        ResourceUsage `json:"max"`
-	NinetyFive ResourceUsage `json:"95th"`
-}
-
-type ResourceUsage map[resource.Type]resource.Quantity
-```
-
-See
-[cadvisor/info/v2](https://github.com/google/cadvisor/blob/master/info/v2/container.go)
-for `ContainerSpec` and `ContainerStats` definitions.
+The schema for raw metrics can be found in
+[pkg/apis/metrics/types.go](../../pkg/apis/metrics/types.go). The
+schema for DerivedMetrics types is TBD, but will have a similar top-level structure to that of
+RawMetrics.
 
 ## Implementation
 

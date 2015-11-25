@@ -18,77 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	reflect "reflect"
-
-	api "k8s.io/kubernetes/pkg/api"
-	metrics "k8s.io/kubernetes/pkg/apis/metrics"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-)
-
-func autoconvert_metrics_RawNode_To_v1alpha1_RawNode(in *metrics.RawNode, out *RawNode, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*metrics.RawNode))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_metrics_RawNode_To_v1alpha1_RawNode(in *metrics.RawNode, out *RawNode, s conversion.Scope) error {
-	return autoconvert_metrics_RawNode_To_v1alpha1_RawNode(in, out, s)
-}
-
-func autoconvert_metrics_RawPod_To_v1alpha1_RawPod(in *metrics.RawPod, out *RawPod, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*metrics.RawPod))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_metrics_RawPod_To_v1alpha1_RawPod(in *metrics.RawPod, out *RawPod, s conversion.Scope) error {
-	return autoconvert_metrics_RawPod_To_v1alpha1_RawPod(in, out, s)
-}
-
-func autoconvert_v1alpha1_RawNode_To_metrics_RawNode(in *RawNode, out *metrics.RawNode, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RawNode))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1alpha1_RawNode_To_metrics_RawNode(in *RawNode, out *metrics.RawNode, s conversion.Scope) error {
-	return autoconvert_v1alpha1_RawNode_To_metrics_RawNode(in, out, s)
-}
-
-func autoconvert_v1alpha1_RawPod_To_metrics_RawPod(in *RawPod, out *metrics.RawPod, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RawPod))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1alpha1_RawPod_To_metrics_RawPod(in *RawPod, out *metrics.RawPod, s conversion.Scope) error {
-	return autoconvert_v1alpha1_RawPod_To_metrics_RawPod(in, out, s)
-}
+import api "k8s.io/kubernetes/pkg/api"
 
 func init() {
-	err := api.Scheme.AddGeneratedConversionFuncs(
-		autoconvert_metrics_RawNode_To_v1alpha1_RawNode,
-		autoconvert_metrics_RawPod_To_v1alpha1_RawPod,
-		autoconvert_v1alpha1_RawNode_To_metrics_RawNode,
-		autoconvert_v1alpha1_RawPod_To_metrics_RawPod,
-	)
+	err := api.Scheme.AddGeneratedConversionFuncs()
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
