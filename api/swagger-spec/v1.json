@@ -12037,6 +12037,10 @@
       "type": "integer",
       "format": "int32",
       "description": "The number of times this event has occurred."
+     },
+     "type": {
+      "type": "string",
+      "description": "Type of this event (Normal, Warning), new types could be added in the future"
      }
     }
    },

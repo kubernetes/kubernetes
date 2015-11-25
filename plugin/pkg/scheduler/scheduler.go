@@ -125,7 +125,7 @@ func (s *Scheduler) scheduleOne() {
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %+v", pod)
-		s.config.Recorder.Eventf(pod, "FailedScheduling", "%v", err)
+		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -145,11 +145,11 @@ func (s *Scheduler) scheduleOne() {
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %+v", err)
-			s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
+			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
 			return
 		}
-		s.config.Recorder.Eventf(pod, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+		s.config.Recorder.Eventf(pod, api.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 		// tell the model to assume that this binding took effect.
 		assumed := *pod
 		assumed.Spec.NodeName = dest

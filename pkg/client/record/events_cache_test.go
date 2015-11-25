@@ -50,6 +50,7 @@ func makeEvent(reason, message string, involvedObject api.ObjectReference) api.E
 		Count:          1,
 		FirstTimestamp: eventTime,
 		LastTimestamp:  eventTime,
+		Type:           api.EventTypeNormal,
 	}
 	return event
 }

@@ -64,9 +64,9 @@ func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime, im
 }
 
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
-func (puller *serializedImagePuller) logIt(ref *api.ObjectReference, event, prefix, msg string, logFn func(args ...interface{})) {
+func (puller *serializedImagePuller) logIt(ref *api.ObjectReference, eventtype, event, prefix, msg string, logFn func(args ...interface{})) {
 	if ref != nil {
-		puller.recorder.Event(ref, event, msg)
+		puller.recorder.Event(ref, eventtype, event, msg)
 	} else {
 		logFn(fmt.Sprint(prefix, " ", msg))
 	}
@@ -84,18 +84,18 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
-		puller.logIt(ref, FailedToInspectImage, logPrefix, msg, glog.Warning)
+		puller.logIt(ref, api.EventTypeWarning, FailedToInspectImage, logPrefix, msg, glog.Warning)
 		return ErrImageInspect, msg
 	}
 
 	if !shouldPullImage(container, present) {
 		if present {
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
-			puller.logIt(ref, PulledImage, logPrefix, msg, glog.Info)
+			puller.logIt(ref, api.EventTypeNormal, PulledImage, logPrefix, msg, glog.Info)
 			return nil, ""
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
-			puller.logIt(ref, ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
+			puller.logIt(ref, api.EventTypeWarning, ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
 			return ErrImageNeverPull, msg
 		}
 	}
@@ -103,7 +103,7 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 	backOffKey := fmt.Sprintf("%s_%s", pod.Name, container.Image)
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
-		puller.logIt(ref, BackOffPullImage, logPrefix, msg, glog.Info)
+		puller.logIt(ref, api.EventTypeNormal, BackOffPullImage, logPrefix, msg, glog.Info)
 		return ErrImagePullBackOff, msg
 	}
 
@@ -118,7 +118,7 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 		returnChan:  returnChan,
 	}
 	if err = <-returnChan; err != nil {
-		puller.logIt(ref, FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
+		puller.logIt(ref, api.EventTypeWarning, FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
 		if err == RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is temporarily unavailable.", container.Image)
@@ -127,14 +127,14 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 			return ErrImagePull, err.Error()
 		}
 	}
-	puller.logIt(ref, PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
+	puller.logIt(ref, api.EventTypeNormal, PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	puller.backOff.GC()
 	return nil, ""
 }
 
 func (puller *serializedImagePuller) pullImages() {
 	for pullRequest := range puller.pullRequests {
-		puller.logIt(pullRequest.ref, PullingImage, pullRequest.logPrefix, fmt.Sprintf("pulling image %q", pullRequest.container.Image), glog.Info)
+		puller.logIt(pullRequest.ref, api.EventTypeNormal, PullingImage, pullRequest.logPrefix, fmt.Sprintf("pulling image %q", pullRequest.container.Image), glog.Info)
 		pullRequest.returnChan <- puller.runtime.PullImage(pullRequest.spec, pullRequest.pullSecrets)
 	}
 }
