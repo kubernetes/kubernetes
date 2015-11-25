@@ -33,4 +33,4 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
 export KUBERNETES_CONTRIB=mesos
 
-"${KUBE_ROOT}/contrib/mesos/ci/run.sh" make clean all ${TEST_ARGS}
+exec "${KUBE_ROOT}/contrib/mesos/ci/run.sh" make clean all ${TEST_ARGS}
