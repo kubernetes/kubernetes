@@ -32,7 +32,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	kerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -169,7 +168,7 @@ func (o LogsOptions) Validate() error {
 		return errors.New("unexpected log options object")
 	}
 	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
-		return kerrors.NewAggregate(errs)
+		return errs.ToAggregate()
 	}
 
 	return nil
