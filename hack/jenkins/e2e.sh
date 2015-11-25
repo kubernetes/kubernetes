@@ -426,7 +426,8 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-scalability)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability"}
     : ${E2E_NETWORK:="e2e-scalability"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\] \
+        --gather-resource-usage=true"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
