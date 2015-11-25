@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -45,11 +46,11 @@ type Reaper interface {
 }
 
 type NoSuchReaperError struct {
-	kind string
+	kind unversioned.GroupKind
 }
 
 func (n *NoSuchReaperError) Error() string {
-	return fmt.Sprintf("no reaper has been implemented for %q", n.kind)
+	return fmt.Sprintf("no reaper has been implemented for %v", n.kind)
 }
 
 func IsNoSuchReaperError(err error) bool {
@@ -57,18 +58,23 @@ func IsNoSuchReaperError(err error) bool {
 	return ok
 }
 
-func ReaperFor(kind string, c client.Interface) (Reaper, error) {
+func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	switch kind {
-	case "ReplicationController":
+	case api.Kind("ReplicationController"):
 		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
-	case "DaemonSet":
+
+	case extensions.Kind("DaemonSet"):
 		return &DaemonSetReaper{c, Interval, Timeout}, nil
-	case "Pod":
+
+	case api.Kind("Pod"):
 		return &PodReaper{c}, nil
-	case "Service":
+
+	case api.Kind("Service"):
 		return &ServiceReaper{c}, nil
-	case "Job":
+
+	case extensions.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
+
 	}
 	return nil, &NoSuchReaperError{kind}
 }
@@ -120,7 +126,7 @@ func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	rc := reaper.ReplicationControllers(namespace)
-	scaler, err := ScalerFor("ReplicationController", *reaper)
+	scaler, err := ScalerFor(api.Kind("ReplicationController"), *reaper)
 	if err != nil {
 		return err
 	}
@@ -224,7 +230,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	jobs := reaper.Extensions().Jobs(namespace)
 	pods := reaper.Pods(namespace)
-	scaler, err := ScalerFor("Job", *reaper)
+	scaler, err := ScalerFor(extensions.Kind("Job"), *reaper)
 	if err != nil {
 		return err
 	}

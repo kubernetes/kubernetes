@@ -124,7 +124,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job up")
-		scaler, err := kubectl.ScalerFor("Job", f.Client)
+		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -149,7 +149,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		scaler, err := kubectl.ScalerFor("Job", f.Client)
+		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -172,7 +172,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		reaper, err := kubectl.ReaperFor("Job", f.Client)
+		reaper, err := kubectl.ReaperFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
 		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
