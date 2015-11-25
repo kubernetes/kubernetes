@@ -31,6 +31,7 @@ var (
 			Subsystem: schedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
 			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
+			MaxAge:    time.Hour,
 		},
 	)
 	SchedulingAlgorithmLatency = prometheus.NewSummary(
@@ -38,6 +39,7 @@ var (
 			Subsystem: schedulerSubsystem,
 			Name:      "scheduling_algorithm_latency_microseconds",
 			Help:      "Scheduling algorithm latency",
+			MaxAge:    time.Hour,
 		},
 	)
 	BindingLatency = prometheus.NewSummary(
@@ -45,6 +47,7 @@ var (
 			Subsystem: schedulerSubsystem,
 			Name:      "binding_latency_microseconds",
 			Help:      "Binding latency",
+			MaxAge:    time.Hour,
 		},
 	)
 )
