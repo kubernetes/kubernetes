@@ -64,7 +64,7 @@ func encodeKeyValue(k, v string) (string, string) {
 	if isASCII(v) {
 		return k, v
 	}
-	key := k + binHdrSuffix
+	key := strings.ToLower(k + binHdrSuffix)
 	val := base64.StdEncoding.EncodeToString([]byte(v))
 	return key, string(val)
 }
@@ -85,14 +85,14 @@ func DecodeKeyValue(k, v string) (string, string, error) {
 
 // MD is a mapping from metadata keys to values. Users should use the following
 // two convenience functions New and Pairs to generate MD.
-type MD map[string]string
+type MD map[string][]string
 
 // New creates a MD from given key-value map.
 func New(m map[string]string) MD {
 	md := MD{}
 	for k, v := range m {
 		key, val := encodeKeyValue(k, v)
-		md[key] = val
+		md[key] = append(md[key], val)
 	}
 	return md
 }
@@ -111,7 +111,7 @@ func Pairs(kv ...string) MD {
 			continue
 		}
 		key, val := encodeKeyValue(k, s)
-		md[key] = val
+		md[key] = append(md[key], val)
 	}
 	return md
 }
@@ -125,7 +125,9 @@ func (md MD) Len() int {
 func (md MD) Copy() MD {
 	out := MD{}
 	for k, v := range md {
-		out[k] = v
+		for _, i := range v {
+			out[k] = append(out[k], i)
+		}
 	}
 	return out
 }

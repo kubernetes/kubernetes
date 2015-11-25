@@ -30,10 +30,12 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc"
+
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
-	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/unit"
+	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -53,10 +55,11 @@ import (
 const (
 	RktType = "rkt"
 
-	acVersion             = "0.7.1"
-	minimumRktVersion     = "0.9.0"
-	recommendRktVersion   = "0.9.0"
-	systemdMinimumVersion = "219"
+	minimumAppcVersion       = "0.7.1"
+	minimumRktBinVersion     = "0.9.0"
+	recommendedRktBinVersion = "0.9.0"
+	minimumRktApiVersion     = "1.0.0-alpha"
+	minimumSystemdVersion    = "219"
 
 	systemdServiceDir = "/run/systemd/system"
 	rktDataDir        = "/var/lib/rkt"
@@ -73,14 +76,18 @@ const (
 	authDir            = "auth.d"
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
 
-	defaultImageTag = "latest"
+	defaultImageTag          = "latest"
+	defaultRktAPIServiceAddr = "localhost:15441"
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
 // uses systemd, so in order to run this runtime, systemd must be installed
 // on the machine.
 type Runtime struct {
-	systemd *dbus.Conn
+	systemd systemdInterface
+	// The grpc client for rkt api-service.
+	apisvcConn *grpc.ClientConn
+	apisvc     rktapi.PublicAPIClient
 	// The absolute path to rkt binary.
 	rktBinAbsPath string
 	config        *Config
@@ -93,6 +100,12 @@ type Runtime struct {
 	livenessManager     proberesults.Manager
 	volumeGetter        volumeGetter
 	imagePuller         kubecontainer.ImagePuller
+
+	// Versions
+	binVersion     rktVersion
+	apiVersion     rktVersion
+	appcVersion    rktVersion
+	systemdVersion systemdVersion
 }
 
 var _ kubecontainer.Runtime = &Runtime{}
@@ -114,21 +127,16 @@ func New(config *Config,
 	imageBackOff *util.Backoff,
 	serializeImagePulls bool,
 ) (*Runtime, error) {
-	systemdVersion, err := getSystemdVersion()
+	// Create dbus connection.
+	systemd, err := newSystemd()
 	if err != nil {
-		return nil, err
-	}
-	result, err := systemdVersion.Compare(systemdMinimumVersion)
-	if err != nil {
-		return nil, err
-	}
-	if result < 0 {
-		return nil, fmt.Errorf("rkt: systemd version is too old, requires at least %v", systemdMinimumVersion)
+		return nil, fmt.Errorf("rkt: cannot create systemd interface: %v", err)
 	}
 
-	systemd, err := dbus.New()
+	// TODO(yifan): Use secure connection.
+	apisvcConn, err := grpc.Dial(defaultRktAPIServiceAddr, grpc.WithInsecure())
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to dbus: %v", err)
+		return nil, fmt.Errorf("rkt: cannot connect to rkt api service: %v", err)
 	}
 
 	rktBinAbsPath := config.Path
@@ -144,6 +152,8 @@ func New(config *Config,
 	rkt := &Runtime{
 		systemd:             systemd,
 		rktBinAbsPath:       rktBinAbsPath,
+		apisvcConn:          apisvcConn,
+		apisvc:              rktapi.NewPublicAPIClient(apisvcConn),
 		config:              config,
 		dockerKeyring:       credentialprovider.NewDockerKeyring(),
 		containerRefManager: containerRefManager,
@@ -158,28 +168,13 @@ func New(config *Config,
 		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
 	}
 
-	// Test the rkt version.
-	version, err := rkt.Version()
-	if err != nil {
+	if err := rkt.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion); err != nil {
+		// TODO(yifan): Latest go-systemd version have the ability to close the
+		// dbus connection. However the 'docker/libcontainer' package is using
+		// the older go-systemd version, so we can't update the go-systemd version.
+		rkt.apisvcConn.Close()
 		return nil, err
 	}
-	result, err = version.Compare(minimumRktVersion)
-	if err != nil {
-		return nil, err
-	}
-	if result < 0 {
-		return nil, fmt.Errorf("rkt: version is too old, requires at least %v", minimumRktVersion)
-	}
-
-	result, err = version.Compare(recommendRktVersion)
-	if err != nil {
-		return nil, err
-	}
-	if result != 0 {
-		// TODO(yifan): Record an event to expose the information.
-		glog.Warningf("rkt: current version %q is not recommended (recommended version %q)", version, recommendRktVersion)
-	}
-
 	return rkt, nil
 }
 
@@ -880,33 +875,8 @@ func (r *Runtime) Type() string {
 	return RktType
 }
 
-// Version invokes 'rkt version' to get the version information of the rkt
-// runtime on the machine.
-// The return values are an int array containers the version number.
-//
-// Example:
-// rkt:0.3.2+git --> []int{0, 3, 2}.
-//
 func (r *Runtime) Version() (kubecontainer.Version, error) {
-	output, err := r.runCommand("version")
-	if err != nil {
-		return nil, err
-	}
-
-	// Example output for 'rkt version':
-	// rkt version 0.3.2+git
-	// appc version 0.3.0+git
-	for _, line := range output {
-		tuples := strings.Split(strings.TrimSpace(line), " ")
-		if len(tuples) != 3 {
-			glog.Warningf("rkt: cannot parse the output: %q.", line)
-			continue
-		}
-		if tuples[0] == "rkt" {
-			return parseVersion(tuples[2])
-		}
-	}
-	return nil, fmt.Errorf("rkt: cannot determine the version")
+	return r.binVersion, nil
 }
 
 // TODO(yifan): This is very racy, unefficient, and unsafe, we need to provide
