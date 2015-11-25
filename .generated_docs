@@ -75,5 +75,4 @@ docs/user-guide/kubectl/kubectl_replace.md
 docs/user-guide/kubectl/kubectl_rolling-update.md
 docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
-docs/user-guide/kubectl/kubectl_stop.md
 docs/user-guide/kubectl/kubectl_version.md
