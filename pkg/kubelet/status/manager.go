@@ -60,7 +60,7 @@ type manager struct {
 	podStatuses      map[types.UID]versionedPodStatus
 	podStatusesLock  sync.RWMutex
 	podStatusChannel chan podStatusSyncRequest
-	// Map from pod UID to latest status version successfully sent to the API server.
+	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[types.UID]uint64
 }
@@ -296,7 +296,7 @@ func (m *manager) syncBatch() {
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
 			_, hasPod := m.podStatuses[uid]
-			_, hasMirror := podToMirror[uid]
+			_, hasMirror := mirrorToPod[uid]
 			if !hasPod && !hasMirror {
 				delete(m.apiStatusVersions, uid)
 			}
@@ -304,8 +304,8 @@ func (m *manager) syncBatch() {
 
 		for uid, status := range m.podStatuses {
 			syncedUID := uid
-			if translated, ok := mirrorToPod[uid]; ok {
-				syncedUID = translated
+			if mirrorUID, ok := podToMirror[uid]; ok {
+				syncedUID = mirrorUID
 			}
 			if m.needsUpdate(syncedUID, status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
