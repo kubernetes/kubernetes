@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
@@ -139,12 +140,12 @@ func (w *etcdWatcher) etcdWatch(client tools.EtcdClient, key string, resourceVer
 func etcdGetInitialWatchState(client tools.EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
-		if !IsEtcdNotFound(err) {
+		if !etcdutil.IsEtcdNotFound(err) {
 			glog.Errorf("watch was unable to retrieve the current index for the provided key (%q): %v", key, err)
 			return resourceVersion, err
 		}
-		if index, ok := etcdErrorIndex(err); ok {
-			resourceVersion = index
+		if etcdError, ok := err.(*etcd.EtcdError); ok {
+			resourceVersion = etcdError.Index
 		}
 		return resourceVersion, nil
 	}
@@ -184,7 +185,7 @@ func (w *etcdWatcher) translate() {
 			if err != nil {
 				var status *unversioned.Status
 				switch {
-				case IsEtcdWatchExpired(err):
+				case etcdutil.IsEtcdWatchExpired(err):
 					status = &unversioned.Status{
 						Status:  unversioned.StatusFailure,
 						Message: err.Error(),
@@ -193,7 +194,7 @@ func (w *etcdWatcher) translate() {
 					}
 				// TODO: need to generate errors using api/errors which has a circular dependency on this package
 				//   no other way to inject errors
-				// case IsEtcdUnreachable(err):
+				// case etcdutil.IsEtcdUnreachable(err):
 				//   status = errors.NewServerTimeout(...)
 				default:
 					status = &unversioned.Status{

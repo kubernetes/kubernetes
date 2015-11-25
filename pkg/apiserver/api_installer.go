@@ -126,13 +126,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
+	gvk := a.group.GroupVersion.WithKind(kind)
+
 	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.GroupVersion.String())
+	mapping, err := a.group.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +150,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.GroupVersion.String())
+		parentGVK := a.group.GroupVersion.WithKind(parentKind)
+
+		parentMapping, err := a.group.Mapper.RESTMapping(parentGVK.GroupKind(), parentGVK.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -375,11 +379,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc:      ctxFn,
-		Creater:          a.group.Creater,
-		Convertor:        a.group.Convertor,
-		Codec:            mapping.Codec,
-		APIVersion:       a.group.GroupVersion.String(),
+		ContextFunc: ctxFn,
+		Creater:     a.group.Creater,
+		Convertor:   a.group.Convertor,
+		Codec:       mapping.Codec,
+		APIVersion:  a.group.GroupVersion.String(),
+		// TODO, this internal version needs to plumbed through from the caller
+		// this works in all the cases we have now
+		InternalVersion:  unversioned.GroupVersion{Group: a.group.GroupVersion.Group},
 		ServerAPIVersion: serverGroupVersion.String(),
 		Resource:         resource,
 		Subresource:      subresource,

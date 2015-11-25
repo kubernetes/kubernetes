@@ -49,6 +49,7 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -806,7 +807,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 	thirdPartyObj := extensions.ThirdPartyResourceData{}
 	err = master.thirdPartyStorage.Get(
 		context.TODO(), expectedDeletedKey, &thirdPartyObj, false)
-	if !etcdstorage.IsEtcdNotFound(err) {
+	if !etcdutil.IsEtcdNotFound(err) {
 		t.Errorf("expected deletion didn't happen: %v", err)
 	}
 }
@@ -893,7 +894,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	for _, key := range expectedDeletedKeys {
 		thirdPartyObj := extensions.ThirdPartyResourceData{}
 		err := master.thirdPartyStorage.Get(context.TODO(), key, &thirdPartyObj, false)
-		if !etcdstorage.IsEtcdNotFound(err) {
+		if !etcdutil.IsEtcdNotFound(err) {
 			t.Errorf("expected deletion didn't happen: %v", err)
 		}
 	}

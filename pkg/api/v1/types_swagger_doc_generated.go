@@ -343,6 +343,7 @@ var map_Event = map[string]string{
 	"firstTimestamp": "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)",
 	"lastTimestamp":  "The time at which the most recent occurrence of this event was recorded.",
 	"count":          "The number of times this event has occurred.",
+	"type":           "Type of this event (Normal, Warning), new types could be added in the future",
 }
 
 func (Event) SwaggerDoc() map[string]string {

@@ -73,7 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/tools"
 
 	// lock to this API version, compilation will fail when this becomes unsupported
@@ -894,7 +894,7 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.FrameworkID, error) {
 	if s.failoverTimeout > 0 {
 		if response, err := client.Get(meta.FrameworkIDKey, false, false); err != nil {
-			if !etcdstorage.IsEtcdNotFound(err) {
+			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("unexpected failure attempting to load framework ID from etcd: %v", err)
 			}
 			log.V(1).Infof("did not find framework ID in etcd")
@@ -905,7 +905,7 @@ func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.Fram
 	} else {
 		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
 		if _, err := client.Delete(meta.FrameworkIDKey, true); err != nil {
-			if !etcdstorage.IsEtcdNotFound(err) {
+			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)
 			}
 			log.V(1).Infof("nothing to delete: did not find framework ID in etcd")

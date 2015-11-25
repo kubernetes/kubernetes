@@ -217,6 +217,7 @@ func NewMainKubelet(
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
 	containerManager cm.ContainerManager,
+	flannelExperimentalOverlay bool,
 ) (*Kubelet, error) {
 
 	if rootDirectory == "" {
@@ -238,7 +239,7 @@ func NewMainKubelet(
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		}
@@ -255,7 +256,7 @@ func NewMainKubelet(
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, options)
 			},
 		}
@@ -327,8 +328,20 @@ func NewMainKubelet(
 		cpuCFSQuota:                    cpuCFSQuota,
 		daemonEndpoints:                daemonEndpoints,
 		containerManager:               containerManager,
+		flannelExperimentalOverlay:     flannelExperimentalOverlay,
+		flannelHelper:                  NewFlannelHelper(),
 	}
-
+	if klet.flannelExperimentalOverlay {
+		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
+	}
+	if klet.kubeClient == nil {
+		// The master kubelet cannot wait for the flannel daemon because it is responsible
+		// for starting up the flannel server in a static pod. So even though the flannel
+		// daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
+		// on the master run with host networking, so the master flannel doesn't care
+		// even if the network changes. We only need it for the master proxy.
+		klet.flannelExperimentalOverlay = false
+	}
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
 	} else {
@@ -649,6 +662,13 @@ type Kubelet struct {
 
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
+
+	flannelExperimentalOverlay bool
+
+	// TODO: Flannelhelper doesn't store any state, we can instantiate it
+	// on the fly if we're confident the dbus connetions it opens doesn't
+	// put the system under duress.
+	flannelHelper *FlannelHelper
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -882,7 +902,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
 	if err := kl.initializeModules(); err != nil {
-		kl.recorder.Eventf(kl.nodeRef, kubecontainer.KubeletSetupFailed, err.Error())
+		kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, kubecontainer.KubeletSetupFailed, err.Error())
 		glog.Error(err)
 		kl.runtimeState.setInitError(err)
 	}
@@ -1635,7 +1655,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// Mount volumes.
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
-		kl.recorder.Eventf(ref, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", podFullName, err)
+		kl.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", podFullName, err)
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
 		return err
 	}
@@ -1700,7 +1720,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 	if egress != nil || ingress != nil {
 		if podUsesHostNetwork(pod) {
-			kl.recorder.Event(pod, kubecontainer.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
+			kl.recorder.Event(pod, api.EventTypeWarning, kubecontainer.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
 		} else if kl.shaper != nil {
 			status, found := kl.statusManager.GetPodStatus(pod.UID)
 			if !found {
@@ -1715,7 +1735,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", status.PodIP), egress, ingress)
 			}
 		} else {
-			kl.recorder.Event(pod, kubecontainer.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")
+			kl.recorder.Event(pod, api.EventTypeWarning, kubecontainer.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")
 		}
 	}
 
@@ -2205,7 +2225,7 @@ func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
 }
 
 func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
-	kl.recorder.Eventf(pod, reason, message)
+	kl.recorder.Eventf(pod, api.EventTypeWarning, reason, message)
 	kl.statusManager.SetPodStatus(pod, api.PodStatus{
 		Phase:   api.PodFailed,
 		Reason:  reason,
@@ -2606,11 +2626,11 @@ func (kl *Kubelet) updateNodeStatus() error {
 	return fmt.Errorf("update node status exceeds retry count")
 }
 
-func (kl *Kubelet) recordNodeStatusEvent(event string) {
+func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	glog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, event, "Node %s status is now: %s", kl.nodeName, event)
+	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
@@ -2619,6 +2639,16 @@ var oldNodeUnschedulable bool
 func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	if kl.configureCBR0 {
+		if kl.flannelExperimentalOverlay {
+			podCIDR, err := kl.flannelHelper.Handshake()
+			if err != nil {
+				glog.Infof("Flannel server handshake failed %v", err)
+				return
+			}
+			glog.Infof("Setting cidr: %v -> %v",
+				kl.runtimeState.podCIDR(), podCIDR)
+			kl.runtimeState.setPodCIDR(podCIDR)
+		}
 		if err := ensureIPTablesMasqRule(); err != nil {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
 			glog.Error(err)
@@ -2721,7 +2751,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated
 			// and event is recorded or neither should happen, see issue #6055.
-			kl.recorder.Eventf(kl.nodeRef, kubecontainer.NodeRebooted,
+			kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, kubecontainer.NodeRebooted,
 				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
@@ -2783,9 +2813,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	}
 	if !updated || oldNodeReadyConditionStatus != newNodeReadyCondition.Status {
 		if newNodeReadyCondition.Status == api.ConditionTrue {
-			kl.recordNodeStatusEvent(kubecontainer.NodeReady)
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeReady)
 		} else {
-			kl.recordNodeStatusEvent(kubecontainer.NodeNotReady)
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotReady)
 		}
 	}
 
@@ -2827,7 +2857,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			nodeOODCondition.Reason = "KubeletOutOfDisk"
 			nodeOODCondition.Message = "out of disk space"
 			nodeOODCondition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent("NodeOutOfDisk")
+			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeOutOfDisk")
 		}
 	} else {
 		if nodeOODCondition.Status != api.ConditionFalse {
@@ -2835,7 +2865,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			nodeOODCondition.Reason = "KubeletHasSufficientDisk"
 			nodeOODCondition.Message = "kubelet has sufficient disk space available"
 			nodeOODCondition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent("NodeHasSufficientDisk")
+			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasSufficientDisk")
 		}
 	}
 
@@ -2845,9 +2875,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
-			kl.recordNodeStatusEvent(kubecontainer.NodeNotSchedulable)
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotSchedulable)
 		} else {
-			kl.recordNodeStatusEvent(kubecontainer.NodeSchedulable)
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeSchedulable)
 		}
 		oldNodeUnschedulable = node.Spec.Unschedulable
 	}
@@ -2884,7 +2914,22 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
-	if kl.reconcileCIDR {
+	// Flannel is the authoritative source of pod CIDR, if it's running.
+	// This is a short term compromise till we get flannel working in
+	// reservation mode.
+	if kl.flannelExperimentalOverlay {
+		flannelPodCIDR := kl.runtimeState.podCIDR()
+		if node.Spec.PodCIDR != flannelPodCIDR {
+			node.Spec.PodCIDR = flannelPodCIDR
+			glog.Infof("Updating podcidr to %v", node.Spec.PodCIDR)
+			if updatedNode, err := kl.kubeClient.Nodes().Update(node); err != nil {
+				glog.Warningf("Failed to update podCIDR: %v", err)
+			} else {
+				// Update the node resourceVersion so the status update doesn't fail.
+				node = updatedNode
+			}
+		}
+	} else if kl.reconcileCIDR {
 		kl.runtimeState.setPodCIDR(node.Spec.PodCIDR)
 	}
 
@@ -3032,7 +3077,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
 		reason := "DeadlineExceeded"
-		kl.recorder.Eventf(pod, reason, "Pod was active on the node longer than specified deadline")
+		kl.recorder.Eventf(pod, api.EventTypeNormal, reason, "Pod was active on the node longer than specified deadline")
 		return api.PodStatus{
 			Phase:   api.PodFailed,
 			Reason:  reason,
@@ -3157,7 +3202,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 // BirthCry sends an event that the kubelet has started up.
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
-	kl.recorder.Eventf(kl.nodeRef, kubecontainer.StartingKubelet, "Starting kubelet.")
+	kl.recorder.Eventf(kl.nodeRef, api.EventTypeNormal, kubecontainer.StartingKubelet, "Starting kubelet.")
 }
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {

@@ -41,7 +41,7 @@ import (
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
 	kselector "k8s.io/kubernetes/pkg/fields"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -419,7 +419,7 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 		err    error
 	)
 	for attempt := 1; attempt <= maxConnectAttempts; attempt++ {
-		if _, err = etcdstorage.GetEtcdVersion(etcdServer); err == nil {
+		if _, err = etcdutil.GetEtcdVersion(etcdServer); err == nil {
 			break
 		}
 		if attempt == maxConnectAttempts {

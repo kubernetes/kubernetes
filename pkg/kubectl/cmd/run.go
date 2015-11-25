@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -370,10 +371,15 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 	}
 
 	mapper, typer := f.Object()
-	version, kind, err := typer.ObjectVersionAndKind(obj)
+	gvString, kind, err := typer.ObjectVersionAndKind(obj)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
+	gv, err := unversioned.ParseGroupVersion(gvString)
+	if err != nil {
+		return nil, "", nil, nil, err
+	}
+	gvk := gv.WithKind(kind)
 
 	if len(overrides) > 0 {
 		obj, err = cmdutil.Merge(obj, overrides, kind)
@@ -382,7 +388,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 		}
 	}
 
-	mapping, err := mapper.RESTMapping(kind, version)
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}

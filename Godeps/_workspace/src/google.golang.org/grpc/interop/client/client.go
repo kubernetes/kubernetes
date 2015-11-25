@@ -40,12 +40,16 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 	"google.golang.org/grpc/grpclog"
 	testpb "google.golang.org/grpc/interop/grpc_testing"
 	"google.golang.org/grpc/metadata"
@@ -67,10 +71,15 @@ var (
         client_streaming : request streaming with single response;
         server_streaming : single request with response streaming;
         ping_pong : full-duplex streaming;
+        empty_stream : full-duplex streaming with zero message;
+        timeout_on_sleeping_server: fullduplex streaming;
         compute_engine_creds: large_unary with compute engine auth;
-	service_account_creds: large_unary with service account auth;
-	cancel_after_begin: cancellation after metadata has been sent but before payloads are sent;
-	cancel_after_first_response: cancellation after receiving 1st message from the server.`)
+        service_account_creds: large_unary with service account auth;
+        jwt_token_creds: large_unary with jwt token auth;
+        per_rpc_creds: large_unary with per rpc token;
+        oauth2_auth_token: large_unary with oauth2 token auth;
+        cancel_after_begin: cancellation after metadata has been sent but before payloads are sent;
+        cancel_after_first_response: cancellation after receiving 1st message from the server.`)
 )
 
 var (
@@ -244,6 +253,44 @@ func doPingPong(tc testpb.TestServiceClient) {
 	grpclog.Println("Pingpong done")
 }
 
+func doEmptyStream(tc testpb.TestServiceClient) {
+	stream, err := tc.FullDuplexCall(context.Background())
+	if err != nil {
+		grpclog.Fatalf("%v.FullDuplexCall(_) = _, %v", tc, err)
+	}
+	if err := stream.CloseSend(); err != nil {
+		grpclog.Fatalf("%v.CloseSend() got %v, want %v", stream, err, nil)
+	}
+	if _, err := stream.Recv(); err != io.EOF {
+		grpclog.Fatalf("%v failed to complete the empty stream test: %v", stream, err)
+	}
+	grpclog.Println("Emptystream done")
+}
+
+func doTimeoutOnSleepingServer(tc testpb.TestServiceClient) {
+	ctx, _ := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	stream, err := tc.FullDuplexCall(ctx)
+	if err != nil {
+		if grpc.Code(err) == codes.DeadlineExceeded {
+			grpclog.Println("TimeoutOnSleepingServer done")
+			return
+		}
+		grpclog.Fatalf("%v.FullDuplexCall(_) = _, %v", tc, err)
+	}
+	pl := newPayload(testpb.PayloadType_COMPRESSABLE, 27182)
+	req := &testpb.StreamingOutputCallRequest{
+		ResponseType: testpb.PayloadType_COMPRESSABLE.Enum(),
+		Payload:      pl,
+	}
+	if err := stream.Send(req); err != nil {
+		grpclog.Fatalf("%v.Send(%v) = %v", stream, req, err)
+	}
+	if _, err := stream.Recv(); grpc.Code(err) != codes.DeadlineExceeded {
+		grpclog.Fatalf("%v.Recv() = _, %v, want error code %d", stream, err, codes.DeadlineExceeded)
+	}
+	grpclog.Println("TimeoutOnSleepingServer done")
+}
+
 func doComputeEngineCreds(tc testpb.TestServiceClient) {
 	pl := newPayload(testpb.PayloadType_COMPRESSABLE, largeReqSize)
 	req := &testpb.SimpleRequest{
@@ -301,10 +348,96 @@ func doServiceAccountCreds(tc testpb.TestServiceClient) {
 	grpclog.Println("ServiceAccountCreds done")
 }
 
+func doJWTTokenCreds(tc testpb.TestServiceClient) {
+	pl := newPayload(testpb.PayloadType_COMPRESSABLE, largeReqSize)
+	req := &testpb.SimpleRequest{
+		ResponseType: testpb.PayloadType_COMPRESSABLE.Enum(),
+		ResponseSize: proto.Int32(int32(largeRespSize)),
+		Payload:      pl,
+		FillUsername: proto.Bool(true),
+	}
+	reply, err := tc.UnaryCall(context.Background(), req)
+	if err != nil {
+		grpclog.Fatal("/TestService/UnaryCall RPC failed: ", err)
+	}
+	jsonKey := getServiceAccountJSONKey()
+	user := reply.GetUsername()
+	if !strings.Contains(string(jsonKey), user) {
+		grpclog.Fatalf("Got user name %q which is NOT a substring of %q.", user, jsonKey)
+	}
+	grpclog.Println("JWTtokenCreds done")
+}
+
+func getToken() *oauth2.Token {
+	jsonKey := getServiceAccountJSONKey()
+	config, err := google.JWTConfigFromJSON(jsonKey, *oauthScope)
+	if err != nil {
+		grpclog.Fatalf("Failed to get the config: %v", err)
+	}
+	token, err := config.TokenSource(context.Background()).Token()
+	if err != nil {
+		grpclog.Fatalf("Failed to get the token: %v", err)
+	}
+	return token
+}
+
+func doOauth2TokenCreds(tc testpb.TestServiceClient) {
+	pl := newPayload(testpb.PayloadType_COMPRESSABLE, largeReqSize)
+	req := &testpb.SimpleRequest{
+		ResponseType:   testpb.PayloadType_COMPRESSABLE.Enum(),
+		ResponseSize:   proto.Int32(int32(largeRespSize)),
+		Payload:        pl,
+		FillUsername:   proto.Bool(true),
+		FillOauthScope: proto.Bool(true),
+	}
+	reply, err := tc.UnaryCall(context.Background(), req)
+	if err != nil {
+		grpclog.Fatal("/TestService/UnaryCall RPC failed: ", err)
+	}
+	jsonKey := getServiceAccountJSONKey()
+	user := reply.GetUsername()
+	scope := reply.GetOauthScope()
+	if !strings.Contains(string(jsonKey), user) {
+		grpclog.Fatalf("Got user name %q which is NOT a substring of %q.", user, jsonKey)
+	}
+	if !strings.Contains(*oauthScope, scope) {
+		grpclog.Fatalf("Got OAuth scope %q which is NOT a substring of %q.", scope, *oauthScope)
+	}
+	grpclog.Println("Oauth2TokenCreds done")
+}
+
+func doPerRPCCreds(tc testpb.TestServiceClient) {
+	jsonKey := getServiceAccountJSONKey()
+	pl := newPayload(testpb.PayloadType_COMPRESSABLE, largeReqSize)
+	req := &testpb.SimpleRequest{
+		ResponseType:   testpb.PayloadType_COMPRESSABLE.Enum(),
+		ResponseSize:   proto.Int32(int32(largeRespSize)),
+		Payload:        pl,
+		FillUsername:   proto.Bool(true),
+		FillOauthScope: proto.Bool(true),
+	}
+	token := getToken()
+	kv := map[string]string{"authorization": token.TokenType + " " + token.AccessToken}
+	ctx := metadata.NewContext(context.Background(), metadata.MD{"authorization": []string{kv["authorization"]}})
+	reply, err := tc.UnaryCall(ctx, req)
+	if err != nil {
+		grpclog.Fatal("/TestService/UnaryCall RPC failed: ", err)
+	}
+	user := reply.GetUsername()
+	scope := reply.GetOauthScope()
+	if !strings.Contains(string(jsonKey), user) {
+		grpclog.Fatalf("Got user name %q which is NOT a substring of %q.", user, jsonKey)
+	}
+	if !strings.Contains(*oauthScope, scope) {
+		grpclog.Fatalf("Got OAuth scope %q which is NOT a substring of %q.", scope, *oauthScope)
+	}
+	grpclog.Println("PerRPCCreds done")
+}
+
 var (
 	testMetadata = metadata.MD{
-		"key1": "value1",
-		"key2": "value2",
+		"key1": []string{"value1"},
+		"key2": []string{"value2"},
 	}
 )
 
@@ -373,14 +506,24 @@ func main() {
 		}
 		opts = append(opts, grpc.WithTransportCredentials(creds))
 		if *testCase == "compute_engine_creds" {
-			opts = append(opts, grpc.WithPerRPCCredentials(credentials.NewComputeEngine()))
+			opts = append(opts, grpc.WithPerRPCCredentials(oauth.NewComputeEngine()))
 		} else if *testCase == "service_account_creds" {
-			jwtCreds, err := credentials.NewServiceAccountFromFile(*serviceAccountKeyFile, *oauthScope)
+			jwtCreds, err := oauth.NewServiceAccountFromFile(*serviceAccountKeyFile, *oauthScope)
 			if err != nil {
 				grpclog.Fatalf("Failed to create JWT credentials: %v", err)
 			}
 			opts = append(opts, grpc.WithPerRPCCredentials(jwtCreds))
+		} else if *testCase == "jwt_token_creds" {
+			jwtCreds, err := oauth.NewJWTAccessFromFile(*serviceAccountKeyFile)
+			if err != nil {
+				grpclog.Fatalf("Failed to create JWT credentials: %v", err)
+			}
+			opts = append(opts, grpc.WithPerRPCCredentials(jwtCreds))
+		} else if *testCase == "oauth2_auth_token" {
+			opts = append(opts, grpc.WithPerRPCCredentials(oauth.NewOauthAccess(getToken())))
 		}
+	} else {
+		opts = append(opts, grpc.WithInsecure())
 	}
 	conn, err := grpc.Dial(serverAddr, opts...)
 	if err != nil {
@@ -399,6 +542,10 @@ func main() {
 		doServerStreaming(tc)
 	case "ping_pong":
 		doPingPong(tc)
+	case "empty_stream":
+		doEmptyStream(tc)
+	case "timeout_on_sleeping_server":
+		doTimeoutOnSleepingServer(tc)
 	case "compute_engine_creds":
 		if !*useTLS {
 			grpclog.Fatalf("TLS is not enabled. TLS is required to execute compute_engine_creds test case.")
@@ -409,6 +556,21 @@ func main() {
 			grpclog.Fatalf("TLS is not enabled. TLS is required to execute service_account_creds test case.")
 		}
 		doServiceAccountCreds(tc)
+	case "jwt_token_creds":
+		if !*useTLS {
+			grpclog.Fatalf("TLS is not enabled. TLS is required to execute jwt_token_creds test case.")
+		}
+		doJWTTokenCreds(tc)
+	case "per_rpc_creds":
+		if !*useTLS {
+			grpclog.Fatalf("TLS is not enabled. TLS is required to execute per_rpc_creds test case.")
+		}
+		doPerRPCCreds(tc)
+	case "oauth2_auth_token":
+		if !*useTLS {
+			grpclog.Fatalf("TLS is not enabled. TLS is required to execute oauth2_auth_token test case.")
+		}
+		doOauth2TokenCreds(tc)
 	case "cancel_after_begin":
 		doCancelAfterBegin(tc)
 	case "cancel_after_first_response":

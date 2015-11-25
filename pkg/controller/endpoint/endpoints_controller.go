@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -65,7 +66,7 @@ func NewEndpointController(client *client.Client, resyncPeriod controller.Resync
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
@@ -86,7 +87,7 @@ func NewEndpointController(client *client.Client, resyncPeriod controller.Resync
 			ListFunc: func() (runtime.Object, error) {
 				return e.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

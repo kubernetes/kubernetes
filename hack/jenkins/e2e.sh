@@ -173,6 +173,7 @@ DISRUPTIVE_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
+    "GCE\sL7\sLoadBalancer\sController"
     "DaemonRestart\sController\sManager"
     "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
     "Resource\susage\sof\ssystem\scontainers"
@@ -700,7 +701,6 @@ case ${JOB_NAME} in
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          # This test is not disruptive, however there is no better suite to run it.
           "\[Autoscaling\]\sReplicationController" \
           "GCE\sL7\sLoadBalancer\sController"
           )"}

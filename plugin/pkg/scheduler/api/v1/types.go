@@ -16,7 +16,13 @@ limitations under the License.
 
 package v1
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"time"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+)
 
 type Policy struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -24,6 +30,8 @@ type Policy struct {
 	Predicates []PredicatePolicy `json:"predicates"`
 	// Holds the information to configure the priority functions
 	Priorities []PriorityPolicy `json:"priorities"`
+	// Holds the information to communicate with the extender(s)
+	ExtenderConfigs []ExtenderConfig `json:"extenders"`
 }
 
 type PredicatePolicy struct {
@@ -99,4 +107,67 @@ type LabelPreference struct {
 	// If true, higher priority is given to nodes that have the label
 	// If false, higher priority is given to nodes that do not have the label
 	Presence bool `json:"presence"`
+}
+
+// Holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// it is assumed that the extender chose not to provide that extension.
+type ExtenderConfig struct {
+	// URLPrefix at which the extender is available
+	URLPrefix string `json:"urlPrefix"`
+	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
+	FilterVerb string `json:"filterVerb,omitempty"`
+	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
+	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
+	// The numeric multiplier for the node scores that the prioritize call generates.
+	// The weight should be a positive integer
+	Weight int `json:"weight,omitempty"`
+	// EnableHttps specifies whether https should be used to communicate with the extender
+	EnableHttps bool `json:"enableHttps,omitempty"`
+	// TLSConfig specifies the transport layer security config
+	TLSConfig *client.TLSClientConfig `json:"tlsConfig,omitempty"`
+	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
+	// timeout is ignored, k8s/other extenders priorities are used to select the node.
+	HTTPTimeout time.Duration `json:"httpTimeout,omitempty"`
+}
+
+// ExtenderArgs represents the arguments needed by the extender to filter/prioritize
+// nodes for a pod.
+type ExtenderArgs struct {
+	// Pod being scheduled
+	Pod apiv1.Pod `json:"pod"`
+	// List of candidate nodes where the pod can be scheduled
+	Nodes apiv1.NodeList `json:"nodes"`
+}
+
+// ExtenderFilterResult represents the results of a filter call to an extender
+type ExtenderFilterResult struct {
+	// Filtered set of nodes where the pod can be scheduled
+	Nodes apiv1.NodeList `json:"nodes,omitempty"`
+	// Error message indicating failure
+	Error string `json:"error,omitempty"`
+}
+
+// HostPriority represents the priority of scheduling to a particular host, higher priority is better.
+type HostPriority struct {
+	// Name of the host
+	Host string `json:"host"`
+	// Score associated with the host
+	Score int `json:"score"`
+}
+
+type HostPriorityList []HostPriority
+
+func (h HostPriorityList) Len() int {
+	return len(h)
+}
+
+func (h HostPriorityList) Less(i, j int) bool {
+	if h[i].Score == h[j].Score {
+		return h[i].Host < h[j].Host
+	}
+	return h[i].Score < h[j].Score
+}
+
+func (h HostPriorityList) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
 }

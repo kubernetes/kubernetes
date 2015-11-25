@@ -147,11 +147,11 @@ type RESTMapping struct {
 // TODO(caesarxuchao): Add proper multi-group support so that kinds & resources are
 // scoped to groups. See http://issues.k8s.io/12413 and http://issues.k8s.io/10009.
 type RESTMapper interface {
-	VersionAndKindForResource(resource string) (defaultVersion, kind string, err error)
-	// TODO(caesarxuchao): Remove GroupForResource when multi-group support is in (since
-	// group will be part of the version).
-	GroupForResource(resource string) (string, error)
-	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
+	// KindFor takes a resource and returns back the unambiguous Kind (GroupVersionKind)
+	KindFor(resource string) (unversioned.GroupVersionKind, error)
+
+	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
 	ResourceIsValid(resource string) bool

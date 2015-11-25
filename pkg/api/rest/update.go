@@ -57,11 +57,11 @@ func validateCommonFields(obj, old runtime.Object) utilvalidation.ErrorList {
 	allErrs := utilvalidation.ErrorList{}
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return append(allErrs, errors.NewInternalError(err))
+		return append(allErrs, utilvalidation.NewInternalError("metadata", err))
 	}
 	oldObjectMeta, err := api.ObjectMetaFor(old)
 	if err != nil {
-		return append(allErrs, errors.NewInternalError(err))
+		return append(allErrs, utilvalidation.NewInternalError("metadata", err))
 	}
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(objectMeta, oldObjectMeta)...)
 

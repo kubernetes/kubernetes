@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,7 +39,7 @@ type EventInterface interface {
 	Patch(event *api.Event, data []byte) (*api.Event, error)
 	List(label labels.Selector, field fields.Selector) (*api.EventList, error)
 	Get(name string) (*api.Event, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
 	Delete(name string) error
@@ -141,7 +142,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 }
 
 // Watch starts watching for events matching the given selectors.
-func (e *events) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (e *events) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).

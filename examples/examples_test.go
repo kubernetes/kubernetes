@@ -33,12 +33,13 @@ import (
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
-func validateObject(obj runtime.Object) (errors []error) {
+func validateObject(obj runtime.Object) (errors utilvalidation.ErrorList) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		if t.Namespace == "" {
@@ -122,7 +123,7 @@ func validateObject(obj runtime.Object) (errors []error) {
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
 	default:
-		return []error{fmt.Errorf("no validation defined for %#v", obj)}
+		return utilvalidation.ErrorList{utilvalidation.NewInternalError("", fmt.Errorf("no validation defined for %#v", obj))}
 	}
 	return errors
 }
@@ -234,7 +235,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"daemon": &extensions.DaemonSet{},
 		},
 		"../examples": {
-			"scheduler-policy-config": &schedulerapi.Policy{},
+			"scheduler-policy-config":               &schedulerapi.Policy{},
+			"scheduler-policy-config-with-extender": &schedulerapi.Policy{},
 		},
 		"../examples/rbd/secret": {
 			"ceph-secret": &api.Secret{},
@@ -408,7 +410,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				t.Logf("skipping : %s/%s\n", path, name)
 				return
 			}
-			if name == "scheduler-policy-config" {
+			if strings.Contains(name, "scheduler-policy-config") {
 				if err := schedulerapilatest.Codec.DecodeInto(data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return

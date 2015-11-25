@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
@@ -108,17 +109,19 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *Scheme {
+	internalGV := unversioned.GroupVersion{}
+	externalGV := unversioned.GroupVersion{Version: "v1"}
+
 	s := NewScheme()
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
 	// both types are from the same package, we need to get it into the system
 	// so that converter will match it with ExternalType2.
-	s.AddKnownTypes("", &TestType1{}, &TestType2{}, &ExternalInternalSame{})
-	s.AddKnownTypes("v1", &ExternalInternalSame{})
-	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
-	s.AddKnownTypeWithName("v1", "TestType2", &ExternalTestType2{})
-	s.AddKnownTypeWithName("", "TestType3", &TestType1{})
-	s.AddKnownTypeWithName("v1", "TestType3", &ExternalTestType1{})
-	s.InternalVersion = ""
+	s.AddKnownTypes(internalGV, &TestType1{}, &TestType2{}, &ExternalInternalSame{})
+	s.AddKnownTypes(externalGV, &ExternalInternalSame{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType2"), &ExternalTestType2{})
+	s.AddKnownTypeWithName(internalGV.WithKind("TestType3"), &TestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &ExternalTestType1{})
 	s.MetaFactory = testMetaFactory{}
 	return s
 }
@@ -229,13 +232,16 @@ func TestMultipleNames(t *testing.T) {
 }
 
 func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
+	internalGV := unversioned.GroupVersion{}
+	externalGV := unversioned.GroupVersion{Version: "v1"}
+
 	s := NewScheme()
 	// create two names internally, with TestType1 being preferred
-	s.AddKnownTypeWithName("", "TestType1", &TestType1{})
-	s.AddKnownTypeWithName("", "OtherType1", &TestType1{})
+	s.AddKnownTypeWithName(internalGV.WithKind("TestType1"), &TestType1{})
+	s.AddKnownTypeWithName(internalGV.WithKind("OtherType1"), &TestType1{})
 	// create two names externally, with TestType1 being preferred
-	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
-	s.AddKnownTypeWithName("v1", "OtherType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("OtherType1"), &ExternalTestType1{})
 	s.MetaFactory = testMetaFactory{}
 
 	ext := &ExternalTestType1{}
@@ -267,11 +273,11 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 
 func TestKnownTypes(t *testing.T) {
 	s := GetTestScheme()
-	if len(s.KnownTypes("v2")) != 0 {
+	if len(s.KnownTypes(unversioned.GroupVersion{Group: "group", Version: "v2"})) != 0 {
 		t.Errorf("should have no known types for v2")
 	}
 
-	types := s.KnownTypes("v1")
+	types := s.KnownTypes(unversioned.GroupVersion{Version: "v1"})
 	for _, s := range []string{"TestType1", "TestType2", "TestType3", "ExternalInternalSame"} {
 		if _, ok := types[s]; !ok {
 			t.Errorf("missing type %q", s)
@@ -361,7 +367,7 @@ func TestBadJSONRejection(t *testing.T) {
 
 func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
 	s := GetTestScheme()
-	s.InternalVersion = "v1"
+	s.InternalVersions[""] = unversioned.GroupVersion{Version: "v1"}
 	badJSONs := [][]byte{
 		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
 	}

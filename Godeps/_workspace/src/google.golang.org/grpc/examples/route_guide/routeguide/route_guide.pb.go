@@ -15,7 +15,7 @@ It has these top-level messages:
 	RouteNote
 	RouteSummary
 */
-package proto
+package routeguide
 
 import proto1 "github.com/golang/protobuf/proto"
 

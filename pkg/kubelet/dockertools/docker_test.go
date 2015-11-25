@@ -79,19 +79,16 @@ func findPodContainer(dockerContainers []*docker.APIContainers, podFullName stri
 
 func TestGetContainerID(t *testing.T) {
 	fakeDocker := &FakeDockerClient{}
-	fakeDocker.ContainerList = []docker.APIContainers{
+	fakeDocker.SetFakeRunningContainers([]*docker.Container{
 		{
-			ID:    "foobar",
-			Names: []string{"/k8s_foo_qux_ns_1234_42"},
+			ID:   "foobar",
+			Name: "/k8s_foo_qux_ns_1234_42",
 		},
 		{
-			ID:    "barbar",
-			Names: []string{"/k8s_bar_qux_ns_2565_42"},
+			ID:   "barbar",
+			Name: "/k8s_bar_qux_ns_2565_42",
 		},
-	}
-	fakeDocker.Container = &docker.Container{
-		ID: "foobar",
-	}
+	})
 
 	dockerContainers, err := GetKubeletDockerContainers(fakeDocker, false)
 	if err != nil {

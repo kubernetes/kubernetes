@@ -261,7 +261,7 @@ func (d *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationControll
 	}
 	newRC, err := d.scaleRC(rc, newScale)
 	if err == nil {
-		d.eventRecorder.Eventf(&deployment, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
+		d.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
 	}
 	return newRC, err
 }

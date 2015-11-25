@@ -104,10 +104,16 @@ var _ = Describe("Density [Skipped]", func() {
 
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
-		// Verify latency metrics
+		// Verify latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+
+		// Verify scheduler metrics.
+		// TODO: Reset metrics at the beginning of the test.
+		// We should do something similar to how we do it for APIserver.
+		// TODO: Reenable it once it is running with Kubemark.
+		// expectNoError(VerifySchedulerLatency())
 	})
 
 	framework := NewFramework("density")
@@ -198,7 +204,7 @@ var _ = Describe("Density [Skipped]", func() {
 					ListFunc: func() (runtime.Object, error) {
 						return c.Events(ns).List(labels.Everything(), fields.Everything())
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 						return c.Events(ns).Watch(labels.Everything(), fields.Everything(), options)
 					},
 				},
@@ -281,7 +287,7 @@ var _ = Describe("Density [Skipped]", func() {
 						ListFunc: func() (runtime.Object, error) {
 							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
 						},
-						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+						WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), options)
 						},
 					},

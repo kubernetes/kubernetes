@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 type SelectorSpread struct {
@@ -39,7 +40,7 @@ func NewSelectorSpreadPriority(serviceLister algorithm.ServiceLister, controller
 // CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service or replication controller. It counts number of pods that run under
 // Services or RCs as the pod being scheduled and tries to minimize the number of conflicts. I.e. pushes scheduler towards a Node where there's a smallest number of
 // pods which match the same selectors of Services and RCs as current pod.
-func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var maxCount int
 	var nsPods []*api.Pod
 
@@ -95,7 +96,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 		}
 	}
 
-	result := []algorithm.HostPriority{}
+	result := []schedulerapi.HostPriority{}
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
 	for _, node := range nodes.Items {
@@ -104,7 +105,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 		if maxCount > 0 {
 			fScore = 10 * (float32(maxCount-counts[node.Name]) / float32(maxCount))
 		}
-		result = append(result, algorithm.HostPriority{Host: node.Name, Score: int(fScore)})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
 		glog.V(10).Infof(
 			"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, node.Name, int(fScore),
 		)
@@ -128,7 +129,7 @@ func NewServiceAntiAffinityPriority(serviceLister algorithm.ServiceLister, label
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var nsServicePods []*api.Pod
 
 	services, err := s.serviceLister.GetPodServices(pod)
@@ -175,7 +176,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLis
 	}
 
 	numServicePods := len(nsServicePods)
-	result := []algorithm.HostPriority{}
+	result := []schedulerapi.HostPriority{}
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
 	for node := range labeledNodes {
@@ -184,11 +185,11 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLis
 		if numServicePods > 0 {
 			fScore = 10 * (float32(numServicePods-podCounts[labeledNodes[node]]) / float32(numServicePods))
 		}
-		result = append(result, algorithm.HostPriority{Host: node, Score: int(fScore)})
+		result = append(result, schedulerapi.HostPriority{Host: node, Score: int(fScore)})
 	}
 	// add the open nodes with a score of 0
 	for _, node := range otherNodes {
-		result = append(result, algorithm.HostPriority{Host: node, Score: 0})
+		result = append(result, schedulerapi.HostPriority{Host: node, Score: 0})
 	}
 
 	return result, nil

@@ -86,11 +86,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
 		},
-		func(j *api.ListOptions, c fuzz.Continue) {
-			// TODO: add some parsing
-			j.LabelSelector, _ = labels.Parse("a=b")
-			j.FieldSelector, _ = fields.ParseSelector("a=b")
-		},
 		func(j *unversioned.ListOptions, c fuzz.Continue) {
 			// TODO: add some parsing
 			label, _ := labels.Parse("a=b")
@@ -291,9 +286,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.ValueFrom = &api.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
-				versions := registered.RegisteredVersions
+				versions := registered.RegisteredGroupVersions
 
-				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
+				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))].String()
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
 			}
 		},

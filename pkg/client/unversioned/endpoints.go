@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -37,7 +38,7 @@ type EndpointsInterface interface {
 	Get(name string) (*api.Endpoints, error)
 	Delete(name string) error
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // endpoints implements EndpointsInterface
@@ -84,7 +85,7 @@ func (c *endpoints) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
-func (c *endpoints) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

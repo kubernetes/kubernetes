@@ -18,35 +18,13 @@ package algorithm
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 type FitPredicate func(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error)
 
-// HostPriority represents the priority of scheduling to a particular host, lower priority is better.
-type HostPriority struct {
-	Host  string
-	Score int
-}
-
-type HostPriorityList []HostPriority
-
-func (h HostPriorityList) Len() int {
-	return len(h)
-}
-
-func (h HostPriorityList) Less(i, j int) bool {
-	if h[i].Score == h[j].Score {
-		return h[i].Host < h[j].Host
-	}
-	return h[i].Score < h[j].Score
-}
-
-func (h HostPriorityList) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-}
-
-type PriorityFunction func(pod *api.Pod, podLister PodLister, nodeLister NodeLister) (HostPriorityList, error)
+type PriorityFunction func(pod *api.Pod, podLister PodLister, nodeLister NodeLister) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
 	Function PriorityFunction

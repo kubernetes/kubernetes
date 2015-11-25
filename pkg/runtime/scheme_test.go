@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -43,9 +44,13 @@ func (*InternalSimple) IsAnAPIObject() {}
 func (*ExternalSimple) IsAnAPIObject() {}
 
 func TestScheme(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
 
 	// test that scheme is an ObjectTyper
 	var _ runtime.ObjectTyper = scheme
@@ -56,10 +61,10 @@ func TestScheme(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := scheme.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-			if e, a := "", scope.Meta().SrcVersion; e != a {
+			if e, a := internalGV.String(), scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "externalVersion", scope.Meta().DestVersion; e != a {
+			if e, a := externalGV.String(), scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
@@ -68,10 +73,10 @@ func TestScheme(t *testing.T) {
 			return nil
 		},
 		func(in *ExternalSimple, out *InternalSimple, scope conversion.Scope) error {
-			if e, a := "externalVersion", scope.Meta().SrcVersion; e != a {
+			if e, a := externalGV.String(), scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "", scope.Meta().DestVersion; e != a {
+			if e, a := internalGV.String(), scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
@@ -89,11 +94,11 @@ func TestScheme(t *testing.T) {
 
 	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
-	data, err := scheme.EncodeToVersion(obj, "externalVersion")
+	data, err := scheme.EncodeToVersion(obj, externalGV.String())
 	obj2, err2 := scheme.Decode(data)
 	obj3 := &InternalSimple{}
 	err3 := scheme.DecodeInto(data, obj3)
-	obj4, err4 := scheme.DecodeToVersion(data, "externalVersion")
+	obj4, err4 := scheme.DecodeToVersion(data, externalGV)
 	if err != nil || err2 != nil || err3 != nil || err4 != nil {
 		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
@@ -131,8 +136,10 @@ func TestScheme(t *testing.T) {
 }
 
 func TestInvalidObjectValueKind(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "", Version: ""}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 
 	embedded := &runtime.EmbeddedObject{}
 	switch obj := embedded.Object.(type) {
@@ -198,9 +205,13 @@ func (*ExternalOptionalExtensionType) IsAnAPIObject() {}
 func (*InternalOptionalExtensionType) IsAnAPIObject() {}
 
 func TestExternalToInternalMapping(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &ExternalOptionalExtensionType{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -208,7 +219,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 	}{
 		{
 			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
-			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
+			`{"kind":"OptionalExtensionType","apiVersion":"` + externalGV.String() + `"}`,
 		},
 	}
 
@@ -230,15 +241,19 @@ func TestExternalToInternalMapping(t *testing.T) {
 }
 
 func TestExtensionMapping(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionType{})
-	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName("", "A", &ExtensionA{})
-	scheme.AddKnownTypeWithName("", "B", &ExtensionB{})
-	scheme.AddKnownTypeWithName("testExternal", "ExtensionType", &ExternalExtensionType{})
-	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName("testExternal", "A", &ExtensionA{})
-	scheme.AddKnownTypeWithName("testExternal", "B", &ExtensionB{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("ExtensionType"), &InternalExtensionType{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("A"), &ExtensionA{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("B"), &ExtensionB{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("ExtensionType"), &ExternalExtensionType{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &ExternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("A"), &ExtensionA{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("B"), &ExtensionB{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -246,21 +261,21 @@ func TestExtensionMapping(t *testing.T) {
 	}{
 		{
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}
+			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"A","testString":"foo"}}
 `,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}
+			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"B","testString":"bar"}}
 `,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}
+			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":null}
 `,
 		},
 	}
 
 	for _, item := range table {
-		gotEncoded, err := scheme.EncodeToVersion(item.obj, "testExternal")
+		gotEncoded, err := scheme.EncodeToVersion(item.obj, externalGV.String())
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%#v)", err, item.obj)
 		} else if e, a := item.encoded, string(gotEncoded); e != a {
@@ -284,10 +299,14 @@ func TestExtensionMapping(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
+
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
-	codec := runtime.CodecFor(scheme, "externalVersion")
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
+	codec := runtime.CodecFor(scheme, externalGV.String())
 	test := &InternalSimple{
 		TestString: "I'm the same",
 	}

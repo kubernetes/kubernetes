@@ -82,13 +82,13 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	// TODO: We should deduce the group for a resource by discovering the supported resources at server.
-	group, err := mapper.GroupForResource(inModel)
+	gvk, err := mapper.KindFor(inModel)
 	if err != nil {
 		return err
 	}
 
 	if len(apiV) == 0 {
-		groupMeta, err := latest.Group(group)
+		groupMeta, err := latest.Group(gvk.Group)
 		if err != nil {
 			return err
 		}

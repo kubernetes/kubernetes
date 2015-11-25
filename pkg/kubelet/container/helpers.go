@@ -132,21 +132,21 @@ func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*
 	return nil, false
 }
 
-func (irecorder *innerEventRecorder) Event(object runtime.Object, reason, message string) {
+func (irecorder *innerEventRecorder) Event(object runtime.Object, eventtype, reason, message string) {
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
-		irecorder.recorder.Event(ref, reason, message)
+		irecorder.recorder.Event(ref, eventtype, reason, message)
 	}
 }
 
-func (irecorder *innerEventRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
+func (irecorder *innerEventRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
-		irecorder.recorder.Eventf(ref, reason, messageFmt, args...)
+		irecorder.recorder.Eventf(ref, eventtype, reason, messageFmt, args...)
 	}
 
 }
 
-func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
+func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
-		irecorder.recorder.PastEventf(ref, timestamp, reason, messageFmt, args...)
+		irecorder.recorder.PastEventf(ref, timestamp, eventtype, reason, messageFmt, args...)
 	}
 }

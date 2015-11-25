@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -111,7 +112,7 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 		ListFunc: func() (runtime.Object, error) {
 			return c.client.Pods(namespace).List(labels.Everything(), fieldSelector)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return c.client.Pods(namespace).Watch(labels.Everything(), fieldSelector, options)
 		},
 	}

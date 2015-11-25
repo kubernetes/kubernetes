@@ -18,6 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -85,6 +86,6 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOp
 	return err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeHorizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, label, field, opts))
 }

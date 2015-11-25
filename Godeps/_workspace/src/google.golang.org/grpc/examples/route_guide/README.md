@@ -2,7 +2,7 @@
 The route guide server and client demonstrate how to use grpc go libraries to
 perform unary, client streaming, server streaming and full duplex RPCs.
 
-Please refer to [Getting Started Guide for Go] (https://github.com/grpc/grpc-common/blob/master/go/gotutorial.md) for more information.
+Please refer to [Getting Started Guide for Go] (examples/gotutorial.md) for more information.
 
 See the definition of the route guide service in proto/route_guide.proto.
 

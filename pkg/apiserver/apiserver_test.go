@@ -58,6 +58,7 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
+var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: ""}
 var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
 var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
 var prefix = "apis"
@@ -107,27 +108,26 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	gvStrings := []string{testGroupVersion.String(), newGroupVersion.String()}
-	return meta.NewDefaultRESTMapper(testAPIGroup, gvStrings, interfacesFor)
+	return meta.NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
 }
 
 func addGrouplessTypes() {
 	api.Scheme.AddKnownTypes(
-		grouplessGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		grouplessGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessGroupVersion.String(), &api.Pod{})
+	api.Scheme.AddKnownTypes(grouplessGroupVersion, &api.Pod{})
 }
 
 func addTestTypes() {
 	api.Scheme.AddKnownTypes(
-		testGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		testGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(testGroupVersion.String(), &api.Pod{})
+	api.Scheme.AddKnownTypes(testGroupVersion, &api.Pod{})
 }
 
 func addNewTestTypes() {
 	api.Scheme.AddKnownTypes(
-		newGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		newGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
@@ -137,8 +137,9 @@ func init() {
 
 	// "internal" version
 	api.Scheme.AddKnownTypes(
-		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		testInternalGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddInternalGroupVersion(testInternalGroupVersion)
 	addGrouplessTypes()
 	addTestTypes()
 	addNewTestTypes()
@@ -148,12 +149,13 @@ func init() {
 	// enumerate all supported versions, get the kinds, and register with
 	// the mapper how to address our resources
 	for _, gv := range groupVersions {
-		for kind := range api.Scheme.KnownTypes(gv.String()) {
+		for kind := range api.Scheme.KnownTypes(gv) {
+			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(meta.RESTScopeRoot, kind, gv.String(), false)
+				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
 			} else {
-				nsMapper.Add(meta.RESTScopeNamespace, kind, gv.String(), false)
+				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
 			}
 		}
 	}
@@ -1629,7 +1631,7 @@ func TestConnectWithOptions(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)
@@ -1676,7 +1678,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)
