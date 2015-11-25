@@ -1217,8 +1217,8 @@ __EOF__
   kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
   kubectl scale rc cassandra --replicas=1 "${kube_flags[@]}"
   kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert "all -l'name=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:cassandra:'
-  kubectl delete all -l name=cassandra "${kube_flags[@]}"
+  kube::test::get_object_assert "all -l'app=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:cassandra:'
+  kubectl delete all -l app=cassandra "${kube_flags[@]}"
 
 
   ###########
