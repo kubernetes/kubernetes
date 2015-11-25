@@ -67,6 +67,163 @@ function get_latest_trusty_image() {
     rm -rf .gsutil &> /dev/null
 }
 
+# Properly configure globals for an upgrade step in a GKE or GCE upgrade suite
+#
+# These suites:
+#   step1: launch a cluster at $old_version,
+#   step2: upgrades the master to $new_version,
+#   step3: runs $old_version e2es,
+#   step4: upgrades the rest of the cluster,
+#   step5: runs $old_version e2es again, then
+#   step6: runs $new_version e2es and tears down the cluster.
+#
+# Assumes globals:
+#   $JOB_NAME
+#   $KUBERNETES_PROVIDER
+#   $GKE_DEFAULT_SKIP_TESTS
+#   $GCE_DEFAULT_SKIP_TESTS
+#   $GCE_FLAKY_TESTS
+#   $GCE_SLOW_TESTS
+#   $GKE_FLAKY_TESTS
+#
+# Args:
+#   $1 old_version:  the version to deploy a cluster at, and old e2e tests to run
+#                    against the upgraded cluster (should be something like
+#                    'release/latest', to work with JENKINS_PUBLISHED_VERSION logic)
+#   $2 new_version:  the version to upgrade the cluster to, and new e2e tests to run
+#                    against the upgraded cluster (should be something like
+#                    'ci/latest', to work with JENKINS_PUBLISHED_VERSION logic)
+#   $3 cluster_name: determines E2E_CLUSTER_NAME and E2E_NETWORK
+#   $4 project:      determines PROJECT
+
+function configure_upgrade_step() {
+  local -r old_version="$1"
+  local -r new_version="$2"
+  local -r cluster_name="$3"
+  local -r project="$4"
+
+  [[ "${JOB_NAME}" =~ .*-(step[1-6])-.* ]] || {
+    echo "JOB_NAME ${JOB_NAME} is not a valid upgrade job name, could not parse"
+    exit 1
+  }
+  local -r step="${BASH_REMATCH[1]}"
+
+  local -r gce_test_args="--ginkgo.skip=$(join_regex_allow_empty \
+        ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+        ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+        ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+        )"
+  local -r gke_test_args="--ginkgo.skip=$(join_regex_allow_empty \
+        ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+        ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+        ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+        ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+        ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
+        )"
+
+  if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    DOGFOOD_GCLOUD="true"
+    GKE_API_ENDPOINT="https://test-container.sandbox.googleapis.com/"
+  fi
+
+  E2E_CLUSTER_NAME="$cluster_name"
+  E2E_NETWORK="$cluster_name"
+  PROJECT="$project"
+
+  case $step in
+    step1)
+      # Deploy at old version
+      JENKINS_PUBLISHED_VERSION="${old_version}"
+
+      E2E_UP="true"
+      E2E_TEST="false"
+      E2E_DOWN="false"
+
+      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        E2E_SET_CLUSTER_API_VERSION=y
+      fi
+      ;;
+
+    step2)
+      # Use upgrade logic of version we're upgrading to.
+      JENKINS_PUBLISHED_VERSION="${new_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="false"
+      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${new_version}"
+      ;;
+
+    step3)
+      # Run old e2es
+      JENKINS_PUBLISHED_VERSION="${old_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="false"
+
+      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        GINKGO_TEST_ARGS="${gke_test_args}"
+      else
+        GINKGO_TEST_ARGS="${gce_test_args}"
+      fi
+      ;;
+
+    step4)
+      # Use upgrade logic of version we're upgrading to.
+      JENKINS_PUBLISHED_VERSION="${new_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="false"
+      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${new_version}"
+      ;;
+
+    step5)
+      # Run old e2es
+      JENKINS_PUBLISHED_VERSION="${old_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="false"
+
+      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        GINKGO_TEST_ARGS="${gke_test_args}"
+      else
+        GINKGO_TEST_ARGS="${gce_test_args}"
+      fi
+      ;;
+
+    step6)
+      # Run new e2es
+      JENKINS_PUBLISHED_VERSION="${new_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      # TODO(15011): these really shouldn't be (very) version skewed, but
+      # because we have to get ci/latest again, it could get slightly out of
+      # whack.
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="true"
+
+      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        GINKGO_TEST_ARGS="${gke_test_args}"
+      else
+        GINKGO_TEST_ARGS="${gce_test_args}"
+      fi
+      ;;
+  esac
+}
+
 echo "--------------------------------------------------------------------------------"
 echo "Initial Environment:"
 printenv | sort
