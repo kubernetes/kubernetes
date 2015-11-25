@@ -59,7 +59,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)
 	}
-	mapping, err := m.RESTMapping(kind, version)
+	mapping, err := m.RESTMapping(unversioned.GroupKind{Group: gv.Group, Kind: kind}, gv.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 	}
@@ -97,11 +97,15 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {
-	version, kind, err := m.ObjectVersionAndKind(obj)
+	gvString, kind, err := m.ObjectVersionAndKind(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
-	mapping, err := m.RESTMapping(kind, version)
+	gv, err := unversioned.ParseGroupVersion(gvString)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse group/version from %q: %v", gvString, err)
+	}
+	mapping, err := m.RESTMapping(unversioned.GroupKind{Group: gv.Group, Kind: kind}, gv.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", kind, err)
 	}

@@ -57,11 +57,11 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
-	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
+	gvk, err := api.RESTMapper.KindFor(a.GetResource())
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
-	mapping, err := api.RESTMapper.RESTMapping(kind, defaultVersion)
+	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}

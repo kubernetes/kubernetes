@@ -126,13 +126,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
+	gvk := a.group.GroupVersion.WithKind(kind)
+
 	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.GroupVersion.String())
+	mapping, err := a.group.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +150,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.GroupVersion.String())
+		parentGVK := a.group.GroupVersion.WithKind(parentKind)
+
+		parentMapping, err := a.group.Mapper.RESTMapping(parentGVK.GroupKind(), parentGVK.Version)
 		if err != nil {
 			return nil, err
 		}
