@@ -683,3 +683,30 @@ const (
 	PodSelectorOpExists       PodSelectorOperator = "Exists"
 	PodSelectorOpDoesNotExist PodSelectorOperator = "DoesNotExist"
 )
+
+type DedicatedMachine struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this dedicated machine rule.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec DedicatedMachineSpec `json:"spec"`
+}
+
+// DedicatedList is a collection of dedicated machines.
+type DedicatedMachineList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of DedicatedMachines.
+	Items []DedicatedMachine `json:"items"`
+}
+
+type DedicatedMachineSpec struct {
+	// TargetNamespace string `json:"namespace,omitempty"`
+	LabelValue string `json:"labelvalue"`
+}
