@@ -105,6 +105,7 @@ func-dest
 fuzz-iters
 gather-resource-usage
 gce-project
+gce-service-account
 gce-zone
 gke-cluster
 go-header-file
