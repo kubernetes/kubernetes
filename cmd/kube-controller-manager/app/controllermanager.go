@@ -300,6 +300,8 @@ func (s *CMServer) Run(_ []string) error {
 			routeController := routecontroller.New(routes, kubeClient, s.ClusterName, &s.ClusterCIDR)
 			routeController.Run(s.NodeSyncPeriod)
 		}
+	} else {
+		glog.Infof("allocate-node-cidrs set to %v, node controller not creating routes", s.AllocateNodeCIDRs)
 	}
 
 	resourcequotacontroller.NewResourceQuotaController(kubeClient).Run(s.ResourceQuotaSyncPeriod)
