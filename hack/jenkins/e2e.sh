@@ -319,7 +319,7 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ) --gather-resource-usage=true"}
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
