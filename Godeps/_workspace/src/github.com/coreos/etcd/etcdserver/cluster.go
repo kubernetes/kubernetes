@@ -220,6 +220,9 @@ func (c *cluster) SetID(id types.ID) { c.id = id }
 func (c *cluster) SetStore(st store.Store) { c.store = st }
 
 func (c *cluster) Recover() {
+	c.Lock()
+	defer c.Unlock()
+
 	c.members, c.removed = membersFromStore(c.store)
 	c.version = clusterVersionFromStore(c.store)
 	MustDetectDowngrade(c.version)
