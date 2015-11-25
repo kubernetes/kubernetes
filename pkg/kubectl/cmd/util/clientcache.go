@@ -71,16 +71,8 @@ func (c *ClientCache) ClientConfigForVersion(version string) (*client.Config, er
 		}
 		preferredGV = &gv
 	}
-	registeredGVs := []unversioned.GroupVersion{}
-	for _, gvString := range registered.RegisteredVersions {
-		gv, err := unversioned.ParseGroupVersion(gvString)
-		if err != nil {
-			return nil, err
-		}
-		registeredGVs = append(registeredGVs, gv)
-	}
 
-	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registeredGVs)
+	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.RegisteredGroupVersions)
 	if err != nil {
 		return nil, err
 	}

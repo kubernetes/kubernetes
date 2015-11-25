@@ -291,9 +291,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.ValueFrom = &api.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
-				versions := registered.RegisteredVersions
+				versions := registered.RegisteredGroupVersions
 
-				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
+				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))].String()
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
 			}
 		},
