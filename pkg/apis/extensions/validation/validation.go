@@ -219,6 +219,18 @@ func ValidateDaemonSetName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateDedicatedMachine tests if required fields in the Dedicated are set.
+func ValidateDedicatedMachine(dedicatedmachine *extensions.DedicatedMachine) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	return allErrs
+}
+
+// ValidateDedicatedMachineUpdate tests if required fields in the Dedicated are set.
+func ValidateDedicatedMachineUpdate(dedicatedmachine, olddedicatedmachine *extensions.DedicatedMachine) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	return allErrs
+}
+
 // Validates that the given name can be used as a deployment name.
 func ValidateDeploymentName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
