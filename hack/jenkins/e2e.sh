@@ -437,6 +437,8 @@ case ${JOB_NAME} in
 
   # Runs "disruptive" tests on GCE on the release candidate branch,
   # sequentially, against the latest 1.1 ci release.
+  # The autoscaling test is not disruptive, however there is no better suite
+  # to run it.
   kubernetes-e2e-gce-disruptive-1.1)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-disruptive-1.1"}
     : ${E2E_DOWN:="false"}
