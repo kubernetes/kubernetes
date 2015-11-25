@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -174,6 +175,6 @@ func TestNamespaceWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Namespaces().Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
+	_, err := c.Setup(t).Namespaces().Watch(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, nil, err)
 }

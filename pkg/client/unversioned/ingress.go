@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -36,7 +37,7 @@ type IngressInterface interface {
 	Create(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Update(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 	UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error)
 }
 
@@ -93,7 +94,7 @@ func (c *ingress) Delete(name string, options *api.DeleteOptions) (err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested ingress.
-func (c *ingress) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *ingress) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

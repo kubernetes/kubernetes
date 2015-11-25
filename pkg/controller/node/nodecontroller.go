@@ -166,7 +166,7 @@ func NewNodeController(
 			ListFunc: func() (runtime.Object, error) {
 				return nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
@@ -182,7 +182,7 @@ func NewNodeController(
 			ListFunc: func() (runtime.Object, error) {
 				return nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},

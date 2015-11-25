@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -281,7 +282,7 @@ func startEndpointWatcher(f *Framework, q *endpointQueries) {
 			ListFunc: func() (runtime.Object, error) {
 				return f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything())
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return f.Client.Endpoints(f.Namespace.Name).Watch(labels.Everything(), fields.Everything(), options)
 			},
 		},
