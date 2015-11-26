@@ -40,6 +40,8 @@ func (gvr *GroupVersionResource) String() string {
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupKind struct {
 	Group string
 	Kind  string
@@ -55,6 +57,8 @@ func (gk *GroupKind) String() string {
 
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupVersionKind struct {
 	Group   string
 	Version string
@@ -79,6 +83,8 @@ func (gvk *GroupVersionKind) String() string {
 }
 
 // GroupVersion contains the "group" and the "version", which uniquely identifies the API.
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupVersion struct {
 	Group   string
 	Version string
