@@ -57,6 +57,7 @@ func TestGetAttrs(t *testing.T) {
 		},
 		Reason: "ForTesting",
 		Source: api.EventSource{Component: "test"},
+		Type:   api.EventTypeNormal,
 	}
 	label, field, err := getAttrs(eventA)
 	if err != nil {
@@ -77,6 +78,7 @@ func TestGetAttrs(t *testing.T) {
 		"involvedObject.fieldPath":       "",
 		"reason":                         "ForTesting",
 		"source":                         "test",
+		"type":                           api.EventTypeNormal,
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
