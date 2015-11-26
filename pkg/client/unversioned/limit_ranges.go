@@ -33,7 +33,7 @@ type LimitRangesNamespacer interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.LimitRangeList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.LimitRangeList, error)
 	Get(name string) (*api.LimitRange, error)
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
@@ -56,9 +56,9 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 }
 
 // List takes a selector, and returns the list of limitRanges that match that selector.
-func (c *limitRanges) List(label labels.Selector, field fields.Selector) (result *api.LimitRangeList, err error) {
+func (c *limitRanges) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

@@ -37,7 +37,7 @@ type EventInterface interface {
 	Create(event *api.Event) (*api.Event, error)
 	Update(event *api.Event) (*api.Event, error)
 	Patch(event *api.Event, data []byte) (*api.Event, error)
-	List(label labels.Selector, field fields.Selector) (*api.EventList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EventList, error)
 	Get(name string) (*api.Event, error)
 	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 	// Search finds events about the specified object
@@ -117,11 +117,12 @@ func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, err
 }
 
 // List returns a list of events matching the selectors.
-func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
+func (e *events) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -175,7 +176,7 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 		refUID = &stringRefUID
 	}
 	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
-	return e.List(labels.Everything(), fieldSelector)
+	return e.List(labels.Everything(), fieldSelector, unversioned.ListOptions{})
 }
 
 // Delete deletes an existing event.

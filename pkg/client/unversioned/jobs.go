@@ -33,7 +33,7 @@ type JobsNamespacer interface {
 
 // JobInterface exposes methods to work on Job resources.
 type JobInterface interface {
-	List(label labels.Selector, field fields.Selector) (*extensions.JobList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.JobList, error)
 	Get(name string) (*extensions.Job, error)
 	Create(job *extensions.Job) (*extensions.Job, error)
 	Update(job *extensions.Job) (*extensions.Job, error)
@@ -57,9 +57,9 @@ func newJobs(c *ExtensionsClient, namespace string) *jobs {
 var _ JobInterface = &jobs{}
 
 // List returns a list of jobs that match the label and field selectors.
-func (c *jobs) List(label labels.Selector, field fields.Selector) (result *extensions.JobList, err error) {
+func (c *jobs) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *extensions.JobList, err error) {
 	result = &extensions.JobList{}
-	err = c.r.Get().Namespace(c.ns).Resource("jobs").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("jobs").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

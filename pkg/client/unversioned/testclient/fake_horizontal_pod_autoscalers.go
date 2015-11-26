@@ -41,7 +41,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string) (*extensions.HorizontalP
 	return obj.(*extensions.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (*extensions.HorizontalPodAutoscalerList, error) {
+func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, label, field), &extensions.HorizontalPodAutoscalerList{})
 	if obj == nil {
 		return nil, err

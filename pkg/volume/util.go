@@ -110,7 +110,7 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 
 	podLW := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return c.client.Pods(namespace).List(labels.Everything(), fieldSelector)
+			return c.client.Pods(namespace).List(labels.Everything(), fieldSelector, unversioned.ListOptions{})
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return c.client.Pods(namespace).Watch(labels.Everything(), fieldSelector, options)

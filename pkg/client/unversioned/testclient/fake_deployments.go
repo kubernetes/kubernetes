@@ -41,7 +41,7 @@ func (c *FakeDeployments) Get(name string) (*extensions.Deployment, error) {
 	return obj.(*extensions.Deployment), err
 }
 
-func (c *FakeDeployments) List(label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error) {
+func (c *FakeDeployments) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.DeploymentList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("deployments", c.Namespace, label, field), &extensions.DeploymentList{})
 	if obj == nil {
 		return nil, err

@@ -55,7 +55,7 @@ func TestListServices(t *testing.T) {
 			},
 		},
 	}
-	receivedServiceList, err := c.Setup(t).Services(ns).List(labels.Everything(), fields.Everything())
+	receivedServiceList, err := c.Setup(t).Services(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
@@ -92,7 +92,7 @@ func TestListServicesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedServiceList, err := c.Services(ns).List(selector, fields.Everything())
+	receivedServiceList, err := c.Services(ns).List(selector, fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, receivedServiceList, err)
 }
 

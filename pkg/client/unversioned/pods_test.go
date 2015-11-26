@@ -34,7 +34,7 @@ func TestListEmptyPods(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything())
+	podList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, podList, err)
 }
 
@@ -60,7 +60,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything())
+	receivedPodList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -94,7 +94,7 @@ func TestListPodsLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedPodList, err := c.Pods(ns).List(selector, fields.Everything())
+	receivedPodList, err := c.Pods(ns).List(selector, fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, receivedPodList, err)
 }
 

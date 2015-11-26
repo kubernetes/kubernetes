@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -104,7 +105,7 @@ var _ = Describe("[Example] ClusterDns", func() {
 		// the application itself may have not been initialized. Just query the application.
 		for _, ns := range namespaces {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
-			pods, err := c.Pods(ns.Name).List(label, fields.Everything())
+			pods, err := c.Pods(ns.Name).List(label, fields.Everything(), unversioned.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			err = podsResponding(c, ns.Name, backendPodName, false, pods)
 			Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
@@ -123,7 +124,7 @@ var _ = Describe("[Example] ClusterDns", func() {
 		// dns error or timeout.
 		// This code is probably unnecessary, but let's stay on the safe side.
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
-		pods, err := c.Pods(namespaces[0].Name).List(label, fields.Everything())
+		pods, err := c.Pods(namespaces[0].Name).List(label, fields.Everything(), unversioned.ListOptions{})
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
 			Failf("no running pods found")

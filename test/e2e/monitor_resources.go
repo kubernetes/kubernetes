@@ -19,6 +19,7 @@ package e2e
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -88,7 +89,7 @@ var _ = Describe("Resource usage of system containers", func() {
 
 	It("should not exceed expected amount.", func() {
 		By("Getting ResourceConsumption on all nodes")
-		nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		expectNoError(err)
 
 		resourceUsagePerNode := make(map[string][]resourceUsagePerContainer)

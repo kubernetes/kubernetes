@@ -530,7 +530,7 @@ var _ = Describe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			// Node
-			nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+			nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
 			output = runKubectlOrDie("describe", "node", node.Name)
@@ -1088,7 +1088,7 @@ func forEachReplicationController(c *client.Client, ns, selectorKey, selectorVal
 	var rcs *api.ReplicationControllerList
 	var err error
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
-		rcs, err = c.ReplicationControllers(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything())
+		rcs, err = c.ReplicationControllers(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if len(rcs.Items) > 0 {
 			break

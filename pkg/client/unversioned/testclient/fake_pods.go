@@ -41,7 +41,7 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
+func (c *FakePods) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, label, field), &api.PodList{})
 	if obj == nil {
 		return nil, err

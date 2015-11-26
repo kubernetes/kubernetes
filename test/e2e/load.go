@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -70,7 +71,7 @@ var _ = Describe("[Performance] Load capacity [Skipped]", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
@@ -209,7 +210,7 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	_, err := config.Client.Pods(config.Namespace).List(selector, fields.Everything())
+	_, err := config.Client.Pods(config.Namespace).List(selector, fields.Everything(), unversioned.ListOptions{})
 	expectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }
 

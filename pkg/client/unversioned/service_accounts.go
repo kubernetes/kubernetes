@@ -32,7 +32,7 @@ type ServiceAccountsInterface interface {
 	Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error)
 	Update(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error)
 	Delete(name string) error
-	List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ServiceAccountList, error)
 	Get(name string) (*api.ServiceAccount, error)
 	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
 }
@@ -64,12 +64,13 @@ func (s *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.Servi
 }
 
 // List returns a list of serviceAccounts matching the selectors.
-func (s *serviceAccounts) List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error) {
+func (s *serviceAccounts) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ServiceAccountList, error) {
 	result := &api.ServiceAccountList{}
 
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().

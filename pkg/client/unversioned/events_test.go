@@ -167,7 +167,7 @@ func TestEventList(t *testing.T) {
 		Response: Response{StatusCode: 200, Body: eventList},
 	}
 	response, err := c.Setup(t).Events(ns).List(labels.Everything(),
-		fields.Everything())
+		fields.Everything(), unversioned.ListOptions{})
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)

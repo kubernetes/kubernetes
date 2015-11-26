@@ -40,7 +40,7 @@ func (c *FakeServiceAccounts) Get(name string) (*api.ServiceAccount, error) {
 	return obj.(*api.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error) {
+func (c *FakeServiceAccounts) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ServiceAccountList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("serviceaccounts", c.Namespace, label, field), &api.ServiceAccountList{})
 	if obj == nil {
 		return nil, err

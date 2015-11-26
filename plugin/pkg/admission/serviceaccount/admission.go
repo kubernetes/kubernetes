@@ -84,7 +84,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return cl.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return cl.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return cl.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
@@ -98,7 +98,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return cl.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector)
+				return cl.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector, unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return cl.Secrets(api.NamespaceAll).Watch(labels.Everything(), tokenSelector, options)

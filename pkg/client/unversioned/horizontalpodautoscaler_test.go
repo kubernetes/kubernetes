@@ -100,7 +100,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscalerList},
 	}
-	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 

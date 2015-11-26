@@ -105,7 +105,7 @@ func (f *Framework) afterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(labels.Everything(), fields.Everything())
+		events, err := f.Client.Events(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, e := range events.Items {
@@ -179,7 +179,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything())
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return err
 		}
