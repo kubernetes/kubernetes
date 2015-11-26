@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	etcderr "github.com/coreos/etcd/error"
@@ -52,8 +53,8 @@ var rootRole = Role{
 	Role: RootRoleName,
 	Permissions: Permissions{
 		KV: RWPermission{
-			Read:  []string{"*"},
-			Write: []string{"*"},
+			Read:  []string{"/*"},
+			Write: []string{"/*"},
 		},
 	},
 }
@@ -62,8 +63,8 @@ var guestRole = Role{
 	Role: GuestRoleName,
 	Permissions: Permissions{
 		KV: RWPermission{
-			Read:  []string{"*"},
-			Write: []string{"*"},
+			Read:  []string{"/*"},
+			Write: []string{"/*"},
 		},
 	},
 }
@@ -93,7 +94,9 @@ type store struct {
 	server      doer
 	timeout     time.Duration
 	ensuredOnce bool
-	enabled     *bool
+
+	mu      sync.Mutex // protect enabled
+	enabled *bool
 }
 
 type User struct {
@@ -377,6 +380,9 @@ func (s *store) UpdateRole(role Role) (Role, error) {
 }
 
 func (s *store) AuthEnabled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return s.detectAuth()
 }
 
@@ -384,6 +390,10 @@ func (s *store) EnableAuth() error {
 	if s.AuthEnabled() {
 		return authErr(http.StatusConflict, "already enabled")
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	_, err := s.GetUser("root")
 	if err != nil {
 		return authErr(http.StatusConflict, "No root user available, please create one")
@@ -412,6 +422,10 @@ func (s *store) DisableAuth() error {
 	if !s.AuthEnabled() {
 		return authErr(http.StatusConflict, "already disabled")
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	err := s.disableAuth()
 	if err == nil {
 		b := false

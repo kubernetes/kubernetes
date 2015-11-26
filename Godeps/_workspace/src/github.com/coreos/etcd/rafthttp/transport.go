@@ -151,7 +151,10 @@ func (t *transport) Send(msgs []raftpb.Message) {
 			t.maybeUpdatePeersTerm(m.Term)
 		}
 
+		t.mu.RLock()
 		p, ok := t.peers[to]
+		t.mu.RUnlock()
+
 		if ok {
 			if m.Type == raftpb.MsgApp {
 				t.serverStats.SendAppendReq(m.Size())

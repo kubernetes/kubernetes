@@ -4,12 +4,41 @@
 package codec
 
 import (
+	"fmt"
 	"time"
 )
 
 var (
 	timeDigits = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 )
+
+type timeExt struct{}
+
+func (x timeExt) WriteExt(v interface{}) (bs []byte) {
+	switch v2 := v.(type) {
+	case time.Time:
+		bs = encodeTime(v2)
+	case *time.Time:
+		bs = encodeTime(*v2)
+	default:
+		panic(fmt.Errorf("unsupported format for time conversion: expecting time.Time; got %T", v2))
+	}
+	return
+}
+func (x timeExt) ReadExt(v interface{}, bs []byte) {
+	tt, err := decodeTime(bs)
+	if err != nil {
+		panic(err)
+	}
+	*(v.(*time.Time)) = tt
+}
+
+func (x timeExt) ConvertExt(v interface{}) interface{} {
+	return x.WriteExt(v)
+}
+func (x timeExt) UpdateExt(v interface{}, src interface{}) {
+	x.ReadExt(v, src.([]byte))
+}
 
 // EncodeTime encodes a time.Time as a []byte, including
 // information on the instant in time and UTC offset.
