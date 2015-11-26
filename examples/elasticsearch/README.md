@@ -131,7 +131,7 @@ curl 10.100.108.94:9200/_cluster/health?pretty
 You should see something similar to the following:
 
 ```json
-
+{
   "cluster_name" : "myesdb",
   "status" : "green",
   "timed_out" : false,
