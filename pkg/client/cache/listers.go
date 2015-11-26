@@ -138,23 +138,6 @@ func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 	return
 }
 
-// TODO Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToNodeLister.
-// GetNodeInfo returns cached data for the node 'id'.
-func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	node, exists, err := s.Get(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
-
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("node '%v' is not in cache", id)
-	}
-
-	return node.(*api.Node), nil
-}
-
 // StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
 type StoreToReplicationControllerLister struct {
 	Store
