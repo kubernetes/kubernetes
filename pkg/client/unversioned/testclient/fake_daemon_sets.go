@@ -80,6 +80,6 @@ func (c *FakeDaemonSets) Delete(name string) error {
 	return err
 }
 
-func (c *FakeDaemonSets) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, label, field, opts))
+func (c *FakeDaemonSets) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, opts))
 }

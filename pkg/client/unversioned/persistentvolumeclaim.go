@@ -39,7 +39,7 @@ type PersistentVolumeClaimInterface interface {
 	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // persistentVolumeClaims implements PersistentVolumeClaimsNamespacer interface
@@ -99,13 +99,11 @@ func (c *persistentVolumeClaims) Delete(name string) error {
 	return c.client.Delete().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(name).Do().Error()
 }
 
-func (c *persistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumeClaims) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }

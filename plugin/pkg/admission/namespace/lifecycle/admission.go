@@ -113,7 +113,7 @@ func NewLifecycle(c client.Interface) admission.Interface {
 				return c.Namespaces().List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return c.Namespaces().Watch(labels.Everything(), fields.Everything(), options)
+				return c.Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},

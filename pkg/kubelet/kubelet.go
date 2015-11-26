@@ -240,7 +240,7 @@ func NewMainKubelet(
 				return kubeClient.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return kubeClient.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+				return kubeClient.Services(api.NamespaceAll).Watch(options)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
@@ -257,7 +257,8 @@ func NewMainKubelet(
 				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, options)
+				options.FieldSelector.Selector = fieldSelector
+				return kubeClient.Nodes().Watch(options)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()

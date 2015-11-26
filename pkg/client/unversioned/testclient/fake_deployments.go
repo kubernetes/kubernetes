@@ -87,6 +87,6 @@ func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeDeployments) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("deployments", c.Namespace, label, field, opts))
+func (c *FakeDeployments) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("deployments", c.Namespace, opts))
 }

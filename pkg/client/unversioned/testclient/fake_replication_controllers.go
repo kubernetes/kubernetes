@@ -80,6 +80,6 @@ func (c *FakeReplicationControllers) Delete(name string) error {
 	return err
 }
 
-func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, label, field, opts))
+func (c *FakeReplicationControllers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, opts))
 }

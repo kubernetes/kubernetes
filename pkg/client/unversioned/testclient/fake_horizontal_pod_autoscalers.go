@@ -86,6 +86,6 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOp
 	return err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, label, field, opts))
+func (c *FakeHorizontalPodAutoscalers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, opts))
 }

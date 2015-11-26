@@ -113,7 +113,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 			return c.client.Pods(namespace).List(labels.Everything(), fieldSelector)
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-			return c.client.Pods(namespace).Watch(labels.Everything(), fieldSelector, options)
+			options.FieldSelector.Selector = fieldSelector
+			return c.client.Pods(namespace).Watch(options)
 		},
 	}
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)

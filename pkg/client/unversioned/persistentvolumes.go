@@ -38,7 +38,7 @@ type PersistentVolumeInterface interface {
 	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	UpdateStatus(persistentVolume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // persistentVolumes implements PersistentVolumesInterface
@@ -94,12 +94,10 @@ func (c *persistentVolumes) Delete(name string) error {
 	return c.client.Delete().Resource("persistentVolumes").Name(name).Do().Error()
 }
 
-func (c *persistentVolumes) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentVolumes").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }
