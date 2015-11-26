@@ -418,8 +418,8 @@
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Comment": "v0.1-55-g2093b57",
-			"Rev": "2093b57e5ca2ccbee4626814100bc1aada691b18"
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",

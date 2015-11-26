@@ -1115,9 +1115,8 @@ func (o *Buffer) enc_new_map(p *Properties, base structPointer) error {
 		return nil
 	}
 
-	keys := v.MapKeys()
-	sort.Sort(mapKeys(keys))
-	for _, key := range keys {
+	// Don't sort map keys. It is not required by the spec, and C++ doesn't do it.
+	for _, key := range v.MapKeys() {
 		val := v.MapIndex(key)
 
 		// The only illegal map entry values are nil message pointers.
