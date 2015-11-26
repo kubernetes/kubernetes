@@ -114,7 +114,7 @@ var _ = Describe("Daemon set", func() {
 		By("Stop a daemon pod, check that the daemon pod is revived.")
 		podClient := c.Pods(ns)
 
-		podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything())
+		podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(podList.Items)).To(BeNumerically(">", 0))
 		pod := podList.Items[0]
@@ -160,7 +160,7 @@ var _ = Describe("Daemon set", func() {
 
 		By("Change label of node, check that daemon pod is launched.")
 		nodeClient := c.Nodes()
-		nodeList, err := nodeClient.List(labels.Everything(), fields.Everything())
+		nodeList, err := nodeClient.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
@@ -196,7 +196,7 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 
 func clearDaemonSetNodeLabels(c *client.Client) error {
 	nodeClient := c.Nodes()
-	nodeList, err := nodeClient.List(labels.Everything(), fields.Everything())
+	nodeList, err := nodeClient.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func setDaemonSetNodeLabels(c *client.Client, nodeName string, labels map[string
 
 func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := f.Client.Pods(f.Namespace.Name).List(labels.Set(selector).AsSelector(), fields.Everything())
+		podList, err := f.Client.Pods(f.Namespace.Name).List(labels.Set(selector).AsSelector(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -279,7 +279,7 @@ func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames [
 
 func checkRunningOnAllNodes(f *Framework, selector map[string]string) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.Client.Nodes().List(labels.Everything(), fields.Everything())
+		nodeList, err := f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, nil
 		}

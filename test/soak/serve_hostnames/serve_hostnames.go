@@ -89,7 +89,7 @@ func main() {
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err = c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err == nil {
 			break
 		}

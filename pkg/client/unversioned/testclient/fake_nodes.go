@@ -39,7 +39,7 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+func (c *FakeNodes) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error) {
 	obj, err := c.Fake.Invokes(NewRootListAction("nodes", label, field), &api.NodeList{})
 	if obj == nil {
 		return nil, err

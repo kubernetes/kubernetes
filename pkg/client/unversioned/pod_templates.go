@@ -31,7 +31,7 @@ type PodTemplatesNamespacer interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodTemplateList, error)
 	Get(name string) (*api.PodTemplate, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
@@ -54,9 +54,9 @@ func newPodTemplates(c *Client, namespace string) *podTemplates {
 }
 
 // List takes label and field selectors, and returns the list of podTemplates that match those selectors.
-func (c *podTemplates) List(label labels.Selector, field fields.Selector) (result *api.PodTemplateList, err error) {
+func (c *podTemplates) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.PodTemplateList, err error) {
 	result = &api.PodTemplateList{}
-	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

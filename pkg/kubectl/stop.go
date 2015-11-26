@@ -109,7 +109,7 @@ type objInterface interface {
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
-	rcs, err := c.List(labels.Everything(), fields.Everything())
+	rcs, err := c.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}
@@ -252,7 +252,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 	// at this point only dead pods are left, that should be removed
 	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
-	podList, err := pods.List(selector, fields.Everything())
+	podList, err := pods.List(selector, fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}

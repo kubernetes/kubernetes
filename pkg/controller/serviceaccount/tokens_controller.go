@@ -64,7 +64,7 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return e.client.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
@@ -84,7 +84,7 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 	e.secrets, e.secretController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector)
+				return e.client.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector, unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.Secrets(api.NamespaceAll).Watch(labels.Everything(), tokenSelector, options)

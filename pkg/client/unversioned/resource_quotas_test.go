@@ -115,7 +115,7 @@ func TestResourceQuotaList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: resourceQuotaList},
 	}
-	response, err := c.Setup(t).ResourceQuotas(ns).List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).ResourceQuotas(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 

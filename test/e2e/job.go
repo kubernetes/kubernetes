@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -259,7 +260,7 @@ func deleteJob(c *client.Client, ns, name string) error {
 func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {
-		pods, err := c.Pods(ns).List(label, fields.Everything())
+		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, err
 		}

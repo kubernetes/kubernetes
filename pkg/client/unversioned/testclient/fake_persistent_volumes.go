@@ -37,7 +37,7 @@ func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) 
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
+func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PersistentVolumeList, error) {
 	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", label, field), &api.PersistentVolumeList{})
 	if obj == nil {
 		return nil, err

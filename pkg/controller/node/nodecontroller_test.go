@@ -91,7 +91,7 @@ func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
 	return nil, nil
 }
 
-func (m *FakeNodeHandler) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+func (m *FakeNodeHandler) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error) {
 	defer func() { m.RequestCount++ }()
 	var nodes []*api.Node
 	for i := 0; i < len(m.UpdatedNodes); i++ {

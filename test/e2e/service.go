@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -1043,7 +1044,7 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		i++
 	}
 
-	if pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+	if pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
@@ -1095,7 +1096,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 }
 
 func getNodePublicIps(c *client.Client) ([]string, error) {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

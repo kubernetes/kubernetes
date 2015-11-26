@@ -40,7 +40,7 @@ func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
 	return obj.(*api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error) {
+func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodTemplateList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, label, field), &api.PodTemplateList{})
 	if obj == nil {
 		return nil, err
