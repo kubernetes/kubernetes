@@ -58,8 +58,7 @@ KUBE_PROXY_START="start-stop-daemon \
 --quiet \
 --exec $KUBE_PROXY \
 --make-pidfile --pidfile $KUBE_PROXY_PIDFILE \
--- $KUBE_PROXY_OPTS \
->> $KUBE_PROXY_LOGFILE 2>&1"
+-- $KUBE_PROXY_OPTS"
 
 KUBE_PROXY_STOP="start-stop-daemon \
 --stop \

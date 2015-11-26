@@ -58,8 +58,7 @@ KUBE_SCHEDULER_START="start-stop-daemon \
 --quiet \
 --exec $KUBE_SCHEDULER \
 --make-pidfile --pidfile $KUBE_SCHEDULER_PIDFILE \
--- $KUBE_SCHEDULER_OPTS \
->> $KUBE_SCHEDULER_LOGFILE 2>&1"
+-- $KUBE_SCHEDULER_OPTS"
 
 KUBE_SCHEDULER_STOP="start-stop-daemon \
 --stop \

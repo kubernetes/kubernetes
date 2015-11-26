@@ -58,8 +58,7 @@ KUBELET_START="start-stop-daemon \
 --quiet \
 --exec $KUBELET \
 --make-pidfile --pidfile $KUBELET_PIDFILE \
--- $KUBELET_OPTS \
->> $KUBELET_LOGFILE 2>&1"
+-- $KUBELET_OPTS"
 
 KUBELET_STOP="start-stop-daemon \
 --stop \

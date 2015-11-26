@@ -306,10 +306,7 @@ function kube-up() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
   # downloading tarball release
-  if [[ -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
-    rm -rf "${KUBE_ROOT}/cluster/ubuntu/binaries"
-  fi
-  "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
+  [[ -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]] || "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
 
   setClusterInfo
   local ii=0
@@ -508,6 +505,12 @@ function provision-masterandnode() {
       cp ~/kube/minion/* /opt/bin/
 
       service etcd start
+      service kube-apiserver start
+      service kube-controller-manager start
+      service kube-scheduler start
+      service flanneld start
+      service kubelet start
+      service kube-proxy start
       FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh ai
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
