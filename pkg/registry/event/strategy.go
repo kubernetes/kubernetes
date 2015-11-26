@@ -95,6 +95,7 @@ func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, e
 		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
 		"reason":                         event.Reason,
 		"source":                         event.Source.Component,
+		"type":                           event.Type,
 	}
 	return l, generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet), nil
 }
