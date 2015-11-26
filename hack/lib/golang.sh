@@ -50,6 +50,7 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 # The server platform we are building on.
 readonly KUBE_SERVER_PLATFORMS=(
   linux/amd64
+  linux/arm
 )
 
 # The set of client targets that we are building for all platforms
