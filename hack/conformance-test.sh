@@ -70,7 +70,7 @@ echo -n "Conformance test SHA:"
 HEAD_SHA=$(git rev-parse HEAD)
 echo $HEAD_SHA
 echo "Conformance test version tag(s):"
-git show-ref | grep $HEAD_SHA | grep refs/tags
+git tag --points-at $HEAD_SHA
 echo
 echo "Conformance test checking conformance with Kubernetes version 1.0"
 
