@@ -839,6 +839,7 @@ func TestValidateJob(t *testing.T) {
 		}
 	}
 	negative := -1
+	negative64 := int64(-1)
 	errorCases := map[string]extensions.Job{
 		"spec.parallelism:must be non-negative": {
 			ObjectMeta: api.ObjectMeta{
@@ -860,6 +861,17 @@ func TestValidateJob(t *testing.T) {
 				Completions: &negative,
 				Selector:    validSelector,
 				Template:    validPodTemplateSpec,
+			},
+		},
+		"spec.activeDeadlineSeconds:must be non-negative": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.JobSpec{
+				ActiveDeadlineSeconds: &negative64,
+				Selector:              validSelector,
+				Template:              validPodTemplateSpec,
 			},
 		},
 		"spec.selector:required value": {

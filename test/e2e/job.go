@@ -182,6 +182,19 @@ var _ = Describe("Job", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
+
+	It("should fail a job", func() {
+		By("Creating a job")
+		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
+		activeDeadlineSeconds := int64(10)
+		job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+		job, err := createJob(f.Client, f.Namespace.Name, job)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring job was failed")
+		err = waitForJobFail(f.Client, f.Namespace.Name, job.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
 
 // newTestJob returns a job which does one of several testing behaviors.
@@ -281,5 +294,21 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int) err
 			return false, err
 		}
 		return curr.Status.Succeeded == completions, nil
+	})
+}
+
+// Wait for job fail.
+func waitForJobFail(c *client.Client, ns, jobName string) error {
+	return wait.Poll(poll, jobTimeout, func() (bool, error) {
+		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		if err != nil {
+			return false, err
+		}
+		for _, c := range curr.Status.Conditions {
+			if c.Type == extensions.JobFailed && c.Status == api.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }
