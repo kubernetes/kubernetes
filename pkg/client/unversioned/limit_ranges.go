@@ -38,7 +38,7 @@ type LimitRangeInterface interface {
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // limitRanges implements LimitRangesNamespacer interface
@@ -93,13 +93,11 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *limitRanges) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *limitRanges) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("limitRanges").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }

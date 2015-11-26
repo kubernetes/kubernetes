@@ -208,6 +208,6 @@ func TestLimitRangeWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	_, err := c.Setup(t).LimitRanges(api.NamespaceAll).Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)
 }

@@ -305,9 +305,11 @@ var _ = Describe("Pods", func() {
 			Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
-		w, err := podClient.Watch(
-			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(),
-			unversioned.ListOptions{ResourceVersion: pods.ListMeta.ResourceVersion})
+		options := unversioned.ListOptions{
+			LabelSelector:   unversioned.LabelSelector{labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))},
+			ResourceVersion: pods.ListMeta.ResourceVersion,
+		}
+		w, err := podClient.Watch(options)
 		if err != nil {
 			Failf("Failed to set up watch: %v", err)
 		}

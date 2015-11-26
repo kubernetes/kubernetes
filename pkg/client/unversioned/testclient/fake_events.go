@@ -112,10 +112,10 @@ func (c *FakeEvents) Delete(name string) error {
 }
 
 // Watch starts watching for events matching the given selectors.
-func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	action := NewRootWatchAction("events", label, field, opts)
+func (c *FakeEvents) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	action := NewRootWatchAction("events", opts)
 	if c.Namespace != "" {
-		action = NewWatchAction("events", c.Namespace, label, field, opts)
+		action = NewWatchAction("events", c.Namespace, opts)
 	}
 	return c.Fake.InvokesWatch(action)
 }

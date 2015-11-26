@@ -150,21 +150,37 @@ func NewDeleteAction(resource, namespace, name string) DeleteActionImpl {
 	return action
 }
 
-func NewRootWatchAction(resource string, label labels.Selector, field fields.Selector, opts unversioned.ListOptions) WatchActionImpl {
+func NewRootWatchAction(resource string, opts unversioned.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
-	action.WatchRestrictions = WatchRestrictions{label, field, opts.ResourceVersion}
+	labelSelector := opts.LabelSelector.Selector
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	fieldSelector := opts.FieldSelector.Selector
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, opts.ResourceVersion}
 
 	return action
 }
 
-func NewWatchAction(resource, namespace string, label labels.Selector, field fields.Selector, opts unversioned.ListOptions) WatchActionImpl {
+func NewWatchAction(resource, namespace string, opts unversioned.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
-	action.WatchRestrictions = WatchRestrictions{label, field, opts.ResourceVersion}
+	labelSelector := opts.LabelSelector.Selector
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	fieldSelector := opts.FieldSelector.Selector
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, opts.ResourceVersion}
 
 	return action
 }

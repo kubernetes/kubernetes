@@ -38,7 +38,7 @@ type DeploymentInterface interface {
 	Create(*extensions.Deployment) (*extensions.Deployment, error)
 	Update(*extensions.Deployment) (*extensions.Deployment, error)
 	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // deployments implements DeploymentInterface
@@ -102,13 +102,11 @@ func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *e
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *deployments) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }
