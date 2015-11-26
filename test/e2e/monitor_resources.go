@@ -31,17 +31,17 @@ const datapointAmount = 5
 
 var systemContainers = []string{"/docker-daemon", "/kubelet", "/system"}
 
-//TODO tweak those values.
 var allowedUsage = resourceUsagePerContainer{
 	"/docker-daemon": &containerResourceUsage{
 		CPUUsageInCores:         0.08,
 		MemoryUsageInBytes:      4500000000,
 		MemoryWorkingSetInBytes: 1500000000,
 	},
+	// TODO: Make Kubelet constraints sane again when #17774 is fixed.
 	"/kubelet": &containerResourceUsage{
 		CPUUsageInCores:         0.1,
-		MemoryUsageInBytes:      150000000,
-		MemoryWorkingSetInBytes: 150000000,
+		MemoryUsageInBytes:      1000000000,
+		MemoryWorkingSetInBytes: 250000000,
 	},
 	"/system": &containerResourceUsage{
 		CPUUsageInCores:         0.03,
@@ -95,7 +95,7 @@ var _ = Describe("Resource usage of system containers", func() {
 
 		for i := 0; i < datapointAmount; i++ {
 			for _, node := range nodeList.Items {
-				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 5*time.Second, func() []string {
+				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 15*time.Second, func() []string {
 					if providerIs("gce", "gke") {
 						return systemContainers
 					} else {
