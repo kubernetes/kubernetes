@@ -57,6 +57,10 @@ func addKnownTypes() {
 		&Ingress{},
 		&IngressList{},
 	)
+
+	// Register Unversioned types
+	// TODO this should not be done here
+	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
 }
 
 func (*ClusterAutoscaler) IsAnAPIObject()           {}
