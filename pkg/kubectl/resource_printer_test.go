@@ -1262,3 +1262,32 @@ func TestPrintDeployment(t *testing.T) {
 		buf.Reset()
 	}
 }
+
+func TestPrintDedicated(t *testing.T) {
+	tests := []struct {
+		dedicatedMachine extensions.DedicatedMachine
+		expect           string
+	}{
+		{
+			extensions.DedicatedMachine{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test1",
+					Namespace: "testnamespace",
+				},
+				Spec: extensions.DedicatedMachineSpec{
+					LabelValue: "foo",
+				},
+			},
+			"test1\ttestnamespace\tfoo\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printDedicatedMachine(&test.dedicatedMachine, buf, false, false, true, []string{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
