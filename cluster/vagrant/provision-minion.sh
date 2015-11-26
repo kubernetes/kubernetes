@@ -144,7 +144,6 @@ EOF
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   cloud: vagrant
-  network_mode: openvswitch
   node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: '$(echo "$NETWORK_IF_NAME" | sed -e "s/'/''/g")'
