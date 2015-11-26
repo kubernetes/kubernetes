@@ -31,4 +31,19 @@ TEST_ARGS="$@"
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
-"${KUBE_ROOT}/contrib/mesos/ci/run-with-cluster.sh" KUBECONFIG=~/.kube/config hack/conformance-test.sh ${TEST_ARGS}
+if [ -n "${CONFORMANCE_BRANCH}" ]; then
+	# checkout CONFORMANCE_BRANCH, but leave the contrib/mesos/ci directory
+	# untouched.
+	TEST_CMD="
+git fetch https://github.com/kubernetes/kubernetes ${CONFORMANCE_BRANCH} &&
+git checkout FETCH_HEAD -- . ':(exclude)contrib/mesos/ci/**' &&
+git reset FETCH_HEAD &&
+git clean -d -f -- . ':(exclude)contrib/mesos/ci/**' &&
+git status &&
+make all &&
+"
+else
+	TEST_CMD=""
+fi
+TEST_CMD+="KUBECONFIG=~/.kube/config hack/conformance-test.sh"
+"${KUBE_ROOT}/contrib/mesos/ci/run-with-cluster.sh" ${TEST_CMD} ${TEST_ARGS}
