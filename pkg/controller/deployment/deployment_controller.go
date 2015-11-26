@@ -120,7 +120,10 @@ func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment exten
 		// Update DeploymentStatus
 		return d.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
-	// TODO: raise an event, neither scaled up nor down.
+	// raise an event if neither scaled up nor down.
+	if !scaledUp && !scaledDown {
+		d.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingRC", "Scaling not required")
+	}
 	return nil
 }
 
