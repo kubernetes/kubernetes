@@ -91,7 +91,7 @@ func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, e
 		"involvedObject.name":            event.InvolvedObject.Name,
 		"involvedObject.uid":             string(event.InvolvedObject.UID),
 		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
-		"involvedObject.resourceVersion": fmt.Sprintf("%s", event.InvolvedObject.ResourceVersion),
+		"involvedObject.resourceVersion": event.InvolvedObject.ResourceVersion,
 		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
 		"reason":                         event.Reason,
 		"source":                         event.Source.Component,
