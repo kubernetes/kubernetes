@@ -103,6 +103,7 @@ framework-name
 framework-weburi
 func-dest
 fuzz-iters
+gather-logs-sizes
 gather-resource-usage
 gce-project
 gce-service-account

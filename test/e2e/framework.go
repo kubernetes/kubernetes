@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -42,6 +43,10 @@ type Framework struct {
 	NamespaceDeletionTimeout time.Duration
 
 	gatherer containerResourceGatherer
+
+	logsSizeWaitGroup    sync.WaitGroup
+	logsSizeCloseChannel chan bool
+	logsSizeVerifier     *LogsSizeVerifier
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -81,6 +86,17 @@ func (f *Framework) beforeEach() {
 
 	if testContext.GatherKubeSystemResourceUsageData {
 		f.gatherer.startGatheringData(c, time.Minute)
+	}
+
+	if testContext.GatherLogsSizes {
+		f.logsSizeWaitGroup = sync.WaitGroup{}
+		f.logsSizeWaitGroup.Add(1)
+		f.logsSizeCloseChannel = make(chan bool)
+		f.logsSizeVerifier = NewLogsVerifier(c, f.logsSizeCloseChannel)
+		go func() {
+			f.logsSizeVerifier.Run()
+			f.logsSizeWaitGroup.Done()
+		}()
 	}
 }
 
@@ -125,6 +141,11 @@ func (f *Framework) afterEach() {
 
 	if testContext.GatherKubeSystemResourceUsageData {
 		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100})
+	}
+
+	if testContext.GatherLogsSizes {
+		close(f.logsSizeCloseChannel)
+		f.logsSizeWaitGroup.Wait()
 	}
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
