@@ -18,7 +18,7 @@
 # supports key features for Kubernetes version 1.0.
 
 # Instructions:
-#  - Setup a Kubernetes cluster with $NUM_MINIONS nodes (defined below).
+#  - Setup a Kubernetes cluster with $NUM_NODES nodes (defined below).
 #  - Provide a Kubeconfig file whose current context is set to the
 #    cluster to be tested, and with suitable auth setting.
 #  - Specify the location of that kubeconfig with, e.g.:
@@ -78,10 +78,10 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 # somewhere in the description (i.e. either in the Describe part or the It part).
 # The list of tagged conformance tests can be retrieved by:
 #
-# NUM_MINIONS=4 KUBERNETES_CONFORMANCE_TEST="y" \
+# NUM_NODES=4 KUBERNETES_CONFORMANCE_TEST="y" \
 # hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]' -ginkgo.dryRun=true
 
 declare -x KUBERNETES_CONFORMANCE_TEST="y"
-declare -x NUM_MINIONS=4
+declare -x NUM_NODES=4
 hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]' -ginkgo.skip='\[Skipped\]'
 exit $?

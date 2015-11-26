@@ -32,7 +32,7 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 detect-project &> /dev/null
 
 echo "kube-dump.sh: Getting docker statuses on all nodes..."
-ALL_NODES=(${MINION_NAMES[*]} ${MASTER_NAME})
+ALL_NODES=(${NODE_NAMES[*]} ${MASTER_NAME})
 for NODE in ${ALL_NODES[*]}; do 
   echo "kube-dump.sh: Node $NODE:"
   ssh-to-node "${NODE}" '

@@ -68,9 +68,9 @@ fi
 
 
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
-for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-  minion=${MINION_NAMES[$i]}
-  ip=${MINION_IPS[$i]}
+for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+  minion=${NODE_NAMES[$i]}
+  ip=${NODE_IPS[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts

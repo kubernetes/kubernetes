@@ -16,10 +16,10 @@
 
 ## Contains configuration values for interacting with the mesos/docker cluster
 
-NUM_MINIONS=${NUM_MINIONS:-2}
+NUM_NODES=${NUM_NODES:-2}
 INSTANCE_PREFIX="${INSTANCE_PREFIX:-kubernetes}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_NODES}}))
 
 SERVICE_CLUSTER_IP_RANGE=10.10.10.0/24
 

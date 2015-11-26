@@ -57,7 +57,7 @@ At the end of the example, we will have:
 
 ## Prerequisites
 
-You should already have turned up a Kubernetes cluster. To get the most of this example, ensure that Kubernetes will create more than one node (e.g. by setting your `NUM_MINIONS` environment variable to 2 or more).
+You should already have turned up a Kubernetes cluster. To get the most of this example, ensure that Kubernetes will create more than one node (e.g. by setting your `NUM_NODES` environment variable to 2 or more).
 
 
 ## Step 1: Start the RabbitMQ service
