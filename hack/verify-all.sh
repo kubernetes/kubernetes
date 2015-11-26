@@ -59,7 +59,8 @@ if $SILENT ; then
   echo "Running in the silent mode, run with -v if you want to see script logs."
 fi
 
-EXCLUDE="verify-godeps.sh"
+# remove protobuf until it is part of direct generation
+EXCLUDE="verify-godeps.sh verify-generated-protobuf.sh"
 
 ret=0
 for t in `ls $KUBE_ROOT/hack/verify-*.sh`
