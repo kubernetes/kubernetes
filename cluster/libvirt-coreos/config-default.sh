@@ -17,8 +17,8 @@
 ## Contains configuration values for interacting with the libvirt CoreOS cluster
 
 # Number of minions in the cluster
-NUM_MINIONS=${NUM_MINIONS:-3}
-export NUM_MINIONS
+NUM_NODES=${NUM_NODES:-3}
+export NUM_NODES
 
 # The IP of the master
 export MASTER_IP="192.168.10.1"
@@ -33,18 +33,18 @@ MASTER_CONTAINER_NETMASK="255.255.255.0"
 MASTER_CONTAINER_ADDR="${NODE_CONTAINER_SUBNET_BASE}.0.1"
 MASTER_CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.1/24"
 CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.0/16"
-if [[ "$NUM_MINIONS" -gt 253 ]]; then
+if [[ "$NUM_NODES" -gt 253 ]]; then
   echo "ERROR: Because of how IPs are allocated in ${BASH_SOURCE}, you cannot create more than 253 nodes"
   exit 1
 fi
-for ((i=0; i < NUM_MINIONS; i++)) do
+for ((i=0; i < NUM_NODES; i++)) do
   NODE_IPS[$i]="${NODE_IP_BASE}$((i+2))"
   NODE_NAMES[$i]="${INSTANCE_PREFIX}-node-$((i+1))"
   NODE_CONTAINER_SUBNETS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"
   NODE_CONTAINER_ADDRS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1"
   NODE_CONTAINER_NETMASKS[$i]="255.255.255.0"
 done
-NODE_CONTAINER_SUBNETS[$NUM_MINIONS]=$MASTER_CONTAINER_SUBNET
+NODE_CONTAINER_SUBNETS[$NUM_NODES]=$MASTER_CONTAINER_SUBNET
 
 SERVICE_CLUSTER_IP_RANGE=10.11.0.0/16  # formerly PORTAL_NET
 

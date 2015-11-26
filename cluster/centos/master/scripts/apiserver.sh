@@ -38,7 +38,7 @@ KUBE_API_ADDRESS="--address=${MASTER_ADDRESS}"
 KUBE_API_PORT="--port=8080"
 
 # --kubelet-port=10250: Kubelet port
-MINION_PORT="--kubelet-port=10250"
+NODE_PORT="--kubelet-port=10250"
 
 # --allow-privileged=false: If true, allow privileged containers.
 KUBE_ALLOW_PRIV="--allow-privileged=false"
@@ -75,7 +75,7 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
                         \${KUBE_ETCD_SERVERS}        \\
                         \${KUBE_API_ADDRESS}         \\
                         \${KUBE_API_PORT}            \\
-                        \${MINION_PORT}              \\
+                        \${NODE_PORT}              \\
                         \${KUBE_ALLOW_PRIV}          \\
                         \${KUBE_SERVICE_ADDRESSES}   \\
                         \${KUBE_ADMISSION_CONTROL}   \\

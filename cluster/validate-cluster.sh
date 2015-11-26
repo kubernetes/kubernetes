@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-EXPECTED_NUM_NODES="${NUM_MINIONS}"
+EXPECTED_NUM_NODES="${NUM_NODES}"
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+1))
 fi

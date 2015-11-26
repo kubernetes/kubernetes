@@ -214,13 +214,13 @@ function upload-server-tars() {
 # Assumed vars:
 #   NODE_INSTANCE_PREFIX
 # Vars set:
-#   MINION_NAMES
+#   NODE_NAMES
 function detect-minion-names {
   detect-project
-  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+  NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
     "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
     --format=yaml | grep instance: | cut -d ' ' -f 2))
-  echo "MINION_NAMES=${MINION_NAMES[*]}" >&2
+  echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
 }
 
 # Detect the information about the minions
@@ -228,24 +228,24 @@ function detect-minion-names {
 # Assumed vars:
 #   ZONE
 # Vars set:
-#   MINION_NAMES
-#   KUBE_MINION_IP_ADDRESSES (array)
+#   NODE_NAMES
+#   KUBE_NODE_IP_ADDRESSES (array)
 function detect-minions () {
   detect-project
   detect-minion-names
-  KUBE_MINION_IP_ADDRESSES=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  KUBE_NODE_IP_ADDRESSES=()
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-      "${MINION_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
+      "${NODE_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
     if [[ -z "${minion_ip-}" ]] ; then
-      echo "Did not find ${MINION_NAMES[$i]}" >&2
+      echo "Did not find ${NODE_NAMES[$i]}" >&2
     else
-      echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-      KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+      echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
+      KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
     fi
   done
-  if [[ -z "${KUBE_MINION_IP_ADDRESSES-}" ]]; then
+  if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
@@ -370,19 +370,19 @@ function create-node-template {
 
   local attempt=1
   local preemptible_minions=""
-  if [[ "${PREEMPTIBLE_MINION}" == "true" ]]; then
+  if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
   fi
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
     if ! gcloud compute instance-templates create "$template_name" \
       --project "${PROJECT}" \
-      --machine-type "${MINION_SIZE}" \
-      --boot-disk-type "${MINION_DISK_TYPE}" \
-      --boot-disk-size "${MINION_DISK_SIZE}" \
-      --image-project="${MINION_IMAGE_PROJECT}" \
-      --image "${MINION_IMAGE}" \
-      --tags "${MINION_TAG}" \
+      --machine-type "${NODE_SIZE}" \
+      --boot-disk-type "${NODE_DISK_TYPE}" \
+      --boot-disk-size "${NODE_DISK_SIZE}" \
+      --image-project="${NODE_IMAGE_PROJECT}" \
+      --image "${NODE_IMAGE}" \
+      --tags "${NODE_TAG}" \
       --network "${NETWORK}" \
       ${preemptible_minions} \
       $2 \
@@ -649,7 +649,7 @@ function kube-up {
   create-master-instance "${MASTER_RESERVED_IP}" &
 
   # Create a single firewall rule for all minions.
-  create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
+  create-firewall-rule "${NODE_TAG}-all" "${CLUSTER_IP_RANGE}" "${NODE_TAG}" &
 
   # Report logging choice (if any).
   if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
@@ -663,8 +663,8 @@ function kube-up {
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
-  if [ -n "${MINION_SCOPES}" ]; then
-    scope_flags="--scopes ${MINION_SCOPES}"
+  if [ -n "${NODE_SCOPES}" ]; then
+    scope_flags="--scopes ${NODE_SCOPES}"
   else
     scope_flags="--no-scopes"
   fi
@@ -680,7 +680,7 @@ function kube-up {
       --project "${PROJECT}" \
       --zone "${ZONE}" \
       --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-      --size "${NUM_MINIONS}" \
+      --size "${NUM_NODES}" \
       --template "$template_name" || true;
   gcloud compute instance-groups managed wait-until-stable \
       "${NODE_INSTANCE_PREFIX}-group" \
@@ -877,11 +877,11 @@ function kube-down {
   fi
 
   # Delete firewall rule for minions.
-  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
-      "${MINION_TAG}-all"
+      "${NODE_TAG}-all"
   fi
 
   # Delete routes.
@@ -989,7 +989,7 @@ function check-resources {
     return 1
   fi
 
-  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-all"
     return 1
   fi
@@ -1040,8 +1040,8 @@ function prepare-push() {
 
     # TODO(zmerlynn): Refactor setting scope flags.
     local scope_flags=
-    if [ -n "${MINION_SCOPES}" ]; then
-      scope_flags="--scopes ${MINION_SCOPES}"
+    if [ -n "${NODE_SCOPES}" ]; then
+      scope_flags="--scopes ${NODE_SCOPES}"
     else
       scope_flags="--no-scopes"
     fi
@@ -1105,8 +1105,8 @@ function kube-push {
 
   push-master
 
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    push-node "${MINION_NAMES[$i]}" &
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    push-node "${NODE_NAMES[$i]}" &
   done
   wait-for-jobs
 
@@ -1153,34 +1153,34 @@ function test-setup {
   local start=`date +%s`
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}" \
+    --target-tags "${NODE_TAG}" \
     --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
+    "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
   do sleep 5
   done
   # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
+  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
   start=`date +%s`
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}" \
+    --target-tags "${NODE_TAG}" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --network "${NETWORK}" \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
+    "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  until gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
   do sleep 5
   done
   # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
+  gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
@@ -1191,11 +1191,11 @@ function test-teardown {
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
     --quiet \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true
+    "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" || true
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
     --quiet \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" || true
+    "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" || true
   "${KUBE_ROOT}/cluster/kube-down.sh"
 }
 
@@ -1333,7 +1333,7 @@ KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
 ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
-NUM_MINIONS: $(yaml-quote ${NUM_MINIONS})
+NUM_NODES: $(yaml-quote ${NUM_NODES})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF

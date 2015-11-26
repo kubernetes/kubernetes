@@ -14,4 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NUM_MINIONS=${NUM_MINIONS:-2}
+NUM_NODES=${NUM_NODES:-2}

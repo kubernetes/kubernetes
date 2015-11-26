@@ -14,22 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NUM_MINIONS=2
+NUM_NODES=2
 DISK=./kube/kube.vmdk
 GUEST_ID=debian7_64Guest
 
 INSTANCE_PREFIX="e2e-test-${USER}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
+NODE_TAG="${INSTANCE_PREFIX}-minion"
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_MEMORY_MB=1024
 MASTER_CPU=1
 
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
-MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
-MINION_MEMORY_MB=1024
-MINION_CPU=1
+NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_NODES}}))
+NODE_IP_RANGES=($(eval echo "10.244.{1..${NUM_NODES}}.0/24"))
+NODE_MEMORY_MB=1024
+NODE_CPU=1
 
 SERVICE_CLUSTER_IP_RANGE="10.244.240.0/20"  # formerly PORTAL_NET
 
