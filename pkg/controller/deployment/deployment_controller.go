@@ -219,6 +219,7 @@ func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControll
 		// Cannot scale down.
 		return false, nil
 	}
+	scaled := false
 	totalScaleDownCount := readyPodCount - minAvailable
 	for _, targetRC := range oldRCs {
 		if totalScaleDownCount == 0 {
@@ -236,9 +237,10 @@ func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControll
 		if err != nil {
 			return false, err
 		}
+		scaled = true
 		totalScaleDownCount -= scaleDownCount
 	}
-	return true, err
+	return scaled, err
 }
 
 func (d *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
