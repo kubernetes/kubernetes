@@ -311,6 +311,8 @@ func (*APIResourceList) IsAnAPIObject() {}
 
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type APIVersions struct {
 	TypeMeta `json:",inline"`
 	// versions are the api versions that are available.
