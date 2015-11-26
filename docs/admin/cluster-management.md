@@ -46,31 +46,15 @@ To install Kubernetes on a set of machines, consult one of the existing [Getting
 
 The current state of cluster upgrades is provider dependent.
 
-### Master Upgrades
+### Upgrading Google Compute Engine clusters
 
-Both Google Container Engine (GKE) and
-Compute Engine Open Source (GCE-OSS) support node upgrades via a [Managed Instance Group](https://cloud.google.com/compute/docs/instance-groups/).
-Managed Instance Group upgrades sequentially delete and recreate each virtual machine, while maintaining the same
-Persistent Disk (PD) to ensure that data is retained across the upgrade.
+Google Compute Engine Open Source (GCE-OSS) support master upgrades by deleting and
+recreating the master, while maintaining the same Persistent Disk (PD) to ensure that data is retained across the
+upgrade.
 
-In contrast, the `kube-push.sh` process used on [other platforms](#other-platforms) attempts to upgrade the binaries in
-places, without recreating the virtual machines.
-
-### Node Upgrades
-
-Node upgrades for GKE and GCE-OSS again use a Managed Instance Group, each node is sequentially destroyed and then recreated with new software.  Any Pods that are running
-on that node need to be controlled by a Replication Controller, or manually re-created after the roll out.
-
-For other platforms, `kube-push.sh` is again used, performing an in-place binary upgrade on existing machines.
-
-### Upgrading Google Container Engine (GKE)
-
-Google Container Engine automatically updates master components (e.g. `kube-apiserver`, `kube-scheduler`) to the latest
-version. It also handles upgrading the operating system and other components that the master runs on.
-
-The node upgrade process is user-initiated and is described in the [GKE documentation.](https://cloud.google.com/container-engine/docs/clusters/upgrade)
-
-### Upgrading open source Google Compute Engine clusters
+Node upgrades for GCE use a [Managed Instance Group](https://cloud.google.com/compute/docs/instance-groups/), each node
+is sequentially destroyed and then recreated with new software.  Any Pods that are running on that node need to be
+controlled by a Replication Controller, or manually re-created after the roll out.
 
 Upgrades on open source Google Compute Engine (GCE) clusters are controlled by the `cluster/gce/upgrade.sh` script.
 
@@ -88,7 +72,14 @@ Alternatively, to upgrade your entire cluster to the latest stable release:
 cluster/gce/upgrade.sh release/stable
 ```
 
-### Other platforms
+### Upgrading Google Container Engine (GKE) clusters
+
+Google Container Engine automatically updates master components (e.g. `kube-apiserver`, `kube-scheduler`) to the latest
+version. It also handles upgrading the operating system and other components that the master runs on.
+
+The node upgrade process is user-initiated and is described in the [GKE documentation.](https://cloud.google.com/container-engine/docs/clusters/upgrade)
+
+### Upgrading clusters on other platforms
 
 The `cluster/kube-push.sh` script will do a rudimentary update.  This process is still quite experimental, we
 recommend testing the upgrade on an experimental cluster before performing the update on a production cluster.
