@@ -79,8 +79,13 @@ done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
-# Configure the master network
-provision-network-master
+if [ "${NETWORK_PROVIDER}" = "calico" ]; then
+  echo "Using default networking for Calico on master"
+else
+  # Configure the default network
+  echo "Provisioning flannel network on master"
+  provision-network-master
+fi
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
@@ -99,7 +104,6 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
-  network_mode: openvswitch
   networkInterfaceName: '$(echo "$NETWORK_IF_NAME" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   cloud: vagrant
@@ -109,6 +113,7 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
   keep_host_etcd: true
+  cbr-cidr: '$(echo "$MASTER_CONTAINER_CIDR" | sed -e "s/'/''/g")'
 EOF
 
 mkdir -p /srv/salt-overlay/pillar
@@ -133,6 +138,7 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/'/''/g")'
   opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
   e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
+  kubelet_token: '$(echo "$KUBELET_TOKEN" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master

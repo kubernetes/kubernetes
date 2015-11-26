@@ -119,6 +119,8 @@
 {% set network_plugin = "" -%}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
   {% set network_plugin = "--network-plugin=opencontrail" %}
+{% elif pillar.get('network_provider', '').lower() == "calico" and 'kubernetes-pool' in grains.roles -%}
+  {% set network_plugin = " --network_plugin=calico" -%}
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
