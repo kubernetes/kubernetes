@@ -28,7 +28,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// TODO (random-liu) Cleanup the test soon
 func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
 	fakeDocker := new(FakeDockerClient)
 	gc := NewContainerGC(fakeDocker, "")
@@ -41,34 +40,28 @@ func makeTime(id int) time.Time {
 	return zero.Add(time.Duration(id) * time.Second)
 }
 
-// Makes an API object with the specified Docker ID and pod UID.
-func makeAPIContainer(uid, name, dockerID string) docker.APIContainers {
-	return docker.APIContainers{
-		Names: []string{fmt.Sprintf("/k8s_%s_bar_new_%s_42", name, uid)},
-		ID:    dockerID,
+// Makes a container with the specified properties.
+func makeContainer(id, uid, name string, running bool, created time.Time) *docker.Container {
+	return &docker.Container{
+		Name: fmt.Sprintf("/k8s_%s_bar_new_%s_42", name, uid),
+		State: docker.State{
+			Running: running,
+		},
+		ID:      id,
+		Created: created,
 	}
 }
 
-// Makes a function that adds to a map a detailed container with the specified properties.
-func makeContainerDetail(id string, running bool, created time.Time) func(map[string]*docker.Container) {
-	return func(m map[string]*docker.Container) {
-		m[id] = &docker.Container{
-			State: docker.State{
-				Running: running,
-			},
-			ID:      id,
-			Created: created,
-		}
+// Makes a container with unidentified name and specified properties.
+func makeUndefinedContainer(id string, running bool, created time.Time) *docker.Container {
+	return &docker.Container{
+		Name: "/k8s_unidentified",
+		State: docker.State{
+			Running: running,
+		},
+		ID:      id,
+		Created: created,
 	}
-}
-
-// Makes a detailed container map from the specified functions.
-func makeContainerDetailMap(funcs ...func(map[string]*docker.Container)) map[string]*docker.Container {
-	m := make(map[string]*docker.Container, len(funcs))
-	for _, f := range funcs {
-		f(m)
-	}
-	return m
 }
 
 func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
@@ -87,12 +80,9 @@ func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
 
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 	gc, fakeDocker := newTestContainerGC(t)
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeAPIContainer("foo", "POD", "1876"),
-	}
-	fakeDocker.ContainerMap = makeContainerDetailMap(
-		makeContainerDetail("1876", false, makeTime(0)),
-	)
+	fakeDocker.SetFakeContainers([]*docker.Container{
+		makeContainer("1876", "foo", "POD", false, makeTime(0)),
+	})
 
 	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, 1, 0}))
 	assert.Len(t, fakeDocker.Removed, 1)
@@ -100,20 +90,13 @@ func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 
 func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 	gc, fakeDocker := newTestContainerGC(t)
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeAPIContainer("foo", "POD", "1876"),
-		makeAPIContainer("foo1", "POD", "2876"),
-		makeAPIContainer("foo2", "POD", "3876"),
-		makeAPIContainer("foo3", "POD", "4876"),
-		makeAPIContainer("foo4", "POD", "5876"),
-	}
-	fakeDocker.ContainerMap = makeContainerDetailMap(
-		makeContainerDetail("1876", false, makeTime(0)),
-		makeContainerDetail("2876", false, makeTime(1)),
-		makeContainerDetail("3876", false, makeTime(2)),
-		makeContainerDetail("4876", false, makeTime(3)),
-		makeContainerDetail("5876", false, makeTime(4)),
-	)
+	fakeDocker.SetFakeContainers([]*docker.Container{
+		makeContainer("1876", "foo", "POD", false, makeTime(0)),
+		makeContainer("2876", "foo1", "POD", false, makeTime(1)),
+		makeContainer("3876", "foo2", "POD", false, makeTime(2)),
+		makeContainer("4876", "foo3", "POD", false, makeTime(3)),
+		makeContainer("5876", "foo4", "POD", false, makeTime(4)),
+	})
 
 	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, -1, 4}))
 	assert.Len(t, fakeDocker.Removed, 1)
@@ -121,20 +104,13 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 
 func TestGarbageCollectNoMaxLimit(t *testing.T) {
 	gc, fakeDocker := newTestContainerGC(t)
-	fakeDocker.ContainerList = []docker.APIContainers{
-		makeAPIContainer("foo", "POD", "1876"),
-		makeAPIContainer("foo1", "POD", "2876"),
-		makeAPIContainer("foo2", "POD", "3876"),
-		makeAPIContainer("foo3", "POD", "4876"),
-		makeAPIContainer("foo4", "POD", "5876"),
-	}
-	fakeDocker.ContainerMap = makeContainerDetailMap(
-		makeContainerDetail("1876", false, makeTime(0)),
-		makeContainerDetail("2876", false, makeTime(0)),
-		makeContainerDetail("3876", false, makeTime(0)),
-		makeContainerDetail("4876", false, makeTime(0)),
-		makeContainerDetail("5876", false, makeTime(0)),
-	)
+	fakeDocker.SetFakeContainers([]*docker.Container{
+		makeContainer("1876", "foo", "POD", false, makeTime(0)),
+		makeContainer("2876", "foo1", "POD", false, makeTime(0)),
+		makeContainer("3876", "foo2", "POD", false, makeTime(0)),
+		makeContainer("4876", "foo3", "POD", false, makeTime(0)),
+		makeContainer("5876", "foo4", "POD", false, makeTime(0)),
+	})
 
 	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, 1, -1}))
 	assert.Len(t, fakeDocker.Removed, 0)
@@ -142,172 +118,103 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 
 func TestGarbageCollect(t *testing.T) {
 	tests := []struct {
-		containers       []docker.APIContainers
-		containerDetails map[string]*docker.Container
-		expectedRemoved  []string
+		containers      []*docker.Container
+		expectedRemoved []string
 	}{
 		// Don't remove containers started recently.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
-				makeAPIContainer("foo", "POD", "2876"),
-				makeAPIContainer("foo", "POD", "3876"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", false, time.Now()),
+				makeContainer("2876", "foo", "POD", false, time.Now()),
+				makeContainer("3876", "foo", "POD", false, time.Now()),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", false, time.Now()),
-				makeContainerDetail("2876", false, time.Now()),
-				makeContainerDetail("3876", false, time.Now()),
-			),
 		},
 		// Remove oldest containers.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
-				makeAPIContainer("foo", "POD", "2876"),
-				makeAPIContainer("foo", "POD", "3876"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", false, makeTime(0)),
+				makeContainer("2876", "foo", "POD", false, makeTime(1)),
+				makeContainer("3876", "foo", "POD", false, makeTime(2)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", false, makeTime(0)),
-				makeContainerDetail("2876", false, makeTime(1)),
-				makeContainerDetail("3876", false, makeTime(2)),
-			),
 			expectedRemoved: []string{"1876"},
 		},
 		// Only remove non-running containers.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
-				makeAPIContainer("foo", "POD", "2876"),
-				makeAPIContainer("foo", "POD", "3876"),
-				makeAPIContainer("foo", "POD", "4876"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", true, makeTime(0)),
+				makeContainer("2876", "foo", "POD", false, makeTime(1)),
+				makeContainer("3876", "foo", "POD", false, makeTime(2)),
+				makeContainer("4876", "foo", "POD", false, makeTime(3)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", true, makeTime(0)),
-				makeContainerDetail("2876", false, makeTime(1)),
-				makeContainerDetail("3876", false, makeTime(2)),
-				makeContainerDetail("4876", false, makeTime(3)),
-			),
 			expectedRemoved: []string{"2876"},
 		},
 		// Less than maxContainerCount doesn't delete any.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", false, makeTime(0)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", false, makeTime(0)),
-			),
 		},
 		// maxContainerCount applies per (UID,container) pair.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
-				makeAPIContainer("foo", "POD", "2876"),
-				makeAPIContainer("foo", "POD", "3876"),
-				makeAPIContainer("foo", "bar", "1076"),
-				makeAPIContainer("foo", "bar", "2076"),
-				makeAPIContainer("foo", "bar", "3076"),
-				makeAPIContainer("foo2", "POD", "1176"),
-				makeAPIContainer("foo2", "POD", "2176"),
-				makeAPIContainer("foo2", "POD", "3176"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", false, makeTime(0)),
+				makeContainer("2876", "foo", "POD", false, makeTime(1)),
+				makeContainer("3876", "foo", "POD", false, makeTime(2)),
+				makeContainer("1076", "foo", "bar", false, makeTime(0)),
+				makeContainer("2076", "foo", "bar", false, makeTime(1)),
+				makeContainer("3076", "foo", "bar", false, makeTime(2)),
+				makeContainer("1176", "foo2", "POD", false, makeTime(0)),
+				makeContainer("2176", "foo2", "POD", false, makeTime(1)),
+				makeContainer("3176", "foo2", "POD", false, makeTime(2)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", false, makeTime(0)),
-				makeContainerDetail("2876", false, makeTime(1)),
-				makeContainerDetail("3876", false, makeTime(2)),
-				makeContainerDetail("1076", false, makeTime(0)),
-				makeContainerDetail("2076", false, makeTime(1)),
-				makeContainerDetail("3076", false, makeTime(2)),
-				makeContainerDetail("1176", false, makeTime(0)),
-				makeContainerDetail("2176", false, makeTime(1)),
-				makeContainerDetail("3176", false, makeTime(2)),
-			),
 			expectedRemoved: []string{"1076", "1176", "1876"},
 		},
 		// Remove non-running unidentified Kubernetes containers.
 		{
-			containers: []docker.APIContainers{
-				{
-					// Unidentified Kubernetes container.
-					Names: []string{"/k8s_unidentified"},
-					ID:    "1876",
-				},
-				{
-					// Unidentified (non-running) Kubernetes container.
-					Names: []string{"/k8s_unidentified"},
-					ID:    "2876",
-				},
-				makeAPIContainer("foo", "POD", "3876"),
+			containers: []*docker.Container{
+				makeUndefinedContainer("1876", true, makeTime(0)),
+				makeUndefinedContainer("2876", false, makeTime(0)),
+				makeContainer("3876", "foo", "POD", false, makeTime(0)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", true, makeTime(0)),
-				makeContainerDetail("2876", false, makeTime(0)),
-				makeContainerDetail("3876", false, makeTime(0)),
-			),
 			expectedRemoved: []string{"2876"},
 		},
 		// Max limit applied and tries to keep from every pod.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
-				makeAPIContainer("foo", "POD", "2876"),
-				makeAPIContainer("foo1", "POD", "3876"),
-				makeAPIContainer("foo1", "POD", "4876"),
-				makeAPIContainer("foo2", "POD", "5876"),
-				makeAPIContainer("foo2", "POD", "6876"),
-				makeAPIContainer("foo3", "POD", "7876"),
-				makeAPIContainer("foo3", "POD", "8876"),
-				makeAPIContainer("foo4", "POD", "9876"),
-				makeAPIContainer("foo4", "POD", "10876"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", false, makeTime(0)),
+				makeContainer("2876", "foo", "POD", false, makeTime(1)),
+				makeContainer("3876", "foo1", "POD", false, makeTime(0)),
+				makeContainer("4876", "foo1", "POD", false, makeTime(1)),
+				makeContainer("5876", "foo2", "POD", false, makeTime(0)),
+				makeContainer("6876", "foo2", "POD", false, makeTime(1)),
+				makeContainer("7876", "foo3", "POD", false, makeTime(0)),
+				makeContainer("8876", "foo3", "POD", false, makeTime(1)),
+				makeContainer("9876", "foo4", "POD", false, makeTime(0)),
+				makeContainer("10876", "foo4", "POD", false, makeTime(1)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", false, makeTime(0)),
-				makeContainerDetail("2876", false, makeTime(1)),
-				makeContainerDetail("3876", false, makeTime(0)),
-				makeContainerDetail("4876", false, makeTime(1)),
-				makeContainerDetail("5876", false, makeTime(0)),
-				makeContainerDetail("6876", false, makeTime(1)),
-				makeContainerDetail("7876", false, makeTime(0)),
-				makeContainerDetail("8876", false, makeTime(1)),
-				makeContainerDetail("9876", false, makeTime(0)),
-				makeContainerDetail("10876", false, makeTime(1)),
-			),
 			expectedRemoved: []string{"1876", "3876", "5876", "7876", "9876"},
 		},
 		// If more pods than limit allows, evicts oldest pod.
 		{
-			containers: []docker.APIContainers{
-				makeAPIContainer("foo", "POD", "1876"),
-				makeAPIContainer("foo", "POD", "2876"),
-				makeAPIContainer("foo1", "POD", "3876"),
-				makeAPIContainer("foo1", "POD", "4876"),
-				makeAPIContainer("foo2", "POD", "5876"),
-				makeAPIContainer("foo3", "POD", "6876"),
-				makeAPIContainer("foo4", "POD", "7876"),
-				makeAPIContainer("foo5", "POD", "8876"),
-				makeAPIContainer("foo6", "POD", "9876"),
-				makeAPIContainer("foo7", "POD", "10876"),
+			containers: []*docker.Container{
+				makeContainer("1876", "foo", "POD", false, makeTime(1)),
+				makeContainer("2876", "foo", "POD", false, makeTime(2)),
+				makeContainer("3876", "foo1", "POD", false, makeTime(1)),
+				makeContainer("4876", "foo1", "POD", false, makeTime(2)),
+				makeContainer("5876", "foo2", "POD", false, makeTime(0)),
+				makeContainer("6876", "foo3", "POD", false, makeTime(1)),
+				makeContainer("7876", "foo4", "POD", false, makeTime(0)),
+				makeContainer("8876", "foo5", "POD", false, makeTime(1)),
+				makeContainer("9876", "foo6", "POD", false, makeTime(2)),
+				makeContainer("10876", "foo7", "POD", false, makeTime(1)),
 			},
-			containerDetails: makeContainerDetailMap(
-				makeContainerDetail("1876", false, makeTime(1)),
-				makeContainerDetail("2876", false, makeTime(2)),
-				makeContainerDetail("3876", false, makeTime(1)),
-				makeContainerDetail("4876", false, makeTime(2)),
-				makeContainerDetail("5876", false, makeTime(0)),
-				makeContainerDetail("6876", false, makeTime(1)),
-				makeContainerDetail("7876", false, makeTime(0)),
-				makeContainerDetail("8876", false, makeTime(1)),
-				makeContainerDetail("9876", false, makeTime(2)),
-				makeContainerDetail("10876", false, makeTime(1)),
-			),
 			expectedRemoved: []string{"1876", "3876", "5876", "7876"},
 		},
 	}
 	for i, test := range tests {
 		t.Logf("Running test case with index %d", i)
 		gc, fakeDocker := newTestContainerGC(t)
-		fakeDocker.ContainerList = test.containers
-		fakeDocker.ContainerMap = test.containerDetails
+		fakeDocker.SetFakeContainers(test.containers)
 		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Hour, 2, 6}))
 		verifyStringArrayEqualsAnyOrder(t, fakeDocker.Removed, test.expectedRemoved)
 	}
