@@ -2111,7 +2111,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	// support.
 	keyfile := ""
 	switch provider {
-	case "gce", "gke":
+	case "gce", "gke", "kubemark":
 		keyfile = "google_compute_engine"
 	case "aws":
 		// If there is an env. variable override, use that.
