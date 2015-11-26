@@ -103,8 +103,7 @@ func (c *jobs) Watch(label labels.Selector, field fields.Selector, opts unversio
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

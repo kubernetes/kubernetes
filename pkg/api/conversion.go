@@ -32,8 +32,12 @@ var Codec = runtime.CodecFor(Scheme, "")
 func init() {
 	Scheme.AddDefaultingFuncs(
 		func(obj *unversioned.ListOptions) {
-			obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}
-			obj.FieldSelector = unversioned.FieldSelector{fields.Everything()}
+			if obj.LabelSelector.Selector == nil {
+				obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}
+			}
+			if obj.FieldSelector.Selector == nil {
+				obj.FieldSelector = unversioned.FieldSelector{fields.Everything()}
+			}
 		},
 		// TODO: see about moving this into v1/defaults.go
 		func(obj *PodExecOptions) {
@@ -133,6 +137,28 @@ func init() {
 				return nil
 			}
 			*out = in.Selector.String()
+			return nil
+		},
+		func(in *unversioned.LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
+			if in.Selector == nil {
+				return nil
+			}
+			selector, err := labels.Parse(in.Selector.String())
+			if err != nil {
+				return err
+			}
+			out.Selector = selector
+			return nil
+		},
+		func(in *unversioned.FieldSelector, out *unversioned.FieldSelector, s conversion.Scope) error {
+			if in.Selector == nil {
+				return nil
+			}
+			selector, err := fields.ParseSelector(in.Selector.String())
+			if err != nil {
+				return err
+			}
+			out.Selector = selector
 			return nil
 		},
 		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {

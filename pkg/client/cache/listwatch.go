@@ -19,6 +19,7 @@ package cache
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -60,9 +61,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 			Prefix("watch").
 			Namespace(namespace).
 			Resource(resource).
-			// TODO: Use VersionedParams once this is supported for non v1 API.
-			Param("resourceVersion", options.ResourceVersion).
-			TimeoutSeconds(timeoutFromListOptions(options)).
+			VersionedParams(&options, api.Scheme).
 			FieldsSelectorParam(fieldSelector).
 			Watch()
 	}
