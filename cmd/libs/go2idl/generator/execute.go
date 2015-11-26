@@ -44,17 +44,9 @@ func (c *Context) ExecutePackages(outDir string, packages Packages) error {
 	return nil
 }
 
-type file struct {
-	name        string
-	packageName string
-	header      []byte
-	imports     map[string]struct{}
-	vars        bytes.Buffer
-	consts      bytes.Buffer
-	body        bytes.Buffer
-}
+type golangFileType struct{}
 
-func (f *file) assembleToFile(pathname string) error {
+func (ft golangFileType) AssembleFile(f *File, pathname string) error {
 	log.Printf("Assembling file %q", pathname)
 	destFile, err := os.Create(pathname)
 	if err != nil {
@@ -64,7 +56,7 @@ func (f *file) assembleToFile(pathname string) error {
 
 	b := &bytes.Buffer{}
 	et := NewErrorTracker(b)
-	f.assemble(et)
+	ft.assemble(et, f)
 	if et.Error() != nil {
 		return et.Error()
 	}
@@ -78,14 +70,14 @@ func (f *file) assembleToFile(pathname string) error {
 	}
 }
 
-func (f *file) assemble(w io.Writer) {
-	w.Write(f.header)
-	fmt.Fprintf(w, "package %v\n\n", f.packageName)
+func (ft golangFileType) assemble(w io.Writer, f *File) {
+	w.Write(f.Header)
+	fmt.Fprintf(w, "package %v\n\n", f.PackageName)
 
-	if len(f.imports) > 0 {
+	if len(f.Imports) > 0 {
 		fmt.Fprint(w, "import (\n")
 		// TODO: sort imports like goimports does.
-		for i := range f.imports {
+		for i := range f.Imports {
 			if strings.Contains(i, "\"") {
 				// they included quotes, or are using the
 				// `name "path/to/pkg"` format.
@@ -97,27 +89,27 @@ func (f *file) assemble(w io.Writer) {
 		fmt.Fprint(w, ")\n\n")
 	}
 
-	if f.vars.Len() > 0 {
+	if f.Vars.Len() > 0 {
 		fmt.Fprint(w, "var (\n")
-		w.Write(f.vars.Bytes())
+		w.Write(f.Vars.Bytes())
 		fmt.Fprint(w, ")\n\n")
 	}
 
-	if f.consts.Len() > 0 {
+	if f.Consts.Len() > 0 {
 		fmt.Fprint(w, "const (\n")
-		w.Write(f.consts.Bytes())
+		w.Write(f.Consts.Bytes())
 		fmt.Fprint(w, ")\n\n")
 	}
 
-	w.Write(f.body.Bytes())
+	w.Write(f.Body.Bytes())
 }
 
 // format should be one line only, and not end with \n.
 func addIndentHeaderComment(b *bytes.Buffer, format string, args ...interface{}) {
 	if b.Len() > 0 {
-		fmt.Fprintf(b, "\n\t// "+format+"\n", args...)
+		fmt.Fprintf(b, "\n// "+format+"\n", args...)
 	} else {
-		fmt.Fprintf(b, "\t// "+format+"\n", args...)
+		fmt.Fprintf(b, "// "+format+"\n", args...)
 	}
 }
 
@@ -161,52 +153,66 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
 	os.MkdirAll(path, 0755)
-	files := map[string]*file{}
+	files := map[string]*File{}
 	for _, g := range p.Generators(packageContext) {
 		// Filter out types the *generator* doesn't care about.
 		genContext := packageContext.filteredBy(g.Filter)
 		// Now add any extra name systems defined by this generator
 		genContext = genContext.addNameSystems(g.Namers(genContext))
 
+		fileType := g.FileType()
+		if len(fileType) == 0 {
+			return fmt.Errorf("generator %q must specify a file type", g.Name())
+		}
 		f := files[g.Filename()]
 		if f == nil {
 			// This is the first generator to reference this file, so start it.
-			f = &file{
-				name:        g.Filename(),
-				packageName: p.Name(),
-				header:      p.Header(g.Filename()),
-				imports:     map[string]struct{}{},
+			f = &File{
+				Name:        g.Filename(),
+				FileType:    fileType,
+				PackageName: p.Name(),
+				Header:      p.Header(g.Filename()),
+				Imports:     map[string]struct{}{},
 			}
-			files[f.name] = f
+			files[f.Name] = f
+		} else {
+			if f.FileType != g.FileType() {
+				return fmt.Errorf("file %q already has type %q, but generator %q wants to use type %q", f.Name, f.FileType, g.Name(), g.FileType())
+			}
 		}
+
 		if vars := g.PackageVars(genContext); len(vars) > 0 {
-			addIndentHeaderComment(&f.vars, "Package-wide variables from generator %q.", g.Name())
+			addIndentHeaderComment(&f.Vars, "Package-wide variables from generator %q.", g.Name())
 			for _, v := range vars {
-				if _, err := fmt.Fprintf(&f.vars, "\t%s\n", v); err != nil {
+				if _, err := fmt.Fprintf(&f.Vars, "%s\n", v); err != nil {
 					return err
 				}
 			}
 		}
 		if consts := g.PackageVars(genContext); len(consts) > 0 {
-			addIndentHeaderComment(&f.consts, "Package-wide consts from generator %q.", g.Name())
+			addIndentHeaderComment(&f.Consts, "Package-wide consts from generator %q.", g.Name())
 			for _, v := range consts {
-				if _, err := fmt.Fprintf(&f.consts, "\t%s\n", v); err != nil {
+				if _, err := fmt.Fprintf(&f.Consts, "%s\n", v); err != nil {
 					return err
 				}
 			}
 		}
-		if err := genContext.executeBody(&f.body, g); err != nil {
+		if err := genContext.executeBody(&f.Body, g); err != nil {
 			return err
 		}
 		if imports := g.Imports(genContext); len(imports) > 0 {
 			for _, i := range imports {
-				f.imports[i] = struct{}{}
+				f.Imports[i] = struct{}{}
 			}
 		}
 	}
 
 	for _, f := range files {
-		if err := f.assembleToFile(filepath.Join(path, f.name)); err != nil {
+		assembler, ok := c.FileTypes[f.FileType]
+		if !ok {
+			return fmt.Errorf("the file type %q registered for file %q does not exist in the context", f.FileType, f.Name)
+		}
+		if err := assembler.AssembleFile(f, filepath.Join(path, f.Name)); err != nil {
 			return err
 		}
 	}

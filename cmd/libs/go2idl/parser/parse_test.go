@@ -175,7 +175,7 @@ type Blah struct {
 
 	_, u, o := construct(t, structTest, namer.NewPublicNamer(0))
 	t.Logf("%#v", o)
-	blahT := u.Get(types.Name{"base/foo/proto", "Blah"})
+	blahT := u.Get(types.Name{Package: "base/foo/proto", Name: "Blah"})
 	if blahT == nil {
 		t.Fatal("type not found")
 	}
@@ -344,11 +344,11 @@ type Interface interface{Method(a, b string) (c, d string)}
 		}
 
 		// Also do some one-off checks
-		gtest := u.Get(types.Name{"g", "Test"})
+		gtest := u.Get(types.Name{Package: "g", Name: "Test"})
 		if e, a := 1, len(gtest.Methods); e != a {
 			t.Errorf("expected %v but found %v methods: %#v", e, a, gtest)
 		}
-		iface := u.Get(types.Name{"g", "Interface"})
+		iface := u.Get(types.Name{Package: "g", Name: "Interface"})
 		if e, a := 1, len(iface.Methods); e != a {
 			t.Errorf("expected %v but found %v methods: %#v", e, a, iface)
 		}

@@ -54,11 +54,11 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"type":             t,
 		"package":          pkg,
 		"Package":          namer.IC(pkg),
-		"fieldSelector":    c.Universe.Get(types.Name{"k8s.io/kubernetes/pkg/fields", "Selector"}),
-		"labelSelector":    c.Universe.Get(types.Name{"k8s.io/kubernetes/pkg/labels", "Selector"}),
-		"watchInterface":   c.Universe.Get(types.Name{"k8s.io/kubernetes/pkg/watch", "Interface"}),
-		"apiDeleteOptions": c.Universe.Get(types.Name{"k8s.io/kubernetes/pkg/api", "DeleteOptions"}),
-		"apiListOptions":   c.Universe.Get(types.Name{"k8s.io/kubernetes/pkg/api", "ListOptions"}),
+		"fieldSelector":    c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/fields", Name: "Selector"}),
+		"labelSelector":    c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Selector"}),
+		"watchInterface":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"apiDeleteOptions": c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
+		"apiListOptions":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 	}
 	sw.Do(namespacerTemplate, m)
 	sw.Do(interfaceTemplate, m)
