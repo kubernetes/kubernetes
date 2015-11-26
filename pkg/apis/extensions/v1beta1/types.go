@@ -25,13 +25,13 @@ import (
 // describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 }
 
 // represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
-	Replicas int `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 
 	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
@@ -70,7 +70,7 @@ type SubresourceReference struct {
 type CPUTargetUtilization struct {
 	// fraction of the requested CPU that should be utilized/used,
 	// e.g. 70 means that 70% of the requested CPU should be in use.
-	TargetPercentage int `json:"targetPercentage"`
+	TargetPercentage int32 `json:"targetPercentage"`
 }
 
 // specification of a horizontal pod autoscaler.
@@ -79,9 +79,9 @@ type HorizontalPodAutoscalerSpec struct {
 	// and will set the desired number of pods by modifying its spec.
 	ScaleRef SubresourceReference `json:"scaleRef"`
 	// lower limit for the number of pods that can be set by the autoscaler, default 1.
-	MinReplicas *int `json:"minReplicas,omitempty"`
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
 	// upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
-	MaxReplicas int `json:"maxReplicas"`
+	MaxReplicas int32 `json:"maxReplicas"`
 	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
 	// if not specified it defaults to the target CPU utilization at 80% of the requested resources.
 	CPUUtilization *CPUTargetUtilization `json:"cpuUtilization,omitempty"`
@@ -97,14 +97,14 @@ type HorizontalPodAutoscalerStatus struct {
 	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
 
 	// current number of replicas of pods managed by this autoscaler.
-	CurrentReplicas int `json:"currentReplicas"`
+	CurrentReplicas int32 `json:"currentReplicas"`
 
 	// desired number of replicas of pods managed by this autoscaler.
-	DesiredReplicas int `json:"desiredReplicas"`
+	DesiredReplicas int32 `json:"desiredReplicas"`
 
 	// current average CPU utilization over all pods, represented as a percentage of requested CPU,
 	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
-	CurrentCPUUtilizationPercentage *int `json:"currentCPUUtilizationPercentage,omitempty"`
+	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
 // configuration of a horizontal pod autoscaler.
@@ -192,7 +192,7 @@ type Deployment struct {
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
-	Replicas *int `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be the ones affected by this deployment.
@@ -268,16 +268,16 @@ type RollingUpdateDeployment struct {
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	MinReadySeconds int `json:"minReadySeconds,omitempty"`
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
 	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
-	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 }
 
 // DeploymentList is a list of Deployments.
@@ -311,17 +311,17 @@ type DaemonSetStatus struct {
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
-	CurrentNumberScheduled int `json:"currentNumberScheduled"`
+	CurrentNumberScheduled int32 `json:"currentNumberScheduled"`
 
 	// NumberMisscheduled is the number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
-	NumberMisscheduled int `json:"numberMisscheduled"`
+	NumberMisscheduled int32 `json:"numberMisscheduled"`
 
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemon.md
-	DesiredNumberScheduled int `json:"desiredNumberScheduled"`
+	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
 }
 
 // DaemonSet represents the configuration of a daemon set.
@@ -400,12 +400,12 @@ type JobSpec struct {
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
-	Parallelism *int `json:"parallelism,omitempty"`
+	Parallelism *int32 `json:"parallelism,omitempty"`
 
 	// Completions specifies the desired number of successfully finished pods the
 	// job should be run with. Defaults to 1.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
-	Completions *int `json:"completions,omitempty"`
+	Completions *int32 `json:"completions,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
@@ -435,13 +435,13 @@ type JobStatus struct {
 	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
 
 	// Active is the number of actively running pods.
-	Active int `json:"active,omitempty"`
+	Active int32 `json:"active,omitempty"`
 
 	// Succeeded is the number of pods which reached Phase Succeeded.
-	Succeeded int `json:"succeeded,omitempty"`
+	Succeeded int32 `json:"succeeded,omitempty"`
 
 	// Failed is the number of pods which reached Phase Failed.
-	Failed int `json:"failed,omitempty"`
+	Failed int32 `json:"failed,omitempty"`
 }
 
 type JobConditionType string
@@ -621,10 +621,10 @@ type NodeUtilization struct {
 // Configuration of the Cluster Autoscaler
 type ClusterAutoscalerSpec struct {
 	// Minimum number of nodes that the cluster should have.
-	MinNodes int `json:"minNodes"`
+	MinNodes int32 `json:"minNodes"`
 
 	// Maximum number of nodes that the cluster should have.
-	MaxNodes int `json:"maxNodes"`
+	MaxNodes int32 `json:"maxNodes"`
 
 	// Target average utilization of the cluster nodes. New nodes will be added if one of the
 	// targets is exceeded. Cluster size will be decreased if the current utilization is too low

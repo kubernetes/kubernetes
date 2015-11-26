@@ -62,7 +62,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		util.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
 		return &unversioned.Status{
 			Status:  unversioned.StatusFailure,
-			Code:    status,
+			Code:    int32(status),
 			Reason:  unversioned.StatusReasonUnknown,
 			Message: err.Error(),
 		}

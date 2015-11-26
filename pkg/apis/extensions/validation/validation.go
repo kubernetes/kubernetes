@@ -249,7 +249,7 @@ func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
 	if isPercent {
 		return value
 	}
-	return intOrStringValue.IntVal
+	return intOrStringValue.IntValue()
 }
 
 func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fieldName string) validation.ErrorList {
@@ -525,7 +525,7 @@ func validateIngressBackend(backend *extensions.IngressBackend) validation.Error
 		if !validation.IsValidPortName(backend.ServicePort.StrVal) {
 			allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))
 		}
-	} else if !validation.IsValidPortNum(backend.ServicePort.IntVal) {
+	} else if !validation.IsValidPortNum(backend.ServicePort.IntValue()) {
 		allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort, apivalidation.PortRangeErrorMsg))
 	}
 	return allErrs
