@@ -410,6 +410,10 @@ type JobSpec struct {
 	// job should be run with. Defaults to 1.
 	Completions *int `json:"completions,omitempty"`
 
+	// Optional duration in seconds relative to the startTime that the job may be active
+	// before the system tries to terminate it; value must be positive integer
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+
 	// Selector is a label query over pods that should match the pod count.
 	Selector *LabelSelector `json:"selector,omitempty"`
 
@@ -450,6 +454,8 @@ type JobConditionType string
 const (
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
+	// JobFailed means the job has failed its execution.
+	JobFailed JobConditionType = "Failed"
 )
 
 // JobCondition describes current state of a job.

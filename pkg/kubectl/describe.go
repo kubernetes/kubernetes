@@ -895,6 +895,12 @@ func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
+		if job.Status.StartTime != nil {
+			fmt.Fprintf(out, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
+		}
+		if job.Spec.ActiveDeadlineSeconds != nil {
+			fmt.Fprintf(out, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
+		}
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(job.Labels))
 		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		describeVolumes(job.Spec.Template.Spec.Volumes, out)

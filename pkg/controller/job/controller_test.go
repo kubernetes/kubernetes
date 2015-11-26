@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -209,20 +210,156 @@ func TestControllerSyncJob(t *testing.T) {
 		if actual.Status.Failed != tc.expectedFailed {
 			t.Errorf("%s: unexpected number of failed pods.  Expected %d, saw %d\n", name, tc.expectedFailed, actual.Status.Failed)
 		}
+		if actual.Status.StartTime == nil {
+			t.Errorf("%s: .status.startTime was not set", name)
+		}
 		// validate conditions
-		if tc.expectedComplete {
-			completed := false
-			for _, v := range actual.Status.Conditions {
-				if v.Type == extensions.JobComplete && v.Status == api.ConditionTrue {
-					completed = true
-					break
-				}
-			}
-			if !completed {
-				t.Errorf("%s: expected completion condition.  Got %v", name, actual.Status.Conditions)
-			}
+		if tc.expectedComplete && !getCondition(actual, extensions.JobComplete) {
+			t.Errorf("%s: expected completion condition.  Got %#v", name, actual.Status.Conditions)
 		}
 	}
+}
+
+func TestSyncJobPastDeadline(t *testing.T) {
+	testCases := map[string]struct {
+		// job setup
+		parallelism           int
+		completions           int
+		activeDeadlineSeconds int64
+		startTime             int64
+
+		// pod setup
+		activePods    int
+		succeededPods int
+		failedPods    int
+
+		// expectations
+		expectedDeletions int
+		expectedActive    int
+		expectedSucceeded int
+		expectedFailed    int
+	}{
+		"activeDeadlineSeconds less than single pod execution": {
+			1, 1, 10, 15,
+			1, 0, 0,
+			1, 0, 0, 1,
+		},
+		"activeDeadlineSeconds bigger than single pod execution": {
+			1, 2, 10, 15,
+			1, 1, 0,
+			1, 0, 1, 1,
+		},
+		"activeDeadlineSeconds times-out before any pod starts": {
+			1, 1, 10, 10,
+			0, 0, 0,
+			0, 0, 0, 0,
+		},
+	}
+
+	for name, tc := range testCases {
+		// job manager setup
+		client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
+		manager := NewJobController(client, controller.NoResyncPeriodFunc)
+		fakePodControl := controller.FakePodControl{}
+		manager.podControl = &fakePodControl
+		manager.podStoreSynced = alwaysReady
+		var actual *extensions.Job
+		manager.updateHandler = func(job *extensions.Job) error {
+			actual = job
+			return nil
+		}
+
+		// job & pods setup
+		job := newJob(tc.parallelism, tc.completions)
+		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
+		start := unversioned.Unix(unversioned.Now().Time.Unix()-tc.startTime, 0)
+		job.Status.StartTime = &start
+		manager.jobStore.Store.Add(job)
+		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
+			manager.podStore.Store.Add(&pod)
+		}
+		for _, pod := range newPodList(tc.succeededPods, api.PodSucceeded, job) {
+			manager.podStore.Store.Add(&pod)
+		}
+		for _, pod := range newPodList(tc.failedPods, api.PodFailed, job) {
+			manager.podStore.Store.Add(&pod)
+		}
+
+		// run
+		err := manager.syncJob(getKey(job, t))
+		if err != nil {
+			t.Errorf("%s: unexpected error when syncing jobs %v", err)
+		}
+
+		// validate created/deleted pods
+		if len(fakePodControl.Templates) != 0 {
+			t.Errorf("%s: unexpected number of creates.  Expected 0, saw %d\n", name, len(fakePodControl.Templates))
+		}
+		if len(fakePodControl.DeletePodName) != tc.expectedDeletions {
+			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
+		}
+		// validate status
+		if actual.Status.Active != tc.expectedActive {
+			t.Errorf("%s: unexpected number of active pods.  Expected %d, saw %d\n", name, tc.expectedActive, actual.Status.Active)
+		}
+		if actual.Status.Succeeded != tc.expectedSucceeded {
+			t.Errorf("%s: unexpected number of succeeded pods.  Expected %d, saw %d\n", name, tc.expectedSucceeded, actual.Status.Succeeded)
+		}
+		if actual.Status.Failed != tc.expectedFailed {
+			t.Errorf("%s: unexpected number of failed pods.  Expected %d, saw %d\n", name, tc.expectedFailed, actual.Status.Failed)
+		}
+		if actual.Status.StartTime == nil {
+			t.Errorf("%s: .status.startTime was not set", name)
+		}
+		// validate conditions
+		if !getCondition(actual, extensions.JobFailed) {
+			t.Errorf("%s: expected fail condition.  Got %#v", name, actual.Status.Conditions)
+		}
+	}
+}
+
+func getCondition(job *extensions.Job, condition extensions.JobConditionType) bool {
+	for _, v := range job.Status.Conditions {
+		if v.Type == condition && v.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSyncPastDeadlineJobFinished(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+	manager.podStoreSynced = alwaysReady
+	var actual *extensions.Job
+	manager.updateHandler = func(job *extensions.Job) error {
+		actual = job
+		return nil
+	}
+
+	job := newJob(1, 1)
+	activeDeadlineSeconds := int64(10)
+	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	start := unversioned.Unix(unversioned.Now().Time.Unix()-15, 0)
+	job.Status.StartTime = &start
+	job.Status.Conditions = append(job.Status.Conditions, newCondition(extensions.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
+	manager.jobStore.Store.Add(job)
+	err := manager.syncJob(getKey(job, t))
+	if err != nil {
+		t.Errorf("Unexpected error when syncing jobs %v", err)
+	}
+	if len(fakePodControl.Templates) != 0 {
+		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.Templates))
+	}
+	if len(fakePodControl.DeletePodName) != 0 {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
+	}
+	if actual != nil {
+		t.Error("Unexpected job modification")
+	}
+
 }
 
 func TestSyncJobDeleted(t *testing.T) {

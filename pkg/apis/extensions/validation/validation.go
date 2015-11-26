@@ -338,6 +338,9 @@ func ValidateJobSpec(spec *extensions.JobSpec, fldPath *field.Path) field.ErrorL
 	if spec.Completions != nil {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Completions), fldPath.Child("completions"))...)
 	}
+	if spec.ActiveDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
+	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector")))
 	} else {
