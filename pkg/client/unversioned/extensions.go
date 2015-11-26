@@ -36,6 +36,7 @@ type ExtensionsInterface interface {
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
+	DedicatedMachinesNamespacer
 	JobsNamespacer
 	IngressNamespacer
 }
@@ -90,6 +91,10 @@ func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
 
 func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
+}
+
+func (c *ExtensionsClient) DedicatedMachines(namespace string) DedicatedMachineInterface {
+	return newDedicatedMachines(c, namespace)
 }
 
 func (c *ExtensionsClient) Jobs(namespace string) JobInterface {

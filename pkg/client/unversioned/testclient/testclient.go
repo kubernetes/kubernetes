@@ -336,6 +336,10 @@ func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterf
 	return &FakeDeployments{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) DedicatedMachines(namespace string) client.DedicatedMachineInterface {
+	return &FakeDedicatedMachines{Fake: c, Namespace: namespace}
+}
+
 func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
 	return &FakeScales{Fake: c, Namespace: namespace}
 }
