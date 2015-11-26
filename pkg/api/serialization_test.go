@@ -111,7 +111,12 @@ func TestSpecificKind(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "Pod"
-	doRoundTripTest(kind, t)
+	for i := 0; i < *fuzzIters; i++ {
+		doRoundTripTest(kind, t)
+		if t.Failed() {
+			break
+		}
+	}
 }
 
 func TestList(t *testing.T) {
@@ -142,6 +147,9 @@ func TestRoundTripTypes(t *testing.T) {
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
 			doRoundTripTest(kind, t)
+			if t.Failed() {
+				break
+			}
 		}
 	}
 }

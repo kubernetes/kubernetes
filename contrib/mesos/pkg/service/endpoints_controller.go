@@ -427,7 +427,7 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 		// it actually maps to a host-port assigned to the pod. upstream
 		// doesn't check this and happily returns the container port spec'd
 		// in the service, but that doesn't align w/ mesos port mgmt.
-		p := portName.IntVal
+		p := portName.IntValue()
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {

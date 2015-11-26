@@ -34,7 +34,7 @@ func addDefaultingFuncs() {
 				obj.HealthzBindAddress = "127.0.0.1"
 			}
 			if obj.OOMScoreAdj == nil {
-				temp := qos.KubeProxyOOMScoreAdj
+				temp := int32(qos.KubeProxyOOMScoreAdj)
 				obj.OOMScoreAdj = &temp
 			}
 			if obj.IPTablesSyncePeriodSeconds == 0 {

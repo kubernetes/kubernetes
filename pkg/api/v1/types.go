@@ -635,7 +635,7 @@ type GCEPersistentDiskVolumeSource struct {
 	// Examples: For volume /dev/sda1, you specify the partition as "1".
 	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
-	Partition int `json:"partition,omitempty"`
+	Partition int32 `json:"partition,omitempty"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
@@ -661,7 +661,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 	// If omitted, the default is to mount by volume name.
 	// Examples: For volume /dev/sda1, you specify the partition as "1".
 	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
-	Partition int `json:"partition,omitempty"`
+	Partition int32 `json:"partition,omitempty"`
 	// Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
 	// If omitted, the default is "false".
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
@@ -709,7 +709,7 @@ type ISCSIVolumeSource struct {
 	// Target iSCSI Qualified Name.
 	IQN string `json:"iqn"`
 	// iSCSI target lun number.
-	Lun int `json:"lun"`
+	Lun int32 `json:"lun"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs".
@@ -726,7 +726,7 @@ type FCVolumeSource struct {
 	// Required: FC target world wide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
-	Lun *int `json:"lun"`
+	Lun *int32 `json:"lun"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"
@@ -747,10 +747,10 @@ type ContainerPort struct {
 	// If specified, this must be a valid port number, 0 < x < 65536.
 	// If HostNetwork is specified, this must match ContainerPort.
 	// Most containers do not need this.
-	HostPort int `json:"hostPort,omitempty"`
+	HostPort int32 `json:"hostPort,omitempty"`
 	// Number of port to expose on the pod's IP address.
 	// This must be a valid port number, 0 < x < 65536.
-	ContainerPort int `json:"containerPort"`
+	ContainerPort int32 `json:"containerPort"`
 	// Protocol for port. Must be UDP or TCP.
 	// Defaults to "TCP".
 	Protocol Protocol `json:"protocol,omitempty"`
@@ -853,20 +853,20 @@ type Probe struct {
 	Handler `json:",inline"`
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
-	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
-	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 	// How often (in seconds) to perform the probe.
 	// Default to 10 seconds. Minimum value is 1.
-	PeriodSeconds int64 `json:"periodSeconds,omitempty"`
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Must be 1 for liveness. Minimum value is 1.
-	SuccessThreshold int `json:"successThreshold,omitempty"`
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// Defaults to 3. Minimum value is 1.
-	FailureThreshold int `json:"failureThreshold,omitempty"`
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
@@ -1064,9 +1064,9 @@ type ContainerStateRunning struct {
 // ContainerStateTerminated is a terminated state of a container.
 type ContainerStateTerminated struct {
 	// Exit status from the last termination of the container
-	ExitCode int `json:"exitCode"`
+	ExitCode int32 `json:"exitCode"`
 	// Signal from the last termination of the container
-	Signal int `json:"signal,omitempty"`
+	Signal int32 `json:"signal,omitempty"`
 	// (brief) reason from the last termination of the container
 	Reason string `json:"reason,omitempty"`
 	// Message regarding the last termination of the container
@@ -1106,7 +1106,7 @@ type ContainerStatus struct {
 	// the number of dead containers that have not yet been removed.
 	// Note that this is calculated from dead containers. But those containers are subject to
 	// garbage collection. This value will get capped at 5 by GC.
-	RestartCount int `json:"restartCount"`
+	RestartCount int32 `json:"restartCount"`
 	// The image the container is running.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md
 	// TODO(dchen1107): Which image the container is running with?
@@ -1423,7 +1423,7 @@ type ReplicationControllerSpec struct {
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
-	Replicas *int `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
@@ -1448,7 +1448,7 @@ type ReplicationControllerSpec struct {
 type ReplicationControllerStatus struct {
 	// Replicas is the most recently oberved number of replicas.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
-	Replicas int `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 
 	// ObservedGeneration reflects the generation of the most recently observed replication controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -1612,7 +1612,7 @@ type ServicePort struct {
 	Protocol Protocol `json:"protocol,omitempty"`
 
 	// The port that will be exposed by this service.
-	Port int `json:"port"`
+	Port int32 `json:"port"`
 
 	// Number or name of the port to access on the pods targeted by the service.
 	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
@@ -1628,7 +1628,7 @@ type ServicePort struct {
 	// if unused or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport
-	NodePort int `json:"nodePort,omitempty"`
+	NodePort int32 `json:"nodePort,omitempty"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -1771,7 +1771,7 @@ type EndpointPort struct {
 	Name string `json:"name,omitempty"`
 
 	// The port number of the endpoint.
-	Port int `json:"port"`
+	Port int32 `json:"port"`
 
 	// The IP protocol for this port.
 	// Must be UDP or TCP.
@@ -1807,7 +1807,7 @@ type NodeSpec struct {
 // DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpoint struct {
 	// Port number of the given endpoint.
-	Port int `json:port`
+	Port int32 `json:port`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
@@ -2258,7 +2258,7 @@ type Event struct {
 	LastTimestamp unversioned.Time `json:"lastTimestamp,omitempty"`
 
 	// The number of times this event has occurred.
-	Count int `json:"count,omitempty"`
+	Count int32 `json:"count,omitempty"`
 
 	// Type of this event (Normal, Warning), new types could be added in the future
 	Type string `json:"type,omitempty"`
