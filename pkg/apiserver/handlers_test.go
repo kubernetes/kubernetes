@@ -35,7 +35,7 @@ import (
 type fakeRL bool
 
 func (fakeRL) Stop()             {}
-func (f fakeRL) CanAccept() bool { return bool(f) }
+func (f fakeRL) TryAccept() bool { return bool(f) }
 func (f fakeRL) Accept()         {}
 
 func expectHTTP(url string, code int, t *testing.T) {

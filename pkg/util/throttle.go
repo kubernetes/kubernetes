@@ -19,8 +19,9 @@ package util
 import "github.com/juju/ratelimit"
 
 type RateLimiter interface {
-	// CanAccept returns true if the rate is below the limit, false otherwise
-	CanAccept() bool
+	// TryAccept returns true if a token is taken immediately. Otherwise,
+	// it returns false.
+	TryAccept() bool
 	// Accept returns once a token becomes available.
 	Accept()
 	// Stop stops the rate limiter, subsequent calls to CanAccept will return false
@@ -47,7 +48,7 @@ func NewFakeRateLimiter() RateLimiter {
 	return &fakeRateLimiter{}
 }
 
-func (t *tickRateLimiter) CanAccept() bool {
+func (t *tickRateLimiter) TryAccept() bool {
 	return t.limiter.TakeAvailable(1) == 1
 }
 
@@ -59,7 +60,7 @@ func (t *tickRateLimiter) Accept() {
 func (t *tickRateLimiter) Stop() {
 }
 
-func (t *fakeRateLimiter) CanAccept() bool {
+func (t *fakeRateLimiter) TryAccept() bool {
 	return true
 }
 
