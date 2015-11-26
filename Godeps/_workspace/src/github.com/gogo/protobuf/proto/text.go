@@ -175,20 +175,12 @@ func writeName(w *textWriter, props *Properties) error {
 	return nil
 }
 
-var (
-	messageSetType = reflect.TypeOf((*MessageSet)(nil)).Elem()
-)
-
 // raw is the interface satisfied by RawMessage.
 type raw interface {
 	Bytes() []byte
 }
 
 func writeStruct(w *textWriter, sv reflect.Value) error {
-	if sv.Type() == messageSetType {
-		return writeMessageSet(w, sv.Addr().Interface().(*MessageSet))
-	}
-
 	st := sv.Type()
 	sprops := GetProperties(st)
 	for i := 0; i < sv.NumField(); i++ {
@@ -387,7 +379,13 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 	}
 
 	// Extensions (the XXX_extensions field).
-	pv := sv.Addr()
+	pv := sv
+	if pv.CanAddr() {
+		pv = sv.Addr()
+	} else {
+		pv = reflect.New(sv.Type())
+		pv.Elem().Set(sv)
+	}
 	if pv.Type().Implements(extendableProtoType) {
 		if err := writeExtensions(w, pv); err != nil {
 			return err
@@ -550,45 +548,7 @@ func writeString(w *textWriter, s string) error {
 	return w.WriteByte('"')
 }
 
-func writeMessageSet(w *textWriter, ms *MessageSet) error {
-	for _, item := range ms.Item {
-		id := *item.TypeId
-		if msd, ok := messageSetMap[id]; ok {
-			// Known message set type.
-			if _, err := fmt.Fprintf(w, "[%s]: <\n", msd.name); err != nil {
-				return err
-			}
-			w.indent()
-
-			pb := reflect.New(msd.t.Elem())
-			if err := Unmarshal(item.Message, pb.Interface().(Message)); err != nil {
-				if _, ferr := fmt.Fprintf(w, "/* bad message: %v */\n", err); ferr != nil {
-					return ferr
-				}
-			} else {
-				if err := writeStruct(w, pb.Elem()); err != nil {
-					return err
-				}
-			}
-		} else {
-			// Unknown type.
-			if _, err := fmt.Fprintf(w, "[%d]: <\n", id); err != nil {
-				return err
-			}
-			w.indent()
-			if err := writeUnknownStruct(w, item.Message); err != nil {
-				return err
-			}
-		}
-		w.unindent()
-		if _, err := w.Write(gtNewline); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writeUnknownStruct(w *textWriter, data []byte) error {
+func writeUnknownStruct(w *textWriter, data []byte) (err error) {
 	if !w.compact {
 		if _, err := fmt.Fprintf(w, "/* %d unknown bytes */\n", len(data)); err != nil {
 			return err
