@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -38,6 +39,7 @@ func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
 		{"scaleRef-kind", false},
 		{"scaleRef-name", false},
 		{"scaleRef-apiVersion", false},
+		{"scaleRef-apiGroup", false},
 		{"scaleRef-subresource", false},
 		{"min", false},
 		{"max", true},
@@ -92,9 +94,12 @@ func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interfac
 		},
 		Spec: extensions.HorizontalPodAutoscalerSpec{
 			ScaleRef: extensions.SubresourceReference{
-				Kind:        params["scaleRef-kind"],
-				Name:        params["scaleRef-name"],
-				APIVersion:  params["scaleRef-apiVersion"],
+				Kind: params["scaleRef-kind"],
+				Name: params["scaleRef-name"],
+				APIVersion: unversioned.GroupVersion{
+					Version: params["scaleRef-apiVersion"],
+					Group:   params["scaleRef-apiGroup"],
+				},
 				Subresource: scaleSubResource,
 			},
 			MaxReplicas: max,

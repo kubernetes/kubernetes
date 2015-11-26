@@ -367,6 +367,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			s.MinReplicas = &minReplicas
 			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(c.RandUint64())}
 		},
+		func(g *unversioned.GroupVersion, c fuzz.Continue) {
+			g.Version = strconv.FormatUint(c.RandUint64(), 10)
+			g.Group = strconv.FormatUint(c.RandUint64(), 10)
+		},
 	)
 	return f
 }

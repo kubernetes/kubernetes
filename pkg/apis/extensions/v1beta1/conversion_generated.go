@@ -3026,7 +3026,9 @@ func autoconvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference
 	}
 	out.Kind = in.Kind
 	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	if err := s.Convert(&in.APIVersion, &out.APIVersion, 0); err != nil {
+		return err
+	}
 	out.Subresource = in.Subresource
 	return nil
 }
@@ -3989,7 +3991,9 @@ func autoconvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference
 	}
 	out.Kind = in.Kind
 	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	if err := s.Convert(&in.APIVersion, &out.APIVersion, 0); err != nil {
+		return err
+	}
 	out.Subresource = in.Subresource
 	return nil
 }

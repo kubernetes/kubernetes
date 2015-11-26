@@ -862,6 +862,12 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
+func deepCopy_unversioned_GroupVersion(in unversioned.GroupVersion, out *unversioned.GroupVersion, c *conversion.Cloner) error {
+	out.Group = in.Group
+	out.Version = in.Version
+	return nil
+}
+
 func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
@@ -1487,7 +1493,9 @@ func deepCopy_extensions_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conver
 func deepCopy_extensions_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	if err := deepCopy_unversioned_GroupVersion(in.APIVersion, &out.APIVersion, c); err != nil {
+		return err
+	}
 	out.Subresource = in.Subresource
 	return nil
 }
@@ -1623,6 +1631,7 @@ func init() {
 		deepCopy_api_VolumeMount,
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
+		deepCopy_unversioned_GroupVersion,
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
