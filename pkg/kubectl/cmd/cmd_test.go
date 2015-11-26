@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -82,7 +83,7 @@ var internalGV = unversioned.GroupVersion{Group: "apitest", Version: ""}
 var unlikelyGV = unversioned.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVersion}
 
-func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
+func newExternalScheme() (*runtime.Scheme, restmapper.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Type"), &internalType{})
@@ -91,7 +92,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, unlikelyGV.String())
-	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version string) (*meta.VersionInterfaces, error) {
+	mapper := restmapper.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version string) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
 			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
@@ -103,7 +104,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 			gvk := gv.WithKind(kind)
 
 			mixedCase := false
-			scope := meta.RESTScopeNamespace
+			scope := restmapper.RESTScopeNamespace
 			mapper.Add(gvk, scope, mixedCase)
 		}
 	}
@@ -139,7 +140,7 @@ func (t *testDescriber) Describe(namespace, name string) (output string, err err
 }
 
 type testFactory struct {
-	Mapper       meta.RESTMapper
+	Mapper       restmapper.RESTMapper
 	Typer        runtime.ObjectTyper
 	Client       kubectl.RESTClient
 	Describer    kubectl.Describer
@@ -158,16 +159,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Typer:     scheme,
 	}
 	return &cmdutil.Factory{
-		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (restmapper.RESTMapper, runtime.ObjectTyper) {
 			return t.Mapper, t.Typer
 		},
-		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
+		RESTClient: func(*restmapper.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
 		},
-		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
+		Describer: func(*restmapper.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *restmapper.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -184,10 +185,10 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 
 func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	f, t, c := NewTestFactory()
-	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
-		return meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+	f.Object = func() (restmapper.RESTMapper, runtime.ObjectTyper) {
+		return restmapper.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
 	}
-	f.RESTClient = func(m *meta.RESTMapping) (resource.RESTClient, error) {
+	f.RESTClient = func(m *restmapper.RESTMapping) (resource.RESTClient, error) {
 		if m.ObjectConvertor == api.Scheme {
 			return apiClient, t.Err
 		}
@@ -208,7 +209,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		"service/test": testServiceGenerator{},
 	}
 	f := &cmdutil.Factory{
-		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (restmapper.RESTMapper, runtime.ObjectTyper) {
 			return testapi.Default.RESTMapper(), api.Scheme
 		},
 		Client: func() (*client.Client, error) {
@@ -218,13 +219,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 			c.Client = fakeClient.Client
 			return c, t.Err
 		},
-		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
+		RESTClient: func(*restmapper.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
 		},
-		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
+		Describer: func(*restmapper.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *restmapper.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -284,7 +285,7 @@ func stringBody(body string) io.ReadCloser {
 //	f := cmdutil.NewFactory(nil)
 //
 //	version := testapi.Default.Version()
-//	mapping := &meta.RESTMapping{
+//	mapping := &restmapper.RESTMapping{
 //		APIVersion: version,
 //	}
 //	c, err := f.RESTClient(mapping)

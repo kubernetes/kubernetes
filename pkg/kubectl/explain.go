@@ -23,7 +23,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
@@ -41,7 +41,7 @@ func GetSwaggerSchema(apiVer string, kubeClient client.Interface) (*swagger.ApiD
 }
 
 // SplitAndParseResourceRequest separates the users input into a model and fields
-func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
+func SplitAndParseResourceRequest(inResource string, mapper restmapper.RESTMapper) (string, []string, error) {
 	inResource, fieldsPath := splitDotNotation(inResource)
 	inResource, _ = mapper.ResourceSingularizer(expandResourceShortcut(inResource))
 	return inResource, fieldsPath, nil

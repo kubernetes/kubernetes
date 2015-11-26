@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -77,7 +77,7 @@ type resourceTuple struct {
 }
 
 // NewBuilder creates a builder that operates on generic objects.
-func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
+func NewBuilder(mapper restmapper.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
 	return &Builder{
 		mapper:        &Mapper{typer, mapper, clientMapper},
 		requireObject: true,
@@ -420,11 +420,11 @@ func (b *Builder) SingleResourceType() *Builder {
 	return b
 }
 
-func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
+func (b *Builder) resourceMappings() ([]*restmapper.RESTMapping, error) {
 	if len(b.resources) > 1 && b.singleResourceType {
 		return nil, fmt.Errorf("you may only specify a single resource type")
 	}
-	mappings := []*meta.RESTMapping{}
+	mappings := []*restmapper.RESTMapping{}
 	for _, r := range b.resources {
 		gvk, err := b.mapper.KindFor(r)
 		if err != nil {
@@ -439,8 +439,8 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	return mappings, nil
 }
 
-func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) {
-	mappings := make(map[string]*meta.RESTMapping)
+func (b *Builder) resourceTupleMappings() (map[string]*restmapper.RESTMapping, error) {
+	mappings := make(map[string]*restmapper.RESTMapping)
 	canonical := make(map[string]struct{})
 	for _, r := range b.resourceTuples {
 		if _, ok := mappings[r.Resource]; ok {
@@ -504,7 +504,7 @@ func (b *Builder) visitorResult() *Result {
 				return &Result{err: err}
 			}
 			selectorNamespace := b.namespace
-			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			if mapping.Scope.Name() != restmapper.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			}
 			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector))
@@ -557,7 +557,7 @@ func (b *Builder) visitorResult() *Result {
 			}
 
 			selectorNamespace := b.namespace
-			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			if mapping.Scope.Name() != restmapper.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			} else {
 				if len(b.namespace) == 0 {
@@ -604,7 +604,7 @@ func (b *Builder) visitorResult() *Result {
 		}
 
 		selectorNamespace := b.namespace
-		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+		if mapping.Scope.Name() != restmapper.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		} else {
 			if len(b.namespace) == 0 {

@@ -21,8 +21,8 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -32,7 +32,7 @@ import (
 // needed to create Info for arbitrary objects.
 type Mapper struct {
 	runtime.ObjectTyper
-	meta.RESTMapper
+	restmapper.RESTMapper
 	ClientMapper
 }
 

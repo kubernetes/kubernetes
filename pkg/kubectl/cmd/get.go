@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -237,12 +237,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	// use the default printer for each object
 	printer = nil
-	var lastMapping *meta.RESTMapping
+	var lastMapping *restmapper.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
 
 	for ix := range objs {
-		var mapping *meta.RESTMapping
+		var mapping *restmapper.RESTMapping
 		if sorter != nil {
 			mapping = infos[sorter.OriginalPosition(ix)].Mapping
 		} else {

@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -46,12 +46,12 @@ func makeImageList(spec *api.PodSpec) string {
 // OutputVersionMapper is a RESTMapper that will prefer mappings that
 // correspond to a preferred output version (if feasible)
 type OutputVersionMapper struct {
-	meta.RESTMapper
+	restmapper.RESTMapper
 	OutputVersion string
 }
 
-// RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+// RESTMapping implements restmapper.RESTMapper by prepending the output version to the preferred version list.
+func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*restmapper.RESTMapping, error) {
 	mapping, err := m.RESTMapper.RESTMapping(gk, m.OutputVersion)
 	if err == nil {
 		return mapping, nil
@@ -63,12 +63,12 @@ func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...s
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes
 // resources.
 type ShortcutExpander struct {
-	meta.RESTMapper
+	restmapper.RESTMapper
 }
 
-var _ meta.RESTMapper = &ShortcutExpander{}
+var _ restmapper.RESTMapper = &ShortcutExpander{}
 
-// KindFor implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
+// KindFor implements restmapper.RESTMapper. It expands the resource first, then invokes the wrapped
 // mapper.
 func (e ShortcutExpander) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	resource = expandResourceShortcut(resource)
@@ -82,7 +82,7 @@ func (e ShortcutExpander) ResourceIsValid(resource string) bool {
 }
 
 // expandResourceShortcut will return the expanded version of resource
-// (something that a pkg/api/meta.RESTMapper can understand), if it is
+// (something that a pkg/api/restmapper.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
 func expandResourceShortcut(resource string) string {
 	shortForms := map[string]string{

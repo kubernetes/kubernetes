@@ -37,6 +37,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
@@ -74,7 +75,7 @@ var newCodec = runtime.CodecFor(api.Scheme, newGroupVersion.String())
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
 var selfLinker runtime.SelfLinker = accessor
-var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
+var mapper, namespaceMapper restmapper.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
 var requestContextMapper api.RequestContextMapper
 
@@ -107,8 +108,8 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	}
 }
 
-func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
+func newMapper() *restmapper.DefaultRESTMapper {
+	return restmapper.NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
 }
 
 func addGrouplessTypes() {
@@ -153,9 +154,9 @@ func init() {
 			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
+				nsMapper.Add(gvk, restmapper.RESTScopeRoot, false)
 			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
+				nsMapper.Add(gvk, restmapper.RESTScopeNamespace, false)
 			}
 		}
 	}

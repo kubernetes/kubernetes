@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -65,7 +65,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
-	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+	if mapping.Scope.Name() != restmapper.RESTScopeNameNamespace {
 		return nil
 	}
 	namespaceObj, exists, err := l.store.Get(&api.Namespace{

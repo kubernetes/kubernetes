@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -33,13 +33,13 @@ import (
 )
 
 type thirdPartyResourceDataMapper struct {
-	mapper  meta.RESTMapper
+	mapper  restmapper.RESTMapper
 	kind    string
 	version string
 	group   string
 }
 
-var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
+var _ restmapper.RESTMapper = &thirdPartyResourceDataMapper{}
 
 func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
 	return resource == strings.ToLower(t.kind)+"s"
@@ -52,7 +52,7 @@ func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.Gro
 	return t.mapper.KindFor(resource)
 }
 
-func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*restmapper.RESTMapping, error) {
 	if len(versions) != 1 {
 		return nil, fmt.Errorf("unexpected set of versions: %v", versions)
 	}
@@ -90,7 +90,7 @@ func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource string) bool {
 	return t.isThirdPartyResource(resource) || t.mapper.ResourceIsValid(resource)
 }
 
-func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMapper {
+func NewMapper(mapper restmapper.RESTMapper, kind, version, group string) restmapper.RESTMapper {
 	return &thirdPartyResourceDataMapper{
 		mapper:  mapper,
 		kind:    kind,

@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -274,7 +274,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var apiResource unversioned.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
-	case meta.RESTScopeNameRoot:
+	case restmapper.RESTScopeNameRoot:
 		// Handle non-namespace scoped resources like nodes.
 		resourcePath := resource
 		resourceParams := params
@@ -310,7 +310,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
 		break
-	case meta.RESTScopeNameNamespace:
+	case restmapper.RESTScopeNameNamespace:
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		namespaceParam := ws.PathParameter(scope.ArgumentName(), scope.ParamDescription()).DataType("string")
 		namespacedPath := scope.ParamName() + "/{" + scope.ArgumentName() + "}/" + resource
@@ -610,7 +610,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 // rootScopeNaming reads only names from a request and ignores namespaces. It implements ScopeNamer
 // for root scoped resources.
 type rootScopeNaming struct {
-	scope meta.RESTScope
+	scope restmapper.RESTScope
 	runtime.SelfLinker
 	itemPath string
 }
@@ -672,7 +672,7 @@ func (n rootScopeNaming) ObjectName(obj runtime.Object) (namespace, name string,
 // scopeNaming returns naming information from a request. It implements ScopeNamer for
 // namespace scoped resources.
 type scopeNaming struct {
-	scope meta.RESTScope
+	scope restmapper.RESTScope
 	runtime.SelfLinker
 	itemPath      string
 	allNamespaces bool

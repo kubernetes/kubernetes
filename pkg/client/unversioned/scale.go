@@ -17,7 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -48,14 +48,14 @@ func newScales(c *ExtensionsClient, namespace string) *scales {
 // Get takes the reference to scale subresource and returns the subresource or error, if one occurs.
 func (c *scales) Get(kind string, name string) (result *extensions.Scale, err error) {
 	result = &extensions.Scale{}
-	resource, _ := meta.KindToResource(kind, false)
+	resource, _ := restmapper.KindToResource(kind, false)
 	err = c.client.Get().Namespace(c.ns).Resource(resource).Name(name).SubResource("scale").Do().Into(result)
 	return
 }
 
 func (c *scales) Update(kind string, scale *extensions.Scale) (result *extensions.Scale, err error) {
 	result = &extensions.Scale{}
-	resource, _ := meta.KindToResource(kind, false)
+	resource, _ := restmapper.KindToResource(kind, false)
 	err = c.client.Put().
 		Namespace(scale.Namespace).
 		Resource(resource).
