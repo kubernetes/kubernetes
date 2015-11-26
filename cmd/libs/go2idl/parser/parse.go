@@ -83,6 +83,11 @@ func New() *Builder {
 	}
 }
 
+// AddBuildTags adds the specified build tags to the parse context.
+func (b *Builder) AddBuildTags(tags ...string) {
+	b.context.BuildTags = append(b.context.BuildTags, tags...)
+}
+
 // Get package information from the go/build package. Automatically excludes
 // e.g. test files and files for other platforms-- there is quite a bit of
 // logic of that nature in the build package.
