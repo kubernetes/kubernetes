@@ -176,11 +176,11 @@ DISRUPTIVE_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
-    "GCE\sL7\sLoadBalancer\sController"
-    "DaemonRestart\sController\sManager"
-    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon"
-    "Resource\susage\sof\ssystem\scontainers"
-    "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #13258
+    "KubeProxy\sshould\stest\skube-proxy" # extremely flaky in slow suite since Nov 23rd (build was broken on 21st and 2nd), issue: #17781
+    "GCE\sL7\sLoadBalancer\sController" # issue: #17518
+    "DaemonRestart\sController\sManager" # issue: #17829
+    "Resource\susage\sof\ssystem\scontainers" # issue: #13931
+    "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #17830
     )
 
 # The following tests are known to be slow running (> 2 min), and are
