@@ -363,8 +363,10 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
-	if err := s.SetVersionAndKind(outVersion, outKind.Kind, out); err != nil {
-		return nil, err
+	if len(outVersion) != 0 {
+		if err := s.SetVersionAndKind(outVersion, outKind.Kind, out); err != nil {
+			return nil, err
+		}
 	}
 
 	return out, nil
