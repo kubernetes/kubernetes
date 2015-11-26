@@ -48,6 +48,5 @@ spec:
         - mountPath: /data
           name: storage
       volumes:
-        - emptyDir:
-            medium: ""
-          name: "storage"
+        - name: storage
+          emptyDir: {}
