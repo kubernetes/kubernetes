@@ -76,9 +76,11 @@ You need [go](https://golang.org/doc/install) at least 1.3+ in your path, please
 
 In order to run kubernetes you must have the kubernetes code on the local machine. Cloning this repository is sufficient.
 
-```$ git clone --depth=1 https://github.com/kubernetes/kubernetes.git```
-
-The `--depth=1` parameter is optional and will ensure a smaller download.
+```
+$ git clone https://github.com/kubernetes/kubernetes.git
+$ cd kubernetes
+$ git checkout tags/v1.1.2 # Specify the latest version
+```
 
 ### Starting the cluster
 
