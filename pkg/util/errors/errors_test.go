@@ -17,6 +17,7 @@ limitations under the License.
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -281,6 +282,43 @@ func TestAggregateGoroutines(t *testing.T) {
 			if !testCase.expected[err.Error()] {
 				t.Errorf("%d: expected %v, got aggregate containing %v", i, testCase.expected, err)
 			}
+		}
+	}
+}
+
+func TestErrorListsWithNils(t *testing.T) {
+	tests := []struct {
+		name        string
+		errs        []error
+		expectedLen int
+	}{
+		{
+			name:        "nils list",
+			errs:        []error{nil, nil, nil},
+			expectedLen: 0,
+		},
+		{
+			name:        "2 out of 3",
+			errs:        []error{errors.New("actual error"), nil, errors.New("another error")},
+			expectedLen: 2,
+		},
+	}
+
+	for _, test := range tests {
+		agg := NewAggregate(test.errs)
+		if test.expectedLen == 0 && agg != nil {
+			t.Errorf("%s: expected nil, got %s", test.name, agg.Error())
+			continue
+		}
+		if test.expectedLen != 0 && agg == nil {
+			t.Errorf("%s: expected non-nil", test.name)
+			continue
+		}
+		if agg == nil {
+			continue
+		}
+		if got, exp := len(agg.Errors()), test.expectedLen; got != exp {
+			t.Errorf("%s: expected %d errors, got %d", test.name, exp, got)
 		}
 	}
 }
