@@ -59,8 +59,7 @@ ETCD_START="start-stop-daemon \
 --exec $ETCD \
 --make-pidfile \
 --pidfile $ETCD_PIDFILE \
--- $ETCD_OPTS \
->> $ETCD_LOGFILE 2>&1"
+-- $ETCD_OPTS"
 
 ETCD_STOP="start-stop-daemon \
 --stop \
