@@ -2220,12 +2220,14 @@ type EventSource struct {
 	Host string `json:"host,omitempty"`
 }
 
+type EventType string
+
 // Valid values for event types (new types could be added in future)
 const (
 	// Information only and will not cause any problems
-	EventTypeNormal string = "Normal"
+	EventTypeNormal EventType = "Normal"
 	// These events are to warn that something might go wrong
-	EventTypeWarning string = "Warning"
+	EventTypeWarning EventType = "Warning"
 )
 
 // Event is a report of an event somewhere in the cluster.
@@ -2261,7 +2263,7 @@ type Event struct {
 	Count int `json:"count,omitempty"`
 
 	// Type of this event (Normal, Warning), new types could be added in the future
-	Type string `json:"type,omitempty"`
+	Type EventType `json:"type,omitempty"`
 }
 
 // EventList is a list of events.
