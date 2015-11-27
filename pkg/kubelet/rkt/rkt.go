@@ -1371,7 +1371,6 @@ func parseImageInfo(input string) (*kubecontainer.Image, error) {
 }
 
 // RemoveImage removes an on-disk image using 'rkt image rm'.
-// TODO(yifan): Use image ID to reference image.
 func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	img, err := r.getImageByName(image.Image)
 	if err != nil {
