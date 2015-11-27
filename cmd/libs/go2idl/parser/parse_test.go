@@ -70,6 +70,9 @@ type Object struct {
 	common.Object
 }
 
+func AFunc(obj1 common.Object, obj2 Object) Frobber {
+}
+
 `,
 		"base/common/proto/common.go": `
 package common
@@ -88,10 +91,15 @@ package o
 }
 
 {{end}}
-{{range $t := .}}{{if eq $t.Kind "Struct"}}{{template "Struct" $t}}{{end}}{{end}}`
+{{define "Func"}}{{$s := .Signature}}func {{Raw .}}( {{range $s.Parameters}}{{Raw .}} {{end}}) {{range $s.Results}}{{Raw .}} {{end}}{}
+
+{{end}}
+{{range $t := .}}{{if eq $t.Kind "Struct"}}{{template "Struct" $t}}{{end}}{{end}}
+{{range $t := .}}{{if eq $t.Kind "Func"}}{{template "Func" $t}}{{end}}{{end}}`
 
 	var expect = `
 package o
+
 
 type CommonObject interface { 
 	ID() Int64
@@ -119,8 +127,12 @@ type FooObject interface {
 	CommonObject
 }
 
+
+func proto.AFunc( proto.Object proto.Object ) proto.Frobber {}
+
 `
 	testNamer := namer.NewPublicNamer(1, "proto")
+	rawNamer := namer.NewRawNamer("o", nil)
 	_, u, o := construct(t, testFiles, testNamer)
 	t.Logf("\n%v\n\n", o)
 	tmpl := template.Must(
@@ -128,6 +140,7 @@ type FooObject interface {
 			Funcs(
 			map[string]interface{}{
 				"Name": testNamer.Name,
+				"Raw":  rawNamer.Name,
 			}).
 			Parse(tmplText),
 	)
