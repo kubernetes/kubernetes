@@ -35,4 +35,4 @@ export KUBERNETES_CONTRIB=mesos
 export KUBE_RELEASE_RUN_TESTS="${KUBE_RELEASE_RUN_TESTS:-N}"
 export KUBE_SKIP_CONFIRMATIONS=Y
 
-"${KUBE_ROOT}/build/release.sh"
+exec "${KUBE_ROOT}/build/release.sh"

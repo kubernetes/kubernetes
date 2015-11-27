@@ -56,30 +56,49 @@ echo "${DOCKER_BIN_PATH}"
 
 # Clean (k8s output & images), Build, Kube-Up, Test, Kube-Down
 cd "${KUBE_ROOT}"
-exec docker run \
-  --rm \
-  -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
-  -v "/var/run/docker.sock:/var/run/docker.sock" \
-  -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
-  -v "${MESOS_DOCKER_WORK_DIR}/auth:${MESOS_DOCKER_WORK_DIR}/auth" \
-  -v "${MESOS_DOCKER_WORK_DIR}/log:${MESOS_DOCKER_WORK_DIR}/log" \
-  -v "${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos:${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos" \
-  -v "${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos" \
-  -v "${MESOS_DOCKER_WORK_DIR}/overlay:${MESOS_DOCKER_WORK_DIR}/overlay" \
-  -v "${MESOS_DOCKER_WORK_DIR}/reports:${MESOS_DOCKER_WORK_DIR}/reports" \
-  -e "MESOS_DOCKER_WORK_DIR=${MESOS_DOCKER_WORK_DIR}" \
-  -e "MESOS_DOCKER_IMAGE_DIR=/var/tmp/kubernetes" \
-  -e "MESOS_DOCKER_OVERLAY_DIR=${MESOS_DOCKER_WORK_DIR}/overlay" \
-  -e "KUBERNETES_CONTRIB=mesos" \
-  -e "KUBERNETES_PROVIDER=mesos/docker" \
-  -e "TERM=ansi" \
-  -e "USER=root" \
-  -e "E2E_REPORT_DIR=${MESOS_DOCKER_WORK_DIR}/reports" \
-  mesosphere/kubernetes-mesos-test \
-  -ceux "\
-    make clean all && \
-    trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
-    ./cluster/kube-up.sh && \
-    trap 'test \$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; timeout 5m ./cluster/kube-down.sh' EXIT && \
-    ${RUN_CMD}
-  "
+
+container_id=$(
+  docker run \
+    -d \
+    -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
+    -v "/var/run/docker.sock:/var/run/docker.sock" \
+    -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
+    -v "${MESOS_DOCKER_WORK_DIR}/auth:${MESOS_DOCKER_WORK_DIR}/auth" \
+    -v "${MESOS_DOCKER_WORK_DIR}/log:${MESOS_DOCKER_WORK_DIR}/log" \
+    -v "${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos:${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos" \
+    -v "${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos" \
+    -v "${MESOS_DOCKER_WORK_DIR}/overlay:${MESOS_DOCKER_WORK_DIR}/overlay" \
+    -v "${MESOS_DOCKER_WORK_DIR}/reports:${MESOS_DOCKER_WORK_DIR}/reports" \
+    -e "MESOS_DOCKER_WORK_DIR=${MESOS_DOCKER_WORK_DIR}" \
+    -e "MESOS_DOCKER_IMAGE_DIR=/var/tmp/kubernetes" \
+    -e "MESOS_DOCKER_OVERLAY_DIR=${MESOS_DOCKER_WORK_DIR}/overlay" \
+    -e "KUBERNETES_CONTRIB=mesos" \
+    -e "KUBERNETES_PROVIDER=mesos/docker" \
+    -e "TERM=ansi" \
+    -e "USER=root" \
+    -e "E2E_REPORT_DIR=${MESOS_DOCKER_WORK_DIR}/reports" \
+    mesosphere/kubernetes-mesos-test \
+    -ceux "\
+      make clean all && \
+      trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
+      ./cluster/kube-up.sh && \
+      trap 'test \$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; timeout 5m ./cluster/kube-down.sh' EXIT && \
+      ${RUN_CMD}
+    "
+)
+
+# cleanup container
+trap 'docker rm -f "${container_id}" > /dev/null' EXIT
+
+# tail logs
+docker logs -f "${container_id}" &
+
+# trap and kill for better signal handing
+trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
+exit_status=$(docker wait "${container_id}")
+trap - INT TERM
+
+if [ "$exit_status" != 0 ]; then
+  echo "Exited ${exit_status}" 1>&2
+  exit "${exit_status}"
+fi
