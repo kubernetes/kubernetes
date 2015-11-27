@@ -61,7 +61,7 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, the server will apply a default value."))
 	cmd.Flags().String("name", "", "The name for the newly created object. If not specified, the name of the input resource will be used.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
+	usage := "Filename, directory, or URL to a file identifying the resource to autoscale."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd

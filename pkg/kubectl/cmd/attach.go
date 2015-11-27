@@ -57,7 +57,7 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 	cmd := &cobra.Command{
 		Use:     "attach POD -c CONTAINER",
 		Short:   "Attach to a running container.",
-		Long:    "Attach to a a process that is already running inside an existing container.",
+		Long:    "Attach to a process that is already running inside an existing container.",
 		Example: attach_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
