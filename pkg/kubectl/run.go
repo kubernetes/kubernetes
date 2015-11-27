@@ -109,7 +109,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 				},
 				Spec: *podSpec,
 			},
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 		},
 	}
 	return &deployment, nil

@@ -85,7 +85,7 @@ func addDefaultingFuncs() {
 			}
 			if obj.Spec.UniqueLabelKey == nil {
 				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = "deployment.kubernetes.io/podTemplateHash"
+				*obj.Spec.UniqueLabelKey = DefaultDeploymentUniqueLabelKey
 			}
 		},
 		func(obj *Job) {

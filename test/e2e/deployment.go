@@ -54,7 +54,7 @@ func testNewDeployment(f *Framework) {
 		Spec: extensions.DeploymentSpec{
 			Replicas:       1,
 			Selector:       podLabels,
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabels,
@@ -147,7 +147,7 @@ func testRollingUpdateDeployment(f *Framework) {
 		Spec: extensions.DeploymentSpec{
 			Replicas:       3,
 			Selector:       deploymentPodLabels,
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: deploymentPodLabels,
@@ -228,7 +228,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		Spec: extensions.DeploymentSpec{
 			Replicas:       1,
 			Selector:       deploymentPodLabels,
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: deploymentPodLabels,
