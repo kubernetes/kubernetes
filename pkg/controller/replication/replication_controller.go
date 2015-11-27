@@ -383,7 +383,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		for i := 0; i < diff; i++ {
 			go func(ix int) {
 				defer wait.Done()
-				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name); err != nil {
+				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.DeletionObserved(rcKey)

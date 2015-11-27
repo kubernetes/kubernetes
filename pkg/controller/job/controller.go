@@ -346,7 +346,7 @@ func (jm *JobController) syncJob(key string) error {
 		for i := 0; i < active; i++ {
 			go func(ix int) {
 				defer wait.Done()
-				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name); err != nil {
+				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, &job); err != nil {
 					defer util.HandleError(err)
 				}
 			}(i)
@@ -440,7 +440,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ex
 		for i := 0; i < diff; i++ {
 			go func(ix int) {
 				defer wait.Done()
-				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name); err != nil {
+				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
 					defer util.HandleError(err)
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					jm.expectations.DeletionObserved(jobKey)
