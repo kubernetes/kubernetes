@@ -82,6 +82,9 @@ var _ = Describe("Density [Skipped]", func() {
 	var ns string
 	var uuid string
 
+	framework := NewFramework("density")
+	framework.NamespaceDeletionTimeout = time.Hour
+
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
 		// Remove any remaining pods from this test if the
@@ -114,10 +117,6 @@ var _ = Describe("Density [Skipped]", func() {
 		// We should do something similar to how we do it for APIserver.
 		expectNoError(VerifySchedulerLatency())
 	})
-
-	framework := NewFramework("density")
-	framework.NamespaceDeletionTimeout = time.Hour
-	framework.GatherKubeSystemResourceUsageData = testContext.GatherKubeSystemResourceUsageData
 
 	BeforeEach(func() {
 		c = framework.Client

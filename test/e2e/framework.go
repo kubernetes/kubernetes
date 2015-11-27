@@ -41,10 +41,7 @@ type Framework struct {
 	Client                   *client.Client
 	NamespaceDeletionTimeout time.Duration
 
-	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
-	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
-	GatherKubeSystemResourceUsageData bool
-	gatherer                          containerResourceGatherer
+	gatherer containerResourceGatherer
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -82,7 +79,7 @@ func (f *Framework) beforeEach() {
 		Logf("Skipping waiting for service account")
 	}
 
-	if f.GatherKubeSystemResourceUsageData {
+	if testContext.GatherKubeSystemResourceUsageData {
 		f.gatherer.startGatheringData(c, time.Minute)
 	}
 }
@@ -126,7 +123,7 @@ func (f *Framework) afterEach() {
 		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
 
-	if f.GatherKubeSystemResourceUsageData {
+	if testContext.GatherKubeSystemResourceUsageData {
 		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100})
 	}
 	// Paranoia-- prevent reuse!
