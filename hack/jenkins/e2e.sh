@@ -542,19 +542,25 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-e2e-gke-1.1-features)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
-    : ${E2E_CLUSTER_NAME:="gke-1-1-features"}
-    : ${E2E_NETWORK:="gke-1-1-features"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
-    : ${PROJECT:="k8s-jkns-e2e-gke-1-1-features"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=GCE\sL7\sLoadBalancer\sController|Job|Horizontal\spod\sautoscaling"}
-    # At least n1-standard-2 nodes are required for the cluster to
-    # have enough cpu/ram to run the Horizontal pod autoscaling tests.
-    MINION_SIZE="n1-standard-2"
+  kubernetes-e2e-aws-release-1.1)
+    : ${E2E_PUBLISH_GREEN_VERSION=true}
+    : ${E2E_CLUSTER_NAME="e2e-aws-1-1"}
+    : ${E2E_NETWORK="e2e-aws-1-1"}
+    : ${E2E_ZONE="us-west-2a"}
+    : ${ZONE="us-west-2a"}
+    : ${JENKINS_PUBLISHED_VERSION="ci/latest-1.1"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
+          )"}
+
+    : ${AWS_CONFIG_FILE=/var/lib/jenkins/.aws/credentials}
+    : ${AWS_SSH_KEY=/var/lib/jenkins/.ssh/kube_aws_rsa}
+    : ${KUBE_SSH_USER=ubuntu}
+    # Needed to be able to create PD from the e2e test
+    : ${AWS_SHARED_CREDENTIALS_FILE=/var/lib/jenkins/.aws/credentials}
     ;;
 esac
 
