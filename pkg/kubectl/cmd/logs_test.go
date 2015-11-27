@@ -69,7 +69,7 @@ func TestLog(t *testing.T) {
 		tf.ClientConfig = &client.Config{GroupVersion: &unversioned.GroupVersion{Version: test.version}}
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdLog(f, buf)
+		cmd := NewCmdLogs(f, buf)
 		cmd.Flags().Set("namespace", "test")
 		cmd.Run(cmd, []string{"foo"})
 
@@ -119,7 +119,7 @@ func TestValidateLogFlags(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		cmd := NewCmdLog(f, bytes.NewBuffer([]byte{}))
+		cmd := NewCmdLogs(f, bytes.NewBuffer([]byte{}))
 		out := ""
 		for flag, value := range test.flags {
 			cmd.Flags().Set(flag, value)
@@ -130,7 +130,7 @@ func TestValidateLogFlags(t *testing.T) {
 		cmd.Run = func(cmd *cobra.Command, args []string) {
 			o.Complete(f, os.Stdout, cmd, args)
 			out = o.Validate().Error()
-			o.RunLog()
+			o.RunLogs()
 		}
 		cmd.Run(cmd, []string{"foo"})
 

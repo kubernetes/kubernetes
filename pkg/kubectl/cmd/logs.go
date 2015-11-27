@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	log_example = `# Return snapshot logs from pod nginx with only one container
+	logs_example = `# Return snapshot logs from pod nginx with only one container
 $ kubectl logs nginx
 
 # Return snapshot of previous terminated ruby container logs from pod web-1
@@ -65,14 +65,14 @@ type LogsOptions struct {
 	Out io.Writer
 }
 
-// NewCmdLog creates a new pod log command
-func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+// NewCmdLog creates a new pod logs command
+func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
-		Example: log_example,
+		Example: logs_example,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
 				printDeprecationWarning("logs", "log")
@@ -83,7 +83,7 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			_, err := o.RunLog()
+			_, err := o.RunLogs()
 			cmdutil.CheckErr(err)
 		},
 		Aliases: []string{"log"},
@@ -163,19 +163,19 @@ func (o LogsOptions) Validate() error {
 	if len(o.ResourceArg) == 0 {
 		return errors.New("a pod must be specified")
 	}
-	logOptions, ok := o.Options.(*api.PodLogOptions)
+	logsOptions, ok := o.Options.(*api.PodLogOptions)
 	if !ok {
-		return errors.New("unexpected log options object")
+		return errors.New("unexpected logs options object")
 	}
-	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
+	if errs := validation.ValidatePodLogOptions(logsOptions); len(errs) > 0 {
 		return errs.ToAggregate()
 	}
 
 	return nil
 }
 
-// RunLog retrieves a pod log
-func (o LogsOptions) RunLog() (int64, error) {
+// RunLogs retrieves a pod log
+func (o LogsOptions) RunLogs() (int64, error) {
 	infos, err := resource.NewBuilder(o.Mapper, o.Typer, o.ClientMapper).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("pods", o.ResourceArg).
