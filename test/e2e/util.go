@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -61,6 +62,11 @@ const (
 	// Initial pod start can be delayed O(minutes) by slow docker pulls
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
+
+	// If there are any orphaned namespaces to clean up, this test is running
+	// on a long lived cluster. A long wait here is preferably to spurious test
+	// failures caused by leaked resources from a previous test run.
+	namespaceCleanupTimeout = 15 * time.Minute
 
 	// Some pods can take much longer to get ready due to volume attach/detach latency.
 	slowPodStartTimeout = 15 * time.Minute
@@ -128,6 +134,7 @@ type TestContextType struct {
 	UpgradeTarget         string
 	PrometheusPushGateway string
 	VerifyServiceAccount  bool
+	CleanStart            bool
 }
 
 var testContext TestContextType
@@ -392,6 +399,71 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 	}
 	return nil
+}
+
+// deleteNamespaces deletes all namespaces that match the given delete and skip filters.
+// Filter is by simple strings.Contains; first skip filter, then delete filter.
+// Returns the list of deleted namespaces or an error.
+func deleteNamespaces(c *client.Client, deleteFilter, skipFilter []string) ([]string, error) {
+	By("Deleting namespaces")
+	nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	var deleted []string
+	var wg sync.WaitGroup
+OUTER:
+	for _, item := range nsList.Items {
+		if skipFilter != nil {
+			for _, pattern := range skipFilter {
+				if strings.Contains(item.Name, pattern) {
+					continue OUTER
+				}
+			}
+		}
+		if deleteFilter != nil {
+			var shouldDelete bool
+			for _, pattern := range deleteFilter {
+				if strings.Contains(item.Name, pattern) {
+					shouldDelete = true
+					break
+				}
+			}
+			if !shouldDelete {
+				continue OUTER
+			}
+		}
+		wg.Add(1)
+		deleted = append(deleted, item.Name)
+		go func(nsName string) {
+			defer wg.Done()
+			defer GinkgoRecover()
+			Expect(c.Namespaces().Delete(nsName)).To(Succeed())
+			Logf("namespace : %v api call to delete is complete ", nsName)
+		}(item.Name)
+	}
+	wg.Wait()
+	return deleted, nil
+}
+
+func waitForNamespacesDeleted(c *client.Client, namespaces []string, timeout time.Duration) error {
+	By("Waiting for namespaces to vanish")
+	nsMap := map[string]bool{}
+	for _, ns := range namespaces {
+		nsMap[ns] = true
+	}
+	//Now POLL until all namespaces have been eradicated.
+	return wait.Poll(2*time.Second, timeout,
+		func() (bool, error) {
+			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+			if err != nil {
+				return false, err
+			}
+			for _, item := range nsList.Items {
+				if _, ok := nsMap[item.Name]; ok {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
 }
 
 func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, timeout time.Duration) error {
