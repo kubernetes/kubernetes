@@ -120,22 +120,24 @@ type CloudConfig struct {
 }
 
 type TestContextType struct {
-	KubeConfig                        string
-	KubeContext                       string
-	CertDir                           string
-	Host                              string
-	RepoRoot                          string
-	Provider                          string
-	CloudConfig                       CloudConfig
-	KubectlPath                       string
-	OutputDir                         string
-	prefix                            string
-	MinStartupPods                    int
-	UpgradeTarget                     string
-	PrometheusPushGateway             string
-	VerifyServiceAccount              bool
-	DeleteNamespace                   bool
-	CleanStart                        bool
+	KubeConfig            string
+	KubeContext           string
+	CertDir               string
+	Host                  string
+	RepoRoot              string
+	Provider              string
+	CloudConfig           CloudConfig
+	KubectlPath           string
+	OutputDir             string
+	prefix                string
+	MinStartupPods        int
+	UpgradeTarget         string
+	PrometheusPushGateway string
+	VerifyServiceAccount  bool
+	DeleteNamespace       bool
+	CleanStart            bool
+	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
+	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
 	GatherKubeSystemResourceUsageData bool
 }
 
