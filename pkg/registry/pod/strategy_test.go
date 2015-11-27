@@ -17,9 +17,12 @@ limitations under the License.
 package pod
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestCheckGracefulDelete(t *testing.T) {
@@ -73,6 +76,94 @@ func TestCheckGracefulDelete(t *testing.T) {
 		}
 		if *(out.GracePeriodSeconds) != tc.gracePeriod {
 			t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
+		}
+	}
+}
+
+type mockPodGetter struct {
+	pod *api.Pod
+}
+
+func (g mockPodGetter) Get(api.Context, string) (runtime.Object, error) {
+	return g.pod, nil
+}
+
+func TestCheckLogLocation(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	tcs := []struct {
+		in          *api.Pod
+		opts        *api.PodLogOptions
+		expectedErr error
+	}{
+		{
+			in: &api.Pod{
+				Spec:   api.PodSpec{},
+				Status: api.PodStatus{},
+			},
+			opts:        &api.PodLogOptions{},
+			expectedErr: errors.NewBadRequest("a container name must be specified for pod test"),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "mycontainer"},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts:        &api.PodLogOptions{},
+			expectedErr: nil,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts:        &api.PodLogOptions{},
+			expectedErr: errors.NewBadRequest("a container name must be specified for pod test"),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts: &api.PodLogOptions{
+				Container: "unknown",
+			},
+			expectedErr: errors.NewBadRequest("container unknown is not valid for pod test"),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts: &api.PodLogOptions{
+				Container: "container2",
+			},
+			expectedErr: nil,
+		},
+	}
+	for _, tc := range tcs {
+		getter := &mockPodGetter{tc.in}
+		_, _, err := LogLocation(getter, nil, ctx, "test", tc.opts)
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
 	}
 }
