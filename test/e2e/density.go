@@ -112,8 +112,7 @@ var _ = Describe("Density [Skipped]", func() {
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		// TODO: Reenable it once it is running with Kubemark.
-		// expectNoError(VerifySchedulerLatency())
+		expectNoError(VerifySchedulerLatency())
 	})
 
 	framework := NewFramework("density")
