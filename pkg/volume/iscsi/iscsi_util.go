@@ -180,6 +180,9 @@ func extractPortalAndIqn(device string) (string, string, error) {
 	portal := device[0:ind1]
 	ind2 := strings.Index(device, "iqn.")
 	if ind2 < 0 {
+		ind2 = strings.Index(device, "eui.")
+	}
+	if ind2 < 0 {
 		return "", "", fmt.Errorf("iscsi detach disk: no iqn in %s", device)
 	}
 	ind := strings.LastIndex(device, "-lun-")
