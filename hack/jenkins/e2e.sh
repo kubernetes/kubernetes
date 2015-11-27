@@ -54,7 +54,9 @@ TRUSTY_IMAGE_PROJECT="${TRUSTY_IMAGE_PROJECT:-}"
 function get_latest_trusty_image() {
     local job_name="${1:-${JOB_NAME}}"
     local image_index=""
-    if [[ "${job_name}" =~ trusty-beta ]]; then
+    if [[ "${job_name}" =~ trusty-dev ]]; then
+      image_index="trusty-dev"
+    elif [[ "${job_name}" =~ trusty-beta ]]; then
       image_index="trusty-beta"
     elif [[ "${job_name}" =~ trusty ]]; then
       image_index="trusty"
@@ -237,12 +239,6 @@ TRUSTY_DEFAULT_SKIP_TESTS=(
     # TODO(wonderfly): Remove this once
     # https://github.com/kubernetes/kubernetes/issues/12689 is fixed.
     "Services.*should\swork\safter\srestarting\skube-proxy"
-    # This test was broken and fixed after v1.1.1 release cut. As Trusty release
-    # tests pin to the latest release version of k8s, we'd have to wait till
-    # next release to pick up the fix.
-    # https://github.com/kubernetes/kubernetes/pull/14603
-    # TODO(wonderfly): Remove this once v1.1.2 is out.
-    "Kubelet\sregular\sresource\susage\stracking\sover\s30m0s\swith\s0\spods\sper\snode"
 )
 
 TRUSTY_SKIP_TESTS=(
@@ -250,9 +246,16 @@ TRUSTY_SKIP_TESTS=(
     "Monitoring\sshould\sverify\smonitoring\spods\sand\sall\scluster\snodes\sare\savailable\son\sinfluxdb\susing\sheapster"
 )
 
+TRUSTY_DEV_SKIP_TESTS=(
+    "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
+    "Monitoring\sshould\sverify\smonitoring\spods\sand\sall\scluster\snodes\sare\savailable\son\sinfluxdb\susing\sheapster"
+)
+
 TRUSTY_BETA_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
 )
+
+KUBERNETES_VERSION_FOR_TRUSTY="${KUBERNETES_VERSION_FOR_TRUSTY:-"release/v1.1.2"}"
 
 # Define environment variables based on the Jenkins project name.
 # NOTE: Not all jobs are defined here. The hack/jenkins/e2e.sh in master and
@@ -351,7 +354,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
     ;;
 
   # Runs slow tests on GCE with Trusy as base image for minions, sequentially.
@@ -369,9 +372,51 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
+
+  # Runs non-flaky tests on GCE with Trusty-dev as base image for minions,
+  # sequentially.
+  kubernetes-e2e-gce-trusty-dev-release)
+   : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-dev-release"}
+   : ${E2E_DOWN:="false"}
+   : ${E2E_NETWORK:="e2e-gce-trusty-dev-release"}
+   : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+         ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
+         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+         ${TRUSTY_DEV_SKIP_TESTS[@]:+${TRUSTY_DEV_SKIP_TESTS[@]}} \
+         )"}
+   : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+   : ${PROJECT:="k8s-e2e-gce-trusty-dev"}
+   : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+   : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+   : ${KUBE_OS_DISTRIBUTION:="trusty"}
+   : ${ENABLE_CLUSTER_REGISTRY:=false}
+   : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+   ;;
+
+  # Runs slow tests on GCE with Trusy-dev as base image for minions,
+  # sequentially.
+  kubernetes-e2e-gce-trusty-dev-slow)
+   : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-dev-slow"}
+   : ${E2E_NETWORK:="e2e-gce-trusty-dev-slow"}
+   : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+         ) --ginkgo.skip=$(join_regex_allow_empty \
+         ${TRUSTY_DEV_SKIP_TESTS[@]:+${TRUSTY_DEV_SKIP_TESTS[@]}} \
+         )"}
+   : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-dev-slow"}
+   : ${PROJECT:="k8s-e2e-gce-trusty-dev-slow"}
+   : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
+   : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
+   : ${KUBE_OS_DISTRIBUTION:="trusty"}
+   : ${ENABLE_CLUSTER_REGISTRY:=false}
+   : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+   : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+   ;;
 
   # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
   # sequentially.
@@ -392,7 +437,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
     ;;
 
   # Runs slow tests on GCE with Trusy-beta as base image for minions,
@@ -411,7 +456,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="release/v1.1.1"}
+    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
