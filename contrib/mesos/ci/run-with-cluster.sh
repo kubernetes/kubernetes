@@ -81,6 +81,6 @@ exec docker run \
     trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
     ./cluster/kube-down.sh && \
     ./cluster/kube-up.sh && \
-    trap 'test \$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; timeout 5m ./cluster/kube-down.sh' EXIT && \
+    trap \"test \\\$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; cd \${PWD} && timeout 5m ./cluster/kube-down.sh\" EXIT && \
     ${RUN_CMD}
   "
