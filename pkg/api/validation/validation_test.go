@@ -1875,6 +1875,33 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "valid port headless",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Port = 11722
+				s.Spec.Ports[0].TargetPort = intstr.FromInt(11722)
+				s.Spec.ClusterIP = api.ClusterIPNone
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid port headless",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Port = 11722
+				s.Spec.Ports[0].TargetPort = intstr.FromInt(11721)
+				s.Spec.ClusterIP = api.ClusterIPNone
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid port headless",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Port = 11722
+				s.Spec.Ports[0].TargetPort = intstr.FromString("target")
+				s.Spec.ClusterIP = api.ClusterIPNone
+			},
+			numErrs: 1,
+		},
+		{
 			name: "invalid publicIPs localhost",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.ExternalIPs = []string{"127.0.0.1"}
