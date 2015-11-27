@@ -39,8 +39,11 @@ import (
 )
 
 const (
-	podStartupThreshold           time.Duration = 5 * time.Second
-	listPodLatencyThreshold       time.Duration = 2 * time.Second
+	podStartupThreshold time.Duration = 5 * time.Second
+	// TODO: Decrease PodStartup latencies as soon as their perfomance improves
+	listPodLatencySmallThreshold  time.Duration = 2 * time.Second
+	listPodLatencyMediumThreshold time.Duration = 4 * time.Second
+	listPodLatencyLargeThreshold  time.Duration = 15 * time.Second
 	apiCallLatencySmallThreshold  time.Duration = 250 * time.Millisecond
 	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
@@ -164,6 +167,16 @@ func apiCallLatencyThreshold(numNodes int) time.Duration {
 	return apiCallLatencyLargeThreshold
 }
 
+func listPodsLatencyThreshold(numNodes int) time.Duration {
+	if numNodes <= 250 {
+		return listPodLatencySmallThreshold
+	}
+	if numNodes <= 500 {
+		return listPodLatencyMediumThreshold
+	}
+	return listPodLatencyLargeThreshold
+}
+
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
 func HighLatencyRequests(c *client.Client) (int, error) {
@@ -182,7 +195,7 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 	for _, metric := range metrics.APICalls {
 		threshold := apiCallLatencyThreshold(numNodes)
 		if metric.Verb == "LIST" && metric.Resource == "pods" {
-			threshold = listPodLatencyThreshold
+			threshold = listPodsLatencyThreshold(numNodes)
 		}
 
 		isBad := false
