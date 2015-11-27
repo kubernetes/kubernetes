@@ -122,6 +122,7 @@ __custom_func() {
    * persistentvolumeclaims (aka 'pvc')
    * limitranges (aka 'limits')
    * resourcequotas (aka 'quota')
+   * horizontalpodautoscalers (aka 'hpa')
 `
 )
 

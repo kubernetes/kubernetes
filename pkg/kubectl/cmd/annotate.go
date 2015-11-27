@@ -54,7 +54,7 @@ If --resource-version is specified, then updates will use this resource version,
 Possible resources include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota) or secrets.`
+horizontalpodautoscalers (hpa), resourcequotas (quota) or secrets.`
 	annotate_example = `# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
 # If the same annotation is set multiple times, only the last value will be applied
 $ kubectl annotate pods foo description='my frontend'
