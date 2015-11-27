@@ -58,7 +58,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		Burst:        5000,
 	})
 
-	schedulerConfigFactory = factory.NewConfigFactory(c, nil)
+	schedulerConfigFactory = factory.NewConfigFactory(c, nil, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		panic("Couldn't create scheduler config")

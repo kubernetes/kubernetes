@@ -2218,3 +2218,8 @@ type RangeAllocation struct {
 	// a single allocated address (the fifth bit on CIDR 10.0.0.0/8 is 10.0.0.4).
 	Data []byte `json:"data"`
 }
+
+const (
+	// "default-scheduler" is the name of default scheduler.
+	DefaultSchedulerName = "default-scheduler"
+)

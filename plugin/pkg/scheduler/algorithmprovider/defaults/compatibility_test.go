@@ -100,7 +100,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
 			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
 		}
-		_, err = factory.NewConfigFactory(nil, nil).CreateFromConfig(policy)
+		_, err = factory.NewConfigFactory(nil, nil, "some-scheduler-name").CreateFromConfig(policy)
 		if err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue

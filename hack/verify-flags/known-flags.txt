@@ -288,6 +288,7 @@ run-proxy
 runtime-config
 save-config
 scheduler-config
+scheduler-name
 schema-cache-dir
 secure-port
 serialize-image-pulls
