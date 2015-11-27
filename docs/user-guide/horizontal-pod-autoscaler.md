@@ -47,6 +47,9 @@ Please note that if some of the pod's containers do not have CPU request set,
 CPU utilization for the pod will not be defined and the autoscaler will not take any action.
 Further details of the autoscaling algorithm are given [here](../design/horizontal-pod-autoscaler.md#autoscaling-algorithm).
 
+Autoscaler uses heapster to collect CPU utilization.
+Therefore, it is required to deploy heapster monitoring in your cluster for autoscaling to work.
+
 Autoscaler accesses corresponding replication controller or deployment by scale sub-resource.
 Scale is an interface which allows to dynamically set the number of replicas and to learn the current state of them.
 More details on scale sub-resource can be found [here](../design/horizontal-pod-autoscaler.md#scale-subresource).
