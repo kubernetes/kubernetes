@@ -79,6 +79,7 @@ exec docker run \
   -ceux "\
     make clean all && \
     trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
+    ./cluster/kube-down.sh && \
     ./cluster/kube-up.sh && \
     trap 'test \$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; timeout 5m ./cluster/kube-down.sh' EXIT && \
     ${RUN_CMD}
