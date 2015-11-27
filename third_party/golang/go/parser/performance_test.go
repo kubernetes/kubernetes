@@ -5,9 +5,10 @@
 package parser
 
 import (
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io/ioutil"
 	"testing"
+
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 var src = readFile("parser.go")

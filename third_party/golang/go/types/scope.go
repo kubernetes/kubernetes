@@ -9,10 +9,11 @@ package types
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io"
 	"sort"
 	"strings"
+
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 // TODO(gri) Provide scopes with a name or other mechanism so that
