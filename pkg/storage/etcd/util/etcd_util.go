@@ -23,32 +23,49 @@ import (
 	"net/http"
 
 	goetcd "github.com/coreos/go-etcd/etcd"
-	"k8s.io/kubernetes/pkg/tools"
+)
+
+const (
+	etcdErrorCodeNotFound      = 100
+	etcdErrorCodeTestFailed    = 101
+	etcdErrorCodeNodeExist     = 105
+	etcdErrorCodeValueRequired = 200
+	etcdErrorCodeWatchExpired  = 401
+	etcdErrorCodeUnreachable   = 501
+)
+
+var (
+	etcdErrorNotFound      = &goetcd.EtcdError{ErrorCode: etcdErrorCodeNotFound}
+	etcdErrorTestFailed    = &goetcd.EtcdError{ErrorCode: etcdErrorCodeTestFailed}
+	etcdErrorNodeExist     = &goetcd.EtcdError{ErrorCode: etcdErrorCodeNodeExist}
+	etcdErrorValueRequired = &goetcd.EtcdError{ErrorCode: etcdErrorCodeValueRequired}
+	etcdErrorWatchExpired  = &goetcd.EtcdError{ErrorCode: etcdErrorCodeWatchExpired}
+	etcdErrorUnreachable   = &goetcd.EtcdError{ErrorCode: etcdErrorCodeUnreachable}
 )
 
 // IsEtcdNotFound returns true if and only if err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
-	return isEtcdErrorNum(err, tools.EtcdErrorCodeNotFound)
+	return isEtcdErrorNum(err, etcdErrorCodeNotFound)
 }
 
 // IsEtcdNodeExist returns true if and only if err is an etcd node already exist error.
 func IsEtcdNodeExist(err error) bool {
-	return isEtcdErrorNum(err, tools.EtcdErrorCodeNodeExist)
+	return isEtcdErrorNum(err, etcdErrorCodeNodeExist)
 }
 
 // IsEtcdTestFailed returns true if and only if err is an etcd write conflict.
 func IsEtcdTestFailed(err error) bool {
-	return isEtcdErrorNum(err, tools.EtcdErrorCodeTestFailed)
+	return isEtcdErrorNum(err, etcdErrorCodeTestFailed)
 }
 
 // IsEtcdWatchExpired returns true if and only if err indicates the watch has expired.
 func IsEtcdWatchExpired(err error) bool {
-	return isEtcdErrorNum(err, tools.EtcdErrorCodeWatchExpired)
+	return isEtcdErrorNum(err, etcdErrorCodeWatchExpired)
 }
 
 // IsEtcdUnreachable returns true if and only if err indicates the server could not be reached.
 func IsEtcdUnreachable(err error) bool {
-	return isEtcdErrorNum(err, tools.EtcdErrorCodeUnreachable)
+	return isEtcdErrorNum(err, etcdErrorCodeUnreachable)
 }
 
 // isEtcdErrorNum returns true if and only if err is an etcd error, whose errorCode matches errorCode

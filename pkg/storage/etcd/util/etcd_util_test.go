@@ -28,10 +28,6 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/stretchr/testify/assert"
-
-	// TODO: once fakeClient has been purged move utils
-	// and eliminate these deps
-	"k8s.io/kubernetes/pkg/tools"
 )
 
 const validEtcdVersion = "etcd 2.0.9"
@@ -42,7 +38,7 @@ func TestIsEtcdNotFound(t *testing.T) {
 			t.Errorf("Expected %#v to return %v, but it did not", err, isNotFound)
 		}
 	}
-	try(tools.EtcdErrorNotFound, true)
+	try(etcdErrorNotFound, true)
 	try(&etcd.EtcdError{ErrorCode: 101}, false)
 	try(nil, false)
 	try(fmt.Errorf("some other kind of error"), false)
