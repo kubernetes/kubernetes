@@ -23,13 +23,14 @@
 package parser
 
 import (
-	"k8s.io/kubernetes/third_party/golang/go/scanner"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/third_party/golang/go/scanner"
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 const testdata = "testdata"

@@ -9,13 +9,14 @@ package parser
 import (
 	"bytes"
 	"errors"
-	"k8s.io/kubernetes/third_party/golang/go/ast"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"k8s.io/kubernetes/third_party/golang/go/ast"
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 // If src != nil, readSource converts src to a []byte if possible;
