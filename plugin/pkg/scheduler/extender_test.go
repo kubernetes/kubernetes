@@ -284,7 +284,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		for ii := range test.extenders {
 			extenders = append(extenders, &test.extenders[ii])
 		}
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, extenders, algorithm.FakePodLister(test.pods), random)
+		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, nil, extenders, algorithm.FakePodLister(test.pods), random)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
