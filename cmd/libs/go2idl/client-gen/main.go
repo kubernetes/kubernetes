@@ -35,6 +35,8 @@ func main() {
 		"k8s.io/kubernetes/pkg/fields",
 		"k8s.io/kubernetes/pkg/labels",
 		"k8s.io/kubernetes/pkg/watch",
+		"k8s.io/kubernetes/pkg/client/unversioned",
+		"k8s.io/kubernetes/pkg/api/latest",
 	}
 	// We may change the output path later.
 	arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset/unversioned"
