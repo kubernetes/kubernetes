@@ -25,7 +25,7 @@ import (
 	"os"
 	"runtime"
 
-	"k8s.io/kubernetes/cmd/kubelet/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
@@ -34,7 +34,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewKubeletServer()
+	s := kubeletapp.NewKubeletServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
