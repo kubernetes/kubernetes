@@ -35,15 +35,16 @@ Documentation for other releases can be found at
 
 A proposal to modify [`Job` resource](../../docs/user-guide/jobs.md) to implement a minimal [Workflow managment system](https://en.wikipedia.org/wiki/Workflow_management_system) in kubernetes.
 Workflows (aka DAG workflows since jobs are organized in a Direct Acyclic Graph) are ubiquitous in modern [job schedulers](https://en.wikipedia.org/wiki/Job_scheduler), see for example:
-    - [luigi](https://github.com/spotify/luigi)
-    - [ozie](http://oozie.apache.org/)
-    - [azkaban](https://azkaban.github.io/)
+
+* [luigi](https://github.com/spotify/luigi)
+* [ozie](http://oozie.apache.org/)
+* [azkaban](https://azkaban.github.io/)
 
 Most of the [job schedulers](https://en.wikipedia.org/wiki/List_of_job_scheduler_software) offer workflow functionality to some extent.
 
 ## Use Cases
 
-    * As a user I want to be able to define job chains such that the completion of a given job will trigger other jobs.
+* As a user I want to be able to define job chains such that the completion of a given job will trigger other jobs.
 
 ## Implementation
 
@@ -56,77 +57,82 @@ A similar approach is implemented in Chronos for [dependent jobs](https://mesos.
 To implement _workflows_ the `Job` API should be modified:
 
 ```go
-// JobsSelector it's just an alias for PodSelector
-type JobSelector PodSelector
+// JobSpec describes how the job execution will look like.
 
-// Job represents the configuration of a single job.
-type Job struct {
-    unversioned.TypeMeta `json:",inline"`
-    // Standard object's metadata.
+// These are valid conditions of a job.
+const (
+	// JobComplete means the job has completed its execution.
+	JobComplete JobConditionType = "Complete"
+	JobWaiting  JobConditionType = "Waiting"
+)
 
-    // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-    api.ObjectMeta `json:"metadata,omitempty"`
+type JobSpec struct {
 
-    // Spec is a structure defining the expected behavior of a job.
-    // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-    Spec JobSpec `json:"spec,omitempty"`
+	// Parallelism specifies the maximum desired number of pods the job should
+	// run at any given time. The actual number of pods running in steady state will
+	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
+	// i.e. when the work left to do is less than max parallelism.
+	Parallelism *int `json:"parallelism,omitempty"`
 
-    // Status is a structure describing current status of a job.
-    // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-    Status JobStatus `json:"status,omitempty"`
+	// Completions specifies the desired number of successfully finished pods the
+	// job should be run with. Defaults to 1.
+	Completions *int `json:"completions,omitempty"`
 
-    // JobSelector to detect parents jobs
-    ParentSelector *JobSelector `json:"parentSelector, omitempty"`
+	// Selector is a label query over pods that should match the pod count.
+	Selector *PodSelector `json:"selector,omitempty"`
+
+	// Template is the object that describes the pod that will be created when
+	// executing a job.
+	Template api.PodTemplateSpec `json:"template"`
+
+	// Job labels selector to detect parents jobs.
+	ParentSelector map[string]string `json:"parentSelector"`
 }
+
 ```
 
-#### JobSpec and JobStatus
+#### JobSpec
 
-No modifications
-
-#### Parent JobSelector
-
-The `.job.parentselector` is a label query over a set of jobs.
+A new labels selector will be added to `apis.extensions.jobspec`. The `jobspec.parentselector` is a label query over a set of jobs.
 If all selected jobs are completed the `job` will be started immediately.
-If `.job.parentselector` is absent the `job` will be started immediately.
+If `.jobspec.parentselector` is absent the `job` will be started immediately.
 Since labels are forwarded directly from `job` to pods, users should not create pods whose labels match this selector, either directly,
 via another Job, or via another controller (for example Replication controller), [see](https://github.com/kubernetes/kubernetes/issues/14961).
 
-#### Some special cases
+#### JobStatus
 
-Jobs terminated via [#17244](https://github.com/kubernetes/kubernetes/issues/17244)  (if implemented) will be considered _completed_ so will trigger the _child_ jobs. Since it's very unlikely that the user would keep the _child_ jobs alive we may add a field to cascade termination to _child_ jobs if any to the current proposals made by @pmorie and @bgrant0607.
+`apis.extensions.jobstatus` won't be modified, but a new job condition will be added.
 
-For example
+#### JobCondition
 
-```json
-apiVersion: v1alpha1
-kind: UpwardAPIRequest
-spec:
-    terminateExistingJob: true
-    reason: "TimeOut"
-    message: "Pods ran out of time"
-    cascade: true
-```
+A new constant value will be added to `JobConditionType` - `Waiting`. This will inform the job is waiting for its parents to finish execution. `Waiting` condition will be valid only for `workflow job`.
 
 ### CRUD
 
-    - Creating a job without an empty `jobs.parentselector` will simply follow the usual `job` life cycle.  With a non non nil `jobs.parentselector` the logic already described will be considered.
-    - Users may read the `job` using the usual `get`, `describe` commands already implemented for `job`. Obviously the `describe` command should display the non nil `jobs.parentsselector` (if any).
-    - A `job` cannot be updated. To update a `job`, user should delete and re-create it. The only exception is `job` _scaling_. A `workflow job` (i.e. with a non nil selector) can be scaled in the common way. No matter if pods are currently running or not.
-    - A `job` can be deleted in the usual way `job`. A cascade mechanism may be implemented in a later phase.
+* Creating a job without a `jobspec.parentselector` (nil `jobspec.parentselector`) will simply follow the usual `job` life cycle.
+* Without a `jobspec.parentselector` (i.e. nil) the job will be started immediately.
+* With a non nil `jobspec.parentselector` the logic already described will be considered.
+* The validation will prevent the user to set an _empty_ `jobspec.parentselector`.
+* Users may read the `job` using the usual `get`, `describe` commands already implemented for `job`. The `describe` command should display the non nil `jobs.parentsselector` (if any).
+* A `job` cannot be updated. To update a `job`, user should delete and re-create it. The only exception is `job` _scaling_. A `workflow job` (i.e. with a non nil selector) can be scaled in the common way. No matter if pods are currently running or not.
+* A `job` can be deleted in the usual way.
 
 ## Events
 
 The usual Job controller events will be emitted.
-    * JobStart
-    * JobFinished
-Since a Job with a non nil job selector can be created and may never start we propose to add the event:
-    * JobCreated
+
+* JobStart
+* JobFinished
+
+Since a Job with a non nil job selector can be created and may never start we propose to add the events:
+
+* JobCreated
+* JobWaiting
 
 ## Known drawbacks
 
-    * Using only a label selector won't permit to implement backtracking for failures, a common functionality for a DAG worflow system. In this cases [controllerRef](https://github.com/kubernetes/kubernetes/issues/2210#issuecomment-134878215) could help.
-    * There's no guarantee to DAG rules aren't violated. For example we cannot prevent cycles between one or more jobs. The only check one may perform is to ensure there is no self-loop on each Job (basically preventing a Job from being its own parent).
+* Using only a label selector and a boolean field will produce only a very limited ability to troubleshoot failures (for example backtracking chain of jobs in case of failures). In this cases [controllerRef](https://github.com/kubernetes/kubernetes/issues/2210#issuecomment-134878215) could help.
+* No guarantee DAG rules
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
