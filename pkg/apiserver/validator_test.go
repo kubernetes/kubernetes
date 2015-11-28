@@ -17,31 +17,29 @@ limitations under the License.
 package apiserver
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/probe"
+	"net/url"
+	"time"
 )
 
-type fakeRoundTripper struct {
-	err  error
-	resp *http.Response
-	url  string
+type fakeHttpProber struct {
+	result probe.Result
+	body   string
+	err    error
 }
 
-func (f *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	f.url = req.URL.String()
-	return f.resp, f.err
+func (f *fakeHttpProber) Probe(*url.URL, time.Duration) (probe.Result, string, error) {
+	return f.result, f.body, f.err
 }
 
 func alwaysError([]byte) error { return errors.New("test error") }
 
 func matchError(data []byte) error {
-	if string(data) == "bar" {
+	if string(data) != "bar" {
 		return errors.New("match error")
 	}
 	return nil
@@ -49,47 +47,44 @@ func matchError(data []byte) error {
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
-		err            error
-		data           string
-		expectedStatus probe.Result
-		code           int
-		expectErr      bool
-		validator      ValidatorFn
+		probeResult probe.Result
+		probeData   string
+		probeErr    error
+
+		expectResult probe.Result
+		expectData   string
+		expectErr    bool
+
+		validator ValidatorFn
 	}{
-		{fmt.Errorf("test error"), "", probe.Unknown, 500 /*ignored*/, true, nil},
-		{nil, "foo", probe.Success, 200, false, nil},
-		{nil, "foo", probe.Failure, 500, true, nil},
-		{nil, "foo", probe.Failure, 200, true, alwaysError},
-		{nil, "foo", probe.Success, 200, false, matchError},
+		{probe.Unknown, "", fmt.Errorf("probe error"), probe.Unknown, "", true, nil},
+		{probe.Failure, "", nil, probe.Failure, "", false, nil},
+		{probe.Success, "foo", nil, probe.Failure, "foo", true, matchError},
+		{probe.Success, "foo", nil, probe.Success, "foo", false, nil},
 	}
 
 	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}
 
 	for _, test := range tests {
-		fakeRT := &fakeRoundTripper{
-			err: test.err,
-			resp: &http.Response{
-				Body:       ioutil.NopCloser(bytes.NewBufferString(test.data)),
-				StatusCode: test.code,
-			},
+		fakeProber := &fakeHttpProber{
+			result: test.probeResult,
+			body:   test.probeData,
+			err:    test.probeErr,
 		}
+
 		s.Validate = test.validator
-		status, data, err := s.DoServerCheck(fakeRT)
-		expect := fmt.Sprintf("http://%s:%d/healthz", s.Addr, s.Port)
-		if fakeRT.url != expect {
-			t.Errorf("expected %s, got %s", expect, fakeRT.url)
-		}
+		result, data, err := s.DoServerCheck(fakeProber)
 		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error")
+			t.Error("unexpected non-error")
 		}
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if data != test.data {
-			t.Errorf("expected empty string, got %s", status)
+		if data != test.expectData {
+			t.Errorf("expected %s, got %s", test.expectData, data)
 		}
-		if status != test.expectedStatus {
-			t.Errorf("expected %s, got %s", test.expectedStatus, status)
+		if result != test.expectResult {
+			t.Errorf("expected %s, got %s", test.expectResult, result)
 		}
 	}
 }
