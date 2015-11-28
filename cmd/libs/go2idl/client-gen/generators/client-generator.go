@@ -19,6 +19,7 @@ package generators
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
@@ -50,6 +51,22 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	if err != nil {
 		glog.Fatalf("Failed loading boilerplate: %v", err)
 	}
+
+	groupToTypes := map[string][]*types.Type{}
+	for _, inputDir := range arguments.InputDirs {
+		p := context.Universe.Package(inputDir)
+		for _, t := range p.Types {
+			if types.ExtractCommentTags("+", t.CommentLines)["genclient"] != "true" {
+				continue
+			}
+			group := filepath.Base(t.Name.Package)
+			if _, found := groupToTypes[group]; !found {
+				groupToTypes[group] = []*types.Type{}
+			}
+			groupToTypes[group] = append(groupToTypes[group], t)
+		}
+	}
+
 	return generator.Packages{&generator.DefaultPackage{
 		PackageName: "unversioned",
 		PackagePath: arguments.OutputPackagePath,
@@ -85,6 +102,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 					},
 					outputPackage: arguments.OutputPackagePath,
 					typeToMatch:   t,
+					imports:       generator.NewImportTracker(),
+				})
+			}
+
+			for group, types := range groupToTypes {
+				generators = append(generators, &genGroup{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: group,
+					},
+					outputPackage: arguments.OutputPackagePath,
+					group:         group,
+					types:         types,
 					imports:       generator.NewImportTracker(),
 				})
 			}
