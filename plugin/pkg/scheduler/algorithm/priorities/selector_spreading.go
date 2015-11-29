@@ -19,6 +19,7 @@ package priorities
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
@@ -34,6 +35,24 @@ func NewSelectorSpreadPriority(serviceLister algorithm.ServiceLister, controller
 		controllerLister: controllerLister,
 	}
 	return selectorSpread.CalculateSpreadPriority
+}
+
+// Helper function that builds a string identifier that is unique per failure-zone
+// Returns empty-string for no zone
+func getZoneKey(node *api.Node) string {
+	labels := node.Labels
+	if labels == nil {
+		return ""
+	}
+
+	region, _ := labels[unversioned.LabelZoneRegion]
+	failureDomain, _ := labels[unversioned.LabelZoneFailureDomain]
+
+	if region == "" && failureDomain == "" {
+		return ""
+	}
+
+	return region + ":" + failureDomain
 }
 
 // CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service or replication controller. It counts number of pods that run under
@@ -75,9 +94,17 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 		return nil, err
 	}
 
-	counts := map[string]int{}
+	maxCountByNodeName := 0
+	countsByNodeName := map[string]int{}
 	if len(nsPods) > 0 {
 		for _, pod := range nsPods {
+			// When we are replacing a failed pod, we often see the previous deleted version
+			// while scheduling the replacement.  Ignore the previous deleted version for spreading
+			// purposes (it can still be considered for resource restrictions etc.)
+			if pod.DeletionTimestamp != nil {
+				glog.V(2).Infof("skipping pending-deleted pod: %s/%s", pod.Namespace, pod.Name)
+				continue
+			}
 			matches := false
 			for _, selector := range selectors {
 				if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
@@ -86,23 +113,60 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 				}
 			}
 			if matches {
-				counts[pod.Spec.NodeName]++
+				countsByNodeName[pod.Spec.NodeName]++
 				// Compute the maximum number of pods hosted on any node
-				if counts[pod.Spec.NodeName] > maxCount {
-					maxCount = counts[pod.Spec.NodeName]
+				if countsByNodeName[pod.Spec.NodeName] > maxCountByNodeName {
+					maxCountByNodeName = countsByNodeName[pod.Spec.NodeName]
 				}
 			}
+		}
+	}
+
+	maxCountByZone := 0
+	haveZones := false
+	countsByZone := map[string]int{}
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+
+		count, found := countsByNodeName[node.Name]
+		if !found {
+			continue
+		}
+
+		zoneId := getZoneKey(node)
+		if zoneId == "" {
+			continue
+		}
+
+		haveZones = true
+		countsByZone[zoneId] += count
+		// Compute the maximum number of pods hosted in any zone
+		if countsByZone[zoneId] > maxCountByZone {
+			maxCountByZone = countsByZone[zoneId]
 		}
 	}
 
 	result := []algorithm.HostPriority{}
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
-	for _, node := range nodes.Items {
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
 		// initializing to the default/max node score of 10
 		fScore := float32(10)
-		if maxCount > 0 {
-			fScore = 10 * (float32(maxCount-counts[node.Name]) / float32(maxCount))
+		if maxCountByNodeName > 0 {
+			fScore = 10 * (float32(maxCountByNodeName-countsByNodeName[node.Name]) / float32(maxCountByNodeName))
+		}
+
+		// If there is zone information present, incorporate it
+		if haveZones {
+			zoneId := getZoneKey(node)
+			if zoneId != "" {
+				fScore += 20 * (float32(maxCountByZone-countsByZone[zoneId]) / float32(maxCountByZone))
+			}
+
+			// Give 2/3 of the weighting to zone spreading, 1/3 to node spreading
+			// TODO: Any way to justify this weighting?
+			fScore /= 3.0
 		}
 		result = append(result, algorithm.HostPriority{Host: node.Name, Score: int(fScore)})
 		glog.V(10).Infof(
