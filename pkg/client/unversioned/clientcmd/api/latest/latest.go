@@ -16,11 +16,6 @@ limitations under the License.
 
 package latest
 
-import (
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-)
-
 // Version is the string that represents the current external default version.
 const Version = "v1"
 
@@ -33,9 +28,3 @@ const OldestVersion = "v1"
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
 var Versions = []string{"v1"}
-
-// Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
-// disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
-var Codec = runtime.YAMLDecoder(v1.Codec)

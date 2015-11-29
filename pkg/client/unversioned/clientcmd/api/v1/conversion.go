@@ -69,7 +69,7 @@ func init() {
 			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
 				return err
 			}
-			out.Extensions = make(map[string]*runtime.EmbeddedObject)
+			out.Extensions = make(map[string]runtime.Object)
 			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
 				return err
 			}
@@ -192,10 +192,10 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedExtension, out *map[string]*runtime.EmbeddedObject, s conversion.Scope) error {
+		func(in *[]NamedExtension, out *map[string]runtime.Object, s conversion.Scope) error {
 			for _, curr := range *in {
-				newExtension := &runtime.EmbeddedObject{}
-				if err := s.Convert(&curr.Extension, newExtension, 0); err != nil {
+				var newExtension runtime.Object
+				if err := s.Convert(&curr.Extension, &newExtension, 0); err != nil {
 					return err
 				}
 				(*out)[curr.Name] = newExtension
@@ -203,7 +203,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]*runtime.EmbeddedObject, out *[]NamedExtension, s conversion.Scope) error {
+		func(in *map[string]runtime.Object, out *[]NamedExtension, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)

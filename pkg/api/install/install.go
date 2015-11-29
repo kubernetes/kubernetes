@@ -31,8 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
 
 // userResources is a group of resources mostly used by a kubectl user
@@ -41,6 +42,8 @@ var userResources = []string{"rc", "svc", "pods", "pvc"}
 const importPrefix = "k8s.io/kubernetes/pkg/api"
 
 var accessor = meta.NewAccessor()
+
+var v1Codec runtime.Codec
 
 func init() {
 	groupMeta, err := latest.RegisterGroup("")
@@ -58,7 +61,6 @@ func init() {
 		GroupVersion: groupVersion.String(),
 		Group:        groupVersion.Group,
 		Version:      groupVersion.Version,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string
@@ -100,6 +102,8 @@ func init() {
 	groupMeta.RESTMapper = mapper
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
+
+	v1Codec := versioning.NewCodec()
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
@@ -108,7 +112,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case "v1":
 		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
+			Codec:            v1Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil

@@ -56,9 +56,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				*j = nil
 			}
 		},
-		func(j *runtime.PluginBase, c fuzz.Continue) {
-			// Do nothing; this struct has only a Kind field and it must stay blank in memory.
-		},
 		func(j *runtime.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.

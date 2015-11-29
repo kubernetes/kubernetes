@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -38,6 +38,8 @@ import (
 const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 
 var accessor = meta.NewAccessor()
+
+var v1beta1Codec runtime.Codec
 
 func init() {
 	groupMeta, err := latest.RegisterGroup("extensions")
@@ -54,7 +56,6 @@ func init() {
 		GroupVersion: groupVersion.String(),
 		Group:        groupVersion.Group,
 		Version:      groupVersion.Version,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string
@@ -85,7 +86,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case "extensions/v1beta1":
 		return &meta.VersionInterfaces{
-			Codec:            v1beta1.Codec,
+			Codec:            v1beta1Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil

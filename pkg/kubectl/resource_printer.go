@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -201,46 +202,44 @@ type NamePrinter struct {
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
 // and print "resource/name" pair. If the object is a List, print all items in it.
+// TODO: NamePrinter needs to take ObjectTyper, RESTMapper, and a list of decoders
+//   in order to do what it needs to do.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	// TODO: this is wrong, it should be using an ObjectTyper and a RESTMapper
 	objvalue := reflect.ValueOf(obj).Elem()
 	kind := objvalue.FieldByName("Kind")
 	if !kind.IsValid() {
 		kind = reflect.ValueOf("<unknown>")
 	}
-	if kind.String() == "List" {
-		items := objvalue.FieldByName("Items")
-		if items.Type().String() == "[]runtime.RawExtension" {
-			for i := 0; i < items.Len(); i++ {
-				rawObj := items.Index(i).FieldByName("RawJSON").Interface().([]byte)
-				scheme := api.Scheme
-				version, kind, err := scheme.DataVersionAndKind(rawObj)
-				if err != nil {
-					return err
-				}
-				decodedObj, err := scheme.DecodeToVersion(rawObj, unversioned.GroupVersion{})
-				if err != nil {
-					return err
-				}
-				tpmeta := unversioned.TypeMeta{
-					APIVersion: version,
-					Kind:       kind,
-				}
-				s := reflect.ValueOf(decodedObj).Elem()
-				s.FieldByName("TypeMeta").Set(reflect.ValueOf(tpmeta))
-				p.PrintObj(decodedObj, w)
-			}
-		} else {
-			return errors.New("the list object contains unrecognized items.")
-		}
-	} else {
-		name := objvalue.FieldByName("Name")
-		if !name.IsValid() {
-			name = reflect.ValueOf("<unknown>")
-		}
-		_, resource := meta.KindToResource(kind.String(), false)
 
-		fmt.Fprintf(w, "%s/%s\n", resource, name)
+	// TODO: this code is wrong and should not expected to be processing lists (because
+	// DecodeList needs access to the structured error schemes)
+	if meta.IsListType(obj) {
+		items, err := meta.ExtractList(obj)
+		if err != nil {
+			return err
+		}
+		// TODO: this is wrong, should access all metadata schemes.
+		if errs := runtime.DecodeList(items, runtime.UnstructuredJSONScheme, api.Scheme); len(errs) > 0 {
+			return utilerrors.NewAggregate(errs)
+		}
+		for _, obj := range items {
+			if err := p.PrintObj(obj, w); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
+
+	// TODO: this is wrong, runtime.Unknown and runtime.Unstructured are not handled properly here.
+	name := meta.Accessor(obj).Name()
+	if len(name) == 0 {
+		name = "<unknown>"
+	}
+	// TODO: this is wrong, it assumes that meta knows about all Kinds
+	_, resource := meta.KindToResource(kind.String(), false)
+
+	fmt.Fprintf(w, "%s/%s\n", resource, name)
 
 	return nil
 }

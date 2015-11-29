@@ -19,13 +19,10 @@ package v1beta1
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
-
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
 
 func init() {
 	addKnownTypes()

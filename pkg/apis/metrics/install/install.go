@@ -54,7 +54,6 @@ func init() {
 		GroupVersion: groupVersion.String(),
 		Group:        groupVersion.Group,
 		Version:      groupVersion.Version,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 	var versions []string
 	var groupVersions []string

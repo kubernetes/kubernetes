@@ -24,9 +24,9 @@ import (
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
-	runtime.Codec
 	runtime.ObjectConvertor
 	MetadataAccessor
+	runtime.Codec
 }
 
 // Interface lets you work with object and list metadata from any of the versioned or

@@ -25,8 +25,6 @@ import (
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "componentconfig", Version: "v1alpha1"}
 
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
-
 func init() {
 	addKnownTypes()
 	addDefaultingFuncs()

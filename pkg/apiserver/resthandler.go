@@ -758,6 +758,7 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 	if err != nil {
 		return err
 	}
+	// TODO: I am going away... bye!
 	if version, dataKind, err := typer.DataVersionAndKind(body); err == nil && len(dataKind) > 0 {
 		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", dataKind, version, kind, baseErr))
 	}
