@@ -32,12 +32,42 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/rand"
+	//"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"os"
 )
 
 // versions ~ 1.3 (original RO test), 1.6 uses newer services/tokens,...
 const nettestVersion = "1.6"
+
+func readScaleMultipliers() (int, int) {
+
+	scaleDensityMult := os.Getenv("KUBE_SCALE_DENSITY_MULTIPLIER")
+	scaleTimeoutMult := os.Getenv("KUBE_SCALE_TIMEOUT_MULTIPLIER")
+
+	scaleDensityInt := int64(1)
+	scaleTimeoutInt := int64(1)
+
+	if scaleDensityMult == "" || scaleTimeoutMult == "" {
+		return int(scaleDensityInt), int(scaleTimeoutInt)
+	}
+
+	scaleDensityInt, errS := strconv.ParseInt(scaleDensityMult, 10, 0)
+
+	if errS != nil {
+		panic(errS.Error())
+	}
+
+	scaleTimeoutInt, errT := strconv.ParseInt(scaleTimeoutMult, 10, 0)
+
+	if errT != nil {
+		panic(errT.Error())
+	}
+
+	Logf("SCALE PARAMETERS: %v %v", scaleDensityInt, scaleTimeoutInt)
+
+	return int(scaleDensityInt), int(scaleTimeoutInt)
+}
 
 var _ = Describe("Networking", func() {
 
@@ -107,6 +137,8 @@ var _ = Describe("Networking", func() {
 		}
 	})
 
+	scaleDensityMultiplier, scaleTimeoutMultiplier := readScaleMultipliers()
+
 	// Each tuple defined in this struct array represents
 	// a number of services, and a timeout.  So for example,
 	// {1, 300} defines a test where 1 service is created and
@@ -117,20 +149,33 @@ var _ = Describe("Networking", func() {
 		service        int
 		timeoutSeconds time.Duration
 	}{
-		// Note: On a GCE 3 node cluster, 30 ports is no problem.  > 50 seems to get blocked.
-		{3, time.Duration(100 * time.Second)},
+		// example usage:
+		// export KUBE_SCALE_DENSITY_MULTIPLIER=30
+		// export KUBE_SCALE_TIMEOUT_MULTIPLIER=2
+		// Soak test will be run for 30 services, 200 seconds timeout.
+		// export nothing? 1 service, 100 second timeout.
+		{1 * scaleDensityMultiplier, time.Duration(time.Duration(100*scaleTimeoutMultiplier) * time.Second)},
 	}
 
 	for _, svcSoak := range serviceSoakTests {
 		// copy to local to avoid range overwriting
 		timeoutSeconds := svcSoak.timeoutSeconds
 		serviceNum := svcSoak.service
+
+		if serviceNum <= 0 || timeoutSeconds <= 0 {
+			panic(fmt.Sprintf("Can't run a meaningfull test with services=%v and timeout=%v ", serviceNum, timeoutSeconds))
+		}
 		It(fmt.Sprintf("should function for intrapod communication between all hosts in %v parallel services [Conformance]", serviceNum),
 			func() {
 				// Create a list of a few 1000 ports to use as a grab bag.
 				minPort := 1000
 				maxPort := 10000
-				allPorts := rand.Intsn(minPort, 9000, maxPort)
+				allPorts := make([]int, 0, serviceNum)
+				for i := minPort; i < maxPort; i++ {
+					allPorts = append(allPorts, i)
+				}
+				// Randomized ports.  We don't need this now.
+				// allPorts := rand.Intsn(minPort, 9000, maxPort)
 				Logf("Running service test with timeout = %v for %v, ports = ", timeout, serviceNum, allPorts)
 				runNetTest(timeoutSeconds, f, allPorts, serviceNum, nettestVersion)
 			})
@@ -278,7 +323,6 @@ func runNetTest(timeoutSeconds time.Duration, f *Framework, portsGrabBag []int, 
 		Logf("Only one ready node is detected. The test has limited scope in such setting. " +
 			"Rerun it with at least two nodes to get complete coverage.")
 	}
-
 	// Test doesn't register as passed until all channels report back.
 	portCompleteChannel := make(chan string, minSvcPorts)
 
@@ -287,8 +331,8 @@ func runNetTest(timeoutSeconds time.Duration, f *Framework, portsGrabBag []int, 
 
 	// This is where the actual port connectivity test is invoked.
 	for _, service := range servicesToTest {
-		go func() {
-			passed := CreatePodsAndWait(f, nodes, service, timeoutSeconds)
+		go func(nodes *api.NodeList, svc *api.Service) {
+			passed := CreatePodsAndWait(f, nodes, svc, timeoutSeconds)
 			if passed {
 				portCompleteChannel <- service.Name
 			} else {
@@ -296,7 +340,7 @@ func runNetTest(timeoutSeconds time.Duration, f *Framework, portsGrabBag []int, 
 				netTestDone = true
 				Failf("Test failed.")
 			}
-		}()
+		}(nodes, service)
 	}
 
 	for pReturned := 0; pReturned < minSvcPorts; pReturned++ {
@@ -390,10 +434,8 @@ func CreateAllPods(port int, version string, f *Framework, nodes *api.NodeList, 
 	podNames := []string{}
 	Logf("launching net test pod per node %v on with service name %v", len(nodes.Items), svcName)
 	totalPods := len(nodes.Items)
-
 	Expect(totalPods).NotTo(Equal(0))
-
-	for _, node := range nodes.Items {
+	for nodei, node := range nodes.Items {
 		pod, err := f.Client.Pods(f.Namespace.Name).Create(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				GenerateName: svcName + "-",
@@ -421,7 +463,7 @@ func CreateAllPods(port int, version string, f *Framework, nodes *api.NodeList, 
 			},
 		})
 		Expect(err).NotTo(HaveOccurred())
-		Logf("Created pod %s on node %s", pod.ObjectMeta.Name, node.Name)
+		Logf("%v : Created pod %s on node %s", nodei, pod.ObjectMeta.Name, node.Name)
 		podNames = append(podNames, pod.ObjectMeta.Name)
 	}
 	return podNames
