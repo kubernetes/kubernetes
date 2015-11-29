@@ -57,12 +57,12 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"group":                      g.group,
 		"Group":                      namer.IC(g.group),
 		"types":                      g.types,
-		"Config":                     c.Universe.Get(types.Name{pkgUnversioned, "Config"}),
-		"DefaultKubernetesUserAgent": c.Universe.Get(types.Name{pkgUnversioned, "DefaultKubernetesUserAgent"}),
-		"RESTClient":                 c.Universe.Get(types.Name{pkgUnversioned, "RESTClient"}),
-		"RESTClientFor":              c.Universe.Get(types.Name{pkgUnversioned, "RESTClientFor"}),
-		"latestGroup":                c.Universe.Get(types.Name{pkgLatest, "Group"}),
-		"GroupOrDie":                 c.Universe.Get(types.Name{pkgLatest, "GroupOrDie"}),
+		"Config":                     c.Universe.Get(types.Name{Package: pkgUnversioned, Name: "Config"}),
+		"DefaultKubernetesUserAgent": c.Universe.Get(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
+		"RESTClient":                 c.Universe.Get(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
+		"RESTClientFor":              c.Universe.Get(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
+		"latestGroup":                c.Universe.Get(types.Name{Package: pkgLatest, Name: "Group"}),
+		"GroupOrDie":                 c.Universe.Get(types.Name{Package: pkgLatest, Name: "GroupOrDie"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)

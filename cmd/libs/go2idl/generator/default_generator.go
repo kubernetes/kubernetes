@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 )
 
+const (
+	GolangFileType = "golang"
+)
+
 // DefaultGen implements a do-nothing Generator.
 //
 // It can be used to implement static content files.
@@ -45,6 +49,7 @@ func (d DefaultGen) PackageVars(*Context) []string                       { retur
 func (d DefaultGen) PackageConsts(*Context) []string                     { return []string{} }
 func (d DefaultGen) GenerateType(*Context, *types.Type, io.Writer) error { return nil }
 func (d DefaultGen) Filename() string                                    { return d.OptionalName + ".go" }
+func (d DefaultGen) FileType() string                                    { return GolangFileType }
 
 func (d DefaultGen) Init(c *Context, w io.Writer) error {
 	_, err := w.Write(d.OptionalBody)
