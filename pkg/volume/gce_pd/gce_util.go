@@ -137,7 +137,16 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (volum
 	requestBytes := c.options.Capacity.Value()
 	// GCE works with gigabytes, convert to GiB with rounding up
 	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
-	err = cloud.CreateDisk(name, int64(requestGB))
+
+	// The disk will be created in the zone in which this code is currently running
+	// TODO: We should support auto-provisioning volumes in multiple/specified zones
+	zone, err := cloud.GetZone()
+	if err != nil {
+		glog.V(2).Infof("error getting zone information from GCE: %v", err)
+		return "", 0, err
+	}
+
+	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB))
 	if err != nil {
 		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
 		return "", 0, err

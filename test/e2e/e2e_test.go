@@ -119,7 +119,13 @@ func TestE2E(t *testing.T) {
 			Logf("Using service account %q as token source.", cloudConfig.ServiceAccount)
 			tokenSource = google.ComputeTokenSource(cloudConfig.ServiceAccount)
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, testContext.CloudConfig.Zone, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
+		zone := testContext.CloudConfig.Zone
+		region, err := gcecloud.GetGCERegion(zone)
+		if err != nil {
+			glog.Fatalf("error parsing GCE region from zone %q: %v", zone, err)
+		}
+		managedZones := []string{zone} // Only single-zone for now
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
 		if err != nil {
 			glog.Fatal("Error building GCE provider: ", err)
 		}
