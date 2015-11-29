@@ -48,6 +48,10 @@ import (
 // are therefore not allowed to set manually.
 var specialParams = sets.NewString("timeout")
 
+func init() {
+	metrics.Register()
+}
+
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -109,7 +113,6 @@ type Request struct {
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
 	codec runtime.Codec) *Request {
-	metrics.Register()
 	return &Request{
 		client:     client,
 		verb:       verb,
