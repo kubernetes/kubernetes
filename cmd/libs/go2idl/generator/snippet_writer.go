@@ -116,6 +116,10 @@ func (s *SnippetWriter) Do(format string, args interface{}) *SnippetWriter {
 	return s
 }
 
+func (s *SnippetWriter) Out() io.Writer {
+	return s.w
+}
+
 // Error returns any encountered error.
 func (s *SnippetWriter) Error() error {
 	return s.err
