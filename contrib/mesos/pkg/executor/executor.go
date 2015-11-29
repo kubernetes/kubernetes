@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,13 +35,12 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
-	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -89,15 +89,11 @@ func (s *stateType) transitionTo(to stateType, unless ...stateType) bool {
 
 type kuberTask struct {
 	mesosTaskInfo *mesos.TaskInfo
-	podName       string // empty until pod is sent to kubelet and registed in KubernetesExecutor.pods
+	launchTimer   *time.Timer // launchTimer expires when the launch-task process duration exceeds launchGracePeriod
+	podName       string      // empty until pod is sent to kubelet and registed in KubernetesExecutor.pods
 }
 
 type podStatusFunc func() (*api.PodStatus, error)
-
-type NodeInfo struct {
-	Cores int
-	Mem   int64 // in bytes
-}
 
 // KubernetesExecutor is an mesos executor that runs pods
 // in a minion machine.
@@ -118,9 +114,9 @@ type Executor struct {
 	exitFunc             func(int)
 	podStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	staticPodsConfigPath string
-	podController        *framework.Controller
 	launchGracePeriod    time.Duration
 	nodeInfos            chan<- NodeInfo
+	initCompleted        chan struct{} // closes upon completion of Init()
 }
 
 type Config struct {
@@ -144,6 +140,13 @@ func (k *Executor) isConnected() bool {
 
 // New creates a new kubernetes executor.
 func New(config Config) *Executor {
+	launchGracePeriod := config.LaunchGracePeriod
+	if launchGracePeriod == 0 {
+		// this is the equivalent of saying "the timer never expires" and simplies nil
+		// timer checks elsewhere in the code. it's a little hacky but less code to
+		// maintain that alternative approaches.
+		launchGracePeriod = time.Duration(math.MaxInt64)
+	}
 	k := &Executor{
 		updateChan:           config.Updates,
 		state:                disconnectedState,
@@ -160,41 +163,22 @@ func New(config Config) *Executor {
 		exitFunc:             config.ExitFunc,
 		podStatusFunc:        config.PodStatusFunc,
 		staticPodsConfigPath: config.StaticPodsConfigPath,
-		launchGracePeriod:    config.LaunchGracePeriod,
+		launchGracePeriod:    launchGracePeriod,
 		nodeInfos:            config.NodeInfos,
+		initCompleted:        make(chan struct{}),
 	}
+	runtime.On(k.initCompleted, k.runSendLoop)
 
-	// watch pods from the given pod ListWatch
-	if config.PodLW == nil {
-		// fail early to make debugging easier
-		panic("cannot create executor with nil PodLW")
-	}
-	_, k.podController = framework.NewInformer(config.PodLW, &api.Pod{}, podRelistPeriod, &framework.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			pod := obj.(*api.Pod)
-			log.V(4).Infof("pod %s/%s created on apiserver", pod.Namespace, pod.Name)
-			k.handleChangedApiserverPod(pod)
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			pod := newObj.(*api.Pod)
-			log.V(4).Infof("pod %s/%s updated on apiserver", pod.Namespace, pod.Name)
-			k.handleChangedApiserverPod(pod)
-		},
-		DeleteFunc: func(obj interface{}) {
-			pod := obj.(*api.Pod)
-			log.V(4).Infof("pod %s/%s deleted on apiserver", pod.Namespace, pod.Name)
-		},
-	})
+	po := newPodObserver(config.PodLW, k.updateTask, k.terminate)
+	runtime.On(k.initCompleted, po.run)
 
 	return k
 }
 
 func (k *Executor) Init(driver bindings.ExecutorDriver) {
+	defer close(k.initCompleted)
 	k.killKubeletContainers()
 	k.resetSuicideWatch(driver)
-
-	go k.podController.Run(k.terminate)
-	go k.sendLoop()
 	//TODO(jdef) monitor kubeletFinished and shutdown if it happens
 }
 
@@ -251,7 +235,7 @@ func (k *Executor) Registered(
 		}
 	}
 
-	annotations, err := executorInfoToAnnotations(executorInfo)
+	annotations, err := annotationsFor(executorInfo)
 	if err != nil {
 		log.Errorf(
 			"cannot get node annotations from executor info %v error %v",
@@ -374,10 +358,10 @@ func (k *Executor) LaunchTask(driver bindings.ExecutorDriver, taskInfo *mesos.Ta
 		return
 	}
 
+	taskId := taskInfo.GetTaskId().GetValue()
 	k.lock.Lock()
 	defer k.lock.Unlock()
 
-	taskId := taskInfo.GetTaskId().GetValue()
 	if _, found := k.tasks[taskId]; found {
 		log.Errorf("task already launched\n")
 		// Not to send back TASK_RUNNING here, because
@@ -390,49 +374,11 @@ func (k *Executor) LaunchTask(driver bindings.ExecutorDriver, taskInfo *mesos.Ta
 	// (c) we're leaving podName == "" for now, indicates we don't need to delete containers
 	k.tasks[taskId] = &kuberTask{
 		mesosTaskInfo: taskInfo,
+		launchTimer:   time.NewTimer(k.launchGracePeriod),
 	}
 	k.resetSuicideWatch(driver)
 
 	go k.launchTask(driver, taskId, pod)
-}
-
-func (k *Executor) handleChangedApiserverPod(pod *api.Pod) {
-	// exclude "pre-scheduled" pods which have a NodeName set to this node without being scheduled already
-	taskId := pod.Annotations[meta.TaskIdKey]
-	if taskId == "" {
-		log.V(5).Infof("ignoring pod update for %s/%s because %s annotation is missing", pod.Namespace, pod.Name, meta.TaskIdKey)
-		return
-	}
-
-	k.lock.Lock()
-	defer k.lock.Unlock()
-
-	// exclude tasks which are already deleted from our task registry
-	task := k.tasks[taskId]
-	if task == nil {
-		log.Warningf("task %s for pod %s/%s not found", taskId, pod.Namespace, pod.Name)
-		return
-	}
-
-	oldPod := k.pods[task.podName]
-
-	// terminating pod?
-	if oldPod != nil && pod.Status.Phase == api.PodRunning {
-		timeModified := differentTime(oldPod.DeletionTimestamp, pod.DeletionTimestamp)
-		graceModified := differentPeriod(oldPod.DeletionGracePeriodSeconds, pod.DeletionGracePeriodSeconds)
-		if timeModified || graceModified {
-			log.Infof("pod %s/%s is terminating at %v with %vs grace period, telling kubelet", pod.Namespace, pod.Name, *pod.DeletionTimestamp, *pod.DeletionGracePeriodSeconds)
-
-			// modify the pod in our registry instead of sending the new pod. The later
-			// would allow that other changes bleed into the kubelet. For now we are
-			// very conservative changing this behaviour.
-			// TODO(sttts): check whether we can and should send all changes down to the kubelet
-			oldPod.DeletionTimestamp = pod.DeletionTimestamp
-			oldPod.DeletionGracePeriodSeconds = pod.DeletionGracePeriodSeconds
-
-			k.sendPodsSnapshot()
-		}
-	}
 }
 
 // determine whether we need to start a suicide countdown. if so, then start
@@ -619,17 +565,10 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, taskId string, pod
 	psf := podStatusFunc(func() (*api.PodStatus, error) {
 		return k.podStatusFunc(pod)
 	})
-	go k._launchTask(driver, taskId, podFullName, psf)
+	go k._launchTask(driver, taskId, podFullName, psf, task.launchTimer.C)
 }
 
-func (k *Executor) _launchTask(driver bindings.ExecutorDriver, taskId, podFullName string, psf podStatusFunc) {
-
-	expired := make(chan struct{})
-
-	if k.launchGracePeriod > 0 {
-		time.AfterFunc(k.launchGracePeriod, func() { close(expired) })
-	}
-
+func (k *Executor) _launchTask(driver bindings.ExecutorDriver, taskId, podFullName string, psf podStatusFunc, expired <-chan time.Time) {
 	getMarshalledInfo := func() (data []byte, cancel bool) {
 		// potentially long call..
 		if podStatus, err := psf(); err == nil && podStatus != nil {
@@ -677,7 +616,8 @@ waitForRunningPod:
 			} else {
 				k.lock.Lock()
 				defer k.lock.Unlock()
-				if _, found := k.tasks[taskId]; !found {
+				task, found := k.tasks[taskId]
+				if !found {
 					goto reportLost
 				}
 
@@ -689,6 +629,7 @@ waitForRunningPod:
 				}
 
 				k.sendStatus(driver, statusUpdate)
+				task.launchTimer.Stop()
 
 				// continue to monitor the health of the pod
 				go k.__launchTask(driver, taskId, podFullName, psf)
@@ -946,7 +887,7 @@ func (k *Executor) sendFrameworkMessage(driver bindings.ExecutorDriver, msg stri
 	}
 }
 
-func (k *Executor) sendLoop() {
+func (k *Executor) runSendLoop() {
 	defer log.V(1).Info("sender loop exiting")
 	for {
 		select {
@@ -982,53 +923,7 @@ func (k *Executor) sendLoop() {
 	}
 }
 
-func differentTime(a, b *unversionedapi.Time) bool {
-	return (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b)
-}
-
-func differentPeriod(a, b *int64) bool {
-	return (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b)
-}
-
-func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
-	var executorCPU, executorMem float64
-
-	// get executor resources
-	if ei != nil {
-		for _, r := range ei.GetResources() {
-			if r == nil || r.GetType() != mesos.Value_SCALAR {
-				continue
-			}
-			switch r.GetName() {
-			case "cpus":
-				executorCPU = r.GetScalar().GetValue()
-			case "mem":
-				executorMem = r.GetScalar().GetValue()
-			}
-		}
-	}
-
-	// get resource capacity of the node
-	ni := NodeInfo{}
-	for _, r := range si.GetResources() {
-		if r == nil || r.GetType() != mesos.Value_SCALAR {
-			continue
-		}
-
-		switch r.GetName() {
-		case "cpus":
-			// We intentionally take the floor of executorCPU because cores are integers
-			// and we would loose a complete cpu here if the value is <1.
-			// TODO(sttts): switch to float64 when "Machine Allocables" are implemented
-			ni.Cores = int(r.GetScalar().GetValue() - float64(int(executorCPU)))
-		case "mem":
-			ni.Mem = int64(r.GetScalar().GetValue()-executorMem) * 1024 * 1024
-		}
-	}
-	return ni
-}
-
-func executorInfoToAnnotations(ei *mesos.ExecutorInfo) (annotations map[string]string, err error) {
+func annotationsFor(ei *mesos.ExecutorInfo) (annotations map[string]string, err error) {
 	annotations = map[string]string{}
 	if ei == nil {
 		return
@@ -1042,5 +937,38 @@ func executorInfoToAnnotations(ei *mesos.ExecutorInfo) (annotations map[string]s
 	annotations[meta.ExecutorIdKey] = ei.GetExecutorId().GetValue()
 	annotations[meta.ExecutorResourcesKey] = buf.String()
 
+	return
+}
+
+// updateTask executes some mutating operation for the given task/pod, blocking until the update is either
+// attempted or discarded. uses the executor state lock to synchronize concurrent invocation. returns true
+// only if the specified update operation was attempted and also returns true. a result of true also indicates
+// changes have been sent upstream to the kubelet.
+func (k *Executor) updateTask(taskId string, f func(*kuberTask, *api.Pod) bool) (changed bool, err error) {
+	k.lock.Lock()
+	defer k.lock.Unlock()
+
+	// exclude tasks which are already deleted from our task registry
+	task := k.tasks[taskId]
+	if task == nil {
+		// the pod has completed the launch-task-binding phase because it's been annotated with
+		// the task-id, but we don't have a record of it; it's best to let the scheduler reconcile.
+		// it's also possible that our update queue is backed up and hasn't caught up with the state
+		// of the world yet.
+
+		// TODO(jdef) should we hint to the scheduler (via TASK_FAILED, reason=PodRefersToUnknownTask)?
+
+		err = fmt.Errorf("task %s not found", taskId)
+		return
+	}
+
+	oldPod := k.pods[task.podName]
+	changed = f(task, oldPod)
+
+	// TODO(jdef) this abstraction isn't perfect since changes that only impact the task struct,
+	// and not the pod, don't require a new pod snapshot sent back to the kubelet.
+	if changed {
+		k.sendPodsSnapshot()
+	}
 	return
 }
