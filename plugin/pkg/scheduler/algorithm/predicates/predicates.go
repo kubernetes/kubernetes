@@ -26,10 +26,19 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*api.Node, error)
+}
+
+type PersistentVolumeInfo interface {
+	GetPersistentVolumeInfo(pvID string) (*api.PersistentVolume, error)
+}
+
+type PersistentVolumeClaimInfo interface {
+	GetPersistentVolumeClaimInfo(namespace string, pvcID string) (*api.PersistentVolumeClaim, error)
 }
 
 type StaticNodeInfo struct {
@@ -133,6 +142,108 @@ func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, e
 			}
 		}
 	}
+	return true, nil
+}
+
+type VolumeZoneChecker struct {
+	nodeInfo NodeInfo
+	pvInfo   PersistentVolumeInfo
+	pvcInfo  PersistentVolumeClaimInfo
+}
+
+// VolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
+// that some volumes may have zone scheduling constraints.  The requirement is that any
+// volume zone-labels must match the equivalent zone-labels on the node.  It is OK for
+// the node to have more zone-label constraints (for example, a hypothetical replicated
+// volume might allow region-wide access)
+//
+// Currently this is only supported with PersistentVolumeClaims, and looks to the labels
+// only on the bound PersistentVolume.
+//
+// Working with volumes declared inline in the pod specification (i.e. not
+// using a PersistentVolume) is likely to be harder, as it would require
+// determining the zone of a volume during scheduling, and that is likely to
+// require calling out to the cloud provider.  It seems that we are moving away
+// from inline volume declarations anyway.
+func NewVolumeZonePredicate(nodeInfo NodeInfo, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+	c := &VolumeZoneChecker{
+		nodeInfo: nodeInfo,
+		pvInfo:   pvInfo,
+		pvcInfo:  pvcInfo,
+	}
+	return c.predicate
+}
+
+func (c *VolumeZoneChecker) predicate(pod *api.Pod, existingPods []*api.Pod, nodeID string) (bool, error) {
+	node, err := c.nodeInfo.GetNodeInfo(nodeID)
+	if err != nil {
+		return false, err
+	}
+	if node == nil {
+		return false, fmt.Errorf("node not found: %q", nodeID)
+	}
+
+	nodeConstraints := make(map[string]string)
+	for k, v := range node.ObjectMeta.Labels {
+		if k != unversioned.LabelZoneFailureDomain && k != unversioned.LabelZoneRegion {
+			continue
+		}
+		nodeConstraints[k] = v
+	}
+
+	if len(nodeConstraints) == 0 {
+		// The node has no zone constraints, so we're OK to schedule.
+		// In practice, when using zones, all nodes must be labeled with zone labels.
+		// We want to fast-path this case though.
+		return true, nil
+	}
+
+	namespace := pod.Namespace
+
+	manifest := &(pod.Spec)
+	for i := range manifest.Volumes {
+		volume := &manifest.Volumes[i]
+		if volume.PersistentVolumeClaim != nil {
+			pvcName := volume.PersistentVolumeClaim.ClaimName
+			if pvcName == "" {
+				return false, fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+			}
+			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+			if err != nil {
+				return false, err
+			}
+
+			if pvc == nil {
+				return false, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
+			}
+
+			pvName := pvc.Spec.VolumeName
+			if pvName == "" {
+				return false, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+			}
+
+			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+			if err != nil {
+				return false, err
+			}
+
+			if pv == nil {
+				return false, fmt.Errorf("PersistentVolume not found: %q", pvName)
+			}
+
+			for k, v := range pv.ObjectMeta.Labels {
+				if k != unversioned.LabelZoneFailureDomain && k != unversioned.LabelZoneRegion {
+					continue
+				}
+				nodeV, _ := nodeConstraints[k]
+				if v != nodeV {
+					glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, nodeID, pvName, k)
+					return false, nil
+				}
+			}
+		}
+	}
+
 	return true, nil
 }
 

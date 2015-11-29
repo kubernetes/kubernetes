@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 const ProviderName = "aws"
@@ -158,6 +159,9 @@ type Volumes interface {
 	// Create a volume with the specified options
 	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
 	DeleteVolume(volumeName string) error
+
+	// Get labels to apply to volume on creation
+	GetVolumeLabels(volumeName string) (map[string]string, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -510,6 +514,16 @@ func isRegionValid(region string) bool {
 	return false
 }
 
+// Derives the region from a valid az name.
+// Returns an error if the az is known invalid (empty)
+func azToRegion(az string) (string, error) {
+	if len(az) < 1 {
+		return "", fmt.Errorf("invalid (empty) AZ")
+	}
+	region := az[:len(az)-1]
+	return region, nil
+}
+
 // newAWSCloud creates a new instance of AWSCloud.
 // AWSProvider and instanceId are primarily for tests
 func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
@@ -527,7 +541,10 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	if len(zone) <= 1 {
 		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
 	}
-	regionName := zone[:len(zone)-1]
+	regionName, err := azToRegion(zone)
+	if err != nil {
+		return nil, err
+	}
 
 	valid := isRegionValid(regionName)
 	if !valid {
@@ -1272,6 +1289,32 @@ func (aws *AWSCloud) DeleteVolume(volumeName string) error {
 		return err
 	}
 	return awsDisk.deleteVolume()
+}
+
+// Implements Volumes.GetVolumeLabels
+func (c *AWSCloud) GetVolumeLabels(volumeName string) (map[string]string, error) {
+	awsDisk, err := newAWSDisk(c, volumeName)
+	if err != nil {
+		return nil, err
+	}
+	info, err := awsDisk.getInfo()
+	if err != nil {
+		return nil, err
+	}
+	labels := make(map[string]string)
+	az := aws.StringValue(info.AvailabilityZone)
+	if az == "" {
+		return nil, fmt.Errorf("volume did not have AZ information: %q", info.VolumeId)
+	}
+
+	labels[unversioned.LabelZoneFailureDomain] = az
+	region, err := azToRegion(az)
+	if err != nil {
+		return nil, err
+	}
+	labels[unversioned.LabelZoneRegion] = region
+
+	return labels, nil
 }
 
 func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
