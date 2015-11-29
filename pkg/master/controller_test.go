@@ -161,6 +161,54 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 		},
 		{
+			testName:          "existing endpoints satisfy and endpoint addresses length less than master count",
+			serviceName:       "foo",
+			ip:                "4.3.2.2",
+			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 3,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "4.3.2.1"},
+							{IP: "4.3.2.2"},
+						},
+						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: nil,
+		},
+		{
+			testName:          "existing endpoints current IP missing and address length less than master count",
+			serviceName:       "foo",
+			ip:                "4.3.2.2",
+			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 3,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "4.3.2.1"},
+						},
+						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{
+						{IP: "4.3.2.1"},
+						{IP: "4.3.2.2"},
+					},
+					Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
+		{
 			testName:      "existing endpoints wrong name",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
