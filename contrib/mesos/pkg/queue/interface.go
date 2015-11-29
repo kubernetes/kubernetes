@@ -59,7 +59,7 @@ type FIFO interface {
 	// ready, they are returned in the order in which they were added/updated.
 	// The item is removed from the queue (and the store) before it is returned,
 	// so if you don't successfully process it, you need to add it back with Add().
-	Pop() interface{}
+	Pop(cancel <-chan struct{}) interface{}
 
 	// Await attempts to Pop within the given interval; upon success the non-nil
 	// item is returned, otherwise nil
@@ -101,3 +101,5 @@ type UniqueDeadlined interface {
 	UniqueID
 	Deadlined
 }
+
+func WithoutCancel() <-chan struct{} { return nil }

@@ -104,7 +104,7 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 
 			now := time.Now()
 			log.V(3).Infof("reoffering pod %v", podKey)
-			s.qr.Reoffer(queuer.NewPodWithDeadline(pod, &now))
+			s.qr.Reoffer(queuer.NewPod(pod, queuer.Deadline(now)))
 		} else {
 			// pod is scheduled.
 			// not sure how this happened behind our backs. attempt to reconstruct

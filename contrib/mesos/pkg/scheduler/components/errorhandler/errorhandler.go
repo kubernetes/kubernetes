@@ -89,7 +89,7 @@ func (k *errorHandler) Error(pod *api.Pod, schedulingErr error) {
 		}
 		delay := k.backoff.Get(podKey)
 		log.V(3).Infof("requeuing pod %v with delay %v", podKey, delay)
-		k.qr.Requeue(&queuer.Pod{Pod: pod, Delay: &delay, Notify: breakoutEarly})
+		k.qr.Requeue(queuer.NewPod(pod, queuer.Delay(delay), queuer.Notify(breakoutEarly)))
 
 	default:
 		log.V(2).Infof("Task is no longer pending, aborting reschedule for pod %v", podKey)

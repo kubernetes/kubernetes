@@ -78,7 +78,7 @@ func (r *clientRegistrator) Run(terminate <-chan struct{}) error {
 	loop := func() {
 	RegistrationLoop:
 		for {
-			obj := r.queue.CancelablePop(terminate)
+			obj := r.queue.Pop(terminate)
 			if obj == nil {
 				break RegistrationLoop
 			}
