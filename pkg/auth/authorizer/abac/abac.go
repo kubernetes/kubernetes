@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
@@ -65,6 +66,11 @@ type policy struct {
 }
 
 type policyList []policy
+
+type PolicyAuthorizer struct {
+	PL   *policyList
+	Lock *sync.RWMutex
+}
 
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
@@ -142,4 +148,11 @@ func (pl policyList) Authorize(a authorizer.Attributes) error {
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.
+}
+
+// Authorizer implements authorizer.Authorize
+func (policyAuthz PolicyAuthorizer) Authorize(a authorizer.Attributes) error {
+	policyAuthz.Lock.RLock()
+	defer policyAuthz.Lock.RUnlock()
+	return policyAuthz.PL.Authorize(a)
 }
