@@ -90,7 +90,7 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVersion, reflection reflect.Type) error {
 	kind := reflection.Name()
 	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
-	internalGV, exists := g.scheme.InternalVersions[gv.Group]
+	internalGV, exists := g.scheme.InternalGroupVersion(gv.Group)
 	if !exists {
 		return fmt.Errorf("no internal version for %v", gv)
 	}
@@ -834,12 +834,7 @@ type typePair struct {
 	outType reflect.Type
 }
 
-var defaultConversions []typePair = []typePair{
-	{reflect.TypeOf([]RawExtension{}), reflect.TypeOf([]Object{})},
-	{reflect.TypeOf([]Object{}), reflect.TypeOf([]RawExtension{})},
-	{reflect.TypeOf(RawExtension{}), reflect.TypeOf(EmbeddedObject{})},
-	{reflect.TypeOf(EmbeddedObject{}), reflect.TypeOf(RawExtension{})},
-}
+var defaultConversions []typePair = []typePair{}
 
 func (g *conversionGenerator) existsDedicatedConversionFunction(inType, outType reflect.Type) bool {
 	if inType == outType {

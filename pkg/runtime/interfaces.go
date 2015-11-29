@@ -23,56 +23,57 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-// Codec defines methods for serializing and deserializing API objects.
-type Codec interface {
-	Decoder
-	Encoder
+const (
+	APIVersionInternal    = "__internal"
+	APIVersionUnversioned = "__unversioned"
+)
+
+// Typer retrieves information about an object's group, version, and kind.
+type Typer interface {
+	// ObjectVersionAndKind returns the version and kind of the provided object, or an
+	// error if the object is not recognized (IsNotRegisteredError will return true).
+	ObjectVersionAndKind(Object) (*unversioned.GroupVersionKind, error)
 }
 
-// Decoder defines methods for deserializing API objects into a given type
-type Decoder interface {
-	Decode(data []byte) (Object, error)
-	// TODO: Remove this method?
-	DecodeToVersion(data []byte, groupVersion unversioned.GroupVersion) (Object, error)
-	DecodeInto(data []byte, obj Object) error
-	// TODO: Remove this method?
-	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, groupVersionKind unversioned.GroupVersionKind) error
-
-	DecodeParametersInto(parameters url.Values, obj Object) error
-}
-
-// Encoder defines methods for serializing API objects into bytes
 type Encoder interface {
-	Encode(obj Object) (data []byte, err error)
+	// EncodeToStream writes an object to a stream.
 	EncodeToStream(obj Object, stream io.Writer) error
-
-	// TODO: Add method for processing url parameters.
-	// EncodeParameters(obj Object) (url.Values, error)
 }
 
-// ObjectCodec represents the common mechanisms for converting to and from a particular
-// binary representation of an object.
-// TODO: Remove this interface - it is used only in CodecFor() method.
-type ObjectCodec interface {
+type Decoder interface {
+	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
+	// default kind, group, and version provided. It returns a decoded object as well as the actual kind, group, and
+	// version decoded, or an error.
+	Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error)
+}
+
+// Serializer is the core interface for transforming objects into a serialized format and back.
+// Implementations may choose to perform conversion of the object, but no assumptions should be made.
+type Serializer interface {
+	Encoder
 	Decoder
-
-	// EncodeToVersion convert and serializes an object in the internal format
-	// to a specified output version. An error is returned if the object
-	// cannot be converted for any reason.
-	EncodeToVersion(obj Object, outVersion string) ([]byte, error)
-	EncodeToVersionStream(obj Object, outVersion string, stream io.Writer) error
 }
+
+// Codec is a Serializer that deals with the details of versioning objects. It offers the same
+// interface as Serializer, so this is a marker to consumers that care about the version of the objects
+// they receive.
+type Codec Serializer
+
+// ParameterCodec defines methods for serializing and deserializing API objects to url.Values
+type ParameterSerializer interface {
+	DecodeParameters(parameters url.Values, gvk unversioned.GroupVersionKind) (Object, error)
+	EncodeParameters(Object) (url.Values, error)
+}
+
+type ParameterCodec ParameterSerializer
 
 // ObjectDecoder is a convenience interface for identifying serialized versions of objects
 // and transforming them into Objects. It intentionally overlaps with ObjectTyper and
 // Decoder for use in decode only paths.
 // TODO: Consider removing this interface?
 type ObjectDecoder interface {
-	Decoder
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
-	// if another problem is detected. In many cases this method can be as expensive to
-	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
+	// Identical to Serializer#Decode
+	Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error)
 	// Recognizes returns true if the scheme is able to handle the provided version and kind
 	// of an object.
 	Recognizes(version, kind string) bool
@@ -80,6 +81,10 @@ type ObjectDecoder interface {
 
 ///////////////////////////////////////////////////////////////////////////////
 // Non-codec interfaces
+
+type ObjectVersioner interface {
+	ConvertToVersion(in Object, outVersion string) (out Object, err error)
+}
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
@@ -91,10 +96,6 @@ type ObjectConvertor interface {
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
-	// if another problem is detected. In many cases this method can be as expensive to
-	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
 	// ObjectVersionAndKind returns the version and kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
 	ObjectVersionAndKind(Object) (version, kind string, err error)

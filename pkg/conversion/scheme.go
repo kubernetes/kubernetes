@@ -41,20 +41,16 @@ type Scheme struct {
 	// deep copy behavior.
 	cloner *Cloner
 
-	// Indent will cause the JSON output from Encode to be indented,
-	// if and only if it is true.
-	Indent bool
-
 	// InternalVersion is the default internal version. It is recommended that
 	// you use "" for the internal version.
 	// TODO logically the InternalVersion is different for every Group, so this structure
 	// must be map
-	InternalVersions map[string]unversioned.GroupVersion
+	// TODO remove this hard coded list.  As step one, hardcode it here so this pull doesn't become even bigger
+	internalVersions map[string]unversioned.GroupVersion
 
-	// MetaInsertionFactory is used to create an object to store and retrieve
-	// the version and kind information for all objects. The default uses the
-	// keys "apiVersion" and "kind" respectively.
-	MetaFactory MetaFactory
+	// Indent will cause the JSON output from Encode to be indented,
+	// if and only if it is true.
+	Indent bool
 }
 
 // NewScheme manufactures a new scheme.
@@ -64,17 +60,19 @@ func NewScheme() *Scheme {
 		typeToGVK: map[reflect.Type][]unversioned.GroupVersionKind{},
 		converter: NewConverter(),
 		cloner:    NewCloner(),
-		// TODO remove this hard coded list.  As step one, hardcode it here so this pull doesn't become even bigger
-		InternalVersions: map[string]unversioned.GroupVersion{
-			"":                {},
-			"componentconfig": {Group: "componentconfig"},
-			"extensions":      {Group: "extensions"},
-			"metrics":         {Group: "metrics"},
-		},
-		MetaFactory: DefaultMetaFactory,
 	}
 	s.converter.nameFunc = s.nameFunc
 	return s
+}
+
+// AddInternalGroupVersion registers an internal version to the scheme
+func (s *Scheme) AddInternalGroupVersion(internalVersions ...unversioned.GroupVersion) {
+	if s.internalVersions == nil {
+		s.internalVersions = make(map[string]unversioned.GroupVersion)
+	}
+	for _, gv := range internalVersions {
+		s.internalVersions[gv.Group] = gv
+	}
 }
 
 // Log sets a logger on the scheme. For test purposes only
@@ -92,7 +90,7 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	}
 
 	for _, gvk := range gvks {
-		internalGV, exists := s.InternalVersions[gvk.Group]
+		internalGV, exists := s.internalVersions[gvk.Group]
 		if !exists {
 			internalGV := gvk.GroupVersion()
 			internalGV.Version = ""
@@ -112,6 +110,9 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 // All objects passed to types should be pointers to structs. The name that go reports for
 // the struct becomes the "kind" field when encoding.
 func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...interface{}) {
+	if len(gv.Version) == 0 {
+		panic(fmt.Sprintf("version is required on all types: %s %v", gv, types[0]))
+	}
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
 		if t.Kind() != reflect.Ptr {
@@ -133,6 +134,9 @@ func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...interface{}
 // your structs.
 func (s *Scheme) AddKnownTypeWithName(gvk unversioned.GroupVersionKind, obj interface{}) {
 	t := reflect.TypeOf(obj)
+	if len(gvk.Version) == 0 {
+		panic(fmt.Sprintf("version is required on all types: %s %v", gvk, t))
+	}
 	if t.Kind() != reflect.Ptr {
 		panic("All types must be pointers to structs.")
 	}
@@ -281,6 +285,11 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 	return nil
 }
 
+func (s *Scheme) InternalGroupVersion(group string) (unversioned.GroupVersion, bool) {
+	gv, ok := s.internalVersions[group]
+	return gv, ok
+}
+
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
 func (s *Scheme) Recognizes(gvString, kind string) bool {
@@ -344,7 +353,7 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, fmt.Errorf("%v cannot be converted into version %q", t, outVersion)
+		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
 	}
 	outKind := gvks[0]
 
@@ -363,16 +372,20 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
-	if err := s.SetVersionAndKind(outVersion, outKind.Kind, out); err != nil {
-		return nil, err
-	}
-
 	return out, nil
 }
 
 // Converter allows access to the converter for the scheme
 func (s *Scheme) Converter() *Converter {
 	return s.converter
+}
+
+// WithConversions returns a scheme with additional conversion functions
+func (s *Scheme) WithConversions(fns *ConversionFuncs) *Scheme {
+	c := s.converter.WithConversions(fns)
+	copied := *s
+	copied.converter = c
+	return &copied
 }
 
 // generateConvertMeta constructs the meta value we pass to Convert.
@@ -383,12 +396,6 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interfac
 		DestVersion:    destVersion,
 		KeyNameMapping: s.converter.inputFieldMappingFuncs[t],
 	}
-}
-
-// DataVersionAndKind will return the APIVersion and Kind of the given wire-format
-// encoding of an API Object, or an error.
-func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
-	return s.MetaFactory.Interpret(data)
 }
 
 // ObjectVersionAndKind returns the API version and kind of the go object,
@@ -407,13 +414,6 @@ func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string,
 	apiVersion = gvks[0].GroupVersion().String()
 	kind = gvks[0].Kind
 	return
-}
-
-// SetVersionAndKind sets the version and kind fields (with help from
-// MetaInsertionFactory). Returns an error if this isn't possible. obj
-// must be a pointer.
-func (s *Scheme) SetVersionAndKind(version, kind string, obj interface{}) error {
-	return s.MetaFactory.Update(version, kind, obj)
 }
 
 // maybeCopy copies obj if it is not a pointer, to get a settable/addressable

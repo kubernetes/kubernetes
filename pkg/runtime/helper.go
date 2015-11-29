@@ -20,8 +20,29 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 )
+
+type objectTyperToTyper struct {
+	ObjectTyper
+}
+
+func (t objectTyperToTyper) ObjectVersionAndKind(obj Object) (*unversioned.GroupVersionKind, error) {
+	version, kind, err := t.ObjectTyper.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, err
+	}
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		return nil, err
+	}
+	return &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}, nil
+}
+
+func ObjectTyperToTyper(typer ObjectTyper) Typer {
+	return objectTyperToTyper{typer}
+}
 
 // fieldPtr puts the address of fieldName, which must be a member of v,
 // into dest, which must be an address of a variable to which this field's
@@ -59,7 +80,7 @@ func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
 				if !decoder.Recognizes(t.APIVersion, t.Kind) {
 					continue
 				}
-				obj, err := decoder.Decode(t.RawJSON)
+				obj, _, err := decoder.Decode(t.RawJSON, nil)
 				if err != nil {
 					errs = append(errs, err)
 					break
@@ -76,16 +97,6 @@ func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
 type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
-
-func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string, err error) {
-	for _, t := range m {
-		version, kind, err = t.DataVersionAndKind(data)
-		if err == nil {
-			return
-		}
-	}
-	return
-}
 
 func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
 	for _, t := range m {

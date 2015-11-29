@@ -141,8 +141,8 @@ func TestInvalidObjectValueKind(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 
-	embedded := &runtime.EmbeddedObject{}
-	switch obj := embedded.Object.(type) {
+	embedded := &runtime.Object{}
+	switch obj := embedded.(type) {
 	default:
 		_, _, err := scheme.ObjectVersionAndKind(obj)
 		if err == nil {
@@ -168,13 +168,11 @@ func TestBadJSONRejection(t *testing.T) {
 }
 
 type ExtensionA struct {
-	runtime.PluginBase `json:",inline"`
-	TestString         string `json:"testString"`
+	TestString string `json:"testString"`
 }
 
 type ExtensionB struct {
-	runtime.PluginBase `json:",inline"`
-	TestString         string `json:"testString"`
+	TestString string `json:"testString"`
 }
 
 type ExternalExtensionType struct {
@@ -184,7 +182,7 @@ type ExternalExtensionType struct {
 
 type InternalExtensionType struct {
 	TypeMeta  `json:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension"`
+	Extension runtime.Object `json:"extension"`
 }
 
 type ExternalOptionalExtensionType struct {
@@ -194,7 +192,7 @@ type ExternalOptionalExtensionType struct {
 
 type InternalOptionalExtensionType struct {
 	TypeMeta  `json:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension,omitempty"`
+	Extension runtime.Object `json:"extension,omitempty"`
 }
 
 func (*ExtensionA) IsAnAPIObject()                    {}
@@ -218,7 +216,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
+			&InternalOptionalExtensionType{Extension: nil},
 			`{"kind":"OptionalExtensionType","apiVersion":"` + externalGV.String() + `"}`,
 		},
 	}
@@ -260,15 +258,15 @@ func TestExtensionMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
+			&InternalExtensionType{Extension: &ExtensionA{TestString: "foo"}},
 			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"A","testString":"foo"}}
 `,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
+			&InternalExtensionType{Extension: &ExtensionB{TestString: "bar"}},
 			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"B","testString":"bar"}}
 `,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
+			&InternalExtensionType{Extension: nil},
 			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":null}
 `,
 		},

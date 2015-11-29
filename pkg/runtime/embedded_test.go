@@ -31,8 +31,8 @@ import (
 type EmbeddedTest struct {
 	runtime.TypeMeta
 	ID          string
-	Object      runtime.EmbeddedObject
-	EmptyObject runtime.EmbeddedObject
+	Object      runtime.Object
+	EmptyObject runtime.Object
 }
 
 type EmbeddedTestExternal struct {
@@ -168,10 +168,8 @@ func TestEmbeddedObject(t *testing.T) {
 
 	outer := &EmbeddedTest{
 		ID: "outer",
-		Object: runtime.EmbeddedObject{
-			Object: &EmbeddedTest{
-				ID: "inner",
-			},
+		Object: &EmbeddedTest{
+			ID: "inner",
 		},
 	}
 

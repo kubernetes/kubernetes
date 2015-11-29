@@ -40,8 +40,8 @@ type DebugLogger interface {
 type Converter struct {
 	// Map from the conversion pair to a function which can
 	// do the conversion.
-	conversionFuncs          map[typePair]reflect.Value
-	generatedConversionFuncs map[typePair]reflect.Value
+	conversionFuncs          ConversionFuncs
+	generatedConversionFuncs ConversionFuncs
 
 	// This is a map from a source field type and name, to a list of destination
 	// field type and name.
@@ -76,8 +76,8 @@ type Converter struct {
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	c := &Converter{
-		conversionFuncs:          map[typePair]reflect.Value{},
-		generatedConversionFuncs: map[typePair]reflect.Value{},
+		conversionFuncs:          NewConversionFuncs(),
+		generatedConversionFuncs: NewConversionFuncs(),
 		defaultingFuncs:          map[reflect.Type]reflect.Value{},
 		defaultingInterfaces:     map[reflect.Type]interface{}{},
 		nameFunc:                 func(t reflect.Type) string { return t.Name() },
@@ -89,6 +89,21 @@ func NewConverter() *Converter {
 	}
 	c.RegisterConversionFunc(byteSliceCopy)
 	return c
+}
+
+// WithConversions returns a Converter with all conversions defined on the
+// base converter and the passed conversion functions.
+func (c *Converter) WithConversions(fns *ConversionFuncs) *Converter {
+	merged := NewConversionFuncs()
+	for k, v := range c.conversionFuncs.fns {
+		merged.fns[k] = v
+	}
+	for k, v := range fns.fns {
+		merged.fns[k] = v
+	}
+	copied := *c
+	copied.conversionFuncs = merged
+	return &copied
 }
 
 // Prevent recursing into every byte...
@@ -129,6 +144,26 @@ type Scope interface {
 // FieldMappingFunc can convert an input field value into different values, depending on
 // the value of the source or destination struct tags.
 type FieldMappingFunc func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string)
+
+func NewConversionFuncs() ConversionFuncs {
+	return ConversionFuncs{fns: make(map[typePair]reflect.Value)}
+}
+
+type ConversionFuncs struct {
+	fns map[typePair]reflect.Value
+}
+
+func (c *ConversionFuncs) Register(fns ...interface{}) error {
+	for _, fn := range fns {
+		fv := reflect.ValueOf(fn)
+		ft := fv.Type()
+		if err := verifyConversionFunctionSignature(ft); err != nil {
+			return err
+		}
+		c.fns[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
+	}
+	return nil
+}
 
 // Meta is supplied by Scheme, when it calls Convert.
 type Meta struct {
@@ -296,29 +331,17 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 //                 return nil
 //          })
 func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
-	fv := reflect.ValueOf(conversionFunc)
-	ft := fv.Type()
-	if err := verifyConversionFunctionSignature(ft); err != nil {
-		return err
-	}
-	c.conversionFuncs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
-	return nil
+	return c.conversionFuncs.Register(conversionFunc)
 }
 
 // Similar to RegisterConversionFunc, but registers conversion function that were
 // automatically generated.
 func (c *Converter) RegisterGeneratedConversionFunc(conversionFunc interface{}) error {
-	fv := reflect.ValueOf(conversionFunc)
-	ft := fv.Type()
-	if err := verifyConversionFunctionSignature(ft); err != nil {
-		return err
-	}
-	c.generatedConversionFuncs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
-	return nil
+	return c.generatedConversionFuncs.Register(conversionFunc)
 }
 
 func (c *Converter) HasConversionFunc(inType, outType reflect.Type) bool {
-	_, found := c.conversionFuncs[typePair{inType, outType}]
+	_, found := c.conversionFuncs.fns[typePair{inType, outType}]
 	return found
 }
 
@@ -505,13 +528,13 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	}
 
 	// Convert sv to dv.
-	if fv, ok := c.conversionFuncs[typePair{st, dt}]; ok {
+	if fv, ok := c.conversionFuncs.fns[typePair{st, dt}]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
 		return c.callCustom(sv, dv, fv, scope)
 	}
-	if fv, ok := c.generatedConversionFuncs[typePair{st, dt}]; ok {
+	if fv, ok := c.generatedConversionFuncs.fns[typePair{st, dt}]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
