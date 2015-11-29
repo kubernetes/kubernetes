@@ -38,6 +38,8 @@ type PluginFactoryArgs struct {
 	algorithm.ControllerLister
 	NodeLister algorithm.NodeLister
 	NodeInfo   predicates.NodeInfo
+	PVInfo     predicates.PersistentVolumeInfo
+	PVCInfo    predicates.PersistentVolumeClaimInfo
 }
 
 // A FitPredicateFactory produces a FitPredicate from the given args.
