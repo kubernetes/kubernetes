@@ -120,45 +120,11 @@ function create-provision-scripts {
 
   (
     echo "#! /bin/bash"
-    echo "KUBE_ROOT=/vagrant"
-    echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-    echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
-    echo "MASTER_IP='${MASTER_IP}'"
-    echo "NODE_NAMES=(${NODE_NAMES[@]})"
-    echo "NODE_IPS=(${NODE_IPS[@]})"
+    echo-kube-env
     echo "NODE_IP='${MASTER_IP}'"
-    echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
-    echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
-    echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
     echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
-    echo "NODE_CONTAINER_NETMASKS='${NODE_CONTAINER_NETMASKS[@]}'"
-    echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
-    echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-    echo "MASTER_USER='${MASTER_USER}'"
-    echo "MASTER_PASSWD='${MASTER_PASSWD}'"
-    echo "KUBE_USER='${KUBE_USER}'"
-    echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
-    echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
-    echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
-    echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
-    echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
-    echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
-    echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
-    echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
-    echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
-    echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
-    echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-    echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-    echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
-    echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
-    echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-    echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
-    echo "NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
-    echo "OPENCONTRAIL_TAG='${OPENCONTRAIL_TAG:-}'"
-    echo "OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
-    echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
-    echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
+    echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
@@ -166,29 +132,58 @@ function create-provision-scripts {
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
-      echo "MASTER_NAME='${MASTER_NAME}'"
-      echo "MASTER_IP='${MASTER_IP}'"
-      echo "NODE_NAMES=(${NODE_NAMES[@]})"
+      echo-kube-env
       echo "NODE_NAME=(${NODE_NAMES[$i]})"
-      echo "NODE_IPS=(${NODE_IPS[@]})"
       echo "NODE_IP='${NODE_IPS[$i]}'"
       echo "NODE_ID='$i'"
-      echo "NODE_IP='${NODE_IPS[$i]}'"
-      echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
       echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
       echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
-      echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
-      echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
-      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-      echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-      echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
-      echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
-      echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-      echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
+}
+
+function echo-kube-env() {
+  echo "KUBE_ROOT=/vagrant"
+  echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
+  echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
+  echo "MASTER_IP='${MASTER_IP}'"
+  echo "NODE_NAMES=(${NODE_NAMES[@]})"
+  echo "NODE_IPS=(${NODE_IPS[@]})"
+  echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
+  echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
+  echo "NODE_CONTAINER_NETMASKS='${NODE_CONTAINER_NETMASKS[@]}'"
+  echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
+  echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
+  echo "MASTER_USER='${MASTER_USER}'"
+  echo "MASTER_PASSWD='${MASTER_PASSWD}'"
+  echo "KUBE_USER='${KUBE_USER}'"
+  echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
+  echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
+  echo "ENABLE_CLUSTER_LOGGING='${ENABLE_CLUSTER_LOGGING:-false}'"
+  echo "ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-1}'"
+  echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+  echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
+  echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
+  echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
+  echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
+  echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
+  echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
+  echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
+  echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
+  echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
+  echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
+  echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
+  echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
+  echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
+  echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
+  echo "NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
+  echo "OPENCONTRAIL_TAG='${OPENCONTRAIL_TAG:-}'"
+  echo "OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
+  echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
+  echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
 }
 
 function verify-cluster {
@@ -203,16 +198,12 @@ function verify-cluster {
   # verify master has all required daemons
   echo "Validating master"
   local machine="master"
-  local -a required_daemon=("salt-master" "salt-minion" "kubelet")
+  local -a required_processes=("kube-apiserver" "kube-scheduler" "kube-controller-manager" "kubelet" "docker")
   local validated="1"
-  # This is a hack, but sometimes the salt-minion gets stuck on the master, so we just restart it
-  # to ensure that users never wait forever
-  vagrant ssh "$machine" -c "sudo systemctl restart salt-minion"
   until [[ "$validated" == "0" ]]; do
     validated="0"
-    local daemon
-    for daemon in "${required_daemon[@]}"; do
-      vagrant ssh "$machine" -c "which '${daemon}'" >/dev/null 2>&1 || {
+    for process in "${required_processes[@]}"; do
+      vagrant ssh "${machine}" -c "pgrep -f ${process}" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
@@ -225,13 +216,12 @@ function verify-cluster {
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     echo "Validating ${VAGRANT_NODE_NAMES[$i]}"
     local machine=${VAGRANT_NODE_NAMES[$i]}
-    local -a required_daemon=("salt-minion" "kubelet" "docker")
+    local -a required_processes=("kube-proxy" "kubelet" "docker")
     local validated="1"
-    until [[ "$validated" == "0" ]]; do
+    until [[ "${validated}" == "0" ]]; do
       validated="0"
-      local daemon
-      for daemon in "${required_daemon[@]}"; do
-        vagrant ssh "$machine" -c "which $daemon" >/dev/null 2>&1 || {
+      for process in "${required_processes[@]}"; do
+        vagrant ssh "${machine}" -c "pgrep -f ${process}" >/dev/null 2>&1 || {
           printf "."
           validated="1"
           sleep 2
@@ -242,16 +232,14 @@ function verify-cluster {
 
   echo
   echo "Waiting for each minion to be registered with cloud provider"
-  for (( i=0; i<${#NODE_IPS[@]}; i++)); do
-    local machine="${NODE_IPS[$i]}"
-    local count="0"
-    until [[ "$count" == "1" ]]; do
-      local minions
-      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o go-template='{{range.items}}{{.metadata.name}}:{{end}}' --api-version=v1)
-      count=$(echo $minions | grep -c "${NODE_IPS[i]}") || {
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    local validated="0"
+    until [[ "$validated" == "1" ]]; do
+      local minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+      validated=$(echo $minions | grep -c "${NODE_NAMES[i]}") || {
         printf "."
         sleep 2
-        count="0"
+        validated="0"
       }
     done
   done
@@ -277,7 +265,7 @@ function verify-cluster {
     echo "  https://${MASTER_IP}:9090"
     echo
     echo "For more information on Cockpit, visit http://cockpit-project.org"
-    echo 
+    echo
     echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
   )

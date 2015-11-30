@@ -9,7 +9,9 @@
 {% set cloud_config_volume = "" -%}
 
 {% if grains.cloud is defined -%}
-  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+  {% if grains.cloud != 'vagrant' -%}
+    {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+  {% endif -%}
 
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}

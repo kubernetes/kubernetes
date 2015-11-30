@@ -46,7 +46,7 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined -%}
+{% if grains.cloud is defined and grains.cloud != 'vagrant' -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
