@@ -117,7 +117,7 @@ func testPreStop(c *client.Client, ns string) {
 
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, c)
 		if err != nil {
 			return false, err
 		}

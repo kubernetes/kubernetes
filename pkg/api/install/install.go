@@ -108,6 +108,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"PodExecOptions",
 		"PodAttachOptions",
 		"PodProxyOptions",
+		"NodeProxyOptions",
 		"ThirdPartyResource",
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")

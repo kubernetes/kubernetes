@@ -813,6 +813,15 @@ func (NodeList) SwaggerDoc() map[string]string {
 	return map_NodeList
 }
 
+var map_NodeProxyOptions = map[string]string{
+	"":     "NodeProxyOptions is the query options to a Node's proxy call.",
+	"path": "Path is the URL path to use for the current proxy request to node.",
+}
+
+func (NodeProxyOptions) SwaggerDoc() map[string]string {
+	return map_NodeProxyOptions
+}
+
 var map_NodeSelector = map[string]string{
 	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
 	"nodeSelectorTerms": "Required. A list of node selector terms. The terms are ORed.",
