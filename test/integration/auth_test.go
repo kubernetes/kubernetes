@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -420,6 +421,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	transport := http.DefaultTransport
@@ -549,6 +551,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	transport := http.DefaultTransport
@@ -630,6 +633,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -730,6 +734,7 @@ func TestBobIsForbidden(t *testing.T) {
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	transport := http.DefaultTransport
@@ -804,6 +809,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		Authorizer:            allowAliceAuthorizer{},
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	transport := http.DefaultTransport
@@ -903,6 +909,7 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		Authorizer:            trackingAuthorizer,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	transport := http.DefaultTransport
@@ -997,6 +1004,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1125,6 +1133,7 @@ func TestKindAuthorization(t *testing.T) {
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1240,6 +1249,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		Authorizer:            a,
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	transport := http.DefaultTransport

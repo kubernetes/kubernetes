@@ -401,19 +401,6 @@ func setDefaults(c *Config) {
 	if c.CacheTimeout == 0 {
 		c.CacheTimeout = 5 * time.Second
 	}
-	for c.PublicAddress == nil || c.PublicAddress.IsUnspecified() || c.PublicAddress.IsLoopback() {
-		// TODO: This should be done in the caller and just require a
-		// valid value to be passed in.
-		hostIP, err := util.ChooseHostInterface()
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		c.PublicAddress = hostIP
-		glog.Infof("Will report %v as public IP address.", c.PublicAddress)
-	}
 	if c.RequestContextMapper == nil {
 		c.RequestContextMapper = api.NewRequestContextMapper()
 	}
