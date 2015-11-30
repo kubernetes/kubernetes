@@ -54,6 +54,8 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - Panic recovery to produce HTTP 500, customizable using RecoverHandler(...)
 - Route errors produce HTTP 404/405/406/415 errors, customizable using ServiceErrorHandler(...)
 - Configurable (trace) logging
+- Customizable encoding using EntityReaderWriter registration
+- Customizable gzip/deflate readers and writers using CompressorProvider registration
 	
 ### Resources
 

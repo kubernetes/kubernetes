@@ -15,7 +15,7 @@ var Logger StdLogger
 
 func init() {
 	// default Logger
-	SetLogger(stdlog.New(os.Stdout, "[restful] ", stdlog.LstdFlags|stdlog.Lshortfile))
+	SetLogger(stdlog.New(os.Stderr, "[restful] ", stdlog.LstdFlags|stdlog.Lshortfile))
 }
 
 func SetLogger(customLogger StdLogger) {

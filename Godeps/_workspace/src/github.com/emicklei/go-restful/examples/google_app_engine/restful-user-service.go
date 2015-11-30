@@ -1,10 +1,10 @@
 package main
 
 import (
-	"appengine"
-	"appengine/memcache"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"google.golang.com/appengine"
+	"google.golang.com/appengine/memcache"
 	"net/http"
 )
 
