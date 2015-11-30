@@ -1229,7 +1229,7 @@ case ${JOB_NAME} in
     NUM_NODES="11"
     MASTER_SIZE="n1-standard-4"
     NODE_SIZE="n1-standard-8"   # Note: can fit about 17 hollow nodes per core
-    #                                     so NUM_NODES x cores_per_minion should
+    #                                     so NUM_NODES x cores_per_node should
     #                                     be set accordingly.
     KUBE_GCE_INSTANCE_PREFIX="kubemark1000"
     E2E_ZONE="asia-east1-a"
