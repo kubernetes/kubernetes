@@ -34,6 +34,11 @@ func Kind(kind string) unversioned.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
+// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+func Resource(resource string) unversioned.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
 	// TODO this will get cleaned up with the scheme types are fixed
