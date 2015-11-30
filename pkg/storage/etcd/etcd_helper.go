@@ -71,6 +71,10 @@ type etcdHelper struct {
 	cache util.Cache
 }
 
+var (
+	_ = storage.Interface(&etcdHelper{})
+)
+
 func init() {
 	metrics.Register()
 }
