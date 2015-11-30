@@ -172,15 +172,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			gvk, err := api.RESTMapper.KindFor(mapping.Resource)
-			if err != nil {
-				return nil, err
-			}
 			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
-			if describer, ok := kubectl.DescriberFor(gvk.Group, mapping.GroupVersionKind.Kind, client); ok {
+			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), client); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
@@ -257,14 +253,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.GroupVersionKind.Kind, client)
+			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ReaperFor(mapping.GroupVersionKind.Kind, client)
+			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {

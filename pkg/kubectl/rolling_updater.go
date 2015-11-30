@@ -342,7 +342,7 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 
 // scalerScaleAndWait scales a controller using a Scaler and a real client.
 func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-	scaler, err := ScalerFor("ReplicationController", r.c)
+	scaler, err := ScalerFor(api.Kind("ReplicationController"), r.c)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't make scaler: %s", err)
 	}
