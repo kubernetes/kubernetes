@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -66,32 +67,29 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
-func describerMap(c *client.Client) map[string]Describer {
-	m := map[string]Describer{
-		"Pod": &PodDescriber{c},
-		"ReplicationController": &ReplicationControllerDescriber{c},
-		"Secret":                &SecretDescriber{c},
-		"Service":               &ServiceDescriber{c},
-		"ServiceAccount":        &ServiceAccountDescriber{c},
-		"Node":                  &NodeDescriber{c},
-		"LimitRange":            &LimitRangeDescriber{c},
-		"ResourceQuota":         &ResourceQuotaDescriber{c},
-		"PersistentVolume":      &PersistentVolumeDescriber{c},
-		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
-		"Namespace":             &NamespaceDescriber{c},
-		"Endpoints":             &EndpointsDescriber{c},
-	}
-	return m
-}
+func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
+	m := map[unversioned.GroupKind]Describer{
+		api.Kind("Pod"):                   &PodDescriber{c},
+		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
+		api.Kind("Secret"):                &SecretDescriber{c},
+		api.Kind("Service"):               &ServiceDescriber{c},
+		api.Kind("ServiceAccount"):        &ServiceAccountDescriber{c},
+		api.Kind("Node"):                  &NodeDescriber{c},
+		api.Kind("LimitRange"):            &LimitRangeDescriber{c},
+		api.Kind("ResourceQuota"):         &ResourceQuotaDescriber{c},
+		api.Kind("PersistentVolume"):      &PersistentVolumeDescriber{c},
+		api.Kind("PersistentVolumeClaim"): &PersistentVolumeClaimDescriber{c},
+		api.Kind("Namespace"):             &NamespaceDescriber{c},
+		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 
-func expDescriberMap(c *client.Client) map[string]Describer {
-	return map[string]Describer{
-		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{c},
-		"DaemonSet":               &DaemonSetDescriber{c},
-		"Job":                     &JobDescriber{c},
-		"Deployment":              &DeploymentDescriber{c},
-		"Ingress":                 &IngressDescriber{c},
+		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
+		extensions.Kind("Job"):                     &JobDescriber{c},
+		extensions.Kind("Deployment"):              &DeploymentDescriber{c},
+		extensions.Kind("Ingress"):                 &IngressDescriber{c},
 	}
+
+	return m
 }
 
 // List of all resource types we can describe
@@ -99,7 +97,7 @@ func DescribableResources() []string {
 	keys := make([]string, 0)
 
 	for k := range describerMap(nil) {
-		resource := strings.ToLower(k)
+		resource := strings.ToLower(k.Kind)
 		keys = append(keys, resource)
 	}
 	return keys
@@ -107,17 +105,8 @@ func DescribableResources() []string {
 
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(group string, kind string, c *client.Client) (Describer, bool) {
-	var f Describer
-	var ok bool
-
-	switch group {
-	case "":
-		f, ok = describerMap(c)[kind]
-	case "extensions":
-		f, ok = expDescriberMap(c)[kind]
-	}
-
+func DescriberFor(kind unversioned.GroupKind, c *client.Client) (Describer, bool) {
+	f, ok := describerMap(c)[kind]
 	return f, ok
 }
 

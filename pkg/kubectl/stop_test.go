@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -424,7 +425,7 @@ func (c *reaperFake) Services(namespace string) client.ServiceInterface {
 func TestSimpleStop(t *testing.T) {
 	tests := []struct {
 		fake        *reaperFake
-		kind        string
+		kind        unversioned.GroupKind
 		actions     []testclient.Action
 		expectError bool
 		test        string
@@ -433,7 +434,7 @@ func TestSimpleStop(t *testing.T) {
 			fake: &reaperFake{
 				Fake: &testclient.Fake{},
 			},
-			kind: "Pod",
+			kind: api.Kind("Pod"),
 			actions: []testclient.Action{
 				testclient.NewGetAction("pods", api.NamespaceDefault, "foo"),
 				testclient.NewDeleteAction("pods", api.NamespaceDefault, "foo"),
@@ -445,7 +446,7 @@ func TestSimpleStop(t *testing.T) {
 			fake: &reaperFake{
 				Fake: &testclient.Fake{},
 			},
-			kind: "Service",
+			kind: api.Kind("Service"),
 			actions: []testclient.Action{
 				testclient.NewGetAction("services", api.NamespaceDefault, "foo"),
 				testclient.NewDeleteAction("services", api.NamespaceDefault, "foo"),
@@ -458,7 +459,7 @@ func TestSimpleStop(t *testing.T) {
 				Fake:      &testclient.Fake{},
 				noSuchPod: true,
 			},
-			kind:        "Pod",
+			kind:        api.Kind("Pod"),
 			actions:     []testclient.Action{},
 			expectError: true,
 			test:        "stop pod fails, no pod",
@@ -468,7 +469,7 @@ func TestSimpleStop(t *testing.T) {
 				Fake:            &testclient.Fake{},
 				noDeleteService: true,
 			},
-			kind: "Service",
+			kind: api.Kind("Service"),
 			actions: []testclient.Action{
 				testclient.NewGetAction("services", api.NamespaceDefault, "foo"),
 			},

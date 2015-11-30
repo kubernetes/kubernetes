@@ -98,7 +98,7 @@ var _ = Describe("Daemon set", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			Logf("Check that reaper kills all daemon pods for %s", dsName)
-			dsReaper, err := kubectl.ReaperFor("DaemonSet", c)
+			dsReaper, err := kubectl.ReaperFor(extensions.Kind("DaemonSet"), c)
 			Expect(err).NotTo(HaveOccurred())
 			err = dsReaper.Stop(ns, dsName, 0, nil)
 			Expect(err).NotTo(HaveOccurred())
