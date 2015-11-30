@@ -387,7 +387,8 @@ Fields must be either optional or required.
 Optional fields have the following properties:
 
 - They have `omitempty` struct tag in Go.
-- They are a pointer type in the Go definition (e.g. `bool *awesomeFlag`).
+- They are a pointer type in the Go definition (e.g. `bool *awesomeFlag`) or have a built-in `nil`
+  value (e.g. maps and slices).
 - The API server should allow POSTing and PUTing a resource with this field unset.
 
 Required fields have the opposite properties, namely:
@@ -409,7 +410,8 @@ codebase.  However:
 - having a pointer consistently imply optional is clearer for users of the Go language client, and any
   other clients that use corresponding types
 
-Therefore, we ask that pointers always be used with optional fields.
+Therefore, we ask that pointers always be used with optional fields that do not have a built-in
+`nil` value.
 
 
 ## Defaulting
