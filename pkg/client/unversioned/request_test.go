@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -45,8 +46,8 @@ import (
 
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
-		err:        errors.New("test"),
-		apiVersion: testapi.Default.Version(),
+		err:          errors.New("test"),
+		groupVersion: *testapi.Default.GroupVersion(),
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -177,7 +178,7 @@ func TestRequestParam(t *testing.T) {
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{apiVersion: "v1"}).Param("foo", "a")
+	r := (&Request{groupVersion: v1.SchemeGroupVersion}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -193,7 +194,7 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{apiVersion: "v1"}
+	r := &Request{groupVersion: v1.SchemeGroupVersion}
 	r.VersionedParams(&unversioned.ListOptions{ResourceVersion: "1"}, api.Scheme)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
@@ -261,7 +262,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "test", nil)
+	r := NewRequest(nil, "POST", uri, unversioned.GroupVersion{Group: "test"}, nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -322,7 +323,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, testapi.Default.Version(), testapi.Default.Codec())
+		r := NewRequest(nil, "", uri, *testapi.Default.GroupVersion(), testapi.Default.Codec())
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -1029,7 +1030,7 @@ func TestUintParam(t *testing.T) {
 
 	for _, item := range table {
 		u, _ := url.Parse("http://localhost")
-		r := NewRequest(nil, "GET", u, "test", nil).AbsPath("").UintParam(item.name, item.testVal)
+		r := NewRequest(nil, "GET", u, unversioned.GroupVersion{Group: "test"}, nil).AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.URL().String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
@@ -1200,5 +1201,5 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		}
 	}
 	baseURL.Path = testapi.Default.ResourcePath("", "", "")
-	return NewRESTClient(baseURL, testapi.Default.GroupVersion().String(), testapi.Default.Codec(), 0, 0)
+	return NewRESTClient(baseURL, *testapi.Default.GroupVersion(), testapi.Default.Codec(), 0, 0)
 }

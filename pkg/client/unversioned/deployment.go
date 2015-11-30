@@ -72,7 +72,7 @@ func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 	if options == nil {
 		return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
 	if err != nil {
 		return err
 	}
