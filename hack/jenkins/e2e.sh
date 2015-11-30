@@ -942,8 +942,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="kubernetes-gke-e2e-flaky"}
     : ${E2E_NETWORK:="gke-e2e-flaky"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    # TODO: Someone from GKE should create a project for this suite
-    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
           ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
