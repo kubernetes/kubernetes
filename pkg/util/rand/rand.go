@@ -18,6 +18,7 @@ limitations under the License.
 package rand
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -30,6 +31,21 @@ var rng = struct {
 	rand *rand.Rand
 }{
 	rand: rand.New(rand.NewSource(time.Now().UTC().UnixNano())),
+}
+
+// Intsn return a range of ints, from
+// [min, max]
+func Intsn(min int, n int, max int) []int {
+	rng.Lock()
+	defer rng.Unlock()
+	if max-min < 0 {
+		panic(fmt.Sprintf("Range (min,max) doesn't exist:", min, max))
+	}
+	m := make([]int, n)
+	for i := 0; int(i) < n; i++ {
+		m[i] = min + rng.rand.Intn(max-min)
+	}
+	return m
 }
 
 // String generates a random alphanumeric string n characters long.  This will
