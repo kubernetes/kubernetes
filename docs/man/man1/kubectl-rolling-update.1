@@ -27,12 +27,6 @@ existing replication controller and overwrite at least one (common) label in its
     Container name which will have its image upgraded. Only relevant when \-\-image is specified, ignored otherwise. Required when using \-\-image on a multi\-container pod
 
 .PP
-\fB\-\-addon\-check\fP=true
-    If true, prevents the users from manipulating add\-ons / cluster services. See 
-\[la]http://releases.k8s.io/HEAD/cluster/addons\[ra] for more info. Default true.
->>>>>>> Error on manipulation for cluster services / add-ons
-
-.PP
 \fB\-\-deployment\-label\-key\fP="deployment"
     The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when \-\-image is specified, ignored otherwise
 
@@ -98,6 +92,10 @@ existing replication controller and overwrite at least one (common) label in its
 .PP
 \fB\-\-validate\fP=true
     If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-write\-protect\fP=true
+    If true, prevents the users from manipulating resources that shouldn't be changed, such as add\-ons and auto\-generated resources. Note that changing this flag may cause problems to your cluster. Default true.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

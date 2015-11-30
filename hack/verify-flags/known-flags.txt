@@ -1,7 +1,6 @@
 
 accept-hosts
 accept-paths
-addon-check
 admission-control
 admission-control-config-file
 advertise-address
@@ -339,5 +338,6 @@ watch-cache
 watch-only
 whitelist-override-label
 windows-line-endings
+write-protect
 www-prefix
 experimental-flannel-overlay

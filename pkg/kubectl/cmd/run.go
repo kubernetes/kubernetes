@@ -241,7 +241,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 				ResourceNames(mapping.Resource, name).
 				Flatten().
 				Do()
-			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper)
+			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper, false)
 		}
 		return nil
 	}

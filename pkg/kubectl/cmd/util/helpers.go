@@ -483,12 +483,12 @@ func MutateClusterServiceError(info *resource.Info) error {
 	return nil
 }
 
-// AddMutateClusterServiceFlag adds a flag that prevents the manipulation on add-ons. Used by mutations only.
-func AddMutateClusterServiceFlag(cmd *cobra.Command) {
-	cmd.Flags().BoolP("addon-check", "", true, "If true, prevents the users from manipulating add-ons / cluster services. See http://releases.k8s.io/HEAD/cluster/addons for more info. Default true.")
+// AddWriteProtectFlag adds a flag that prevents the manipulation on things that they shouldn't touch, such as add-ons.
+func AddWriteProtectFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolP("write-protect", "", true, "If true, prevents the users from manipulating resources that shouldn't be changed, such as add-ons and auto-generated resources. Note that changing this flag may cause problems to your cluster. Default true.")
 }
 
-// GetMutateClusterServiceFlag returns the value of the addon-check flag
-func GetMutateClusterServiceFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "addon-check")
+// GetWriteProtectFlag returns the value of the addon-check flag
+func GetWriteProtectFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "write-protect")
 }

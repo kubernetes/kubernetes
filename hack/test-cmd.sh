@@ -1079,7 +1079,7 @@ __EOF__
   # force replacing add-on should fail (cascade)
   ! kubectl replace --force -f hack/testdata/add-on-rc.yaml --cascade
   # Cleanup
-  kubectl delete rc addon --addon-check=false
+  kubectl delete rc addon --write-protect=false
   # Post-condition: no rc is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 
