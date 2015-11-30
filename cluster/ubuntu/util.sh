@@ -306,9 +306,6 @@ function kube-up() {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
 
   # downloading tarball release
-  if [[ -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
-    rm -rf "${KUBE_ROOT}/cluster/ubuntu/binaries"
-  fi
   "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
 
   setClusterInfo
