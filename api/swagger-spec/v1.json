@@ -3168,7 +3168,7 @@
     ]
    },
    {
-    "path": "/api/v1/proxy/nodes/{name}/{path:*}",
+    "path": "/api/v1/proxy/nodes/{name}/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -5281,7 +5281,7 @@
     ]
    },
    {
-    "path": "/api/v1/proxy/namespaces/{namespace}/pods/{name}/{path:*}",
+    "path": "/api/v1/proxy/namespaces/{namespace}/pods/{name}/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -6633,7 +6633,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/pods/{name}/proxy/{path:*}",
+    "path": "/api/v1/namespaces/{namespace}/pods/{name}/proxy/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -10918,7 +10918,7 @@
     ]
    },
    {
-    "path": "/api/v1/proxy/namespaces/{namespace}/services/{name}/{path:*}",
+    "path": "/api/v1/proxy/namespaces/{namespace}/services/{name}/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
