@@ -1156,6 +1156,12 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *validation.FieldPath) validatio
 		}
 	}
 
+	if len(spec.NodeName) > 0 {
+		if ok, msg := ValidateNodeName(spec.NodeName, false); !ok {
+			allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("nodeName"), spec.NodeName, msg))
+		}
+	}
+
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
 			allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
