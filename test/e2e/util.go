@@ -118,7 +118,8 @@ const (
 //
 // TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively
 // in v1.3).
-var subResourceProxyVersion = version.MustParse("v1.1.0")
+var subResourcePodProxyVersion = version.MustParse("v1.1.0")
+var subResourceServiceAndNodeProxyVersion = version.MustParse("v1.2.0")
 
 type CloudConfig struct {
 	ProjectID         string
@@ -995,7 +996,7 @@ func (r podProxyResponseChecker) checkAllResponses() (done bool, err error) {
 		if !isElementOf(pod.UID, currentPods) {
 			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
 		}
-		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, r.c)
+		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, r.c)
 		if err != nil {
 			return false, err
 		}

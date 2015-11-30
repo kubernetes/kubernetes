@@ -1564,6 +1564,18 @@ func Convert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s conv
 	return autoConvert_api_NodeList_To_v1_NodeList(in, out, s)
 }
 
+func autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in, out, s)
+}
+
 func autoConvert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NodeSpec))(in)
@@ -4804,6 +4816,18 @@ func Convert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s conv
 	return autoConvert_v1_NodeList_To_api_NodeList(in, out, s)
 }
 
+func autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in *NodeProxyOptions, out *api.NodeProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*NodeProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in *NodeProxyOptions, out *api.NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in, out, s)
+}
+
 func autoConvert_v1_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *api.NodeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeSpec))(in)
@@ -6519,6 +6543,7 @@ func init() {
 		autoConvert_api_NodeCondition_To_v1_NodeCondition,
 		autoConvert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints,
 		autoConvert_api_NodeList_To_v1_NodeList,
+		autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions,
 		autoConvert_api_NodeSpec_To_v1_NodeSpec,
 		autoConvert_api_NodeStatus_To_v1_NodeStatus,
 		autoConvert_api_NodeSystemInfo_To_v1_NodeSystemInfo,
@@ -6649,6 +6674,7 @@ func init() {
 		autoConvert_v1_NodeCondition_To_api_NodeCondition,
 		autoConvert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints,
 		autoConvert_v1_NodeList_To_api_NodeList,
+		autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions,
 		autoConvert_v1_NodeSpec_To_api_NodeSpec,
 		autoConvert_v1_NodeStatus_To_api_NodeStatus,
 		autoConvert_v1_NodeSystemInfo_To_api_NodeSystemInfo,
