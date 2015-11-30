@@ -485,7 +485,7 @@ var _ = Describe("Nodes", func() {
 	})
 
 	Describe("Network", func() {
-		Context("when a minion node becomes unreachable", func() {
+		Context("when a node becomes unreachable", func() {
 			BeforeEach(func() {
 				SkipUnlessProviderIs("gce", "gke", "aws")
 				SkipUnlessNodeCountIsAtLeast(2)
@@ -497,8 +497,8 @@ var _ = Describe("Nodes", func() {
 			// 1. pods from a uncontactable nodes are rescheduled
 			// 2. when a node joins the cluster, it can host new pods.
 			// Factor out the cases into two separate tests.
-			It("[replication controller] recreates pods scheduled on the unreachable minion node "+
-				"AND allows scheduling of pods on a minion after it rejoins the cluster", func() {
+			It("[replication controller] recreates pods scheduled on the unreachable node "+
+				"AND allows scheduling of pods on a node after it rejoins the cluster", func() {
 
 				// Create a replication controller for a service that serves its hostname.
 				// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
