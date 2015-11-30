@@ -74,6 +74,7 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageVersions[""] = testapi.Default.Version()
 	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	config.StorageVersions = storageVersions
+	config.PublicAddress = net.ParseIP("192.168.10.4")
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
 	return master, server, config, assert.New(t)

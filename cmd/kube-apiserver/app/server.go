@@ -367,12 +367,17 @@ func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
 
 	// If advertise-address is not specified, use bind-address. If bind-address
-	// is not usable (unset, 0.0.0.0, or loopback), setDefaults() in
-	// pkg/master/master.go will do the right thing and use the host's default
-	// interface.
+	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
+	// interface as valid public addr for master (see: util#ValidPublicAddrForMaster)
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		s.AdvertiseAddress = s.BindAddress
+		hostIP, err := util.ValidPublicAddrForMaster(s.BindAddress)
+		if err != nil {
+			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
+				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+		}
+		s.AdvertiseAddress = hostIP
 	}
+	glog.Infof("Will report %v as public IP address.", s.AdvertiseAddress)
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		glog.Fatalf("Specify either --etcd-servers or --etcd-config")

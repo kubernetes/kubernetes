@@ -512,3 +512,17 @@ func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
 
 	return list, errs, nil
 }
+
+// If bind-address is usable, return it directly
+// If bind-address is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
+// interface.
+func ValidPublicAddrForMaster(bindAddress net.IP) (net.IP, error) {
+	if bindAddress == nil || bindAddress.IsUnspecified() || bindAddress.IsLoopback() {
+		hostIP, err := ChooseHostInterface()
+		if err != nil {
+			return nil, err
+		}
+		bindAddress = hostIP
+	}
+	return bindAddress, nil
+}

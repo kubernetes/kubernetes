@@ -21,6 +21,7 @@ package integration
 // This file tests use of the secrets API resource.
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -81,6 +82,7 @@ func TestSecrets(t *testing.T) {
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	framework.DeleteAllEtcdKeys()
