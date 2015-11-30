@@ -101,7 +101,7 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	seed := rand.Int63()
 	fuzzInternalObject(t, testapi.Default.InternalGroupVersion().String(), item, seed)
 
-	version := testapi.Default.VersionUnderTest
+	version := testapi.Default.GroupVersion().String()
 	codecs := []runtime.Codec{}
 	for _, fn := range codecsToTest {
 		codec, err := fn(version, item)

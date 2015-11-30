@@ -142,9 +142,9 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case unversioned.LabelSelectorQueryParam(testapi.Default.Version()):
+			case unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()):
 				validator = validateLabels
-			case unversioned.FieldSelectorQueryParam(testapi.Default.Version()):
+			case unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }

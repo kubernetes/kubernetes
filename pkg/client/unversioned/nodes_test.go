@@ -44,7 +44,7 @@ func TestListNodes(t *testing.T) {
 }
 
 func TestListNodesLabels(t *testing.T) {
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",

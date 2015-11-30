@@ -18,3 +18,10 @@ package unversioned
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = GroupVersion{Group: "", Version: ""}
+
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
+// TODO this doesn't actually register them right now due to cycles.

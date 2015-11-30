@@ -79,7 +79,7 @@ func timeoutPath(resource, namespace, name string) string {
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -97,7 +97,7 @@ var aPod string = `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -130,7 +130,7 @@ var aRC string = `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -154,7 +154,7 @@ var aService string = `
 var aNode string = `
 {
   "kind": "Node",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -166,7 +166,7 @@ var aNode string = `
 var aEvent string = `
 {
   "kind": "Event",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -182,7 +182,7 @@ var aEvent string = `
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -205,7 +205,7 @@ var emptyEndpoints string = `
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -230,7 +230,7 @@ var aEndpoints string = `
 var deleteNow string = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Default.Version() + `",
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "gracePeriodSeconds": 0%s
 }
 `
