@@ -21,7 +21,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"hash/fnv"
 	"net/http"
@@ -34,6 +33,7 @@ import (
 	etcd "github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 	skymsg "github.com/skynetservices/skydns/msg"
+	flag "github.com/spf13/pflag"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
@@ -47,12 +47,11 @@ import (
 )
 
 var (
-	// TODO: switch to pflag and make - and _ equivalent.
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
-	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
+	argEtcdMutationTimeout = flag.Duration("etcd-mutation-timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
-	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
-	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
+	argKubecfgFile         = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service; --kube-master-url overrides the URL part of this; if neither this nor --kube-master-url are provided, defaults to service account tokens")
+	argKubeMasterURL       = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
 
 const (
@@ -349,7 +348,7 @@ func (ks *kube2sky) addDNS(subdomain string, service *kapi.Service) error {
 }
 
 // Implements retry logic for arbitrary mutator. Crashes after retrying for
-// etcd_mutation_timeout.
+// etcd-mutation-timeout.
 func (ks *kube2sky) mutateEtcdOrDie(mutator func() error) {
 	timeout := time.After(ks.etcdMutationTimeout)
 	for {
@@ -456,10 +455,10 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 func expandKubeMasterURL() (string, error) {
 	parsedURL, err := url.Parse(os.ExpandEnv(*argKubeMasterURL))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
+		return "", fmt.Errorf("failed to parse --kube-master-url %s - %v", *argKubeMasterURL, err)
 	}
 	if parsedURL.Scheme == "" || parsedURL.Host == "" || parsedURL.Host == ":" {
-		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterURL)
+		return "", fmt.Errorf("invalid --kube-master-url specified %s", *argKubeMasterURL)
 	}
 	return parsedURL.String(), nil
 }
@@ -471,7 +470,7 @@ func newKubeClient() (*kclient.Client, error) {
 		err       error
 		masterURL string
 	)
-	// If the user specified --kube_master_url, expand env vars and verify it.
+	// If the user specified --kube-master-url, expand env vars and verify it.
 	if *argKubeMasterURL != "" {
 		masterURL, err = expandKubeMasterURL()
 		if err != nil {
@@ -480,15 +479,15 @@ func newKubeClient() (*kclient.Client, error) {
 	}
 
 	if masterURL != "" && *argKubecfgFile == "" {
-		// Only --kube_master_url was provided.
+		// Only --kube-master-url was provided.
 		config = &kclient.Config{
 			Host:         masterURL,
 			GroupVersion: &unversioned.GroupVersion{Version: "v1"},
 		}
 	} else {
 		// We either have:
-		//  1) --kube_master_url and --kubecfg_file
-		//  2) just --kubecfg_file
+		//  1) --kube-master-url and --kubecfg-file
+		//  2) just --kubecfg-file
 		//  3) neither flag
 		// In any case, the logic is the same.  If (3), this will automatically
 		// fall back on the service account token.
@@ -563,6 +562,7 @@ func getHash(text string) string {
 }
 
 func main() {
+	flag.CommandLine.SetNormalizeFunc(util.WarnWordSepNormalizeFunc)
 	flag.Parse()
 	var err error
 	// TODO: Validate input flags.
