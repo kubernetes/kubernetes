@@ -73,7 +73,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 	if options == nil {
 		return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
 	if err != nil {
 		return err
 	}

@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
@@ -99,7 +100,7 @@ type Request struct {
 	selector     labels.Selector
 	timeout      time.Duration
 
-	apiVersion string
+	groupVersion unversioned.GroupVersion
 
 	// output
 	err  error
@@ -111,15 +112,14 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
-	codec runtime.Codec) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, groupVersion unversioned.GroupVersion, codec runtime.Codec) *Request {
 	return &Request{
-		client:     client,
-		verb:       verb,
-		baseURL:    baseURL,
-		path:       baseURL.Path,
-		apiVersion: apiVersion,
-		codec:      codec,
+		client:       client,
+		verb:         verb,
+		baseURL:      baseURL,
+		path:         baseURL.Path,
+		groupVersion: groupVersion,
+		codec:        codec,
 	}
 }
 
@@ -307,25 +307,25 @@ func (r resourceTypeToFieldMapping) filterField(resourceType, field, value strin
 	return fMapping.filterField(field, value)
 }
 
-type versionToResourceToFieldMapping map[string]resourceTypeToFieldMapping
+type versionToResourceToFieldMapping map[unversioned.GroupVersion]resourceTypeToFieldMapping
 
-func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, field, value string) (newField, newValue string, err error) {
-	rMapping, ok := v[apiVersion]
+func (v versionToResourceToFieldMapping) filterField(groupVersion unversioned.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
+	rMapping, ok := v[groupVersion]
 	if !ok {
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
 		return field, value, nil
 	}
 	newField, newValue, err = rMapping.filterField(resourceType, field, value)
 	if err != nil {
 		// This is only a warning until we find and fix all of the client's usages.
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
 		return field, value, nil
 	}
 	return newField, newValue, nil
 }
 
 var fieldMappings = versionToResourceToFieldMapping{
-	"v1": resourceTypeToFieldMapping{
+	v1.SchemeGroupVersion: resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
 			ObjectNameField:   ObjectNameField,
 			NodeUnschedulable: NodeUnschedulable,
@@ -370,13 +370,13 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 		return r
 	}
 	s2, err := s.Transform(func(field, value string) (newField, newValue string, err error) {
-		return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+		return fieldMappings.filterField(r.groupVersion, r.resource, field, value)
 	})
 	if err != nil {
 		r.err = err
 		return r
 	}
-	return r.setParam(unversioned.FieldSelectorQueryParam(r.apiVersion), s2.String())
+	return r.setParam(unversioned.FieldSelectorQueryParam(r.groupVersion.String()), s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
@@ -390,7 +390,7 @@ func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(unversioned.LabelSelectorQueryParam(r.apiVersion), s.String())
+	return r.setParam(unversioned.LabelSelectorQueryParam(r.groupVersion.String()), s.String())
 }
 
 // UintParam creates a query parameter with the given value.
@@ -416,7 +416,7 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 	if r.err != nil {
 		return r
 	}
-	versioned, err := convertor.ConvertToVersion(obj, r.apiVersion)
+	versioned, err := convertor.ConvertToVersion(obj, r.groupVersion.String())
 	if err != nil {
 		r.err = err
 		return r
@@ -430,14 +430,14 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 		for _, value := range v {
 			// TODO: Move it to setParam method, once we get rid of
 			// FieldSelectorParam & LabelSelectorParam methods.
-			if k == unversioned.LabelSelectorQueryParam(r.apiVersion) && value == "" {
+			if k == unversioned.LabelSelectorQueryParam(r.groupVersion.String()) && value == "" {
 				// Don't set an empty selector for backward compatibility.
 				// Since there is no way to get the difference between empty
 				// and unspecified string, we don't set it to avoid having
 				// labelSelector= param in every request.
 				continue
 			}
-			if k == unversioned.FieldSelectorQueryParam(r.apiVersion) {
+			if k == unversioned.FieldSelectorQueryParam(r.groupVersion.String()) {
 				if value == "" {
 					// Don't set an empty selector for backward compatibility.
 					// Since there is no way to get the difference between empty
@@ -453,7 +453,7 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 				}
 				filteredSelector, err := selector.Transform(
 					func(field, value string) (newField, newValue string, err error) {
-						return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+						return fieldMappings.filterField(r.groupVersion, r.resource, field, value)
 					})
 				if err != nil {
 					r.err = fmt.Errorf("untransformable field selector: %v", err)

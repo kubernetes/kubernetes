@@ -187,7 +187,7 @@ func (e *events) Delete(name string) error {
 // Returns the appropriate field selector based on the API version being used to communicate with the server.
 // The returned field selector can be used with List and Watch to filter desired events.
 func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
-	apiVersion := e.client.APIVersion()
+	apiVersion := e.client.APIVersion().String()
 	field := fields.Set{}
 	if involvedObjectName != nil {
 		field[getInvolvedObjectNameFieldLabel(apiVersion)] = *involvedObjectName
