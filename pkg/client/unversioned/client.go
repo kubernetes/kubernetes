@@ -120,12 +120,6 @@ type VersionInterface interface {
 	ServerAPIVersions() (*unversioned.APIVersions, error)
 }
 
-// APIStatus is exposed by errors that can be converted to an api.Status object
-// for finer grained details.
-type APIStatus interface {
-	Status() unversioned.Status
-}
-
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient

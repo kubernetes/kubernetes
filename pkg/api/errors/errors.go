@@ -45,6 +45,12 @@ type StatusError struct {
 	ErrStatus unversioned.Status
 }
 
+// APIStatus is exposed by errors that can be converted to an api.Status object
+// for finer grained details.
+type APIStatus interface {
+	Status() unversioned.Status
+}
+
 var _ error = &StatusError{}
 
 // Error implements the Error interface.
@@ -394,7 +400,7 @@ func IsServerTimeout(err error) bool {
 // and may be the result of another HTTP actor.
 func IsUnexpectedServerError(err error) bool {
 	switch t := err.(type) {
-	case *StatusError:
+	case APIStatus:
 		if d := t.Status().Details; d != nil {
 			for _, cause := range d.Causes {
 				if cause.Type == unversioned.CauseTypeUnexpectedServerResponse {
@@ -416,7 +422,7 @@ func IsUnexpectedObjectError(err error) bool {
 // suggested seconds to wait, or false if the error does not imply a wait.
 func SuggestsClientDelay(err error) (int, bool) {
 	switch t := err.(type) {
-	case *StatusError:
+	case APIStatus:
 		if t.Status().Details != nil {
 			switch t.Status().Reason {
 			case unversioned.StatusReasonServerTimeout, unversioned.StatusReasonTimeout:
@@ -429,8 +435,8 @@ func SuggestsClientDelay(err error) (int, bool) {
 
 func reasonForError(err error) unversioned.StatusReason {
 	switch t := err.(type) {
-	case *StatusError:
-		return t.ErrStatus.Reason
+	case APIStatus:
+		return t.Status().Reason
 	}
 	return unversioned.StatusReasonUnknown
 }
