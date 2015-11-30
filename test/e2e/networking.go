@@ -334,7 +334,7 @@ func runNetTest(timeoutSeconds time.Duration, f *Framework, portsGrabBag []int, 
 		go func(nodes *api.NodeList, svc *api.Service) {
 			passed := CreatePodsAndWait(f, nodes, svc, timeoutSeconds)
 			if passed {
-				portCompleteChannel <- service.Name
+				portCompleteChannel <- svc.Name
 			} else {
 				// Fail the test and set the done flag, so that all polling stops.
 				netTestDone = true
