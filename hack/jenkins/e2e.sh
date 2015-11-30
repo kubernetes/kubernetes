@@ -147,6 +147,7 @@ GKE_REQUIRED_SKIP_TESTS=(
 # Tests wchich are known to be flaky on GKE
 GKE_FLAKY_TESTS=(
     "KubeProxy\sshould\stest\skube-proxy"
+    "NodeOutOfDisk"
   )
 
 # Specialized tests which should be skipped by default for GKE.
@@ -181,6 +182,7 @@ GCE_FLAKY_TESTS=(
     "DaemonRestart\sController\sManager" # issue: #17829
     "Resource\susage\sof\ssystem\scontainers" # issue: #13931
     "allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #17830
+    "NodeOutOfDisk" # issue: 17687
     )
 
 # The following tests are known to be slow running (> 2 min), and are
@@ -776,7 +778,7 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-gke-e2e-flaky)
+  kubernetes-e2e-gke-flaky)
     : ${DOGFOOD_GCLOUD:="true"}
     : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
     : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
