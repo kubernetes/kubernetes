@@ -114,6 +114,10 @@ type Cacher struct {
 	ListFromCache bool
 }
 
+var (
+	_ = Interface(&Cacher{})
+)
+
 // Create a new Cacher responsible from service WATCH and LIST requests from its
 // internal cache and updating its cache in the background based on the given
 // configuration.
