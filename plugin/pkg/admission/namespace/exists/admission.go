@@ -47,7 +47,7 @@ type exists struct {
 }
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
-	gvk, err := api.RESTMapper.KindFor(a.GetResource())
+	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}

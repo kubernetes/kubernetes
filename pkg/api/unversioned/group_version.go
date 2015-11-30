@@ -22,6 +22,17 @@ import (
 	"strings"
 )
 
+// GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
+// concepts during lookup stages without having partially valid types
+type GroupResource struct {
+	Group    string
+	Resource string
+}
+
+func (gr *GroupResource) String() string {
+	return strings.Join([]string{gr.Group, ", Resource=", gr.Resource}, "")
+}
+
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
 type GroupVersionResource struct {
@@ -30,12 +41,16 @@ type GroupVersionResource struct {
 	Resource string
 }
 
+func (gvr GroupVersionResource) GroupResource() GroupResource {
+	return GroupResource{Group: gvr.Group, Resource: gvr.Resource}
+}
+
 func (gvr GroupVersionResource) GroupVersion() GroupVersion {
 	return GroupVersion{Group: gvr.Group, Version: gvr.Version}
 }
 
 func (gvr *GroupVersionResource) String() string {
-	return gvr.Group + "/" + gvr.Version + ", Resource=" + gvr.Resource
+	return strings.Join([]string{gvr.Group, "/", gvr.Version, ", Resource=", gvr.Resource}, "")
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
