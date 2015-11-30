@@ -28,7 +28,7 @@ type RateLimiter interface {
 	Stop()
 }
 
-type tickRateLimiter struct {
+type tokenBucketRateLimiter struct {
 	limiter *ratelimit.Bucket
 }
 
@@ -39,7 +39,7 @@ type tickRateLimiter struct {
 // The maximum number of tokens in the bucket is capped at 'burst'.
 func NewTokenBucketRateLimiter(qps float32, burst int) RateLimiter {
 	limiter := ratelimit.NewBucketWithRate(float64(qps), int64(burst))
-	return &tickRateLimiter{limiter}
+	return &tokenBucketRateLimiter{limiter}
 }
 
 type fakeRateLimiter struct{}
@@ -48,16 +48,16 @@ func NewFakeRateLimiter() RateLimiter {
 	return &fakeRateLimiter{}
 }
 
-func (t *tickRateLimiter) TryAccept() bool {
+func (t *tokenBucketRateLimiter) TryAccept() bool {
 	return t.limiter.TakeAvailable(1) == 1
 }
 
 // Accept will block until a token becomes available
-func (t *tickRateLimiter) Accept() {
+func (t *tokenBucketRateLimiter) Accept() {
 	t.limiter.Wait(1)
 }
 
-func (t *tickRateLimiter) Stop() {
+func (t *tokenBucketRateLimiter) Stop() {
 }
 
 func (t *fakeRateLimiter) TryAccept() bool {
