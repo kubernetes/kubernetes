@@ -417,12 +417,12 @@ func TestDeleteMultipleSelector(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods" && m == "GET":
-				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, pods)}, nil
 			case p == "/namespaces/test/services" && m == "GET":
-				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil

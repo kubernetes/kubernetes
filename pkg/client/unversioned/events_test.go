@@ -32,12 +32,12 @@ func TestEventSearch(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "baz", ""),
 			Query: url.Values{
-				unversioned.FieldSelectorQueryParam(testapi.Default.Version()): []string{
-					getInvolvedObjectNameFieldLabel(testapi.Default.Version()) + "=foo,",
+				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
+					getInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
-				unversioned.LabelSelectorQueryParam(testapi.Default.Version()): []string{},
+				unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{},
 			},
 		},
 		Response: Response{StatusCode: 200, Body: &api.EventList{}},

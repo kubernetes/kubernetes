@@ -55,7 +55,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		location      string
 		resource      string
@@ -105,7 +105,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		rv            string
 		location      string

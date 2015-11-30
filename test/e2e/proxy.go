@@ -36,7 +36,7 @@ import (
 )
 
 var _ = Describe("Proxy", func() {
-	version := testapi.Default.Version()
+	version := testapi.Default.GroupVersion().Version
 	Context("version "+version, func() { proxyContext(version) })
 })
 

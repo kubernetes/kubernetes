@@ -264,7 +264,7 @@ func NewTestPod() (*api.Pod, int) {
 	currentPodNum = currentPodNum + 1
 	name := fmt.Sprintf("pod%d", currentPodNum)
 	return &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,

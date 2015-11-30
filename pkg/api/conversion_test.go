@@ -37,11 +37,11 @@ func BenchmarkPodConversion(b *testing.B) {
 	scheme := api.Scheme.Raw()
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Default.Version())
+		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Default.GroupVersion().String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.Group].String())
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.GroupVersion().Group].String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -65,11 +65,11 @@ func BenchmarkNodeConversion(b *testing.B) {
 	scheme := api.Scheme.Raw()
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.Version())
+		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.GroupVersion().String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.Group].String())
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.GroupVersion().Group].String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -93,11 +93,11 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	scheme := api.Scheme.Raw()
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.Version())
+		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.GroupVersion().String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.Group].String())
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersions[testapi.Default.GroupVersion().Group].String())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
