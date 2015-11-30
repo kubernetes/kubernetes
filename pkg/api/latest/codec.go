@@ -17,10 +17,6 @@ limitations under the License.
 package latest
 
 import (
-	"fmt"
-	"io"
-	"reflect"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -77,21 +73,13 @@ type CodecFactory struct {
 	serializers []serializerType
 }
 
-type noopEncoder struct {
-	runtime.Decoder
-}
-
-func (e noopEncoder) EncodeToStream(obj runtime.Object, w io.Writer) error {
-	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(e.Decoder))
-}
-
 // UniversalDecoder returns a runtime.Decoder capable of decoding all known API objects in all known formats. Used
 // by clients that do not need to encode objects but want to deserialize API objects stored on disk. Only decodes
 // objects in groups registered with the scheme. The GroupVersions passed may be used to select alternate
 // versions of objects to return - by default, runtime.APIVersionInternal is used. If any versions are specified,
 // unrecognized groups will be returned in the version they are encoded as (no conversion).
 func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(noopEncoder{UniversalDeserializer}, versions...)
+	return f.CodecForVersions(runtime.NoopEncoder{UniversalDeserializer}, versions...)
 }
 
 // CodecFor creates a codec with the provided serializer. If versions are specified, objects are converted to

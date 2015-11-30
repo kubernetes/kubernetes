@@ -18,10 +18,15 @@ package runtime
 
 import (
 	"bytes"
+	"fmt"
+	"io"
+	"reflect"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func EncodeOrDie(codec Codec, obj Object) string {
+func EncodeOrDie(codec Serializer, obj Object) string {
 	bytes, err := Encode(codec, obj)
 	if err != nil {
 		panic(err)
@@ -37,4 +42,22 @@ func Encode(s Serializer, obj Object) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// NoopEncoder converts an Decoder to a Serializer or Codec for code that expects them but only uses decoding.
+type NoopEncoder struct {
+	Decoder
+}
+
+func (n NoopEncoder) EncodeToStream(obj Object, w io.Writer) error {
+	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
+}
+
+// NoopDecoder converts an Encoder to a Serializer or Codec for code that expects them but only uses encoding.
+type NoopDecoder struct {
+	Encoder
+}
+
+func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error) {
+	return nil, nil, fmt.Errorf("decoding is not allowed for this codec: %v", reflect.TypeOf(n.Encoder))
 }
