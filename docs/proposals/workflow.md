@@ -48,8 +48,8 @@ Most of the [job schedulers](https://en.wikipedia.org/wiki/List_of_job_scheduler
 
 ## Implementation
 
-The basic idea consists in adding a label selector to the current Job API object. The new selector will determine the parent jobs.  The parent jobs are the jobs current job will depend on. The current job will be scheduled once all the parent jobs will run to completion.
-The strongest point in favor of this approach is the ability to re-use the current `job` implementation. Using a label selector the current `job` will simply become a `graph` of jobs: all the features/controllers that will be built on top of `job` like for example [#11980](https://github.com/kubernetes/kubernetes/issues/11980) and [#17242](https://github.com/kubernetes/kubernetes/issues/17242) will be automatically extended to support workflows. Not sure about https://github.com/kubernetes/kubernetes/issues/16845 and https://github.com/kubernetes/kubernetes/issues/14188.
+The basic idea is to add a label selector to the current Job API object. The new selector will determine the parent jobs.  The parent jobs are the jobs current job will depend on. The current job will be scheduled once all the parent jobs will run to completion.
+The strongest point in favor of this approach is the ability to re-use the current `job` implementation. Using a label selector the current `job` will simply become a `graph` of jobs: all the features/controllers that will be built on top of `job` like for example [#11980](https://github.com/kubernetes/kubernetes/issues/11980) and [#17242](https://github.com/kubernetes/kubernetes/issues/17242) will be automatically extended to support workflows. Not sure about [#16845](https://github.com/kubernetes/kubernetes/issues/16845) and [#14188](https://github.com/kubernetes/kubernetes/issues/14188).
 A similar approach is implemented in Chronos for [dependent jobs](https://mesos.github.io/chronos/docs/api.html#adding-a-dependent-job).
 
 ### API Object
@@ -63,29 +63,13 @@ To implement _workflows_ the `Job` API should be modified:
 const (
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
+	// JobWaiting means the job is waiting for its parents to finish their tasks.
 	JobWaiting  JobConditionType = "Waiting"
 )
 
 type JobSpec struct {
-
-	// Parallelism specifies the maximum desired number of pods the job should
-	// run at any given time. The actual number of pods running in steady state will
-	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
-	// i.e. when the work left to do is less than max parallelism.
-	Parallelism *int `json:"parallelism,omitempty"`
-
-	// Completions specifies the desired number of successfully finished pods the
-	// job should be run with. Defaults to 1.
-	Completions *int `json:"completions,omitempty"`
-
-	// Selector is a label query over pods that should match the pod count.
-	Selector *PodSelector `json:"selector,omitempty"`
-
-	// Template is the object that describes the pod that will be created when
-	// executing a job.
-	Template api.PodTemplateSpec `json:"template"`
-
-	// Job labels selector to detect parents jobs.
+	...
+	// Job labels selector to detect parent jobs.
 	ParentSelector map[string]string `json:"parentSelector"`
 }
 
@@ -93,15 +77,16 @@ type JobSpec struct {
 
 #### JobSpec
 
-A new labels selector will be added to `apis.extensions.jobspec`. The `jobspec.parentselector` is a label query over a set of jobs.
+A new labels selector will be added to `job.spec`. The `job.Spec.ParentSelector` is a label query over a set of jobs.
 If all selected jobs are completed the `job` will be started immediately.
-If `.jobspec.parentselector` is absent the `job` will be started immediately.
+If `job.Spec.ParentSelector` is absent the `job` will be started immediately.
+If `job.Spec.ParentSelector` is pointing to a non-existing job, the job will wait indefinitely.
 Since labels are forwarded directly from `job` to pods, users should not create pods whose labels match this selector, either directly,
 via another Job, or via another controller (for example Replication controller), [see](https://github.com/kubernetes/kubernetes/issues/14961).
 
 #### JobStatus
 
-`apis.extensions.jobstatus` won't be modified, but a new job condition will be added.
+`job.Status` won't be modified, but a new job condition will be added.
 
 #### JobCondition
 
@@ -109,11 +94,11 @@ A new constant value will be added to `JobConditionType` - `Waiting`. This will 
 
 ### CRUD
 
-* Creating a job without a `jobspec.parentselector` (nil `jobspec.parentselector`) will simply follow the usual `job` life cycle.
-* Without a `jobspec.parentselector` (i.e. nil) the job will be started immediately.
-* With a non nil `jobspec.parentselector` the logic already described will be considered.
-* The validation will prevent the user to set an _empty_ `jobspec.parentselector`.
-* Users may read the `job` using the usual `get`, `describe` commands already implemented for `job`. The `describe` command should display the non nil `jobs.parentsselector` (if any).
+* Creating a job without a `job.Spec.Parentselector` (nil `job.Spec.Parentselector`) will simply follow the usual `job` life cycle.
+* Without a `job.Spec.ParentSelector` (i.e. nil) the job will be started immediately.
+* With a non nil `job.Spec.ParentSelector` the logic already described will be considered.
+* The validation will prevent the user to set an _empty_ `job.Spec.ParentSelector`.
+* Users may read the `job` using the usual `get`, `describe` commands already implemented for `job`. The `describe` command should display the non nil `job.Spec.ParentSelector` (if any).
 * A `job` cannot be updated. To update a `job`, user should delete and re-create it. The only exception is `job` _scaling_. A `workflow job` (i.e. with a non nil selector) can be scaled in the common way. No matter if pods are currently running or not.
 * A `job` can be deleted in the usual way.
 
@@ -126,7 +111,6 @@ The usual Job controller events will be emitted.
 
 Since a Job with a non nil job selector can be created and may never start we propose to add the events:
 
-* JobCreated
 * JobWaiting
 
 ## Known drawbacks
