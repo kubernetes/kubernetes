@@ -187,6 +187,9 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 
+kube::log::status "Checking kubectl version"
+kubectl version
+
 runTests() {
   version="$1"
   echo "Testing api version: $1"
