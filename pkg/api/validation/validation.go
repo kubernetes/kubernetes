@@ -1115,6 +1115,12 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 		}
 	}
 
+	if len(spec.NodeName) > 0 {
+		if ok, msg := ValidateNodeName(spec.NodeName, false); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("nodeName", spec.NodeName, msg))
+		}
+	}
+
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
 			allErrs = append(allErrs, errs.NewFieldInvalid("activeDeadlineSeconds", spec.ActiveDeadlineSeconds, "activeDeadlineSeconds must be a positive integer greater than 0"))

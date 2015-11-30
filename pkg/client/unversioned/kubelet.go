@@ -18,7 +18,10 @@ package unversioned
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+
+	"k8s.io/kubernetes/pkg/api/validation"
 )
 
 // KubeletClient is an interface for all kubelet functionality
@@ -75,6 +78,9 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 }
 
 func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+	if ok, msg := validation.ValidateNodeName(host, false); !ok {
+		return "", 0, nil, fmt.Errorf("invalid node name: %s", msg)
+	}
 	scheme := "http"
 	if c.Config.EnableHttps {
 		scheme = "https"
