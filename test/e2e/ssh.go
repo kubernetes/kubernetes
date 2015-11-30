@@ -35,7 +35,7 @@ var _ = Describe("SSH", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// When adding more providers here, also implement their functionality in util.go's getSigner(...).
-		SkipUnlessProviderIs("gce", "gke")
+		SkipUnlessProviderIs(providersWithSSH...)
 	})
 
 	It("should SSH to all nodes and run commands", func() {
