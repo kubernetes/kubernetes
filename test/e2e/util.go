@@ -768,7 +768,10 @@ func waitForPodToDisappear(c *client.Client, ns, podName string, label labels.Se
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	return waitForPodToDisappear(c, ns, podName, label, 20*time.Second, 5*time.Minute)
+	// NodeController evicts pod after 5 minutes, so we need timeout greater than that.
+	// Additionally, there can be non-zero grace period, so we are setting 10 minutes
+	// to be on the safe size.
+	return waitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
 }
 
 // waitForService waits until the service appears (exist == true), or disappears (exist == false)
