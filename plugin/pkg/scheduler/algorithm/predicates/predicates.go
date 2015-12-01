@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -50,6 +51,25 @@ type ClientNodeInfo struct {
 
 func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
 	return nodes.Nodes().Get(nodeID)
+}
+
+type CachedNodeInfo struct {
+	*cache.StoreToNodeLister
+}
+
+// GetNodeInfo returns cached data for the node 'id'.
+func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
+	node, exists, err := c.Get(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("node '%v' is not in cache", id)
+	}
+
+	return node.(*api.Node), nil
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {

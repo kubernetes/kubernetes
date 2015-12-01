@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api/validation"
 
@@ -176,7 +177,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		ControllerLister: f.ControllerLister,
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
-		NodeInfo:   f.NodeLister,
+		NodeInfo:   &predicates.CachedNodeInfo{f.NodeLister},
 	}
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
