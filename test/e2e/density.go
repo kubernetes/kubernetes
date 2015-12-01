@@ -70,6 +70,39 @@ func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
 	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
 }
 
+func density30AddonResourceVerifier() map[string]resourceConstraint {
+	constraints := make(map[string]resourceConstraint)
+	constraints["fluentd-elasticsearch"] = resourceConstraint{
+		cpuConstraint:    0.03,
+		memoryConstraint: 150 * (1024 * 1024),
+	}
+	constraints["elasticsearch-logging"] = resourceConstraint{
+		cpuConstraint:    2,
+		memoryConstraint: 750 * (1024 * 1024),
+	}
+	constraints["heapster"] = resourceConstraint{
+		cpuConstraint:    2,
+		memoryConstraint: 1800 * (1024 * 1024),
+	}
+	constraints["kibana-logging"] = resourceConstraint{
+		cpuConstraint:    0.01,
+		memoryConstraint: 100 * (1024 * 1024),
+	}
+	constraints["kube-proxy"] = resourceConstraint{
+		cpuConstraint:    0.01,
+		memoryConstraint: 20 * (1024 * 1024),
+	}
+	constraints["l7-lb-controller"] = resourceConstraint{
+		cpuConstraint:    0.02,
+		memoryConstraint: 20 * (1024 * 1024),
+	}
+	constraints["influxdb"] = resourceConstraint{
+		cpuConstraint:    2,
+		memoryConstraint: 300 * (1024 * 1024),
+	}
+	return constraints
+}
+
 // This test suite can take a long time to run, and can affect or be affected by other tests.
 // So by default it is added to the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -177,6 +210,7 @@ var _ = Describe("Density [Skipped]", func() {
 		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
 		if testArg.podsPerNode == 30 {
 			name = "[Performance] " + name
+			framework.addonResourceConstraints = density30AddonResourceVerifier()
 		}
 		itArg := testArg
 		It(name, func() {

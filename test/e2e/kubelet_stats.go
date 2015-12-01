@@ -41,6 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	. "github.com/onsi/gomega"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -403,6 +405,11 @@ func computePercentiles(timeSeries map[time.Time]resourceUsagePerContainer, perc
 	return result
 }
 
+type resourceConstraint struct {
+	cpuConstraint    float64
+	memoryConstraint int64
+}
+
 type containerResourceGatherer struct {
 	usageTimeseries map[time.Time]resourceUsagePerContainer
 	stopCh          chan struct{}
@@ -433,7 +440,7 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 	}()
 }
 
-func (g *containerResourceGatherer) stopAndPrintData(percentiles []int) {
+func (g *containerResourceGatherer) stopAndPrintData(percentiles []int, constraints map[string]resourceConstraint) {
 	close(g.stopCh)
 	g.timer.Stop()
 	g.wg.Wait()
@@ -447,6 +454,7 @@ func (g *containerResourceGatherer) stopAndPrintData(percentiles []int) {
 		sortedKeys = append(sortedKeys, name)
 	}
 	sort.Strings(sortedKeys)
+	violatedConstraints := make([]string, 0)
 	for _, perc := range percentiles {
 		buf := &bytes.Buffer{}
 		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
@@ -454,10 +462,38 @@ func (g *containerResourceGatherer) stopAndPrintData(percentiles []int) {
 		for _, name := range sortedKeys {
 			usage := stats[perc][name]
 			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, usage.CPUUsageInCores, float64(usage.MemoryWorkingSetInBytes)/(1024*1024))
+			// Verifying 99th percentile of resource usage
+			if perc == 99 {
+				// Name has a form: <pod_name>/<container_name>
+				containerName := strings.Split(name, "/")[1]
+				if constraint, ok := constraints[containerName]; ok {
+					if usage.CPUUsageInCores > constraint.cpuConstraint {
+						violatedConstraints = append(
+							violatedConstraints,
+							fmt.Sprintf("Container %v is using %v/%v CPU",
+								name,
+								usage.CPUUsageInCores,
+								constraint.cpuConstraint,
+							),
+						)
+					}
+					if usage.MemoryWorkingSetInBytes > constraint.memoryConstraint {
+						violatedConstraints = append(
+							violatedConstraints,
+							fmt.Sprintf("Container %v is using %v/%v MB of memory",
+								name,
+								float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
+								float64(constraint.memoryConstraint)/(1024*1024),
+							),
+						)
+					}
+				}
+			}
 		}
 		w.Flush()
 		Logf("%v percentile:\n%v", perc, buf.String())
 	}
+	Expect(violatedConstraints).To(BeEmpty())
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.

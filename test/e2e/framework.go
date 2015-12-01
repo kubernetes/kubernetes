@@ -43,6 +43,10 @@ type Framework struct {
 	NamespaceDeletionTimeout time.Duration
 
 	gatherer containerResourceGatherer
+	// Constraints that passed to a check which is exectued after data is gathered to
+	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
+	// as expectations vary greatly. Constraints are groupped by the container names.
+	addonResourceConstraints map[string]resourceConstraint
 
 	logsSizeWaitGroup    sync.WaitGroup
 	logsSizeCloseChannel chan bool
@@ -53,7 +57,8 @@ type Framework struct {
 // you (you can write additional before/after each functions).
 func NewFramework(baseName string) *Framework {
 	f := &Framework{
-		BaseName: baseName,
+		BaseName:                 baseName,
+		addonResourceConstraints: make(map[string]resourceConstraint),
 	}
 
 	BeforeEach(f.beforeEach)
@@ -140,7 +145,7 @@ func (f *Framework) afterEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100})
+		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100}, f.addonResourceConstraints)
 	}
 
 	if testContext.GatherLogsSizes {
