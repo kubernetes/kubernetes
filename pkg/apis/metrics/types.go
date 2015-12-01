@@ -92,8 +92,6 @@ type RawContainerMetrics struct {
 	Labels map[string]string `json:"labels,omitempty"`
 	// Historical metric samples gathered from the container.
 	Samples []ContainerSample `json:"samples" patchStrategy:"merge" patchMergeKey:"sampleTime"`
-	// Application-specific metrics.
-	CustomMetrics []CustomMetric `json:"customMetrics,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // NonLocalObjectReference contains enough information to locate the referenced object.
@@ -181,41 +179,6 @@ type FilesystemMetrics struct {
 	UsageBytes *resource.Quantity `json:"usageBytes,omitempty"`
 	// Number of bytes that can be consumed by the container on this filesystem.
 	LimitBytes *resource.Quantity `json:"limitBytes,omitempty"`
-}
-
-// CustomMetricType specifies the type of metric being exported.
-type CustomMetricType string
-
-const (
-	// Instantaneous value. May increase or decrease.
-	CustomMetricGauge CustomMetricType = "Gauge"
-	// A counter-like value that increases monotonically.
-	CustomMetricCumulative CustomMetricType = "Cumulative"
-	// Rate over a time period.
-	CustomMetricDelta CustomMetricType = "Delta"
-)
-
-// CustomMetric provides custom application metric data.
-// See https://github.com/google/cadvisor/blob/master/docs/application_metrics.md
-type CustomMetric struct {
-	// The name of the metric.
-	Name string `json:"name"`
-	// Type of the metric.
-	Type CustomMetricType `json:"type"`
-	// Display Unit for the sample values.
-	Unit string `json:"unit"`
-	// Historical custom metric samples.
-	Samples []CustomMetricSample `json:"samples,omitempty" patchStrategy:"merge" patchMergeKey:"sampleTime"`
-}
-
-// CustomMetric contains a single sample point for a custom metric.
-type CustomMetricSample struct {
-	Sample `json:",inline"`
-	// Label associated with a metric
-	Label *string `json:"label,omitempty"`
-	// The value of the metric at this point.
-	// The unit is defined by the CustomMetric this sample belongs to.
-	Value resource.Quantity `json:"value"`
 }
 
 // RawMetricsOptions are the query options for raw metrics endpoints.

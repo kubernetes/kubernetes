@@ -149,39 +149,6 @@ func deepCopy_metrics_ContainerSample(in ContainerSample, out *ContainerSample, 
 	return nil
 }
 
-func deepCopy_metrics_CustomMetric(in CustomMetric, out *CustomMetric, c *conversion.Cloner) error {
-	out.Name = in.Name
-	out.Type = in.Type
-	out.Unit = in.Unit
-	if in.Samples != nil {
-		out.Samples = make([]CustomMetricSample, len(in.Samples))
-		for i := range in.Samples {
-			if err := deepCopy_metrics_CustomMetricSample(in.Samples[i], &out.Samples[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Samples = nil
-	}
-	return nil
-}
-
-func deepCopy_metrics_CustomMetricSample(in CustomMetricSample, out *CustomMetricSample, c *conversion.Cloner) error {
-	if err := deepCopy_metrics_Sample(in.Sample, &out.Sample, c); err != nil {
-		return err
-	}
-	if in.Label != nil {
-		out.Label = new(string)
-		*out.Label = *in.Label
-	} else {
-		out.Label = nil
-	}
-	if err := deepCopy_resource_Quantity(in.Value, &out.Value, c); err != nil {
-		return err
-	}
-	return nil
-}
-
 func deepCopy_metrics_FilesystemMetrics(in FilesystemMetrics, out *FilesystemMetrics, c *conversion.Cloner) error {
 	out.Device = in.Device
 	if in.UsageBytes != nil {
@@ -313,16 +280,6 @@ func deepCopy_metrics_RawContainerMetrics(in RawContainerMetrics, out *RawContai
 		}
 	} else {
 		out.Samples = nil
-	}
-	if in.CustomMetrics != nil {
-		out.CustomMetrics = make([]CustomMetric, len(in.CustomMetrics))
-		for i := range in.CustomMetrics {
-			if err := deepCopy_metrics_CustomMetric(in.CustomMetrics[i], &out.CustomMetrics[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.CustomMetrics = nil
 	}
 	return nil
 }
@@ -468,8 +425,6 @@ func init() {
 		deepCopy_metrics_AggregateSample,
 		deepCopy_metrics_CPUMetrics,
 		deepCopy_metrics_ContainerSample,
-		deepCopy_metrics_CustomMetric,
-		deepCopy_metrics_CustomMetricSample,
 		deepCopy_metrics_FilesystemMetrics,
 		deepCopy_metrics_MemoryMetrics,
 		deepCopy_metrics_MetricsMeta,

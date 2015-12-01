@@ -45,8 +45,6 @@ func addKnownTypes() {
 		&NetworkMetrics{},
 		&CPUMetrics{},
 		&MemoryMetrics{},
-		&CustomMetric{},
-		&CustomMetricSample{},
 		&RawMetricsOptions{},
 	)
 }
@@ -65,6 +63,4 @@ func (*ContainerSample) IsAnAPIObject()         {}
 func (*NetworkMetrics) IsAnAPIObject()          {}
 func (*CPUMetrics) IsAnAPIObject()              {}
 func (*MemoryMetrics) IsAnAPIObject()           {}
-func (*CustomMetric) IsAnAPIObject()            {}
-func (*CustomMetricSample) IsAnAPIObject()      {}
 func (*RawMetricsOptions) IsAnAPIObject()       {}
