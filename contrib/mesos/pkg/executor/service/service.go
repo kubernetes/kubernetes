@@ -27,7 +27,7 @@ import (
 	log "github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/cmd/kubelet/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
@@ -43,7 +43,7 @@ import (
 )
 
 type KubeletExecutorServer struct {
-	*app.KubeletServer
+	*kubeletapp.KubeletServer
 	SuicideTimeout    time.Duration
 	LaunchGracePeriod time.Duration
 
@@ -53,7 +53,7 @@ type KubeletExecutorServer struct {
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
 	k := &KubeletExecutorServer{
-		KubeletServer:     app.NewKubeletServer(),
+		KubeletServer:     kubeletapp.NewKubeletServer(),
 		SuicideTimeout:    config.DefaultSuicideTimeout,
 		LaunchGracePeriod: config.DefaultLaunchGracePeriod,
 	}
@@ -151,8 +151,8 @@ func (s *KubeletExecutorServer) runKubelet(
 	if err == nil {
 		// apply Messo specific settings
 		executorDone := make(chan struct{})
-		kcfg.Builder = func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
-			k, pc, err := app.CreateAndInitKubelet(kc)
+		kcfg.Builder = func(kc *kubeletapp.KubeletConfig) (kubeletapp.KubeletBootstrap, *kconfig.PodConfig, error) {
+			k, pc, err := kubeletapp.CreateAndInitKubelet(kc)
 			if err != nil {
 				return k, pc, err
 			}
