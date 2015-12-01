@@ -541,6 +541,8 @@ function upload-server-tars() {
     # "US Classic" does not follow the pattern
     s3_url_base=https://s3.amazonaws.com
     s3_bucket_location=us-east-1
+  elif [[ "${s3_bucket_location}" == "cn-north-1" ]]; then
+    s3_url_base=https://s3.cn-north-1.amazonaws.com.cn
   fi
 
   local -r staging_path="devel"
