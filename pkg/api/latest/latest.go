@@ -42,6 +42,12 @@ var (
 	IsRegistered = allGroups.IsRegistered
 )
 
+// ExternalVersions is a list of all external versions for this API group in order of
+// most preferred to least preferred
+var ExternalVersions = []unversioned.GroupVersion{
+	{Group: "", Version: "v1"},
+}
+
 // GroupMetaMap is a map between group names and their metadata.
 type GroupMetaMap map[string]*GroupMeta
 

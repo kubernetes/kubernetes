@@ -95,9 +95,9 @@ type Factory struct {
 	// Returns the generator for the provided generator name
 	Generator func(name string) (kubectl.Generator, bool)
 	// Check whether the kind of resources could be exposed
-	CanBeExposed func(kind string) error
+	CanBeExposed func(kind unversioned.GroupKind) error
 	// Check whether the kind of resources could be autoscaled
-	CanBeAutoscaled func(kind string) error
+	CanBeAutoscaled func(kind unversioned.GroupKind) error
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject func(object runtime.Object) (*api.Pod, error)
 	// EditorEnvs returns a group of environment variables that the edit command
@@ -140,12 +140,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
 			CheckErr(err)
-			cmdApiVersion := ""
+			cmdApiVersion := unversioned.GroupVersion{}
 			if cfg.GroupVersion != nil {
-				cmdApiVersion = cfg.GroupVersion.String()
+				cmdApiVersion = *cfg.GroupVersion
 			}
 
-			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersion: cmdApiVersion}, api.Scheme
+			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion("")
@@ -163,9 +163,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			switch gvk.Group {
-			case "":
+			case api.SchemeGroupVersion.Group:
 				return client.RESTClient, nil
-			case "extensions":
+			case extensions.SchemeGroupVersion.Group:
 				return client.ExtensionsClient.RESTClient, nil
 			}
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
@@ -290,21 +290,21 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			generator, ok := generators[name]
 			return generator, ok
 		},
-		CanBeExposed: func(kind string) error {
+		CanBeExposed: func(kind unversioned.GroupKind) error {
 			switch kind {
-			case "ReplicationController", "Service", "Pod":
+			case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"):
 				// nothing to do here
 			default:
 				return fmt.Errorf("cannot expose a %s", kind)
 			}
 			return nil
 		},
-		CanBeAutoscaled: func(kind string) error {
+		CanBeAutoscaled: func(kind unversioned.GroupKind) error {
 			switch kind {
-			case "ReplicationController", "Deployment":
+			case api.Kind("ReplicationController"), extensions.Kind("Deployment"):
 				// nothing to do here
 			default:
-				return fmt.Errorf("cannot autoscale a %s", kind)
+				return fmt.Errorf("cannot autoscale a %v", kind)
 			}
 			return nil
 		},
@@ -604,19 +604,20 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
-		defaultVersion := ""
-		if clientConfig.GroupVersion != nil {
-			defaultVersion = clientConfig.GroupVersion.String()
-		}
 
-		version := OutputVersion(cmd, defaultVersion)
-		if len(version) == 0 {
-			version = mapping.GroupVersionKind.GroupVersion().String()
+		version, err := OutputVersion(cmd, clientConfig.GroupVersion)
+		if err != nil {
+			return nil, err
 		}
-		if len(version) == 0 {
+		if version.IsEmpty() {
+			version = mapping.GroupVersionKind.GroupVersion()
+		}
+		if version.IsEmpty() {
 			return nil, fmt.Errorf("you must specify an output-version when using this output format")
 		}
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion().String())
+
+		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
+
 	} else {
 		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
 		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
@@ -629,6 +630,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		}
 		printer = maybeWrapSortingPrinter(cmd, printer)
 	}
+
 	return printer, nil
 }
 

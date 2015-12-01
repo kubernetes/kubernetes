@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -149,10 +150,13 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 	windowsLineEndings := cmdutil.GetFlagBool(cmd, "windows-line-endings")
 	edit := editor.NewDefaultEditor(f.EditorEnvs())
-	defaultVersion := cmdutil.OutputVersionFromGroupVersion(cmd, clientConfig.GroupVersion)
+	defaultVersion, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+	if err != nil {
+		return err
+	}
 	results := editResults{}
 	for {
-		objs, err := resource.AsVersionedObjects(infos, defaultVersion)
+		objs, err := resource.AsVersionedObjects(infos, defaultVersion.String())
 		if err != nil {
 			return preservedFile(err, results.file, out)
 		}
@@ -356,7 +360,7 @@ type editResults struct {
 	edit      []*resource.Info
 	file      string
 
-	version string
+	version unversioned.GroupVersion
 }
 
 func (r *editResults) addError(err error, info *resource.Info) string {

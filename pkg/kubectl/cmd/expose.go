@@ -120,7 +120,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	if err := f.CanBeExposed(mapping.GroupVersionKind.Kind); err != nil {
+	if err := f.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
 		return err
 	}
 	// Get the input object

@@ -157,28 +157,28 @@ func (fn ResourcePrinterFunc) HandledResources() []string {
 type VersionedPrinter struct {
 	printer   ResourcePrinter
 	convertor runtime.ObjectConvertor
-	version   []string
+	versions  []unversioned.GroupVersion
 }
 
 // NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConvertor, version ...string) ResourcePrinter {
+func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConvertor, versions ...unversioned.GroupVersion) ResourcePrinter {
 	return &VersionedPrinter{
 		printer:   printer,
 		convertor: convertor,
-		version:   version,
+		versions:  versions,
 	}
 }
 
 // PrintObj implements ResourcePrinter
 func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	if len(p.version) == 0 {
+	if len(p.versions) == 0 {
 		return fmt.Errorf("no version specified, object cannot be converted")
 	}
-	for _, version := range p.version {
-		if len(version) == 0 {
+	for _, version := range p.versions {
+		if version.IsEmpty() {
 			continue
 		}
-		converted, err := p.convertor.ConvertToVersion(obj, version)
+		converted, err := p.convertor.ConvertToVersion(obj, version.String())
 		if conversion.IsNotRegisteredError(err) {
 			continue
 		}
@@ -187,7 +187,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 		return p.printer.PrintObj(converted, w)
 	}
-	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.version)
+	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.versions)
 }
 
 // TODO: implement HandledResources()

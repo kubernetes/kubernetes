@@ -164,7 +164,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			rcVersion:       testapi.Default.Version(),
 		},
 		"handles second specific version": {
-			outputVersion:   "unlikelyversion",
+			outputVersion:   "unlikely.group/unlikelyversion",
 			listVersion:     testapi.Default.Version(),
 			testtypeVersion: unlikelyGV.String(),
 			rcVersion:       testapi.Default.Version(), // see expected behavior 3b

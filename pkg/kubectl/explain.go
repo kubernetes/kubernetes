@@ -24,6 +24,7 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
@@ -32,8 +33,8 @@ var allModels = make(map[string]*swagger.NamedModel)
 var recursive = false // this is global for convenience, can become int for multiple levels
 
 // GetSwaggerSchema returns the swagger spec from master
-func GetSwaggerSchema(apiVer string, kubeClient client.Interface) (*swagger.ApiDeclaration, error) {
-	swaggerSchema, err := kubeClient.SwaggerSchema(apiVer)
+func GetSwaggerSchema(version unversioned.GroupVersion, kubeClient client.Interface) (*swagger.ApiDeclaration, error) {
+	swaggerSchema, err := kubeClient.SwaggerSchema(version)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read swagger schema from server: %v", err)
 	}
