@@ -893,7 +893,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.labels', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.labels', Details: supported values: data, metadata.name, metadata.namespace, status.podIP",
 		},
 		{
 			name: "invalid fieldPath annotations",
@@ -906,7 +906,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.annotations', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.annotations', Details: supported values: data, metadata.name, metadata.namespace, status.podIP",
 		},
 		{
 			name: "unsupported fieldPath",
@@ -919,7 +919,36 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "valueFrom.fieldRef.fieldPath: unsupported value 'status.phase', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+			expectedError: "valueFrom.fieldRef.fieldPath: unsupported value 'status.phase', Details: supported values: data, metadata.name, metadata.namespace, status.podIP",
+		},
+		{
+			name: "unsupported kind name",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "data.password",
+						APIVersion: testapi.Default.Version(),
+						Kind:       "Secret",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.name: required value",
+		},
+		{
+			name: "unsupported secret fieldPath",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "invalid-path.password",
+						APIVersion: testapi.Default.Version(),
+						Kind:       "Secret",
+						Name:       "test-secret",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: invalid value 'invalid-path', Details: error converting fieldPath",
 		},
 	}
 	for _, tc := range errorCases {
