@@ -77,6 +77,11 @@ func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
+func (podTemplateStrategy) Export(obj runtime.Object, exact bool) error {
+	// Do nothing
+	return nil
+}
+
 func PodTemplateToSelectableFields(podTemplate *api.PodTemplate) fields.Set {
 	return fields.Set{}
 }

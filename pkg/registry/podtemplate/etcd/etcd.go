@@ -56,8 +56,10 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 		},
 		EndpointName: "podtemplates",
 
-		CreateStrategy:      podtemplate.Strategy,
-		UpdateStrategy:      podtemplate.Strategy,
+		CreateStrategy: podtemplate.Strategy,
+		UpdateStrategy: podtemplate.Strategy,
+		ExportStrategy: podtemplate.Strategy,
+
 		ReturnDeletedObject: true,
 
 		Storage: storageInterface,
