@@ -219,6 +219,9 @@ func (r *responder) Error(err error) {
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		// For performance tracking purposes.
+		trace := util.NewTrace("List " + req.Request.URL.Path)
+
 		w := res.ResponseWriter
 
 		namespace, err := scope.Namer.Namespace(req)
@@ -297,16 +300,23 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 
+		// Log only long List requests (ignore Watch).
+		defer trace.LogIfLong(500 * time.Millisecond)
+		trace.Step("About to List from storage")
 		result, err := r.List(ctx, &opts)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		if err := setListSelfLink(result, req, scope.Namer); err != nil {
+		trace.Step("Listing from storage done")
+		numberOfItems, err := setListSelfLink(result, req, scope.Namer)
+		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Self-linking done")
 		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
+		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
 
@@ -784,16 +794,16 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 }
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
-// on all child objects returned.
-func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) error {
+// on all child objects returned. Returns the number of items in the list.
+func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) (int, error) {
 	if !meta.IsListType(obj) {
-		return nil
+		return 0, nil
 	}
 
 	// TODO: List SelfLink generation should return a full URL?
 	path, query, err := namer.GenerateListLink(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	newURL := *req.Request.URL
 	newURL.Path = path
@@ -807,15 +817,14 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 	// Set self-link of objects in the list.
 	items, err := meta.ExtractList(obj)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	for i := range items {
 		if err := setSelfLink(items[i], req, namer); err != nil {
-			return err
+			return len(items), err
 		}
 	}
-	return meta.SetList(obj, items)
-
+	return len(items), meta.SetList(obj, items)
 }
 
 func getPatchedJS(patchType api.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
