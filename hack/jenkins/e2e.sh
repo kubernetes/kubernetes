@@ -410,6 +410,39 @@ case ${JOB_NAME} in
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="release-1.0"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
+
+  # kubernetes-upgrade-gke-1.0-release
+  #
+  # Configurations for step2, step4, and step6 live in the current release
+  # branch.
+
+  kubernetes-upgrade-1.0-release-gke-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'gke-upgrade-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-1.0-release-gke-step3-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'gke-upgrade-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-1.0-release-gke-step5-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'gke-upgrade-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  # kubernetes-upgrade-gke-1.0-master
+  #
+  # Configurations for step2, step4, and step6 live in master.
+
+  kubernetes-upgrade-1.0-master-gke-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'gke-upgrade-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-1.0-master-gke-step3-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'gke-upgrade-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-1.0-master-gke-step5-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-master' 'gke-upgrade-1-0-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
 esac
 
 # AWS variables
