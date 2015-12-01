@@ -17,15 +17,17 @@ limitations under the License.
 package apiserver
 
 import (
-	"crypto/tls"
-	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	httpprober "k8s.io/kubernetes/pkg/probe/http"
+	"time"
+)
+
+const (
+	probeTimeOut = time.Minute
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -51,41 +53,12 @@ type ServerStatus struct {
 	Err        string       `json:"err,omitempty"`
 }
 
-// TODO: can this use pkg/probe/http
 func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string, error) {
-	var client *http.Client
+	client := httpprober.New()
 	scheme := "http://"
 	if server.EnableHTTPS {
-		// TODO(roberthbailey): The servers that use HTTPS are currently the
-		// kubelets, and we should be using a standard kubelet client library
-		// to talk to them rather than a separate http client.
-		transport := util.SetTransportDefaults(&http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		})
-
-		client = &http.Client{Transport: transport}
 		scheme = "https://"
-	} else {
-		client = &http.Client{Transport: rt}
 	}
-
-	resp, err := client.Get(scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path)
-	if err != nil {
-		return probe.Unknown, "", err
-	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return probe.Unknown, string(data), err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return probe.Failure, string(data),
-			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
-	}
-	if server.Validate != nil {
-		if err := server.Validate(data); err != nil {
-			return probe.Failure, string(data), err
-		}
-	}
-	return probe.Success, string(data), nil
+	url := scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path
+	return client.Probe(url, probeTimeOut)
 }
