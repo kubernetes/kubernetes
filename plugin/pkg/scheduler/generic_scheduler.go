@@ -44,7 +44,7 @@ func (f *FitError) Error() string {
 	var reason string
 	// We iterate over all nodes for logging purposes, even though we only return one reason from one node
 	for node, predicateList := range f.FailedPredicates {
-		glog.Infof("failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
+		glog.V(2).Infof("Failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
 		if len(reason) == 0 {
 			reason, _ = predicateList.PopAny()
 		}
