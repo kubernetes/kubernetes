@@ -117,7 +117,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		{
 			location: buildLocation(
 				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
-				buildQueryValues(url.Values{"resourceVersion": []string{""}})),
+				buildQueryValues(url.Values{})),
 			rv:            "",
 			resource:      "nodes",
 			namespace:     api.NamespaceAll,

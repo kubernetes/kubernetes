@@ -107,8 +107,7 @@ func (c *deployments) Watch(label labels.Selector, field fields.Selector, opts u
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()
