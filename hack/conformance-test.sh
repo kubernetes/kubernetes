@@ -61,6 +61,7 @@
 # a new column for conformance at that new version, and notify
 # community.
 
+TEST_ARGS="$@"
 
 : ${KUBECONFIG:?"Must set KUBECONFIG before running conformance test."}
 echo "Conformance test using current-context of ${KUBECONFIG}"
@@ -83,5 +84,4 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 
 declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_NODES=4
-hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]' -ginkgo.skip='\[Skipped\]'
-exit $?
+exec hack/ginkgo-e2e.sh -ginkgo.focus='\[Conformance\]' -ginkgo.skip='\[Skipped\]' ${TEST_ARGS}
