@@ -1404,7 +1404,7 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ─────────\t────\t\t────────────\t──────────\t───────────────\t─────────────\n")
 	for _, pod := range nonTerminatedPods {
-		req, limit, err := getSinglePodTotalRequestsAndLimits(pod)
+		req, limit, err := api.PodRequestsAndLimits(pod)
 		if err != nil {
 			return err
 		}
@@ -1452,7 +1452,7 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 func getPodsTotalRequestsAndLimits(pods []*api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, pod := range pods {
-		podReqs, podLimits, err := getSinglePodTotalRequestsAndLimits(pod)
+		podReqs, podLimits, err := api.PodRequestsAndLimits(pod)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1467,27 +1467,6 @@ func getPodsTotalRequestsAndLimits(pods []*api.Pod) (reqs map[api.ResourceName]r
 			if value, ok := limits[podLimitName]; !ok {
 				limits[podLimitName] = *podLimitValue.Copy()
 			} else if err = value.Add(podLimitValue); err != nil {
-				return nil, nil, err
-			}
-		}
-	}
-	return
-}
-
-func getSinglePodTotalRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
-	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
-	for _, container := range pod.Spec.Containers {
-		for name, quantity := range container.Resources.Requests {
-			if value, ok := reqs[name]; !ok {
-				reqs[name] = *quantity.Copy()
-			} else if err = value.Add(quantity); err != nil {
-				return nil, nil, err
-			}
-		}
-		for name, quantity := range container.Resources.Limits {
-			if value, ok := limits[name]; !ok {
-				limits[name] = *quantity.Copy()
-			} else if err = value.Add(quantity); err != nil {
 				return nil, nil, err
 			}
 		}

@@ -98,8 +98,11 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	}
 
 	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
-		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\", cpu %.2f, mem %.2f MB",
-			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.CPU, task.Spec.Memory)
+		log.V(2).Infof(
+			"launching task: %q on target %q slave %q for pod \"%v/%v\", resources %v",
+			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.Resources,
+		)
+
 		if err = b.sched.LaunchTask(task); err == nil {
 			b.sched.Offers().Invalidate(offerId)
 			task.Set(podtask.Launched)
