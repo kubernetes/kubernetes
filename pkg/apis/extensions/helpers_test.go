@@ -23,11 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func TestPodSelectorAsSelector(t *testing.T) {
+func TestLabelSelectorAsSelector(t *testing.T) {
 	matchLabels := map[string]string{"foo": "bar"}
-	matchExpressions := []PodSelectorRequirement{{
+	matchExpressions := []LabelSelectorRequirement{{
 		Key:      "baz",
-		Operator: PodSelectorOpIn,
+		Operator: LabelSelectorOpIn,
 		Values:   []string{"qux", "norf"},
 	}}
 	mustParse := func(s string) labels.Selector {
@@ -38,29 +38,29 @@ func TestPodSelectorAsSelector(t *testing.T) {
 		return out
 	}
 	tc := []struct {
-		in        *PodSelector
+		in        *LabelSelector
 		out       labels.Selector
 		expectErr bool
 	}{
 		{in: nil, out: labels.Nothing()},
-		{in: &PodSelector{}, out: labels.Everything()},
+		{in: &LabelSelector{}, out: labels.Everything()},
 		{
-			in:  &PodSelector{MatchLabels: matchLabels},
+			in:  &LabelSelector{MatchLabels: matchLabels},
 			out: mustParse("foo in (bar)"),
 		},
 		{
-			in:  &PodSelector{MatchExpressions: matchExpressions},
+			in:  &LabelSelector{MatchExpressions: matchExpressions},
 			out: mustParse("baz in (norf,qux)"),
 		},
 		{
-			in:  &PodSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
+			in:  &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
 			out: mustParse("foo in (bar),baz in (norf,qux)"),
 		},
 		{
-			in: &PodSelector{
-				MatchExpressions: []PodSelectorRequirement{{
+			in: &LabelSelector{
+				MatchExpressions: []LabelSelectorRequirement{{
 					Key:      "baz",
-					Operator: PodSelectorOpExists,
+					Operator: LabelSelectorOpExists,
 					Values:   []string{"qux", "norf"},
 				}},
 			},
@@ -69,7 +69,7 @@ func TestPodSelectorAsSelector(t *testing.T) {
 	}
 
 	for i, tc := range tc {
-		out, err := PodSelectorAsSelector(tc.in)
+		out, err := LabelSelectorAsSelector(tc.in)
 		if err == nil && tc.expectErr {
 			t.Errorf("[%v]expected error but got none.", i)
 		}

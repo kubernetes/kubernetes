@@ -272,7 +272,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.PodSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
@@ -311,13 +311,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.PodSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &extensions.PodSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
@@ -401,7 +401,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.PodSelector{
+						Selector: &extensions.LabelSelector{
 							MatchLabels: map[string]string{"foo": "baz"},
 						},
 					},
@@ -444,7 +444,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.PodSelector{
+						Selector: &extensions.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -452,7 +452,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.PodSelector{
+						Selector: &extensions.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -477,7 +477,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.PodSelector{
+						Selector: &extensions.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
@@ -485,7 +485,7 @@ func TestStoreToJobLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
 					Spec: extensions.JobSpec{
-						Selector: &extensions.PodSelector{
+						Selector: &extensions.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},

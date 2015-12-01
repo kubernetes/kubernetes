@@ -43,7 +43,7 @@ func newJob(parallelism, completions int) *extensions.Job {
 		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
-			Selector: &extensions.PodSelector{
+			Selector: &extensions.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: api.PodTemplateSpec{
@@ -291,7 +291,7 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.PodSelector{
+					Selector: &extensions.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
 					},
 				},
@@ -310,11 +310,11 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.PodSelector{
-						MatchExpressions: []extensions.PodSelectorRequirement{
+					Selector: &extensions.LabelSelector{
+						MatchExpressions: []extensions.LabelSelectorRequirement{
 							{
 								Key:      "foo",
-								Operator: extensions.PodSelectorOpIn,
+								Operator: extensions.LabelSelectorOpIn,
 								Values:   []string{"bar"},
 							},
 						},

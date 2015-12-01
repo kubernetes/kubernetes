@@ -888,7 +888,7 @@ func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
 		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
-		selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
+		selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		fmt.Fprintf(out, "Completions:\t%d\n", *job.Spec.Completions)
@@ -916,7 +916,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	selector, err := extensions.PodSelectorAsSelector(daemon.Spec.Selector)
+	selector, err := extensions.LabelSelectorAsSelector(daemon.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -938,9 +938,9 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 		} else {
 			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
 		}
-		selector, err := extensions.PodSelectorAsSelector(daemon.Spec.Selector)
+		selector, err := extensions.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
-			// this shouldn't happen if PodSelector passed validation
+			// this shouldn't happen if LabelSelector passed validation
 			return err
 		}
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
@@ -1554,7 +1554,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 	// Find the ones that match labelsToMatch.
 	var matchingDaemonSets []extensions.DaemonSet
 	for _, ds := range dss.Items {
-		selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+		selector, err := extensions.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
 			// this should never happen if the DaemonSet passed validation
 			return nil, err
