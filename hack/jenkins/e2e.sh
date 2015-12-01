@@ -64,7 +64,6 @@ function join_regex_no_empty() {
 #   $GCE_DEFAULT_SKIP_TESTS
 #   $GCE_FLAKY_TESTS
 #   $GCE_SLOW_TESTS
-#   $GKE_FLAKY_TESTS
 #
 # Args:
 #   $1 old_version:  the version to deploy a cluster at, and old e2e tests to run
@@ -98,7 +97,6 @@ function configure_upgrade_step() {
         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-        ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
         )"
 
   if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
