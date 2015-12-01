@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
@@ -367,6 +368,27 @@ func TestBindingWithExamples(t *testing.T) {
 	if mockClient.volume.Spec.ClaimRef != nil {
 		t.Errorf("Expected nil ClaimRef: %+v", mockClient.volume.Spec.ClaimRef)
 	}
+}
+
+func TestCasting(t *testing.T) {
+	client := &testclient.Fake{}
+	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+
+	pv := &api.PersistentVolume{}
+	unk := cache.DeletedFinalStateUnknown{}
+	pvc := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Status:     api.PersistentVolumeClaimStatus{Phase: api.ClaimBound},
+	}
+
+	// none of these should fail casting.
+	// the real test is not failing when passed DeletedFinalStateUnknown in the deleteHandler
+	binder.addVolume(pv)
+	binder.updateVolume(pv, pv)
+	binder.deleteVolume(pv)
+	binder.deleteVolume(unk)
+	binder.addClaim(pvc)
+	binder.updateClaim(pvc, pvc)
 }
 
 type mockBinderClient struct {

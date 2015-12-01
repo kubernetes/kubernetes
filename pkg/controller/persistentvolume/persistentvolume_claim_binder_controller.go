@@ -94,24 +94,32 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 
 	return binder
 }
-
 func (binder *PersistentVolumeClaimBinder) addVolume(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	volume := obj.(*api.PersistentVolume)
-	err := syncVolume(binder.volumeIndex, binder.client, volume)
-	if err != nil {
-		glog.Errorf("PVClaimBinder could not add volume %s: %+v", volume.Name, err)
+	pv, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", obj)
+		return
+	}
+	if err := syncVolume(binder.volumeIndex, binder.client, pv); err != nil {
+		glog.Errorf("PVClaimBinder could not add volume %s: %+v", pv.Name, err)
 	}
 }
 
 func (binder *PersistentVolumeClaimBinder) updateVolume(oldObj, newObj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	newVolume := newObj.(*api.PersistentVolume)
-	binder.volumeIndex.Update(newVolume)
-	err := syncVolume(binder.volumeIndex, binder.client, newVolume)
-	if err != nil {
+	newVolume, ok := newObj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
+		return
+	}
+	if err := binder.volumeIndex.Update(newVolume); err != nil {
+		glog.Errorf("Error updating volume %s in index: %v", newVolume.Name, err)
+		return
+	}
+	if err := syncVolume(binder.volumeIndex, binder.client, newVolume); err != nil {
 		glog.Errorf("PVClaimBinder could not update volume %s: %+v", newVolume.Name, err)
 	}
 }
@@ -119,16 +127,25 @@ func (binder *PersistentVolumeClaimBinder) updateVolume(oldObj, newObj interface
 func (binder *PersistentVolumeClaimBinder) deleteVolume(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	volume := obj.(*api.PersistentVolume)
-	binder.volumeIndex.Delete(volume)
+	volume, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", obj)
+		return
+	}
+	if err := binder.volumeIndex.Delete(volume); err != nil {
+		glog.Errorf("Error deleting volume %s from index: %v", volume.Name, err)
+	}
 }
 
 func (binder *PersistentVolumeClaimBinder) addClaim(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	claim := obj.(*api.PersistentVolumeClaim)
-	err := syncClaim(binder.volumeIndex, binder.client, claim)
-	if err != nil {
+	claim, ok := obj.(*api.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but handler received %+v", obj)
+		return
+	}
+	if err := syncClaim(binder.volumeIndex, binder.client, claim); err != nil {
 		glog.Errorf("PVClaimBinder could not add claim %s: %+v", claim.Name, err)
 	}
 }
@@ -136,9 +153,11 @@ func (binder *PersistentVolumeClaimBinder) addClaim(obj interface{}) {
 func (binder *PersistentVolumeClaimBinder) updateClaim(oldObj, newObj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	newClaim := newObj.(*api.PersistentVolumeClaim)
-	err := syncClaim(binder.volumeIndex, binder.client, newClaim)
-	if err != nil {
+	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but handler received %+v", newObj)
+	}
+	if err := syncClaim(binder.volumeIndex, binder.client, newClaim); err != nil {
 		glog.Errorf("PVClaimBinder could not update claim %s: %+v", newClaim.Name, err)
 	}
 }
