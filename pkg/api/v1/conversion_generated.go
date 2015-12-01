@@ -23,6 +23,7 @@ import (
 
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -1113,34 +1114,6 @@ func autoconvert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope
 
 func convert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope) error {
 	return autoconvert_api_List_To_v1_List(in, out, s)
-}
-
-func autoconvert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ListOptions))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
-		return err
-	}
-	out.Watch = in.Watch
-	out.ResourceVersion = in.ResourceVersion
-	if in.TimeoutSeconds != nil {
-		out.TimeoutSeconds = new(int64)
-		*out.TimeoutSeconds = *in.TimeoutSeconds
-	} else {
-		out.TimeoutSeconds = nil
-	}
-	return nil
-}
-
-func convert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
-	return autoconvert_api_ListOptions_To_v1_ListOptions(in, out, s)
 }
 
 func autoconvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalancerIngress, out *LoadBalancerIngress, s conversion.Scope) error {
@@ -3065,6 +3038,50 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	return autoconvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
 }
 
+func autoconvert_unversioned_ExportOptions_To_v1_ExportOptions(in *unversioned.ExportOptions, out *ExportOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*unversioned.ExportOptions))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return nil
+}
+
+func convert_unversioned_ExportOptions_To_v1_ExportOptions(in *unversioned.ExportOptions, out *ExportOptions, s conversion.Scope) error {
+	return autoconvert_unversioned_ExportOptions_To_v1_ExportOptions(in, out, s)
+}
+
+func autoconvert_unversioned_ListOptions_To_v1_ListOptions(in *unversioned.ListOptions, out *ListOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*unversioned.ListOptions))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
+	return nil
+}
+
+func convert_unversioned_ListOptions_To_v1_ListOptions(in *unversioned.ListOptions, out *ListOptions, s conversion.Scope) error {
+	return autoconvert_unversioned_ListOptions_To_v1_ListOptions(in, out, s)
+}
+
 func autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*AWSElasticBlockStoreVolumeSource))(in)
@@ -3804,6 +3821,22 @@ func convert_v1_ExecAction_To_api_ExecAction(in *ExecAction, out *api.ExecAction
 	return autoconvert_v1_ExecAction_To_api_ExecAction(in, out, s)
 }
 
+func autoconvert_v1_ExportOptions_To_unversioned_ExportOptions(in *ExportOptions, out *unversioned.ExportOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ExportOptions))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return nil
+}
+
+func convert_v1_ExportOptions_To_unversioned_ExportOptions(in *ExportOptions, out *unversioned.ExportOptions, s conversion.Scope) error {
+	return autoconvert_v1_ExportOptions_To_unversioned_ExportOptions(in, out, s)
+}
+
 func autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource(in *FCVolumeSource, out *api.FCVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*FCVolumeSource))(in)
@@ -4154,7 +4187,7 @@ func convert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope) er
 	return autoconvert_v1_List_To_api_List(in, out, s)
 }
 
-func autoconvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
+func autoconvert_v1_ListOptions_To_unversioned_ListOptions(in *ListOptions, out *unversioned.ListOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ListOptions))(in)
 	}
@@ -4178,8 +4211,8 @@ func autoconvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.Lis
 	return nil
 }
 
-func convert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
-	return autoconvert_v1_ListOptions_To_api_ListOptions(in, out, s)
+func convert_v1_ListOptions_To_unversioned_ListOptions(in *ListOptions, out *unversioned.ListOptions, s conversion.Scope) error {
+	return autoconvert_v1_ListOptions_To_unversioned_ListOptions(in, out, s)
 }
 
 func autoconvert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(in *LoadBalancerIngress, out *api.LoadBalancerIngress, s conversion.Scope) error {
@@ -6154,7 +6187,6 @@ func init() {
 		autoconvert_api_LimitRangeList_To_v1_LimitRangeList,
 		autoconvert_api_LimitRangeSpec_To_v1_LimitRangeSpec,
 		autoconvert_api_LimitRange_To_v1_LimitRange,
-		autoconvert_api_ListOptions_To_v1_ListOptions,
 		autoconvert_api_List_To_v1_List,
 		autoconvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
 		autoconvert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
@@ -6227,6 +6259,8 @@ func init() {
 		autoconvert_api_VolumeMount_To_v1_VolumeMount,
 		autoconvert_api_VolumeSource_To_v1_VolumeSource,
 		autoconvert_api_Volume_To_v1_Volume,
+		autoconvert_unversioned_ExportOptions_To_v1_ExportOptions,
+		autoconvert_unversioned_ListOptions_To_v1_ListOptions,
 		autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		autoconvert_v1_Binding_To_api_Binding,
 		autoconvert_v1_Capabilities_To_api_Capabilities,
@@ -6258,6 +6292,7 @@ func init() {
 		autoconvert_v1_EventSource_To_api_EventSource,
 		autoconvert_v1_Event_To_api_Event,
 		autoconvert_v1_ExecAction_To_api_ExecAction,
+		autoconvert_v1_ExportOptions_To_unversioned_ExportOptions,
 		autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		autoconvert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource,
 		autoconvert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource,
@@ -6272,7 +6307,7 @@ func init() {
 		autoconvert_v1_LimitRangeList_To_api_LimitRangeList,
 		autoconvert_v1_LimitRangeSpec_To_api_LimitRangeSpec,
 		autoconvert_v1_LimitRange_To_api_LimitRange,
-		autoconvert_v1_ListOptions_To_api_ListOptions,
+		autoconvert_v1_ListOptions_To_unversioned_ListOptions,
 		autoconvert_v1_List_To_api_List,
 		autoconvert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
 		autoconvert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,

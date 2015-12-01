@@ -117,14 +117,16 @@ func addGrouplessTypes() {
 func addTestTypes() {
 	api.Scheme.AddKnownTypes(
 		testGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
+		&unversioned.ExportOptions{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &api.Pod{})
 }
 
 func addNewTestTypes() {
 	api.Scheme.AddKnownTypes(
 		newGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
+		&unversioned.ExportOptions{})
 }
 
 func init() {
@@ -332,6 +334,21 @@ type SimpleRESTStorage struct {
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
+}
+
+func (storage *SimpleRESTStorage) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+	obj, err := storage.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	s, ok := obj.(*apiservertesting.Simple)
+	if !ok {
+		return nil, fmt.Errorf("unexpected object")
+	}
+
+	// Set a marker to verify the method was called
+	s.Other = "exported"
+	return obj, storage.errors["export"]
 }
 
 func (storage *SimpleRESTStorage) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
@@ -1147,6 +1164,55 @@ func TestMetadata(t *testing.T) {
 	}
 	if matches["text/plain,application/json"] == 0 || matches["application/json"] == 0 || matches["*/*"] == 0 || len(matches) != 3 {
 		t.Errorf("unexpected mime types: %v", matches)
+	}
+}
+
+func TestExport(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: apiservertesting.Simple{
+			ObjectMeta: api.ObjectMeta{
+				ResourceVersion:   "1234",
+				CreationTimestamp: unversioned.NewTime(time.Unix(10, 10)),
+			},
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?export=true")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		data, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		t.Fatalf("unexpected response: %#v\n%s\n", resp, string(data))
+	}
+	var itemOut apiservertesting.Simple
+	body, err := extractBody(resp, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if itemOut.Name != simpleStorage.item.Name {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+	}
+	if itemOut.Other != "exported" {
+		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
+	}
+
+	if !selfLinker.called {
+		t.Errorf("Never set self link")
 	}
 }
 

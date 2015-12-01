@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -112,23 +113,42 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
+func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
 			// For performance tracking purposes.
 			trace := util.NewTrace("Get " + req.Request.URL.Path)
 			defer trace.LogIfLong(250 * time.Millisecond)
+			opts := v1.ExportOptions{}
+			if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &opts); err != nil {
+				return nil, err
+			}
+			internalOpts := unversioned.ExportOptions{}
+			scope.Convertor.Convert(&opts, &internalOpts)
+			if internalOpts.Export {
+				if e == nil {
+					return nil, errors.NewBadRequest("export unsupported")
+				}
+				return e.Export(ctx, name, internalOpts)
+			}
 			return r.Get(ctx, name)
 		})
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, internalKind, externalKind unversioned.GroupVersionKind, subpath bool, subpathKey string) restful.RouteFunction {
+func GetResourceWithOptions(r rest.GetterWithOptions, e rest.Exporter, scope RequestScope, internalKind, externalKind unversioned.GroupVersionKind, subpath bool, subpathKey string) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
 			opts, err := getRequestOptions(req, scope, internalKind, externalKind, subpath, subpathKey)
 			if err != nil {
 				return nil, err
+			}
+			exportOpts := unversioned.ExportOptions{}
+			if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &exportOpts); err != nil {
+				return nil, err
+			}
+			if exportOpts.Export {
+				return nil, errors.NewBadRequest("export unsupported")
 			}
 			return r.Get(ctx, name, opts)
 		})

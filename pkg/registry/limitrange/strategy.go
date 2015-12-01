@@ -78,6 +78,13 @@ func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
 	return fields.Set{}
 }
 
+func (limitrangeStrategy) Export(runtime.Object, bool) error {
+	// Copied from OpenShift exporter
+	// TODO: this needs to be fixed
+	//  limitrange.Strategy.PrepareForCreate(obj)
+	return nil
+}
+
 func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {
 	return &generic.SelectionPredicate{
 		Label: label,

@@ -79,6 +79,28 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
+func (svcStrategy) Export(obj runtime.Object, exact bool) error {
+	t, ok := obj.(*api.Service)
+	if !ok {
+		// unexpected programmer error
+		return fmt.Errorf("unexpected object: %v", obj)
+	}
+	// TODO: service does not yet have a prepare create strategy (see above)
+	t.Status = api.ServiceStatus{}
+	if exact {
+		return nil
+	}
+	if t.Spec.ClusterIP != api.ClusterIPNone {
+		t.Spec.ClusterIP = ""
+	}
+	if t.Spec.Type == api.ServiceTypeNodePort {
+		for i := range t.Spec.Ports {
+			t.Spec.Ports[i].NodePort = 0
+		}
+	}
+	return nil
+}
+
 func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher {
 	return &generic.SelectionPredicate{
 		Label: label,

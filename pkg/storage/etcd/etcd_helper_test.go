@@ -399,6 +399,9 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 		return objUpdate, nil
 	}))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	objCheck := &storagetesting.TestResource{}
 	err = helper.Get(context.TODO(), key, objCheck, false)
@@ -406,7 +409,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		t.Errorf("Unexpected error %#v", err)
 	}
 	if objCheck.Value != 2 {
-		t.Errorf("Value should have been 2 but got", objCheck.Value)
+		t.Errorf("Value should have been 2 but got %v", objCheck.Value)
 	}
 
 	if !callbackCalled {
