@@ -1952,7 +1952,7 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 				return false, fmt.Errorf("old RCs are not fully scaled down")
 			}
 			if deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
-				return false, fmt.Errorf("new RCs is not fully scaled up")
+				return false, fmt.Errorf("new RC is not fully scaled up")
 			}
 			return true, nil
 		}
@@ -1976,6 +1976,21 @@ func waitForEvents(c *client.Client, ns string, objOrRef runtime.Object, desired
 		}
 		// Number of events has exceeded the desired count.
 		return false, fmt.Errorf("number of events has exceeded the desired count, eventsCount: %d, desiredCount: %d", eventsCount, desiredEventsCount)
+	})
+}
+
+// Waits for the number of events on the given object to be at least a desired count.
+func waitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, atLeastEventsCount int) error {
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+		events, err := c.Events(ns).Search(objOrRef)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		eventsCount := len(events.Items)
+		if eventsCount >= atLeastEventsCount {
+			return true, nil
+		}
+		return false, nil
 	})
 }
 
