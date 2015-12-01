@@ -350,7 +350,7 @@ Note: This is not implemented yet.
 
 #### Rolling Update Deployment
 
-Deployment updates pods in a [rolling update][update-demo/] fashion
+Deployment updates pods in a [rolling update](update-demo/) fashion
 when `.spec.strategy.type==RollingUpdate`.
 Users can specify `maxUnavailable`, `maxSurge` and `minReadySeconds` to control
 the rolling update process.
