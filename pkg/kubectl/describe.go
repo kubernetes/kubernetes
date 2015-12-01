@@ -1299,7 +1299,7 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 		fmt.Fprintf(out, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
-			fmt.Fprint(out, "  ────\t──────\t─────────────────\t──────────────────\t──────\t───────\n")
+			fmt.Fprint(out, "  ----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range node.Status.Conditions {
 				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
@@ -1402,7 +1402,7 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 	nonTerminatedPods := filterTerminatedPods(pods)
 	fmt.Fprintf(out, "Non-terminated Pods:\t(%d in total)\n", len(nonTerminatedPods))
 	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	fmt.Fprint(out, "  ─────────\t────\t\t────────────\t──────────\t───────────────\t─────────────\n")
+	fmt.Fprint(out, "  ---------\t----\t\t------------\t----------\t---------------\t-------------\n")
 	for _, pod := range nonTerminatedPods {
 		req, limit, err := api.PodRequestsAndLimits(pod)
 		if err != nil {
@@ -1419,7 +1419,7 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 	}
 
 	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	fmt.Fprint(out, "  ────────────\t──────────\t───────────────\t─────────────\n")
+	fmt.Fprint(out, "  ------------\t----------\t---------------\t-------------\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nonTerminatedPods)
 	if err != nil {
 		return err
@@ -1481,7 +1481,7 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 	}
 	sort.Sort(SortableEvents(el.Items))
 	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tType\tReason\tMessage\n")
-	fmt.Fprint(w, "  ─────────\t────────\t─────\t────\t─────────────\t────────\t──────\t───────\n")
+	fmt.Fprint(w, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
 			translateTimestamp(e.FirstTimestamp),
