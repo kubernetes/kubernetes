@@ -767,16 +767,16 @@ case ${JOB_NAME} in
   #
   # Configurations for step1, step3, and step5 live in the release-1.0 branch.
 
-  kubernetes-upgrade-1.0-release-gke-step2-upgrade-master)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'gke-upgrade-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-release-step2-upgrade-master)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-1.0-release-gke-step4-upgrade-cluster)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'gke-upgrade-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-release-step4-upgrade-cluster)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-1.0-release-gke-step6-e2e-new)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'gke-upgrade-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-release-step6-e2e-new)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 esac
 
