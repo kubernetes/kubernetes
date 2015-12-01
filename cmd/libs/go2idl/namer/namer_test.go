@@ -27,26 +27,26 @@ func TestNameStrategy(t *testing.T) {
 	u := types.Universe{}
 
 	// Add some types.
-	base := u.Get(types.Name{Package: "foo/bar", Name: "Baz"})
+	base := u.Type(types.Name{Package: "foo/bar", Name: "Baz"})
 	base.Kind = types.Struct
 
-	tmp := u.Get(types.Name{Package: "", Name: "[]bar.Baz"})
+	tmp := u.Type(types.Name{Package: "", Name: "[]bar.Baz"})
 	tmp.Kind = types.Slice
 	tmp.Elem = base
 
-	tmp = u.Get(types.Name{Package: "", Name: "map[string]bar.Baz"})
+	tmp = u.Type(types.Name{Package: "", Name: "map[string]bar.Baz"})
 	tmp.Kind = types.Map
 	tmp.Key = types.String
 	tmp.Elem = base
 
-	tmp = u.Get(types.Name{Package: "foo/other", Name: "Baz"})
+	tmp = u.Type(types.Name{Package: "foo/other", Name: "Baz"})
 	tmp.Kind = types.Struct
 	tmp.Members = []types.Member{{
 		Embedded: true,
 		Type:     base,
 	}}
 
-	u.Get(types.Name{Package: "", Name: "string"})
+	u.Type(types.Name{Package: "", Name: "string"})
 
 	o := Orderer{NewPublicNamer(0)}
 	order := o.Order(u)
