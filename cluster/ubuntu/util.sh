@@ -255,7 +255,8 @@ EOF
 
 function create-flanneld-opts() {
   cat <<EOF > ~/kube/default/flanneld
-FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001"
+FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001 \
+ --iface=${2}"
 EOF
 }
 
@@ -387,7 +388,7 @@ function provision-master() {
       '${SERVICE_NODE_PORT_RANGE}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
-    create-flanneld-opts '127.0.0.1'
+    create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
     sudo -E -p '[sudo] password to start master: ' -- /bin/bash -c '
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
@@ -431,9 +432,9 @@ function provision-node() {
       '${DNS_SERVER_IP}' \
       '${DNS_DOMAIN}'
     create-kube-proxy-opts \
-	  '${1#*@}' \
-	  '${MASTER_IP}'
-    create-flanneld-opts '${MASTER_IP}'
+      '${1#*@}' \
+      '${MASTER_IP}' 
+    create-flanneld-opts '${MASTER_IP}' '${1#*@}'
 
     sudo -E -p '[sudo] password to start node: ' -- /bin/bash -c '
       cp ~/kube/default/* /etc/default/
@@ -497,9 +498,9 @@ function provision-masterandnode() {
       '${DNS_SERVER_IP}' \
       '${DNS_DOMAIN}'
     create-kube-proxy-opts \
-	  '${MASTER_IP}' \
-	  '${MASTER_IP}'
-    create-flanneld-opts '127.0.0.1'
+      '${MASTER_IP}' \
+      '${MASTER_IP}'
+    create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
     sudo -E -p '[sudo] password to start master: ' -- /bin/bash -c '
       cp ~/kube/default/* /etc/default/
