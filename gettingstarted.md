@@ -56,6 +56,8 @@ installguides:
     url: /v1.1/docs/getting-started-guides/aws.html
   - label: Mesos
     url: /v1.1/docs/getting-started-guides/mesos.html
+  - label: DCOS
+    url: /v1.1/docs/getting-started-guides/dcos.html
 
 firstapp:
     label: Run Now
