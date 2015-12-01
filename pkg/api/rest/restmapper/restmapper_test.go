@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package meta
+package restmapper
 
 import (
 	"errors"
@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -73,16 +74,16 @@ func (fakeConvertor) ConvertFieldLabel(version, kind, label, value string) (stri
 }
 
 var validCodec = fakeCodec{}
-var validAccessor = resourceAccessor{}
+var validAccessor = meta.ResourceAccessor{}
 var validConvertor = fakeConvertor{}
 
-func fakeInterfaces(version string) (*VersionInterfaces, error) {
-	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
+func fakeInterfaces(version string) (*meta.VersionInterfaces, error) {
+	return &meta.VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
 var unmatchedErr = errors.New("no version")
 
-func unmatchedVersionInterfaces(version string) (*VersionInterfaces, error) {
+func unmatchedVersionInterfaces(version string) (*meta.VersionInterfaces, error) {
 	return nil, unmatchedErr
 }
 

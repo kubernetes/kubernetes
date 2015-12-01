@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	"github.com/emicklei/go-restful"
@@ -34,7 +34,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 		namespace:   "other",
 	}
 	s := scopeNaming{
-		meta.RESTScopeNamespace,
+		restmapper.RESTScopeNamespace,
 		selfLinker,
 		"/api/v1/namespaces/{namespace}/services/{name}",
 		true,

@@ -18,7 +18,7 @@ package resource
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -41,13 +41,13 @@ type Helper struct {
 }
 
 // NewHelper creates a Helper from a ResourceMapping
-func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
+func NewHelper(client RESTClient, mapping *restmapper.RESTMapping) *Helper {
 	return &Helper{
 		RESTClient:      client,
 		Resource:        mapping.Resource,
 		Codec:           mapping.Codec,
 		Versioner:       mapping.MetadataAccessor,
-		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		NamespaceScoped: mapping.Scope.Name() == restmapper.RESTScopeNameNamespace,
 	}
 }
 

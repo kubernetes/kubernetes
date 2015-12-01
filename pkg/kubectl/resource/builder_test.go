@@ -29,8 +29,8 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -55,13 +55,13 @@ func watchBody(events ...watch.Event) string {
 }
 
 func fakeClient() ClientMapper {
-	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
+	return ClientMapperFunc(func(*restmapper.RESTMapping) (RESTClient, error) {
 		return &fake.RESTClient{}, nil
 	})
 }
 
 func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
-	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
+	return ClientMapperFunc(func(*restmapper.RESTMapping) (RESTClient, error) {
 		return &fake.RESTClient{
 			Codec: testapi.Default.Codec(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -28,13 +28,13 @@ import (
 // Selector is a Visitor for resources that match a label selector.
 type Selector struct {
 	Client    RESTClient
-	Mapping   *meta.RESTMapping
+	Mapping   *restmapper.RESTMapping
 	Namespace string
 	Selector  labels.Selector
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace string, selector labels.Selector) *Selector {
+func NewSelector(client RESTClient, mapping *restmapper.RESTMapping, namespace string, selector labels.Selector) *Selector {
 	return &Selector{
 		Client:    client,
 		Mapping:   mapping,
@@ -74,6 +74,6 @@ func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping
-func (r *Selector) ResourceMapping() *meta.RESTMapping {
+func (r *Selector) ResourceMapping() *restmapper.RESTMapping {
 	return r.Mapping
 }

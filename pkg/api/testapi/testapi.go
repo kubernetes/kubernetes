@@ -24,12 +24,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -208,7 +209,7 @@ func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 	return g.ResourcePathWithPrefix("", resource, namespace, name)
 }
 
-func (g TestGroup) RESTMapper() meta.RESTMapper {
+func (g TestGroup) RESTMapper() restmapper.RESTMapper {
 	return latest.GroupOrDie(g.Group).RESTMapper
 }
 

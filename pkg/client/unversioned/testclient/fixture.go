@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -56,7 +57,7 @@ type ObjectScheme interface {
 // should attempt to return a list of replication controllers. This method delegates to the
 // ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
 // TODO: add support for sub resources
-func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
+func ObjectReaction(o ObjectRetriever, mapper restmapper.RESTMapper) ReactionFunc {
 
 	return func(action Action) (bool, runtime.Object, error) {
 		gvk, err := mapper.KindFor(action.GetResource())

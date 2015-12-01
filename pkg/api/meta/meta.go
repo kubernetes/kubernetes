@@ -104,13 +104,13 @@ func TypeAccessor(obj interface{}) (TypeInterface, error) {
 // or manipulate resource version on objects derived from core API
 // metadata concepts.
 func NewAccessor() MetadataAccessor {
-	return resourceAccessor{}
+	return ResourceAccessor{}
 }
 
-// resourceAccessor implements ResourceVersioner and SelfLinker.
-type resourceAccessor struct{}
+// ResourceAccessor implements ResourceVersioner and SelfLinker.
+type ResourceAccessor struct{}
 
-func (resourceAccessor) Kind(obj runtime.Object) (string, error) {
+func (ResourceAccessor) Kind(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -118,7 +118,7 @@ func (resourceAccessor) Kind(obj runtime.Object) (string, error) {
 	return accessor.Kind(), nil
 }
 
-func (resourceAccessor) SetKind(obj runtime.Object, kind string) error {
+func (ResourceAccessor) SetKind(obj runtime.Object, kind string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func (resourceAccessor) SetKind(obj runtime.Object, kind string) error {
 	return nil
 }
 
-func (resourceAccessor) APIVersion(obj runtime.Object) (string, error) {
+func (ResourceAccessor) APIVersion(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -135,7 +135,7 @@ func (resourceAccessor) APIVersion(obj runtime.Object) (string, error) {
 	return accessor.APIVersion(), nil
 }
 
-func (resourceAccessor) SetAPIVersion(obj runtime.Object, version string) error {
+func (ResourceAccessor) SetAPIVersion(obj runtime.Object, version string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (resourceAccessor) SetAPIVersion(obj runtime.Object, version string) error 
 	return nil
 }
 
-func (resourceAccessor) Namespace(obj runtime.Object) (string, error) {
+func (ResourceAccessor) Namespace(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -152,7 +152,7 @@ func (resourceAccessor) Namespace(obj runtime.Object) (string, error) {
 	return accessor.Namespace(), nil
 }
 
-func (resourceAccessor) SetNamespace(obj runtime.Object, namespace string) error {
+func (ResourceAccessor) SetNamespace(obj runtime.Object, namespace string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -161,7 +161,7 @@ func (resourceAccessor) SetNamespace(obj runtime.Object, namespace string) error
 	return nil
 }
 
-func (resourceAccessor) Name(obj runtime.Object) (string, error) {
+func (ResourceAccessor) Name(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -169,7 +169,7 @@ func (resourceAccessor) Name(obj runtime.Object) (string, error) {
 	return accessor.Name(), nil
 }
 
-func (resourceAccessor) SetName(obj runtime.Object, name string) error {
+func (ResourceAccessor) SetName(obj runtime.Object, name string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -178,7 +178,7 @@ func (resourceAccessor) SetName(obj runtime.Object, name string) error {
 	return nil
 }
 
-func (resourceAccessor) GenerateName(obj runtime.Object) (string, error) {
+func (ResourceAccessor) GenerateName(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -186,7 +186,7 @@ func (resourceAccessor) GenerateName(obj runtime.Object) (string, error) {
 	return accessor.GenerateName(), nil
 }
 
-func (resourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
+func (ResourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ func (resourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
 	return nil
 }
 
-func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
+func (ResourceAccessor) UID(obj runtime.Object) (types.UID, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -203,7 +203,7 @@ func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
 	return accessor.UID(), nil
 }
 
-func (resourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
+func (ResourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -212,7 +212,7 @@ func (resourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
 	return nil
 }
 
-func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
+func (ResourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -220,7 +220,7 @@ func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 	return accessor.SelfLink(), nil
 }
 
-func (resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
+func (ResourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func (resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
 	return nil
 }
 
-func (resourceAccessor) Labels(obj runtime.Object) (map[string]string, error) {
+func (ResourceAccessor) Labels(obj runtime.Object) (map[string]string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (resourceAccessor) Labels(obj runtime.Object) (map[string]string, error) {
 	return accessor.Labels(), nil
 }
 
-func (resourceAccessor) SetLabels(obj runtime.Object, labels map[string]string) error {
+func (ResourceAccessor) SetLabels(obj runtime.Object, labels map[string]string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -246,7 +246,7 @@ func (resourceAccessor) SetLabels(obj runtime.Object, labels map[string]string) 
 	return nil
 }
 
-func (resourceAccessor) Annotations(obj runtime.Object) (map[string]string, error) {
+func (ResourceAccessor) Annotations(obj runtime.Object) (map[string]string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -254,7 +254,7 @@ func (resourceAccessor) Annotations(obj runtime.Object) (map[string]string, erro
 	return accessor.Annotations(), nil
 }
 
-func (resourceAccessor) SetAnnotations(obj runtime.Object, annotations map[string]string) error {
+func (ResourceAccessor) SetAnnotations(obj runtime.Object, annotations map[string]string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -263,7 +263,7 @@ func (resourceAccessor) SetAnnotations(obj runtime.Object, annotations map[strin
 	return nil
 }
 
-func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
+func (ResourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -271,7 +271,7 @@ func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
 	return accessor.ResourceVersion(), nil
 }
 
-func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
+func (ResourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err

@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -351,7 +351,7 @@ type Master struct {
 
 // NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdStorage(client tools.EtcdClient, interfacesFunc meta.VersionInterfacesFunc, version, prefix string) (etcdStorage storage.Interface, err error) {
+func NewEtcdStorage(client tools.EtcdClient, interfacesFunc restmapper.VersionInterfacesFunc, version, prefix string) (etcdStorage storage.Interface, err error) {
 	versionInterfaces, err := interfacesFunc(version)
 	if err != nil {
 		return etcdStorage, err

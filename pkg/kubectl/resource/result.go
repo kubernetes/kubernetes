@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -155,14 +156,14 @@ func (r *Result) Object() (runtime.Object, error) {
 	}, err
 }
 
-// ResourceMapping returns a single meta.RESTMapping representing the
+// ResourceMapping returns a single restmapper.RESTMapping representing the
 // resources located by the builder, or an error if more than one
 // mapping was found.
-func (r *Result) ResourceMapping() (*meta.RESTMapping, error) {
+func (r *Result) ResourceMapping() (*restmapper.RESTMapping, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	mappings := map[string]*meta.RESTMapping{}
+	mappings := map[string]*restmapper.RESTMapping{}
 	for i := range r.sources {
 		m, ok := r.sources[i].(ResourceMapping)
 		if !ok {

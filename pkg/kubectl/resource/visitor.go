@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -60,14 +61,14 @@ type Watchable interface {
 // ResourceMapping allows an object to return the resource mapping associated with
 // the resource or resources it represents.
 type ResourceMapping interface {
-	ResourceMapping() *meta.RESTMapping
+	ResourceMapping() *restmapper.RESTMapping
 }
 
 // Info contains temporary info to execute a REST call, or show the results
 // of an already completed REST call.
 type Info struct {
 	Client    RESTClient
-	Mapping   *meta.RESTMapping
+	Mapping   *restmapper.RESTMapping
 	Namespace string
 	Name      string
 
@@ -88,7 +89,7 @@ type Info struct {
 }
 
 // NewInfo returns a new info object
-func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string) *Info {
+func NewInfo(client RESTClient, mapping *restmapper.RESTMapping, namespace, name string) *Info {
 	return &Info{
 		Client:    client,
 		Mapping:   mapping,
@@ -147,7 +148,7 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 
 // Namespaced returns true if the object belongs to a namespace
 func (i *Info) Namespaced() bool {
-	return i.Mapping != nil && i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	return i.Mapping != nil && i.Mapping.Scope.Name() == restmapper.RESTScopeNameNamespace
 }
 
 // Watch returns server changes to this object after it was retrieved.
@@ -156,7 +157,7 @@ func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping
-func (i *Info) ResourceMapping() *meta.RESTMapping {
+func (i *Info) ResourceMapping() *restmapper.RESTMapping {
 	return i.Mapping
 }
 

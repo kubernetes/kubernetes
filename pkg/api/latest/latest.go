@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -141,7 +142,7 @@ type GroupMeta struct {
 
 	// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
 	// Kubernetes versions.
-	RESTMapper meta.RESTMapper
+	RESTMapper restmapper.RESTMapper
 
 	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
 	// string, or an error if the version is not known.

@@ -18,7 +18,7 @@ package resource
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -34,13 +34,13 @@ type RESTClient interface {
 
 // ClientMapper retrieves a client object for a given mapping
 type ClientMapper interface {
-	ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error)
+	ClientForMapping(mapping *restmapper.RESTMapping) (RESTClient, error)
 }
 
 // ClientMapperFunc implements ClientMapper for a function
-type ClientMapperFunc func(mapping *meta.RESTMapping) (RESTClient, error)
+type ClientMapperFunc func(mapping *restmapper.RESTMapping) (RESTClient, error)
 
 // ClientForMapping implements ClientMapper
-func (f ClientMapperFunc) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
+func (f ClientMapperFunc) ClientForMapping(mapping *restmapper.RESTMapping) (RESTClient, error) {
 	return f(mapping)
 }

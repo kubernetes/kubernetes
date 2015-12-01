@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -63,22 +64,22 @@ type Factory struct {
 	generators map[string]kubectl.Generator
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
-	Object func() (meta.RESTMapper, runtime.ObjectTyper)
+	Object func() (restmapper.RESTMapper, runtime.ObjectTyper)
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func() (*client.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
-	RESTClient func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	RESTClient func(mapping *restmapper.RESTMapping) (resource.RESTClient, error)
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
-	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
+	Describer func(mapping *restmapper.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error)
+	Printer func(mapping *restmapper.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
-	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
+	Scaler func(mapping *restmapper.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
-	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
+	Reaper func(mapping *restmapper.RESTMapping) (kubectl.Reaper, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
 	PodSelectorForObject func(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
@@ -138,7 +139,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		flags:      flags,
 		generators: generators,
 
-		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (restmapper.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
 			CheckErr(err)
 			cmdApiVersion := ""
@@ -154,7 +155,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		ClientConfig: func() (*client.Config, error) {
 			return clients.ClientConfigForVersion("")
 		},
-		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+		RESTClient: func(mapping *restmapper.RESTMapping) (resource.RESTClient, error) {
 			gvk, err := api.RESTMapper.KindFor(mapping.Resource)
 			if err != nil {
 				return nil, err
@@ -171,7 +172,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
-		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+		Describer: func(mapping *restmapper.RESTMapping) (kubectl.Describer, error) {
 			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
@@ -181,7 +182,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *restmapper.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, columnLabels), nil
 		},
 		PodSelectorForObject: func(object runtime.Object) (string, error) {
@@ -248,14 +249,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, fmt.Errorf("cannot get the logs from %s", kind)
 			}
 		},
-		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
+		Scaler: func(mapping *restmapper.RESTMapping) (kubectl.Scaler, error) {
 			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
 			}
 			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
-		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
+		Reaper: func(mapping *restmapper.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
 			if err != nil {
 				return nil, err
@@ -394,7 +395,7 @@ func getServicePorts(spec api.ServiceSpec) []string {
 type clientSwaggerSchema struct {
 	c        *client.Client
 	cacheDir string
-	mapper   meta.RESTMapper
+	mapper   restmapper.RESTMapper
 }
 
 const schemaFileName = "schema.json"
@@ -499,7 +500,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if ok := registered.IsRegisteredAPIGroupVersion(gv); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredGroupVersions)
 	}
-	resource, _ := meta.KindToResource(kind, false)
+	resource, _ := restmapper.KindToResource(kind, false)
 	gvk, err := c.mapper.KindFor(resource)
 	if err != nil {
 		return fmt.Errorf("could not find api group for %s: %v", kind, err)
@@ -593,7 +594,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 
 // PrinterForMapping returns a printer suitable for displaying the provided resource type.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *restmapper.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
 	printer, ok, err := PrinterForCommand(cmd)
 	if err != nil {
 		return nil, err
@@ -633,7 +634,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 
 // ClientMapperForCommand returns a ClientMapper for the factory.
 func (f *Factory) ClientMapperForCommand() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	return resource.ClientMapperFunc(func(mapping *restmapper.RESTMapping) (resource.RESTClient, error) {
 		return f.RESTClient(mapping)
 	})
 }
@@ -641,7 +642,7 @@ func (f *Factory) ClientMapperForCommand() resource.ClientMapper {
 // NilClientMapperForCommand returns a ClientMapper which always returns nil.
 // When command is running locally and client isn't needed, this mapper can be parsed to NewBuilder.
 func (f *Factory) NilClientMapperForCommand() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	return resource.ClientMapperFunc(func(mapping *restmapper.RESTMapping) (resource.RESTClient, error) {
 		return nil, nil
 	})
 }

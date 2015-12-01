@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -93,7 +93,7 @@ type APIGroupVersion struct {
 	// TODO this seems suspicious.  Is this actually just "unversioned" now?
 	ServerGroupVersion *unversioned.GroupVersion
 
-	Mapper meta.RESTMapper
+	Mapper restmapper.RESTMapper
 
 	Codec     runtime.Codec
 	Typer     runtime.ObjectTyper

@@ -14,15 +14,73 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: move everything in this file to pkg/api/rest
-package meta
+package restmapper
 
 import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
+
+type RESTScopeName string
+
+const (
+	RESTScopeNameNamespace RESTScopeName = "namespace"
+	RESTScopeNameRoot      RESTScopeName = "root"
+)
+
+// RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
+type RESTScope interface {
+	// Name of the scope
+	Name() RESTScopeName
+	// ParamName is the optional name of the parameter that should be inserted in the resource url
+	// If empty, no param will be inserted
+	ParamName() string
+	// ArgumentName is the optional name that should be used for the variable holding the value.
+	ArgumentName() string
+	// ParamDescription is the optional description to use to document the parameter in api documentation
+	ParamDescription() string
+}
+
+// RESTMapping contains the information needed to deal with objects of a specific
+// resource and kind in a RESTful manner.
+type RESTMapping struct {
+	// Resource is a string representing the name of this resource as a REST client would see it
+	Resource string
+
+	GroupVersionKind unversioned.GroupVersionKind
+
+	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
+	Scope RESTScope
+
+	runtime.Codec
+	runtime.ObjectConvertor
+	meta.MetadataAccessor
+}
+
+// RESTMapper allows clients to map resources to kind, and map kind and version
+// to interfaces for manipulating those objects. It is primarily intended for
+// consumers of Kubernetes compatible REST APIs as defined in docs/devel/api-conventions.md.
+//
+// The Kubernetes API provides versioned resources and object kinds which are scoped
+// to API groups. In other words, kinds and resources should not be assumed to be
+// unique across groups.
+//
+// TODO(caesarxuchao): Add proper multi-group support so that kinds & resources are
+// scoped to groups. See http://issues.k8s.io/12413 and http://issues.k8s.io/10009.
+type RESTMapper interface {
+	// KindFor takes a resource and returns back the unambiguous Kind (GroupVersionKind)
+	KindFor(resource string) (unversioned.GroupVersionKind, error)
+
+	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+
+	AliasesForResource(resource string) ([]string, bool)
+	ResourceSingularizer(resource string) (singular string, err error)
+	ResourceIsValid(resource string) bool
+}
 
 // Implements RESTScope interface
 type restScope struct {
@@ -84,7 +142,7 @@ var _ RESTMapper = &DefaultRESTMapper{}
 
 // VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
-type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
+type VersionInterfacesFunc func(apiVersion string) (*meta.VersionInterfaces, error)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme

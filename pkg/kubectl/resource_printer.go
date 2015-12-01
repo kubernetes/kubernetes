@@ -34,7 +34,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -237,7 +237,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if !name.IsValid() {
 			name = reflect.ValueOf("<unknown>")
 		}
-		_, resource := meta.KindToResource(kind.String(), false)
+		_, resource := restmapper.KindToResource(kind.String(), false)
 
 		fmt.Fprintf(w, "%s/%s\n", resource, name)
 	}

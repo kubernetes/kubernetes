@@ -21,7 +21,7 @@ import (
 	"io"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 
@@ -47,7 +47,7 @@ func AddOutputFlagsForMutation(cmd *cobra.Command) {
 }
 
 // PrintSuccess prints message after finishing mutating operations
-func PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource string, name string, operation string) {
+func PrintSuccess(mapper restmapper.RESTMapper, shortOutput bool, out io.Writer, resource string, name string, operation string) {
 	resource, _ = mapper.ResourceSingularizer(resource)
 	if shortOutput {
 		// -o name: prints resource/name

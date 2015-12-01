@@ -19,25 +19,25 @@ package api
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-var RESTMapper meta.RESTMapper
+var RESTMapper restmapper.RESTMapper
 
 func init() {
-	RESTMapper = meta.MultiRESTMapper{}
+	RESTMapper = restmapper.MultiRESTMapper{}
 }
 
-func RegisterRESTMapper(m meta.RESTMapper) {
-	RESTMapper = append(RESTMapper.(meta.MultiRESTMapper), m)
+func RegisterRESTMapper(m restmapper.RESTMapper) {
+	RESTMapper = append(RESTMapper.(restmapper.MultiRESTMapper), m)
 }
 
-func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
-	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {
+func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc restmapper.VersionInterfacesFunc,
+	importPathPrefix string, ignoredKinds, rootScoped sets.String) *restmapper.DefaultRESTMapper {
 
-	mapper := meta.NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
+	mapper := restmapper.NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
 	// our resources.
 	for _, gv := range defaultGroupVersions {
@@ -49,9 +49,9 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, inter
 			if !strings.HasPrefix(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
 				continue
 			}
-			scope := meta.RESTScopeNamespace
+			scope := restmapper.RESTScopeNamespace
 			if rootScoped.Has(kind) {
-				scope = meta.RESTScopeRoot
+				scope = restmapper.RESTScopeRoot
 			}
 			mapper.Add(gvk, scope, false)
 		}

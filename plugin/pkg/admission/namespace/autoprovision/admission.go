@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -56,7 +56,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
-	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+	if mapping.Scope.Name() != restmapper.RESTScopeNameNamespace {
 		return nil
 	}
 	namespace := &api.Namespace{

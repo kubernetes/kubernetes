@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -56,7 +56,7 @@ type LogsOptions struct {
 	ResourceArg string
 	Options     runtime.Object
 
-	Mapper       meta.RESTMapper
+	Mapper       restmapper.RESTMapper
 	Typer        runtime.ObjectTyper
 	ClientMapper resource.ClientMapper
 

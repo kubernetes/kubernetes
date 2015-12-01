@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest/restmapper"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -130,7 +130,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newEtcd := func(_ string, serverList []string, _ meta.VersionInterfacesFunc, _, _ string) (storage.Interface, error) {
+		newEtcd := func(_ string, serverList []string, _ restmapper.VersionInterfacesFunc, _, _ string) (storage.Interface, error) {
 			if !reflect.DeepEqual(test.servers, serverList) {
 				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, serverList)
 			}
