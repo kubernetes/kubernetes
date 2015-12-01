@@ -309,6 +309,7 @@ function start_kubeproxy {
     PROXY_LOG=/tmp/kube-proxy.log
     sudo -E "${GO_OUT}/kube-proxy" \
       --v=${LOG_LEVEL} \
+      --hostname-override="127.0.0.1" \
       --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 

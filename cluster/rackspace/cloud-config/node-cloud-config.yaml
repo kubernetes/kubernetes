@@ -179,6 +179,7 @@ coreos:
         --bind-address=$private_ipv4 \
         --kubeconfig=/var/lib/kube-proxy/kubeconfig \
         --logtostderr=true \
+        --hostname-override=$private_ipv4 \
         --master=${FIRST_APISERVER_URL}
         Restart=always
         RestartSec=5

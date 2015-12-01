@@ -48,9 +48,9 @@ EOF
 
 KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
                     \${KUBE_LOG_LEVEL}       \\
-                    \${NODE_ADDRESS}       \\
-                    \${NODE_PORT}          \\
-                    \${NODE_HOSTNAME}      \\
+                    \${NODE_ADDRESS}         \\
+                    \${NODE_PORT}            \\
+                    \${NODE_HOSTNAME}        \\
                     \${KUBELET_API_SERVER}   \\
                     \${KUBE_ALLOW_PRIV}      \\
                     \${KUBELET_ARGS}"
