@@ -984,8 +984,8 @@ func deepCopy_v1beta1_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *con
 
 func deepCopy_v1beta1_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
-		out.Selector = new(PodSelector)
-		if err := deepCopy_v1beta1_PodSelector(*in.Selector, out.Selector, c); err != nil {
+		out.Selector = new(LabelSelector)
+		if err := deepCopy_v1beta1_LabelSelector(*in.Selector, out.Selector, c); err != nil {
 			return err
 		}
 	} else {
@@ -1357,8 +1357,8 @@ func deepCopy_v1beta1_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) er
 		out.Completions = nil
 	}
 	if in.Selector != nil {
-		out.Selector = new(PodSelector)
-		if err := deepCopy_v1beta1_PodSelector(*in.Selector, out.Selector, c); err != nil {
+		out.Selector = new(LabelSelector)
+		if err := deepCopy_v1beta1_LabelSelector(*in.Selector, out.Selector, c); err != nil {
 			return err
 		}
 	} else {
@@ -1403,13 +1403,7 @@ func deepCopy_v1beta1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clon
 	return nil
 }
 
-func deepCopy_v1beta1_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
-	out.Resource = in.Resource
-	out.Value = in.Value
-	return nil
-}
-
-func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversion.Cloner) error {
+func deepCopy_v1beta1_LabelSelector(in LabelSelector, out *LabelSelector, c *conversion.Cloner) error {
 	if in.MatchLabels != nil {
 		out.MatchLabels = make(map[string]string)
 		for key, val := range in.MatchLabels {
@@ -1419,9 +1413,9 @@ func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversio
 		out.MatchLabels = nil
 	}
 	if in.MatchExpressions != nil {
-		out.MatchExpressions = make([]PodSelectorRequirement, len(in.MatchExpressions))
+		out.MatchExpressions = make([]LabelSelectorRequirement, len(in.MatchExpressions))
 		for i := range in.MatchExpressions {
-			if err := deepCopy_v1beta1_PodSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+			if err := deepCopy_v1beta1_LabelSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
 				return err
 			}
 		}
@@ -1431,7 +1425,7 @@ func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversio
 	return nil
 }
 
-func deepCopy_v1beta1_PodSelectorRequirement(in PodSelectorRequirement, out *PodSelectorRequirement, c *conversion.Cloner) error {
+func deepCopy_v1beta1_LabelSelectorRequirement(in LabelSelectorRequirement, out *LabelSelectorRequirement, c *conversion.Cloner) error {
 	out.Key = in.Key
 	out.Operator = in.Operator
 	if in.Values != nil {
@@ -1442,6 +1436,12 @@ func deepCopy_v1beta1_PodSelectorRequirement(in PodSelectorRequirement, out *Pod
 	} else {
 		out.Values = nil
 	}
+	return nil
+}
+
+func deepCopy_v1beta1_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
+	out.Resource = in.Resource
+	out.Value = in.Value
 	return nil
 }
 
@@ -1681,9 +1681,9 @@ func init() {
 		deepCopy_v1beta1_JobList,
 		deepCopy_v1beta1_JobSpec,
 		deepCopy_v1beta1_JobStatus,
+		deepCopy_v1beta1_LabelSelector,
+		deepCopy_v1beta1_LabelSelectorRequirement,
 		deepCopy_v1beta1_NodeUtilization,
-		deepCopy_v1beta1_PodSelector,
-		deepCopy_v1beta1_PodSelectorRequirement,
 		deepCopy_v1beta1_ReplicationControllerDummy,
 		deepCopy_v1beta1_RollingUpdateDeployment,
 		deepCopy_v1beta1_Scale,

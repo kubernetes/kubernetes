@@ -36,7 +36,7 @@ func addDefaultingFuncs() {
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &PodSelector{
+					obj.Spec.Selector = &LabelSelector{
 						MatchLabels: labels,
 					}
 				}
@@ -93,7 +93,7 @@ func addDefaultingFuncs() {
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &PodSelector{
+					obj.Spec.Selector = &LabelSelector{
 						MatchLabels: labels,
 					}
 				}

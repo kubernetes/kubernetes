@@ -6217,7 +6217,7 @@ func (x *DaemonSetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.Selector == nil {
-					x.Selector = new(PodSelector)
+					x.Selector = new(LabelSelector)
 				}
 				x.Selector.CodecDecodeSelf(d)
 			}
@@ -6263,7 +6263,7 @@ func (x *DaemonSetSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.Selector == nil {
-			x.Selector = new(PodSelector)
+			x.Selector = new(LabelSelector)
 		}
 		x.Selector.CodecDecodeSelf(d)
 	}
@@ -8503,7 +8503,7 @@ func (x *JobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.Selector == nil {
-					x.Selector = new(PodSelector)
+					x.Selector = new(LabelSelector)
 				}
 				x.Selector.CodecDecodeSelf(d)
 			}
@@ -8597,7 +8597,7 @@ func (x *JobSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.Selector == nil {
-			x.Selector = new(PodSelector)
+			x.Selector = new(LabelSelector)
 		}
 		x.Selector.CodecDecodeSelf(d)
 	}
@@ -12900,7 +12900,7 @@ func (x *ClusterAutoscalerList) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *PodSelector) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *LabelSelector) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -12975,7 +12975,7 @@ func (x *PodSelector) CodecEncodeSelf(e *codec1978.Encoder) {
 						_ = yym1084
 						if false {
 						} else {
-							h.encSlicePodSelectorRequirement(([]PodSelectorRequirement)(x.MatchExpressions), e)
+							h.encSliceLabelSelectorRequirement(([]LabelSelectorRequirement)(x.MatchExpressions), e)
 						}
 					}
 				} else {
@@ -12993,7 +12993,7 @@ func (x *PodSelector) CodecEncodeSelf(e *codec1978.Encoder) {
 						_ = yym1085
 						if false {
 						} else {
-							h.encSlicePodSelectorRequirement(([]PodSelectorRequirement)(x.MatchExpressions), e)
+							h.encSliceLabelSelectorRequirement(([]LabelSelectorRequirement)(x.MatchExpressions), e)
 						}
 					}
 				}
@@ -13007,7 +13007,7 @@ func (x *PodSelector) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PodSelector) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *LabelSelector) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -13037,7 +13037,7 @@ func (x *PodSelector) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PodSelector) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *LabelSelector) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -13080,7 +13080,7 @@ func (x *PodSelector) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym1092
 				if false {
 				} else {
-					h.decSlicePodSelectorRequirement((*[]PodSelectorRequirement)(yyv1091), d)
+					h.decSliceLabelSelectorRequirement((*[]LabelSelectorRequirement)(yyv1091), d)
 				}
 			}
 		default:
@@ -13090,7 +13090,7 @@ func (x *PodSelector) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PodSelector) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *LabelSelector) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -13138,7 +13138,7 @@ func (x *PodSelector) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		_ = yym1097
 		if false {
 		} else {
-			h.decSlicePodSelectorRequirement((*[]PodSelectorRequirement)(yyv1096), d)
+			h.decSliceLabelSelectorRequirement((*[]LabelSelectorRequirement)(yyv1096), d)
 		}
 	}
 	for {
@@ -13157,7 +13157,7 @@ func (x *PodSelector) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *PodSelectorRequirement) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *LabelSelectorRequirement) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -13258,7 +13258,7 @@ func (x *PodSelectorRequirement) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PodSelectorRequirement) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *LabelSelectorRequirement) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -13288,7 +13288,7 @@ func (x *PodSelectorRequirement) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PodSelectorRequirement) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *LabelSelectorRequirement) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -13320,7 +13320,7 @@ func (x *PodSelectorRequirement) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			if r.TryDecodeAsNil() {
 				x.Operator = ""
 			} else {
-				x.Operator = PodSelectorOperator(r.DecodeString())
+				x.Operator = LabelSelectorOperator(r.DecodeString())
 			}
 		case "values":
 			if r.TryDecodeAsNil() {
@@ -13341,7 +13341,7 @@ func (x *PodSelectorRequirement) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PodSelectorRequirement) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *LabelSelectorRequirement) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -13378,7 +13378,7 @@ func (x *PodSelectorRequirement) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.Operator = ""
 	} else {
-		x.Operator = PodSelectorOperator(r.DecodeString())
+		x.Operator = LabelSelectorOperator(r.DecodeString())
 	}
 	yyj1114++
 	if yyhl1114 {
@@ -13418,7 +13418,7 @@ func (x *PodSelectorRequirement) codecDecodeSelfFromArray(l int, d *codec1978.De
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x PodSelectorOperator) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x LabelSelectorOperator) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -13431,7 +13431,7 @@ func (x PodSelectorOperator) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PodSelectorOperator) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *LabelSelectorOperator) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -14952,7 +14952,7 @@ func (x codecSelfer1234) decSliceClusterAutoscaler(v *[]ClusterAutoscaler, d *co
 	}
 }
 
-func (x codecSelfer1234) encSlicePodSelectorRequirement(v []PodSelectorRequirement, e *codec1978.Encoder) {
+func (x codecSelfer1234) encSliceLabelSelectorRequirement(v []LabelSelectorRequirement, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -14965,7 +14965,7 @@ func (x codecSelfer1234) encSlicePodSelectorRequirement(v []PodSelectorRequireme
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirement, d *codec1978.Decoder) {
+func (x codecSelfer1234) decSliceLabelSelectorRequirement(v *[]LabelSelectorRequirement, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -14975,7 +14975,7 @@ func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirem
 	var yyc1201 bool
 	if yyl1201 == 0 {
 		if yyv1201 == nil {
-			yyv1201 = []PodSelectorRequirement{}
+			yyv1201 = []LabelSelectorRequirement{}
 			yyc1201 = true
 		} else if len(yyv1201) != 0 {
 			yyv1201 = yyv1201[:0]
@@ -14993,10 +14993,10 @@ func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirem
 				if yyrl1201 <= cap(yyv1201) {
 					yyv1201 = yyv1201[:yyrl1201]
 				} else {
-					yyv1201 = make([]PodSelectorRequirement, yyrl1201)
+					yyv1201 = make([]LabelSelectorRequirement, yyrl1201)
 				}
 			} else {
-				yyv1201 = make([]PodSelectorRequirement, yyrl1201)
+				yyv1201 = make([]LabelSelectorRequirement, yyrl1201)
 			}
 			yyc1201 = true
 			yyrr1201 = len(yyv1201)
@@ -15011,7 +15011,7 @@ func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirem
 		for ; yyj1201 < yyrr1201; yyj1201++ {
 			yyh1201.ElemContainerState(yyj1201)
 			if r.TryDecodeAsNil() {
-				yyv1201[yyj1201] = PodSelectorRequirement{}
+				yyv1201[yyj1201] = LabelSelectorRequirement{}
 			} else {
 				yyv1202 := &yyv1201[yyj1201]
 				yyv1202.CodecDecodeSelf(d)
@@ -15020,10 +15020,10 @@ func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirem
 		}
 		if yyrt1201 {
 			for ; yyj1201 < yyl1201; yyj1201++ {
-				yyv1201 = append(yyv1201, PodSelectorRequirement{})
+				yyv1201 = append(yyv1201, LabelSelectorRequirement{})
 				yyh1201.ElemContainerState(yyj1201)
 				if r.TryDecodeAsNil() {
-					yyv1201[yyj1201] = PodSelectorRequirement{}
+					yyv1201[yyj1201] = LabelSelectorRequirement{}
 				} else {
 					yyv1203 := &yyv1201[yyj1201]
 					yyv1203.CodecDecodeSelf(d)
@@ -15037,13 +15037,13 @@ func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirem
 		for ; !r.CheckBreak(); yyj1201++ {
 
 			if yyj1201 >= len(yyv1201) {
-				yyv1201 = append(yyv1201, PodSelectorRequirement{}) // var yyz1201 PodSelectorRequirement
+				yyv1201 = append(yyv1201, LabelSelectorRequirement{}) // var yyz1201 LabelSelectorRequirement
 				yyc1201 = true
 			}
 			yyh1201.ElemContainerState(yyj1201)
 			if yyj1201 < len(yyv1201) {
 				if r.TryDecodeAsNil() {
-					yyv1201[yyj1201] = PodSelectorRequirement{}
+					yyv1201[yyj1201] = LabelSelectorRequirement{}
 				} else {
 					yyv1204 := &yyv1201[yyj1201]
 					yyv1204.CodecDecodeSelf(d)
@@ -15058,7 +15058,7 @@ func (x codecSelfer1234) decSlicePodSelectorRequirement(v *[]PodSelectorRequirem
 			yyv1201 = yyv1201[:yyj1201]
 			yyc1201 = true
 		} else if yyj1201 == 0 && yyv1201 == nil {
-			yyv1201 = []PodSelectorRequirement{}
+			yyv1201 = []LabelSelectorRequirement{}
 			yyc1201 = true
 		}
 	}

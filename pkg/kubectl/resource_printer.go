@@ -730,7 +730,7 @@ func printJob(job *extensions.Job, w io.Writer, withNamespace bool, wide bool, s
 		}
 	}
 
-	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
+	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d",
 		name,
 		firstContainer.Name,
@@ -931,9 +931,9 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, withNamespace bool, w
 			return err
 		}
 	}
-	selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+	selector, err := extensions.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
-		// this shouldn't happen if PodSelector passed validation
+		// this shouldn't happen if LabelSelector passed validation
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",

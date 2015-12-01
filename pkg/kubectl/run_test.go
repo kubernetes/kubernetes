@@ -746,7 +746,7 @@ func TestGenerateJob(t *testing.T) {
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.PodSelector{
+					Selector: &extensions.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar", "baz": "blah"},
 					},
 					Template: api.PodTemplateSpec{

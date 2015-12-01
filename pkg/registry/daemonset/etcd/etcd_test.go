@@ -42,7 +42,7 @@ func newValidDaemonSet() *extensions.DaemonSet {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &extensions.PodSelector{MatchLabels: map[string]string{"a": "b"}},
+			Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -77,7 +77,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&extensions.DaemonSet{
 			Spec: extensions.DaemonSetSpec{
-				Selector: &extensions.PodSelector{MatchLabels: map[string]string{}},
+				Selector: &extensions.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validDaemonSet.Spec.Template,
 			},
 		},
@@ -115,7 +115,7 @@ func TestUpdate(t *testing.T) {
 		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.DaemonSet)
-			object.Spec.Selector = &extensions.PodSelector{MatchLabels: map[string]string{}}
+			object.Spec.Selector = &extensions.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)
