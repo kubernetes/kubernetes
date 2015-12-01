@@ -1,3 +1,17 @@
+- 
+    date: 2015-12-03 18:30:00 +0100
+    title: "Docker meets Kubernetes"
+    location: "Eifflerstrasse, Hamburg"
+    venue: "Betahaus"
+    speaker: ""
+    url: "http://www.meetup.com/Hamburg-Kubernetes-Meetup/events/226702996/"
+- 
+    date: 2015-12-03 18:30:00 +0000 
+    title: "Kubernetes Dublin Meetup"
+    location: "Zendesk, 1 Grand Parade"
+    venue: "Zendesk"
+    speaker: "Mandy Waite, Michael Hausenblas, Shane Hender"
+    url: "http://www.meetup.com/Kubernetes-Ireland/events/226566273/"
 -
     date: 2015-08-06 18:30:00 +0100
     title: "Kubernetes London Meetup"
