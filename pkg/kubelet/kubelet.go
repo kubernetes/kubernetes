@@ -1466,7 +1466,7 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 // domains of the cluster.
 func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	var hostDNS, hostSearch []string
-	// Get host DNS settings and append them to cluster DNS settings.
+	// Get host DNS settings
 	if kl.resolverConfig != "" {
 		f, err := os.Open(kl.resolverConfig)
 		if err != nil {
@@ -1496,9 +1496,17 @@ func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	var dns, dnsSearch []string
 
 	if kl.clusterDNS != nil {
-		dns = append([]string{kl.clusterDNS.String()}, hostDNS...)
+		// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
+		// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
+		// in case the cluster DNS server cannot resolve the DNS query itself
+		dns = []string{kl.clusterDNS.String()}
 	} else {
-		dns = hostDNS
+		// clusterDNS is not known.
+		// pod with ClusterDNSFirst Policy cannot be created
+		kl.recorder.Eventf(pod, api.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy", pod.Spec.DNSPolicy)
+		log := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. pod:%q", pod.Spec.DNSPolicy, kubecontainer.GetPodFullName(pod))
+		kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, "MissingClusterDNS", log)
+		return nil, nil, fmt.Errorf(log)
 	}
 	if kl.clusterDomain != "" {
 		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
