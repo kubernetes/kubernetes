@@ -104,6 +104,14 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			field, _ := fields.ParseSelector("a=b")
 			j.FieldSelector = unversioned.FieldSelector{field}
 		},
+		func(j *api.PodExecOptions, c fuzz.Continue) {
+			j.Stdout = true
+			j.Stderr = true
+		},
+		func(j *api.PodAttachOptions, c fuzz.Continue) {
+			j.Stdout = true
+			j.Stderr = true
+		},
 		func(s *api.PodSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			// has a default value
