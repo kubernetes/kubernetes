@@ -19,6 +19,7 @@ package deleter
 import (
 	"testing"
 
+	"github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
@@ -60,7 +61,13 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 			UID:       "foo0",
 			Namespace: api.NamespaceDefault,
 		}}}
-	task, err := podtask.New(api.NewDefaultContext(), "bar", pod.Pod)
+	task, err := podtask.New(
+		api.NewDefaultContext(),
+		"bar",
+		pod.Pod,
+		&mesosproto.ExecutorInfo{},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -100,7 +107,13 @@ func TestDeleteOne_Running(t *testing.T) {
 			UID:       "foo0",
 			Namespace: api.NamespaceDefault,
 		}}}
-	task, err := podtask.New(api.NewDefaultContext(), "bar", pod.Pod)
+	task, err := podtask.New(
+		api.NewDefaultContext(),
+		"bar",
+		pod.Pod,
+		&mesosproto.ExecutorInfo{},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

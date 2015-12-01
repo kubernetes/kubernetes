@@ -21,39 +21,43 @@ import (
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-type HostPortMappingType string
-
 const (
 	// maps a Container.HostPort to the same exact offered host port, ignores .HostPort = 0
-	HostPortMappingFixed HostPortMappingType = "fixed"
+	HostPortMappingFixed = "fixed"
 	// same as HostPortMappingFixed, except that .HostPort of 0 are mapped to any port offered
 	HostPortMappingWildcard = "wildcard"
 )
 
+// Objects implementing the HostPortMapper interface generate port mappings
+// from k8s container ports to ports offered by mesos
 type HostPortMapper interface {
-	// abstracts the way that host ports are mapped to pod container ports
-	Generate(t *T, offer *mesos.Offer) ([]HostPortMapping, error)
+	// Map maps the given pod task and the given mesos offer
+	// and returns a slice of port mappings
+	// or an error if the mapping failed
+	Map(t *T, offer *mesos.Offer) ([]HostPortMapping, error)
 }
 
+// HostPortMapperFunc is a function adapter to the HostPortMapper interface
+type HostPortMapperFunc func(*T, *mesos.Offer) ([]HostPortMapping, error)
+
+// Map calls f(t, offer)
+func (f HostPortMapperFunc) Map(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
+	return f(t, offer)
+}
+
+// A HostPortMapping represents the mapping between k8s container ports
+// ports offered by mesos. It references the k8s' container and port
+// and specifies the offered mesos port and the offered port's role
 type HostPortMapping struct {
-	ContainerIdx int // index of the container in the pod spec
-	PortIdx      int // index of the port in a container's port spec
-	OfferPort    uint64
-}
-
-func (self HostPortMappingType) Generate(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
-	switch self {
-	case HostPortMappingWildcard:
-		return wildcardHostPortMapping(t, offer)
-	case HostPortMappingFixed:
-	default:
-		log.Warningf("illegal host-port mapping spec %q, defaulting to %q", self, HostPortMappingFixed)
-	}
-	return defaultHostPortMapping(t, offer)
+	ContainerIdx int    // index of the container in the pod spec
+	PortIdx      int    // index of the port in a container's port spec
+	OfferPort    uint64 // the port offered by mesos
+	Role         string // the role asssociated with the offered port
 }
 
 type PortAllocationError struct {
@@ -75,16 +79,18 @@ func (err *DuplicateHostPortError) Error() string {
 		err.m1.OfferPort, err.m1.ContainerIdx, err.m1.PortIdx, err.m2.ContainerIdx, err.m2.PortIdx)
 }
 
-// wildcard k8s host port mapping implementation: hostPort == 0 gets mapped to any available offer port
-func wildcardHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
-	mapping, err := defaultHostPortMapping(t, offer)
+// WildcardMapper maps k8s wildcard ports (hostPort == 0) to any available offer port
+func WildcardMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
+	mapping, err := FixedMapper(t, offer)
 	if err != nil {
 		return nil, err
 	}
+
 	taken := make(map[uint64]struct{})
 	for _, entry := range mapping {
 		taken[entry.OfferPort] = struct{}{}
 	}
+
 	wildports := []HostPortMapping{}
 	for i, container := range t.Pod.Spec.Containers {
 		for pi, port := range container.Ports {
@@ -96,8 +102,9 @@ func wildcardHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error
 			}
 		}
 	}
+
 	remaining := len(wildports)
-	foreachRange(offer, "ports", func(bp, ep uint64) {
+	foreachPortsRange(offer.GetResources(), t.Roles(), func(bp, ep uint64, role string) {
 		log.V(3).Infof("Searching for wildcard port in range {%d:%d}", bp, ep)
 		for i := range wildports {
 			if wildports[i].OfferPort != 0 {
@@ -108,6 +115,7 @@ func wildcardHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error
 					continue
 				}
 				wildports[i].OfferPort = port
+				wildports[i].Role = starredRole(role)
 				mapping = append(mapping, wildports[i])
 				remaining--
 				taken[port] = struct{}{}
@@ -115,6 +123,7 @@ func wildcardHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error
 			}
 		}
 	})
+
 	if remaining > 0 {
 		err := &PortAllocationError{
 			PodId: t.Pod.Name,
@@ -122,12 +131,12 @@ func wildcardHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error
 		// it doesn't make sense to include a port list here because they were all zero (wildcards)
 		return nil, err
 	}
+
 	return mapping, nil
 }
 
-// default k8s host port mapping implementation: hostPort == 0 means containerPort remains pod-private, and so
-// no offer ports will be mapped to such Container ports.
-func defaultHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
+// FixedMapper maps k8s host ports to offered ports ignoring hostPorts == 0 (remaining pod-private)
+func FixedMapper(t *T, offer *mesos.Offer) ([]HostPortMapping, error) {
 	requiredPorts := make(map[uint64]HostPortMapping)
 	mapping := []HostPortMapping{}
 	for i, container := range t.Pod.Spec.Containers {
@@ -149,15 +158,19 @@ func defaultHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error)
 			requiredPorts[uint64(port.HostPort)] = m
 		}
 	}
-	foreachRange(offer, "ports", func(bp, ep uint64) {
+
+	foreachPortsRange(offer.GetResources(), t.Roles(), func(bp, ep uint64, role string) {
 		for port := range requiredPorts {
 			log.V(3).Infof("evaluating port range {%d:%d} %d", bp, ep, port)
 			if (bp <= port) && (port <= ep) {
-				mapping = append(mapping, requiredPorts[port])
+				m := requiredPorts[port]
+				m.Role = starredRole(role)
+				mapping = append(mapping, m)
 				delete(requiredPorts, port)
 			}
 		}
 	})
+
 	unsatisfiedPorts := len(requiredPorts)
 	if unsatisfiedPorts > 0 {
 		err := &PortAllocationError{
@@ -168,18 +181,19 @@ func defaultHostPortMapping(t *T, offer *mesos.Offer) ([]HostPortMapping, error)
 		}
 		return nil, err
 	}
+
 	return mapping, nil
 }
 
-const PortMappingLabelKey = "k8s.mesosphere.io/portMapping"
-
-func MappingTypeForPod(pod *api.Pod) HostPortMappingType {
+// NewHostPortMapper returns a new mapper based
+// based on the port mapping key value
+func NewHostPortMapper(pod *api.Pod) HostPortMapper {
 	filter := map[string]string{
-		PortMappingLabelKey: string(HostPortMappingFixed),
+		meta.PortMappingKey: HostPortMappingFixed,
 	}
 	selector := labels.Set(filter).AsSelector()
 	if selector.Matches(labels.Set(pod.Labels)) {
-		return HostPortMappingFixed
+		return HostPortMapperFunc(FixedMapper)
 	}
-	return HostPortMappingWildcard
+	return HostPortMapperFunc(WildcardMapper)
 }

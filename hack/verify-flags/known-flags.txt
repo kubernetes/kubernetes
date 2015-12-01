@@ -1,7 +1,6 @@
 
 accept-hosts
 accept-paths
-account-for-pod-resources
 admission-control
 admission-control-config-file
 advertise-address
@@ -192,8 +191,8 @@ mesos-executor-cpus
 mesos-executor-mem
 mesos-launch-grace-period
 mesos-master
-mesos-role
 mesos-sandbox-overlay
+mesos-roles
 mesos-user
 minimum-container-ttl-duration
 minion-max-log-age
