@@ -30,7 +30,7 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("",
+	api.Scheme.AddKnownTypes("metrics/v1alpha1",
 		&MetricsMeta{},
 		&RawNodeMetrics{},
 		&RawNodeMetricsList{},
