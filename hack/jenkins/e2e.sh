@@ -763,6 +763,22 @@ case ${JOB_NAME} in
     : ${AWS_SHARED_CREDENTIALS_FILE=/var/lib/jenkins/.aws/credentials}
     ;;
 
+  # kubernetes-upgrade-gke-1.1-master
+  #
+  # Configurations for step2, step4, and step6 live in master.
+
+  kubernetes-upgrade-gke-1.1-master-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-1.1-master-step3-e2e-old)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-1.1-master-step5-e2e-old)
+    configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
   # kubernetes-upgrade-gke-1.0-release
   #
   # Configurations for step1, step3, and step5 live in the release-1.0 branch.
