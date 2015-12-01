@@ -78,7 +78,7 @@ func getSelfLink(name, namespace string) string {
 	if len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	selfLink = fmt.Sprintf("/api/"+latest.GroupOrDie("").Version+"/pods/namespaces/%s/%s", name, namespace)
+	selfLink = fmt.Sprintf("/api/"+latest.GroupOrDie("").GroupVersion.Version+"/pods/namespaces/%s/%s", name, namespace)
 	return selfLink
 }
 

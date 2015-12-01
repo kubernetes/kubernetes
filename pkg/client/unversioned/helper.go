@@ -544,11 +544,8 @@ func defaultVersionFor(config *Config) *unversioned.GroupVersion {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		// TODO this drops out when groupmeta is refactored
-		gv, err := unversioned.ParseGroupVersion(latest.GroupOrDie("").GroupVersion)
-		if err != nil {
-			panic(err)
-		}
-		return &gv
+		copyGroupVersion := latest.GroupOrDie("").GroupVersion
+		return &copyGroupVersion
 	}
 
 	return config.GroupVersion

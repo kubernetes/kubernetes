@@ -95,7 +95,7 @@ type ConvertOptions struct {
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
-	o.outputVersion = cmdutil.OutputVersion(cmd, latest.GroupOrDie("").Version)
+	o.outputVersion = cmdutil.OutputVersion(cmd, latest.GroupOrDie("").GroupVersion.Version)
 	outputGV, err := unversioned.ParseGroupVersion(o.outputVersion)
 	if err != nil {
 		return fmt.Errorf("unable to parse group/version from %q: %v", o.outputVersion, err)

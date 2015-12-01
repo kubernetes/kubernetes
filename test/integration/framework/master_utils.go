@@ -126,8 +126,8 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	if masterConfig == nil {
 		etcdClient := NewEtcdClient()
 		storageVersions := make(map[string]string)
-		etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion, etcdtest.PathPrefix())
-		storageVersions[""] = latest.GroupOrDie("").GroupVersion
+		etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion.String(), etcdtest.PathPrefix())
+		storageVersions[""] = latest.GroupOrDie("").GroupVersion.String()
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}

@@ -660,16 +660,16 @@ func (m *Master) init(c *Config) {
 				Version:      expVersion.GroupVersion.Version,
 			},
 		}
-		storageVersion, found := c.StorageVersions[g.Group]
+		storageVersion, found := c.StorageVersions[g.GroupVersion.Group]
 		if !found {
-			glog.Fatalf("Couldn't find storage version of group %v", g.Group)
+			glog.Fatalf("Couldn't find storage version of group %v", g.GroupVersion.Group)
 		}
 		group := unversioned.APIGroup{
-			Name:             g.Group,
+			Name:             g.GroupVersion.Group,
 			Versions:         expAPIVersions,
 			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group, group)
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").GroupVersion.Group, group)
 		allGroups = append(allGroups, group)
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
@@ -1008,7 +1008,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
+	serverGroupVersion := latest.GroupOrDie("").GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
@@ -1098,7 +1098,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	extensionsGroup := latest.GroupOrDie("extensions")
-	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
+	serverGroupVersion := latest.GroupOrDie("").GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                m.apiGroupPrefix,
@@ -1112,7 +1112,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Codec:              extensionsGroup.Codec,
 		Linker:             extensionsGroup.SelfLinker,
 		Storage:            storage,
-		GroupVersion:       unversioned.ParseGroupVersionOrDie(extensionsGroup.GroupVersion),
+		GroupVersion:       extensionsGroup.GroupVersion,
 		ServerGroupVersion: &serverGroupVersion,
 
 		Admit:   m.admissionControl,
