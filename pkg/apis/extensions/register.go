@@ -67,6 +67,7 @@ func addKnownTypes() {
 		&api.ListOptions{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&api.ExportOptions{},
 	)
 }
 

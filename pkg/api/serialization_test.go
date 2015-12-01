@@ -147,9 +147,9 @@ func TestList(t *testing.T) {
 	roundTripSame(t, item)
 }
 
-var nonRoundTrippableTypes = sets.NewString()
+var nonRoundTrippableTypes = sets.NewString("ExportOptions")
 
-var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions")
+var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "ExportOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 
 func TestRoundTripTypes(t *testing.T) {

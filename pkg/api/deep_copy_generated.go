@@ -24,8 +24,6 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	fields "k8s.io/kubernetes/pkg/fields"
-	labels "k8s.io/kubernetes/pkg/labels"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	inf "speter.net/go/exp/math/dec/inf"
@@ -805,35 +803,6 @@ func deepCopy_api_List(in List, out *List, c *conversion.Cloner) error {
 		}
 	} else {
 		out.Items = nil
-	}
-	return nil
-}
-
-func deepCopy_api_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if newVal, err := c.DeepCopy(in.LabelSelector); err != nil {
-		return err
-	} else if newVal == nil {
-		out.LabelSelector = nil
-	} else {
-		out.LabelSelector = newVal.(labels.Selector)
-	}
-	if newVal, err := c.DeepCopy(in.FieldSelector); err != nil {
-		return err
-	} else if newVal == nil {
-		out.FieldSelector = nil
-	} else {
-		out.FieldSelector = newVal.(fields.Selector)
-	}
-	out.Watch = in.Watch
-	out.ResourceVersion = in.ResourceVersion
-	if in.TimeoutSeconds != nil {
-		out.TimeoutSeconds = new(int64)
-		*out.TimeoutSeconds = *in.TimeoutSeconds
-	} else {
-		out.TimeoutSeconds = nil
 	}
 	return nil
 }
@@ -2417,7 +2386,6 @@ func init() {
 		deepCopy_api_LimitRangeList,
 		deepCopy_api_LimitRangeSpec,
 		deepCopy_api_List,
-		deepCopy_api_ListOptions,
 		deepCopy_api_LoadBalancerIngress,
 		deepCopy_api_LoadBalancerStatus,
 		deepCopy_api_LocalObjectReference,

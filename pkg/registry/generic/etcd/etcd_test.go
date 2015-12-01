@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -50,7 +52,19 @@ func (t *testRESTStrategy) NamespaceScoped() bool          { return t.namespaceS
 func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreateOnUpdate }
 func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
 
-func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object)      {}
+func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		panic(err.Error())
+	}
+	labels := accessor.Labels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels["prepare_create"] = "true"
+	accessor.SetLabels(labels)
+}
+
 func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
 func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	return nil
@@ -325,6 +339,95 @@ func TestEtcdUpdate(t *testing.T) {
 
 }
 
+type testPodExport struct{}
+
+func (t testPodExport) Export(obj runtime.Object, exact bool) error {
+	pod := obj.(*api.Pod)
+	if pod.Labels == nil {
+		pod.Labels = map[string]string{}
+	}
+	pod.Labels["exported"] = "true"
+	pod.Labels["exact"] = strconv.FormatBool(exact)
+
+	return nil
+}
+
+func TestEtcdCustomExport(t *testing.T) {
+	podA := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "test",
+			Name:      "foo",
+			Labels:    map[string]string{},
+		},
+		Spec: api.PodSpec{NodeName: "machine"},
+	}
+
+	server, registry := NewTestGenericEtcdRegistry(t)
+	defer server.Terminate(t)
+
+	registry.ExportStrategy = testPodExport{}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
+	if !updateAndVerify(t, testContext, registry, &podA) {
+		t.Errorf("Unexpected error updating podA")
+	}
+
+	obj, err := registry.Export(testContext, podA.Name, unversioned.ExportOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	exportedPod := obj.(*api.Pod)
+	if exportedPod.Labels["exported"] != "true" {
+		t.Errorf("expected: exported->true, found: %s", exportedPod.Labels["exported"])
+	}
+	if exportedPod.Labels["exact"] != "false" {
+		t.Errorf("expected: exact->false, found: %s", exportedPod.Labels["exact"])
+	}
+	delete(exportedPod.Labels, "exported")
+	delete(exportedPod.Labels, "exact")
+	exportObjectMeta(&podA.ObjectMeta, false)
+	podA.Spec = exportedPod.Spec
+	if !reflect.DeepEqual(&podA, exportedPod) {
+		t.Errorf("expected:\n%v\nsaw:\n%v\n", &podA, exportedPod)
+	}
+}
+
+func TestEtcdBasicExport(t *testing.T) {
+	podA := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "test",
+			Name:      "foo",
+			Labels:    map[string]string{},
+		},
+		Spec:   api.PodSpec{NodeName: "machine"},
+		Status: api.PodStatus{HostIP: "1.2.3.4"},
+	}
+
+	server, registry := NewTestGenericEtcdRegistry(t)
+	defer server.Terminate(t)
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
+	if !updateAndVerify(t, testContext, registry, &podA) {
+		t.Errorf("Unexpected error updating podA")
+	}
+
+	obj, err := registry.Export(testContext, podA.Name, unversioned.ExportOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	exportedPod := obj.(*api.Pod)
+	if exportedPod.Labels["prepare_create"] != "true" {
+		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
+	}
+	exportObjectMeta(&podA.ObjectMeta, false)
+	podA.Spec = exportedPod.Spec
+	if !reflect.DeepEqual(&podA, exportedPod) {
+		t.Errorf("expected:\n%v\nsaw:\n%v\n", &podA, exportedPod)
+	}
+}
+
 func TestEtcdGet(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
@@ -344,7 +447,6 @@ func TestEtcdGet(t *testing.T) {
 	if !updateAndVerify(t, testContext, registry, podA) {
 		t.Errorf("Unexpected error updating podA")
 	}
-
 }
 
 func TestEtcdDelete(t *testing.T) {

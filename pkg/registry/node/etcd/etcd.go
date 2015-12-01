@@ -76,6 +76,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, con
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
+		ExportStrategy: node.Strategy,
 
 		Storage: storageInterface,
 	}

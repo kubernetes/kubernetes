@@ -40,3 +40,4 @@ func (obj *APIVersions) GetObjectKind() ObjectKind     { return &obj.TypeMeta }
 func (obj *APIGroupList) GetObjectKind() ObjectKind    { return &obj.TypeMeta }
 func (obj *APIGroup) GetObjectKind() ObjectKind        { return &obj.TypeMeta }
 func (obj *APIResourceList) GetObjectKind() ObjectKind { return &obj.TypeMeta }
+func (obj *ExportOptions) GetObjectKind() ObjectKind   { return &obj.TypeMeta }
