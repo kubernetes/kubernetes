@@ -99,8 +99,7 @@ func (c *ingress) Watch(label labels.Selector, field fields.Selector, opts unver
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("ingresses").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Watch()

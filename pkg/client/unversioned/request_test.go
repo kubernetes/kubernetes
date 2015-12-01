@@ -176,16 +176,6 @@ func TestRequestParam(t *testing.T) {
 	}
 }
 
-func TestTimeoutSeconds(t *testing.T) {
-	r := &Request{}
-	r.TimeoutSeconds(time.Duration(5 * time.Second))
-	if !reflect.DeepEqual(r.params, url.Values{
-		"timeoutSeconds": []string{"5"},
-	}) {
-		t.Errorf("invalid timeoutSeconds parameter: %#v", r)
-	}
-}
-
 func TestRequestVersionedParams(t *testing.T) {
 	r := (&Request{apiVersion: "v1"}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {

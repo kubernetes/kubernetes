@@ -568,12 +568,3 @@ func DefaultKubernetesUserAgent() string {
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
 }
-
-// TimeoutFromListOptions returns timeout to be set via TimeoutSeconds() method
-// based on given options.
-func TimeoutFromListOptions(options unversioned.ListOptions) time.Duration {
-	if options.TimeoutSeconds != nil {
-		return time.Duration(*options.TimeoutSeconds) * time.Second
-	}
-	return 0
-}
