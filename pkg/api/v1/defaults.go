@@ -26,6 +26,14 @@ import (
 
 func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
+		func(obj *PodExecOptions) {
+			obj.Stdout = true
+			obj.Stderr = true
+		},
+		func(obj *PodAttachOptions) {
+			obj.Stdout = true
+			obj.Stderr = true
+		},
 		func(obj *ReplicationController) {
 			var labels map[string]string
 			if obj.Spec.Template != nil {
