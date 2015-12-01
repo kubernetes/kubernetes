@@ -21,7 +21,7 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
-	kubelet "k8s.io/kubernetes/cmd/kubelet/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -46,7 +46,7 @@ type StatusUpdater struct {
 }
 
 func NewStatusUpdater(client *client.Client, relistPeriod time.Duration, nowFunc func() time.Time) *StatusUpdater {
-	kubecfg := kubelet.NewKubeletServer() // only create to get the config, this is without side-effects
+	kubecfg := kubeletapp.NewKubeletServer() // only create to get the config, this is without side-effects
 	return &StatusUpdater{
 		client:          client,
 		relistPeriod:    relistPeriod,

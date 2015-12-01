@@ -25,7 +25,7 @@ import (
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
-	klapp "k8s.io/kubernetes/cmd/kubelet/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	schapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
@@ -66,7 +66,7 @@ func main() {
 		cobra.GenMarkdownTree(scheduler, outDir)
 	case "kubelet":
 		// generate docs for kubelet
-		kubelet := klapp.NewKubeletCommand()
+		kubelet := kubeletapp.NewKubeletCommand()
 		cobra.GenMarkdownTree(kubelet, outDir)
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)
