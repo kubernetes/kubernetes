@@ -64,7 +64,7 @@ func TestVersionedPrinter(t *testing.T) {
 			return nil
 		}),
 		api.Scheme,
-		testapi.Default.Version(),
+		*testapi.Default.GroupVersion(),
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -422,7 +422,7 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, testapi.Default.Version())
+	printer := NewVersionedPrinter(p, api.Scheme, *testapi.Default.GroupVersion())
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}

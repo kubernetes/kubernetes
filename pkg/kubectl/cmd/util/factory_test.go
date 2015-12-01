@@ -170,15 +170,15 @@ func TestLabelsForObject(t *testing.T) {
 func TestCanBeExposed(t *testing.T) {
 	factory := NewFactory(nil)
 	tests := []struct {
-		kind      string
+		kind      unversioned.GroupKind
 		expectErr bool
 	}{
 		{
-			kind:      "ReplicationController",
+			kind:      api.Kind("ReplicationController"),
 			expectErr: false,
 		},
 		{
-			kind:      "Node",
+			kind:      api.Kind("Node"),
 			expectErr: true,
 		},
 	}

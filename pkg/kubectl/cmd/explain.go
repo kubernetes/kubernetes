@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -70,7 +71,8 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	recursive := cmdutil.GetFlagBool(cmd, "recursive")
-	apiV := cmdutil.GetFlagString(cmd, "api-version")
+	apiVersionString := cmdutil.GetFlagString(cmd, "api-version")
+	apiVersion := unversioned.GroupVersion{}
 
 	mapper, _ := f.Object()
 	// TODO: After we figured out the new syntax to separate group and resource, allow
@@ -87,14 +89,21 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return err
 	}
 
-	if len(apiV) == 0 {
+	if len(apiVersionString) == 0 {
 		groupMeta, err := latest.Group(gvk.Group)
 		if err != nil {
 			return err
 		}
-		apiV = groupMeta.GroupVersion.String()
+		apiVersion = groupMeta.GroupVersion
+
+	} else {
+		apiVersion, err = unversioned.ParseGroupVersion(apiVersionString)
+		if err != nil {
+			return nil
+		}
 	}
-	swagSchema, err := kubectl.GetSwaggerSchema(apiV, client)
+
+	swagSchema, err := kubectl.GetSwaggerSchema(apiVersion, client)
 	if err != nil {
 		return err
 	}

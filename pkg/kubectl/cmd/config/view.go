@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -70,16 +69,12 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 			}
 
 			printer, _, err := cmdutil.PrinterForCommand(cmd)
-			if err != nil {
-				glog.FatalDepth(1, err)
-			}
-			version := cmdutil.OutputVersion(cmd, latest.Version)
+			cmdutil.CheckErr(err)
+			version, err := cmdutil.OutputVersion(cmd, &latest.ExternalVersion)
+			cmdutil.CheckErr(err)
 			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
 
-			if err := options.Run(out, printer); err != nil {
-				glog.FatalDepth(1, err)
-			}
-
+			cmdutil.CheckErr(options.Run(out, printer))
 		},
 	}
 
