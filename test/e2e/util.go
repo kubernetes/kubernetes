@@ -139,6 +139,7 @@ type TestContextType struct {
 	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
 	GatherKubeSystemResourceUsageData bool
+	GatherLogsSizes                   bool
 }
 
 var testContext TestContextType
