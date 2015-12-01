@@ -326,6 +326,7 @@ func deepCopy_v1_GCEPersistentDiskVolumeSource(in v1.GCEPersistentDiskVolumeSour
 func deepCopy_v1_GitRepoVolumeSource(in v1.GitRepoVolumeSource, out *v1.GitRepoVolumeSource, c *conversion.Cloner) error {
 	out.Repository = in.Repository
 	out.Revision = in.Revision
+	out.Directory = in.Directory
 	return nil
 }
 
