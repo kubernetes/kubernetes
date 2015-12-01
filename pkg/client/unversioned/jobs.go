@@ -90,7 +90,7 @@ func (c *jobs) Delete(name string, options *api.DeleteOptions) (err error) {
 		return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Do().Error()
 	}
 
-	body, err := api.Scheme.EncodeToVersion(options, latest.GroupOrDie("").GroupVersion)
+	body, err := api.Scheme.EncodeToVersion(options, latest.GroupOrDie("").GroupVersion.String())
 	if err != nil {
 		return err
 	}

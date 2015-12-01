@@ -92,7 +92,7 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		if err != nil {
 			return err
 		}
-		apiV = groupMeta.GroupVersion
+		apiV = groupMeta.GroupVersion.String()
 	}
 	swagSchema, err := kubectl.GetSwaggerSchema(apiV, client)
 	if err != nil {
