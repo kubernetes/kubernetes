@@ -421,8 +421,14 @@ kube::golang::build_binaries_for_platform() {
 kube::golang::get_physmem() {
   local mem
 
-  # Linux, in kb
+  # Linux kernel version >=3.14, in kb
   if mem=$(grep MemAvailable /proc/meminfo | awk '{ print $2 }'); then
+    echo $(( ${mem} / 1048576 ))
+    return
+  fi
+
+  # Linux, in kb
+  if mem=$(grep MemTotal /proc/meminfo | awk '{ print $2 }'); then
     echo $(( ${mem} / 1048576 ))
     return
   fi
