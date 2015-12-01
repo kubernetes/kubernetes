@@ -88,10 +88,10 @@ func TestResources(tst *testing.T) {
 			resourcequotacontroller.PodHasRequests(pod, api.ResourceMemory),
 		)
 
-		beforeCpuR, beforeCpuL, _, err := CPUForPod(pod, DefaultDefaultContainerCPULimit)
+		beforeCpuR, beforeCpuL, _, err := LimitedCPUForPod(pod, DefaultDefaultContainerCPULimit)
 		assert.NoError(err, "CPUForPod should not return an error")
 
-		beforeMemR, beforeMemL, _, err := MemForPod(pod, DefaultDefaultContainerMemLimit)
+		beforeMemR, beforeMemL, _, err := LimitedMemForPod(pod, DefaultDefaultContainerMemLimit)
 		assert.NoError(err, "MemForPod should not return an error")
 
 		cpuR, cpuL, _, err := LimitPodCPU(pod, DefaultDefaultContainerCPULimit)

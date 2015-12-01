@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -54,9 +55,20 @@ type sched struct {
 	taskRegistry podtask.Registry
 }
 
-func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler,
-	client *client.Client, recorder record.EventRecorder, terminate <-chan struct{}, mux *http.ServeMux, lw *cache.ListWatch) scheduler.Scheduler {
-
+func New(
+	c *config.Config,
+	fw framework.Framework,
+	ps podschedulers.PodScheduler,
+	client *client.Client,
+	recorder record.EventRecorder,
+	terminate <-chan struct{},
+	mux *http.ServeMux,
+	lw *cache.ListWatch,
+	prototype *mesos.ExecutorInfo,
+	roles []string,
+	defaultCpus mresource.CPUShares,
+	defaultMem mresource.MegaBytes,
+) scheduler.Scheduler {
 	core := &sched{
 		framework:    fw,
 		taskRegistry: podtask.NewInMemoryRegistry(),
@@ -69,7 +81,7 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 
 	q := queuer.New(queue.NewDelayFIFO(), podUpdates)
 
-	algorithm := algorithm.New(core, podUpdates, ps)
+	algorithm := algorithm.New(core, podUpdates, ps, prototype, roles, defaultCpus, defaultMem)
 
 	podDeleter := deleter.New(core, q)
 
@@ -86,7 +98,7 @@ func New(c *config.Config, fw framework.Framework, ps podschedulers.PodScheduler
 				// "backs off" when it can't find an offer that matches up with a pod.
 				// The backoff period for a pod can terminate sooner if an offer becomes
 				// available that matches up.
-				return !task.Has(podtask.Launched) && ps.FitPredicate()(task, offer, nil)
+				return !task.Has(podtask.Launched) && ps.Fit(task, offer, nil)
 			default:
 				// no point in continuing to check for matching offers
 				return true
