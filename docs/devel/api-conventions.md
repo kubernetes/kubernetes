@@ -558,6 +558,10 @@ The following HTTP status codes may be returned by the API.
   * * If updating an existing resource:
       * See `Conflict` from the `status` response section below on how to retrieve more information about the nature of the conflict.
       * GET and compare the fields in the pre-existing object, merge changes (if still valid according to preconditions), and retry with the updated request (including `ResourceVersion`).
+* `410 StatusGone`
+  * Indicates that the item is no longer available at the server and no forwarding address is known.
+  * Suggested client recovery behavior
+    * Do not retry. Fix the request.
 * `422 StatusUnprocessableEntity`
   * Indicates that the requested create or update operation cannot be completed due to invalid data provided as part of the request.
   * Suggested client recovery behavior

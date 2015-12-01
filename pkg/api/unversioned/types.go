@@ -183,6 +183,11 @@ const (
 	// Status code 409
 	StatusReasonConflict StatusReason = "Conflict"
 
+	// StatusReasonGone means the item is no longer available at the server and no
+	// forwarding address is known.
+	// Status code 410
+	StatusReasonGone StatusReason = "Gone"
+
 	// StatusReasonInvalid means the requested create or update operation cannot be
 	// completed due to invalid data provided as part of the request. The client may
 	// need to alter the request. When set, the client may use the StatusDetails
