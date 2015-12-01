@@ -33,24 +33,35 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-A proposal to modify [`Job` resource](../../docs/user-guide/jobs.md) to implement a minimal [Workflow managment system](https://en.wikipedia.org/wiki/Workflow_management_system) in kubernetes.
-Workflows (aka DAG workflows since jobs are organized in a Direct Acyclic Graph) are ubiquitous in modern [job schedulers](https://en.wikipedia.org/wiki/Job_scheduler), see for example:
+A proposal to modify [`Job` resource](../../docs/user-guide/jobs.md) to implement a minimal
+[Workflow managment system](https://en.wikipedia.org/wiki/Workflow_management_system) in kubernetes.
+Workflows (aka DAG workflows since jobs are organized in a Direct Acyclic Graph) are ubiquitous
+in modern [job schedulers](https://en.wikipedia.org/wiki/Job_scheduler), see for example:
 
 * [luigi](https://github.com/spotify/luigi)
 * [ozie](http://oozie.apache.org/)
 * [azkaban](https://azkaban.github.io/)
 
-Most of the [job schedulers](https://en.wikipedia.org/wiki/List_of_job_scheduler_software) offer workflow functionality to some extent.
+Most of the [job schedulers](https://en.wikipedia.org/wiki/List_of_job_scheduler_software) offer
+workflow functionality to some extent.
 
 ## Use Cases
 
-* As a user I want to be able to define job chains such that the completion of a given job will trigger other jobs.
+* As a user I want to be able to define job chains such that the completion of a given job will
+trigger other jobs.
 
 ## Implementation
 
-The basic idea is to add a label selector to the current Job API object. The new selector will determine the parent jobs.  The parent jobs are the jobs current job will depend on. The current job will be scheduled once all the parent jobs will run to completion.
-The strongest point in favor of this approach is the ability to re-use the current `job` implementation. Using a label selector the current `job` will simply become a `graph` of jobs: all the features/controllers that will be built on top of `job` like for example [#11980](https://github.com/kubernetes/kubernetes/issues/11980) and [#17242](https://github.com/kubernetes/kubernetes/issues/17242) will be automatically extended to support workflows. Not sure about [#16845](https://github.com/kubernetes/kubernetes/issues/16845) and [#14188](https://github.com/kubernetes/kubernetes/issues/14188).
-A similar approach is implemented in Chronos for [dependent jobs](https://mesos.github.io/chronos/docs/api.html#adding-a-dependent-job).
+The idea of this proposal is to add a label selector for identifying "parent" jobs of the current
+Job API object. A "parent" job is one that the current job depends upon, and that must be
+completed before the current job can be scheduled. The strongest point in favor of this approach
+is the ability to re-use the current job implementation. Using a label selector the current
+job will simply become a graph of jobs: all the features/controllers that will be built on top
+of job (like for example [#11980](https://github.com/kubernetes/kubernetes/issues/11980)
+and [#17242](https://github.com/kubernetes/kubernetes/issues/17242) will be automatically
+extended to support workflows.
+A similar approach is implemented in Chronos for
+[dependent jobs](https://mesos.github.io/chronos/docs/api.html#adding-a-dependent-job).
 
 ### API Object
 
@@ -77,12 +88,17 @@ type JobSpec struct {
 
 #### JobSpec
 
-A new labels selector will be added to `job.spec`. The `job.Spec.ParentSelector` is a label query over a set of jobs.
+A new label selector will be added to `job.spec`. The `job.spec.parentSelector` is a label query
+over a set of jobs.
 If all selected jobs are completed the `job` will be started immediately.
-If `job.Spec.ParentSelector` is absent the `job` will be started immediately.
-If `job.Spec.ParentSelector` is pointing to a non-existing job, the job will wait indefinitely.
-Since labels are forwarded directly from `job` to pods, users should not create pods whose labels match this selector, either directly,
-via another Job, or via another controller (for example Replication controller), [see](https://github.com/kubernetes/kubernetes/issues/14961).
+If `job.spec.parentSelector` is absent the `job` will be started immediately.
+If `job.spec.parentSelector` is pointing to a non-existing job, the job will wait indefinitely or
+until a matching
+job will be created and completed accordingly
+Since labels are forwarded directly from `job` to pods, users should not create pods whose
+labels match this selector, either directly,
+via another Job, or via another controller (for example Replication controller),
+[see](https://github.com/kubernetes/kubernetes/issues/14961).
 
 #### JobStatus
 
@@ -90,16 +106,26 @@ via another Job, or via another controller (for example Replication controller),
 
 #### JobCondition
 
-A new constant value will be added to `JobConditionType` - `Waiting`. This will inform the job is waiting for its parents to finish execution. `Waiting` condition will be valid only for `workflow job`.
+A new constant value will be added to `JobConditionType` - `Waiting`.
+This will inform the job is waiting for its parents to finish execution. `Waiting` condition
+will be valid only for `workflow job`.
 
 ### CRUD
 
-* Creating a job without a `job.Spec.Parentselector` (nil `job.Spec.Parentselector`) will simply follow the usual `job` life cycle.
-* Without a `job.Spec.ParentSelector` (i.e. nil) the job will be started immediately.
-* With a non nil `job.Spec.ParentSelector` the logic already described will be considered.
-* The validation will prevent the user to set an _empty_ `job.Spec.ParentSelector`.
-* Users may read the `job` using the usual `get`, `describe` commands already implemented for `job`. The `describe` command should display the non nil `job.Spec.ParentSelector` (if any).
-* A `job` cannot be updated. To update a `job`, user should delete and re-create it. The only exception is `job` _scaling_. A `workflow job` (i.e. with a non nil selector) can be scaled in the common way. No matter if pods are currently running or not.
+* Creating a job without a `job.pec.arentSelector` (nil `job.spec.arentSelector`) will simply
+follow the usual `job` life cycle.
+* Without a `job.spec.parentSelector` (i.e. nil) the job will be started immediately.
+* With a non nil `job.spec.parentSelector` the logic already described will be considered.
+* The validation will prevent the user to set an _empty_ `job.spec.parentSelector` and
+pointing it to the same job.
+* Users may read the `job` using the usual `get`, `describe` commands already implemented
+for `job`.
+The `describe` command should display the non-empty `job.spec.parentSelector`.
+* A `job` cannot be updated. To update a `job`, user should delete and re-create it.
+The only exception is `job` _scaling_.
+A `workflow job` (i.e. with a non nil selector) can be scaled in the common way.
+No matter if pods are currently running
+or not.
 * A `job` can be deleted in the usual way.
 
 ## Events
@@ -109,13 +135,18 @@ The usual Job controller events will be emitted.
 * JobStart
 * JobFinished
 
-Since a Job with a non nil job selector can be created and may never start we propose to add the events:
+Since a Job with a non nil job selector can be created and may never start we propose to
+add the new event:
 
 * JobWaiting
 
 ## Known drawbacks
 
-* Using only a label selector and a boolean field will produce only a very limited ability to troubleshoot failures (for example backtracking chain of jobs in case of failures). In this cases [controllerRef](https://github.com/kubernetes/kubernetes/issues/2210#issuecomment-134878215) could help.
+* Using only a label selector and a boolean field will produce only a very limited ability
+to troubleshoot failures (for example backtracking chain of jobs in case of failures). In
+this cases
+[controllerRef](https://github.com/kubernetes/kubernetes/issues/2210#issuecomment-134878215)
+could help.
 * No guarantee DAG rules
 
 
