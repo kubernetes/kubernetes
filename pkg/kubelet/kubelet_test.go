@@ -2769,9 +2769,12 @@ func TestDockerRuntimeVersion(t *testing.T) {
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
-	if updatedNode.Status.Conditions[0].Reason != "KubeletNotReady" &&
-		!strings.Contains(updatedNode.Status.Conditions[0].Message, "container runtime version is older than") {
-		t.Errorf("unexpect NodeStatus due to container runtime version")
+
+	for _, cond := range updatedNode.Status.Conditions {
+		if cond.Type == api.NodeReady && cond.Reason != "KubeletNotReady" &&
+			!strings.Contains(cond.Message, "container runtime version is older than") {
+			t.Errorf("unexpect NodeStatus due to container runtime version")
+		}
 	}
 }
 
