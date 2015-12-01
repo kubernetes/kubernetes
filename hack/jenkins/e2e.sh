@@ -1179,6 +1179,22 @@ case ${JOB_NAME} in
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest' 'upgrade-gke-1-0-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
+  # kubernetes-upgrade-gke-1.1-master
+  #
+  # Configurations for step1, step3, and step5 live in the release-1.1 branch.
+
+  kubernetes-upgrade-gke-1.1-master-step2-upgrade-master)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-1.1-master-step4-upgrade-cluster)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-1.1-master-step6-e2e-new)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
   # kubernetes-upgrade-gce
   #
   # This suite:
