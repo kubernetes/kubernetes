@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
@@ -103,6 +104,8 @@ type Etcd struct {
 	// If true, return the object that was deleted. Otherwise, return a generic
 	// success status response.
 	ReturnDeletedObject bool
+	// Allows extended behavior during export, optional
+	ExportStrategy rest.RESTExportStrategy
 
 	// Used for all etcd access functions
 	Storage storage.Interface
@@ -535,4 +538,40 @@ func (e *Etcd) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (
 		ttl, err = e.TTLFunc(obj, ttl, update)
 	}
 	return ttl, err
+}
+
+func exportObjectMeta(objMeta *api.ObjectMeta, exact bool) {
+	objMeta.UID = ""
+	if !exact {
+		objMeta.Namespace = ""
+	}
+	objMeta.CreationTimestamp = unversioned.Time{}
+	objMeta.DeletionTimestamp = nil
+	objMeta.ResourceVersion = ""
+	objMeta.SelfLink = ""
+	if len(objMeta.GenerateName) > 0 && !exact {
+		objMeta.Name = ""
+	}
+}
+
+// Implements the rest.Exporter interface
+func (e *Etcd) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+	obj, err := e.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if meta, err := api.ObjectMetaFor(obj); err == nil {
+		exportObjectMeta(meta, opts.Exact)
+	} else {
+		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
+	}
+
+	if e.ExportStrategy != nil {
+		if err = e.ExportStrategy.Export(obj, opts.Exact); err != nil {
+			return nil, err
+		}
+	} else {
+		e.CreateStrategy.PrepareForCreate(obj)
+	}
+	return obj, nil
 }

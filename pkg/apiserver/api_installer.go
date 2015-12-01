@@ -210,6 +210,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
 	}
+	exporter, isExporter := storage.(rest.Exporter)
+	if !isExporter {
+		exporter = nil
+	}
+
+	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
+	if err != nil {
+		return nil, err
+	}
 
 	if isNamedCreater {
 		isCreater = true
@@ -310,6 +319,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
+
 	params := []*restful.Parameter{}
 	actions := []action{}
 
@@ -444,9 +454,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, exporter, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
 			} else {
-				handler = GetResource(getter, reqScope)
+				handler = GetResource(getter, exporter, reqScope)
 			}
 			doc := "read the specified " + kind
 			if hasSubresource {
@@ -462,6 +472,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Writes(versionedObject)
 			if isGetterWithOptions {
 				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
+					return nil, err
+				}
+			}
+			if isExporter {
+				if err := addObjectParams(ws, route, versionedExportOptions); err != nil {
 					return nil, err
 				}
 			}

@@ -587,6 +587,15 @@ func deepCopy_v1_ExecAction(in ExecAction, out *ExecAction, c *conversion.Cloner
 	return nil
 }
 
+func deepCopy_v1_ExportOptions(in ExportOptions, out *ExportOptions, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return nil
+}
+
 func deepCopy_v1_FCVolumeSource(in FCVolumeSource, out *FCVolumeSource, c *conversion.Cloner) error {
 	if in.TargetWWNs != nil {
 		out.TargetWWNs = make([]string, len(in.TargetWWNs))
@@ -2415,6 +2424,7 @@ func init() {
 		deepCopy_v1_EventList,
 		deepCopy_v1_EventSource,
 		deepCopy_v1_ExecAction,
+		deepCopy_v1_ExportOptions,
 		deepCopy_v1_FCVolumeSource,
 		deepCopy_v1_FlockerVolumeSource,
 		deepCopy_v1_GCEPersistentDiskVolumeSource,

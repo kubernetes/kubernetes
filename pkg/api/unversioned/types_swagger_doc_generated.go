@@ -76,6 +76,16 @@ func (APIVersions) SwaggerDoc() map[string]string {
 	return map_APIVersions
 }
 
+var map_ExportOptions = map[string]string{
+	"":       "ExportOptions is the query options to the standard REST get call.",
+	"export": "Should this value be exported.  Export strips fields that a user can not specify.`",
+	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+}
+
+func (ExportOptions) SwaggerDoc() map[string]string {
+	return map_ExportOptions
+}
+
 var map_GroupVersionForDiscovery = map[string]string{
 	"":             "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensiblity.",
 	"groupVersion": "groupVersion specifies the API group and version in the form \"group/version\"",

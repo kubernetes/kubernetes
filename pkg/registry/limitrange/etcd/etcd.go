@@ -58,6 +58,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 		CreateStrategy: limitrange.Strategy,
 		UpdateStrategy: limitrange.Strategy,
+		ExportStrategy: limitrange.Strategy,
 
 		Storage: storageInterface,
 	}
