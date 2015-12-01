@@ -307,6 +307,10 @@ func (fr *FakeRateLimiter) TryAccept() bool {
 	return true
 }
 
+func (fr *FakeRateLimiter) Saturation() float64 {
+	return 0
+}
+
 func (fr *FakeRateLimiter) Stop() {}
 
 func (fr *FakeRateLimiter) Accept() {

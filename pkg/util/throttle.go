@@ -26,6 +26,11 @@ type RateLimiter interface {
 	Accept()
 	// Stop stops the rate limiter, subsequent calls to CanAccept will return false
 	Stop()
+	// Saturation returns a percentage number which describes how saturated
+	// this rate limiter is.
+	// Usually we use token bucket rate limiter. In that case,
+	// 1.0 means no tokens are available; 0.0 means we have a full bucket of tokens to use.
+	Saturation() float64
 }
 
 type tokenBucketRateLimiter struct {
@@ -52,6 +57,12 @@ func (t *tokenBucketRateLimiter) TryAccept() bool {
 	return t.limiter.TakeAvailable(1) == 1
 }
 
+func (t *tokenBucketRateLimiter) Saturation() float64 {
+	capacity := t.limiter.Capacity()
+	avail := t.limiter.Available()
+	return float64(capacity-avail) / float64(capacity)
+}
+
 // Accept will block until a token becomes available
 func (t *tokenBucketRateLimiter) Accept() {
 	t.limiter.Wait(1)
@@ -62,6 +73,10 @@ func (t *tokenBucketRateLimiter) Stop() {
 
 func (t *fakeRateLimiter) TryAccept() bool {
 	return true
+}
+
+func (t *fakeRateLimiter) Saturation() float64 {
+	return 0
 }
 
 func (t *fakeRateLimiter) Stop() {}
