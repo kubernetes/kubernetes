@@ -183,13 +183,6 @@ type FilesystemMetrics struct {
 
 // RawMetricsOptions are the query options for raw metrics endpoints.
 type RawMetricsOptions struct {
-	// Only include samples with sampleTime equal to or more recent than this time.
-	// This does not affect cumulative values, which are cumulative from object creation.
-	// Defaults to the beginning of time. Must be older than now and untilTime.
-	SinceTime *unversioned.Time `json:"sinceTime,omitempty"`
-	// Only include samples with sampleTime equal to or less recent than this time.
-	// Defaults to the now. Must be newer than sinceTime.
-	UntilTime *unversioned.Time `json:"untilTime,omitempty"`
 	// Specifies the maximum number of elements in any list of samples.
 	// When the total number of samples exceeds the maximum the most recent samples are returned.
 	// Defaults to unlimited. Minimum value 1.

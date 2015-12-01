@@ -285,22 +285,6 @@ func deepCopy_metrics_RawContainerMetrics(in RawContainerMetrics, out *RawContai
 }
 
 func deepCopy_metrics_RawMetricsOptions(in RawMetricsOptions, out *RawMetricsOptions, c *conversion.Cloner) error {
-	if in.SinceTime != nil {
-		out.SinceTime = new(unversioned.Time)
-		if err := deepCopy_unversioned_Time(*in.SinceTime, out.SinceTime, c); err != nil {
-			return err
-		}
-	} else {
-		out.SinceTime = nil
-	}
-	if in.UntilTime != nil {
-		out.UntilTime = new(unversioned.Time)
-		if err := deepCopy_unversioned_Time(*in.UntilTime, out.UntilTime, c); err != nil {
-			return err
-		}
-	} else {
-		out.UntilTime = nil
-	}
 	out.MaxSamples = in.MaxSamples
 	return nil
 }
