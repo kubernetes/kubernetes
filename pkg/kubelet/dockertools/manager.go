@@ -785,12 +785,13 @@ func (dm *DockerManager) runContainer(
 	}
 
 	hc := &docker.HostConfig{
-		PortBindings: portBindings,
-		Binds:        binds,
-		NetworkMode:  netMode,
-		IpcMode:      ipcMode,
-		UTSMode:      utsMode,
-		PidMode:      pidMode,
+		PortBindings:   portBindings,
+		Binds:          binds,
+		NetworkMode:    netMode,
+		IpcMode:        ipcMode,
+		UTSMode:        utsMode,
+		PidMode:        pidMode,
+		ReadonlyRootfs: container.ReadOnlyRootFS,
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
 		Memory:     memoryLimit,
 		MemorySwap: -1,
