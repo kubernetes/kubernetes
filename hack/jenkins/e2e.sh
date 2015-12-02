@@ -779,46 +779,46 @@ case ${JOB_NAME} in
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  # kubernetes-upgrade-gke-1.0-release
+  # kubernetes-upgrade-gke-1.0-current-release
   #
   # Configurations for step1, step3, and step5 live in the release-1.0 branch.
 
-  kubernetes-upgrade-gke-1.0-release-step2-upgrade-master)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-current-release-step2-upgrade-master)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-release-step4-upgrade-cluster)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-current-release-step4-upgrade-cluster)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-release-step6-e2e-new)
-    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-current-release-step6-e2e-new)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  # kubernetes-upgrade-gke-stable-release
+  # kubernetes-upgrade-gke-stable-current-release
 
-  kubernetes-upgrade-gke-stable-release-step1-deploy)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-stable-current-release-step1-deploy)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-release-step2-upgrade-master)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-stable-current-release-step2-upgrade-master)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-release-step3-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-stable-current-release-step3-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-release-step4-upgrade-cluster)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-stable-current-release-step4-upgrade-cluster)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-release-step5-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-stable-current-release-step5-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-release-step6-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-stable-current-release-step6-e2e-new)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 esac
 
