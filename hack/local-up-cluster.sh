@@ -282,6 +282,7 @@ function start_kubelet {
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --cluster-dns="127.0.0.1" \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
