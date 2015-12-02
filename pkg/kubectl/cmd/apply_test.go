@@ -170,6 +170,7 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 }
 
 func TestApplyObject(t *testing.T) {
+	initTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
