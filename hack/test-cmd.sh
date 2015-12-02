@@ -637,13 +637,13 @@ runTests() {
   # Post-Condition: service "nginx" has configuration annotation
   [[ "$(kubectl get svc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up
-  kubectl delete rc,svc nginx 
+  kubectl delete rc,svc nginx
   ## 6. kubectl autoscale --save-config should generate configuration annotation
   # Pre-Condition: no RC exists, then create the rc "frontend", which shouldn't have configuration annotation
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
   ! [[ "$(kubectl get rc frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Command: autoscale rc "frontend" 
+  # Command: autoscale rc "frontend"
   kubectl autoscale -f examples/guestbook/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
   [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
@@ -653,21 +653,21 @@ runTests() {
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: apply a pod "test-pod" (doesn't exist) should create this pod 
+  # Command: apply a pod "test-pod" (doesn't exist) should create this pod
   kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" is created
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
   # Post-Condition: pod "test-pod" has configuration annotation
   [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Clean up 
+  # Clean up
   kubectl delete pods test-pod "${kube_flags[@]}"
 
-  ## kubectl run should create deployments or jobs 
+  ## kubectl run should create deployments or jobs
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl run pi --generator=job/v1beta1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
-  # Post-Condition: Job "pi" is created 
+  # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
@@ -675,11 +675,10 @@ runTests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl run nginx --image=nginx --generator=deployment/v1beta1 "${kube_flags[@]}"
-  # Post-Condition: Deployment "nginx" is created 
+  # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
-  # Clean up 
+  # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
-  kubectl delete rc -l pod-template-hash "${kube_flags[@]}"
 
   ##############
   # Namespaces #
@@ -721,7 +720,7 @@ runTests() {
   # Command
   kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod --grace-period=0
   # Post-condition: valid-pod POD doesn't exist
-  kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''  
+  kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Clean up
   kubectl delete namespace other
 
@@ -966,6 +965,7 @@ __EOF__
   kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
   # Clean-up
   kubectl delete job/pi "${kube_flags[@]}"
+
   # TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
   # ### Scale a deployment
   # kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
@@ -975,8 +975,6 @@ __EOF__
   # kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
   # # Clean-up
   # kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
-  # # TODO: Remove once deployment reaping is implemented
-  # kubectl delete rs --all "${kube_flags[@]}"
 
   ### Expose a deployment as a service
   kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
@@ -988,8 +986,6 @@ __EOF__
   kube::test::get_object_assert 'service nginx-deployment' "{{$port_field}}" '80'
   # Clean-up
   kubectl delete deployment/nginx-deployment service/nginx-deployment "${kube_flags[@]}"
-  # TODO: Remove once deployment reaping is implemented
-  kubectl delete rs --all "${kube_flags[@]}"
 
   ### Expose replication controller as service
   kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
@@ -1094,7 +1090,7 @@ __EOF__
   # Clean up
   kubectl delete rc frontend "${kube_flags[@]}"
 
-  ### Auto scale deployment 
+  ### Auto scale deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1106,9 +1102,8 @@ __EOF__
   # Clean up
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
-  kubectl delete rs -l pod-template-hash "${kube_flags[@]}"
 
-  ### Rollback a deployment 
+  ### Rollback a deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1330,7 +1325,7 @@ __EOF__
     # cleaning
     rm "${temp_editor}"
     # Command
-    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label" 
+    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing labels.
     kubectl-with-retry label -f $file labeled=true --overwrite "${kube_flags[@]}"
@@ -1349,7 +1344,7 @@ __EOF__
     fi
     # Command
     # Command
-    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate" 
+    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing annotations.
     kubectl-with-retry annotate -f $file annotated=true --overwrite "${kube_flags[@]}"
