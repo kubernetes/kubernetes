@@ -68,27 +68,27 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
 	if hpa.Spec.CPUUtilization == nil {
 		// If CPUTarget is not specified than we should return some default values.
 		// Since we always take maximum number of replicas from all policies it is safe
 		// to just return 0.
-		return 0, nil, nil
+		return 0, nil, time.Time{}, nil
 	}
 	currentReplicas := scale.Status.Replicas
-	currentUtilization, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
+	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
 		a.eventRecorder.Event(&hpa, "FailedGetMetrics", err.Error())
-		return 0, nil, fmt.Errorf("failed to get cpu utilization: %v", err)
+		return 0, nil, time.Time{}, fmt.Errorf("failed to get cpu utilization: %v", err)
 	}
 
 	usageRatio := float64(*currentUtilization) / float64(hpa.Spec.CPUUtilization.TargetPercentage)
 	if math.Abs(1.0-usageRatio) > tolerance {
-		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, nil
+		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, timestamp, nil
 	} else {
-		return currentReplicas, currentUtilization, nil
+		return currentReplicas, currentUtilization, timestamp, nil
 	}
 }
 
@@ -102,7 +102,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	}
 	currentReplicas := scale.Status.Replicas
 
-	desiredReplicas, currentUtilization, err := a.computeReplicasForCPUUtilization(hpa, scale)
+	desiredReplicas, currentUtilization, timestamp, err := a.computeReplicasForCPUUtilization(hpa, scale)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, "FailedComputeReplicas", err.Error())
 		return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
@@ -120,7 +120,6 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	if desiredReplicas > hpa.Spec.MaxReplicas {
 		desiredReplicas = hpa.Spec.MaxReplicas
 	}
-	now := time.Now()
 	rescale := false
 
 	if desiredReplicas != currentReplicas {
@@ -128,7 +127,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas &&
 			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(now)) {
+				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
 			rescale = true
 		}
 
@@ -136,7 +135,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas &&
 			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(now)) {
+				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
 			rescale = true
 		}
 	}
@@ -162,7 +161,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		LastScaleTime:                   hpa.Status.LastScaleTime,
 	}
 	if rescale {
-		now := unversioned.NewTime(now)
+		now := unversioned.NewTime(time.Now())
 		hpa.Status.LastScaleTime = &now
 	}
 
