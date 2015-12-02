@@ -728,19 +728,28 @@ func (k *Executor) __launchTask(driver bindings.ExecutorDriver, taskId, podFullN
 // in Docker, then we'll also send a TASK_LOST event.
 func (k *Executor) checkForLostPodTask(driver bindings.ExecutorDriver, taskId string, isKnownPod func() bool) bool {
 	// TODO (jdefelice) don't send false alarms for deleted pods (KILLED tasks)
-	k.lock.Lock()
-	defer k.lock.Unlock()
+
+	// isKnownPod() can block so we take special precaution to avoid locking this mutex while calling it
+	knownTask := func() (ok bool) {
+		k.lock.Lock()
+		defer k.lock.Unlock()
+		_, ok = k.tasks[taskId]
+		return
+	}()
 
 	// TODO(jdef) we should really consider k.pods here, along with what docker is reporting, since the
 	// kubelet may constantly attempt to instantiate a pod as long as it's in the pod state that we're
 	// handing to it. otherwise, we're probably reporting a TASK_LOST prematurely. Should probably
 	// consult RestartPolicy to determine appropriate behavior. Should probably also gracefully handle
 	// docker daemon restarts.
-	if _, ok := k.tasks[taskId]; ok {
+	if knownTask {
 		if isKnownPod() {
 			return false
 		} else {
 			log.Warningf("Detected lost pod, reporting lost task %v", taskId)
+
+			k.lock.Lock()
+			defer k.lock.Unlock()
 			k.reportLostTask(driver, taskId, messages.ContainersDisappeared)
 		}
 	} else {
