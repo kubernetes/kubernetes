@@ -481,12 +481,14 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 		((taskStatus.GetSource() == mesos.TaskStatus_SOURCE_MASTER && taskStatus.GetReason() == mesos.TaskStatus_REASON_RECONCILIATION) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.ContainersDisappeared)) {
+			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.ContainersDisappeared) ||
+			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.TaskKilled && !task.Has(podtask.Deleted))) {
 		//--
 		// pod-task has metadata that refers to:
 		// (1) a task that Mesos no longer knows about, or else
 		// (2) a pod that the Kubelet will never report as "failed"
 		// (3) a pod that the kubeletExecutor reported as lost (likely due to docker daemon crash/restart)
+		// (4) a pod that the kubeletExecutor killed, but the scheduler didn't ask for that (maybe killed by the master)
 		// For now, destroy the pod and hope that there's a replication controller backing it up.
 		// TODO(jdef) for case #2 don't delete the pod, just update it's status to Failed
 		pod := &task.Pod
