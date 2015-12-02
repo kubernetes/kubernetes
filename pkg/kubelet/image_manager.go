@@ -101,6 +101,9 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 	if policy.LowThresholdPercent < 0 || policy.LowThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid LowThresholdPercent %d, must be in range [0-100]", policy.LowThresholdPercent)
 	}
+	if policy.LowThresholdPercent > policy.HighThresholdPercent {
+		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
+	}
 	im := &realImageManager{
 		runtime:      runtime,
 		policy:       policy,
