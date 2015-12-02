@@ -73,14 +73,9 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource        string
-	Subresource     string
-	Kind            string
-	APIVersion      string
-	InternalVersion unversioned.GroupVersion
-
-	// The version of apiserver resources to use
-	ServerAPIVersion string
+	Resource    unversioned.GroupVersionResource
+	Kind        unversioned.GroupVersionKind
+	Subresource string
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -112,7 +107,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 }
 
@@ -125,10 +120,10 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
+func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, internalKind, externalKind unversioned.GroupVersionKind, subpath bool, subpathKey string) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
-			opts, err := getRequestOptions(req, scope, getOptionsKind, subpath, subpathKey)
+			opts, err := getRequestOptions(req, scope, internalKind, externalKind, subpath, subpathKey)
 			if err != nil {
 				return nil, err
 			}
@@ -136,10 +131,11 @@ func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOpt
 		})
 }
 
-func getRequestOptions(req *restful.Request, scope RequestScope, kind string, subpath bool, subpathKey string) (runtime.Object, error) {
-	if len(kind) == 0 {
+func getRequestOptions(req *restful.Request, scope RequestScope, internalKind, externalKind unversioned.GroupVersionKind, subpath bool, subpathKey string) (runtime.Object, error) {
+	if internalKind.IsEmpty() {
 		return nil, nil
 	}
+
 	query := req.Request.URL.Query()
 	if subpath {
 		newQuery := make(url.Values)
@@ -150,30 +146,15 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 		query = newQuery
 	}
 
-	// TODO Options a mess.  Basically the intent is:
-	// 1. try to decode using the expected external GroupVersion
-	// 2. if that fails, fall back to the old external serialization being used before, which was
-	//    "v1" and decode into the unversioned/legacykube group
-	gvString := scope.APIVersion
-	internalGVString := scope.InternalVersion.String()
-
-	versioned, err := scope.Creater.New(gvString, kind)
+	versioned, err := scope.Creater.New(externalKind.GroupVersion().String(), externalKind.Kind)
 	if err != nil {
-		gvString = "v1"
-		internalGVString = ""
-
-		var secondErr error
-		versioned, secondErr = scope.Creater.New(gvString, kind)
-		// if we have an error, return the original failure
-		if secondErr != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	if err := scope.Codec.DecodeParametersInto(query, versioned); err != nil {
 		return nil, errors.NewBadRequest(err.Error())
 	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, internalGVString)
+	out, err := scope.Convertor.ConvertToVersion(versioned, internalKind.GroupVersion().String())
 	if err != nil {
 		// programmer error
 		return nil, err
@@ -182,7 +163,7 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, connectOptionsKind, restPath string, subpath bool, subpathKey string) restful.RouteFunction {
+func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, internalKind, externalKind unversioned.GroupVersionKind, restPath string, subpath bool, subpathKey string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
@@ -192,7 +173,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
-		opts, err := getRequestOptions(req, scope, connectOptionsKind, subpath, subpathKey)
+		opts, err := getRequestOptions(req, scope, internalKind, externalKind, subpath, subpathKey)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -205,7 +186,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			}
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Connect, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -228,7 +209,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	write(statusCode, r.scope.APIVersion, r.scope.Codec, obj, r.w, r.req)
+	write(statusCode, r.scope.Kind.GroupVersion(), r.scope.Codec, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {
@@ -267,7 +248,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// TODO: DecodeParametersInto should do this.
 		if opts.FieldSelector.Selector != nil {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
-				return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
+				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
 			}
 			if opts.FieldSelector.Selector, err = opts.FieldSelector.Selector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
@@ -325,7 +306,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 }
 
@@ -361,7 +342,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		obj := r.New()
 		// TODO this cleans up with proper typing
-		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind(scope.Kind)); err != nil {
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -370,7 +351,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Create, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -394,7 +375,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		write(http.StatusCreated, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusCreated, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 }
 
@@ -441,14 +422,14 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		if admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Update, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
 			}
 		}
 
-		versionedObj, err := converter.ConvertToVersion(r.New(), scope.APIVersion)
+		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion().String())
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -478,7 +459,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 
 }
@@ -594,7 +575,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind(scope.Kind)); err != nil {
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -608,7 +589,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if admit != nil && admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Update, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -673,7 +654,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -696,7 +677,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				Code:   http.StatusOK,
 				Details: &unversioned.StatusDetails{
 					Name: name,
-					Kind: scope.Kind,
+					Kind: scope.Kind.Kind,
 				},
 			}
 		} else {
@@ -708,7 +689,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				}
 			}
 		}
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 }
 
