@@ -45,8 +45,8 @@ e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "
 EOF
 
   cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
-log_level: info
-log_level_logfile: debug
+log_level: warning
+log_level_logfile: warning
 EOF
 
   cat <<EOF >/etc/salt/minion.d/grains.conf
@@ -99,6 +99,8 @@ function install-salt() {
 }
 
 function run-salt() {
+  echo "  Now waiting for the Salt provisioning process to complete on this machine."
+  echo "  This can take some time based on your network, disk, and cpu speed."
   salt-call --local state.highstate
 }
 
