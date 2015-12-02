@@ -97,7 +97,13 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 
 #### Integrations
 
-- [Kubernetes on Mesos](mesos.md) (Uses GCE)
+These solutions provide integration with 3rd party schedulers, resource managers, and/or lower level platforms.
+
+- [Kubernetes on Mesos](mesos.md)
+  - Instructions specify GCE, but are generic enough to be adapted to most existing Mesos clusters
+- [Kubernetes on DCOS](dcos.md)
+  - Community Edition DCOS uses AWS
+  - Enterprise Edition DCOS supports cloud hosting, on-premise VMs, and bare metal
 
 ## Table of Solutions
 
@@ -119,6 +125,7 @@ libvirt              | custom       | Fedora | flannel     | [docs](fedora/flann
 KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+DCOS                 | Marathon   | CoreOS/Alpine | custom | [docs](dcos.md)                                   |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community
 GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires))
 Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles))
