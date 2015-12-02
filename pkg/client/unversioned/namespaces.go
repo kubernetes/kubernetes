@@ -36,7 +36,7 @@ type NamespaceInterface interface {
 	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NamespaceList, error)
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 	Finalize(item *api.Namespace) (*api.Namespace, error)
 	Status(item *api.Namespace) (*api.Namespace, error)
 }
@@ -116,12 +116,10 @@ func (c *namespaces) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *namespaces) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("namespaces").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }

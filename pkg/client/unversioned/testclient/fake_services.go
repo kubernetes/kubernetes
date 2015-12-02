@@ -73,8 +73,8 @@ func (c *FakeServices) Delete(name string) error {
 	return err
 }
 
-func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, label, field, opts))
+func (c *FakeServices) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, opts))
 }
 
 func (c *FakeServices) ProxyGet(scheme, name, port, path string, params map[string]string) client.ResponseWrapper {

@@ -72,6 +72,6 @@ func (c *FakeEndpoints) Delete(name string) error {
 	return err
 }
 
-func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("endpoints", c.Namespace, label, field, opts))
+func (c *FakeEndpoints) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("endpoints", c.Namespace, opts))
 }

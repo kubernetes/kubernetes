@@ -165,7 +165,9 @@ func newPodStore(c *client.Client, namespace string, label labels.Selector, fiel
 			return c.Pods(namespace).List(label, field, unversioned.ListOptions{})
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-			return c.Pods(namespace).Watch(label, field, options)
+			options.LabelSelector.Selector = label
+			options.FieldSelector.Selector = field
+			return c.Pods(namespace).Watch(options)
 		},
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)

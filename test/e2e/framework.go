@@ -199,11 +199,11 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 
-		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(
-			labels.Everything(),
-			fields.Set{"metadata.name": serviceName}.AsSelector(),
-			unversioned.ListOptions{ResourceVersion: rv},
-		)
+		options := unversioned.ListOptions{
+			FieldSelector:   unversioned.FieldSelector{fields.Set{"metadata.name": serviceName}.AsSelector()},
+			ResourceVersion: rv,
+		}
+		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(options)
 		if err != nil {
 			return err
 		}

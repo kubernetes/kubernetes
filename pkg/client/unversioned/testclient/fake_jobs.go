@@ -73,8 +73,8 @@ func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeJobs) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("jobs", c.Namespace, label, field, opts))
+func (c *FakeJobs) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("jobs", c.Namespace, opts))
 }
 
 func (c *FakeJobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
