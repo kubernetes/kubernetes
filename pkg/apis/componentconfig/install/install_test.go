@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	cclatest "k8s.io/kubernetes/pkg/apis/componentconfig/latest"
 )
 
 func TestCodec(t *testing.T) {
@@ -37,17 +38,17 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("componentconfig").GroupVersion.String() || other.Kind != "KubeProxyConfiguration" {
+	if other.APIVersion != cclatest.ExternalVersions[0].String() || other.Kind != "KubeProxyConfiguration" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("componentconfig").InterfacesFor(""); err == nil {
+	if _, err := cclatest.InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]unversioned.GroupVersion{latest.GroupOrDie("componentconfig").GroupVersion}, latest.GroupOrDie("componentconfig").GroupVersions...) {
-		if vi, err := latest.GroupOrDie("componentconfig").InterfacesFor(groupVersion.String()); err != nil || vi == nil {
+	for i, groupVersion := range append([]unversioned.GroupVersion{cclatest.ExternalVersions[0]}, cclatest.ExternalVersions...) {
+		if vi, err := cclatest.InterfacesFor(groupVersion.String()); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}

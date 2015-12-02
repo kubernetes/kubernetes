@@ -24,11 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 )
 
 func TestResourceVersioner(t *testing.T) {
 	daemonSet := extensions.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
-	version, err := accessor.ResourceVersion(&daemonSet)
+	version, err := extlatest.Accessor.ResourceVersion(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,7 +38,7 @@ func TestResourceVersioner(t *testing.T) {
 	}
 
 	daemonSetList := extensions.DaemonSetList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
-	version, err = accessor.ResourceVersion(&daemonSetList)
+	version, err = extlatest.Accessor.ResourceVersion(&daemonSetList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,17 +59,17 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("extensions").GroupVersion.String() || other.Kind != "DaemonSet" {
+	if other.APIVersion != extlatest.ExternalVersions[0].String() || other.Kind != "DaemonSet" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("extensions").InterfacesFor(""); err == nil {
+	if _, err := extlatest.InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]unversioned.GroupVersion{latest.GroupOrDie("extensions").GroupVersion}, latest.GroupOrDie("extensions").GroupVersions...) {
-		if vi, err := latest.GroupOrDie("extensions").InterfacesFor(groupVersion.String()); err != nil || vi == nil {
+	for i, groupVersion := range append([]unversioned.GroupVersion{extlatest.ExternalVersions[0]}, extlatest.ExternalVersions...) {
+		if vi, err := extlatest.InterfacesFor(groupVersion.String()); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
@@ -100,7 +101,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("extensions").InterfacesFor(gv.String())
+		interfaces, _ := extlatest.InterfacesFor(gv.String())
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}
