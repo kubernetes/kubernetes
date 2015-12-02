@@ -336,9 +336,9 @@ func SupportedResourcesHandler(groupVersion unversioned.GroupVersion, apiResourc
 // response. The Accept header and current API version will be passed in, and the output will be copied
 // directly to the response body. If content type is returned it is used, otherwise the content type will
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
-func write(statusCode int, apiVersion string, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+func write(statusCode int, groupVersion unversioned.GroupVersion, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	if stream, ok := object.(rest.ResourceStreamer); ok {
-		out, flush, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))
+		out, flush, contentType, err := stream.InputStream(groupVersion.String(), req.Header.Get("Accept"))
 		if err != nil {
 			errorJSONFatal(err, codec, w)
 			return

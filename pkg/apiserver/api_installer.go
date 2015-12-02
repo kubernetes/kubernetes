@@ -216,18 +216,27 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
-		getOptions          runtime.Object
-		versionedGetOptions runtime.Object
-		getOptionsKind      string
-		getSubpath          bool
-		getSubpathKey       string
+		getOptions             runtime.Object
+		versionedGetOptions    runtime.Object
+		getOptionsInternalKind unversioned.GroupVersionKind
+		getOptionsExternalKind unversioned.GroupVersionKind
+		getSubpath             bool
+		getSubpathKey          string
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
-		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
+		getOptionsGVString, getOptionsKind, err := a.group.Typer.ObjectVersionAndKind(getOptions)
 		if err != nil {
 			return nil, err
 		}
+		gv, err := unversioned.ParseGroupVersion(getOptionsGVString)
+		if err != nil {
+			return nil, err
+		}
+		getOptionsInternalKind = gv.WithKind(getOptionsKind)
+		// TODO this should be a list of all the different external versions we can coerce into the internalKind
+		getOptionsExternalKind = serverGroupVersion.WithKind(getOptionsKind)
+
 		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsKind)
 		if err != nil {
 			return nil, err
@@ -236,19 +245,28 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var (
-		connectOptions          runtime.Object
-		versionedConnectOptions runtime.Object
-		connectOptionsKind      string
-		connectSubpath          bool
-		connectSubpathKey       string
+		connectOptions             runtime.Object
+		versionedConnectOptions    runtime.Object
+		connectOptionsInternalKind unversioned.GroupVersionKind
+		connectOptionsExternalKind unversioned.GroupVersionKind
+		connectSubpath             bool
+		connectSubpathKey          string
 	)
 	if isConnecter {
 		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
 		if connectOptions != nil {
-			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
+			connectOptionsGVString, connectOptionsKind, err := a.group.Typer.ObjectVersionAndKind(connectOptions)
 			if err != nil {
 				return nil, err
 			}
+			gv, err := unversioned.ParseGroupVersion(connectOptionsGVString)
+			if err != nil {
+				return nil, err
+			}
+			connectOptionsInternalKind = gv.WithKind(connectOptionsKind)
+			// TODO this should be a list of all the different external versions we can coerce into the internalKind
+			connectOptionsExternalKind = serverGroupVersion.WithKind(connectOptionsKind)
+
 			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsKind)
 		}
 	}
@@ -383,14 +401,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:     a.group.Creater,
 		Convertor:   a.group.Convertor,
 		Codec:       mapping.Codec,
-		APIVersion:  a.group.GroupVersion.String(),
-		// TODO, this internal version needs to plumbed through from the caller
-		// this works in all the cases we have now
-		InternalVersion:  unversioned.GroupVersion{Group: a.group.GroupVersion.Group},
-		ServerAPIVersion: serverGroupVersion.String(),
-		Resource:         resource,
-		Subresource:      subresource,
-		Kind:             kind,
+
+		Resource:    a.group.GroupVersion.WithResource(resource),
+		Subresource: subresource,
+		Kind:        a.group.GroupVersion.WithKind(kind),
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
@@ -403,7 +417,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
@@ -584,7 +598,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
+					To(ConnectResource(connecter, reqScope, admit, connectOptionsInternalKind, connectOptionsExternalKind, path, connectSubpath, connectSubpathKey)).
 					Filter(m).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource)).
