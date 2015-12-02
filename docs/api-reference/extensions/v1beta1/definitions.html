@@ -717,15 +717,15 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">backend</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A default backend capable of servicing requests that don&#8217;t match any IngressRule. It is optional to allow the loadbalancer controller or defaulting logic to specify a global default.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A default backend capable of servicing requests that don&#8217;t match any rule. At least one of <em>backend</em> or <em>rules</em> must be specified. This field is optional to allow the loadbalancer controller or defaulting logic to specify a global default.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_ingressbackend">v1beta1.IngressBackend</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rules</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A list of host rules used to configure the Ingress.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_ingressrule">v1beta1.IngressRule</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -784,7 +784,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_ingressbackend">v1beta1.IngressBackend</h3>
 <div class="paragraph">
-<p>IngressBackend describes all endpoints for a given Service and port.</p>
+<p>IngressBackend describes all endpoints for a given service and port.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1216,7 +1216,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_ingressrule">v1beta1.IngressRule</h3>
 <div class="paragraph">
-<p>IngressRule represents the rules mapping the paths under a specified host to the related backend services.</p>
+<p>IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1243,15 +1243,15 @@ Examples:<br>
 2. The <code>:</code> delimiter is not respected because ports are not allowed.<br>
 	  Currently the port of an Ingress is implicitly :80 for http and<br>
 	  :443 for https.<br>
-Both these may change in the future. Incoming requests are matched against the Host before the IngressRuleValue.</p></td>
+Both these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">http</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_httpingressrulevalue">v1beta1.HTTPIngressRuleValue</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -1317,7 +1317,7 @@ Both these may change in the future. Incoming requests are matched against the H
 <div class="sect2">
 <h3 id="_v1beta1_httpingressrulevalue">v1beta1.HTTPIngressRuleValue</h3>
 <div class="paragraph">
-<p>HTTPIngressRuleValue is a list of http selectors pointing to IngressBackends. In the example: <a href="http://&lt;host&gt;/&lt;path&gt;?&lt;searchpart&gt;">http://&lt;host&gt;/&lt;path&gt;?&lt;searchpart&gt;</a> &#8594; IngressBackend where parts of the url correspond to RFC 3986, this resource will be used to to match against everything after the last <em>/</em> and before the first <em>?</em> or <em>#</em>.</p>
+<p>HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: <a href="http://&lt;host&gt;/&lt;path&gt;?&lt;searchpart&gt;">http://&lt;host&gt;/&lt;path&gt;?&lt;searchpart&gt;</a> &#8594; backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last <em>/</em> and before the first <em>?</em> or <em>#</em>.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1339,7 +1339,7 @@ Both these may change in the future. Incoming requests are matched against the H
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">paths</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of paths that map requests to IngressBackends.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of paths that map requests to backends.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_httpingresspath">v1beta1.HTTPIngressPath</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1747,14 +1747,14 @@ Both these may change in the future. Incoming requests are matched against the H
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image&#8217;s entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image&#8217;s entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">args</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image&#8217;s cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image&#8217;s cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/release-1.1/docs/user-guide/containers.md#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2716,7 +2716,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">value</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3854,7 +3854,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1beta1_httpingresspath">v1beta1.HTTPIngressPath</h3>
 <div class="paragraph">
-<p>IngressPath associates a path regex with an IngressBackend. Incoming urls matching the Path are forwarded to the Backend.</p>
+<p>HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3876,14 +3876,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Path is a regex matched against the url of an incoming request.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Path is a extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional "path" part of a URL as defined by RFC 3986. Paths must begin with a <em>/</em>. If unspecified, the path defaults to a catch all sending traffic to the backend.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">backend</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Define the referenced service endpoint which the traffic will be forwarded to.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Backend defines the referenced service endpoint to which the traffic will be forwarded to.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_ingressbackend">v1beta1.IngressBackend</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4165,7 +4165,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-11-02 14:28:45 UTC
+Last updated 2015-12-02 07:19:02 UTC
 </div>
 </div>
 </body>
