@@ -44,6 +44,18 @@ var (
 	errNotStarted      = errors.New("HTTP transport has not been started")
 	errTerminal        = errors.New("HTTP transport is terminated")
 	errAlreadyRunning  = errors.New("HTTP transport is already running")
+
+	httpTransport, httpClient = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 10 * time.Second,
+	},
+		&http.Client{
+			Transport: httpTransport,
+			Timeout:   DefaultReadTimeout,
+		}
 )
 
 // httpTransporter is a subset of the Transporter interface
@@ -114,7 +126,7 @@ type HTTPTransporter struct {
 	listener     net.Listener // TODO(yifan): Change to TCPListener.
 	mux          *http.ServeMux
 	tr           *http.Transport
-	client       *http.Client // TODO(yifan): Set read/write deadline.
+	client       *http.Client
 	messageQueue chan *Message
 	address      net.IP // optional binding address
 	shouldQuit   chan struct{}
@@ -124,13 +136,12 @@ type HTTPTransporter struct {
 
 // NewHTTPTransporter creates a new http transporter with an optional binding address.
 func NewHTTPTransporter(upid upid.UPID, address net.IP) *HTTPTransporter {
-	tr := &http.Transport{}
 	result := &HTTPTransporter{
 		upid:         upid,
 		messageQueue: make(chan *Message, defaultQueueSize),
 		mux:          http.NewServeMux(),
-		client:       &http.Client{Transport: tr},
-		tr:           tr,
+		client:       httpClient,
+		tr:           httpTransport,
 		address:      address,
 		shouldQuit:   make(chan struct{}),
 	}

@@ -423,43 +423,43 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/scheduler",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Comment": "mesos-0.24.0-20-gb164c06",
-			"Rev": "b164c06f346af1e93aecb6502f83d31dbacdbb91"
+			"Comment": "v0.0.2-5-ged907b1",
+			"Rev": "ed907b10717e66325cf2894eb90a0553a89fcb11"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
