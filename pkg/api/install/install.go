@@ -28,19 +28,23 @@ import (
 )
 
 func init() {
-	groupMeta, err := latest.RegisterGroup("")
-	if err != nil {
-		glog.V(4).Infof("%v", err)
+	// this means that the entire group is disabled
+	if len(latest.ExternalVersions) == 0 {
 		return
 	}
 
-	*groupMeta = latest.GroupMeta{
+	groupMeta := latest.GroupMeta{
 		GroupVersion:  latest.ExternalVersions[0],
 		GroupVersions: latest.ExternalVersions,
 		Codec:         latest.Codec,
 		RESTMapper:    latest.RESTMapper,
 		SelfLinker:    runtime.SelfLinker(latest.Accessor),
 		InterfacesFor: latest.InterfacesFor,
+	}
+
+	if err := latest.RegisterGroup(groupMeta); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
 	}
 
 	api.RegisterRESTMapper(groupMeta.RESTMapper)

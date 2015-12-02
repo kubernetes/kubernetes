@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -46,26 +45,27 @@ var (
 type GroupMetaMap map[string]*GroupMeta
 
 // RegisterGroup registers a group to GroupMetaMap.
-func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
-	_, found := g[group]
+func (g GroupMetaMap) RegisterGroup(groupMeta GroupMeta) error {
+	groupName := groupMeta.GroupVersion.Group
+	_, found := g[groupName]
 	if found {
-		return nil, fmt.Errorf("group %v is already registered", g)
+		return fmt.Errorf("group %v is already registered", groupName)
 	}
-	if len(registered.GroupVersionsForGroup(group)) == 0 {
-		return nil, fmt.Errorf("No version is registered for group %v", group)
+	if len(groupMeta.GroupVersions) == 0 {
+		return fmt.Errorf("No version is registered for group %v", groupName)
 	}
-	g[group] = &GroupMeta{}
-	return g[group], nil
+	g[groupName] = &groupMeta
+	return nil
 }
 
 // Group returns the metadata of a group if the gruop is registered, otherwise
 // an erorr is returned.
-func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
+func (g GroupMetaMap) Group(group string) (GroupMeta, error) {
 	groupMeta, found := g[group]
 	if !found {
-		return nil, fmt.Errorf("no version is registered for group %v", group)
+		return GroupMeta{}, fmt.Errorf("no version is registered for group %v", group)
 	}
-	return groupMeta, nil
+	return *groupMeta, nil
 }
 
 // IsRegistered takes a string and determines if it's one of the registered groups
@@ -77,7 +77,7 @@ func (g GroupMetaMap) IsRegistered(group string) bool {
 // TODO: This is an expedient function, because we don't check if a Group is
 // supported throughout the code base. We will abandon this function and
 // checking the error returned by the Group() function.
-func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
+func (g GroupMetaMap) GroupOrDie(group string) GroupMeta {
 	groupMeta, found := g[group]
 	if !found {
 		const msg = "Please check the KUBE_API_VERSIONS environment variable."
@@ -87,7 +87,7 @@ func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
 			panic(fmt.Sprintf("No version is registered for group %s. ", group) + msg)
 		}
 	}
-	return groupMeta
+	return *groupMeta
 }
 
 // AllPreferredGroupVersions returns the preferred versions of all registered
@@ -108,13 +108,6 @@ func (g GroupMetaMap) AllPreferredGroupVersions() string {
 type GroupMeta struct {
 	// GroupVersion represents the current external default version of the group.
 	GroupVersion unversioned.GroupVersion
-
-	// Versions is the list of versions that are recognized in code. The order
-	// provided is assumed to be from the oldest to the newest, e.g.,
-	// Versions[0] == oldest and Versions[N-1] == newest.
-	// Clients may choose to prefer the latter items in the list over the former
-	// items when presented with a set of versions to choose.
-	Versions []string
 
 	// GroupVersions is Group + Versions. This is to avoid string concatenation
 	// in many places.

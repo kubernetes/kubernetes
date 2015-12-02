@@ -23,25 +23,28 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	cclatest "k8s.io/kubernetes/pkg/apis/componentconfig/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	groupMeta, err := latest.RegisterGroup(componentconfig.SchemeGroupVersion.Group)
-	if err != nil {
-		glog.V(4).Infof("%v", err)
+	// this means that the entire group is disabled
+	if len(cclatest.ExternalVersions) == 0 {
 		return
 	}
 
-	*groupMeta = latest.GroupMeta{
+	groupMeta := latest.GroupMeta{
 		GroupVersion:  cclatest.ExternalVersions[0],
 		GroupVersions: cclatest.ExternalVersions,
 		Codec:         cclatest.Codec,
 		RESTMapper:    cclatest.RESTMapper,
 		SelfLinker:    runtime.SelfLinker(cclatest.Accessor),
 		InterfacesFor: cclatest.InterfacesFor,
+	}
+
+	if err := latest.RegisterGroup(groupMeta); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
 	}
 
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
