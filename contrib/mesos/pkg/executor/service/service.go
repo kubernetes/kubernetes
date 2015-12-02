@@ -21,7 +21,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	log "github.com/golang/glog"
@@ -47,8 +46,10 @@ type KubeletExecutorServer struct {
 	SuicideTimeout    time.Duration
 	LaunchGracePeriod time.Duration
 
-	kletLock sync.Mutex // TODO(sttts): remove necessity to access the kubelet from the executor
-	klet     *kubelet.Kubelet
+	// TODO(sttts): remove necessity to access the kubelet from the executor
+
+	klet      *kubelet.Kubelet // once set, immutable
+	kletReady chan struct{}    // once closed, klet is guaranteed to be valid and concurrently readable
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -56,6 +57,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 		KubeletServer:     kubeletapp.NewKubeletServer(),
 		SuicideTimeout:    config.DefaultSuicideTimeout,
 		LaunchGracePeriod: config.DefaultLaunchGracePeriod,
+		kletReady:         make(chan struct{}),
 	}
 	if pwd, err := os.Getwd(); err != nil {
 		log.Warningf("failed to determine current directory: %v", err)
@@ -89,10 +91,9 @@ func (s *KubeletExecutorServer) runExecutor(
 		KubeletFinished: kubeletFinished,
 		ExitFunc:        os.Exit,
 		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
-			s.kletLock.Lock()
-			defer s.kletLock.Unlock()
-
-			if s.klet == nil {
+			select {
+			case <-s.kletReady:
+			default:
 				return nil, fmt.Errorf("PodStatucFunc called before kubelet is initialized")
 			}
 
@@ -149,22 +150,20 @@ func (s *KubeletExecutorServer) runKubelet(
 ) error {
 	kcfg, err := s.UnsecuredKubeletConfig()
 	if err == nil {
-		// apply Messo specific settings
+		// apply Mesos specific settings
 		executorDone := make(chan struct{})
 		kcfg.Builder = func(kc *kubeletapp.KubeletConfig) (kubeletapp.KubeletBootstrap, *kconfig.PodConfig, error) {
 			k, pc, err := kubeletapp.CreateAndInitKubelet(kc)
 			if err != nil {
 				return k, pc, err
 			}
-			klet := k.(*kubelet.Kubelet)
 
-			s.kletLock.Lock()
-			s.klet = klet
-			s.kletLock.Unlock()
+			s.klet = k.(*kubelet.Kubelet)
+			close(s.kletReady) // intentionally crash if this is called more than once
 
 			// decorate kubelet such that it shuts down when the executor is
 			decorated := &executorKubelet{
-				Kubelet:      klet,
+				Kubelet:      s.klet,
 				kubeletDone:  kubeletDone,
 				executorDone: executorDone,
 			}
