@@ -411,6 +411,9 @@ case ${JOB_NAME} in
 
   # kubernetes-upgrade-gke-1.0-current-release
   #
+  # Test upgrades from the latest release-1.0 build to the latest current
+  # release build.
+  #
   # Configurations for step2, step4, and step6 live in the current release
   # branch.
 
@@ -427,6 +430,8 @@ case ${JOB_NAME} in
     ;;
 
   # kubernetes-upgrade-gke-1.0-master
+  #
+  # Test upgrades from the latest release-1.0 build to the latest master build.
   #
   # Configurations for step2, step4, and step6 live in master.
 
