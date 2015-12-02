@@ -48,7 +48,7 @@ function detect-master {
 #   NODE_NAMES
 # Vars set:
 #   KUBE_NODE_IP_ADDRESS (array)
-function detect-minions {
+function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip=$(govc vm.ip ${NODE_NAMES[$i]})
@@ -294,7 +294,7 @@ function kube-up {
   fi
 
   # Print minion IPs, so user can log in for debugging.
-  detect-minions
+  detect-nodes
   echo
 
   echo "Waiting for master and minion initialization."

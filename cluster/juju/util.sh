@@ -59,7 +59,7 @@ function detect-master() {
     export KUBE_SERVER=http://${KUBE_MASTER_IP}:8080
 }
 
-function detect-minions() {
+function detect-nodes() {
     # Run the Juju command that gets the minion private IP addresses.
     local ipoutput
     ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)
@@ -97,7 +97,7 @@ function kube-up() {
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
     detect-master
-    detect-minions
+    detect-nodes
 
     local prefix=$RANDOM
     export KUBE_CERT="/tmp/${prefix}-kubecfg.crt"
