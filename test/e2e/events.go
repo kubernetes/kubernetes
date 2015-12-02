@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -72,7 +73,7 @@ var _ = Describe("Events", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(), unversioned.ListOptions{})
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
@@ -93,6 +94,7 @@ var _ = Describe("Events", func() {
 					"involvedObject.namespace": framework.Namespace.Name,
 					"source":                   "scheduler",
 				}.AsSelector(),
+				unversioned.ListOptions{},
 			)
 			if err != nil {
 				return false, err
@@ -114,6 +116,7 @@ var _ = Describe("Events", func() {
 					"involvedObject.namespace": framework.Namespace.Name,
 					"source":                   "kubelet",
 				}.AsSelector(),
+				unversioned.ListOptions{},
 			)
 			if err != nil {
 				return false, err

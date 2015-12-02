@@ -45,7 +45,7 @@ var _ = Describe("Mesos", func() {
 		nodeClient := framework.Client.Nodes()
 
 		rackA := labels.SelectorFromSet(map[string]string{"k8s.mesosphere.io/attribute-rack": "1"})
-		nodes, err := nodeClient.List(rackA, fields.Everything())
+		nodes, err := nodeClient.List(rackA, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			Failf("Failed to query for node: %v", err)
 		}
@@ -64,7 +64,7 @@ var _ = Describe("Mesos", func() {
 		client := framework.Client
 		expectNoError(allNodesReady(client, util.ForeverTestTimeout), "all nodes ready")
 
-		nodelist, err := client.Nodes().List(labels.Everything(), fields.Everything())
+		nodelist, err := client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		expectNoError(err, "nodes fetched from apiserver")
 
 		const ns = "static-pods"
@@ -109,7 +109,7 @@ var _ = Describe("Mesos", func() {
 		role1 := labels.SelectorFromSet(map[string]string{
 			"k8s.mesosphere.io/attribute-role": "role1",
 		})
-		nodes, err := nodeClient.List(role1, fields.Everything())
+		nodes, err := nodeClient.List(role1, fields.Everything(), unversioned.ListOptions{})
 		expectNoError(err)
 
 		Expect(nodes.Items[0].Name).To(Equal(pod.Spec.NodeName))

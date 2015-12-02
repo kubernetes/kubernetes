@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -69,7 +70,7 @@ func ClusterLevelLoggingWithKibana(f *Framework) {
 	// Wait for the Kibana pod(s) to enter the running state.
 	By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
-	pods, err := f.Client.Pods(api.NamespaceSystem).List(label, fields.Everything())
+	pods, err := f.Client.Pods(api.NamespaceSystem).List(label, fields.Everything(), unversioned.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = waitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)

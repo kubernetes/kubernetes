@@ -171,7 +171,7 @@ func replacePods(pods []*api.Pod, store cache.Store) {
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
 // and a list of nodenames across which these containers restarted.
 func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Selector) (int, []string) {
-	pods, err := c.Pods(ns).List(labelSelector, fields.Everything())
+	pods, err := c.Pods(ns).List(labelSelector, fields.Everything(), unversioned.ListOptions{})
 	expectNoError(err)
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
@@ -221,7 +221,7 @@ var _ = Describe("DaemonRestart", func() {
 		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func() (runtime.Object, error) {
-					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
+					return framework.Client.Pods(ns).List(labelSelector, fields.Everything(), unversioned.ListOptions{})
 				},
 				WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), options)

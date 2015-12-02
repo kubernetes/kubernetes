@@ -342,7 +342,7 @@ func GetFirstPod(client *client.Client, namespace string, selector map[string]st
 	var pods *api.PodList
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
-		if pods, err = client.Pods(namespace).List(labels.SelectorFromSet(selector), fields.Everything()); err != nil {
+		if pods, err = client.Pods(namespace).List(labels.SelectorFromSet(selector), fields.Everything(), unversioned.ListOptions{}); err != nil {
 			return nil, err
 		}
 		if len(pods.Items) == 0 {

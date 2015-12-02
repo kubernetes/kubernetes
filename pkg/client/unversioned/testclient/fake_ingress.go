@@ -41,7 +41,7 @@ func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) List(label labels.Selector, fields fields.Selector) (*extensions.IngressList, error) {
+func (c *FakeIngress) List(label labels.Selector, fields fields.Selector, opts unversioned.ListOptions) (*extensions.IngressList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("ingresses", c.Namespace, label, nil), &extensions.IngressList{})
 	if obj == nil {
 		return nil, err

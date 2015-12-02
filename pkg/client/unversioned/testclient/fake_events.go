@@ -47,7 +47,7 @@ func (c *FakeEvents) Get(name string) (*api.Event, error) {
 }
 
 // List returns a list of events matching the selectors.
-func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
+func (c *FakeEvents) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EventList, error) {
 	action := NewRootListAction("events", label, field)
 	if c.Namespace != "" {
 		action = NewListAction("events", c.Namespace, label, field)

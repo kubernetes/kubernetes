@@ -55,7 +55,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.Pods(ns).List(labels.Everything(), fields.Everything())
+	pods, err := client.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.Pods(ns).List(labels.Everything(), fields.Everything())
+	pods, err = client.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

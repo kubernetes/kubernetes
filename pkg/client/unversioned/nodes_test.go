@@ -40,7 +40,7 @@ func TestListNodes(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup(t).Nodes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -70,7 +70,7 @@ func TestListNodesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedNodeList, err := c.Nodes().List(selector, fields.Everything())
+	receivedNodeList, err := c.Nodes().List(selector, fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, receivedNodeList, err)
 }
 

@@ -69,7 +69,7 @@ var _ = Describe("Latency [Skipped]", func() {
 		ns = framework.Namespace.Name
 		var err error
 
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
@@ -144,7 +144,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	_, informer := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
+				return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), options)
@@ -195,7 +195,8 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 			"involvedObject.kind":      "Pod",
 			"involvedObject.namespace": ns,
 			"source":                   "scheduler",
-		}.AsSelector())
+		}.AsSelector(),
+		unversioned.ListOptions{})
 	expectNoError(err)
 	for k := range createTimestamps {
 		for _, event := range schedEvents.Items {
