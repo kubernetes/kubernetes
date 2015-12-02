@@ -1,0 +1,34 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: redis-master
+  # these labels can be applied automatically 
+  # from the labels in the pod template if not set
+  labels:
+    app: redis
+    role: master
+spec:
+  # this replicas value is default
+  # modify it according to your case
+  replicas: 1
+  # selector can be applied automatically 
+  # from the labels in the pod template if not set
+  # selector:
+  #   app: redis
+  #   role: master
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: master
+    spec:
+      containers:
+      - name: redis-master
+        image: redis
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        ports:
+        - name: redis-server
+          containerPort: 6379

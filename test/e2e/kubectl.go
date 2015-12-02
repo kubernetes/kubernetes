@@ -442,7 +442,7 @@ var _ = Describe("Kubectl client", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			controllerJson := mkpath("redis-master-controller.json")
+			controllerJson := mkpath("redis-master-controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			runKubectlOrDie("create", "-f", controllerJson, nsFlag)
@@ -478,8 +478,8 @@ var _ = Describe("Kubectl client", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			controllerJson := mkpath("redis-master-controller.json")
-			serviceJson := mkpath("redis-master-service.json")
+			controllerJson := mkpath("redis-master-controller.yaml")
+			serviceJson := mkpath("redis-master-service.yaml")
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			runKubectlOrDie("create", "-f", controllerJson, nsFlag)
@@ -568,7 +568,7 @@ var _ = Describe("Kubectl client", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			controllerJson := mkpath("redis-master-controller.json")
+			controllerJson := mkpath("redis-master-controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
@@ -677,7 +677,7 @@ var _ = Describe("Kubectl client", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			rcPath = mkpath("redis-master-controller.json")
+			rcPath = mkpath("redis-master-controller.yaml")
 			By("creating an rc")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			runKubectlOrDie("create", "-f", rcPath, nsFlag)
@@ -730,7 +730,7 @@ var _ = Describe("Kubectl client", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
 			}
-			controllerJson := mkpath("redis-master-controller.json")
+			controllerJson := mkpath("redis-master-controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			runKubectlOrDie("create", "-f", controllerJson, nsFlag)
@@ -1073,8 +1073,17 @@ func readReplicationControllerFromFile(filename string) *api.ReplicationControll
 
 func modifyReplicationControllerConfiguration(filename string) io.Reader {
 	rc := readReplicationControllerFromFile(filename)
+	if rc.Labels == nil {
+		rc.Labels = make(map[string]string)
+	}
 	rc.Labels[applyTestLabel] = "ADDED"
+	if rc.Spec.Selector == nil {
+		rc.Spec.Selector = make(map[string]string)
+	}
 	rc.Spec.Selector[applyTestLabel] = "ADDED"
+	if rc.Spec.Template.Labels == nil {
+		rc.Spec.Template.Labels = make(map[string]string)
+	}
 	rc.Spec.Template.Labels[applyTestLabel] = "ADDED"
 	data, err := json.Marshal(rc)
 	if err != nil {

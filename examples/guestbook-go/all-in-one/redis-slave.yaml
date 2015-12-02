@@ -1,0 +1,49 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: redis-slave
+  labels:
+    app: redis
+    role: slave
+spec:
+  ports:
+  - port: 6379
+    targetPort: redis-server
+  selector:
+    app: redis
+    role: slave
+---
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: redis-slave
+  # these labels can be applied automatically
+  # from the labels in the pod template if not set
+  labels:
+    app: redis
+    role: slave
+spec:
+  # this replicas value is default
+  # modify it according to your case
+  replicas: 2
+  # selector can be applied automatically
+  # from the labels in the pod template if not set
+  # selector:
+  #   app: redis
+  #   role: slave
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: slave
+    spec:
+      containers:
+      - name: redis-slave
+        image: kubernetes/redis-slave:v2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        ports:
+        - name: redis-server
+          containerPort: 6379
