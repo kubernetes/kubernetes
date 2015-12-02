@@ -2818,11 +2818,30 @@ func (kl *Kubelet) setNodeStatusDaemonEndpoints(node *api.Node) {
 	node.Status.DaemonEndpoints = *kl.daemonEndpoints
 }
 
+// Set images list fot this node
+func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
+	// Update image list of this node
+	var imagesOnNode []api.ContainerImage
+	containerImages, err := kl.imageManager.GetImageList()
+	if err != nil {
+		glog.Errorf("Error getting image list: %v", err)
+	} else {
+		for _, image := range containerImages {
+			imagesOnNode = append(imagesOnNode, api.ContainerImage{
+				RepoTags: image.RepoTags,
+				Size:     image.Size,
+			})
+		}
+	}
+	node.Status.Images = imagesOnNode
+}
+
 // Set status for the node.
 func (kl *Kubelet) setNodeStatusInfo(node *api.Node) {
 	kl.setNodeStatusMachineInfo(node)
 	kl.setNodeStatusVersionInfo(node)
 	kl.setNodeStatusDaemonEndpoints(node)
+	kl.setNodeStatusImages(node)
 }
 
 // Set Readycondition for the node.
