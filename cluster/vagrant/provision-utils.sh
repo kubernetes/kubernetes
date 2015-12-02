@@ -160,3 +160,114 @@ users:
 EOF
   )
 }
+
+# provision-network runs some generic node network provisioning logic
+function provision-network() {
+  # Set the host name explicitly
+  # See: https://github.com/mitchellh/vagrant/issues/2430
+  hostnamectl set-hostname ${MASTER_NAME}
+
+  if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
+    # Workaround to vagrant inability to guess interface naming sequence
+    # Tell system to abandon the new naming scheme and use eth* instead
+    rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
+
+    # Disable network interface being managed by Network Manager (needed for Fedora 21+)
+    NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+    if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
+    for if_conf in ${if_to_edit}; do
+      grep -q ^NM_CONTROLLED= ${if_conf} || echo 'NM_CONTROLLED=no' >> ${if_conf}
+      sed -i 's/#^NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${if_conf}
+    done;
+    systemctl restart network
+  fi
+
+  NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
+
+  # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    minion=${NODE_NAMES[$i]}
+    ip=${NODE_IPS[$i]}
+    if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
+      echo "Adding $minion to hosts file"
+      echo "$ip $minion" >> /etc/hosts
+    fi
+  done
+
+  echo "127.0.0.1 localhost" >> /etc/hosts
+  echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+}
+
+# provision-flannel-node configures a flannel node
+function provision-flannel-node {
+
+  echo "Provisioning flannel on node"
+
+  FLANNEL_ETCD_URL="http://${MASTER_IP}:4379"
+
+  # Install flannel for overlay
+  if ! which flanneld >/dev/null 2>&1; then
+    yum install -y flannel
+
+    # Configure local daemon to speak to master
+    NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+    if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
+    NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
+    cat <<EOF >/etc/sysconfig/flanneld
+FLANNEL_ETCD="${FLANNEL_ETCD_URL}"
+FLANNEL_ETCD_KEY="/coreos.com/network"
+FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME}"
+EOF
+
+    # Start flannel
+    systemctl enable flanneld
+    systemctl start flanneld
+  fi
+
+  echo "Network configuration verified"
+}
+
+# provision-flannel-master configures flannel on the master
+function provision-flannel-master {
+
+  echo "Provisioning flannel master configuration"
+
+  FLANNEL_ETCD_URL="http://${MASTER_IP}:4379"
+
+  # Install etcd for flannel data
+  if ! which etcd >/dev/null 2>&1; then
+
+    yum install -y etcd
+
+    # Modify etcd configuration for flannel data
+    cat <<EOF >/etc/etcd/etcd.conf
+ETCD_NAME=flannel
+ETCD_DATA_DIR="/var/lib/etcd/flannel.etcd"
+ETCD_LISTEN_PEER_URLS="http://${MASTER_IP}:4380"
+ETCD_LISTEN_CLIENT_URLS="http://${MASTER_IP}:4379"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${MASTER_IP}:4380"
+ETCD_INITIAL_CLUSTER="flannel=http://${MASTER_IP}:4380"
+ETCD_ADVERTISE_CLIENT_URLS="${FLANNEL_ETCD_URL}"
+EOF
+    # Enable and start etcd
+    systemctl enable etcd
+    systemctl start etcd
+
+  fi
+
+  cat <<EOF >/etc/flannel-config.json
+{
+    "Network": "${CONTAINER_SUBNET}",
+    "SubnetLen": 24,
+    "Backend": {
+        "Type": "udp",
+        "Port": 8285
+     }
+}
+EOF
+
+  # Import default configuration into etcd for master setup
+  etcdctl -C ${FLANNEL_ETCD_URL} set /coreos.com/network/config < /etc/flannel-config.json
+
+  echo "Network configuration verified"
+}

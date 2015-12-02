@@ -125,7 +125,6 @@ function create-provision-scripts {
     echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
     echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
-    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
@@ -139,7 +138,6 @@ function create-provision-scripts {
       echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
       echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
