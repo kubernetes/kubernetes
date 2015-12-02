@@ -26,8 +26,8 @@ import (
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
@@ -57,7 +57,12 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper) PodStorage {
+func NewStorage(
+	s storage.Interface,
+	storageDecorator generic.StorageDecorator,
+	k client.ConnectionInfoGetter,
+	proxyTransport http.RoundTripper,
+) PodStorage {
 	prefix := "/pods"
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
