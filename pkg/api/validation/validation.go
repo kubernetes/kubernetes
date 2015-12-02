@@ -1253,9 +1253,11 @@ func ValidateService(service *api.Service) validation.ErrorList {
 			}
 		}
 	}
+
+	isHeadlessService := service.Spec.ClusterIP == api.ClusterIPNone
 	allPortNames := sets.String{}
 	for i := range service.Spec.Ports {
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -1323,7 +1325,7 @@ func ValidateService(service *api.Service) validation.ErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.String) validation.ErrorList {
+func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService bool, allNames *sets.String) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 
 	if requireName && sp.Name == "" {
@@ -1353,6 +1355,12 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 	}
 	if sp.TargetPort.Type == intstr.String && !validation.IsValidPortName(sp.TargetPort.StrVal) {
 		allErrs = append(allErrs, validation.NewInvalidError("targetPort", sp.TargetPort, PortNameErrorMsg))
+	}
+
+	if isHeadlessService {
+		if sp.TargetPort.Type == intstr.String || (sp.TargetPort.Type == intstr.Int && sp.Port != sp.TargetPort.IntValue()) {
+			allErrs = append(allErrs, validation.NewInvalidError("port", sp.Port, "must be equal to targetPort when clusterIP = None"))
+		}
 	}
 
 	return allErrs
