@@ -323,8 +323,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.Pods(status.podNamespace).Get(status.podName)
 	if errors.IsNotFound(err) {
-		glog.V(3).Infof("Pod %q (%s) was deleted on the server", status.podName, uid)
-		m.deletePodStatus(uid)
+		glog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
+		// If the Pod is deleted the status will be cleared in
+		// RemoveOrphanedStatuses, so we just ignore the update here.
 		return
 	}
 	if err == nil {

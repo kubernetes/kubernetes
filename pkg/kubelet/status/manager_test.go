@@ -264,8 +264,6 @@ func TestSyncBatchIgnoresNotFound(t *testing.T) {
 	verifyActions(t, syncer.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 	})
-	_, found := syncer.GetPodStatus(testPod.UID)
-	assert.False(t, found, "Pod status should have been deleted")
 }
 
 func TestSyncBatch(t *testing.T) {
