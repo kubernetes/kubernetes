@@ -265,6 +265,7 @@ _kubectl_get()
     flags_completion=()
 
     flags+=("--all-namespaces")
+    flags+=("--export")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
     flags_completion+=("__handle_filename_extension_flag json|yaml|yml")

@@ -41,6 +41,12 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
+func initTestErrorHandler(t *testing.T) {
+	cmdutil.BehaviorOnFatal(func(str string) {
+		t.Errorf("Error running command: %s", str)
+	})
+}
+
 type internalType struct {
 	Kind       string
 	APIVersion string
