@@ -207,7 +207,7 @@ function detect-master {
 # Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
-function detect-minions {
+function detect-nodes {
   local docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
   if [ -z "${docker_ids}" ]; then
     echo "ERROR: Mesos slave(s) not running" 1>&2
@@ -291,7 +291,7 @@ function kube-up {
   cluster::mesos::docker::run_in_docker_test await-health-check "-t=${MESOS_DOCKER_API_TIMEOUT}" http://apiserver:8888/healthz
 
   detect-master
-  detect-minions
+  detect-nodes
   create-kubeconfig
 
   echo "Deploying Addons" 1>&2
