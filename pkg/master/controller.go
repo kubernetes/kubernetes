@@ -296,9 +296,14 @@ func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointP
 	return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 }
 
-// Determine if the endpoint is in the format ReconcileEndpoints expect (one subset,
-// correct ports, N IP addresses); and if the specified IP address is present and
-// the correct number of ip addresses are found.
+// Determine if the endpoint is in the format ReconcileEndpoints expects.
+//
+// Return values:
+// * formatCorrect is true if exactly one subset is found.
+// * ipCorrect is true when current master's IP is found and the number
+//     of addresses is less than or equal to the master count.
+// * portsCorrect is true when endpoint ports exactly match provided ports.
+//     portsCorrect is only evaluated when reconcilePorts is set to true.
 func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
@@ -318,7 +323,7 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 	}
 	for _, addr := range sub.Addresses {
 		if addr.IP == ip {
-			ipCorrect = len(sub.Addresses) == count
+			ipCorrect = len(sub.Addresses) <= count
 			break
 		}
 	}
