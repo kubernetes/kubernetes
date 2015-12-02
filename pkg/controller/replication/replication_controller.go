@@ -107,8 +107,8 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 
 	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(options)
@@ -148,8 +148,8 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 
 	rm.podStore.Store, rm.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return rm.kubeClient.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return rm.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return rm.kubeClient.Pods(api.NamespaceAll).Watch(options)

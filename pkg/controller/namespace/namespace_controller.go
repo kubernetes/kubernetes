@@ -45,8 +45,8 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Namespaces().List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return kubeClient.Namespaces().List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.Namespaces().Watch(options)

@@ -55,8 +55,8 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.PersistentVolumes().List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return kubeClient.PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumes().Watch(options)
@@ -73,8 +73,8 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 	)
 	_, claimController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(options)

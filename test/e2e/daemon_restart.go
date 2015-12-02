@@ -220,8 +220,8 @@ var _ = Describe("DaemonRestart", func() {
 		tracker = newPodTracker()
 		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func() (runtime.Object, error) {
-					options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}}
+				ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+					options.LabelSelector.Selector = labelSelector
 					return framework.Client.Pods(ns).List(options)
 				},
 				WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {

@@ -43,7 +43,7 @@ import (
 type ListerWatcher interface {
 	// List should return a list type object; the Items field will be extracted, and the
 	// ResourceVersion field will be used to start the watch in the right place.
-	List() (runtime.Object, error)
+	List(options unversioned.ListOptions) (runtime.Object, error)
 	// Watch should begin a watch at the specified version.
 	Watch(options unversioned.ListOptions) (watch.Interface, error)
 }
@@ -227,7 +227,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	resyncCh, cleanup := r.resyncChan()
 	defer cleanup()
 
-	list, err := r.listerWatcher.List()
+	options := unversioned.ListOptions{}
+	list, err := r.listerWatcher.List(options)
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}

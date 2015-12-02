@@ -49,8 +49,8 @@ type quota struct {
 // NewResourceQuota creates a new resource quota admission control handler
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(unversioned.ListOptions{})
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			return client.ResourceQuotas(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return client.ResourceQuotas(api.NamespaceAll).Watch(options)

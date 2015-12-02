@@ -173,7 +173,7 @@ func NewMockPodsListWatch(initialPodList api.PodList) *MockPodsListWatch {
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return lw.fakeWatcher, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
 			lw.lock.Lock()
 			defer lw.lock.Unlock()
 

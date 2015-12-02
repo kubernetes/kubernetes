@@ -249,11 +249,13 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 }
 
 type testLW struct {
-	ListFunc  func() (runtime.Object, error)
+	ListFunc  func(options unversioned.ListOptions) (runtime.Object, error)
 	WatchFunc func(options unversioned.ListOptions) (watch.Interface, error)
 }
 
-func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
+func (t *testLW) List(options unversioned.ListOptions) (runtime.Object, error) {
+	return t.ListFunc(options)
+}
 func (t *testLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
 }
@@ -274,7 +276,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 			go fw.Stop()
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}

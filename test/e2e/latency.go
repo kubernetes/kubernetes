@@ -143,9 +143,9 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	stopCh := make(chan struct{})
 	_, informer := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
 				selector := labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
-				options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+				options.LabelSelector.Selector = selector
 				return c.Pods(ns).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {

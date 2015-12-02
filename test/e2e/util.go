@@ -161,11 +161,9 @@ type podStore struct {
 
 func newPodStore(c *client.Client, namespace string, label labels.Selector, field fields.Selector) *podStore {
 	lw := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			options := unversioned.ListOptions{
-				LabelSelector: unversioned.LabelSelector{label},
-				FieldSelector: unversioned.FieldSelector{field},
-			}
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			options.LabelSelector.Selector = label
+			options.FieldSelector.Selector = field
 			return c.Pods(namespace).List(options)
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
