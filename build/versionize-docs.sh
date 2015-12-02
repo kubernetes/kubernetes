@@ -99,4 +99,4 @@ done
 
 ${KUBE_ROOT}/hack/update-generated-docs.sh
 ${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
-"./hack/gen-swagger-doc/run-gen-swagger-docs.sh" "v1"
+"./hack/gen-swagger-doc/run-gen-swagger-docs.sh"
