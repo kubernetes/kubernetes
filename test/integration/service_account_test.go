@@ -42,7 +42,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -341,25 +340,6 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 
 	deleteAllEtcdKeys()
 
-	// Etcd
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	storageVersions := make(map[string]string)
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-
 	// Listener
 	var m *master.Master
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -380,7 +360,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		}
 		return nil, false, nil
 	})
-	serviceAccountKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	serviceAccountTokenGetter := serviceaccount.NewGetterFromClient(rootClient)
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
 	authenticator := union.New(
@@ -423,19 +403,14 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(rootClient)
 
+	masterConfig := framework.NewMasterConfig()
+	masterConfig.EnableIndex = true
+	masterConfig.Authenticator = authenticator
+	masterConfig.Authorizer = authorizer
+	masterConfig.AdmissionControl = serviceAccountAdmission
+
 	// Create a master and install handlers into mux.
-	m = master.New(&master.Config{
-		StorageDestinations: storageDestinations,
-		KubeletClient:       kubeletclient.FakeKubeletClient{},
-		EnableLogsSupport:   false,
-		EnableUISupport:     false,
-		EnableIndex:         true,
-		APIPrefix:           "/api",
-		Authenticator:       authenticator,
-		Authorizer:          authorizer,
-		AdmissionControl:    serviceAccountAdmission,
-		StorageVersions:     storageVersions,
-	})
+	m = master.New(masterConfig)
 
 	// Start the service account and service account token controllers
 	tokenController := serviceaccount.NewTokensController(rootClient, serviceaccount.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
