@@ -78,6 +78,9 @@ func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	case extensions.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
 
+	case extensions.Kind("Deployment"):
+		return &DeploymentReaper{c, Interval, Timeout}, nil
+
 	}
 	return nil, &NoSuchReaperError{kind}
 }
@@ -99,6 +102,10 @@ type DaemonSetReaper struct {
 	pollInterval, timeout time.Duration
 }
 type JobReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+type DeploymentReaper struct {
 	client.Interface
 	pollInterval, timeout time.Duration
 }
@@ -191,10 +198,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 			return err
 		}
 	}
-	if err := rc.Delete(name); err != nil {
-		return err
-	}
-	return nil
+	return rc.Delete(name)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
@@ -303,10 +307,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return err
 	}
 
-	if err := reaper.Extensions().DaemonSets(namespace).Delete(name); err != nil {
-		return err
-	}
-	return nil
+	return reaper.Extensions().DaemonSets(namespace).Delete(name)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -352,10 +353,92 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return utilerrors.NewAggregate(errList)
 	}
 	// once we have all the pods removed we can safely remove the job itself
-	if err := jobs.Delete(name, gracePeriod); err != nil {
+	return jobs.Delete(name, gracePeriod)
+}
+
+func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
+	deployments := reaper.Extensions().Deployments(namespace)
+	replicaSets := reaper.Extensions().ReplicaSets(namespace)
+	rsReaper, _ := ReaperFor(extensions.Kind("ReplicaSet"), reaper)
+
+	deployment, err := deployments.Get(name)
+	if err != nil {
 		return err
 	}
-	return nil
+
+	// set deployment's history and scale to 0
+	// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
+	zero := 0
+	deployment.Spec.RevisionHistoryLimit = &zero
+	deployment.Spec.Replicas = 0
+	// TODO: un-pausing should not be necessary, remove when this is fixed:
+	// https://github.com/kubernetes/kubernetes/issues/20966
+	// Instead deployment should be Paused at this point and not at next TODO.
+	deployment.Spec.Paused = false
+	deployment, err = deployments.Update(deployment)
+	if err != nil {
+		return err
+	}
+
+	// wait for total no of pods drop to 0
+	if err := wait.Poll(reaper.pollInterval, reaper.timeout, func() (bool, error) {
+		curr, err := deployments.Get(name)
+		// if deployment was not found it must have been deleted, error out
+		if err != nil && errors.IsNotFound(err) {
+			return false, err
+		}
+		// if other errors happen, retry
+		if err != nil {
+			return false, nil
+		}
+		// check if deployment wasn't recreated with the same name
+		// TODO use generations when deployment will have them
+		if curr.UID != deployment.UID {
+			return false, errors.NewNotFound(extensions.Resource("Deployment"), name)
+		}
+		return curr.Status.Replicas == 0, nil
+	}); err != nil {
+		return err
+	}
+
+	// TODO: When deployments will allow running cleanup policy while being
+	// paused, move pausing to above update operation. Without it, we need to
+	// pause deployment before stopping RSs, to prevent creating new RSs.
+	// See https://github.com/kubernetes/kubernetes/issues/20966
+	deployment, err = deployments.Get(name)
+	if err != nil {
+		return err
+	}
+	deployment.Spec.Paused = true
+	deployment, err = deployments.Update(deployment)
+	if err != nil {
+		return err
+	}
+
+	// remove remaining RSs
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	options := api.ListOptions{LabelSelector: selector}
+	rsList, err := replicaSets.List(options)
+	if err != nil {
+		return err
+	}
+	errList := []error{}
+	for _, rc := range rsList.Items {
+		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
+			if !errors.IsNotFound(err) {
+				errList = append(errList, err)
+			}
+		}
+	}
+	if len(errList) > 0 {
+		return utilerrors.NewAggregate(errList)
+	}
+
+	// and finally deployment
+	return deployments.Delete(name, gracePeriod)
 }
 
 func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -364,11 +447,7 @@ func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gra
 	if err != nil {
 		return err
 	}
-	if err := pods.Delete(name, gracePeriod); err != nil {
-		return err
-	}
-
-	return nil
+	return pods.Delete(name, gracePeriod)
 }
 
 func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -377,8 +456,5 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 	if err != nil {
 		return err
 	}
-	if err := services.Delete(name); err != nil {
-		return err
-	}
-	return nil
+	return services.Delete(name)
 }

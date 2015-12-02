@@ -29,6 +29,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 )
 
 func TestReplicationControllerStop(t *testing.T) {
@@ -490,6 +491,133 @@ func TestJobStop(t *testing.T) {
 			}
 			if actions[i].GetResource() != action[1] {
 				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
+			}
+		}
+	}
+}
+
+func TestDeploymentStop(t *testing.T) {
+	name := "foo"
+	ns := "default"
+	deployment := extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: 0,
+			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+		},
+		Status: extensions.DeploymentStatus{
+			Replicas: 0,
+		},
+	}
+	template := deploymentutil.GetNewReplicaSetTemplate(deployment)
+	tests := []struct {
+		Name            string
+		Objs            []runtime.Object
+		StopError       error
+		ExpectedActions []string
+	}{
+		{
+			Name: "SimpleDeployment",
+			Objs: []runtime.Object{
+				&extensions.Deployment{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.DeploymentSpec{
+						Replicas: 0,
+						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"k1": "v1"}},
+					},
+					Status: extensions.DeploymentStatus{
+						Replicas: 0,
+					},
+				},
+				&extensions.Scale{ // UPDATE
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
+					},
+					Status: extensions.ScaleStatus{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1"},
+					},
+				},
+			},
+			StopError: nil,
+			ExpectedActions: []string{"get:deployments", "update:deployments",
+				"get:deployments", "get:deployments", "update:deployments",
+				"list:replicasets", "delete:deployments"},
+		},
+		{
+			Name: "Deployment with single replicaset",
+			Objs: []runtime.Object{
+				&deployment, // GET
+				&extensions.Scale{ // UPDATE
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
+					},
+					Status: extensions.ScaleStatus{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1"},
+					},
+				},
+				&extensions.ReplicaSetList{ // LIST
+					Items: []extensions.ReplicaSet{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: extensions.ReplicaSetSpec{
+								Template: &template,
+							},
+						},
+					},
+				},
+			},
+			StopError: nil,
+			ExpectedActions: []string{"get:deployments", "update:deployments",
+				"get:deployments", "get:deployments", "update:deployments",
+				"list:replicasets", "get:replicasets", "get:replicasets",
+				"update:replicasets", "get:replicasets", "get:replicasets",
+				"delete:replicasets", "delete:deployments"},
+		},
+	}
+
+	for _, test := range tests {
+		fake := testclient.NewSimpleFake(test.Objs...)
+		reaper := DeploymentReaper{fake, time.Millisecond, time.Millisecond}
+		err := reaper.Stop(ns, name, 0, nil)
+		if !reflect.DeepEqual(err, test.StopError) {
+			t.Errorf("%s unexpected error: %v", test.Name, err)
+			continue
+		}
+
+		actions := fake.Actions()
+		if len(actions) != len(test.ExpectedActions) {
+			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
+			continue
+		}
+		for i, expAction := range test.ExpectedActions {
+			action := strings.Split(expAction, ":")
+			if actions[i].GetVerb() != action[0] {
+				t.Errorf("%s unexpected verb: %+v, expected %s", test.Name, actions[i], expAction)
+			}
+			if actions[i].GetResource() != action[1] {
+				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
+			}
+			if len(action) == 3 && actions[i].GetSubresource() != action[2] {
+				t.Errorf("%s unexpected subresource: %+v, expected %s", test.Name, actions[i], expAction)
 			}
 		}
 	}
