@@ -80,8 +80,8 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 	}
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{accountSelector}}
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				options.FieldSelector.Selector = accountSelector
 				return e.client.ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
@@ -99,8 +99,8 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 
 	e.namespaces, e.namespaceController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return e.client.Namespaces().List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return e.client.Namespaces().List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return e.client.Namespaces().Watch(options)

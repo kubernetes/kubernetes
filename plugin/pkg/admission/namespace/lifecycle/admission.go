@@ -107,8 +107,8 @@ func NewLifecycle(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return c.Namespaces().List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return c.Namespaces().List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return c.Namespaces().Watch(options)

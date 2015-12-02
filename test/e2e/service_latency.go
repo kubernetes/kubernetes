@@ -277,8 +277,8 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 func startEndpointWatcher(f *Framework, q *endpointQueries) {
 	_, controller := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return f.Client.Endpoints(f.Namespace.Name).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return f.Client.Endpoints(f.Namespace.Name).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return f.Client.Endpoints(f.Namespace.Name).Watch(options)

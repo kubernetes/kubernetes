@@ -162,8 +162,8 @@ func NewNodeController(
 
 	nc.podStore.Store, nc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return nc.kubeClient.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Pods(api.NamespaceAll).Watch(options)
@@ -178,8 +178,8 @@ func NewNodeController(
 	)
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return nc.kubeClient.Nodes().List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Nodes().List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Nodes().Watch(options)
