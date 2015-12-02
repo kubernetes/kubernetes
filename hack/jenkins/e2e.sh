@@ -1165,6 +1165,8 @@ case ${JOB_NAME} in
 
   # kubernetes-upgrade-gke-1.0-master
   #
+  # Test upgrades from the latest release-1.0 build to the latest master build.
+  #
   # Configurations for step1, step3, and step5 live in the release-1.0 branch.
 
   kubernetes-upgrade-gke-1.0-master-step2-upgrade-master)
@@ -1180,6 +1182,8 @@ case ${JOB_NAME} in
     ;;
 
   # kubernetes-upgrade-gke-1.1-master
+  #
+  # Test upgrades from the latest release-1.1 build to the latest master build.
   #
   # Configurations for step1, step3, and step5 live in the release-1.1 branch.
 
