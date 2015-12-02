@@ -65,8 +65,8 @@ func TestRESTMapper(t *testing.T) {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie("componentconfig").Versions {
-		mapping, err := latest.GroupOrDie("componentconfig").RESTMapper.RESTMapping(proxyGVK.GroupKind(), version)
+	for _, version := range latest.GroupOrDie("componentconfig").GroupVersions {
+		mapping, err := latest.GroupOrDie("componentconfig").RESTMapper.RESTMapping(proxyGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
