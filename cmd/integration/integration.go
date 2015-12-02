@@ -19,7 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -37,10 +36,8 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -55,17 +52,16 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/e2e"
 	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/framework"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -82,12 +78,6 @@ var (
 
 	maxTestTimeout = time.Minute * 10
 )
-
-type fakeKubeletClient struct{}
-
-func (fakeKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	return "", 0, nil, errors.New("Not Implemented")
-}
 
 type delegateHandler struct {
 	delegate http.Handler
@@ -140,21 +130,6 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// We will fix this by supporting multiple group versions in Config
 	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Extensions.GroupVersion()})
 
-	storageVersions := make(map[string]string)
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions[""] = testapi.Default.GroupAndVersion()
-	if err != nil {
-		glog.Fatalf("Unable to get etcd storage: %v", err)
-	}
-	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-	if err != nil {
-		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
-	}
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
 	if err != nil {
@@ -177,22 +152,15 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 			"Fail to get a valid public address for master.", err)
 	}
 
+	masterConfig := framework.NewMasterConfig()
+	masterConfig.EnableCoreControllers = true
+	masterConfig.EnableProfiling = true
+	masterConfig.ReadWritePort = portNumber
+	masterConfig.PublicAddress = hostIP
+	masterConfig.CacheTimeout = 2 * time.Second
+
 	// Create a master and install handlers into mux.
-	m := master.New(&master.Config{
-		StorageDestinations:   storageDestinations,
-		KubeletClient:         fakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableProfiling:       true,
-		APIPrefix:             "/api",
-		APIGroupPrefix:        "/apis",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-		ReadWritePort:         portNumber,
-		PublicAddress:         hostIP,
-		CacheTimeout:          2 * time.Second,
-		StorageVersions:       storageVersions,
-	})
+	m := master.New(masterConfig)
 	handler.delegate = m.Handler
 
 	// Scheduler

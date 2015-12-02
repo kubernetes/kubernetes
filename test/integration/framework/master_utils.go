@@ -18,6 +18,7 @@ package framework
 
 import (
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -126,38 +127,50 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	}))
 
 	if masterConfig == nil {
-		etcdClient := NewEtcdClient()
-		storageVersions := make(map[string]string)
-		etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion.String(), etcdtest.PathPrefix())
-		storageVersions[""] = latest.GroupOrDie("").GroupVersion.String()
-		if err != nil {
-			glog.Fatalf("Failed to create etcd storage for master %v", err)
-		}
-		expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
-		storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-		if err != nil {
-			glog.Fatalf("Failed to create etcd storage for master %v", err)
-		}
-		storageDestinations := master.NewStorageDestinations()
-		storageDestinations.AddAPIGroup("", etcdStorage)
-		storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-		masterConfig = &master.Config{
-			StorageDestinations:  storageDestinations,
-			StorageVersions:      storageVersions,
-			KubeletClient:        kubeletclient.FakeKubeletClient{},
-			EnableLogsSupport:    false,
-			EnableProfiling:      true,
-			EnableSwaggerSupport: true,
-			EnableUISupport:      false,
-			APIPrefix:            "/api",
-			APIGroupPrefix:       "/apis",
-			Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:     admit.NewAlwaysAdmit(),
-		}
+		masterConfig = NewMasterConfig()
+		masterConfig.EnableProfiling = true
+		masterConfig.EnableSwaggerSupport = true
 	}
 	m = master.New(masterConfig)
 	return m, s
+}
+
+// Returns a basic master config.
+func NewMasterConfig() *master.Config {
+	etcdClient := NewEtcdClient()
+	storageVersions := make(map[string]string)
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
+	storageVersions[""] = testapi.Default.GroupAndVersion()
+	if err != nil {
+		glog.Fatalf("Failed to create etcd storage for master %v", err)
+	}
+	expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
+	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+	if err != nil {
+		glog.Fatalf("Failed to create etcd storage for master %v", err)
+	}
+	storageDestinations := master.NewStorageDestinations()
+	storageDestinations.AddAPIGroup("", etcdStorage)
+	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+
+	return &master.Config{
+		StorageDestinations: storageDestinations,
+		StorageVersions:     storageVersions,
+		KubeletClient:       kubeletclient.FakeKubeletClient{},
+		APIPrefix:           "/api",
+		APIGroupPrefix:      "/apis",
+		Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:    admit.NewAlwaysAdmit(),
+	}
+}
+
+// Returns the master config appropriate for most integration tests.
+func NewIntegrationTestMasterConfig() *master.Config {
+	masterConfig := NewMasterConfig()
+	masterConfig.EnableCoreControllers = true
+	masterConfig.EnableIndex = true
+	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	return masterConfig
 }
 
 func (m *MasterComponents) stopRCManager() {
