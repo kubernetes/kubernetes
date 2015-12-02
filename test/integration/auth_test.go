@@ -387,42 +387,14 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	storageVersions := make(map[string]string)
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
 	defer s.Close()
 
-	m = master.New(&master.Config{
-		StorageDestinations:   storageDestinations,
-		KubeletClient:         client.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       storageVersions,
-		PublicAddress:         net.ParseIP("192.168.10.4"),
-	})
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	m = master.New(masterConfig)
 
 	transport := http.DefaultTransport
 	previousResourceVersion := make(map[string]float64)

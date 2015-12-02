@@ -22,7 +22,6 @@ package integration
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -34,15 +33,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -57,23 +53,6 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("Couldn't create etcd storage: %v", err)
-	}
-	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	storageVersions := make(map[string]string)
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -82,19 +61,8 @@ func TestUnschedulableNodes(t *testing.T) {
 	}))
 	defer s.Close()
 
-	m = master.New(&master.Config{
-		StorageDestinations:   storageDestinations,
-		KubeletClient:         kubeletclient.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       storageVersions,
-		PublicAddress:         net.ParseIP("192.168.10.4"),
-	})
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	m = master.New(masterConfig)
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 
@@ -308,23 +276,6 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 }
 
 func BenchmarkScheduling(b *testing.B) {
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		b.Fatalf("Couldn't create etcd storage: %v", err)
-	}
-	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
-	if err != nil {
-		b.Fatalf("unexpected error: %v", err)
-	}
-
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	storageVersions := make(map[string]string)
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -333,19 +284,8 @@ func BenchmarkScheduling(b *testing.B) {
 	}))
 	defer s.Close()
 
-	m = master.New(&master.Config{
-		StorageDestinations:   storageDestinations,
-		KubeletClient:         kubeletclient.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       storageVersions,
-		PublicAddress:         net.ParseIP("192.168.10.4"),
-	})
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	m = master.New(masterConfig)
 
 	c := client.NewOrDie(&client.Config{
 		Host:         s.URL,

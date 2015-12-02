@@ -21,18 +21,14 @@ package integration
 // This file tests use of the secrets API resource.
 
 import (
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -49,42 +45,14 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	storageVersions := make(map[string]string)
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
 	defer s.Close()
 
-	m = master.New(&master.Config{
-		StorageDestinations:   storageDestinations,
-		KubeletClient:         kubeletclient.FakeKubeletClient{},
-		EnableCoreControllers: true,
-		EnableLogsSupport:     false,
-		EnableUISupport:       false,
-		EnableIndex:           true,
-		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
-		StorageVersions:       storageVersions,
-		PublicAddress:         net.ParseIP("192.168.10.4"),
-	})
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	m = master.New(masterConfig)
 
 	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
