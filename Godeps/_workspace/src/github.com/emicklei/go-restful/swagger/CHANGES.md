@@ -1,5 +1,9 @@
 Change history of swagger
 =
+2015-10-16
+- add type override mechanism for swagger models (MR 254, nathanejohnson)
+- replace uses of wildcard in generated apidocs (issue 251)
+
 2015-05-25
 - (api break) changed the type of Properties in Model
 - (api break) changed the type of Models in ApiDeclaration

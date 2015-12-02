@@ -162,6 +162,11 @@ Default value is false; it will recover from panics. This has performance implic
 SetCacheReadEntity controls whether the response data ([]byte) is cached such that ReadEntity is repeatable.
 If you expect to read large amounts of payload data, and you do not use this feature, you should set it to false.
 
+	restful.SetCompressorProvider(NewBoundedCachedCompressors(20, 20))
+
+If content encoding is enabled then the default strategy for getting new gzip/zlib writers and readers is to use a sync.Pool.
+Because writers are expensive structures, performance is even more improved when using a preloaded cache. You can also inject your own implementation.
+
 Trouble shooting
 
 This package has the means to produce detail logging of the complete Http request matching process and filter invocation.

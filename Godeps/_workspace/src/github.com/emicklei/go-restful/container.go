@@ -272,7 +272,7 @@ func (c Container) Handle(pattern string, handler http.Handler) {
 // HandleWithFilter registers the handler for the given pattern.
 // Container's filter chain is applied for handler.
 // If a handler already exists for pattern, HandleWithFilter panics.
-func (c Container) HandleWithFilter(pattern string, handler http.Handler) {
+func (c *Container) HandleWithFilter(pattern string, handler http.Handler) {
 	f := func(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 		if len(c.containerFilters) == 0 {
 			handler.ServeHTTP(httpResponse, httpRequest)

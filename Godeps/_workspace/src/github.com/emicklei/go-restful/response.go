@@ -5,8 +5,7 @@ package restful
 // that can be found in the LICENSE file.
 
 import (
-	"encoding/json"
-	"encoding/xml"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -14,9 +13,7 @@ import (
 // DEPRECATED, use DefaultResponseContentType(mime)
 var DefaultResponseMimeType string
 
-//PrettyPrintResponses controls the indentation feature of XML and JSON
-//serialization in the response methods WriteEntity, WriteAsJson, and
-//WriteAsXml.
+//PrettyPrintResponses controls the indentation feature of XML and JSON serialization
 var PrettyPrintResponses = true
 
 // Response is a wrapper on the actual http ResponseWriter
@@ -36,8 +33,7 @@ func NewResponse(httpWriter http.ResponseWriter) *Response {
 	return &Response{httpWriter, "", []string{}, http.StatusOK, 0, PrettyPrintResponses, nil} // empty content-types
 }
 
-// If Accept header matching fails, fall back to this type, otherwise
-// a "406: Not Acceptable" response is returned.
+// If Accept header matching fails, fall back to this type.
 // Valid values are restful.MIME_JSON and restful.MIME_XML
 // Example:
 // 	restful.DefaultResponseContentType(restful.MIME_JSON)
@@ -68,117 +64,99 @@ func (r *Response) SetRequestAccepts(mime string) {
 	r.requestAccept = mime
 }
 
-// WriteEntity marshals the value using the representation denoted by the Accept Header (XML or JSON)
-// If no Accept header is specified (or */*) then return the Content-Type as specified by the first in the Route.Produces.
-// If an Accept header is specified then return the Content-Type as specified by the first in the Route.Produces that is matched with the Accept header.
-// If the value is nil then nothing is written. You may want to call WriteHeader(http.StatusNotFound) instead.
-// Current implementation ignores any q-parameters in the Accept Header.
-func (r *Response) WriteEntity(value interface{}) error {
-	if value == nil { // do not write a nil representation
-		return nil
-	}
+// EntityWriter returns the registered EntityWriter that the entity (requested resource)
+// can write according to what the request wants (Accept) and what the Route can produce or what the restful defaults say.
+// If called before WriteEntity and WriteHeader then a false return value can be used to write a 406: Not Acceptable.
+func (r *Response) EntityWriter() (EntityReaderWriter, bool) {
 	for _, qualifiedMime := range strings.Split(r.requestAccept, ",") {
 		mime := strings.Trim(strings.Split(qualifiedMime, ";")[0], " ")
 		if 0 == len(mime) || mime == "*/*" {
 			for _, each := range r.routeProduces {
 				if MIME_JSON == each {
-					return r.WriteAsJson(value)
+					return entityAccessRegistry.AccessorAt(MIME_JSON)
 				}
 				if MIME_XML == each {
-					return r.WriteAsXml(value)
+					return entityAccessRegistry.AccessorAt(MIME_XML)
 				}
 			}
 		} else { // mime is not blank; see if we have a match in Produces
 			for _, each := range r.routeProduces {
 				if mime == each {
 					if MIME_JSON == each {
-						return r.WriteAsJson(value)
+						return entityAccessRegistry.AccessorAt(MIME_JSON)
 					}
 					if MIME_XML == each {
-						return r.WriteAsXml(value)
+						return entityAccessRegistry.AccessorAt(MIME_XML)
 					}
 				}
 			}
 		}
 	}
-	if DefaultResponseMimeType == MIME_JSON {
-		return r.WriteAsJson(value)
-	} else if DefaultResponseMimeType == MIME_XML {
-		return r.WriteAsXml(value)
-	} else {
-		if trace {
-			traceLogger.Printf("mismatch in mime-types and no defaults; (http)Accept=%v,(route)Produces=%v\n", r.requestAccept, r.routeProduces)
+	writer, ok := entityAccessRegistry.AccessorAt(r.requestAccept)
+	if !ok {
+		// if not registered then fallback to the defaults (if set)
+		if DefaultResponseMimeType == MIME_JSON {
+			return entityAccessRegistry.AccessorAt(MIME_JSON)
 		}
-		r.WriteHeader(http.StatusNotAcceptable) // for recording only
-		r.ResponseWriter.WriteHeader(http.StatusNotAcceptable)
-		if _, err := r.Write([]byte("406: Not Acceptable")); err != nil {
-			return err
+		if DefaultResponseMimeType == MIME_XML {
+			return entityAccessRegistry.AccessorAt(MIME_XML)
+		}
+		if trace {
+			traceLogger.Printf("no registered EntityReaderWriter found for %s", r.requestAccept)
 		}
 	}
-	return nil
+	return writer, ok
+}
+
+// WriteEntity calls WriteHeaderAndEntity with Http Status OK (200)
+func (r *Response) WriteEntity(value interface{}) error {
+	return r.WriteHeaderAndEntity(http.StatusOK, value)
+}
+
+// WriteHeaderAndEntity marshals the value using the representation denoted by the Accept Header and the registered EntityWriters.
+// If no Accept header is specified (or */*) then respond with the Content-Type as specified by the first in the Route.Produces.
+// If an Accept header is specified then respond with the Content-Type as specified by the first in the Route.Produces that is matched with the Accept header.
+// If the value is nil then no response is send except for the Http status. You may want to call WriteHeader(http.StatusNotFound) instead.
+// If there is no writer available that can represent the value in the requested MIME type then Http Status NotAcceptable is written.
+// Current implementation ignores any q-parameters in the Accept Header.
+// Returns an error if the value could not be written on the response.
+func (r *Response) WriteHeaderAndEntity(status int, value interface{}) error {
+	writer, ok := r.EntityWriter()
+	if !ok {
+		r.WriteHeader(http.StatusNotAcceptable)
+		return nil
+	}
+	return writer.Write(r, status, value)
 }
 
 // WriteAsXml is a convenience method for writing a value in xml (requires Xml tags on the value)
+// It uses the standard encoding/xml package for marshalling the valuel ; not using a registered EntityReaderWriter.
 func (r *Response) WriteAsXml(value interface{}) error {
-	var output []byte
-	var err error
-
-	if value == nil { // do not write a nil representation
-		return nil
-	}
-	if r.prettyPrint {
-		output, err = xml.MarshalIndent(value, " ", " ")
-	} else {
-		output, err = xml.Marshal(value)
-	}
-
-	if err != nil {
-		return r.WriteError(http.StatusInternalServerError, err)
-	}
-	r.Header().Set(HEADER_ContentType, MIME_XML)
-	if r.statusCode > 0 { // a WriteHeader was intercepted
-		r.ResponseWriter.WriteHeader(r.statusCode)
-	}
-	_, err = r.Write([]byte(xml.Header))
-	if err != nil {
-		return err
-	}
-	if _, err = r.Write(output); err != nil {
-		return err
-	}
-	return nil
+	return writeXML(r, http.StatusOK, MIME_XML, value)
 }
 
-// WriteAsJson is a convenience method for writing a value in json
+// WriteHeaderAndXml is a convenience method for writing a status and value in xml (requires Xml tags on the value)
+// It uses the standard encoding/xml package for marshalling the valuel ; not using a registered EntityReaderWriter.
+func (r *Response) WriteHeaderAndXml(status int, value interface{}) error {
+	return writeXML(r, status, MIME_XML, value)
+}
+
+// WriteAsJson is a convenience method for writing a value in json.
+// It uses the standard encoding/json package for marshalling the valuel ; not using a registered EntityReaderWriter.
 func (r *Response) WriteAsJson(value interface{}) error {
-	return r.WriteJson(value, MIME_JSON) // no charset
+	return writeJSON(r, http.StatusOK, MIME_JSON, value)
 }
 
-// WriteJson is a convenience method for writing a value in Json with a given Content-Type
+// WriteJson is a convenience method for writing a value in Json with a given Content-Type.
+// It uses the standard encoding/json package for marshalling the valuel ; not using a registered EntityReaderWriter.
 func (r *Response) WriteJson(value interface{}, contentType string) error {
-	var output []byte
-	var err error
+	return writeJSON(r, http.StatusOK, contentType, value)
+}
 
-	if value == nil { // do not write a nil representation
-		return nil
-	}
-	if r.prettyPrint {
-		output, err = json.MarshalIndent(value, " ", " ")
-	} else {
-		output, err = json.Marshal(value)
-	}
-
-	if err != nil {
-		return r.WriteErrorString(http.StatusInternalServerError, err.Error())
-	}
-	r.Header().Set(HEADER_ContentType, contentType)
-	if r.statusCode > 0 { // a WriteHeader was intercepted
-		r.ResponseWriter.WriteHeader(r.statusCode)
-	}
-	if _, err = r.Write(output); err != nil {
-		return err
-	}
-	return nil
+// WriteHeaderAndJson is a convenience method for writing the status and a value in Json with a given Content-Type.
+// It uses the standard encoding/json package for marshalling the value ; not using a registered EntityReaderWriter.
+func (r *Response) WriteHeaderAndJson(status int, value interface{}, contentType string) error {
+	return writeJSON(r, status, contentType, value)
 }
 
 // WriteError write the http status and the error string on the response.
@@ -187,16 +165,19 @@ func (r *Response) WriteError(httpStatus int, err error) error {
 	return r.WriteErrorString(httpStatus, err.Error())
 }
 
-// WriteServiceError is a convenience method for a responding with a ServiceError and a status
+// WriteServiceError is a convenience method for a responding with a status and a ServiceError
 func (r *Response) WriteServiceError(httpStatus int, err ServiceError) error {
-	r.WriteHeader(httpStatus) // for recording only
-	return r.WriteEntity(err)
+	r.err = err
+	return r.WriteHeaderAndEntity(httpStatus, err)
 }
 
 // WriteErrorString is a convenience method for an error status with the actual error
-func (r *Response) WriteErrorString(status int, errorReason string) error {
-	r.statusCode = status // for recording only
-	r.ResponseWriter.WriteHeader(status)
+func (r *Response) WriteErrorString(httpStatus int, errorReason string) error {
+	if r.err == nil {
+		// if not called from WriteError
+		r.err = errors.New(errorReason)
+	}
+	r.WriteHeader(httpStatus)
 	if _, err := r.Write([]byte(errorReason)); err != nil {
 		return err
 	}
@@ -204,31 +185,13 @@ func (r *Response) WriteErrorString(status int, errorReason string) error {
 }
 
 // WriteHeader is overridden to remember the Status Code that has been written.
-// Note that using this method, the status value is only written when
-//  calling WriteEntity,
-//  or directly calling WriteAsXml or WriteAsJson,
-//  or if the status is one for which no response is allowed:
-//
-//  202 = http.StatusAccepted
-//  204 = http.StatusNoContent
-//  206 = http.StatusPartialContent
-//  304 = http.StatusNotModified
-//
-// If this behavior does not fit your need then you can write to the underlying response, such as:
-//   response.ResponseWriter.WriteHeader(http.StatusAccepted)
+// Changes to the Header of the response have no effect after this.
 func (r *Response) WriteHeader(httpStatus int) {
 	r.statusCode = httpStatus
-	// if 202,204,206,304 then WriteEntity will not be called so we need to pass this code
-	if http.StatusNoContent == httpStatus ||
-		http.StatusNotModified == httpStatus ||
-		http.StatusPartialContent == httpStatus ||
-		http.StatusAccepted == httpStatus {
-		r.ResponseWriter.WriteHeader(httpStatus)
-	}
+	r.ResponseWriter.WriteHeader(httpStatus)
 }
 
 // StatusCode returns the code that has been written using WriteHeader.
-// If WriteHeader, WriteEntity or WriteAsXml has not been called (yet) then return 200 OK.
 func (r Response) StatusCode() int {
 	if 0 == r.statusCode {
 		// no status code has been written yet; assume OK
