@@ -18,6 +18,11 @@ In this document we explain how this feature works by walking you through an exa
 ## Prerequisites
 
 This example requires a running Kubernetes cluster and kubectl in the version at least 1.1.
+[Heapster](https://github.com/kubernetes/heapster) monitoring needs to be deployed in the cluster
+as horizontal pod autoscaler uses it to collect metrics
+(if you followed [getting started on GCE guide](../../../docs/getting-started-guides/gce.html),
+heapster monitoring will be turned-on by default).
+
 
 ## Step One: Run & expose php-apache server
 
@@ -226,4 +231,3 @@ As we see, in the presented case CPU utilization dropped to 0, and the number of
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/horizontal-pod-autoscaling/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
-

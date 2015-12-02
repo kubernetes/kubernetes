@@ -32,6 +32,8 @@ The Kubernetes project was started by Google in 2014. Kubernetes builds upon a [
 
 <hr>
 
+#### Why containers?
+
 Looking for reasons why you should be using [containers](http://aucouranton.com/2014/06/13/linux-containers-parallels-lxc-openvz-docker-and-more/)?
 
 Here are some key points:
@@ -55,11 +57,40 @@ Here are some key points:
 * **Resource utilization**:
     High efficiency and density.
 
+#### What can Kubernetes do?
+
+Kubernetes can schedule and run application containers on clusters of physical or virtual machines.
+
+It can also do much more than that.
+
+Kubernetes satisfies a number of common needs of applications running in production, such as:
+* [co-locating helper processes](user-guide/pods.html),
+* [mounting storage systems](user-guide/volumes.html),
+* [distributing secrets](user-guide/secrets.html),
+* [application health checking](user-guide/production-pods.html#liveness-and-readiness-probes-aka-health-checks),
+* [replicating application instances](user-guide/replication-controller.html),
+* [horizontal auto-scaling](user-guide/horizontal-pod-autoscaler.html),
+* [load balancing](user-guide/services.html),
+* [rolling updates](user-guide/update-demo/), and
+* [resource monitoring](user-guide/monitoring.html).
+
+For more details, see the [user guide](user-guide/).
+
+#### Why and how is Kubernetes a platform?
+
+Even though Kubernetes provides a lot of functionality, there are always new scenarios that would benefit from new features. Ad hoc orchestration that is acceptable initially often requires robust automation at scale. Application-specific workflows can be streamlined to accelerate developer velocity. This is why Kubernetes was also designed to serve as a platform for building an ecosystem of components and tools to make it easier to deploy, scale, and manage applications.
+
+[Labels](user-guide/labels.html) empower users to organize their resources however they please. [Annotations](user-guide/annotations.html) enable users to decorate resources with custom information to facilitate their workflows and provide an easy way for management tools to checkpoint state.
+
+Additionally, the [Kubernetes control plane](admin/cluster-components.html) is built upon the same [APIs](api.html) that are available to developers and users. Users can write their own controllers, [schedulers](devel/scheduler.html), etc., if they choose, with [their own APIs](design/extending-api.html) that can be targeted by a general-purpose [command-line tool](user-guide/kubectl-overview.html).
+
+This [design](design/principles.html) has enabled a number of other systems to build atop Kubernetes.
+
 #### Kubernetes is not:
 
 Kubernetes is not a PaaS (Platform as a Service).
 * Kubernetes does not limit the types of applications supported. It does not dictate application frameworks, restrict the set of supported language runtimes, nor cater to only [12-factor applications](http://12factor.net/). Kubernetes aims to support an extremely diverse variety of workloads: if an application can run in a container, it should run great on Kubernetes.
-* Kubernetes is unopinionated in the source-to-image space. It does not build your application. CI workflow is an area where different users and projects have their own requirements and preferences, so we support layering CI workflows on Kubernetes but don't dictate how it should work.
+* Kubernetes is unopinionated in the source-to-image space. It does not build your application. Continuous Integration (CI) workflow is an area where different users and projects have their own requirements and preferences, so we support layering CI workflows on Kubernetes but don't dictate how it should work.
 * On the other hand, a number of PaaS systems run *on* Kubernetes, such as [Openshift](https://github.com/openshift/origin) and [Deis](http://deis.io/). You could also roll your own custom PaaS, integrate with a CI system of your choice, or get along just fine with just Kubernetes: bring your container images and deploy them on Kubernetes.
 * Since Kubernetes operates at the application level rather than at just the hardware level, it provides some generally applicable features common to PaaS offerings, such as deployment, scaling, load balancing, logging, monitoring, etc. However, Kubernetes is not monolithic, and these default solutions are optional and pluggable.
 
