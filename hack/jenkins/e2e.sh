@@ -243,12 +243,20 @@ TRUSTY_DEFAULT_SKIP_TESTS=(
 
 TRUSTY_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
+    # These tests rely on cadvisor, which doesn't quite work with Trusty and
+    # Trusty dev images yet. An internal issue has been filed to track the fix.
+    # TODO(wonderfly): Remove this once the internal issue is fixed.
     "Monitoring\sshould\sverify\smonitoring\spods\sand\sall\scluster\snodes\sare\savailable\son\sinfluxdb\susing\sheapster"
+    "Horizontal\spod\sautoscaling"
 )
 
 TRUSTY_DEV_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
+    # These tests rely on cadvisor, which doesn't quite work with Trusty and
+    # Trusty dev images yet. An internal issue has been filed to track the fix.
+    # TODO(wonderfly): Remove this once the internal issue is fixed.
     "Monitoring\sshould\sverify\smonitoring\spods\sand\sall\scluster\snodes\sare\savailable\son\sinfluxdb\susing\sheapster"
+    "Horizontal\spod\sautoscaling"
 )
 
 TRUSTY_BETA_SKIP_TESTS=(
