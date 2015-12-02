@@ -84,7 +84,9 @@ func (ps *ProcureState) Result() (*Spec, *mesos.Offer) {
 // and a deep copy of the given offer.
 func NewProcureState(offer *mesos.Offer) *ProcureState {
 	return &ProcureState{
-		spec:  &Spec{},
+		spec: &Spec{
+			OfferID: offer.GetId(),
+		},
 		offer: proto.Clone(offer).(*mesos.Offer),
 	}
 }

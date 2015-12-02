@@ -17,15 +17,13 @@ limitations under the License.
 package podtask
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pborman/uuid"
-	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/api"
 
@@ -58,11 +56,6 @@ type T struct {
 	ID  string
 	Pod api.Pod
 
-	// Stores the final procurement result, once set read-only.
-	// Meant to be set by algorith.SchedulerAlgorithm only.
-	Spec *Spec
-
-	Offer       offers.Perishable // thread-safe
 	State       StateType
 	Flags       map[FlagType]struct{}
 	CreateTime  time.Time
@@ -89,6 +82,7 @@ type Spec struct {
 	PortMap       []HostPortMapping
 	Data          []byte
 	Executor      *mesos.ExecutorInfo
+	OfferID       *mesos.OfferID
 }
 
 // mostly-clone this pod task. the clone will actually share the some fields:
@@ -110,17 +104,6 @@ func (t *T) Clone() *T {
 	return &clone
 }
 
-func (t *T) HasAcceptedOffer() bool {
-	return t.Spec != nil
-}
-
-func (t *T) GetOfferId() string {
-	if t.Offer == nil {
-		return ""
-	}
-	return t.Offer.Details().Id.GetValue()
-}
-
 func generateTaskName(pod *api.Pod) string {
 	ns := pod.Namespace
 	if ns == "" {
@@ -129,29 +112,17 @@ func generateTaskName(pod *api.Pod) string {
 	return fmt.Sprintf("%s.%s.pods", pod.Name, ns)
 }
 
-func (t *T) BuildTaskInfo() (*mesos.TaskInfo, error) {
-	if t.Spec == nil {
-		return nil, errors.New("no podtask.T.Spec given, cannot build task info")
-	}
-
+func (t *T) BuildTaskInfo(spec *Spec) (*mesos.TaskInfo, error) {
 	info := &mesos.TaskInfo{
 		Name:      proto.String(generateTaskName(&t.Pod)),
 		TaskId:    mutil.NewTaskID(t.ID),
-		Executor:  t.Spec.Executor,
-		Data:      t.Spec.Data,
-		Resources: t.Spec.Resources,
-		SlaveId:   mutil.NewSlaveID(t.Spec.SlaveID),
+		Executor:  spec.Executor,
+		Data:      spec.Data,
+		Resources: spec.Resources,
+		SlaveId:   mutil.NewSlaveID(spec.SlaveID),
 	}
 
 	return info, nil
-}
-
-// Clear offer-related details from the task, should be called if/when an offer
-// has already been assigned to a task but for some reason is no longer valid.
-func (t *T) Reset() {
-	log.V(3).Infof("Clearing offer(s) from pod %v", t.Pod.Name)
-	t.Offer = nil
-	t.Spec = nil
 }
 
 func (t *T) Set(f FlagType) {
@@ -171,7 +142,7 @@ func (t *T) Has(f FlagType) (exists bool) {
 func (t *T) Roles() []string {
 	var roles []string
 
-	if r, ok := t.Pod.ObjectMeta.Labels[annotation.RolesKey]; ok {
+	if r, ok := t.Pod.ObjectMeta.Labels[meta.RolesKey]; ok {
 		roles = strings.Split(r, ",")
 
 		for i, r := range roles {
@@ -222,11 +193,10 @@ func New(ctx api.Context, id string, pod *api.Pod, prototype *mesos.ExecutorInfo
 	return task, nil
 }
 
-func (t *T) SaveRecoveryInfo(dict map[string]string) {
-	dict[annotation.TaskIdKey] = t.ID
-	dict[annotation.SlaveIdKey] = t.Spec.SlaveID
-	dict[annotation.OfferIdKey] = t.Offer.Details().Id.GetValue()
-	dict[annotation.ExecutorIdKey] = t.Spec.Executor.ExecutorId.GetValue()
+func (t *T) SaveRecoveryInfo(dict map[string]string, spec *Spec) {
+	dict[meta.TaskIdKey] = t.ID
+	dict[meta.SlaveIdKey] = spec.SlaveID
+	dict[meta.ExecutorIdKey] = spec.Executor.ExecutorId.GetValue()
 }
 
 // reconstruct a task from metadata stashed in a pod entry. there are limited pod states that
@@ -241,12 +211,12 @@ func (t *T) SaveRecoveryInfo(dict map[string]string) {
 //
 // assumes that the pod data comes from the k8s registry and reflects the desired state.
 //
-func RecoverFrom(pod api.Pod) (*T, bool, error) {
-	// we only expect annotations if pod has been bound, which implies that it has already
-	// been scheduled and launched
-	if pod.Spec.NodeName == "" && len(pod.Annotations) == 0 {
+func RecoverFrom(pod api.Pod) (*T, error) {
+	// we cannot recover pods which are not bound because they don't have annotations yet
+	// Mesos will send us a status update if the task is still launching.
+	if pod.Spec.NodeName == "" {
 		log.V(1).Infof("skipping recovery for unbound pod %v/%v", pod.Namespace, pod.Name)
-		return nil, false, nil
+		return nil, nil
 	}
 
 	// only process pods that are not in a terminal state
@@ -254,13 +224,13 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 	case api.PodPending, api.PodRunning, api.PodUnknown: // continue
 	default:
 		log.V(1).Infof("skipping recovery for terminal pod %v/%v", pod.Namespace, pod.Name)
-		return nil, false, nil
+		return nil, nil
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 	key, err := MakePodKey(ctx, pod.Name)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	//TODO(jdef) recover ports (and other resource requirements?) from the pod spec as well
@@ -275,38 +245,19 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		mapper:     NewHostPortMapper(&pod),
 		launchTime: now,
 		bindTime:   now,
-		Spec:       &Spec{},
 	}
-	var (
-		offerId string
-	)
-	for _, k := range []string{
-		annotation.BindingHostKey,
-		annotation.TaskIdKey,
-		annotation.SlaveIdKey,
-		annotation.OfferIdKey,
-	} {
-		v, found := pod.Annotations[k]
-		if !found {
-			return nil, false, fmt.Errorf("incomplete metadata: missing value for pod annotation: %v", k)
-		}
-		switch k {
-		case annotation.BindingHostKey:
-			t.Spec.AssignedSlave = v
-		case annotation.SlaveIdKey:
-			t.Spec.SlaveID = v
-		case annotation.OfferIdKey:
-			offerId = v
-		case annotation.TaskIdKey:
-			t.ID = v
-		case annotation.ExecutorIdKey:
-			// this is nowhere near sufficient to re-launch a task, but we really just
-			// want this for tracking
-			t.Spec.Executor = &mesos.ExecutorInfo{ExecutorId: mutil.NewExecutorID(v)}
-		}
+
+	if pod.Annotations[meta.BindingHostKey] == "" {
+		return nil, fmt.Errorf("incomplete metadata: missing %v annotation. Task looks bound, but not launched.", meta.BindingHostKey)
 	}
-	t.Offer = offers.Expired(offerId, t.Spec.AssignedSlave, 0)
-	t.Flags[Launched] = struct{}{}
-	t.Flags[Bound] = struct{}{}
-	return t, true, nil
+
+	t.ID = pod.Annotations[meta.TaskIdKey]
+	if t.ID == "" {
+		return nil, fmt.Errorf("incomplete metadata: missing %v annotation", meta.TaskIdKey)
+	}
+
+	t.Set(Launched)
+	t.Set(Bound)
+
+	return t, nil
 }

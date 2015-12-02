@@ -63,7 +63,7 @@ func New(sched scheduler.Scheduler, client *client.Client, qr queuer.Queuer, del
 //
 // TODO(jdef) this needs an integration test
 func (s *podReconciler) Reconcile(t *podtask.T) {
-	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
+	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Pod.Spec.NodeName)
 	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
 	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
 	if err != nil {
@@ -81,11 +81,9 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 	}
 
 	log.Infof("pod %v scheduled on %q according to apiserver", pod.Name, pod.Spec.NodeName)
-	if t.Spec.AssignedSlave != pod.Spec.NodeName {
+	if t.Has(podtask.Launched) && !t.Has(podtask.Bound) {
 		if pod.Spec.NodeName == "" {
-			// pod is unscheduled.
-			// it's possible that we dropped the pod in the scheduler error handler
-			// because of task misalignment with the pod (task.Has(podtask.Launched) == true)
+			// pod was launched, but failed. Let's reschedule.
 
 			podKey, err := podtask.MakePodKey(ctx, pod.Name)
 			if err != nil {
@@ -106,11 +104,9 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 			log.V(3).Infof("reoffering pod %v", podKey)
 			s.qr.Reoffer(queuer.NewPodWithDeadline(pod, &now))
 		} else {
-			// pod is scheduled.
-			// not sure how this happened behind our backs. attempt to reconstruct
-			// at least a partial podtask.T record.
-			//TODO(jdef) reconcile the task
-			log.Errorf("pod already scheduled: %v", pod.Name)
+			// pod is pre-scheduled. Not much sense to try to re-schedule again
+			// on the same node
+			log.Errorf("dropping pre-scheduled pod which didn't launch: %v/%v", pod.Namespace, pod.Name)
 		}
 	} else {
 		//TODO(jdef) for now, ignore the fact that the rest of the spec may be different

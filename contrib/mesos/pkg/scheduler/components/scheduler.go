@@ -120,7 +120,7 @@ func New(
 		podtask.InstallDebugHandlers(core.Tasks(), mux)
 	})
 
-	core.controller = controller.New(client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
+	core.controller = controller.New(core, client, algorithm, recorder, q.Yield, errorHandler.Error, binder, startLatch)
 	return core
 }
 
@@ -144,6 +144,6 @@ func (c *sched) KillTask(id string) error {
 	return c.framework.KillTask(id)
 }
 
-func (c *sched) LaunchTask(t *podtask.T) error {
-	return c.framework.LaunchTask(t)
+func (c *sched) LaunchTask(t *podtask.T, spec *podtask.Spec) error {
+	return c.framework.LaunchTask(t, spec)
 }

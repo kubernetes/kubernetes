@@ -21,8 +21,10 @@ import (
 
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -47,9 +49,10 @@ type controller struct {
 	recorder  record.EventRecorder
 	client    *client.Client
 	started   chan<- struct{} // startup latch
+	sched     scheduler.Scheduler
 }
 
-func New(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
+func New(sched scheduler.Scheduler, client *client.Client, algorithm algorithm.SchedulerAlgorithm,
 	recorder record.EventRecorder, nextPod func() *api.Pod, error func(pod *api.Pod, schedulingErr error),
 	binder binder.Binder, started chan<- struct{}) Controller {
 	return &controller{
@@ -60,6 +63,7 @@ func New(client *client.Client, algorithm algorithm.SchedulerAlgorithm,
 		recorder:  recorder,
 		client:    client,
 		started:   started,
+		sched:     sched,
 	}
 }
 
@@ -83,25 +87,40 @@ func (s *controller) scheduleOne() {
 	}
 
 	log.V(3).Infof("Attempting to schedule: %+v", pod)
-	dest, err := s.algorithm.Schedule(pod)
+	offer, spec, err := s.algorithm.Schedule(pod)
 	if err != nil {
 		log.V(1).Infof("Failed to schedule: %+v", pod)
 		s.recorder.Eventf(pod, api.EventTypeWarning, FailedScheduling, "Error scheduling: %v", err)
 		s.error(pod, err)
 		return
 	}
-	b := &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
-		Target: api.ObjectReference{
-			Kind: "Node",
-			Name: dest,
-		},
+
+	// default upstream scheduler passes pod.Name as binding.Name
+	ctx := api.WithNamespace(api.NewContext(), pod.Namespace)
+	podKey, err := podtask.MakePodKey(ctx, pod.Name)
+	if err != nil {
+		offer.Release()
+		return
 	}
-	if err := s.binder.Bind(b); err != nil {
+
+	// meanwhile the task might be deleted (compare the deleter). Using the
+	// lock and the registry query we make sure we notice this here.
+	s.sched.Lock()
+	defer s.sched.Unlock()
+
+	task, state := s.sched.Tasks().ForPod(podKey)
+	if state != podtask.StatePending {
+		// looks like the pod was deleted between scheduling and launch
+		offer.Release()
+		return
+	}
+
+	if err := s.binder.Bind(task, spec); err != nil {
 		log.V(1).Infof("Failed to bind pod: %+v", err)
+		offer.Release()
 		s.recorder.Eventf(pod, api.EventTypeWarning, FailedScheduling, "Binding rejected: %v", err)
 		s.error(pod, err)
 		return
 	}
-	s.recorder.Eventf(pod, api.EventTypeNormal, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
+	s.recorder.Eventf(pod, api.EventTypeNormal, Scheduled, "Successfully assigned %v to %v", pod.Name, spec.AssignedSlave)
 }

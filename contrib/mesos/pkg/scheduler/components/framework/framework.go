@@ -58,7 +58,7 @@ type Framework interface {
 	Init(sched scheduler.Scheduler, electedMaster proc.Process, mux *http.ServeMux) error
 	Registration() <-chan struct{}
 	Offers() offers.Registry
-	LaunchTask(t *podtask.T) error
+	LaunchTask(t *podtask.T, spec *podtask.Spec) error
 	KillTask(id string) error
 }
 
@@ -548,7 +548,7 @@ func (k *framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, ta
 		log.Errorf("possible rogue pod; illegal api.PodStatusResult, unable to parse full pod name from: '%v' for task %v: %v",
 			podStatus.Name, taskId, err)
 	} else if pod, err := k.client.Pods(namespace).Get(name); err == nil {
-		if t, ok, err := podtask.RecoverFrom(*pod); ok {
+		if t, err := podtask.RecoverFrom(*pod); err == nil && t != nil {
 			log.Infof("recovered task %v from metadata in pod %v/%v", taskId, namespace, name)
 			_, err := k.sched.Tasks().Register(t)
 			if err != nil {
@@ -640,8 +640,12 @@ func (k *framework) makeTaskRegistryReconciler() taskreconciler.Action {
 	return taskreconciler.Action(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
 		taskToSlave := make(map[string]string)
 		for _, t := range k.sched.Tasks().List(explicitTaskFilter) {
-			if t.Spec.SlaveID != "" {
-				taskToSlave[t.ID] = t.Spec.SlaveID
+			if len(t.Pod.Annotations) == 0 {
+				continue
+			}
+
+			if sid := t.Pod.Annotations[meta.SlaveIdKey]; sid != "" {
+				taskToSlave[t.ID] = sid
 			}
 		}
 		return proc.ErrorChan(k.explicitlyReconcileTasks(drv, taskToSlave, cancel))
@@ -734,9 +738,15 @@ func (ks *framework) recoverTasks() error {
 		return err
 	}
 	recoverSlave := func(t *podtask.T) {
+		if len(t.Pod.Annotations) == 0 {
+			return
+		}
 
-		slaveId := t.Spec.SlaveID
-		ks.slaveHostNames.Register(slaveId, t.Offer.Host())
+		slaveId := t.Pod.Annotations[meta.SlaveIdKey]
+		hostname := t.Pod.Annotations[meta.BindingHostKey]
+		if slaveId != "" && hostname != "" {
+			ks.slaveHostNames.Register(slaveId, hostname)
+		}
 	}
 	for _, pod := range podList.Items {
 		if _, isMirrorPod := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; isMirrorPod {
@@ -745,14 +755,14 @@ func (ks *framework) recoverTasks() error {
 			// reflected in the apiserver afterward. the scheduler has no knowledge of them.
 			continue
 		}
-		if t, ok, err := podtask.RecoverFrom(pod); err != nil {
+		if t, err := podtask.RecoverFrom(pod); err != nil {
 			log.Errorf("failed to recover task from pod, will attempt to delete '%v/%v': %v", pod.Namespace, pod.Name, err)
 			err := ks.client.Pods(pod.Namespace).Delete(pod.Name, nil)
 			//TODO(jdef) check for temporary or not-found errors
 			if err != nil {
 				log.Errorf("failed to delete pod '%v/%v': %v", pod.Namespace, pod.Name, err)
 			}
-		} else if ok {
+		} else if t != nil {
 			ks.sched.Tasks().Register(t)
 			recoverSlave(t)
 			log.Infof("recovered task %v from pod %v/%v", t.ID, pod.Namespace, pod.Name)
@@ -767,15 +777,15 @@ func (ks *framework) KillTask(id string) error {
 	return err
 }
 
-func (ks *framework) LaunchTask(t *podtask.T) error {
-	taskInfo, err := t.BuildTaskInfo()
+func (ks *framework) LaunchTask(t *podtask.T, spec *podtask.Spec) error {
+	taskInfo, err := t.BuildTaskInfo(spec)
 	if err != nil {
 		return err
 	}
 
 	// assume caller is holding scheduler lock
 	taskList := []*mesos.TaskInfo{taskInfo}
-	offerIds := []*mesos.OfferID{t.Offer.Details().Id}
+	offerIds := []*mesos.OfferID{spec.OfferID}
 	filters := &mesos.Filters{}
 	_, err = ks.driver.LaunchTasks(offerIds, taskList, filters)
 	return err

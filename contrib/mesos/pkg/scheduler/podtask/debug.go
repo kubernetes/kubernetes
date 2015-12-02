@@ -36,11 +36,7 @@ func InstallDebugHandlers(reg Registry, mux *http.ServeMux) {
 			if err := func() (err error) {
 				podName := task.Pod.Name
 				podNamespace := task.Pod.Namespace
-				offerId := ""
-				if task.Offer != nil {
-					offerId = task.Offer.Id()
-				}
-				_, err = io.WriteString(w, fmt.Sprintf("%v\t%v/%v\t%v\t%v\n", task.ID, podNamespace, podName, task.State, offerId))
+				_, err = io.WriteString(w, fmt.Sprintf("%v\t%v/%v\t%v\n", task.ID, podNamespace, podName, task.State))
 				return
 			}(); err != nil {
 				log.Warningf("aborting debug handler: %v", err)
