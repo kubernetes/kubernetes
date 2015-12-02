@@ -7,15 +7,51 @@ VAGRANTFILE_API_VERSION = "2"
 # Require a recent version of vagrant otherwise some have reported errors setting host names on boxes
 Vagrant.require_version ">= 1.6.2"
 
-if ARGV.first == "up" && ENV['USING_KUBE_SCRIPTS'] != 'true'
-  raise Vagrant::Errors::VagrantError.new, <<END
-Calling 'vagrant up' directly is not supported.  Instead, please run the following:
-
-  export KUBERNETES_PROVIDER=vagrant
-  export VAGRANT_DEFAULT_PROVIDER=providername
-  ./cluster/kube-up.sh
-END
+def providercheck
+    err = %{
+    'vagrant up' directly is not supported.  Instead, please run the following:
+    export KUBERNETES_PROVIDER=vagrant
+    export VAGRANT_DEFAULT_PROVIDER=providername
+    ./cluster/kube-up.sh
+    }
+    if ARGV.first == "up" && ENV['USING_KUBE_SCRIPTS'] != 'true'
+        return false, err
+    end
+    return true, nil
 end
+
+def binarycheck
+  if ARGV.first == "up"
+    version="_output/release-stage/full/kubernetes/version"
+    
+    # make sure there is a release...
+    err="No kube release found ! If running from a clone of the git repo, please run 'make quick-release'."
+    return false, err if ! File.exist?(version)
+
+    # make sure release matches source...
+    gitcommit = `git log -1 --abbrev-commit --format="%h"`.gsub("\n","")
+    releasecommit = `cat #{version}`
+    checkbinary = (ENV['IGNORE_BINARY_CHECK']  == nil )
+    err = %{ 
+      Binary version not matching source! Salt binaries are used by the salt deployer. So this is dangerous.
+      To fix this, just re-run 'make quick-release' OR 'export IGNORE_BINARY_CHECK=true'.
+    }
+    puts "commit=#{gitcommit}\nrelease=#{releasecommit}\nchecking=#{checkbinary}"
+    if checkbinary && ! (releasecommit.include? gitcommit)
+        return false, err
+    end
+  end
+  return true, nil
+end
+
+# Below we try each assertion before proceeding.
+checks = [method(:providercheck), method(:binarycheck)]
+checks.each {|ch|
+    success, msg = ch.call
+    if !success
+        raise Vagrant::Errors::VagrantError.new, msg
+    end
+}
 
 # The number of minions to provision
 $num_minion = (ENV['NUM_NODES'] || 1).to_i
