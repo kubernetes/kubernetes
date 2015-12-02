@@ -1745,14 +1745,14 @@ Both these may change in the future. Incoming requests are matched against the H
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image’s entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container’s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image’s entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container’s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">args</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image’s cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container’s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image’s cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container’s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands">http://kubernetes.io/v1.1/docs/user-guide/containers.html#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2714,7 +2714,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">value</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to &#34;&#34;.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to &#34;&#34;.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3921,13 +3921,6 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Namespace of the referent; More info: <a href="http://kubernetes.io/v1.1/docs/user-guide/namespaces.html">http://kubernetes.io/v1.1/docs/user-guide/namespaces.html</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Name of the referent; More info: <a href="http://kubernetes.io/v1.1/docs/user-guide/identifiers.html#names">http://kubernetes.io/v1.1/docs/user-guide/identifiers.html#names</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -4170,7 +4163,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-10-29 20:26:22 UTC
+Last updated 2015-11-02 14:28:45 UTC
 </div>
 </div>
 

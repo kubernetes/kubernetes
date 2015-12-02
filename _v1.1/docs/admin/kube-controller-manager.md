@@ -69,7 +69,7 @@ kube-controller-manager
       --root-ca-file="": If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.
       --service-account-private-key-file="": Filename containing a PEM-encoded private RSA key used to sign service account tokens.
       --service-sync-period=5m0s: The period for syncing services with their external load balancers
-      --terminated-pod-gc-threshold=0: Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If <= 0, the terminated pod garbage collector is disabled.
+      --terminated-pod-gc-threshold=12500: Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If <= 0, the terminated pod garbage collector is disabled.
 {% endraw %}
 ```
 
