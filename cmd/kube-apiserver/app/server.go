@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -460,32 +461,30 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	legacyV1Group, err := latest.Group("")
-	if err != nil {
-		return err
+	if !latest.IsEnabled() {
+		return fmt.Errorf("legacy v1 kubegroup is not enabled")
 	}
 
 	storageDestinations := master.NewStorageDestinations()
 
 	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
-	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
-		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
+	if _, found := storageVersions[latest.PreferredExternalVersion.Group]; !found {
+		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", latest.PreferredExternalVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, latest.InterfacesFor, storageVersions[latest.PreferredExternalVersion.Group], s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
-		expGroup, err := latest.Group("extensions")
-		if err != nil {
+		if !extlatest.IsEnabled() {
 			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
-		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
-			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
+		if _, found := storageVersions[extlatest.PreferredExternalVersion.Group]; !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", extlatest.PreferredExternalVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix)
+		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, extlatest.InterfacesFor, storageVersions[extlatest.PreferredExternalVersion.Group], s.EtcdPathPrefix)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}

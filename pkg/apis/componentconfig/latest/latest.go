@@ -29,34 +29,42 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// ExternalVersions lists all known external versions for this group from most preferred to least preferred
-var ExternalVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
+// ExternalVersions lists all allowed external versions for this group from most preferred to least preferred
+var ExternalVersions = []unversioned.GroupVersion{}
+
+// PreferredExternalVersion is the most preferred external version (ExternalVersions[0])
+var PreferredExternalVersion = unversioned.GroupVersion{}
 
 // Codec is the Codec for the most preferred ExternalVersion
-var Codec = v1alpha1.Codec
+var Codec runtime.Codec
 
 // RESTMapper is a RESTMapper for all versions of the API group
 var RESTMapper meta.RESTMapper
 
 var Accessor = meta.NewAccessor()
 
+// availableVersions lists all known external versions for this group from most preferred to least preferred
+var availableVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
+
 func init() {
 	finalExternalVersions := []unversioned.GroupVersion{}
 
 	for _, allowedVersion := range registered.GroupVersionsForGroup(componentconfig.SchemeGroupVersion.Group) {
-		for _, externalVersion := range ExternalVersions {
+		for _, externalVersion := range availableVersions {
 			if externalVersion == allowedVersion {
 				finalExternalVersions = append(finalExternalVersions, externalVersion)
 			}
 		}
 	}
 
-	ExternalVersions = finalExternalVersions
-	Codec = nil
-	if len(ExternalVersions) > 0 {
-		Codec = runtime.CodecFor(api.Scheme, ExternalVersions[0].String())
-		RESTMapper = newRESTMapper()
+	if len(finalExternalVersions) == 0 {
+		return
 	}
+
+	ExternalVersions = finalExternalVersions
+	PreferredExternalVersion = ExternalVersions[0]
+	Codec = runtime.CodecFor(api.Scheme, PreferredExternalVersion.String())
+	RESTMapper = newRESTMapper()
 }
 
 const importPrefix = "k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -78,8 +86,8 @@ func newRESTMapper() meta.RESTMapper {
 
 // interfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
-func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
+func InterfacesFor(groupVersionString string) (*meta.VersionInterfaces, error) {
+	switch groupVersionString {
 	case v1alpha1.SchemeGroupVersion.String():
 		return &meta.VersionInterfaces{
 			Codec:            v1alpha1.Codec,
@@ -88,6 +96,10 @@ func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, ExternalVersions)
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", groupVersionString, ExternalVersions)
 	}
+}
+
+func IsEnabled() bool {
+	return len(ExternalVersions) > 0
 }

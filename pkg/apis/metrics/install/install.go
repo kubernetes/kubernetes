@@ -34,7 +34,7 @@ func init() {
 	}
 
 	groupMeta := latest.GroupMeta{
-		GroupVersion:  metlatest.ExternalVersions[0],
+		GroupVersion:  metlatest.PreferredExternalVersion,
 		GroupVersions: metlatest.ExternalVersions,
 		Codec:         metlatest.Codec,
 		RESTMapper:    metlatest.RESTMapper,

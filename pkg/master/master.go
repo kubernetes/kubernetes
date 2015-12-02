@@ -36,6 +36,7 @@ import (
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -73,6 +74,7 @@ import (
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/ui"
@@ -643,9 +645,9 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		g, err := latest.Group("extensions")
-		if err != nil {
-			glog.Fatalf("Unable to setup experimental api: %v", err)
+
+		if !extlatest.IsEnabled() {
+			glog.Fatalf("Unable to setup experimental api because the group is not enabled")
 		}
 		expAPIVersions := []unversioned.GroupVersionForDiscovery{
 			{
@@ -653,16 +655,16 @@ func (m *Master) init(c *Config) {
 				Version:      expVersion.GroupVersion.Version,
 			},
 		}
-		storageVersion, found := c.StorageVersions[g.GroupVersion.Group]
+		storageVersion, found := c.StorageVersions[extlatest.PreferredExternalVersion.Group]
 		if !found {
-			glog.Fatalf("Couldn't find storage version of group %v", g.GroupVersion.Group)
+			glog.Fatalf("Couldn't find storage version of group %v", extlatest.PreferredExternalVersion.Group)
 		}
 		group := unversioned.APIGroup{
-			Name:             g.GroupVersion.Group,
+			Name:             extlatest.PreferredExternalVersion.Group,
 			Versions:         expAPIVersions,
 			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").GroupVersion.Group, group)
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+extlatest.PreferredExternalVersion.Group, group)
 		allGroups = append(allGroups, group)
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
@@ -853,12 +855,12 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 		Root:                m.apiPrefix,
 		RequestInfoResolver: m.newRequestInfoResolver(),
 
-		Mapper: latest.GroupOrDie("").RESTMapper,
+		Mapper: latest.RESTMapper,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
-		Linker:    latest.GroupOrDie("").SelfLinker,
+		Linker:    runtime.SelfLinker(latest.Accessor),
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -1001,7 +1003,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	serverGroupVersion := latest.GroupOrDie("").GroupVersion
+	serverGroupVersion := latest.PreferredExternalVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
@@ -1012,9 +1014,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:             thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
-		Codec:              thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
-		Linker:             latest.GroupOrDie("extensions").SelfLinker,
+		Mapper:             thirdpartyresourcedata.NewMapper(extlatest.RESTMapper, kind, version, group),
+		Codec:              thirdpartyresourcedata.NewCodec(extlatest.Codec, kind),
+		Linker:             runtime.SelfLinker(extlatest.Accessor),
 		Storage:            storage,
 		ServerGroupVersion: &serverGroupVersion,
 
@@ -1090,8 +1092,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 
-	extensionsGroup := latest.GroupOrDie("extensions")
-	serverGroupVersion := latest.GroupOrDie("").GroupVersion
+	defaultExternalVersionCopy := latest.PreferredExternalVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                m.apiGroupPrefix,
@@ -1101,12 +1102,12 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:             extensionsGroup.RESTMapper,
-		Codec:              extensionsGroup.Codec,
-		Linker:             extensionsGroup.SelfLinker,
+		Mapper:             extlatest.RESTMapper,
+		Codec:              extlatest.Codec,
+		Linker:             runtime.SelfLinker(extlatest.Accessor),
 		Storage:            storage,
-		GroupVersion:       extensionsGroup.GroupVersion,
-		ServerGroupVersion: &serverGroupVersion,
+		GroupVersion:       extlatest.PreferredExternalVersion,
+		ServerGroupVersion: &defaultExternalVersionCopy,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

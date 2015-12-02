@@ -95,7 +95,7 @@ type ConvertOptions struct {
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
-	o.outputVersion, err = cmdutil.OutputVersion(cmd, &latest.ExternalVersions[0])
+	o.outputVersion, err = cmdutil.OutputVersion(cmd, &latest.PreferredExternalVersion)
 	if err != nil {
 		return err
 	}

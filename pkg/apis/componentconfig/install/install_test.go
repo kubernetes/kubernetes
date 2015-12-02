@@ -20,17 +20,17 @@ import (
 	"encoding/json"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	cclatest "k8s.io/kubernetes/pkg/apis/componentconfig/latest"
 )
 
+// TODO its weird to round-trip an internal type
 func TestCodec(t *testing.T) {
 	daemonSet := componentconfig.KubeProxyConfiguration{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("componentconfig").Codec.Encode(&daemonSet)
+	data, err := cclatest.Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != cclatest.ExternalVersions[0].String() || other.Kind != "KubeProxyConfiguration" {
+	if other.APIVersion != cclatest.PreferredExternalVersion.String() || other.Kind != "KubeProxyConfiguration" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
@@ -47,7 +47,7 @@ func TestInterfacesFor(t *testing.T) {
 	if _, err := cclatest.InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]unversioned.GroupVersion{cclatest.ExternalVersions[0]}, cclatest.ExternalVersions...) {
+	for i, groupVersion := range append([]unversioned.GroupVersion{cclatest.PreferredExternalVersion}, cclatest.ExternalVersions...) {
 		if vi, err := cclatest.InterfacesFor(groupVersion.String()); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
@@ -58,16 +58,16 @@ func TestRESTMapper(t *testing.T) {
 	gv := unversioned.GroupVersion{Group: "componentconfig", Version: "v1alpha1"}
 	proxyGVK := gv.WithKind("KubeProxyConfiguration")
 
-	if gvk, err := latest.GroupOrDie("componentconfig").RESTMapper.KindFor("kubeproxyconfiguration"); err != nil || gvk != proxyGVK {
+	if gvk, err := cclatest.RESTMapper.KindFor("kubeproxyconfiguration"); err != nil || gvk != proxyGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := latest.GroupOrDie("componentconfig").RESTMapper.RESTMapping(proxyGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != proxyGVK || m.Resource != "kubeproxyconfigurations" {
+	if m, err := cclatest.RESTMapper.RESTMapping(proxyGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != proxyGVK || m.Resource != "kubeproxyconfigurations" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie("componentconfig").GroupVersions {
-		mapping, err := latest.GroupOrDie("componentconfig").RESTMapper.RESTMapping(proxyGVK.GroupKind(), version.Version)
+	for _, version := range cclatest.ExternalVersions {
+		mapping, err := cclatest.RESTMapper.RESTMapping(proxyGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -80,7 +80,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("componentconfig").InterfacesFor(gv.String())
+		interfaces, _ := cclatest.InterfacesFor(gv.String())
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

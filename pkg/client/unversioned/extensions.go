@@ -20,8 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -129,24 +130,24 @@ func NewExtensionsOrDie(c *Config) *ExtensionsClient {
 
 func setExtensionsDefaults(config *Config) error {
 	// if experimental group is not registered, return an error
-	g, err := latest.Group("extensions")
-	if err != nil {
-		return err
+	if !extlatest.IsEnabled() {
+		return fmt.Errorf("group %v is not enabled", extensions.SchemeGroupVersion)
 	}
+
 	config.Prefix = "apis/"
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := extlatest.PreferredExternalVersion
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.GroupVersion.String())
+	versionInterfaces, err := extlatest.InterfacesFor(config.GroupVersion.String())
 	if err != nil {
 		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %v)",
-			config.GroupVersion, g.GroupVersions)
+			config.GroupVersion, extlatest.ExternalVersions)
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

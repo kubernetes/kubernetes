@@ -32,8 +32,6 @@ var (
 	Group = allGroups.Group
 	// RegisterGroup is a shortcut to allGroups.RegisterGroup.
 	RegisterGroup = allGroups.RegisterGroup
-	// GroupOrDie is a shortcut to allGroups.GroupOrDie.
-	GroupOrDie = allGroups.GroupOrDie
 	// AllPreferredGroupVersions returns the preferred versions of all
 	// registered groups in the form of "group1/version1,group2/version2,..."
 	AllPreferredGroupVersions = allGroups.AllPreferredGroupVersions
@@ -72,22 +70,6 @@ func (g GroupMetaMap) Group(group string) (GroupMeta, error) {
 func (g GroupMetaMap) IsRegistered(group string) bool {
 	_, found := g[group]
 	return found
-}
-
-// TODO: This is an expedient function, because we don't check if a Group is
-// supported throughout the code base. We will abandon this function and
-// checking the error returned by the Group() function.
-func (g GroupMetaMap) GroupOrDie(group string) GroupMeta {
-	groupMeta, found := g[group]
-	if !found {
-		const msg = "Please check the KUBE_API_VERSIONS environment variable."
-		if group == "" {
-			panic("The legacy v1 API is not registered. " + msg)
-		} else {
-			panic(fmt.Sprintf("No version is registered for group %s. ", group) + msg)
-		}
-	}
-	return *groupMeta
 }
 
 // AllPreferredGroupVersions returns the preferred versions of all registered
