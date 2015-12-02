@@ -134,6 +134,8 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 		APIKey:           cfg.Global.ApiKey,
 		TenantID:         cfg.Global.TenantId,
 		TenantName:       cfg.Global.TenantName,
+		DomainID:         cfg.Global.DomainId,
+		DomainName:       cfg.Global.DomainName,
 
 		// Persistent service, so we need to be able to renew tokens.
 		AllowReauth: true,
