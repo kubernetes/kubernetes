@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
@@ -70,7 +69,8 @@ func ClusterLevelLoggingWithKibana(f *Framework) {
 	// Wait for the Kibana pod(s) to enter the running state.
 	By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
-	pods, err := f.Client.Pods(api.NamespaceSystem).List(label, fields.Everything(), unversioned.ListOptions{})
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{label}}
+	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = waitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)

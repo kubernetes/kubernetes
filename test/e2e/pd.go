@@ -32,8 +32,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -55,7 +53,7 @@ var _ = Describe("Pod Disks", func() {
 
 		podClient = framework.Client.Pods(framework.Namespace.Name)
 
-		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodes, err := framework.Client.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")

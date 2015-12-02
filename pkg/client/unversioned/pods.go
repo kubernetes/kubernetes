@@ -19,8 +19,6 @@ package unversioned
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +29,7 @@ type PodsNamespacer interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodList, error)
+	List(opts unversioned.ListOptions) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(pod *api.Pod) (*api.Pod, error)
@@ -57,9 +55,9 @@ func newPods(c *Client, namespace string) *pods {
 }
 
 // List takes label and field selectors, and returns the list of pods that match those selectors.
-func (c *pods) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.PodList, err error) {
+func (c *pods) List(opts unversioned.ListOptions) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 

@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func getResourceQuotasResoureName() string {
@@ -115,7 +113,7 @@ func TestResourceQuotaList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: resourceQuotaList},
 	}
-	response, err := c.Setup(t).ResourceQuotas(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	response, err := c.Setup(t).ResourceQuotas(ns).List(unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 

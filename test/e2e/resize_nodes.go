@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -234,7 +233,8 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{label}}
+		pods, err := c.Pods(ns).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -397,7 +397,7 @@ var _ = Describe("Nodes", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		systemPods, err := c.Pods(api.NamespaceSystem).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		systemPods, err := c.Pods(api.NamespaceSystem).List(unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = len(systemPods.Items)
 	})
@@ -511,7 +511,8 @@ var _ = Describe("Nodes", func() {
 
 				By("choose a node with at least one pod - we will block some network traffic on this node")
 				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-				pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{}) // list pods after all have been scheduled
+				options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{label}}
+				pods, err := c.Pods(ns).List(options) // list pods after all have been scheduled
 				Expect(err).NotTo(HaveOccurred())
 				nodeName := pods.Items[0].Spec.NodeName
 

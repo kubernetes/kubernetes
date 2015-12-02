@@ -62,7 +62,7 @@ var _ = Describe("Reboot", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := api.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.Client.Events(namespaceName).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			events, err := f.Client.Events(namespaceName).List(unversioned.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {

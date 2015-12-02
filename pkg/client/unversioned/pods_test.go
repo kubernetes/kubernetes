@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -34,7 +33,7 @@ func TestListEmptyPods(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	podList, err := c.Setup(t).Pods(ns).List(unversioned.ListOptions{})
 	c.Validate(t, podList, err)
 }
 
@@ -60,7 +59,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	receivedPodList, err := c.Setup(t).Pods(ns).List(unversioned.ListOptions{})
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -94,7 +93,8 @@ func TestListPodsLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedPodList, err := c.Pods(ns).List(selector, fields.Everything(), unversioned.ListOptions{})
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	receivedPodList, err := c.Pods(ns).List(options)
 	c.Validate(t, receivedPodList, err)
 }
 

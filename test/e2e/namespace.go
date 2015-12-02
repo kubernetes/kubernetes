@@ -18,15 +18,12 @@ package e2e
 
 import (
 	"fmt"
-	//"k8s.io/kubernetes/pkg/api"
 	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -61,7 +58,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
-			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			nsList, err := c.Namespaces().List(unversioned.ListOptions{})
 			if err != nil {
 				return false, err
 			}

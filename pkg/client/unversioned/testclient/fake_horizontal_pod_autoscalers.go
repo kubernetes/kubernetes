@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -41,10 +40,14 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string) (*extensions.HorizontalP
 	return obj.(*extensions.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, label, field), &extensions.HorizontalPodAutoscalerList{})
+func (c *FakeHorizontalPodAutoscalers) List(opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, opts), &extensions.HorizontalPodAutoscalerList{})
 	if obj == nil {
 		return nil, err
+	}
+	label := opts.LabelSelector.Selector
+	if label == nil {
+		label = labels.Everything()
 	}
 	list := &extensions.HorizontalPodAutoscalerList{}
 	for _, a := range obj.(*extensions.HorizontalPodAutoscalerList).Items {

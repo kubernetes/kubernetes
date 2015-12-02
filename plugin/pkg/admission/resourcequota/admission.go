@@ -29,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
@@ -52,7 +50,7 @@ type quota struct {
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			return client.ResourceQuotas(api.NamespaceAll).List(unversioned.ListOptions{})
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return client.ResourceQuotas(api.NamespaceAll).Watch(options)

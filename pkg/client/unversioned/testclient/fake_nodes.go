@@ -19,8 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +37,8 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("nodes", label, field), &api.NodeList{})
+func (c *FakeNodes) List(opts unversioned.ListOptions) (*api.NodeList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("nodes", opts), &api.NodeList{})
 	if obj == nil {
 		return nil, err
 	}

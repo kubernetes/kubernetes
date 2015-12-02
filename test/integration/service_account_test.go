@@ -41,8 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -173,7 +171,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
-		secrets, err := c.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		secrets, err := c.Secrets(ns).List(unversioned.ListOptions{})
 		// Retrieval errors should fail
 		if err != nil {
 			return false, err
@@ -514,11 +512,11 @@ func doServiceAccountAPIRequests(t *testing.T, c *client.Client, ns string, auth
 
 	readOps := []testOperation{
 		func() error {
-			_, err := c.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			_, err := c.Secrets(ns).List(unversioned.ListOptions{})
 			return err
 		},
 		func() error {
-			_, err := c.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			_, err := c.Pods(ns).List(unversioned.ListOptions{})
 			return err
 		},
 	}

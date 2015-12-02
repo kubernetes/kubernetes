@@ -29,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -91,7 +89,7 @@ func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
 	return nil, nil
 }
 
-func (m *FakeNodeHandler) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error) {
+func (m *FakeNodeHandler) List(opts unversioned.ListOptions) (*api.NodeList, error) {
 	defer func() { m.RequestCount++ }()
 	var nodes []*api.Node
 	for i := 0; i < len(m.UpdatedNodes); i++ {

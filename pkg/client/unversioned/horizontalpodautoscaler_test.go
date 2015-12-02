@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func getHorizontalPodAutoscalersResoureName() string {
@@ -100,7 +98,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: horizontalPodAutoscalerList},
 	}
-	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).List(unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 

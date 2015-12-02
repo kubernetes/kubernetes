@@ -18,8 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Fake implements ComponentStatusInterface.
@@ -36,8 +35,8 @@ func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
 	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("componentstatuses", label, field), &api.ComponentStatusList{})
+func (c *FakeComponentStatuses) List(opts unversioned.ListOptions) (result *api.ComponentStatusList, err error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("componentstatuses", opts), &api.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}
