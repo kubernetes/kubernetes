@@ -106,7 +106,9 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		outputFormat = "template"
 	}
 
-	templateFormat := []string{"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file="}
+	templateFormat := []string{
+		"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file=", "custom-columns=", "custom-columns-file=",
+	}
 	for _, format := range templateFormat {
 		if strings.HasPrefix(outputFormat, format) {
 			templateFile = outputFormat[len(format):]
