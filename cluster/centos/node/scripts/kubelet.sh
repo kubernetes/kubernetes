@@ -27,13 +27,13 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 KUBE_LOG_LEVEL="--v=4"
 
 # --address=0.0.0.0: The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
-MINION_ADDRESS="--address=${NODE_ADDRESS}"
+NODE_ADDRESS="--address=${NODE_ADDRESS}"
 
 # --port=10250: The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
-MINION_PORT="--port=10250"
+NODE_PORT="--port=10250"
 
 # --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
-MINION_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
+NODE_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
 
 # --api-servers=[]: List of Kubernetes API servers for publishing events, 
 # and reading pods and services. (ip:port), comma separated.
@@ -48,9 +48,9 @@ EOF
 
 KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
                     \${KUBE_LOG_LEVEL}       \\
-                    \${MINION_ADDRESS}       \\
-                    \${MINION_PORT}          \\
-                    \${MINION_HOSTNAME}      \\
+                    \${NODE_ADDRESS}         \\
+                    \${NODE_PORT}            \\
+                    \${NODE_HOSTNAME}        \\
                     \${KUBELET_API_SERVER}   \\
                     \${KUBE_ALLOW_PRIV}      \\
                     \${KUBELET_ARGS}"

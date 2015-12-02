@@ -39,7 +39,7 @@ func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
 	return obj.(*api.Namespace), err
 }
 
-func (c *FakeNamespaces) List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error) {
+func (c *FakeNamespaces) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NamespaceList, error) {
 	obj, err := c.Fake.Invokes(NewRootListAction("namespaces", label, field), &api.NamespaceList{})
 	if obj == nil {
 		return nil, err
@@ -71,8 +71,8 @@ func (c *FakeNamespaces) Delete(name string) error {
 	return err
 }
 
-func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", label, field, opts))
+func (c *FakeNamespaces) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", opts))
 }
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {

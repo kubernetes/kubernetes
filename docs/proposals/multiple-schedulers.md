@@ -152,6 +152,12 @@ which the client has set a scheduler annotation that does not correspond to a ru
 2. Dynamic launching scheduler(s) and registering to admission controller (as an external call). This also
 requires some work on authorization and authentication to control what schedulers can write the /binding
 subresource of which pods.
+3. Optimize the behaviors of priority functions in multi-scheduler scenario. In the case where multiple schedulers have
+the same predicate and priority functions (for example, when using multiple schedulers for parallelism rather than to
+customize the scheduling policies), all schedulers would tend to pick the same node as "best" when scheduling identical
+pods and therefore would be likely to conflict on the Kubelet. To solve this problem, we can pass
+an optional flag such as `--randomize-node-selection=N` to scheduler, setting this flag would cause the scheduler to pick
+randomly among the top N nodes instead of the one with the highest score.
 
 ## Other issues/discussions related to scheduler design
 

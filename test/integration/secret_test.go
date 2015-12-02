@@ -21,6 +21,7 @@ package integration
 // This file tests use of the secrets API resource.
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -72,7 +74,7 @@ func TestSecrets(t *testing.T) {
 
 	m = master.New(&master.Config{
 		StorageDestinations:   storageDestinations,
-		KubeletClient:         client.FakeKubeletClient{},
+		KubeletClient:         kubeletclient.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
@@ -81,6 +83,7 @@ func TestSecrets(t *testing.T) {
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		StorageVersions:       storageVersions,
+		PublicAddress:         net.ParseIP("192.168.10.4"),
 	})
 
 	framework.DeleteAllEtcdKeys()

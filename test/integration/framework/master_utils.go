@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -36,6 +37,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
@@ -126,8 +128,8 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	if masterConfig == nil {
 		etcdClient := NewEtcdClient()
 		storageVersions := make(map[string]string)
-		etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion, etcdtest.PathPrefix())
-		storageVersions[""] = latest.GroupOrDie("").GroupVersion
+		etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion.String(), etcdtest.PathPrefix())
+		storageVersions[""] = latest.GroupOrDie("").GroupVersion.String()
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
@@ -143,7 +145,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig = &master.Config{
 			StorageDestinations:  storageDestinations,
 			StorageVersions:      storageVersions,
-			KubeletClient:        client.FakeKubeletClient{},
+			KubeletClient:        kubeletclient.FakeKubeletClient{},
 			EnableLogsSupport:    false,
 			EnableProfiling:      true,
 			EnableSwaggerSupport: true,
@@ -189,7 +191,7 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 
 // StopRC stops the rc via kubectl's stop library
 func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
-	reaper, err := kubectl.ReaperFor("ReplicationController", restClient)
+	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), restClient)
 	if err != nil || reaper == nil {
 		return err
 	}
@@ -202,7 +204,7 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 
 // ScaleRC scales the given rc to the given replicas.
 func ScaleRC(name, ns string, replicas int, restClient *client.Client) (*api.ReplicationController, error) {
-	scaler, err := kubectl.ScalerFor("ReplicationController", restClient)
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), restClient)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +243,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
 	hostField := fields.OneTermEqualSelector(client.PodHost, host)
-	pods, err := restClient.Pods(TestNS).List(labels.Everything(), hostField)
+	pods, err := restClient.Pods(TestNS).List(labels.Everything(), hostField, unversioned.ListOptions{})
 	if err != nil || len(pods.Items) == numPods {
 		return err
 	}
@@ -285,7 +287,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 
 	m := master.New(&master.Config{
 		StorageDestinations: storageDestinations,
-		KubeletClient:       client.FakeKubeletClient{},
+		KubeletClient:       kubeletclient.FakeKubeletClient{},
 		EnableLogsSupport:   false,
 		EnableProfiling:     true,
 		EnableUISupport:     false,

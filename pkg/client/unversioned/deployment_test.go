@@ -100,7 +100,7 @@ func TestDeploymentList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: deploymentList},
 	}
-	response, err := c.Setup(t).Deployments(ns).List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Deployments(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -169,6 +169,6 @@ func TestDeploymentWatch(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)
 }

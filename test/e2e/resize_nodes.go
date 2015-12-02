@@ -185,10 +185,11 @@ func rcByNamePort(name string, replicas int, image string, port int, labels map[
 func rcByNameContainer(name string, replicas int, image string, labels map[string]string, c api.Container) *api.ReplicationController {
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
+	gracePeriod := int64(0)
 	return &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: latest.GroupOrDie("").Version,
+			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -203,7 +204,8 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 					Labels: labels,
 				},
 				Spec: api.PodSpec{
-					Containers: []api.Container{c},
+					Containers:                    []api.Container{c},
+					TerminationGracePeriodSeconds: &gracePeriod,
 				},
 			},
 		},
@@ -232,7 +234,7 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		pods, err := c.Pods(ns).List(label, fields.Everything())
+		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +357,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	}()
 
 	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !waitForNodeToBe(c, node.Name, true, resizeNodeReadyTimeout) {
+	if !waitForNodeToBe(c, node.Name, api.NodeReady, true, resizeNodeReadyTimeout) {
 		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 
@@ -371,7 +373,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	}
 
 	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !waitForNodeToBe(c, node.Name, false, resizeNodeNotReadyTimeout) {
+	if !waitForNodeToBe(c, node.Name, api.NodeReady, false, resizeNodeNotReadyTimeout) {
 		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
@@ -395,7 +397,7 @@ var _ = Describe("Nodes", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		systemPods, err := c.Pods(api.NamespaceSystem).List(labels.Everything(), fields.Everything())
+		systemPods, err := c.Pods(api.NamespaceSystem).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = len(systemPods.Items)
 	})
@@ -509,7 +511,7 @@ var _ = Describe("Nodes", func() {
 
 				By("choose a node with at least one pod - we will block some network traffic on this node")
 				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-				pods, err := c.Pods(ns).List(label, fields.Everything()) // list pods after all have been scheduled
+				pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{}) // list pods after all have been scheduled
 				Expect(err).NotTo(HaveOccurred())
 				nodeName := pods.Items[0].Spec.NodeName
 

@@ -48,6 +48,10 @@ import (
 // are therefore not allowed to set manually.
 var specialParams = sets.NewString("timeout")
 
+func init() {
+	metrics.Register()
+}
+
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -109,7 +113,6 @@ type Request struct {
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
 	codec runtime.Codec) *Request {
-	metrics.Register()
 	return &Request{
 		client:     client,
 		verb:       verb,
@@ -424,8 +427,42 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 		return r
 	}
 	for k, v := range params {
-		for _, vv := range v {
-			r.setParam(k, vv)
+		for _, value := range v {
+			// TODO: Move it to setParam method, once we get rid of
+			// FieldSelectorParam & LabelSelectorParam methods.
+			if k == unversioned.LabelSelectorQueryParam(r.apiVersion) && value == "" {
+				// Don't set an empty selector for backward compatibility.
+				// Since there is no way to get the difference between empty
+				// and unspecified string, we don't set it to avoid having
+				// labelSelector= param in every request.
+				continue
+			}
+			if k == unversioned.FieldSelectorQueryParam(r.apiVersion) {
+				if value == "" {
+					// Don't set an empty selector for backward compatibility.
+					// Since there is no way to get the difference between empty
+					// and unspecified string, we don't set it to avoid having
+					// fieldSelector= param in every request.
+					continue
+				}
+				// TODO: Filtering should be handled somewhere else.
+				selector, err := fields.ParseSelector(value)
+				if err != nil {
+					r.err = fmt.Errorf("unparsable field selector: %v", err)
+					return r
+				}
+				filteredSelector, err := selector.Transform(
+					func(field, value string) (newField, newValue string, err error) {
+						return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+					})
+				if err != nil {
+					r.err = fmt.Errorf("untransformable field selector: %v", err)
+					return r
+				}
+				value = filteredSelector.String()
+			}
+
+			r.setParam(k, value)
 		}
 	}
 	return r
@@ -458,19 +495,6 @@ func (r *Request) Timeout(d time.Duration) *Request {
 		return r
 	}
 	r.timeout = d
-	return r
-}
-
-// Timeout makes the request use the given duration as a timeout. Sets the "timeoutSeconds"
-// parameter.
-func (r *Request) TimeoutSeconds(d time.Duration) *Request {
-	if r.err != nil {
-		return r
-	}
-	if d != 0 {
-		timeout := int64(d.Seconds())
-		r.Param("timeoutSeconds", strconv.FormatInt(timeout, 10))
-	}
 	return r
 }
 

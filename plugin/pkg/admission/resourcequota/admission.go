@@ -52,10 +52,10 @@ type quota struct {
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			return client.ResourceQuotas(api.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)

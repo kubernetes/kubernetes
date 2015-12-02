@@ -440,9 +440,12 @@ func validateHostPathVolumeSource(hostPath *api.HostPathVolumeSource) validation
 
 func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource) validation.ErrorList {
 	allErrs := validation.ErrorList{}
-	if gitRepo.Repository == "" {
+	if len(gitRepo.Repository) == 0 {
 		allErrs = append(allErrs, validation.NewRequiredError("repository"))
 	}
+
+	pathErrs := validateVolumeSourcePath(gitRepo.Directory, "directory")
+	allErrs = append(allErrs, pathErrs...)
 	return allErrs
 }
 
@@ -570,23 +573,34 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 		if len(downwardAPIVolumeFile.Path) == 0 {
 			allErrs = append(allErrs, validation.NewRequiredError("path"))
 		}
-		if path.IsAbs(downwardAPIVolumeFile.Path) {
-			allErrs = append(allErrs, validation.NewForbiddenError("path", "must not be an absolute path"))
-		}
-		items := strings.Split(downwardAPIVolumeFile.Path, string(os.PathSeparator))
-		for _, item := range items {
-			if item == ".." {
-				allErrs = append(allErrs, validation.NewInvalidError("path", downwardAPIVolumeFile.Path, "must not contain \"..\"."))
-			}
-		}
-		if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
-			allErrs = append(allErrs, validation.NewInvalidError("path", downwardAPIVolumeFile.Path, "must not start with \"..\"."))
-		}
+		allErrs = append(allErrs, validateVolumeSourcePath(downwardAPIVolumeFile.Path, "path")...)
 		allErrs = append(allErrs, validateObjectFieldSelector(&downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions).Prefix("FieldRef")...)
 	}
 	return allErrs
 }
 
+// This validate will make sure targetPath:
+// 1. is not abs path
+// 2. does not contain '..'
+// 3. does not start with '..'
+func validateVolumeSourcePath(targetPath string, field string) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	if path.IsAbs(targetPath) {
+		allErrs = append(allErrs, validation.NewForbiddenError(field, "must not be an absolute path"))
+	}
+	// TODO assume OS of api server & nodes are the same for now
+	items := strings.Split(targetPath, string(os.PathSeparator))
+
+	for _, item := range items {
+		if item == ".." {
+			allErrs = append(allErrs, validation.NewInvalidError(field, targetPath, "must not contain \"..\""))
+		}
+	}
+	if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
+		allErrs = append(allErrs, validation.NewInvalidError(field, targetPath, "must not start with \"..\""))
+	}
+	return allErrs
+}
 func validateRBD(rbd *api.RBDVolumeSource) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if len(rbd.CephMonitors) == 0 {
@@ -880,8 +894,9 @@ func validateProbe(probe *api.Probe) validation.ErrorList {
 		return allErrs
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler)...)
-	allErrs = append(allErrs, ValidatePositiveField(probe.InitialDelaySeconds, "initialDelaySeconds")...)
-	allErrs = append(allErrs, ValidatePositiveField(probe.TimeoutSeconds, "timeoutSeconds")...)
+
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.InitialDelaySeconds), "initialDelaySeconds")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(probe.TimeoutSeconds), "timeoutSeconds")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(probe.PeriodSeconds), "periodSeconds")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(probe.SuccessThreshold), "successThreshold")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(probe.FailureThreshold), "failureThreshold")...)
@@ -932,7 +947,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) validation.ErrorList {
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, validation.NewRequiredError("path"))
 	}
-	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntVal) {
+	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntValue()) {
 		allErrors = append(allErrors, validation.NewInvalidError("port", http.Port, PortRangeErrorMsg))
 	} else if http.Port.Type == intstr.String && !validation.IsValidPortName(http.Port.StrVal) {
 		allErrors = append(allErrors, validation.NewInvalidError("port", http.Port.StrVal, PortNameErrorMsg))
@@ -946,7 +961,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction) validation.ErrorList {
 
 func validateTCPSocketAction(tcp *api.TCPSocketAction) validation.ErrorList {
 	allErrors := validation.ErrorList{}
-	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntVal) {
+	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntValue()) {
 		allErrors = append(allErrors, validation.NewInvalidError("port", tcp.Port, PortRangeErrorMsg))
 	} else if tcp.Port.Type == intstr.String && !validation.IsValidPortName(tcp.Port.StrVal) {
 		allErrors = append(allErrors, validation.NewInvalidError("port", tcp.Port.StrVal, PortNameErrorMsg))
@@ -1238,9 +1253,11 @@ func ValidateService(service *api.Service) validation.ErrorList {
 			}
 		}
 	}
+
+	isHeadlessService := service.Spec.ClusterIP == api.ClusterIPNone
 	allPortNames := sets.String{}
 	for i := range service.Spec.Ports {
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -1308,7 +1325,7 @@ func ValidateService(service *api.Service) validation.ErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.String) validation.ErrorList {
+func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService bool, allNames *sets.String) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 
 	if requireName && sp.Name == "" {
@@ -1333,11 +1350,17 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *sets.S
 		allErrs = append(allErrs, validation.NewNotSupportedError("protocol", sp.Protocol, supportedPortProtocols.List()))
 	}
 
-	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntVal) {
+	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntValue()) {
 		allErrs = append(allErrs, validation.NewInvalidError("targetPort", sp.TargetPort, PortRangeErrorMsg))
 	}
 	if sp.TargetPort.Type == intstr.String && !validation.IsValidPortName(sp.TargetPort.StrVal) {
 		allErrs = append(allErrs, validation.NewInvalidError("targetPort", sp.TargetPort, PortNameErrorMsg))
+	}
+
+	if isHeadlessService {
+		if sp.TargetPort.Type == intstr.String || (sp.TargetPort.Type == intstr.Int && sp.Port != sp.TargetPort.IntValue()) {
+			allErrs = append(allErrs, validation.NewInvalidError("port", sp.Port, "must be equal to targetPort when clusterIP = None"))
+		}
 	}
 
 	return allErrs

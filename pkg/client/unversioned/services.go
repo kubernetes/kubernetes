@@ -32,12 +32,12 @@ type ServicesNamespacer interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.ServiceList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ServiceList, error)
 	Get(name string) (*api.Service, error)
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 	ProxyGet(scheme, name, port, path string, params map[string]string) ResponseWrapper
 }
 
@@ -53,11 +53,12 @@ func newServices(c *Client, namespace string) *services {
 }
 
 // List takes a selector, and returns the list of services that match that selector
-func (c *services) List(label labels.Selector, field fields.Selector) (result *api.ServiceList, err error) {
+func (c *services) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -92,14 +93,12 @@ func (c *services) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *services) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *services) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }
 

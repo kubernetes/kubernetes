@@ -197,7 +197,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 }
 
 func (p throttledDockerPuller) Pull(image string, secrets []api.Secret) error {
-	if p.limiter.CanAccept() {
+	if p.limiter.TryAccept() {
 		return p.puller.Pull(image, secrets)
 	}
 	return fmt.Errorf("pull QPS exceeded.")

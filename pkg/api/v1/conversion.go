@@ -180,8 +180,8 @@ func convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *a
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerSpec))(in)
 	}
-	out.Replicas = new(int)
-	*out.Replicas = in.Replicas
+	out.Replicas = new(int32)
+	*out.Replicas = int32(in.Replicas)
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -213,7 +213,7 @@ func convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *R
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerSpec))(in)
 	}
-	out.Replicas = *in.Replicas
+	out.Replicas = int(*in.Replicas)
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {

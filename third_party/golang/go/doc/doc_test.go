@@ -8,9 +8,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"k8s.io/kubernetes/third_party/golang/go/parser"
-	"k8s.io/kubernetes/third_party/golang/go/printer"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -18,6 +15,10 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+
+	"k8s.io/kubernetes/third_party/golang/go/parser"
+	"k8s.io/kubernetes/third_party/golang/go/printer"
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 var update = flag.Bool("update", false, "update golden (.out) files")

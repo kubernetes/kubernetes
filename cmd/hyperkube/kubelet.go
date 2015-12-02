@@ -17,13 +17,13 @@ limitations under the License.
 package main
 
 import (
-	kubelet "k8s.io/kubernetes/cmd/kubelet/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 )
 
 // NewKubelet creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubelet() *Server {
-	s := kubelet.NewKubeletServer()
+	s := kubeletapp.NewKubeletServer()
 	hks := Server{
 		SimpleUsage: "kubelet",
 		Long: `The kubelet binary is responsible for maintaining a set of containers on a

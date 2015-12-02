@@ -18,11 +18,11 @@ END
 end
 
 # The number of minions to provision
-$num_minion = (ENV['NUM_MINIONS'] || 1).to_i
+$num_minion = (ENV['NUM_NODES'] || 1).to_i
 
 # ip configuration
 $master_ip = ENV['MASTER_IP']
-$minion_ip_base = ENV['MINION_IP_BASE'] || ""
+$minion_ip_base = ENV['NODE_IP_BASE'] || ""
 $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 
 # Determine the OS platform to use
@@ -105,7 +105,7 @@ end
 # When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
 # This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
 $vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1280).to_i
-$vm_minion_mem = (ENV['KUBERNETES_MINION_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
+$vm_minion_mem = (ENV['KUBERNETES_NODE_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def setvmboxandurl(config, provider)

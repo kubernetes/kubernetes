@@ -6,9 +6,10 @@ package scanner
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io"
 	"sort"
+
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 // In an ErrorList, an error is represented by an *Error.

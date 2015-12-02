@@ -41,7 +41,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string) (*extensions.HorizontalP
 	return obj.(*extensions.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (*extensions.HorizontalPodAutoscalerList, error) {
+func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, label, field), &extensions.HorizontalPodAutoscalerList{})
 	if obj == nil {
 		return nil, err
@@ -86,6 +86,6 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOp
 	return err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, label, field, opts))
+func (c *FakeHorizontalPodAutoscalers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, opts))
 }

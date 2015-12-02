@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
@@ -66,6 +67,7 @@ func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts vo
 		pod:      *pod,
 		source:   spec.Volume.GitRepo.Repository,
 		revision: spec.Volume.GitRepo.Revision,
+		target:   spec.Volume.GitRepo.Directory,
 		exec:     exec.New(),
 		opts:     opts,
 	}, nil
@@ -103,6 +105,7 @@ type gitRepoVolumeBuilder struct {
 	pod      api.Pod
 	source   string
 	revision string
+	target   string
 	exec     exec.Interface
 	opts     volume.VolumeOptions
 }
@@ -143,24 +146,41 @@ func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 		return err
 	}
 
-	if output, err := b.execCommand("git", []string{"clone", b.source}, dir); err != nil {
-		return fmt.Errorf("failed to exec 'git clone %s': %s: %v", b.source, output, err)
+	args := []string{"clone", b.source}
+
+	if len(b.target) != 0 {
+		args = append(args, b.target)
+	}
+	if output, err := b.execCommand("git", args, dir); err != nil {
+		return fmt.Errorf("failed to exec 'git %s': %s: %v",
+			strings.Join(args, " "), output, err)
 	}
 
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return err
 	}
-	if len(files) != 1 {
-		return fmt.Errorf("unexpected directory contents: %v", files)
-	}
+
 	if len(b.revision) == 0 {
 		// Done!
 		volumeutil.SetReady(b.getMetaDir())
 		return nil
 	}
 
-	subdir := path.Join(dir, files[0].Name())
+	var subdir string
+
+	switch {
+	case b.target == ".":
+		// if target dir is '.', use the current dir
+		subdir = path.Join(dir)
+	case len(files) == 1:
+		// if target is not '.', use the generated folder
+		subdir = path.Join(dir, files[0].Name())
+	default:
+		// if target is not '.', but generated many files, it's wrong
+		return fmt.Errorf("unexpected directory contents: %v", files)
+	}
+
 	if output, err := b.execCommand("git", []string{"checkout", b.revision}, subdir); err != nil {
 		return fmt.Errorf("failed to exec 'git checkout %s': %s: %v", b.revision, output, err)
 	}

@@ -114,28 +114,32 @@ type CloudConfig struct {
 	NodeInstanceGroup string
 	NumNodes          int
 	ClusterTag        string
+	ServiceAccount    string
 
 	Provider cloudprovider.Interface
 }
 
 type TestContextType struct {
-	KubeConfig                        string
-	KubeContext                       string
-	CertDir                           string
-	Host                              string
-	RepoRoot                          string
-	Provider                          string
-	CloudConfig                       CloudConfig
-	KubectlPath                       string
-	OutputDir                         string
-	prefix                            string
-	MinStartupPods                    int
-	UpgradeTarget                     string
-	PrometheusPushGateway             string
-	VerifyServiceAccount              bool
-	DeleteNamespace                   bool
-	CleanStart                        bool
+	KubeConfig            string
+	KubeContext           string
+	CertDir               string
+	Host                  string
+	RepoRoot              string
+	Provider              string
+	CloudConfig           CloudConfig
+	KubectlPath           string
+	OutputDir             string
+	prefix                string
+	MinStartupPods        int
+	UpgradeTarget         string
+	PrometheusPushGateway string
+	VerifyServiceAccount  bool
+	DeleteNamespace       bool
+	CleanStart            bool
+	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
+	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
 	GatherKubeSystemResourceUsageData bool
+	GatherLogsSizes                   bool
 }
 
 var testContext TestContextType
@@ -158,10 +162,12 @@ type podStore struct {
 func newPodStore(c *client.Client, namespace string, label labels.Selector, field fields.Selector) *podStore {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
-			return c.Pods(namespace).List(label, field)
+			return c.Pods(namespace).List(label, field, unversioned.ListOptions{})
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-			return c.Pods(namespace).Watch(label, field, options)
+			options.LabelSelector.Selector = label
+			options.FieldSelector.Selector = field
+			return c.Pods(namespace).Watch(options)
 		},
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -360,7 +366,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
 		// ensure they are also checked.
-		rcList, err := c.ReplicationControllers(ns).List(labels.Everything(), fields.Everything())
+		rcList, err := c.ReplicationControllers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			return false, nil
@@ -370,7 +376,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 			replicas += rc.Spec.Replicas
 		}
 
-		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
+		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
@@ -414,7 +420,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 // Returns the list of deleted namespaces or an error.
 func deleteNamespaces(c *client.Client, deleteFilter, skipFilter []string) ([]string, error) {
 	By("Deleting namespaces")
-	nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+	nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	var deleted []string
 	var wg sync.WaitGroup
@@ -461,7 +467,7 @@ func waitForNamespacesDeleted(c *client.Client, namespaces []string, timeout tim
 	//Now POLL until all namespaces have been eradicated.
 	return wait.Poll(2*time.Second, timeout,
 		func() (bool, error) {
-			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -593,7 +599,7 @@ func checkTestingNSDeletedExcept(c *client.Client, skip string) error {
 
 	Logf("Waiting for terminating namespaces to be deleted...")
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(15 * time.Second) {
-		namespaces, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+		namespaces, err := c.Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			Logf("Listing namespaces failed: %v", err)
 			continue
@@ -635,7 +641,7 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 	// check for pods that were not deleted
 	remaining := []string{}
 	missingTimestamp := false
-	if pods, perr := c.Pods(namespace).List(labels.Everything(), fields.Everything()); perr == nil {
+	if pods, perr := c.Pods(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{}); perr == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s %s on node %s remains, has deletion timestamp %s", namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 			remaining = append(remaining, pod.Name)
@@ -723,7 +729,7 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 	var p *api.Pod = nil
 	err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		Logf("Waiting for pod %s to appear on node %s", rcName, node)
-		pods, err := c.Pods(ns).List(label, fields.Everything())
+		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -742,7 +748,7 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 func waitForPodToDisappear(c *client.Client, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
-		pods, err := c.Pods(ns).List(label, fields.Everything())
+		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -765,7 +771,10 @@ func waitForPodToDisappear(c *client.Client, ns, podName string, label labels.Se
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	return waitForPodToDisappear(c, ns, podName, label, 20*time.Second, 5*time.Minute)
+	// NodeController evicts pod after 5 minutes, so we need timeout greater than that.
+	// Additionally, there can be non-zero grace period, so we are setting 10 minutes
+	// to be on the safe size.
+	return waitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
 }
 
 // waitForService waits until the service appears (exist == true), or disappears (exist == false)
@@ -801,7 +810,7 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 func waitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
-		list, err := c.Endpoints(namespace).List(labels.Everything(), fields.Everything())
+		list, err := c.Endpoints(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -869,7 +878,7 @@ type podResponseChecker struct {
 // checkAllResponses issues GETs to all pods in the context and verify they reply with pod name.
 func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 	successes := 0
-	currentPods, err := r.c.Pods(r.ns).List(r.label, fields.Everything())
+	currentPods, err := r.c.Pods(r.ns).List(r.label, fields.Everything(), unversioned.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.
@@ -1605,7 +1614,7 @@ func (config *RCConfig) start() error {
 
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
-		if pods, err := config.Client.Pods(api.NamespaceAll).List(label, fields.Everything()); err == nil {
+		if pods, err := config.Client.Pods(api.NamespaceAll).List(label, fields.Everything(), unversioned.ListOptions{}); err == nil {
 
 			for _, pod := range pods.Items {
 				Logf("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
@@ -1634,7 +1643,7 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 }
 
 func dumpAllPodInfo(c *client.Client) {
-	pods, err := c.Pods("").List(labels.Everything(), fields.Everything())
+	pods, err := c.Pods("").List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		Logf("unable to fetch pod debug info: %v", err)
 	}
@@ -1642,7 +1651,7 @@ func dumpAllPodInfo(c *client.Client) {
 }
 
 func dumpAllNodeInfo(c *client.Client) {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		Logf("unable to fetch node list: %v", err)
 		return
@@ -1697,7 +1706,8 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 			"involvedObject.name":      nodeName,
 			"involvedObject.namespace": api.NamespaceAll,
 			"source":                   "kubelet",
-		}.AsSelector())
+		}.AsSelector(),
+		unversioned.ListOptions{})
 	if err != nil {
 		Logf("Unexpected error retrieving node events %v", err)
 		return []api.Event{}
@@ -1707,7 +1717,7 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
-	scaler, err := kubectl.ScalerFor("ReplicationController", c)
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), c)
 	if err != nil {
 		return err
 	}
@@ -1762,7 +1772,7 @@ waitLoop:
 // Wait up to 10 minutes for getting pods with certain label
 func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (pods *api.PodList, err error) {
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
-		pods, err = c.Pods(ns).List(label, fields.Everything())
+		pods, err = c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if len(pods.Items) > 0 {
 			break
@@ -1813,7 +1823,7 @@ func DeleteRC(c *client.Client, ns, name string) error {
 // have completed termination).
 func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
 	return wait.PollImmediate(poll, 2*time.Minute, func() (bool, error) {
-		if pods, err := c.Pods(rc.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
+		if pods, err := c.Pods(rc.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything(), unversioned.ListOptions{}); err == nil && len(pods.Items) == 0 {
 			return true, nil
 		}
 		return false, nil
@@ -1893,7 +1903,7 @@ func listNodes(c *client.Client, label labels.Selector, field fields.Selector) (
 	var nodes *api.NodeList
 	var errLast error
 	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
-		nodes, errLast = c.Nodes().List(label, field)
+		nodes, errLast = c.Nodes().List(label, field, unversioned.ListOptions{})
 		return errLast == nil, nil
 	}) != nil {
 		return nil, fmt.Errorf("listNodes() failed with last error: %v", errLast)
@@ -1982,7 +1992,7 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 // if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
 func NodeSSHHosts(c *client.Client) ([]string, error) {
-	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting nodes: %v", err)
 	}
@@ -2048,12 +2058,32 @@ func LogSSHResult(result SSHResult) {
 	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
+func issueSSHCommand(cmd, provider string, node *api.Node) error {
+	Logf("Getting external IP address for %s", node.Name)
+	host := ""
+	for _, a := range node.Status.Addresses {
+		if a.Type == api.NodeExternalIP {
+			host = a.Address + ":22"
+			break
+		}
+	}
+	if host == "" {
+		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+	}
+	Logf("Calling %s on %s", cmd, node.Name)
+	if result, err := SSH(cmd, host, provider); result.Code != 0 || err != nil {
+		LogSSHResult(result)
+		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
+	}
+	return nil
+}
+
 // NewHostExecPodSpec returns the pod spec of hostexec pod
 func NewHostExecPodSpec(ns, name string) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").Version,
+			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
@@ -2110,7 +2140,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	// support.
 	keyfile := ""
 	switch provider {
-	case "gce", "gke":
+	case "gce", "gke", "kubemark":
 		keyfile = "google_compute_engine"
 	case "aws":
 		// If there is an env. variable override, use that.
@@ -2157,38 +2187,37 @@ func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeo
 
 // waitForNodeToBeReady returns whether node name is ready within timeout.
 func waitForNodeToBeReady(c *client.Client, name string, timeout time.Duration) bool {
-	return waitForNodeToBe(c, name, true, timeout)
+	return waitForNodeToBe(c, name, api.NodeReady, true, timeout)
 }
 
 // waitForNodeToBeNotReady returns whether node name is not ready (i.e. the
 // readiness condition is anything but ready, e.g false or unknown) within
 // timeout.
 func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duration) bool {
-	return waitForNodeToBe(c, name, false, timeout)
+	return waitForNodeToBe(c, name, api.NodeReady, false, timeout)
 }
 
-func isNodeReadySetAsExpected(node *api.Node, wantReady bool) bool {
+func isNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
 	// Check the node readiness condition (logging all).
 	for i, cond := range node.Status.Conditions {
 		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transition time: %v",
 			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
 			cond.Reason, cond.Message, cond.LastTransitionTime)
-		// Ensure that the condition type is readiness and the status
-		// matches as desired.
-		if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
-			Logf("Successfully found node %s readiness to be %t", node.Name, wantReady)
+		// Ensure that the condition type and the status matches as desired.
+		if cond.Type == conditionType && (cond.Status == api.ConditionTrue) == wantTrue {
+			Logf("Successfully found condition %s of node %s to be %t", conditionType, node.Name, wantTrue)
 			return true
 		}
 	}
 	return false
 }
 
-// waitForNodeToBe returns whether node name's readiness state matches wantReady
-// within timeout. If wantReady is true, it will ensure the node is ready; if
-// it's false, it ensures the node is in any state other than ready (e.g. not
-// ready or unknown).
-func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time.Duration) bool {
-	Logf("Waiting up to %v for node %s readiness to be %t", timeout, name, wantReady)
+// waitForNodeToBe returns whether node "name's" condition state matches wantTrue
+// within timeout. If wantTrue is true, it will ensure the node condition status
+// is ConditionTrue; if it's false, it ensures the node condition is in any state
+// other than ConditionTrue (e.g. not true or unknown).
+func waitForNodeToBe(c *client.Client, name string, conditionType api.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
+	Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		node, err := c.Nodes().Get(name)
 		if err != nil {
@@ -2196,11 +2225,11 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 			continue
 		}
 
-		if isNodeReadySetAsExpected(node, wantReady) {
+		if isNodeConditionSetAsExpected(node, conditionType, wantTrue) {
 			return true
 		}
 	}
-	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
+	Logf("Node %s didn't reach desired %s condition status (%t) within %v", name, conditionType, wantTrue, timeout)
 	return false
 }
 
@@ -2211,12 +2240,12 @@ func allNodesReady(c *client.Client, timeout time.Duration) error {
 	var notReady []api.Node
 	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
 		notReady = nil
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, node := range nodes.Items {
-			if !isNodeReadySetAsExpected(&node, true) {
+			if !isNodeConditionSetAsExpected(&node, api.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
@@ -2330,7 +2359,7 @@ func waitForApiserverUp(c *client.Client) error {
 // waitForClusterSize waits until the cluster has desired size and there is no not-ready nodes in it.
 func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			Logf("Failed to list nodes: %v", err)
 			continue
@@ -2339,7 +2368,7 @@ func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error
 
 		// Filter out not-ready nodes.
 		filterNodes(nodes, func(node api.Node) bool {
-			return isNodeReadySetAsExpected(&node, true)
+			return isNodeConditionSetAsExpected(&node, api.NodeReady, true)
 		})
 		numReady := len(nodes.Items)
 
@@ -2499,4 +2528,64 @@ func lookForString(expectedString string, timeout time.Duration, fn func() strin
 	}
 	err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedString, result)
 	return
+}
+
+// getSvcNodePort returns the node port for the given service:port.
+func getSvcNodePort(client *client.Client, ns, name string, svcPort int) (int, error) {
+	svc, err := client.Services(ns).Get(name)
+	if err != nil {
+		return 0, err
+	}
+	for _, p := range svc.Spec.Ports {
+		if p.Port == svcPort {
+			if p.NodePort != 0 {
+				return p.NodePort, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf(
+		"No node port found for service %v, port %v", name, svcPort)
+}
+
+// getNodePortURL returns the url to a nodeport Service.
+func getNodePortURL(client *client.Client, ns, name string, svcPort int) (string, error) {
+	nodePort, err := getSvcNodePort(client, ns, name, svcPort)
+	if err != nil {
+		return "", err
+	}
+	nodes, err := client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+	if len(nodes.Items) == 0 {
+		return "", fmt.Errorf("Unable to list nodes in cluster.")
+	}
+	for _, node := range nodes.Items {
+		for _, address := range node.Status.Addresses {
+			if address.Type == api.NodeExternalIP {
+				if address.Address != "" {
+					return fmt.Sprintf("http://%v:%v", address.Address, nodePort), nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("Failed to find external address for service %v", name)
+}
+
+// scaleRCByName scales an RC via ns/name lookup. If replicas == 0 it waits till
+// none are running, otherwise it does what a synchronous scale operation would do.
+func scaleRCByName(client *client.Client, ns, name string, replicas uint) error {
+	if err := ScaleRC(client, ns, name, replicas, false); err != nil {
+		return err
+	}
+	rc, err := client.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		return err
+	}
+	if replicas == 0 {
+		return waitForRCPodsGone(client, rc)
+	} else {
+		return waitForPodsWithLabelRunning(
+			client, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector)))
+	}
 }

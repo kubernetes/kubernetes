@@ -83,6 +83,11 @@ func New() *Builder {
 	}
 }
 
+// AddBuildTags adds the specified build tags to the parse context.
+func (b *Builder) AddBuildTags(tags ...string) {
+	b.context.BuildTags = append(b.context.BuildTags, tags...)
+}
+
 // Get package information from the go/build package. Automatically excludes
 // e.g. test files and files for other platforms-- there is quite a bit of
 // logic of that nature in the build package.
@@ -293,11 +298,14 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 		for _, n := range s.Names() {
 			obj := s.Lookup(n)
 			tn, ok := obj.(*tc.TypeName)
-			if !ok {
-				continue
+			if ok {
+				t := b.walkType(u, nil, tn.Type())
+				t.CommentLines = b.priorCommentLines(obj.Pos())
 			}
-			t := b.walkType(u, nil, tn.Type())
-			t.CommentLines = b.priorCommentLines(obj.Pos())
+			tf, ok := obj.(*tc.Func)
+			if ok {
+				b.addFunc(u, nil, tf)
+			}
 		}
 		for p := range b.importGraph[pkgName] {
 			u.AddImports(pkgName, p)
@@ -314,6 +322,12 @@ func (b *Builder) priorCommentLines(pos token.Pos) string {
 		return c.Text()
 	}
 	return ""
+}
+
+func tcFuncNameToName(in string) types.Name {
+	name := strings.TrimLeft(in, "func ")
+	nameParts := strings.Split(name, "(")
+	return tcNameToName(nameParts[0])
 }
 
 func tcNameToName(in string) types.Name {
@@ -494,4 +508,15 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		fmt.Printf("Making unsupported type entry %q for: %#v\n", out, t)
 		return out
 	}
+}
+
+func (b *Builder) addFunc(u types.Universe, useName *types.Name, in *tc.Func) *types.Type {
+	name := tcFuncNameToName(in.String())
+	if useName != nil {
+		name = *useName
+	}
+	out := u.Get(name)
+	out.Kind = types.Func
+	out.Signature = b.convertSignature(u, in.Type().(*tc.Signature))
+	return out
 }

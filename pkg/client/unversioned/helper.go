@@ -28,7 +28,6 @@ import (
 	"reflect"
 	gruntime "runtime"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -91,24 +90,6 @@ type Config struct {
 
 	// Maximum burst for throttle
 	Burst int
-}
-
-type KubeletConfig struct {
-	// ToDo: Add support for different kubelet instances exposing different ports
-	Port        uint
-	EnableHttps bool
-
-	// TLSClientConfig contains settings to enable transport layer security
-	TLSClientConfig
-
-	// Server requires Bearer authentication
-	BearerToken string
-
-	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
-	HTTPTimeout time.Duration
-
-	// Dial is a custom dialer used for the client
-	Dial func(net, addr string) (net.Conn, error)
 }
 
 // TLSClientConfig contains settings to enable transport layer security
@@ -544,11 +525,8 @@ func defaultVersionFor(config *Config) *unversioned.GroupVersion {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		// TODO this drops out when groupmeta is refactored
-		gv, err := unversioned.ParseGroupVersion(latest.GroupOrDie("").GroupVersion)
-		if err != nil {
-			panic(err)
-		}
-		return &gv
+		copyGroupVersion := latest.GroupOrDie("").GroupVersion
+		return &copyGroupVersion
 	}
 
 	return config.GroupVersion
@@ -567,13 +545,4 @@ func DefaultKubernetesUserAgent() string {
 	seg := strings.SplitN(version, "-", 2)
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
-}
-
-// TimeoutFromListOptions returns timeout to be set via TimeoutSeconds() method
-// based on given options.
-func TimeoutFromListOptions(options unversioned.ListOptions) time.Duration {
-	if options.TimeoutSeconds != nil {
-		return time.Duration(*options.TimeoutSeconds) * time.Second
-	}
-	return 0
 }

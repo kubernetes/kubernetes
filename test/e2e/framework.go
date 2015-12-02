@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -41,17 +42,23 @@ type Framework struct {
 	Client                   *client.Client
 	NamespaceDeletionTimeout time.Duration
 
-	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
-	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
-	GatherKubeSystemResourceUsageData bool
-	gatherer                          containerResourceGatherer
+	gatherer containerResourceGatherer
+	// Constraints that passed to a check which is exectued after data is gathered to
+	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
+	// as expectations vary greatly. Constraints are groupped by the container names.
+	addonResourceConstraints map[string]resourceConstraint
+
+	logsSizeWaitGroup    sync.WaitGroup
+	logsSizeCloseChannel chan bool
+	logsSizeVerifier     *LogsSizeVerifier
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewFramework(baseName string) *Framework {
 	f := &Framework{
-		BaseName: baseName,
+		BaseName:                 baseName,
+		addonResourceConstraints: make(map[string]resourceConstraint),
 	}
 
 	BeforeEach(f.beforeEach)
@@ -82,8 +89,19 @@ func (f *Framework) beforeEach() {
 		Logf("Skipping waiting for service account")
 	}
 
-	if f.GatherKubeSystemResourceUsageData {
+	if testContext.GatherKubeSystemResourceUsageData {
 		f.gatherer.startGatheringData(c, time.Minute)
+	}
+
+	if testContext.GatherLogsSizes {
+		f.logsSizeWaitGroup = sync.WaitGroup{}
+		f.logsSizeWaitGroup.Add(1)
+		f.logsSizeCloseChannel = make(chan bool)
+		f.logsSizeVerifier = NewLogsVerifier(c, f.logsSizeCloseChannel)
+		go func() {
+			f.logsSizeVerifier.Run()
+			f.logsSizeWaitGroup.Done()
+		}()
 	}
 }
 
@@ -92,7 +110,7 @@ func (f *Framework) afterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(labels.Everything(), fields.Everything())
+		events, err := f.Client.Events(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, e := range events.Items {
@@ -126,8 +144,13 @@ func (f *Framework) afterEach() {
 		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
 
-	if f.GatherKubeSystemResourceUsageData {
-		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100})
+	if testContext.GatherKubeSystemResourceUsageData {
+		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100}, f.addonResourceConstraints)
+	}
+
+	if testContext.GatherLogsSizes {
+		close(f.logsSizeCloseChannel)
+		f.logsSizeWaitGroup.Wait()
 	}
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
@@ -161,7 +184,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything())
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -176,11 +199,11 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 
-		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(
-			labels.Everything(),
-			fields.Set{"metadata.name": serviceName}.AsSelector(),
-			unversioned.ListOptions{ResourceVersion: rv},
-		)
+		options := unversioned.ListOptions{
+			FieldSelector:   unversioned.FieldSelector{fields.Set{"metadata.name": serviceName}.AsSelector()},
+			ResourceVersion: rv,
+		}
+		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(options)
 		if err != nil {
 			return err
 		}

@@ -31,4 +31,14 @@ TEST_ARGS="$@"
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
-"${KUBE_ROOT}/contrib/mesos/ci/run-with-cluster.sh" KUBECONFIG=~/.kube/config hack/conformance-test.sh ${TEST_ARGS}
+TEST_CMD="KUBECONFIG=~/.kube/config hack/conformance-test.sh"
+if [ -n "${CONFORMANCE_BRANCH}" ]; then
+	# create a CONFORMANCE_BRANCH clone in a subdirectory
+	TEST_CMD="
+git fetch https://github.com/kubernetes/kubernetes --tags -q ${CONFORMANCE_BRANCH} &&
+git branch -f ${CONFORMANCE_BRANCH} FETCH_HEAD &&
+git clone -s -b ${CONFORMANCE_BRANCH} . conformance &&
+cd conformance && make all && ${TEST_CMD}"
+fi
+
+"${KUBE_ROOT}/contrib/mesos/ci/run-with-cluster.sh" ${TEST_CMD} ${TEST_ARGS}

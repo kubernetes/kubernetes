@@ -17,11 +17,12 @@ limitations under the License.
 package node
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"time"
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -32,15 +33,22 @@ import (
 )
 
 const (
-	labelPrefix = "k8s.mesosphere.io/attribute-"
+	labelPrefix         = "k8s.mesosphere.io/attribute-"
+	clientRetryCount    = 5
+	clientRetryInterval = time.Second
 )
 
-// Create creates a new node api object with the given hostname and labels
-func Create(client *client.Client, hostName string, labels map[string]string) (*api.Node, error) {
+// Create creates a new node api object with the given hostname,
+// slave attribute labels and annotations
+func Create(
+	client *client.Client,
+	hostName string,
+	slaveAttrLabels,
+	annotations map[string]string,
+) (*api.Node, error) {
 	n := api.Node{
 		ObjectMeta: api.ObjectMeta{
-			Name:   hostName,
-			Labels: map[string]string{"kubernetes.io/hostname": hostName},
+			Name: hostName,
 		},
 		Spec: api.NodeSpec{
 			ExternalID: hostName,
@@ -49,77 +57,91 @@ func Create(client *client.Client, hostName string, labels map[string]string) (*
 			Phase: api.NodePending,
 		},
 	}
-	for k, v := range labels {
-		n.Labels[k] = v
-	}
+
+	n.Labels = mergeMaps(
+		map[string]string{"kubernetes.io/hostname": hostName},
+		slaveAttrLabels,
+	)
+
+	n.Annotations = annotations
 
 	// try to create
 	return client.Nodes().Create(&n)
 }
 
-// Update updates an existing node api object with new labels
-func Update(client *client.Client, n *api.Node, labels map[string]string) (*api.Node, error) {
-	patch := struct {
-		Metadata struct {
-			Labels map[string]string `json:"labels"`
-		} `json:"metadata"`
-	}{}
-	patch.Metadata.Labels = map[string]string{}
-	for k, v := range n.Labels {
-		if !IsSlaveAttributeLabel(k) {
-			patch.Metadata.Labels[k] = v
+// Update updates an existing node api object
+// by looking up the given hostname.
+// The updated node merges the given slave attribute labels
+// and annotations with the found api object.
+func Update(
+	client *client.Client,
+	hostname string,
+	slaveAttrLabels,
+	annotations map[string]string,
+) (n *api.Node, err error) {
+	for i := 0; i < clientRetryCount; i++ {
+		n, err = client.Nodes().Get(hostname)
+		if err != nil {
+			return nil, fmt.Errorf("error getting node %q: %v", hostname, err)
 		}
-	}
-	for k, v := range labels {
-		patch.Metadata.Labels[k] = v
-	}
-	patchJson, _ := json.Marshal(patch)
-	log.V(4).Infof("Patching labels of node %q: %v", n.Name, string(patchJson))
-	err := client.Patch(api.MergePatchType).RequestURI(n.SelfLink).Body(patchJson).Do().Error()
-	if err != nil {
-		return nil, fmt.Errorf("error updating labels of node %q: %v", n.Name, err)
+		if n == nil {
+			return nil, fmt.Errorf("no node instance returned for %q", hostname)
+		}
+
+		// update labels derived from Mesos slave attributes, keep all other labels
+		n.Labels = mergeMaps(
+			filterMap(n.Labels, IsNotSlaveAttributeLabel),
+			slaveAttrLabels,
+		)
+		n.Annotations = mergeMaps(n.Annotations, annotations)
+
+		n, err = client.Nodes().Update(n)
+		if err == nil && !errors.IsConflict(err) {
+			return n, nil
+		}
+
+		log.Infof("retry %d/%d: error updating node %v err %v", i, clientRetryCount, n, err)
+		time.Sleep(time.Duration(i) * clientRetryInterval)
 	}
 
-	newNode, err := api.Scheme.DeepCopy(n)
-	if err != nil {
-		return nil, err
-	}
-	newNode.(*api.Node).Labels = patch.Metadata.Labels
-
-	return newNode.(*api.Node), nil
+	return nil, err
 }
 
-// CreateOrUpdate tries to create a node api object or updates an already existing one
-func CreateOrUpdate(client *client.Client, hostName string, labels map[string]string) (*api.Node, error) {
-	n, err := Create(client, hostName, labels)
+// CreateOrUpdate creates a node api object or updates an existing one
+func CreateOrUpdate(
+	client *client.Client,
+	hostname string,
+	slaveAttrLabels,
+	annotations map[string]string,
+) (*api.Node, error) {
+	n, err := Create(client, hostname, slaveAttrLabels, annotations)
 	if err == nil {
 		return n, nil
 	}
+
 	if !errors.IsAlreadyExists(err) {
-		return nil, fmt.Errorf("unable to register %q with the apiserver: %v", hostName, err)
+		return nil, fmt.Errorf("unable to register %q with the apiserver: %v", hostname, err)
 	}
 
 	// fall back to update an old node with new labels
-	n, err = client.Nodes().Get(hostName)
-	if err != nil {
-		return nil, fmt.Errorf("error getting node %q: %v", hostName, err)
-	}
-	if n == nil {
-		return nil, fmt.Errorf("no node instance returned for %q", hostName)
-	}
-	return Update(client, n, labels)
+	return Update(client, hostname, slaveAttrLabels, annotations)
+}
+
+// IsNotSlaveAttributeLabel returns true iff the given label is not derived from a slave attribute
+func IsNotSlaveAttributeLabel(key, value string) bool {
+	return !IsSlaveAttributeLabel(key, value)
 }
 
 // IsSlaveAttributeLabel returns true iff the given label is derived from a slave attribute
-func IsSlaveAttributeLabel(l string) bool {
-	return strings.HasPrefix(l, labelPrefix)
+func IsSlaveAttributeLabel(key, value string) bool {
+	return strings.HasPrefix(key, labelPrefix)
 }
 
 // IsUpToDate returns true iff the node's slave labels match the given attributes labels
 func IsUpToDate(n *api.Node, labels map[string]string) bool {
 	slaveLabels := map[string]string{}
 	for k, v := range n.Labels {
-		if IsSlaveAttributeLabel(k) {
+		if IsSlaveAttributeLabel(k, "") {
 			slaveLabels[k] = v
 		}
 	}
@@ -157,4 +179,34 @@ func SlaveAttributesToLabels(attrs []*mesos.Attribute) map[string]string {
 		l[k] = v
 	}
 	return l
+}
+
+// filterMap filters the given map and returns a new map
+// containing all original elements matching the given key-value predicate.
+func filterMap(m map[string]string, predicate func(string, string) bool) map[string]string {
+	result := make(map[string]string, len(m))
+	for k, v := range m {
+		if predicate(k, v) {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+// mergeMaps merges all given maps into a single map.
+// There is no advanced key conflict resolution.
+// The last key from the given maps wins.
+func mergeMaps(ms ...map[string]string) map[string]string {
+	var l int
+	for _, m := range ms {
+		l += len(m)
+	}
+
+	result := make(map[string]string, l)
+	for _, m := range ms {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
 }

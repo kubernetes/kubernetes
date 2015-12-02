@@ -40,7 +40,7 @@ func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(label labels.Selector, field fields.Selector) (*api.ResourceQuotaList, error) {
+func (c *FakeResourceQuotas) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ResourceQuotaList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, label, field), &api.ResourceQuotaList{})
 	if obj == nil {
 		return nil, err
@@ -72,8 +72,8 @@ func (c *FakeResourceQuotas) Delete(name string) error {
 	return err
 }
 
-func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("resourcequotas", c.Namespace, label, field, opts))
+func (c *FakeResourceQuotas) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("resourcequotas", c.Namespace, opts))
 }
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {

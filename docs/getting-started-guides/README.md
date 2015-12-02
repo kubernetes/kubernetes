@@ -125,7 +125,13 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 
 #### Integrations
 
-- [Kubernetes on Mesos](mesos.md) (Uses GCE)
+These solutions provide integration with 3rd party schedulers, resource managers, and/or lower level platforms.
+
+- [Kubernetes on Mesos](mesos.md)
+  - Instructions specify GCE, but are generic enough to be adapted to most existing Mesos clusters
+- [Kubernetes on DCOS](dcos.md)
+  - Community Edition DCOS uses AWS
+  - Enterprise Edition DCOS supports cloud hosting, on-premise VMs, and bare metal
 
 ## Table of Solutions
 
@@ -145,8 +151,9 @@ Bare-metal           | custom       | Fedora | _none_      | [docs](fedora/fedor
 Bare-metal           | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 libvirt              | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           | [✓][4]  | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+DCOS                 | Marathon   | CoreOS/Alpine | custom | [docs](dcos.md)                                   |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community
 GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires))
 Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles))
@@ -160,7 +167,7 @@ OpenStack/HPCloud    | Juju         | Ubuntu | flannel     | [docs](juju.md)    
 Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.md)                                    |          | Community ([@justinsb](https://github.com/justinsb))
 Bare-metal           | custom       | Ubuntu | Calico      | [docs](ubuntu-calico.md)                          |          | Community ([@djosborne](https://github.com/djosborne))
-Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community ([@resouer](https://github.com/resouer), [@WIZARD-CXY](https://github.com/WIZARD-CXY))
+Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community ([@resouer](https://github.com/resouer), [@dalanlan](https://github.com/dalanlan), [@WIZARD-CXY](https://github.com/WIZARD-CXY))
 Local                |              |        | _none_      | [docs](locally.md)                                |          | Community ([@preillyme](https://github.com/preillyme))
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community ([@lhuard1A](https://github.com/lhuard1A))
 oVirt                |              |        |             | [docs](ovirt.md)                                  |          | Community ([@simon3z](https://github.com/simon3z))
@@ -194,6 +201,8 @@ Definition of columns:
 [2]: https://gist.github.com/derekwaynecarr/505e56036cdf010bf6b6
 <!-- GKE conformance test result -->
 [3]: https://gist.github.com/erictune/2f39b22f72565365e59b
+<!-- Mesos/Docker conformance test result -->
+[4]: https://gist.github.com/sttts/d27f3b879223895494d4
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

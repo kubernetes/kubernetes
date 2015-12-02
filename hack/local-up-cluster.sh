@@ -135,8 +135,11 @@ function detect_binary {
       i?86*)
         host_arch=x86
         ;;
+      s390x*)
+        host_arch=s390x
+        ;;
       *)
-        echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+        echo "Unsupported host arch. Must be x86_64, 386, arm or s390x." >&2
         exit 1
         ;;
     esac
@@ -306,6 +309,7 @@ function start_kubeproxy {
     PROXY_LOG=/tmp/kube-proxy.log
     sudo -E "${GO_OUT}/kube-proxy" \
       --v=${LOG_LEVEL} \
+      --hostname-override="127.0.0.1" \
       --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 

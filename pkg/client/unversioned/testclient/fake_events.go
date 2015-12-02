@@ -47,7 +47,7 @@ func (c *FakeEvents) Get(name string) (*api.Event, error) {
 }
 
 // List returns a list of events matching the selectors.
-func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
+func (c *FakeEvents) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EventList, error) {
 	action := NewRootListAction("events", label, field)
 	if c.Namespace != "" {
 		action = NewListAction("events", c.Namespace, label, field)
@@ -112,10 +112,10 @@ func (c *FakeEvents) Delete(name string) error {
 }
 
 // Watch starts watching for events matching the given selectors.
-func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	action := NewRootWatchAction("events", label, field, opts)
+func (c *FakeEvents) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	action := NewRootWatchAction("events", opts)
 	if c.Namespace != "" {
-		action = NewWatchAction("events", c.Namespace, label, field, opts)
+		action = NewWatchAction("events", c.Namespace, opts)
 	}
 	return c.Fake.InvokesWatch(action)
 }

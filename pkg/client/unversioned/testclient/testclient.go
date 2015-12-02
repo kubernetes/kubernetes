@@ -315,6 +315,11 @@ func (c *Fake) SwaggerSchema(version string) (*swagger.ApiDeclaration, error) {
 	return &swagger.ApiDeclaration{}, nil
 }
 
+// NewSimpleFakeExp returns a client that will respond with the provided objects
+func NewSimpleFakeExp(objects ...runtime.Object) *FakeExperimental {
+	return &FakeExperimental{Fake: NewSimpleFake(objects...)}
+}
+
 type FakeExperimental struct {
 	*Fake
 }

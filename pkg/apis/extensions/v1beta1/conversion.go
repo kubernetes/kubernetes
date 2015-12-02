@@ -203,8 +203,8 @@ func convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DeploymentSpec))(in)
 	}
-	out.Replicas = new(int)
-	*out.Replicas = in.Replicas
+	out.Replicas = new(int32)
+	*out.Replicas = int32(in.Replicas)
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -229,7 +229,7 @@ func convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 		defaulting.(func(*DeploymentSpec))(in)
 	}
 	if in.Replicas != nil {
-		out.Replicas = *in.Replicas
+		out.Replicas = int(*in.Replicas)
 	}
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
@@ -299,7 +299,7 @@ func convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployme
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = in.MinReadySeconds
+	out.MinReadySeconds = int32(in.MinReadySeconds)
 	return nil
 }
 
@@ -313,7 +313,7 @@ func convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
 		return err
 	}
-	out.MinReadySeconds = in.MinReadySeconds
+	out.MinReadySeconds = int(in.MinReadySeconds)
 	return nil
 }
 

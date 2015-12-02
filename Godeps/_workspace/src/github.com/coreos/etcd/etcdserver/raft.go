@@ -52,6 +52,8 @@ const (
 )
 
 var (
+	// protects raftStatus
+	raftStatusMu sync.Mutex
 	// indirection for expvar func interface
 	// expvar panics when publishing duplicate name
 	// expvar does not support remove a registered name
@@ -62,7 +64,11 @@ var (
 
 func init() {
 	raft.SetLogger(capnslog.NewPackageLogger("github.com/coreos/etcd", "raft"))
-	expvar.Publish("raft.status", expvar.Func(func() interface{} { return raftStatus() }))
+	expvar.Publish("raft.status", expvar.Func(func() interface{} {
+		raftStatusMu.Lock()
+		defer raftStatusMu.Unlock()
+		return raftStatus()
+	}))
 }
 
 type RaftTimer interface {
@@ -273,7 +279,9 @@ func startNode(cfg *ServerConfig, cl *cluster, ids []types.ID) (id types.ID, n r
 		MaxInflightMsgs: maxInflightMsgs,
 	}
 	n = raft.StartNode(c, peers)
+	raftStatusMu.Lock()
 	raftStatus = n.Status
+	raftStatusMu.Unlock()
 	advanceTicksForElection(n, c.ElectionTick)
 	return
 }
@@ -303,7 +311,9 @@ func restartNode(cfg *ServerConfig, snapshot *raftpb.Snapshot) (types.ID, *clust
 		MaxInflightMsgs: maxInflightMsgs,
 	}
 	n := raft.RestartNode(c)
+	raftStatusMu.Lock()
 	raftStatus = n.Status
+	raftStatusMu.Unlock()
 	advanceTicksForElection(n, c.ElectionTick)
 	return id, cl, n, s, w
 }

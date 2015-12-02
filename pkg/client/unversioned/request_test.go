@@ -176,16 +176,6 @@ func TestRequestParam(t *testing.T) {
 	}
 }
 
-func TestTimeoutSeconds(t *testing.T) {
-	r := &Request{}
-	r.TimeoutSeconds(time.Duration(5 * time.Second))
-	if !reflect.DeepEqual(r.params, url.Values{
-		"timeoutSeconds": []string{"5"},
-	}) {
-		t.Errorf("invalid timeoutSeconds parameter: %#v", r)
-	}
-}
-
 func TestRequestVersionedParams(t *testing.T) {
 	r := (&Request{apiVersion: "v1"}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
@@ -347,7 +337,7 @@ func TestTransformResponse(t *testing.T) {
 				t.Errorf("%d: response should have been transformable into APIStatus: %v", i, err)
 				continue
 			}
-			if status.Status().Code != test.Response.StatusCode {
+			if int(status.Status().Code) != test.Response.StatusCode {
 				t.Errorf("%d: status code did not match response: %#v", i, status.Status())
 			}
 		}

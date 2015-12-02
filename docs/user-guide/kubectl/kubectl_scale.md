@@ -33,12 +33,12 @@ Documentation for other releases can be found at
 
 ## kubectl scale
 
-Set a new size for a Replication Controller.
+Set a new size for a Replication Controller, Job, or Deployment.
 
 ### Synopsis
 
 
-Set a new size for a Replication Controller.
+Set a new size for a Replication Controller, Job, or Deployment.
 
 Scale also allows users to specify one or more preconditions for the scale action.
 If --current-replicas or --resource-version is specified, it is validated before the
@@ -53,23 +53,26 @@ kubectl scale [--resource-version=version] [--current-replicas=count] --replicas
 
 ```
 # Scale replication controller named 'foo' to 3.
-$ kubectl scale --replicas=3 replicationcontrollers foo
+$ kubectl scale --replicas=3 rc/foo
 
-# Scale a replication controller identified by type and name specified in "foo-controller.yaml" to 3.
-$ kubectl scale --replicas=3 -f foo-controller.yaml
+# Scale a resource identified by type and name specified in "foo.yaml" to 3.
+$ kubectl scale --replicas=3 -f foo.yaml
 
-# If the replication controller named foo's current size is 2, scale foo to 3.
-$ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo
+# If the deployment named mysql's current size is 2, scale mysql to 3.
+$ kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
 
 # Scale multiple replication controllers.
-$ kubectl scale --replicas=5 rc/foo rc/bar
+$ kubectl scale --replicas=5 rc/foo rc/bar rc/baz
+
+# Scale job named 'cron' to 3.
+$ kubectl scale --replicas=3 job/cron
 ```
 
 ### Options
 
 ```
-      --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to scale.
-  -f, --filename=[]: Filename, directory, or URL to a file identifying the replication controller to set a new size
+      --current-replicas=-1: Precondition for current size. Requires that the current size of the resource match this value in order to scale.
+  -f, --filename=[]: Filename, directory, or URL to a file identifying the resource to set a new size
   -o, --output="": Output mode. Use "-o name" for shorter output (resource/name).
       --replicas=-1: The new desired number of replicas. Required.
       --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to scale.

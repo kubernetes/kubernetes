@@ -20,7 +20,8 @@ import (
 	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"log"
@@ -46,7 +47,7 @@ const (
 
 // readTransactions reads # of transactions from the k8petstore web server endpoint.
 // for more details see the source of the k8petstore web server.
-func readTransactions(c *unversioned.Client, ns string) (error, int) {
+func readTransactions(c *client.Client, ns string) (error, int) {
 	body, err := c.Get().
 		Namespace(ns).
 		Prefix("proxy").
@@ -64,7 +65,7 @@ func readTransactions(c *unversioned.Client, ns string) (error, int) {
 
 // runK8petstore runs the k8petstore application, bound to external nodeport, and
 // polls until minExpected transactions are acquired, in a maximum of maxSeconds.
-func runK8petstore(restServers int, loadGenerators int, c *unversioned.Client, ns string, minExpected int, maxTime time.Duration) {
+func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns string, minExpected int, maxTime time.Duration) {
 
 	var err error = nil
 	k8bpsScriptLocation := filepath.Join(testContext.RepoRoot, "examples/k8petstore/k8petstore-nodeport.sh")
@@ -157,7 +158,7 @@ var _ = Describe("[Example] Pet Store [Skipped]", func() {
 	f := NewFramework("petstore")
 
 	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout), func() {
-		minions, err := f.Client.Nodes().List(labels.Everything(), fields.Everything())
+		minions, err := f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		minionCount = len(minions.Items)
 

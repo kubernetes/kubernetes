@@ -72,14 +72,15 @@ exec docker run \
   -e "MESOS_DOCKER_OVERLAY_DIR=${MESOS_DOCKER_WORK_DIR}/overlay" \
   -e "KUBERNETES_CONTRIB=mesos" \
   -e "KUBERNETES_PROVIDER=mesos/docker" \
-  -e "TERM=ansi" \
   -e "USER=root" \
   -e "E2E_REPORT_DIR=${MESOS_DOCKER_WORK_DIR}/reports" \
+  -t $(tty &>/dev/null && echo "-i") \
   mesosphere/kubernetes-mesos-test \
   -ceux "\
     make clean all && \
     trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
+    ./cluster/kube-down.sh && \
     ./cluster/kube-up.sh && \
-    trap 'test \$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; timeout 5m ./cluster/kube-down.sh' EXIT && \
+    trap \"test \\\$? != 0 && export MESOS_DOCKER_DUMP_LOGS=true; cd \${PWD} && timeout 5m ./cluster/kube-down.sh\" EXIT && \
     ${RUN_CMD}
   "

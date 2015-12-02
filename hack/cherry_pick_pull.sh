@@ -145,7 +145,7 @@ function make-a-pr() {
   # https://github.com/github/hub/issues/976 Otherwise stdin is stolen
   # when we shove the heredoc at hub directly, tickling the ioctl
   # crash.
-  prtext="$(mktemp)" # cleaned in return_to_kansas
+  prtext="$(mktemp -t prtext.XXXX)" # cleaned in return_to_kansas
   cat >"${prtext}" <<EOF
 Automated cherry pick of ${PULLSUBJ}
 

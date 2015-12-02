@@ -55,7 +55,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.Pods(ns).List(labels.Everything(), fields.Everything())
+	pods, err := client.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.Pods(ns).List(labels.Everything(), fields.Everything())
+	pods, err = client.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -245,11 +245,11 @@ func TestMultiWatch(t *testing.T) {
 			t.Fatalf("Couldn't make %v: %v", name, err)
 		}
 		go func(name, rv string) {
-			w, err := client.Pods(ns).Watch(
-				labels.Set{"watchlabel": name}.AsSelector(),
-				fields.Everything(),
-				unversioned.ListOptions{ResourceVersion: rv},
-			)
+			options := unversioned.ListOptions{
+				LabelSelector:   unversioned.LabelSelector{labels.Set{"watchlabel": name}.AsSelector()},
+				ResourceVersion: rv,
+			}
+			w, err := client.Pods(ns).Watch(options)
 			if err != nil {
 				panic(fmt.Sprintf("watch error for %v: %v", name, err))
 			}

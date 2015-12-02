@@ -85,7 +85,7 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (fakeKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
 
@@ -170,6 +170,13 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("No public address for %s", host)
 	}
 
+	// The caller of master.New should guarantee pulicAddress is properly set
+	hostIP, err := util.ValidPublicAddrForMaster(publicAddress)
+	if err != nil {
+		glog.Fatalf("Unable to find suitable network address.error='%v' . "+
+			"Fail to get a valid public address for master.", err)
+	}
+
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		StorageDestinations:   storageDestinations,
@@ -182,7 +189,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
-		PublicAddress:         publicAddress,
+		PublicAddress:         hostIP,
 		CacheTimeout:          2 * time.Second,
 		StorageVersions:       storageVersions,
 	})
@@ -298,7 +305,7 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
 	// Wait until all pods are running on the node.
 	return func() (bool, error) {
-		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
+		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			glog.Infof("Unable to get pods to list: %v", err)
 			return false, nil
@@ -424,7 +431,7 @@ containers:
 			namespace := kubetypes.NamespaceDefault
 			if err := wait.Poll(time.Second, longTestTimeout,
 				podRunning(c, namespace, podName)); err != nil {
-				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything()); err == nil {
+				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{}); err == nil {
 					for _, pod := range pods.Items {
 						glog.Infof("pod found: %s/%s", namespace, pod.Name)
 					}
@@ -532,7 +539,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
 
-	svcList, err := services.List(labels.Everything(), fields.Everything())
+	svcList, err := services.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
@@ -753,7 +760,7 @@ func runPatchTest(c *client.Client) {
 
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
-	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
+	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Unexpected error listing services: %v", err)
 	}
@@ -880,7 +887,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
 	}
 
-	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Failed to list services across namespaces: %v", err)
 	}

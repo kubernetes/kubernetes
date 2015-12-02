@@ -50,11 +50,17 @@ SWAGGER_PATH="${REPO_DIR}/api/swagger-spec/"
 
 echo "Reading swagger spec from: ${SWAGGER_PATH}"
 
-docker run -u $(id -u) --rm -v $V1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
+user_flags="-u $(id -u)"
+if [[ $(uname) == "Darwin" ]]; then
+  # mapping in a uid from OS X doesn't make any sense
+  user_flags=""
+fi 
+
+docker run ${user_flags} --rm -v $V1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
     v1 \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
 
-docker run -u $(id -u) --rm -v $V1BETA1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
+docker run ${user_flags} --rm -v $V1BETA1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
     v1beta1 \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
 

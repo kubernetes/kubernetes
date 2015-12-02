@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -41,6 +42,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -172,7 +174,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
-		secrets, err := c.Secrets(ns).List(labels.Everything(), fields.Everything())
+		secrets, err := c.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		// Retrieval errors should fail
 		if err != nil {
 			return false, err
@@ -424,7 +426,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	// Create a master and install handlers into mux.
 	m = master.New(&master.Config{
 		StorageDestinations: storageDestinations,
-		KubeletClient:       client.FakeKubeletClient{},
+		KubeletClient:       kubeletclient.FakeKubeletClient{},
 		EnableLogsSupport:   false,
 		EnableUISupport:     false,
 		EnableIndex:         true,
@@ -536,8 +538,14 @@ func doServiceAccountAPIRequests(t *testing.T, c *client.Client, ns string, auth
 	}
 
 	readOps := []testOperation{
-		func() error { _, err := c.Secrets(ns).List(labels.Everything(), fields.Everything()); return err },
-		func() error { _, err := c.Pods(ns).List(labels.Everything(), fields.Everything()); return err },
+		func() error {
+			_, err := c.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			return err
+		},
+		func() error {
+			_, err := c.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			return err
+		},
 	}
 	writeOps := []testOperation{
 		func() error { _, err := c.Secrets(ns).Create(testSecret); return err },

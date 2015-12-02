@@ -30,7 +30,7 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
   kube-scheduler
   kube-proxy
 )
-    
+
 readonly SERVER_BIN_TAR=${1-}
 if [[ -z "$SERVER_BIN_TAR" ]]; then
   echo "!!! No binaries specified"
@@ -38,7 +38,7 @@ if [[ -z "$SERVER_BIN_TAR" ]]; then
 fi
 
 # Create a temp dir for untaring
-KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+KUBE_TEMP=$(mktemp --tmpdir=/srv -d -t kubernetes.XXXXXX)
 trap 'rm -rf "${KUBE_TEMP}"' EXIT
 
 # This file is meant to run on the master.  It will install the salt configs

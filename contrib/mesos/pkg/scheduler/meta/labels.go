@@ -14,5 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package uid encapsulates unique identifiers code used by the scheduler.
-package uid
+package meta
+
+// kubernetes api object labels
+const (
+	RolesKey = "k8s.mesosphere.io/roles"
+)

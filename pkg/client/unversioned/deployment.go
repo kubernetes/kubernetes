@@ -32,13 +32,13 @@ type DeploymentsNamespacer interface {
 
 // DeploymentInterface has methods to work with Deployment resources.
 type DeploymentInterface interface {
-	List(label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.DeploymentList, error)
 	Get(name string) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(*extensions.Deployment) (*extensions.Deployment, error)
 	Update(*extensions.Deployment) (*extensions.Deployment, error)
 	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // deployments implements DeploymentInterface
@@ -56,9 +56,9 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(label labels.Selector, field fields.Selector) (result *extensions.DeploymentList, err error) {
+func (c *deployments) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *extensions.DeploymentList, err error) {
 	result = &extensions.DeploymentList{}
-	err = c.client.Get().Namespace(c.ns).Resource("deployments").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource("deployments").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
@@ -102,14 +102,11 @@ func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *e
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *deployments) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

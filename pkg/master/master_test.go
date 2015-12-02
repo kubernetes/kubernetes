@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -74,6 +74,7 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageVersions[""] = testapi.Default.Version()
 	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
 	config.StorageVersions = storageVersions
+	config.PublicAddress = net.ParseIP("192.168.10.4")
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
 	return master, server, config, assert.New(t)
@@ -354,7 +355,7 @@ func TestExpapi(t *testing.T) {
 	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
 	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
 	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
-	assert.Equal(expAPIGroup.GroupVersion, unversioned.GroupVersion{Group: extensionsGroupMeta.Group, Version: extensionsGroupMeta.Version})
+	assert.Equal(expAPIGroup.GroupVersion, extensionsGroupMeta.GroupVersion)
 }
 
 // TestGetNodeAddresses verifies that proper results are returned

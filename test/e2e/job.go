@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -124,7 +125,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job up")
-		scaler, err := kubectl.ScalerFor("Job", f.Client)
+		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -149,7 +150,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		scaler, err := kubectl.ScalerFor("Job", f.Client)
+		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -172,7 +173,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		reaper, err := kubectl.ReaperFor("Job", f.Client)
+		reaper, err := kubectl.ReaperFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
 		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
@@ -259,7 +260,7 @@ func deleteJob(c *client.Client, ns, name string) error {
 func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {
-		pods, err := c.Pods(ns).List(label, fields.Everything())
+		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -93,7 +93,7 @@ func TestNamespaceList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: namespaceList},
 	}
-	response, err := c.Setup(t).Namespaces().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -175,6 +175,6 @@ func TestNamespaceWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Namespaces().Watch(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	_, err := c.Setup(t).Namespaces().Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)
 }

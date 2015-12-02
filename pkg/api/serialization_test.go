@@ -70,7 +70,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj2) {
-		t.Errorf("1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, util.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), string(data), printer.Sprintf("%#v", obj2))
+		t.Errorf("\n1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, util.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), string(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
@@ -111,7 +111,12 @@ func TestSpecificKind(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "Pod"
-	doRoundTripTest(kind, t)
+	for i := 0; i < *fuzzIters; i++ {
+		doRoundTripTest(kind, t)
+		if t.Failed() {
+			break
+		}
+	}
 }
 
 func TestList(t *testing.T) {
@@ -128,7 +133,8 @@ func TestList(t *testing.T) {
 }
 
 var nonRoundTrippableTypes = sets.NewString()
-var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "PodExecOptions", "PodAttachOptions")
+
+var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 
 func TestRoundTripTypes(t *testing.T) {
@@ -142,6 +148,9 @@ func TestRoundTripTypes(t *testing.T) {
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
 			doRoundTripTest(kind, t)
+			if t.Failed() {
+				break
+			}
 		}
 	}
 }

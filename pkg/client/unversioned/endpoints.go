@@ -34,11 +34,11 @@ type EndpointsNamespacer interface {
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
 	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
-	List(label labels.Selector, field fields.Selector) (*api.EndpointsList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EndpointsList, error)
 	Get(name string) (*api.Endpoints, error)
 	Delete(name string) error
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // endpoints implements EndpointsInterface
@@ -60,11 +60,12 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
-func (c *endpoints) List(label labels.Selector, field fields.Selector) (result *api.EndpointsList, err error) {
+func (c *endpoints) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().
@@ -85,14 +86,12 @@ func (c *endpoints) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
-func (c *endpoints) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }
 

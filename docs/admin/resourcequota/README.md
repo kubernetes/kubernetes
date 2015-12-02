@@ -79,18 +79,18 @@ namespace.
 
 ```console
 $ kubectl describe quota quota --namespace=quota-example
-Name:			quota
-Namespace:		quota-example
-Resource		Used	Hard
---------		----	----
-cpu			0	20
-memory			0	1Gi
-persistentvolumeclaims	0	10
-pods			0	10
-replicationcontrollers	0	20
-resourcequotas		1	1
-secrets			1	10
-services		0	5
+Name:                   quota
+Namespace:              quota-example
+Resource                Used    Hard
+--------                ----    ----
+cpu                     0       20
+memory                  0       1Gi
+persistentvolumeclaims  0       10
+pods                    0       10
+replicationcontrollers  0       20
+resourcequotas          1       1
+secrets                 1       10
+services                0       5
 ```
 
 Step 3: Applying default resource requests and limits
@@ -127,8 +127,9 @@ Replicas:	0 current / 1 desired
 Pods Status:	0 Running / 0 Waiting / 0 Succeeded / 0 Failed
 No volumes.
 Events:
-  FirstSeen	LastSeen	Count	From				SubobjectPath	Reason		Message
-  42s		11s		3	{replication-controller }			FailedCreate	Error creating: Pod "nginx-" is forbidden: Must make a non-zero request for memory since it is tracked by quota.
+  FirstSeen     LastSeen        Count   From                            SubobjectPath   Type            Reason          Message
+  ─────────     ────────        ─────   ────                            ─────────────   ────────        ──────          ───────
+  12s           12s             2       {replication-controller }                       Warning         FailedCreate    Error creating: Pod "nginx-" is forbidden: memory is limited by quota, must make explicit request.
 ```
 
 The Kubernetes API server is rejecting the replication controllers requests to create a pod because our pods
@@ -164,18 +165,18 @@ And if we print out our quota usage in the namespace:
 
 ```console
 $ kubectl describe quota quota --namespace=quota-example
-Name:			quota
-Namespace:		quota-example
-Resource		Used	Hard
---------		----	----
-cpu			100m	20
-memory			256Mi	1Gi
-persistentvolumeclaims	0	10
-pods			1	10
-replicationcontrollers	1	20
-resourcequotas		1	1
-secrets			1	10
-services		0	5
+Name:                   quota
+Namespace:              quota-example
+Resource                Used            Hard
+--------                ----            ----
+cpu                     100m            20
+memory                  268435456       1Gi
+persistentvolumeclaims  0               10
+pods                    1               10
+replicationcontrollers  1               20
+resourcequotas          1               1
+secrets                 1               10
+services                0               5
 ```
 
 You can now see the pod that was created is consuming explicit amounts of resources (specified by resource *request*),

@@ -64,22 +64,3 @@ func (c *Config) transportConfig() *transport.Config {
 		BearerToken: c.BearerToken,
 	}
 }
-
-// transportConfig converts a client config to an appropriate transport config.
-func (c *KubeletConfig) transportConfig() *transport.Config {
-	cfg := &transport.Config{
-		TLS: transport.TLSConfig{
-			CAFile:   c.CAFile,
-			CAData:   c.CAData,
-			CertFile: c.CertFile,
-			CertData: c.CertData,
-			KeyFile:  c.KeyFile,
-			KeyData:  c.KeyData,
-		},
-		BearerToken: c.BearerToken,
-	}
-	if c.EnableHttps && !cfg.HasCA() {
-		cfg.TLS.Insecure = true
-	}
-	return cfg
-}

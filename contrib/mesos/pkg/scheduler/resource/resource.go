@@ -125,8 +125,8 @@ func LimitPodMem(pod *api.Pod, defaultLimit MegaBytes) (request, limit MegaBytes
 	return NewMegaBytes(*r), NewMegaBytes(*l), m, nil
 }
 
-// CPUForPod computes the limits from the spec plus the default CPU limit difference for unlimited containers
-func CPUForPod(pod *api.Pod, defaultLimit CPUShares) (request, limit CPUShares, modified bool, err error) {
+// LimitedCPUForPod computes the limits from the spec plus the default CPU limit difference for unlimited containers
+func LimitedCPUForPod(pod *api.Pod, defaultLimit CPUShares) (request, limit CPUShares, modified bool, err error) {
 	r, l, m, err := podResources(pod, api.ResourceCPU, *defaultLimit.Quantity(), *MinimumContainerCPU.Quantity(), false)
 	if err != nil {
 		return 0.0, 0.0, false, err
@@ -134,8 +134,8 @@ func CPUForPod(pod *api.Pod, defaultLimit CPUShares) (request, limit CPUShares, 
 	return NewCPUShares(*r), NewCPUShares(*l), m, nil
 }
 
-// MemForPod computes the limits from the spec plus the default memory limit difference for unlimited containers
-func MemForPod(pod *api.Pod, defaultLimit MegaBytes) (request, limit MegaBytes, modified bool, err error) {
+// LimitedMemForPod computes the limits from the spec plus the default memory limit difference for unlimited containers
+func LimitedMemForPod(pod *api.Pod, defaultLimit MegaBytes) (request, limit MegaBytes, modified bool, err error) {
 	r, l, m, err := podResources(pod, api.ResourceMemory, *defaultLimit.Quantity(), *MinimumContainerMem.Quantity(), true)
 	if err != nil {
 		return 0.0, 0.0, false, err

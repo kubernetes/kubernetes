@@ -107,7 +107,7 @@ func TestPersistentVolumeList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: persistentVolumeList},
 	}
-	response, err := c.Setup(t).PersistentVolumes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).PersistentVolumes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -181,6 +181,6 @@ func TestPersistentVolumeWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).PersistentVolumes().Watch(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	_, err := c.Setup(t).PersistentVolumes().Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)
 }

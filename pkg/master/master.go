@@ -41,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/healthz"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/componentstatus"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
@@ -182,7 +182,7 @@ type Config struct {
 	// StorageVersions is a map between groups and their storage versions
 	StorageVersions map[string]string
 	EventTTL        time.Duration
-	KubeletClient   client.KubeletClient
+	KubeletClient   kubeletclient.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
 	EnableLogsSupport     bool
@@ -401,19 +401,6 @@ func setDefaults(c *Config) {
 	if c.CacheTimeout == 0 {
 		c.CacheTimeout = 5 * time.Second
 	}
-	for c.PublicAddress == nil || c.PublicAddress.IsUnspecified() || c.PublicAddress.IsLoopback() {
-		// TODO: This should be done in the caller and just require a
-		// valid value to be passed in.
-		hostIP, err := util.ChooseHostInterface()
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		c.PublicAddress = hostIP
-		glog.Infof("Will report %v as public IP address.", c.PublicAddress)
-	}
 	if c.RequestContextMapper == nil {
 		c.RequestContextMapper = api.NewRequestContextMapper()
 	}
@@ -546,7 +533,6 @@ func (m *Master) init(c *Config) {
 
 	storageDecorator := c.storageDecorator()
 	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.get("", resource) }
-	podStorage := podetcd.NewStorage(dbClient("pods"), storageDecorator, c.KubeletClient, m.proxyTransport)
 
 	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"), storageDecorator)
 
@@ -567,6 +553,13 @@ func (m *Master) init(c *Config) {
 
 	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), storageDecorator, c.KubeletClient, m.proxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage)
+
+	podStorage := podetcd.NewStorage(
+		dbClient("pods"),
+		storageDecorator,
+		kubeletclient.ConnectionInfoGetter(nodeStorage),
+		m.proxyTransport,
+	)
 
 	serviceStorage := serviceetcd.NewREST(dbClient("services"), storageDecorator)
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
@@ -673,16 +666,16 @@ func (m *Master) init(c *Config) {
 				Version:      expVersion.GroupVersion.Version,
 			},
 		}
-		storageVersion, found := c.StorageVersions[g.Group]
+		storageVersion, found := c.StorageVersions[g.GroupVersion.Group]
 		if !found {
-			glog.Fatalf("Couldn't find storage version of group %v", g.Group)
+			glog.Fatalf("Couldn't find storage version of group %v", g.GroupVersion.Group)
 		}
 		group := unversioned.APIGroup{
-			Name:             g.Group,
+			Name:             g.GroupVersion.Group,
 			Versions:         expAPIVersions,
 			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group, group)
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").GroupVersion.Group, group)
 		allGroups = append(allGroups, group)
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
@@ -1021,7 +1014,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
+	serverGroupVersion := latest.GroupOrDie("").GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
@@ -1111,7 +1104,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	extensionsGroup := latest.GroupOrDie("extensions")
-	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
+	serverGroupVersion := latest.GroupOrDie("").GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                m.apiGroupPrefix,
@@ -1125,7 +1118,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Codec:              extensionsGroup.Codec,
 		Linker:             extensionsGroup.SelfLinker,
 		Storage:            storage,
-		GroupVersion:       unversioned.ParseGroupVersionOrDie(extensionsGroup.GroupVersion),
+		GroupVersion:       extensionsGroup.GroupVersion,
 		ServerGroupVersion: &serverGroupVersion,
 
 		Admit:   m.admissionControl,

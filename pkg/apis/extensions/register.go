@@ -24,6 +24,11 @@ import (
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: ""}
 
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) unversioned.GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
 func init() {
 	// Register the API.
 	addKnownTypes()
@@ -52,6 +57,10 @@ func addKnownTypes() {
 		&Ingress{},
 		&IngressList{},
 	)
+
+	// Register Unversioned types
+	// TODO this should not be done here
+	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
 }
 
 func (*ClusterAutoscaler) IsAnAPIObject()           {}

@@ -112,6 +112,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
+	kubelet.nodeInfo = testNodeInfo{}
 	kubelet.recorder = fakeRecorder
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
@@ -1045,7 +1046,11 @@ type testNodeLister struct {
 	nodes []api.Node
 }
 
-func (ls testNodeLister) GetNodeInfo(id string) (*api.Node, error) {
+type testNodeInfo struct {
+	nodes []api.Node
+}
+
+func (ls testNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	for _, node := range ls.nodes {
 		if node.Name == id {
 			return &node, nil
@@ -2319,6 +2324,9 @@ func TestHandleNodeSelector(t *testing.T) {
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
 	}}
+	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
+	}}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -2575,18 +2583,18 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -2637,6 +2645,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		}
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
@@ -2691,18 +2704,18 @@ func testDockerRuntimeVersion(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -2754,6 +2767,12 @@ func testDockerRuntimeVersion(t *testing.T) {
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
 	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
+	}
+
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
@@ -2793,18 +2812,18 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
 					{
-						Type:               api.NodeReady,
-						Status:             api.ConditionTrue,
-						Reason:             "KubeletReady",
-						Message:            fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					},
-					{
 						Type:               api.NodeOutOfDisk,
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletOutOfDisk",
 						Message:            "out of disk space",
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:               api.NodeReady,
+						Status:             api.ConditionTrue,
+						Reason:             "KubeletReady",
+						Message:            fmt.Sprintf("kubelet is posting ready status"),
 						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
@@ -2855,18 +2874,18 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{}, // placeholder
-					LastTransitionTime: unversioned.Time{}, // placeholder
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletOutOfDisk",
 					Message:            "out of disk space",
+					LastHeartbeatTime:  unversioned.Time{}, // placeholder
+					LastTransitionTime: unversioned.Time{}, // placeholder
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  unversioned.Time{}, // placeholder
 					LastTransitionTime: unversioned.Time{}, // placeholder
 				},
@@ -2919,6 +2938,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		}
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
@@ -2977,18 +3001,18 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionFalse,
-					Reason:             "KubeletNotReady",
-					Message:            fmt.Sprintf("container runtime is down"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            "kubelet has sufficient disk space available",
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletNotReady",
+					Message:            fmt.Sprintf("container runtime is down"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -3040,6 +3064,11 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		}
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {

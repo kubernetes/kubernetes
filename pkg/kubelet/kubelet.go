@@ -237,10 +237,10 @@ func NewMainKubelet(
 		// than an interface. There is no way to construct a list+watcher using resource name.
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return kubeClient.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return kubeClient.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+				return kubeClient.Services(api.NamespaceAll).Watch(options)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
@@ -254,15 +254,17 @@ func NewMainKubelet(
 		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
+				return kubeClient.Nodes().List(labels.Everything(), fieldSelector, unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, options)
+				options.FieldSelector.Selector = fieldSelector
+				return kubeClient.Nodes().Watch(options)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
 	}
 	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
+	nodeInfo := &predicates.CachedNodeInfo{nodeLister}
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -301,6 +303,7 @@ func NewMainKubelet(
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
+		nodeInfo:                       nodeInfo,
 		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
@@ -405,7 +408,6 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		klet.imageManager = rkt.NewImageManager(rktRuntime)
 		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
 
 		// No Docker daemon to put in a container.
@@ -474,7 +476,6 @@ type serviceLister interface {
 
 type nodeLister interface {
 	List() (machines api.NodeList, err error)
-	GetNodeInfo(id string) (*api.Node, error)
 }
 
 // Kubelet is the main kubelet implementation.
@@ -528,6 +529,7 @@ type Kubelet struct {
 	masterServiceNamespace string
 	serviceLister          serviceLister
 	nodeLister             nodeLister
+	nodeInfo               predicates.NodeInfo
 
 	// a list of node labels to register
 	nodeLabels []string
@@ -823,7 +825,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
 		return nil, errors.New("no node entry for kubelet in standalone mode")
 	}
-	return kl.nodeLister.GetNodeInfo(kl.nodeName)
+	return kl.nodeInfo.GetNodeInfo(kl.nodeName)
 }
 
 // Starts garbage collection threads.
@@ -1205,7 +1207,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		// If the volume supports SELinux and it has not been
 		// relabeled already and it is not a read-only volume,
 		// relabel it and mark it as labeled
-		if vol.Builder.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled && !vol.Builder.GetAttributes().Managed {
+		if vol.Builder.GetAttributes().Managed && vol.Builder.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
@@ -2773,52 +2775,6 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	node.Status.DaemonEndpoints = *kl.daemonEndpoints
 
 	currentTime := unversioned.Now()
-	var newNodeReadyCondition api.NodeCondition
-	var oldNodeReadyConditionStatus api.ConditionStatus
-	if rs := kl.runtimeState.errors(); len(rs) == 0 {
-		newNodeReadyCondition = api.NodeCondition{
-			Type:              api.NodeReady,
-			Status:            api.ConditionTrue,
-			Reason:            "KubeletReady",
-			Message:           "kubelet is posting ready status",
-			LastHeartbeatTime: currentTime,
-		}
-	} else {
-		newNodeReadyCondition = api.NodeCondition{
-			Type:              api.NodeReady,
-			Status:            api.ConditionFalse,
-			Reason:            "KubeletNotReady",
-			Message:           strings.Join(rs, ","),
-			LastHeartbeatTime: currentTime,
-		}
-	}
-
-	updated := false
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == api.NodeReady {
-			oldNodeReadyConditionStatus = node.Status.Conditions[i].Status
-			if oldNodeReadyConditionStatus == newNodeReadyCondition.Status {
-				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
-			} else {
-				newNodeReadyCondition.LastTransitionTime = currentTime
-			}
-			node.Status.Conditions[i] = newNodeReadyCondition
-			updated = true
-			break
-		}
-	}
-	if !updated {
-		newNodeReadyCondition.LastTransitionTime = currentTime
-		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
-	}
-	if !updated || oldNodeReadyConditionStatus != newNodeReadyCondition.Status {
-		if newNodeReadyCondition.Status == api.ConditionTrue {
-			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeReady)
-		} else {
-			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotReady)
-		}
-	}
-
 	var nodeOODCondition *api.NodeCondition
 
 	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
@@ -2871,6 +2827,55 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 
 	if newOODCondition {
 		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
+	}
+
+	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
+	// This is due to an issue with version skewed kubelet and master components.
+	// ref: https://github.com/kubernetes/kubernetes/issues/16961
+	var newNodeReadyCondition api.NodeCondition
+	var oldNodeReadyConditionStatus api.ConditionStatus
+	if rs := kl.runtimeState.errors(); len(rs) == 0 {
+		newNodeReadyCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionTrue,
+			Reason:            "KubeletReady",
+			Message:           "kubelet is posting ready status",
+			LastHeartbeatTime: currentTime,
+		}
+	} else {
+		newNodeReadyCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionFalse,
+			Reason:            "KubeletNotReady",
+			Message:           strings.Join(rs, ","),
+			LastHeartbeatTime: currentTime,
+		}
+	}
+
+	updated := false
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == api.NodeReady {
+			oldNodeReadyConditionStatus = node.Status.Conditions[i].Status
+			if oldNodeReadyConditionStatus == newNodeReadyCondition.Status {
+				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+			} else {
+				newNodeReadyCondition.LastTransitionTime = currentTime
+			}
+			node.Status.Conditions[i] = newNodeReadyCondition
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		newNodeReadyCondition.LastTransitionTime = currentTime
+		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
+	}
+	if !updated || oldNodeReadyConditionStatus != newNodeReadyCondition.Status {
+		if newNodeReadyCondition.Status == api.ConditionTrue {
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeReady)
+		} else {
+			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotReady)
+		}
 	}
 
 	if oldNodeUnschedulable != node.Spec.Unschedulable {

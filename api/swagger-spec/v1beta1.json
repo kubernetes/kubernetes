@@ -3244,8 +3244,7 @@
     "id": "v1.GitRepoVolumeSource",
     "description": "GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.",
     "required": [
-     "repository",
-     "revision"
+     "repository"
     ],
     "properties": {
      "repository": {
@@ -3255,6 +3254,10 @@
      "revision": {
       "type": "string",
       "description": "Commit hash for the specified revision."
+     },
+     "directory": {
+      "type": "string",
+      "description": "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name."
      }
     }
    },
@@ -3784,17 +3787,17 @@
      },
      "initialDelaySeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "periodSeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1."
      },
      "successThreshold": {

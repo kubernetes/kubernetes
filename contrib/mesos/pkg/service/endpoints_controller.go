@@ -60,10 +60,10 @@ func NewEndpointController(client *client.Client) *endpointController {
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+				return e.client.Services(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Service{},
@@ -80,10 +80,10 @@ func NewEndpointController(client *client.Client) *endpointController {
 	e.podStore.Store, e.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+				return e.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return e.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+				return e.client.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -386,7 +386,7 @@ func (e *endpointController) syncService(key string) {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *endpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		glog.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err)
 		return
@@ -427,7 +427,7 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 		// it actually maps to a host-port assigned to the pod. upstream
 		// doesn't check this and happily returns the container port spec'd
 		// in the service, but that doesn't align w/ mesos port mgmt.
-		p := portName.IntVal
+		p := portName.IntValue()
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {

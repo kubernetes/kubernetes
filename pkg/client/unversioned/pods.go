@@ -31,12 +31,12 @@ type PodsNamespacer interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PodList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 	Bind(binding *api.Binding) error
 	UpdateStatus(pod *api.Pod) (*api.Pod, error)
 	GetLogs(name string, opts *api.PodLogOptions) *Request
@@ -57,9 +57,9 @@ func newPods(c *Client, namespace string) *pods {
 }
 
 // List takes label and field selectors, and returns the list of pods that match those selectors.
-func (c *pods) List(label labels.Selector, field fields.Selector) (result *api.PodList, err error) {
+func (c *pods) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
@@ -98,14 +98,12 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *pods) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }
 

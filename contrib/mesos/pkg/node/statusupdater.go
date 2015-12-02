@@ -21,7 +21,7 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
-	kubelet "k8s.io/kubernetes/cmd/kubelet/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -30,6 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -46,7 +47,7 @@ type StatusUpdater struct {
 }
 
 func NewStatusUpdater(client *client.Client, relistPeriod time.Duration, nowFunc func() time.Time) *StatusUpdater {
-	kubecfg := kubelet.NewKubeletServer() // only create to get the config, this is without side-effects
+	kubecfg := kubeletapp.NewKubeletServer() // only create to get the config, this is without side-effects
 	return &StatusUpdater{
 		client:          client,
 		relistPeriod:    relistPeriod,
@@ -61,43 +62,36 @@ func (u *StatusUpdater) Run(terminate <-chan struct{}) error {
 	cache.NewReflector(nodeLW, &api.Node{}, nodeStore, u.relistPeriod).Run()
 
 	monitor := func() {
-		// build up a slave set of nodes without kubelet
-		slavesWithoutKubeletList, err := mesos.CloudProvider.ListWithoutKubelet()
+		// build up a set of listed slave nodes without a kubelet
+		slaves, err := mesos.CloudProvider.ListWithoutKubelet()
 		if err != nil {
-			log.Errorf("Error while updating slave nodes: %v", err)
+			log.Errorf("Error listing slaves without kubelet: %v", err)
 			return
 		}
-		slavesWithoutKubelet := make(map[string]struct{}, len(slavesWithoutKubeletList))
-		for _, s := range slavesWithoutKubeletList {
-			slavesWithoutKubelet[s] = struct{}{}
-		}
+		slavesWithoutKubelet := sets.NewString(slaves...)
 
 		// update status for nodes which do not have a kubelet running and
 		// which are still existing as slave. This status update must be done
 		// before the node controller counts down the NodeMonitorGracePeriod
-		obj, err := nodeLW.List()
-		if err != nil {
-			log.Errorf("Error listing the nodes for status updates: %v", err)
-		}
-		nl, _ := obj.(*api.NodeList)
-		nodes := nl.Items
+		nodes := nodeStore.List()
 
-		for i := range nodes {
-			if _, ok := slavesWithoutKubelet[nodes[i].Spec.ExternalID]; !ok {
+		for _, n := range nodes {
+			node := n.(*api.Node)
+			if !slavesWithoutKubelet.Has(node.Spec.ExternalID) {
 				// let the kubelet do its job updating the status, or the
 				// node controller will remove this node if the node does not even
 				// exist anymore
 				continue
 			}
 
-			err := u.updateStatus(&nodes[i])
+			err := u.updateStatus(node)
 			if err != nil {
 				log.Errorf("Error updating node status: %v", err)
 			}
 		}
 	}
-	go runtime.Until(monitor, u.heartBeatPeriod, terminate)
 
+	go runtime.Until(monitor, u.heartBeatPeriod, terminate)
 	return nil
 }
 
