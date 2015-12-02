@@ -1,6 +1,7 @@
 /etc/kubernetes/kube-node-unpacker.sh:
   file.managed:
     - source: salt://kube-node-unpacker/kube-node-unpacker.sh
+    - makedirs: True
     - user: root
     - group: root
     - mode: 755

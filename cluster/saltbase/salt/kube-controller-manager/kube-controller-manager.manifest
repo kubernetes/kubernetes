@@ -27,7 +27,9 @@
 {% set cloud_config_volume = "" -%}
 
 {% if grains.cloud is defined -%}
-  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+  {% if grains.cloud != 'vagrant' -%}
+    {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+  {% endif -%}
   {% set service_account_key = " --service-account-private-key-file=/srv/kubernetes/server.key " -%}
 
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
