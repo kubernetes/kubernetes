@@ -14,15 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package client
 
 import (
 	"errors"
+	"net"
 	"net/http"
+	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/transport"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 )
+
+type KubeletClientConfig struct {
+	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
+	Port        uint
+	EnableHttps bool
+
+	// TLSClientConfig contains settings to enable transport layer security
+	client.TLSClientConfig
+
+	// Server requires Bearer authentication
+	BearerToken string
+
+	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
+	HTTPTimeout time.Duration
+
+	// Dial is a custom dialer used for the client
+	Dial func(net, addr string) (net.Conn, error)
+}
 
 // KubeletClient is an interface for all kubelet functionality
 type KubeletClient interface {
@@ -30,16 +52,16 @@ type KubeletClient interface {
 }
 
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(host string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
 }
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
 type HTTPKubeletClient struct {
 	Client *http.Client
-	Config *KubeletConfig
+	Config *KubeletClientConfig
 }
 
-func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
+func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 	tlsConfig, err := transport.TLSConfigFor(config.transportConfig())
 	if err != nil {
 		return nil, err
@@ -57,7 +79,7 @@ func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
 }
 
 // TODO: this structure is questionable, it should be using client.Config and overriding defaults.
-func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
+func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) {
 	transport, err := MakeTransport(config)
 	if err != nil {
 		return nil, err
@@ -72,7 +94,8 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	}, nil
 }
 
-func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+// In default HTTPKubeletClient ctx is unused.
+func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
 	scheme := "http"
 	if c.Config.EnableHttps {
 		scheme = "https"
@@ -85,6 +108,25 @@ func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.R
 // no kubelets.
 type FakeKubeletClient struct{}
 
-func (c FakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (c FakeKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
+}
+
+// transportConfig converts a client config to an appropriate transport config.
+func (c *KubeletClientConfig) transportConfig() *transport.Config {
+	cfg := &transport.Config{
+		TLS: transport.TLSConfig{
+			CAFile:   c.CAFile,
+			CAData:   c.CAData,
+			CertFile: c.CertFile,
+			CertData: c.CertData,
+			KeyFile:  c.KeyFile,
+			KeyData:  c.KeyData,
+		},
+		BearerToken: c.BearerToken,
+	}
+	if c.EnableHttps && !cfg.HasCA() {
+		cfg.TLS.Insecure = true
+	}
+	return cfg
 }

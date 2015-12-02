@@ -28,7 +28,6 @@ import (
 	"reflect"
 	gruntime "runtime"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -91,24 +90,6 @@ type Config struct {
 
 	// Maximum burst for throttle
 	Burst int
-}
-
-type KubeletConfig struct {
-	// ToDo: Add support for different kubelet instances exposing different ports
-	Port        uint
-	EnableHttps bool
-
-	// TLSClientConfig contains settings to enable transport layer security
-	TLSClientConfig
-
-	// Server requires Bearer authentication
-	BearerToken string
-
-	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
-	HTTPTimeout time.Duration
-
-	// Dial is a custom dialer used for the client
-	Dial func(net, addr string) (net.Conn, error)
 }
 
 // TLSClientConfig contains settings to enable transport layer security

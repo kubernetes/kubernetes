@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -83,7 +84,7 @@ func TestUnschedulableNodes(t *testing.T) {
 
 	m = master.New(&master.Config{
 		StorageDestinations:   storageDestinations,
-		KubeletClient:         client.FakeKubeletClient{},
+		KubeletClient:         kubeletclient.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
@@ -334,7 +335,7 @@ func BenchmarkScheduling(b *testing.B) {
 
 	m = master.New(&master.Config{
 		StorageDestinations:   storageDestinations,
-		KubeletClient:         client.FakeKubeletClient{},
+		KubeletClient:         kubeletclient.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,

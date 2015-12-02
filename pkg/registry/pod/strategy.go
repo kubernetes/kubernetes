@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -233,7 +233,13 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Conte
 
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
+func LogLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+	opts *api.PodLogOptions,
+) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -258,7 +264,7 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeHost)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -341,17 +347,37 @@ func streamParams(params url.Values, opts runtime.Object) error {
 
 // AttachLocation returns the attach URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func AttachLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodAttachOptions) (*url.URL, http.RoundTripper, error) {
+func AttachLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+	opts *api.PodAttachOptions,
+) (*url.URL, http.RoundTripper, error) {
 	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "attach")
 }
 
 // ExecLocation returns the exec URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
+func ExecLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+	opts *api.PodExecOptions,
+) (*url.URL, http.RoundTripper, error) {
 	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
 }
 
-func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts runtime.Object, container, path string) (*url.URL, http.RoundTripper, error) {
+func streamLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+	opts runtime.Object,
+	container,
+	path string,
+) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -375,7 +401,7 @@ func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter,
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeHost)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -393,7 +419,12 @@ func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter,
 }
 
 // PortForwardLocation returns the port-forward URL for a pod.
-func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
+func PortForwardLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -404,7 +435,7 @@ func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGe
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeHost)
 	if err != nil {
 		return nil, nil, err
 	}

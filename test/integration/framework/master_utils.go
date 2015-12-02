@@ -37,6 +37,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
@@ -144,7 +145,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig = &master.Config{
 			StorageDestinations:  storageDestinations,
 			StorageVersions:      storageVersions,
-			KubeletClient:        client.FakeKubeletClient{},
+			KubeletClient:        kubeletclient.FakeKubeletClient{},
 			EnableLogsSupport:    false,
 			EnableProfiling:      true,
 			EnableSwaggerSupport: true,
@@ -286,7 +287,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 
 	m := master.New(&master.Config{
 		StorageDestinations: storageDestinations,
-		KubeletClient:       client.FakeKubeletClient{},
+		KubeletClient:       kubeletclient.FakeKubeletClient{},
 		EnableLogsSupport:   false,
 		EnableProfiling:     true,
 		EnableUISupport:     false,

@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/storage"
@@ -107,7 +108,7 @@ type APIServer struct {
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
-	KubeletConfig              client.KubeletConfig
+	KubeletConfig              kubeletclient.KubeletClientConfig
 	ClusterName                string
 	EnableProfiling            bool
 	EnableWatchCache           bool
@@ -140,7 +141,7 @@ func NewAPIServer() *APIServer {
 		StorageVersions:        latest.AllPreferredGroupVersions(),
 
 		RuntimeConfig: make(util.ConfigurationMap),
-		KubeletConfig: client.KubeletConfig{
+		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
@@ -259,6 +260,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps, "Use https for kubelet connections")
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port, "Kubelet port")
+	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed")
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout, "Timeout for kubelet operations")
 	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile, "Path to a client cert file for TLS.")
 	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile, "Path to a client key file for TLS.")
@@ -427,7 +429,7 @@ func (s *APIServer) Run(_ []string) error {
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 
-	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
+	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
 	if err != nil {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
