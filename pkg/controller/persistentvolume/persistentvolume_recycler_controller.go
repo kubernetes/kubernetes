@@ -130,23 +130,26 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
 	plugin, err := recycler.pluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
-		return fmt.Errorf("Could not find recyclable volume plugin for spec: %+v", err)
-	}
-	volRecycler, err := plugin.NewRecycler(spec)
-	if err != nil {
-		return fmt.Errorf("Could not obtain Recycler for spec: %+v", err)
-	}
-	// blocks until completion
-	err = volRecycler.Recycle()
-	if err != nil {
-		glog.Errorf("PersistentVolume[%s] failed recycling: %+v", pv.Name, err)
-		pv.Status.Message = fmt.Sprintf("Recycling error: %s", err)
 		nextPhase = api.VolumeFailed
-	} else {
-		glog.V(5).Infof("PersistentVolume[%s] successfully recycled\n", pv.Name)
-		nextPhase = api.VolumePending
+		pv.Status.Message = fmt.Sprintf("%v", err)
+	}
+
+	// an error above means a suitable plugin for this volume was not found.
+	// we don't need to attempt recycling when plugin is nil, but we do need to persist the next/failed phase
+	// of the volume so that subsequent syncs won't attempt recycling through this handler func.
+	if plugin != nil {
+		volRecycler, err := plugin.NewRecycler(spec)
 		if err != nil {
-			glog.Errorf("Error updating pv.Status: %+v", err)
+			return fmt.Errorf("Could not obtain Recycler for spec: %#v  error: %v", spec, err)
+		}
+		// blocks until completion
+		if err := volRecycler.Recycle(); err != nil {
+			glog.Errorf("PersistentVolume[%s] failed recycling: %+v", pv.Name, err)
+			pv.Status.Message = fmt.Sprintf("Recycling error: %s", err)
+			nextPhase = api.VolumeFailed
+		} else {
+			glog.V(5).Infof("PersistentVolume[%s] successfully recycled\n", pv.Name)
+			nextPhase = api.VolumePending
 		}
 	}
 
@@ -172,24 +175,30 @@ func (recycler *PersistentVolumeRecycler) handleDelete(pv *api.PersistentVolume)
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
 	plugin, err := recycler.pluginMgr.FindDeletablePluginBySpec(spec)
 	if err != nil {
-		return fmt.Errorf("Could not find deletable volume plugin for spec: %+v", err)
-	}
-	deleter, err := plugin.NewDeleter(spec)
-	if err != nil {
-		return fmt.Errorf("could not obtain Deleter for spec: %+v", err)
-	}
-	// blocks until completion
-	err = deleter.Delete()
-	if err != nil {
-		glog.Errorf("PersistentVolume[%s] failed deletion: %+v", pv.Name, err)
-		pv.Status.Message = fmt.Sprintf("Deletion error: %s", err)
 		nextPhase = api.VolumeFailed
-	} else {
-		glog.V(5).Infof("PersistentVolume[%s] successfully deleted through plugin\n", pv.Name)
-		// after successful deletion through the plugin, we can also remove the PV from the cluster
-		err = recycler.client.DeletePersistentVolume(pv)
+		pv.Status.Message = fmt.Sprintf("%v", err)
+	}
+
+	// an error above means a suitable plugin for this volume was not found.
+	// we don't need to attempt deleting when plugin is nil, but we do need to persist the next/failed phase
+	// of the volume so that subsequent syncs won't attempt deletion through this handler func.
+	if plugin != nil {
+		deleter, err := plugin.NewDeleter(spec)
 		if err != nil {
-			return fmt.Errorf("error deleting persistent volume: %+v", err)
+			return fmt.Errorf("Could not obtain Deleter for spec: %#v  error: %v", spec, err)
+		}
+		// blocks until completion
+		err = deleter.Delete()
+		if err != nil {
+			glog.Errorf("PersistentVolume[%s] failed deletion: %+v", pv.Name, err)
+			pv.Status.Message = fmt.Sprintf("Deletion error: %s", err)
+			nextPhase = api.VolumeFailed
+		} else {
+			glog.V(5).Infof("PersistentVolume[%s] successfully deleted through plugin\n", pv.Name)
+			// after successful deletion through the plugin, we can also remove the PV from the cluster
+			if err := recycler.client.DeletePersistentVolume(pv); err != nil {
+				return fmt.Errorf("error deleting persistent volume: %+v", err)
+			}
 		}
 	}
 
