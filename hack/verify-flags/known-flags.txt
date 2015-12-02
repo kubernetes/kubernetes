@@ -76,6 +76,7 @@ dry-run
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-custom-metrics
 enable-debugging-handlers
 enable-server
 enable-hostpath-provisioner
@@ -175,6 +176,7 @@ masquerade-all
 master-service-namespace
 max-concurrency
 max-connection-bytes-per-sec
+max-custom-metrics-per-pod
 maximum-dead-containers
 maximum-dead-containers-per-container
 max-log-age

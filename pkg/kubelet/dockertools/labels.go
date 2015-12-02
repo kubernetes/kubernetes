@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -42,6 +43,8 @@ const (
 	kubernetesPodLabel                    = "io.kubernetes.pod.data"
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
+
+	cadvisorPrometheusMetricsLabel = "io.cadvisor.metric.prometheus"
 )
 
 // Container information which has been labelled on each docker container
@@ -55,7 +58,7 @@ type labelledContainerInfo struct {
 	TerminationMessagePath string
 }
 
-func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
+func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
 	// TODO (random-liu) Move more label initialization here
 	labels := map[string]string{}
 	labels[kubernetesPodNameLabel] = pod.Name
@@ -66,6 +69,11 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[str
 	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
 	labels[kubernetesContainerTerminationMessagePathLabel] = container.TerminationMessagePath
+
+	// Add annotation for cAdvisor to handle custom metrics if required.
+	if enableCustomMetrics {
+		addCustomMetricsLabelIfRequired(pod, labels)
+	}
 
 	return labels
 }
@@ -107,4 +115,10 @@ func getIntValueFromLabel(labels map[string]string, label string) (int, error) {
 	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
 	// Just set the value to 0
 	return 0, nil
+}
+
+func addCustomMetricsLabelIfRequired(pod *api.Pod, labels map[string]string) {
+	if _, ok := pod.Annotations[custommetrics.CustomMetricsAnnotationKey]; ok {
+		labels[cadvisorPrometheusMetricsLabel] = custommetrics.CustomMetricsDefinitionContainerPath
+	}
 }

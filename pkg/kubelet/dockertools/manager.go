@@ -141,6 +141,9 @@ type DockerManager struct {
 
 	// Container GC manager
 	containerGC *containerGC
+
+	// Experimental support for gathering custom metrics from pods.
+	enableCustomMetrics bool
 }
 
 func NewDockerManager(
@@ -162,7 +165,8 @@ func NewDockerManager(
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
 	imageBackOff *util.Backoff,
-	serializeImagePulls bool) *DockerManager {
+	serializeImagePulls bool,
+	enableCustomMetrics bool) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
@@ -214,6 +218,7 @@ func NewDockerManager(
 		oomAdjuster:            oomAdjuster,
 		procFs:                 procFs,
 		cpuCFSQuota:            cpuCFSQuota,
+		enableCustomMetrics:    enableCustomMetrics,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
@@ -652,7 +657,7 @@ func (dm *DockerManager) runContainer(
 	// while the Kubelet is down and there is no information available to recover the pod. This includes
 	// termination information like the termination grace period and the pre stop hooks.
 	// TODO: keep these labels up to date if the pod changes
-	labels := newLabels(container, pod, restartCount)
+	labels := newLabels(container, pod, restartCount, dm.enableCustomMetrics)
 
 	if pod.Spec.TerminationGracePeriodSeconds != nil {
 		labels[kubernetesTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)

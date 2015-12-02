@@ -21,12 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // Check whether we have the capabilities to run the specified pod.
-func canRunPod(pod *api.Pod) error {
+func canRunPod(pod *api.Pod, enableCustomMetrics bool, maxCustomMetricsPerPod int) error {
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
 		allowed, err := allowHostNetwork(pod)
 		if err != nil {
@@ -62,6 +63,12 @@ func canRunPod(pod *api.Pod) error {
 			if securitycontext.HasPrivilegedRequest(&container) {
 				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID)
 			}
+		}
+	}
+
+	if enableCustomMetrics {
+		if err := custommetrics.VerifyCustomMetricsAnnotation(pod, maxCustomMetricsPerPod); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 )
 
 func TestLabels(t *testing.T) {
@@ -48,12 +49,35 @@ func TestLabels(t *testing.T) {
 		TerminationMessagePath: container.TerminationMessagePath,
 	}
 
-	labels := newLabels(container, pod, restartCount)
+	labels := newLabels(container, pod, restartCount, false)
 	containerInfo, err := getContainerInfoFromLabel(labels)
 	if err != nil {
 		t.Errorf("Unexpected error when getContainerInfoFromLabel: %v", err)
 	}
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
+	}
+}
+
+func TestAddCustomMetricsLabel(t *testing.T) {
+	labels := map[string]string{}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{},
+		},
+	}
+
+	addCustomMetricsLabelIfRequired(&pod, labels)
+	if len(labels) != 0 {
+		t.Errorf("Expected empty labels, got: %v", labels)
+	}
+
+	pod.Annotations[custommetrics.CustomMetricsAnnotationKey] = "dummy"
+	addCustomMetricsLabelIfRequired(&pod, labels)
+	if len(labels) != 1 {
+		t.Errorf("Expected one label, got: %v", labels)
+	}
+	if labels[cadvisorPrometheusMetricsLabel] != custommetrics.CustomMetricsDefinitionContainerPath {
+		t.Errorf("Unexpected value for 'io.cadvisor.metric.prometheus': %s", labels[cadvisorPrometheusMetricsLabel])
 	}
 }
