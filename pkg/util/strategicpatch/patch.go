@@ -113,7 +113,7 @@ func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}
 }
 
 // CreateTwoWayMergePatch creates a patch that can be passed to StrategicMergePatch from an original
-// document and a modified documernt, which are passed to the method as json encoded content. It will
+// document and a modified document, which are passed to the method as json encoded content. It will
 // return a patch that yields the modified document when applied to the original document, or an error
 // if either of the two documents is invalid.
 func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, fns ...PreconditionFunc) ([]byte, error) {
