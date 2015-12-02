@@ -133,16 +133,15 @@ var _ = Describe("NodeOutOfDisk", func() {
 
 		By(fmt.Sprintf("Finding a failed scheduler event for pod %s", pendingPodName))
 		wait.Poll(2*time.Second, 5*time.Minute, func() (bool, error) {
-			schedEvents, err := c.Events(ns).List(
-				labels.Everything(),
-				fields.Set{
-					"involvedObject.kind":      "Pod",
-					"involvedObject.name":      pendingPodName,
-					"involvedObject.namespace": ns,
-					"source":                   "scheduler",
-					"reason":                   "FailedScheduling",
-				}.AsSelector(),
-				unversioned.ListOptions{})
+			selector := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pendingPodName,
+				"involvedObject.namespace": ns,
+				"source":                   "scheduler",
+				"reason":                   "FailedScheduling",
+			}.AsSelector()
+			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+			schedEvents, err := c.Events(ns).List(options)
 			expectNoError(err)
 
 			if len(schedEvents.Items) > 0 {
@@ -203,7 +202,9 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 func availCpu(c *client.Client, node *api.Node) (int64, error) {
 	podClient := c.Pods(api.NamespaceAll)
 
-	pods, err := podClient.List(labels.Everything(), fields.Set{"spec.nodeName": node.Name}.AsSelector(), unversioned.ListOptions{})
+	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector()
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	pods, err := podClient.List(options)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve all the pods on node %s: %v", node.Name, err)
 	}

@@ -20,8 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -41,8 +39,8 @@ func (c *FakeServices) Get(name string) (*api.Service, error) {
 	return obj.(*api.Service), err
 }
 
-func (c *FakeServices) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ServiceList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("services", c.Namespace, label, field), &api.ServiceList{})
+func (c *FakeServices) List(opts unversioned.ListOptions) (*api.ServiceList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("services", c.Namespace, opts), &api.ServiceList{})
 	if obj == nil {
 		return nil, err
 	}

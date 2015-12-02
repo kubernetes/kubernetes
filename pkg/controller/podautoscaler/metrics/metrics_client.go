@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -119,8 +118,9 @@ func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map
 }
 
 func (h *HeapsterMetricsClient) GetResourceConsumptionAndRequest(resourceName api.ResourceName, namespace string, selector map[string]string) (consumption *ResourceConsumption, request *resource.Quantity, timestamp time.Time, err error) {
+	labelSelector := labels.SelectorFromSet(labels.Set(selector))
 	podList, err := h.client.Pods(namespace).
-		List(labels.SelectorFromSet(labels.Set(selector)), fields.Everything(), unversioned.ListOptions{})
+		List(unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}})
 
 	if err != nil {
 		return nil, nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)

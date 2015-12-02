@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -191,7 +190,8 @@ var _ = Describe("DNS", func() {
 
 		systemClient := f.Client.Pods(api.NamespaceSystem)
 		By("Waiting for DNS Service to be Running")
-		dnsPods, err := systemClient.List(dnsServiceLableSelector, fields.Everything(), unversioned.ListOptions{})
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{dnsServiceLableSelector}}
+		dnsPods, err := systemClient.List(options)
 		if err != nil {
 			Failf("Failed to list all dns service pods")
 		}
@@ -229,7 +229,8 @@ var _ = Describe("DNS", func() {
 		systemClient := f.Client.Pods(api.NamespaceSystem)
 
 		By("Waiting for DNS Service to be Running")
-		dnsPods, err := systemClient.List(dnsServiceLableSelector, fields.Everything(), unversioned.ListOptions{})
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{dnsServiceLableSelector}}
+		dnsPods, err := systemClient.List(options)
 		if err != nil {
 			Failf("Failed to list all dns service pods")
 		}

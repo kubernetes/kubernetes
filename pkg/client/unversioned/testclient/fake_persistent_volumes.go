@@ -19,8 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -37,8 +35,8 @@ func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) 
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PersistentVolumeList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", label, field), &api.PersistentVolumeList{})
+func (c *FakePersistentVolumes) List(opts unversioned.ListOptions) (*api.PersistentVolumeList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", opts), &api.PersistentVolumeList{})
 	if obj == nil {
 		return nil, err
 	}

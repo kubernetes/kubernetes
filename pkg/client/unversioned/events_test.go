@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestEventSearch(t *testing.T) {
@@ -166,8 +164,7 @@ func TestEventList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: eventList},
 	}
-	response, err := c.Setup(t).Events(ns).List(labels.Everything(),
-		fields.Everything(), unversioned.ListOptions{})
+	response, err := c.Setup(t).Events(ns).List(unversioned.ListOptions{})
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)

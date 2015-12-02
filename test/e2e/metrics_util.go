@@ -31,8 +31,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
@@ -181,7 +179,7 @@ func listPodsLatencyThreshold(numNodes int) time.Duration {
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
 func HighLatencyRequests(c *client.Client) (int, error) {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	nodes, err := c.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		return 0, err
 	}

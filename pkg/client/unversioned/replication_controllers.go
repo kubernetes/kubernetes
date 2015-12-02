@@ -19,8 +19,6 @@ package unversioned
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +29,7 @@ type ReplicationControllersNamespacer interface {
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ReplicationControllerList, error)
+	List(opts unversioned.ListOptions) (*api.ReplicationControllerList, error)
 	Get(name string) (*api.ReplicationController, error)
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
@@ -52,9 +50,9 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 }
 
 // List takes a selector, and returns the list of replication controllers that match that selector.
-func (c *replicationControllers) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts unversioned.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 

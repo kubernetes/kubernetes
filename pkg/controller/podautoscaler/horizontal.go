@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -175,7 +173,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 func (a *HorizontalController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
-	list, err := a.client.Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	list, err := a.client.Extensions().HorizontalPodAutoscalers(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}

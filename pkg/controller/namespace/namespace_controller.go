@@ -26,8 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -48,7 +46,7 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+				return kubeClient.Namespaces().List(unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.Namespaces().Watch(options)
@@ -339,7 +337,7 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 }
 
 func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.LimitRanges(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -353,7 +351,7 @@ func deleteLimitRanges(kubeClient client.Interface, ns string) error {
 }
 
 func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -367,7 +365,7 @@ func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ServiceAccounts(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.ServiceAccounts(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -381,7 +379,7 @@ func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.Services(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -395,7 +393,7 @@ func deleteServices(kubeClient client.Interface, ns string) error {
 }
 
 func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.ReplicationControllers(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -409,7 +407,7 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 }
 
 func deletePods(kubeClient client.Interface, ns string, before unversioned.Time) (int64, error) {
-	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.Pods(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -438,7 +436,7 @@ func deletePods(kubeClient client.Interface, ns string, before unversioned.Time)
 }
 
 func deleteEvents(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Events(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.Events(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -452,7 +450,7 @@ func deleteEvents(kubeClient client.Interface, ns string) error {
 }
 
 func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.Secrets(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -466,7 +464,7 @@ func deleteSecrets(kubeClient client.Interface, ns string) error {
 }
 
 func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.PersistentVolumeClaims(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := kubeClient.PersistentVolumeClaims(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -480,7 +478,7 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 }
 
 func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := expClient.HorizontalPodAutoscalers(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -494,7 +492,7 @@ func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns str
 }
 
 func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.DaemonSets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := expClient.DaemonSets(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -508,7 +506,7 @@ func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Jobs(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := expClient.Jobs(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -522,7 +520,7 @@ func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Deployments(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := expClient.Deployments(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -536,7 +534,7 @@ func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Ingress(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	items, err := expClient.Ingress(ns).List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}

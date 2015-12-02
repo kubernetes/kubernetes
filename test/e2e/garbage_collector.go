@@ -24,8 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -57,7 +55,7 @@ var _ = Describe("Garbage collector", func() {
 		// 20 seconds.
 		time.Sleep(30 * time.Second)
 
-		pods, err := f.Client.Pods(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		pods, err := f.Client.Pods(f.Namespace.Name).List(unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(pods.Items)).To(BeNumerically("==", 100))
 	})

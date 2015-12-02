@@ -27,8 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 )
@@ -61,7 +59,7 @@ func (d *DeploymentController) Run(syncPeriod time.Duration) {
 }
 
 func (d *DeploymentController) reconcileDeployments() []error {
-	list, err := d.expClient.Deployments(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	list, err := d.expClient.Deployments(api.NamespaceAll).List(unversioned.ListOptions{})
 	if err != nil {
 		return []error{fmt.Errorf("error listing deployments: %v", err)}
 	}

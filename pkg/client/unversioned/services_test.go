@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -55,7 +54,7 @@ func TestListServices(t *testing.T) {
 			},
 		},
 	}
-	receivedServiceList, err := c.Setup(t).Services(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	receivedServiceList, err := c.Setup(t).Services(ns).List(unversioned.ListOptions{})
 	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
@@ -92,7 +91,8 @@ func TestListServicesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedServiceList, err := c.Services(ns).List(selector, fields.Everything(), unversioned.ListOptions{})
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	receivedServiceList, err := c.Services(ns).List(options)
 	c.Validate(t, receivedServiceList, err)
 }
 

@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -212,7 +211,8 @@ func gcloudDelete(resource, name string) {
 // kubectlLogLBController logs kubectl debug output for the L7 controller pod.
 func kubectlLogLBController(c *client.Client, ns string) {
 	selector := labels.SelectorFromSet(labels.Set(controllerLabels))
-	podList, err := c.Pods(api.NamespaceAll).List(selector, fields.Everything(), unversioned.ListOptions{})
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err := c.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		Logf("Cannot log L7 controller output, error listing pods %v", err)
 		return
@@ -424,8 +424,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			Logf(desc)
 		}
 		// Delete all Ingress, then wait for the controller to cleanup.
-		ings, err := client.Extensions().Ingress(ns).List(
-			labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		ings, err := client.Extensions().Ingress(ns).List(unversioned.ListOptions{})
 		if err != nil {
 			Logf("WARNING: Failed to list ingress: %+v", err)
 		} else {
@@ -483,8 +482,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			createIngress(client, ns, appID, appsPerIngress)
 		}
 
-		ings, err := client.Extensions().Ingress(ns).List(
-			labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		ings, err := client.Extensions().Ingress(ns).List(unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, ing := range ings.Items {

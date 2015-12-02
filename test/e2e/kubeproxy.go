@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -430,7 +429,7 @@ func (config *KubeProxyTestConfig) setup() {
 	}
 
 	By("Getting node addresses")
-	nodeList, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	nodeList, err := config.f.Client.Nodes().List(unversioned.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get node list: %v", err))
 	config.externalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
 	if len(config.externalAddrs) < 2 {
@@ -458,7 +457,7 @@ func (config *KubeProxyTestConfig) setup() {
 
 func (config *KubeProxyTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(nil, nil, unversioned.ListOptions{})
+	nsList, err := nsClient.List(unversioned.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.f.Namespace.Name {
@@ -469,7 +468,7 @@ func (config *KubeProxyTestConfig) cleanup() {
 }
 
 func (config *KubeProxyTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
-	nodes, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	nodes, err := config.f.Client.Nodes().List(unversioned.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// create pods, one for each node

@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
@@ -342,7 +341,9 @@ func GetFirstPod(client *client.Client, namespace string, selector map[string]st
 	var pods *api.PodList
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
-		if pods, err = client.Pods(namespace).List(labels.SelectorFromSet(selector), fields.Everything(), unversioned.ListOptions{}); err != nil {
+		labelSelector := labels.SelectorFromSet(selector)
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}}
+		if pods, err = client.Pods(namespace).List(options); err != nil {
 			return nil, err
 		}
 		if len(pods.Items) == 0 {
