@@ -31,7 +31,7 @@ type ResourceQuotasNamespacer interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.ResourceQuotaList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ResourceQuotaList, error)
 	Get(name string) (*api.ResourceQuota, error)
 	Delete(name string) error
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
@@ -55,9 +55,9 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 }
 
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
-func (c *resourceQuotas) List(label labels.Selector, field fields.Selector) (result *api.ResourceQuotaList, err error) {
+func (c *resourceQuotas) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

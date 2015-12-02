@@ -32,7 +32,7 @@ type IngressNamespacer interface {
 
 // IngressInterface exposes methods to work on Ingress resources.
 type IngressInterface interface {
-	List(label labels.Selector, field fields.Selector) (*extensions.IngressList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.IngressList, error)
 	Get(name string) (*extensions.Ingress, error)
 	Create(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Update(ingress *extensions.Ingress) (*extensions.Ingress, error)
@@ -53,9 +53,9 @@ func newIngress(c *ExtensionsClient, namespace string) *ingress {
 }
 
 // List returns a list of ingress that match the label and field selectors.
-func (c *ingress) List(label labels.Selector, field fields.Selector) (result *extensions.IngressList, err error) {
+func (c *ingress) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *extensions.IngressList, err error) {
 	result = &extensions.IngressList{}
-	err = c.r.Get().Namespace(c.ns).Resource("ingresses").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("ingresses").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

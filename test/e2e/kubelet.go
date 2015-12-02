@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -95,7 +96,7 @@ var _ = Describe("kubelet", func() {
 	var resourceMonitor *resourceMonitor
 
 	BeforeEach(func() {
-		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 		expectNoError(err)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()

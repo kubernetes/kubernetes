@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -108,7 +109,7 @@ func checkExistingRCRecovers(f *Framework) {
 
 	By("deleting pods from existing replication controller")
 	expectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
-		pods, err := podClient.List(rcSelector, fields.Everything())
+		pods, err := podClient.List(rcSelector, fields.Everything(), unversioned.ListOptions{})
 		if err != nil {
 			Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
@@ -126,7 +127,7 @@ func checkExistingRCRecovers(f *Framework) {
 
 	By("waiting for replication controller to recover")
 	expectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
-		pods, err := podClient.List(rcSelector, fields.Everything())
+		pods, err := podClient.List(rcSelector, fields.Everything(), unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && api.IsPodReady(&pod) {

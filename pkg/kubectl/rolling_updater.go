@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -363,7 +364,7 @@ func (r *RollingUpdater) pollForReadyPods(interval, timeout time.Duration, oldRc
 		anyReady := false
 		for _, controller := range controllers {
 			selector := labels.Set(controller.Spec.Selector).AsSelector()
-			pods, err := r.c.Pods(controller.Namespace).List(selector, fields.Everything())
+			pods, err := r.c.Pods(controller.Namespace).List(selector, fields.Everything(), unversioned.ListOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -627,7 +628,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 
 	// Update all pods managed by the rc to have the new hash label, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
-	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
+	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -677,7 +678,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	// Clean up any orphaned pods that don't have the new label, this can happen if the rc manager
 	// doesn't see the update to its pod template and creates a new pod with the old labels after
 	// we've finished re-adopting existing pods to the rc.
-	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything())
+	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything(), unversioned.ListOptions{})
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != deploymentValue {
@@ -718,7 +719,7 @@ func updateWithRetries(rcClient client.ReplicationControllerInterface, rc *api.R
 }
 
 func FindSourceController(r client.ReplicationControllersNamespacer, namespace, name string) (*api.ReplicationController, error) {
-	list, err := r.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything())
+	list, err := r.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

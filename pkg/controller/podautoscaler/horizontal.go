@@ -176,7 +176,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 func (a *HorizontalController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
-	list, err := a.client.Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	list, err := a.client.Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}

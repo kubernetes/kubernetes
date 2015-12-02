@@ -33,7 +33,7 @@ type PersistentVolumeClaimsNamespacer interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeClaimList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PersistentVolumeClaimList, error)
 	Get(name string) (*api.PersistentVolumeClaim, error)
 	Create(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
@@ -53,12 +53,13 @@ func newPersistentVolumeClaims(c *Client, namespace string) *persistentVolumeCla
 	return &persistentVolumeClaims{c, namespace}
 }
 
-func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector) (result *api.PersistentVolumeClaimList, err error) {
+func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	result = &api.PersistentVolumeClaimList{}
 
 	err = c.client.Get().
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
+		VersionedParams(&opts, api.Scheme).
 		LabelsSelectorParam(label).
 		FieldsSelectorParam(field).
 		Do().

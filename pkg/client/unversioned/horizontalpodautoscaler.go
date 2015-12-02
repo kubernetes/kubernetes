@@ -32,7 +32,7 @@ type HorizontalPodAutoscalersNamespacer interface {
 
 // HorizontalPodAutoscalerInterface has methods to work with HorizontalPodAutoscaler resources.
 type HorizontalPodAutoscalerInterface interface {
-	List(label labels.Selector, field fields.Selector) (*extensions.HorizontalPodAutoscalerList, error)
+	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error)
 	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
@@ -56,9 +56,9 @@ func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizon
 }
 
 // List takes label and field selectors, and returns the list of horizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (result *extensions.HorizontalPodAutoscalerList, err error) {
+func (c *horizontalPodAutoscalers) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
 	result = &extensions.HorizontalPodAutoscalerList{}
-	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

@@ -41,7 +41,7 @@ func (c *FakeJobs) Get(name string) (*extensions.Job, error) {
 	return obj.(*extensions.Job), err
 }
 
-func (c *FakeJobs) List(label labels.Selector, fields fields.Selector) (*extensions.JobList, error) {
+func (c *FakeJobs) List(label labels.Selector, fields fields.Selector, opts unversioned.ListOptions) (*extensions.JobList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, label, nil), &extensions.JobList{})
 	if obj == nil {
 		return nil, err

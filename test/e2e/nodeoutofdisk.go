@@ -24,6 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -140,7 +141,8 @@ var _ = Describe("NodeOutOfDisk", func() {
 					"involvedObject.namespace": ns,
 					"source":                   "scheduler",
 					"reason":                   "FailedScheduling",
-				}.AsSelector())
+				}.AsSelector(),
+				unversioned.ListOptions{})
 			expectNoError(err)
 
 			if len(schedEvents.Items) > 0 {
@@ -201,7 +203,7 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 func availCpu(c *client.Client, node *api.Node) (int64, error) {
 	podClient := c.Pods(api.NamespaceAll)
 
-	pods, err := podClient.List(labels.Everything(), fields.Set{"spec.nodeName": node.Name}.AsSelector())
+	pods, err := podClient.List(labels.Everything(), fields.Set{"spec.nodeName": node.Name}.AsSelector(), unversioned.ListOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve all the pods on node %s: %v", node.Name, err)
 	}
