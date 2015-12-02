@@ -409,21 +409,21 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
 
-  # kubernetes-upgrade-gke-1.0-release
+  # kubernetes-upgrade-gke-1.0-current-release
   #
   # Configurations for step2, step4, and step6 live in the current release
   # branch.
 
-  kubernetes-upgrade-gke-1.0-release-step1-deploy)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-current-release-step1-deploy)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-release-step3-e2e-old)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-current-release-step3-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-release-step5-e2e-old)
-    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-release' 'kubernetes-jenkins-gke-upgrade'
+  kubernetes-upgrade-gke-1.0-current-release-step5-e2e-old)
+    configure_upgrade_step 'ci/latest-1.0' 'configured-in-current-release-branch' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
   # kubernetes-upgrade-gke-1.0-master
