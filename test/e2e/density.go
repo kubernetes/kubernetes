@@ -453,6 +453,7 @@ func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image stri
 					Image: image,
 				},
 			},
+			DNSPolicy: api.DNSDefault,
 		},
 	}
 	_, err := c.Pods(ns).Create(pod)
