@@ -700,7 +700,7 @@ waitForRunningPod:
 	k.lock.Lock()
 	defer k.lock.Unlock()
 reportLost:
-	k.reportLostTask(driver, taskId, messages.LaunchTaskFailed)
+	k.reportLostTask(driver, taskId, messages.KubeletPodLaunchFailed)
 }
 
 func (k *Executor) __launchTask(driver bindings.ExecutorDriver, taskId, podFullName string, psf podStatusFunc) {
