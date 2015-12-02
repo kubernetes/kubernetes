@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// To run the e2e tests against one or more hosts on gce: $ go run run_e2e.go --hosts <comma separated hosts>
+// Requires gcloud compute ssh access to the hosts
 package main
 
 import (
@@ -114,8 +116,8 @@ func WaitForUser() {
 func runTests(host string) ([]byte, error) {
 	c := gcloud.NewGCloudClient(host, *zone)
 	// TODO(pwittrock): Come up with something better for bootstrapping the environment.
-	etcdBin := filepath.Join(kubeRoot, "third_party/etcd/etcd")
-	eh, err := c.CopyAndWaitTillHealthy(false, "4001", healthyTimeoutDuration, "v2/keys/", etcdBin)
+	eh, err := c.CopyAndWaitTillHealthy(
+		false, false, "4001", healthyTimeoutDuration, "v2/keys/", "etcd", "--data-dir", "./")
 	defer func() { eh.TearDown() }()
 	if err != nil {
 		return nil, fmt.Errorf("Host %s failed to run command %v", host, err)
@@ -123,7 +125,7 @@ func runTests(host string) ([]byte, error) {
 
 	apiBin := filepath.Join(kubeRoot, *kubeOutputRelPath, "kube-apiserver")
 	ah, err := c.CopyAndWaitTillHealthy(
-		true, "8080", healthyTimeoutDuration, "healthz", apiBin, "--service-cluster-ip-range",
+		true, true, "8080", healthyTimeoutDuration, "healthz", apiBin, "--service-cluster-ip-range",
 		"10.0.0.1/24", "--insecure-bind-address", "0.0.0.0", "--etcd-servers", "http://localhost:4001",
 		"--cluster-name", "kubernetes", "--v", "2", "--kubelet-port", "10250")
 	defer func() { ah.TearDown() }()
@@ -133,7 +135,7 @@ func runTests(host string) ([]byte, error) {
 
 	kubeletBin := filepath.Join(kubeRoot, *kubeOutputRelPath, "kubelet")
 	kh, err := c.CopyAndWaitTillHealthy(
-		true, "4194", healthyTimeoutDuration, "healthz", kubeletBin, "--api-servers", "http://localhost:8080",
+		true, true, "10255", healthyTimeoutDuration, "healthz", kubeletBin, "--api-servers", "http://localhost:8080",
 		"--logtostderr", "--address", "0.0.0.0", "--port", "10250")
 	defer func() { kh.TearDown() }()
 	if err != nil {

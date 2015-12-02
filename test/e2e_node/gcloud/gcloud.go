@@ -37,7 +37,9 @@ var freePortRegexp = regexp.MustCompile(".+:([0-9]+)")
 type TearDown func()
 
 type GCloudClient interface {
-	CopyAndWaitTillHealthy(sudo bool, remotePort string, timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error)
+	CopyAndWaitTillHealthy(
+		sudo bool, copyBin bool, remotePort string,
+		timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error)
 }
 
 type gCloudClientImpl struct {
@@ -99,7 +101,9 @@ func (gc *gCloudClientImpl) CopyToHost(from string, to string) ([]byte, error) {
 	return exec.Command("gcloud", args...).CombinedOutput()
 }
 
-func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string, args ...string) *CmdHandle {
+func (gc *gCloudClientImpl) CopyAndRun(
+	sudo bool, copyBin bool, remotePort string, bin string, args ...string) *CmdHandle {
+
 	h := &CmdHandle{}
 	h.Output = make(chan RunResult)
 
@@ -108,7 +112,10 @@ func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string,
 	// Define where we will copy the temp binary
 	tDir := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
 	_, f := filepath.Split(bin)
-	cmd := filepath.Join(tDir, f)
+	cmd := f
+	if copyBin {
+		cmd = filepath.Join(tDir, f)
+	}
 	h.LPort = getLocalPort()
 
 	h.TearDown = func() {
@@ -133,11 +140,13 @@ func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string,
 	}
 
 	// Copy the binary
-	out, err = gc.CopyToHost(bin, tDir)
-	if err != nil {
-		glog.Errorf("copy-files failed %v", err)
-		h.Output <- RunResult{out, err, fmt.Sprintf("copy-files %s %s", bin, tDir)}
-		return h
+	if copyBin {
+		out, err = gc.CopyToHost(bin, tDir)
+		if err != nil {
+			glog.Errorf("copy-files failed %v", err)
+			h.Output <- RunResult{out, err, fmt.Sprintf("copy-files %s %s", bin, tDir)}
+			return h
+		}
 	}
 
 	// Do the setup
@@ -154,9 +163,9 @@ func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string,
 }
 
 func (gc *gCloudClientImpl) CopyAndWaitTillHealthy(
-	sudo bool,
+	sudo bool, copyBin bool,
 	remotePort string, timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error) {
-	h := gc.CopyAndRun(sudo, remotePort, bin, args...)
+	h := gc.CopyAndRun(sudo, copyBin, remotePort, bin, args...)
 	eTime := time.Now().Add(timeout)
 	done := false
 	for eTime.After(time.Now()) && !done {
