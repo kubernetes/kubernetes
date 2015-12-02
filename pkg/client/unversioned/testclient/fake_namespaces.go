@@ -71,8 +71,8 @@ func (c *FakeNamespaces) Delete(name string) error {
 	return err
 }
 
-func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", label, field, opts))
+func (c *FakeNamespaces) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", opts))
 }
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {

@@ -63,7 +63,7 @@ func NewEndpointController(client *client.Client) *endpointController {
 				return e.client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return e.client.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+				return e.client.Services(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Service{},
@@ -83,7 +83,7 @@ func NewEndpointController(client *client.Client) *endpointController {
 				return e.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return e.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+				return e.client.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},

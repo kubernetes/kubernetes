@@ -72,6 +72,6 @@ func (c *FakeLimitRanges) Delete(name string) error {
 	return err
 }
 
-func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("limitranges", c.Namespace, label, field, opts))
+func (c *FakeLimitRanges) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("limitranges", c.Namespace, opts))
 }

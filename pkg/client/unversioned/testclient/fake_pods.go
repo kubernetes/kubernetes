@@ -78,8 +78,8 @@ func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakePods) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("pods", c.Namespace, label, field, opts))
+func (c *FakePods) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("pods", c.Namespace, opts))
 }
 
 func (c *FakePods) Bind(binding *api.Binding) error {

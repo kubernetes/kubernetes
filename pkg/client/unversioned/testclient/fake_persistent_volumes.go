@@ -69,8 +69,8 @@ func (c *FakePersistentVolumes) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("persistentvolumes", label, field, opts))
+func (c *FakePersistentVolumes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("persistentvolumes", opts))
 }
 
 func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {

@@ -37,7 +37,7 @@ type NodeInterface interface {
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
 	UpdateStatus(*api.Node) (*api.Node, error)
-	Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // nodes implements NodesInterface
@@ -103,13 +103,11 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 }
 
 // Watch returns a watch.Interface that watches the requested nodes.
-func (c *nodes) Watch(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *nodes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(api.NamespaceAll).
 		Resource(c.resourceName()).
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }
