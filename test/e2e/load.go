@@ -64,6 +64,8 @@ var _ = Describe("[Performance] Load capacity [Skipped]", func() {
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
+	// Explicitly put here, to delete namespace at the end of the test
+	// (after measuring latency metrics, etc.).
 	framework := NewFramework("load")
 	framework.NamespaceDeletionTimeout = time.Hour
 
