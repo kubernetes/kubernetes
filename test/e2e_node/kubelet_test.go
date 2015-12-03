@@ -43,13 +43,16 @@ var _ = Describe("Kubelet", func() {
 						Namespace: api.NamespaceDefault,
 					},
 					Spec: api.PodSpec{
+						// Force the Pod to schedule to the node without a scheduler running
 						NodeName: *nodeName,
+						// Don't restart the Pod since it is expected to exit
+						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
 							{
-								Image:           "busybox",
+								Image:           "gcr.io/google_containers/busybox",
 								Name:            "busybox",
 								Command:         []string{"echo", "'Hello World'"},
-								ImagePullPolicy: "IfNotPresent",
+								ImagePullPolicy: api.PullIfNotPresent,
 							},
 						},
 					},
@@ -59,7 +62,7 @@ var _ = Describe("Kubelet", func() {
 			})
 
 			It("it should print the output to logs", func() {
-				errs := Retry(time.Minute*3, time.Second*2, cl, func(cl *client.Client) error {
+				errs := Retry(time.Minute, time.Second*4, func() error {
 					rc, err := cl.Pods(api.NamespaceDefault).GetLogs("busybox", &api.PodLogOptions{}).Stream()
 					if err != nil {
 						return err
@@ -67,7 +70,9 @@ var _ = Describe("Kubelet", func() {
 					defer rc.Close()
 					buf := new(bytes.Buffer)
 					buf.ReadFrom(rc)
-					Expect(buf.String()).To(Equal("'Hello World'\n"))
+					if buf.String() != "'Hello World'\n" {
+						return fmt.Errorf("Expected %s to match 'Hello World'", buf.String())
+					}
 					return nil
 				})
 				Expect(errs).To(BeEmpty(), fmt.Sprintf("Failed to get Logs"))

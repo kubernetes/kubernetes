@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// To run tests in this suite
+// `$ ginkgo -- --node-name node-e2e-test-1  --api-server-address <serveraddress> --logtostderr`
 package e2e_node
 
 import (

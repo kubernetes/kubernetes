@@ -34,10 +34,10 @@ import (
 
 var freePortRegexp = regexp.MustCompile(".+:([0-9]+)")
 
-type TearDown func()
+type TearDown func() *RunResult
 
 type GCloudClient interface {
-	CopyAndWaitTillHealthy(
+	RunAndWaitTillHealthy(
 		sudo bool, copyBin bool, remotePort string,
 		timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error)
 }
@@ -102,7 +102,7 @@ func (gc *gCloudClientImpl) CopyToHost(from string, to string) ([]byte, error) {
 	return exec.Command("gcloud", args...).CombinedOutput()
 }
 
-func (gc *gCloudClientImpl) CopyAndRun(
+func (gc *gCloudClientImpl) Run(
 	sudo bool, copyBin bool, remotePort string, bin string, args ...string) *CmdHandle {
 
 	h := &CmdHandle{}
@@ -119,54 +119,57 @@ func (gc *gCloudClientImpl) CopyAndRun(
 	}
 	h.LPort = getLocalPort()
 
-	h.TearDown = func() {
+	h.TearDown = func() *RunResult {
 		out, err := gc.Command("sudo", "pkill", f)
 		if err != nil {
-			h.Output <- RunResult{out, err, fmt.Sprintf("pkill %s", cmd)}
-			return
+			return &RunResult{out, err, fmt.Sprintf("pkill %s", f)}
 		}
 		out, err = gc.Command("rm", "-rf", tDir)
 		if err != nil {
-			h.Output <- RunResult{out, err, fmt.Sprintf("rm -rf %s", tDir)}
-			return
+			return &RunResult{out, err, fmt.Sprintf("rm -rf %s", tDir)}
 		}
+		return &RunResult{}
 	}
 
-	// Create the tmp directory
-	out, err := gc.Command("mkdir", "-p", tDir)
-	if err != nil {
-		glog.Errorf("mkdir failed %v", err)
-		h.Output <- RunResult{out, err, fmt.Sprintf("mkdir -p %s", tDir)}
-		return h
-	}
-
-	// Copy the binary
-	if copyBin {
-		out, err = gc.CopyToHost(bin, tDir)
-		if err != nil {
-			glog.Errorf("copy-files failed %v", err)
-			h.Output <- RunResult{out, err, fmt.Sprintf("copy-files %s %s", bin, tDir)}
-			return h
-		}
-	}
-
-	// Do the setup
+	// Run the commands in a Go fn so that this method doesn't block when writing to a channel
+	// to report an error
 	go func() {
-		// Start the process
-		out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, tDir, fmt.Sprintf("./%s", f), args...)
+		// Create the tmp directory
+		out, err := gc.Command("mkdir", "-p", tDir)
 		if err != nil {
-			glog.Errorf("command failed %v", err)
-			h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", f, strings.Join(args, " "))}
+			glog.Errorf("mkdir failed %v %s", err, out)
+			h.Output <- RunResult{out, err, fmt.Sprintf("mkdir -p %s", tDir)}
 			return
 		}
+
+		// Copy the binary
+		if copyBin {
+			out, err = gc.CopyToHost(bin, tDir)
+			if err != nil {
+				glog.Errorf("copy-files failed %v %s", err, out)
+				h.Output <- RunResult{out, err, fmt.Sprintf("copy-files %s %s", bin, tDir)}
+				return
+			}
+		}
+
+		// Do the setup
+		go func() {
+			// Start the process
+			out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, tDir, cmd, args...)
+			if err != nil {
+				glog.Errorf("command failed %v %s", err, out)
+				h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))}
+				return
+			}
+		}()
 	}()
 	return h
 }
 
-func (gc *gCloudClientImpl) CopyAndWaitTillHealthy(
+func (gc *gCloudClientImpl) RunAndWaitTillHealthy(
 	sudo bool, copyBin bool,
 	remotePort string, timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error) {
-	h := gc.CopyAndRun(sudo, copyBin, remotePort, bin, args...)
+	h := gc.Run(sudo, copyBin, remotePort, bin, args...)
 	eTime := time.Now().Add(timeout)
 	done := false
 	for eTime.After(time.Now()) && !done {
