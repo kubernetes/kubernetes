@@ -150,7 +150,7 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 
 func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 	clusterIP := config.nodePortService.Spec.ClusterIP
-	tries := epCount*epCount + 5 // if epCount == 0
+	tries := epCount*epCount + 15 // if epCount == 0
 	By("dialing(udp) node1 --> clusterIP:clusterUdpPort")
 	config.dialFromNode("udp", clusterIP, clusterUdpPort, tries, epCount)
 	By("dialing(http) node1 --> clusterIP:clusterHttpPort")
@@ -169,7 +169,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	node1_IP := config.externalAddrs[0]
-	tries := epCount*epCount + 5 // + 10 if epCount == 0
+	tries := epCount*epCount + 15 //  if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1  --> node1:nodeHttpPort")
@@ -429,7 +429,7 @@ func (config *KubeProxyTestConfig) setup() {
 		selectorName: "true",
 	}
 
-	By("Getting two nodes")
+	By("Getting node addresses")
 	nodeList, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get node list: %v", err))
 	config.externalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
