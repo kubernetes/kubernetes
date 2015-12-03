@@ -28,7 +28,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -41,6 +40,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 )
@@ -139,16 +139,10 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 func NewMasterConfig() *master.Config {
 	etcdClient := NewEtcdClient()
 	storageVersions := make(map[string]string)
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	storageVersions[""] = testapi.Default.GroupAndVersion()
-	if err != nil {
-		glog.Fatalf("Failed to create etcd storage for master %v", err)
-	}
-	expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
+	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-	if err != nil {
-		glog.Fatalf("Failed to create etcd storage for master %v", err)
-	}
 	storageDestinations := master.NewStorageDestinations()
 	storageDestinations.AddAPIGroup("", etcdStorage)
 	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
@@ -282,34 +276,9 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	etcdClient := NewEtcdClient()
-	storageVersions := make(map[string]string)
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions[""] = testapi.Default.Version()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	m := master.New(&master.Config{
-		StorageDestinations: storageDestinations,
-		KubeletClient:       kubeletclient.FakeKubeletClient{},
-		EnableLogsSupport:   false,
-		EnableProfiling:     true,
-		EnableUISupport:     false,
-		APIPrefix:           "/api",
-		APIGroupPrefix:      "/apis",
-		Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:    admit.NewAlwaysAdmit(),
-		StorageVersions:     storageVersions,
-	})
+	masterConfig := NewMasterConfig()
+	masterConfig.EnableProfiling = true
+	m := master.New(masterConfig)
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)

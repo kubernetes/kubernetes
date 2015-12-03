@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	forked "k8s.io/kubernetes/third_party/forked/coreos/go-etcd/etcd"
@@ -306,8 +307,12 @@ func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta
 		etcdClient.SetTransport(transport)
 		client = etcdClient
 	}
-	etcdStorage, err = master.NewEtcdStorage(client, interfacesFunc, storageVersion, pathPrefix)
-	return etcdStorage, err
+	versionedInterface, err := interfacesFunc(storageVersion)
+	if err != nil {
+		return nil, err
+	}
+	etcdStorage = etcdstorage.NewEtcdStorage(client, versionedInterface.Codec, pathPrefix)
+	return etcdStorage, nil
 }
 
 // convert to a map between group and groupVersions.
