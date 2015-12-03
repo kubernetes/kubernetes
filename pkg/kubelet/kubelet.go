@@ -16,9 +16,6 @@ limitations under the License.
 
 package kubelet
 
-// Note: if you change code in this file, you might need to change code in
-// contrib/mesos/pkg/executor/.
-
 import (
 	"bufio"
 	"bytes"
@@ -209,7 +206,7 @@ func NewMainKubelet(
 	configureCBR0 bool,
 	podCIDR string,
 	reconcileCIDR bool,
-	pods int,
+	maxPods int,
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
 	cpuCFSQuota bool,
@@ -325,7 +322,7 @@ func NewMainKubelet(
 		writer:                         writer,
 		configureCBR0:                  configureCBR0,
 		reconcileCIDR:                  reconcileCIDR,
-		pods:                           pods,
+		maxPods:                        maxPods,
 		syncLoopMonitor:                util.AtomicValue{},
 		resolverConfig:                 resolverConfig,
 		cpuCFSQuota:                    cpuCFSQuota,
@@ -633,8 +630,8 @@ type Kubelet struct {
 	configureCBR0 bool
 	reconcileCIDR bool
 
-	// Number of Pods which can be run by this Kubelet
-	pods int
+	// Maximum Number of Pods which can be run by this Kubelet
+	maxPods int
 
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor util.AtomicValue
@@ -2740,7 +2737,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.Capacity = api.ResourceList{
 			api.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
 			api.ResourceMemory: resource.MustParse("0Gi"),
-			api.ResourcePods:   *resource.NewQuantity(int64(kl.pods), resource.DecimalSI),
+			api.ResourcePods:   *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI),
 		}
 		glog.Errorf("Error getting machine info: %v", err)
 	} else {
@@ -2748,7 +2745,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 		node.Status.Capacity = cadvisor.CapacityFromMachineInfo(info)
 		node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
-			int64(kl.pods), resource.DecimalSI)
+			int64(kl.maxPods), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated
