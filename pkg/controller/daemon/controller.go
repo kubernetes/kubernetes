@@ -30,7 +30,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -98,7 +97,7 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
@@ -130,7 +129,7 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.podStore.Store, dsc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+				return dsc.kubeClient.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(options)
@@ -148,7 +147,7 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+				return dsc.kubeClient.Nodes().List(unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Nodes().Watch(options)

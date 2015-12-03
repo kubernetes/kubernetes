@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -33,14 +32,16 @@ import (
 func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
-	podList, err := c.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector), fields.Everything(), unversioned.ListOptions{})
+	selector := labels.SelectorFromSet(deployment.Spec.Selector)
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err := c.Pods(namespace).List(options)
 	if err != nil {
 		return nil, fmt.Errorf("error listing pods: %v", err)
 	}
 	// 2. Find the corresponding RCs for pods in podList.
 	// TODO: Right now we list all RCs and then filter. We should add an API for this.
 	oldRCs := map[string]api.ReplicationController{}
-	rcList, err := c.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	rcList, err := c.ReplicationControllers(namespace).List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
@@ -69,7 +70,7 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 // Returns nil if the new RC doesnt exist yet.
 func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
-	rcList, err := c.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	rcList, err := c.ReplicationControllers(namespace).List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
@@ -149,7 +150,9 @@ func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController
 func getPodsForRCs(c client.Interface, replicationControllers []*api.ReplicationController) ([]api.Pod, error) {
 	allPods := []api.Pod{}
 	for _, rc := range replicationControllers {
-		podList, err := c.Pods(rc.ObjectMeta.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything(), unversioned.ListOptions{})
+		selector := labels.SelectorFromSet(rc.Spec.Selector)
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		podList, err := c.Pods(rc.ObjectMeta.Namespace).List(options)
 		if err != nil {
 			return allPods, fmt.Errorf("error listing pods: %v", err)
 		}

@@ -27,8 +27,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
@@ -65,7 +63,7 @@ func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Du
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.PersistentVolumes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+				return kubeClient.PersistentVolumes().List(unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumes().Watch(options)

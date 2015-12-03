@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,7 +30,7 @@ type PersistentVolumesInterface interface {
 
 // PersistentVolumeInterface has methods to work with PersistentVolume resources.
 type PersistentVolumeInterface interface {
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PersistentVolumeList, error)
+	List(opts unversioned.ListOptions) (*api.PersistentVolumeList, error)
 	Get(name string) (*api.PersistentVolume, error)
 	Create(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
@@ -50,13 +48,11 @@ func newPersistentVolumes(c *Client) *persistentVolumes {
 	return &persistentVolumes{c}
 }
 
-func (c *persistentVolumes) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.PersistentVolumeList, err error) {
+func (c *persistentVolumes) List(opts unversioned.ListOptions) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentVolumes").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 

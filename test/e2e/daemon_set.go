@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -114,7 +113,9 @@ var _ = Describe("Daemon set", func() {
 		By("Stop a daemon pod, check that the daemon pod is revived.")
 		podClient := c.Pods(ns)
 
-		podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything(), unversioned.ListOptions{})
+		selector := labels.Set(label).AsSelector()
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		podList, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(podList.Items)).To(BeNumerically(">", 0))
 		pod := podList.Items[0]
@@ -160,7 +161,7 @@ var _ = Describe("Daemon set", func() {
 
 		By("Change label of node, check that daemon pod is launched.")
 		nodeClient := c.Nodes()
-		nodeList, err := nodeClient.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodeList, err := nodeClient.List(unversioned.ListOptions{})
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
@@ -196,7 +197,7 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 
 func clearDaemonSetNodeLabels(c *client.Client) error {
 	nodeClient := c.Nodes()
-	nodeList, err := nodeClient.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	nodeList, err := nodeClient.List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -251,7 +252,9 @@ func setDaemonSetNodeLabels(c *client.Client, nodeName string, labels map[string
 
 func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := f.Client.Pods(f.Namespace.Name).List(labels.Set(selector).AsSelector(), fields.Everything(), unversioned.ListOptions{})
+		selector := labels.Set(selector).AsSelector()
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		podList, err := f.Client.Pods(f.Namespace.Name).List(options)
 		if err != nil {
 			return false, nil
 		}
@@ -279,7 +282,7 @@ func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames [
 
 func checkRunningOnAllNodes(f *Framework, selector map[string]string) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodeList, err := f.Client.Nodes().List(unversioned.ListOptions{})
 		if err != nil {
 			return false, nil
 		}

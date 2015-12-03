@@ -25,8 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -59,7 +57,7 @@ func (rm *ResourceQuotaController) Run(period time.Duration) {
 
 func (rm *ResourceQuotaController) synchronize() {
 	var resourceQuotas []api.ResourceQuota
-	list, err := rm.kubeClient.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	list, err := rm.kubeClient.ResourceQuotas(api.NamespaceAll).List(unversioned.ListOptions{})
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 	}
@@ -143,7 +141,7 @@ func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rm.kubeClient.Pods(usage.Namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		pods, err = rm.kubeClient.Pods(usage.Namespace).List(unversioned.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -166,31 +164,31 @@ func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 		case api.ResourcePods:
 			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
 		case api.ResourceServices:
-			items, err := rm.kubeClient.Services(usage.Namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			items, err := rm.kubeClient.Services(usage.Namespace).List(unversioned.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceReplicationControllers:
-			items, err := rm.kubeClient.ReplicationControllers(usage.Namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			items, err := rm.kubeClient.ReplicationControllers(usage.Namespace).List(unversioned.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
-			items, err := rm.kubeClient.ResourceQuotas(usage.Namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			items, err := rm.kubeClient.ResourceQuotas(usage.Namespace).List(unversioned.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceSecrets:
-			items, err := rm.kubeClient.Secrets(usage.Namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			items, err := rm.kubeClient.Secrets(usage.Namespace).List(unversioned.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourcePersistentVolumeClaims:
-			items, err := rm.kubeClient.PersistentVolumeClaims(usage.Namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			items, err := rm.kubeClient.PersistentVolumeClaims(usage.Namespace).List(unversioned.ListOptions{})
 			if err != nil {
 				return err
 			}

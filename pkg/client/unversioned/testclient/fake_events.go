@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -47,10 +46,10 @@ func (c *FakeEvents) Get(name string) (*api.Event, error) {
 }
 
 // List returns a list of events matching the selectors.
-func (c *FakeEvents) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EventList, error) {
-	action := NewRootListAction("events", label, field)
+func (c *FakeEvents) List(opts unversioned.ListOptions) (*api.EventList, error) {
+	action := NewRootListAction("events", opts)
 	if c.Namespace != "" {
-		action = NewListAction("events", c.Namespace, label, field)
+		action = NewListAction("events", c.Namespace, opts)
 	}
 	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {
@@ -122,9 +121,9 @@ func (c *FakeEvents) Watch(opts unversioned.ListOptions) (watch.Interface, error
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	action := NewRootListAction("events", nil, nil)
+	action := NewRootListAction("events", unversioned.ListOptions{})
 	if c.Namespace != "" {
-		action = NewListAction("events", c.Namespace, nil, nil)
+		action = NewListAction("events", c.Namespace, unversioned.ListOptions{})
 	}
 	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {

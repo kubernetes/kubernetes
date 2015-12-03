@@ -44,7 +44,6 @@ import (
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -273,7 +272,8 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
 	// Wait until all pods are running on the node.
 	return func() (bool, error) {
-		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything(), unversioned.ListOptions{})
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}}
+		pods, err := c.Pods(podNamespace).List(options)
 		if err != nil {
 			glog.Infof("Unable to get pods to list: %v", err)
 			return false, nil
@@ -399,7 +399,7 @@ containers:
 			namespace := kubetypes.NamespaceDefault
 			if err := wait.Poll(time.Second, longTestTimeout,
 				podRunning(c, namespace, podName)); err != nil {
-				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{}); err == nil {
+				if pods, err := c.Pods(namespace).List(unversioned.ListOptions{}); err == nil {
 					for _, pod := range pods.Items {
 						glog.Infof("pod found: %s/%s", namespace, pod.Name)
 					}
@@ -507,7 +507,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
 
-	svcList, err := services.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	svcList, err := services.List(unversioned.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
@@ -728,7 +728,7 @@ func runPatchTest(c *client.Client) {
 
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
-	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	svcList, err := client.Services(api.NamespaceDefault).List(unversioned.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Unexpected error listing services: %v", err)
 	}
@@ -855,7 +855,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
 	}
 
-	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	svcList, err := client.Services(api.NamespaceAll).List(unversioned.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Failed to list services across namespaces: %v", err)
 	}

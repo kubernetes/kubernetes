@@ -20,8 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -41,8 +39,8 @@ func (c *FakeJobs) Get(name string) (*extensions.Job, error) {
 	return obj.(*extensions.Job), err
 }
 
-func (c *FakeJobs) List(label labels.Selector, fields fields.Selector, opts unversioned.ListOptions) (*extensions.JobList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, label, nil), &extensions.JobList{})
+func (c *FakeJobs) List(opts unversioned.ListOptions) (*extensions.JobList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, opts), &extensions.JobList{})
 	if obj == nil {
 		return nil, err
 	}

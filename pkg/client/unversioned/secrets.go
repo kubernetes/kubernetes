@@ -19,8 +19,6 @@ package unversioned
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,7 +30,7 @@ type SecretsInterface interface {
 	Create(secret *api.Secret) (*api.Secret, error)
 	Update(secret *api.Secret) (*api.Secret, error)
 	Delete(name string) error
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.SecretList, error)
+	List(opts unversioned.ListOptions) (*api.SecretList, error)
 	Get(name string) (*api.Secret, error)
 	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
@@ -64,15 +62,13 @@ func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 }
 
 // List returns a list of secrets matching the selectors.
-func (s *secrets) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.SecretList, error) {
+func (s *secrets) List(opts unversioned.ListOptions) (*api.SecretList, error) {
 	result := &api.SecretList{}
 
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("secrets").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 

@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -84,7 +83,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return cl.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+				return cl.ServiceAccounts(api.NamespaceAll).List(unversioned.ListOptions{})
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return cl.ServiceAccounts(api.NamespaceAll).Watch(options)
@@ -98,7 +97,8 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return cl.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector, unversioned.ListOptions{})
+				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{tokenSelector}}
+				return cl.Secrets(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				options.FieldSelector.Selector = tokenSelector

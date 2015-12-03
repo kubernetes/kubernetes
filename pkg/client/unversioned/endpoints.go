@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -34,7 +32,7 @@ type EndpointsNamespacer interface {
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
 	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.EndpointsList, error)
+	List(opts unversioned.ListOptions) (*api.EndpointsList, error)
 	Get(name string) (*api.Endpoints, error)
 	Delete(name string) error
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
@@ -60,14 +58,12 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
-func (c *endpoints) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.EndpointsList, err error) {
+func (c *endpoints) List(opts unversioned.ListOptions) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 	return

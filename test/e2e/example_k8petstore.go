@@ -22,8 +22,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"log"
 	"os"
 	"os/exec"
@@ -158,7 +156,7 @@ var _ = Describe("[Example] Pet Store [Skipped]", func() {
 	f := NewFramework("petstore")
 
 	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout), func() {
-		minions, err := f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		minions, err := f.Client.Nodes().List(unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		minionCount = len(minions.Items)
 

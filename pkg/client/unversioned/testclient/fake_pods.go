@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -41,10 +40,14 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, label, field), &api.PodList{})
+func (c *FakePods) List(opts unversioned.ListOptions) (*api.PodList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, opts), &api.PodList{})
 	if obj == nil {
 		return nil, err
+	}
+	label := opts.LabelSelector.Selector
+	if label == nil {
+		label = labels.Everything()
 	}
 	list := &api.PodList{}
 	for _, pod := range obj.(*api.PodList).Items {

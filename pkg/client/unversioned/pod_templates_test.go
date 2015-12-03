@@ -23,8 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func getPodTemplatesResoureName() string {
@@ -98,7 +96,7 @@ func TestPodTemplateList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: podTemplateList},
 	}
-	response, err := c.Setup(t).PodTemplates(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	response, err := c.Setup(t).PodTemplates(ns).List(unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 

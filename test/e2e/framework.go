@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -110,7 +109,7 @@ func (f *Framework) afterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		events, err := f.Client.Events(f.Namespace.Name).List(unversioned.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, e := range events.Items {
@@ -184,7 +183,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(unversioned.ListOptions{})
 		if err != nil {
 			return err
 		}

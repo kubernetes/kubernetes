@@ -24,8 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
@@ -138,7 +136,7 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodes, err := f.Client.Nodes().List(unversioned.ListOptions{})
 		if err != nil {
 			Failf("Failed to list nodes: %v", err)
 		}
