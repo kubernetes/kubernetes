@@ -278,6 +278,7 @@ const (
 
 	EventReason                  = "reason"
 	EventSource                  = "source"
+	EventType                    = "type"
 	EventInvolvedKind            = "involvedObject.kind"
 	EventInvolvedNamespace       = "involvedObject.namespace"
 	EventInvolvedName            = "involvedObject.name"
