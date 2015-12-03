@@ -173,7 +173,7 @@ var aEvent string = `
     "name": "a"%s
   },
   "involvedObject": {
-    "kind": "Node",
+    "kind": "Pod",
     "namespace": "default",
     "name": "a",
     "apiVersion": "v1"
