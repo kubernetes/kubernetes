@@ -301,6 +301,98 @@ UN  10.244.0.5  74.09 KB   256     49.7%             86feda0f-f070-4a5b-bda1-2ee
 UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
 ```
 
+### Using a DaemonSet
+
+In Kubernetes a _[Daemon Set](../../docs/admin/daemons.md)_ can distribute pods onto Kubernetes nodes, one-to-one.  Like a _ReplicationController_ it has a selector query which identifies the members of it's set.  Unlike a _ReplicationController_ it has a node selector to limit which nodes are scheduled with the templated pods, and replicates not based on a set target number of pods, but rather assigns a single pod to each targeted node.
+
+An example use case: when deploying to the cloud, the expectation is that instances are ephemeral and might die at any time. Cassandra is built to replicate data across the cluster to facilitate data redundancy, so that in the case that an instance dies, the data stored on the instance does not, and the cluster can react by re-replicating the data to other running nodes.
+
+DaemonSet is designed to place a single pod on each node in the Kubernetes cluster. If you're looking for data redundancy with Cassandra, let's create a daemonset to start our storage cluster:
+
+<!-- BEGIN MUNGE: EXAMPLE cassandra-daemonset.yaml -->
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    name: cassandra
+  name: cassandra
+spec:
+  template:
+    metadata:
+      labels:
+        name: cassandra
+    spec:
+      # Filter to specific nodes:
+      # nodeSelector:
+      #  app: cassandra
+      containers:
+        - command:
+            - /run.sh
+          env:
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          image: "gcr.io/google_containers/cassandra:v6"
+          name: cassandra
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 9160
+              name: thrift
+          resources:
+            request:
+              cpu: 0.1
+          volumeMounts:
+            - mountPath: /cassandra_data
+              name: data
+      volumes:
+        - name: data
+          hostPath:
+            path: /var/lib/cassandra
+```
+
+[Download example](cassandra-daemonset.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra-daemonset.yaml -->
+
+Most of this daemon set definition is identical to the Cassandra pod and ReplicationController definitions above, it simply gives the daemon set a recipe to use when it creates new Cassandra pods, and targets all Cassandra nodes in the cluster.  The other differentiating part from a Replication Controller is the ```nodeSelector``` attribute which allows the daemonset to target a specific subset of nodes, and the lack of a ```replicas``` attribute due to the 1 to 1 node-pod relationship.
+
+Create this daemonset:
+
+```console
+$ kubectl create -f examples/cassandra/cassandra-daemonset.yaml
+```
+
+Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see one cassandra pod for each node in your network:
+
+```console 
+$ kubectl get pods -l="name=cassandra"
+NAME              READY     STATUS    RESTARTS   AGE
+cassandra-af6h5   1/1       Running   0          28s
+cassandra-2jq1b   1/1       Running   0          32s
+cassandra-34j2a   1/1       Running   0          29s
+```
+
+To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
+
+```console
+$ kubectl exec -ti cassandra-af6h5 -- nodetool status
+Datacenter: datacenter1
+=======================
+Status=Up/Down
+|/ State=Normal/Leaving/Joining/Moving
+--  Address     Load       Tokens  Owns (effective)  Host ID                               Rack
+UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
+UN  10.244.4.2  32.45 KB   256     100.0%            0b1be71a-6ffb-4895-ac3e-b9791299c141  rack1
+UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
+```
+
 ### tl; dr;
 
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
@@ -323,6 +415,9 @@ kubectl exec -ti cassandra -- nodetool status
 
 # scale up to 4 nodes
 kubectl scale rc cassandra --replicas=4
+
+# create a daemonset to place a cassandra node on each kubernetes node
+kubectl create -f examples/cassandra/cassandra-daemonset.yaml
 ```
 
 ### Seed Provider Source
