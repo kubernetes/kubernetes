@@ -297,7 +297,7 @@ func getKubeSystemContainersResourceUsage(c *client.Client) (resourceUsagePerCon
 	for _, node := range nodes.Items {
 		go func(nodeName string) {
 			defer wg.Done()
-			nodeUsage, err := getOneTimeResourceUsageOnNode(c, nodeName, 5*time.Second, func() []string { return containerIDs }, true)
+			nodeUsage, err := getOneTimeResourceUsageOnNode(c, nodeName, 15*time.Second, func() []string { return containerIDs }, true)
 			mutex.Lock()
 			defer mutex.Unlock()
 			if err != nil {
