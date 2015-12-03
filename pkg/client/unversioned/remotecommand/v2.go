@@ -42,16 +42,52 @@ type streamProtocolV2 struct {
 var _ streamProtocolHandler = &streamProtocolV2{}
 
 func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
+	var (
+		err                                                  error
+		errorStream, remoteStdin, remoteStdout, remoteStderr httpstream.Stream
+	)
+
 	headers := http.Header{}
 
+	// set up all the streams first
 	// set up error stream
 	errorChan := make(chan error)
 	headers.Set(api.StreamType, api.StreamTypeError)
-	errorStream, err := conn.CreateStream(headers)
+	errorStream, err = conn.CreateStream(headers)
 	if err != nil {
 		return err
 	}
 
+	// set up stdin stream
+	if e.stdin != nil {
+		headers.Set(api.StreamType, api.StreamTypeStdin)
+		remoteStdin, err = conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+	}
+
+	// set up stdout stream
+	if e.stdout != nil {
+		headers.Set(api.StreamType, api.StreamTypeStdout)
+		remoteStdout, err = conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+	}
+
+	// set up stderr stream
+	if e.stderr != nil && !e.tty {
+		headers.Set(api.StreamType, api.StreamTypeStderr)
+		remoteStderr, err = conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+	}
+
+	// now that all the streams have been created, proceed with reading & copying
+
+	// always read from errorStream
 	go func() {
 		message, err := ioutil.ReadAll(errorStream)
 		switch {
@@ -68,14 +104,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 	var wg sync.WaitGroup
 	var once sync.Once
 
-	// set up stdin stream
 	if e.stdin != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdin)
-		remoteStdin, err := conn.CreateStream(headers)
-		if err != nil {
-			return err
-		}
-
 		// copy from client's stdin to container's stdin
 		go func() {
 			// if e.stdin is noninteractive, e.g. `echo abc | kubectl exec -i <pod> -- cat`, make sure
@@ -109,14 +138,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 		}()
 	}
 
-	// set up stdout stream
 	if e.stdout != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdout)
-		remoteStdout, err := conn.CreateStream(headers)
-		if err != nil {
-			return err
-		}
-
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -126,14 +148,7 @@ func (e *streamProtocolV2) stream(conn httpstream.Connection) error {
 		}()
 	}
 
-	// set up stderr stream
 	if e.stderr != nil && !e.tty {
-		headers.Set(api.StreamType, api.StreamTypeStderr)
-		remoteStderr, err := conn.CreateStream(headers)
-		if err != nil {
-			return err
-		}
-
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
