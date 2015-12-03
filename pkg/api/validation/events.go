@@ -24,7 +24,11 @@ import (
 // ValidateEvent makes sure that the event makes sense.
 func ValidateEvent(event *api.Event) validation.ErrorList {
 	allErrs := validation.ErrorList{}
-	// TODO: There is no namespace required for node.
+	// There is no namespace required for node.
+	if event.InvolvedObject.Kind == "Node" &&
+		event.Namespace != "" {
+		allErrs = append(allErrs, validation.NewInvalidError("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace is not required for node"))
+	}
 	if event.InvolvedObject.Kind != "Node" &&
 		event.Namespace != event.InvolvedObject.Namespace {
 		allErrs = append(allErrs, validation.NewInvalidError("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
