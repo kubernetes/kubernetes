@@ -88,8 +88,8 @@ This makes it accessible from any node in your cluster. Check the nodes the pod 
 ```console
 $ kubectl create -f ./nginxrc.yaml
 $ kubectl get pods -l app=nginx -o wide
-my-nginx-6isf4   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
-my-nginx-t26zt   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
+my-nginx-6isf4   1/1       Running   0          2h        e2e-test-beeps-node-93ly
+my-nginx-t26zt   1/1       Running   0          2h        e2e-test-beeps-node-93ly
 ```
 
 Check your pods' IPs:

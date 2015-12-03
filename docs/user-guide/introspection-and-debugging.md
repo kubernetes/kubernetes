@@ -93,7 +93,7 @@ We can retrieve a lot more information about each of these pods using `kubectl d
 $ kubectl describe pod my-nginx-gy1ij
 Name:				my-nginx-gy1ij
 Image(s):			nginx
-Node:				kubernetes-minion-y3vk/10.240.154.168
+Node:				kubernetes-node-y3vk/10.240.154.168
 Labels:				app=nginx
 Status:				Running
 Reason:				
@@ -115,13 +115,13 @@ Conditions:
   Ready 	True 
 Events:
   FirstSeen				LastSeen			Count	From					SubobjectPath				Reason		Message
-  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{scheduler }									scheduled	Successfully assigned my-nginx-gy1ij to kubernetes-minion-y3vk
-  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{kubelet kubernetes-minion-y3vk}	implicitly required container POD	pulled		Pod container image "gcr.io/google_containers/pause:0.8.0" already present on machine
-  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{kubelet kubernetes-minion-y3vk}	implicitly required container POD	created		Created with docker id cd1644065066
-  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{kubelet kubernetes-minion-y3vk}	implicitly required container POD	started		Started with docker id cd1644065066
-  Thu, 09 Jul 2015 15:33:06 -0700	Thu, 09 Jul 2015 15:33:06 -0700	1	{kubelet kubernetes-minion-y3vk}	spec.containers{nginx}			pulled		Successfully pulled image "nginx"
-  Thu, 09 Jul 2015 15:33:06 -0700	Thu, 09 Jul 2015 15:33:06 -0700	1	{kubelet kubernetes-minion-y3vk}	spec.containers{nginx}			created		Created with docker id 56d7a7b14dac
-  Thu, 09 Jul 2015 15:33:07 -0700	Thu, 09 Jul 2015 15:33:07 -0700	1	{kubelet kubernetes-minion-y3vk}	spec.containers{nginx}			started		Started with docker id 56d7a7b14dac
+  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{scheduler }									scheduled	Successfully assigned my-nginx-gy1ij to kubernetes-node-y3vk
+  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{kubelet kubernetes-node-y3vk}	implicitly required container POD		pulled		Pod container image "gcr.io/google_containers/pause:0.8.0" already present on machine
+  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{kubelet kubernetes-node-y3vk}	implicitly required container POD		created		Created with docker id cd1644065066
+  Thu, 09 Jul 2015 15:32:58 -0700	Thu, 09 Jul 2015 15:32:58 -0700	1	{kubelet kubernetes-node-y3vk}	implicitly required container POD		started		Started with docker id cd1644065066
+  Thu, 09 Jul 2015 15:33:06 -0700	Thu, 09 Jul 2015 15:33:06 -0700	1	{kubelet kubernetes-node-y3vk}	spec.containers{nginx}				pulled		Successfully pulled image "nginx"
+  Thu, 09 Jul 2015 15:33:06 -0700	Thu, 09 Jul 2015 15:33:06 -0700	1	{kubelet kubernetes-node-y3vk}	spec.containers{nginx}				created		Created with docker id 56d7a7b14dac
+  Thu, 09 Jul 2015 15:33:07 -0700	Thu, 09 Jul 2015 15:33:07 -0700	1	{kubelet kubernetes-node-y3vk}	spec.containers{nginx}				started		Started with docker id 56d7a7b14dac
 ```
 
 Here you can see configuration information about the container(s) and Pod (labels, resource requirements, etc.), as well as status information about the container(s) and Pod (state, readiness, restart count, events, etc.)
@@ -231,7 +231,7 @@ spec:
       name: default-token-zkhkk
       readOnly: true
   dnsPolicy: ClusterFirst
-  nodeName: kubernetes-minion-u619
+  nodeName: kubernetes-node-u619
   restartPolicy: Always
   serviceAccountName: default
   volumes:
@@ -266,14 +266,14 @@ Sometimes when debugging it can be useful to look at the status of a node -- for
 ```console
 $ kubectl get nodes
 NAME                     LABELS                                          STATUS
-kubernetes-minion-861h   kubernetes.io/hostname=kubernetes-minion-861h   NotReady
-kubernetes-minion-bols   kubernetes.io/hostname=kubernetes-minion-bols   Ready
-kubernetes-minion-st6x   kubernetes.io/hostname=kubernetes-minion-st6x   Ready
-kubernetes-minion-unaj   kubernetes.io/hostname=kubernetes-minion-unaj   Ready
+kubernetes-node-861h     kubernetes.io/hostname=kubernetes-node-861h     NotReady
+kubernetes-node-bols     kubernetes.io/hostname=kubernetes-node-bols     Ready
+kubernetes-node-st6x     kubernetes.io/hostname=kubernetes-node-st6x     Ready
+kubernetes-node-unaj     kubernetes.io/hostname=kubernetes-node-unaj     Ready
 
-$ kubectl describe node kubernetes-minion-861h
-Name:			kubernetes-minion-861h
-Labels:			kubernetes.io/hostname=kubernetes-minion-861h
+$ kubectl describe node kubernetes-node-861h
+Name:			kubernetes-node-861h
+Labels:			kubernetes.io/hostname=kubernetes-node-861h
 CreationTimestamp:	Fri, 10 Jul 2015 14:32:29 -0700
 Conditions:
   Type		Status		LastHeartbeatTime			LastTransitionTime			Reason					Message
@@ -295,28 +295,28 @@ Pods:				(0 in total)
   Namespace			Name
 Events:
   FirstSeen				LastSeen			Count	From					SubobjectPath	Reason		Message
-  Fri, 10 Jul 2015 14:32:28 -0700	Fri, 10 Jul 2015 14:32:28 -0700	1	{kubelet kubernetes-minion-861h}			NodeNotReady	Node kubernetes-minion-861h status is now: NodeNotReady
-  Fri, 10 Jul 2015 14:32:30 -0700	Fri, 10 Jul 2015 14:32:30 -0700	1	{kubelet kubernetes-minion-861h}			NodeNotReady	Node kubernetes-minion-861h status is now: NodeNotReady
-  Fri, 10 Jul 2015 14:33:00 -0700	Fri, 10 Jul 2015 14:33:00 -0700	1	{kubelet kubernetes-minion-861h}			starting	Starting kubelet.
-  Fri, 10 Jul 2015 14:33:02 -0700	Fri, 10 Jul 2015 14:33:02 -0700	1	{kubelet kubernetes-minion-861h}			NodeReady	Node kubernetes-minion-861h status is now: NodeReady
-  Fri, 10 Jul 2015 14:35:15 -0700	Fri, 10 Jul 2015 14:35:15 -0700	1	{controllermanager }					NodeNotReady	Node kubernetes-minion-861h status is now: NodeNotReady
+  Fri, 10 Jul 2015 14:32:28 -0700	Fri, 10 Jul 2015 14:32:28 -0700	1	{kubelet kubernetes-node-861h}				NodeNotReady	Node kubernetes-node-861h status is now: NodeNotReady
+  Fri, 10 Jul 2015 14:32:30 -0700	Fri, 10 Jul 2015 14:32:30 -0700	1	{kubelet kubernetes-node-861h}				NodeNotReady	Node kubernetes-node-861h status is now: NodeNotReady
+  Fri, 10 Jul 2015 14:33:00 -0700	Fri, 10 Jul 2015 14:33:00 -0700	1	{kubelet kubernetes-node-861h}				starting	Starting kubelet.
+  Fri, 10 Jul 2015 14:33:02 -0700	Fri, 10 Jul 2015 14:33:02 -0700	1	{kubelet kubernetes-node-861h}				NodeReady	Node kubernetes-node-861h status is now: NodeReady
+  Fri, 10 Jul 2015 14:35:15 -0700	Fri, 10 Jul 2015 14:35:15 -0700	1	{controllermanager }					NodeNotReady	Node kubernetes-node-861h status is now: NodeNotReady
 
 
-$ kubectl get node kubernetes-minion-861h -o yaml
+$ kubectl get node kubernetes-node-861h -o yaml
 apiVersion: v1
 kind: Node
 metadata:
   creationTimestamp: 2015-07-10T21:32:29Z
   labels:
-    kubernetes.io/hostname: kubernetes-minion-861h
-  name: kubernetes-minion-861h
+    kubernetes.io/hostname: kubernetes-node-861h
+  name: kubernetes-node-861h
   resourceVersion: "757"
-  selfLink: /api/v1/nodes/kubernetes-minion-861h
+  selfLink: /api/v1/nodes/kubernetes-node-861h
   uid: 2a69374e-274b-11e5-a234-42010af0d969
 spec:
   externalID: "15233045891481496305"
   podCIDR: 10.244.0.0/24
-  providerID: gce://striped-torus-760/us-central1-b/kubernetes-minion-861h
+  providerID: gce://striped-torus-760/us-central1-b/kubernetes-node-861h
 status:
   addresses:
   - address: 10.240.115.55
