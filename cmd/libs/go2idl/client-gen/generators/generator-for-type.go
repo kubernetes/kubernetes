@@ -54,11 +54,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"type":             t,
 		"package":          pkg,
 		"Package":          namer.IC(pkg),
-		"fieldSelector":    c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/fields", Name: "Selector"}),
-		"labelSelector":    c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Selector"}),
 		"watchInterface":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"apiDeleteOptions": c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"apiListOptions":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"unvListOptions":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "ListOptions"}),
 	}
 	sw.Do(namespacerTemplate, m)
 	sw.Do(interfaceTemplate, m)
@@ -90,8 +88,8 @@ type $.type|public$Interface interface {
 	Update(*$.type|raw$) (*$.type|raw$, error)
 	Delete(name string, options *$.apiDeleteOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
-	List(label $.labelSelector|raw$, field $.fieldSelector|raw$) (*$.type|raw$List, error)
-	Watch(label $.labelSelector|raw$, field $.fieldSelector|raw$, opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	List(opts $.unvListOptions|raw$) (*$.type|raw$List, error)
+	Watch(opts $.unvListOptions|raw$) ($.watchInterface|raw$, error)
 }
 `
 
@@ -114,13 +112,12 @@ func new$.type|public$s(c *ExtensionsClient, namespace string) *$.type|private$s
 `
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.type|public$s that match those selectors.
-func (c *$.type|private$s) List(label $.labelSelector|raw$, field $.fieldSelector|raw$) (result *$.type|raw$List, err error) {
+func (c *$.type|private$s) List(opts $.unvListOptions|raw$) (result *$.type|raw$List, err error) {
 	result = &$.type|raw$List{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("$.type|private$s").
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
 	return
@@ -191,15 +188,12 @@ func (c *$.type|private$s) Update($.type|private$ *$.type|raw$) (result *$.type|
 
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|private$s.
-func (c *$.type|private$s) Watch(label $.labelSelector|raw$, field $.fieldSelector|raw$, opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
+func (c *$.type|private$s) Watch(opts $.unvListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("$.type|private$s").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
 `
