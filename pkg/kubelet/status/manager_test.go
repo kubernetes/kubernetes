@@ -538,3 +538,42 @@ func TestSetContainerReadiness(t *testing.T) {
 	m.SetContainerReadiness(testPod, kubecontainer.ContainerID{"test", "foo"}, true)
 	verifyUpdates(t, m, 0)
 }
+
+func TestSyncBatchCleanupVersions(t *testing.T) {
+	m := newTestManager(&testclient.Fake{})
+	mirrorPod := *testPod
+	mirrorPod.UID = "mirror-uid"
+	mirrorPod.Name = "mirror_pod"
+	mirrorPod.Annotations = map[string]string{
+		kubetypes.ConfigSourceAnnotationKey: "api",
+		kubetypes.ConfigMirrorAnnotationKey: "mirror",
+	}
+
+	// Orphaned pods should be removed.
+	m.apiStatusVersions[testPod.UID] = 100
+	m.apiStatusVersions[mirrorPod.UID] = 200
+	m.syncBatch()
+	if _, ok := m.apiStatusVersions[testPod.UID]; ok {
+		t.Errorf("Should have cleared status for testPod")
+	}
+	if _, ok := m.apiStatusVersions[mirrorPod.UID]; ok {
+		t.Errorf("Should have cleared status for mirrorPod")
+	}
+
+	// Non-orphaned pods should not be removed.
+	m.SetPodStatus(testPod, getRandomPodStatus())
+	m.podManager.AddPod(&mirrorPod)
+	staticPod := mirrorPod
+	staticPod.UID = "static-uid"
+	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
+	m.podManager.AddPod(&staticPod)
+	m.apiStatusVersions[testPod.UID] = 100
+	m.apiStatusVersions[mirrorPod.UID] = 200
+	m.syncBatch()
+	if _, ok := m.apiStatusVersions[testPod.UID]; !ok {
+		t.Errorf("Should not have cleared status for testPod")
+	}
+	if _, ok := m.apiStatusVersions[mirrorPod.UID]; !ok {
+		t.Errorf("Should not have cleared status for mirrorPod")
+	}
+}
