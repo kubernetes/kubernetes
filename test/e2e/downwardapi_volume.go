@@ -30,7 +30,7 @@ import (
 )
 
 // How long to wait for a log pod to be displayed
-const podLogTimeout = 15 * time.Second
+const podLogTimeout = 45 * time.Second
 
 // utility function for gomega Eventually
 func getPodLogs(c *client.Client, namespace, podName, containerName string) (string, error) {
