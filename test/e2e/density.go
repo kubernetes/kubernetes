@@ -89,7 +89,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 		memoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["kube-proxy"] = resourceConstraint{
-		cpuConstraint:    0.02,
+		cpuConstraint:    0.05,
 		memoryConstraint: 20 * (1024 * 1024),
 	}
 	constraints["l7-lb-controller"] = resourceConstraint{
