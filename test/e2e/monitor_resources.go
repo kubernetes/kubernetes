@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -89,7 +87,7 @@ var _ = Describe("Resource usage of system containers", func() {
 
 	It("should not exceed expected amount.", func() {
 		By("Getting ResourceConsumption on all nodes")
-		nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodeList, err := c.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err)
 
 		resourceUsagePerNode := make(map[string][]resourceUsagePerContainer)

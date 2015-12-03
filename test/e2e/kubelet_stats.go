@@ -35,10 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -273,11 +271,11 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getKubeSystemContainersResourceUsage(c *client.Client) (resourceUsagePerContainer, error) {
-	pods, err := c.Pods("kube-system").List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	pods, err := c.Pods("kube-system").List(unversioned.ListOptions{})
 	if err != nil {
 		return resourceUsagePerContainer{}, err
 	}
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	nodes, err := c.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		return resourceUsagePerContainer{}, err
 	}
@@ -688,7 +686,7 @@ func newResourceMonitor(c *client.Client, containerNames []string, pollingInterv
 }
 
 func (r *resourceMonitor) Start() {
-	nodes, err := r.client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	nodes, err := r.client.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		Failf("resourceMonitor: unable to get list of nodes: %v", err)
 	}

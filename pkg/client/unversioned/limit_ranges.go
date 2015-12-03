@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,7 +31,7 @@ type LimitRangesNamespacer interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.LimitRangeList, error)
+	List(opts unversioned.ListOptions) (*api.LimitRangeList, error)
 	Get(name string) (*api.LimitRange, error)
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
@@ -56,9 +54,9 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 }
 
 // List takes a selector, and returns the list of limitRanges that match that selector.
-func (c *limitRanges) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.LimitRangeList, err error) {
+func (c *limitRanges) List(opts unversioned.ListOptions) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 

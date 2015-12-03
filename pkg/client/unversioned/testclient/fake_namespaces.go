@@ -19,8 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +37,8 @@ func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
 	return obj.(*api.Namespace), err
 }
 
-func (c *FakeNamespaces) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NamespaceList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("namespaces", label, field), &api.NamespaceList{})
+func (c *FakeNamespaces) List(opts unversioned.ListOptions) (*api.NamespaceList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("namespaces", opts), &api.NamespaceList{})
 	if obj == nil {
 		return nil, err
 	}

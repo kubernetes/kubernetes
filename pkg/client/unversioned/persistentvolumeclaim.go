@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,7 +31,7 @@ type PersistentVolumeClaimsNamespacer interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PersistentVolumeClaimList, error)
+	List(opts unversioned.ListOptions) (*api.PersistentVolumeClaimList, error)
 	Get(name string) (*api.PersistentVolumeClaim, error)
 	Create(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
@@ -53,15 +51,13 @@ func newPersistentVolumeClaims(c *Client, namespace string) *persistentVolumeCla
 	return &persistentVolumeClaims{c, namespace}
 }
 
-func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
+func (c *persistentVolumeClaims) List(opts unversioned.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	result = &api.PersistentVolumeClaimList{}
 
 	err = c.client.Get().
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 

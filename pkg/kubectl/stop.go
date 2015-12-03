@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -109,7 +108,7 @@ type objInterface interface {
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
-	rcs, err := c.List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	rcs, err := c.List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}
@@ -252,7 +251,8 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 	// at this point only dead pods are left, that should be removed
 	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
-	podList, err := pods.List(selector, fields.Everything(), unversioned.ListOptions{})
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err := pods.List(options)
 	if err != nil {
 		return err
 	}

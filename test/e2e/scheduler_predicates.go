@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +46,7 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 // Simplified version of RunRC, that does not create RC, but creates plain Pods and
 // requires passing whole Pod definition, which is needed to test various Scheduler predicates.
 func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
-	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 	expectNoError(err)
 	podsScheduledBefore, _ := getPodsScheduled(allPods)
 
@@ -68,7 +67,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 	startTime := time.Now()
 	currentlyScheduledPods := 0
 	for len(podsScheduledBefore)+replicas != currentlyScheduledPods {
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 		expectNoError(err)
 		scheduledPods := 0
 		for _, pod := range allPods.Items {
@@ -96,36 +95,34 @@ func getRequestedCPU(pod api.Pod) int64 {
 }
 
 func verifyResult(c *client.Client, podName string, ns string) {
-	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 	expectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
 
-	schedEvents, err := c.Events(ns).List(
-		labels.Everything(),
-		fields.Set{
-			"involvedObject.kind":      "Pod",
-			"involvedObject.name":      podName,
-			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
-			"reason":                   "FailedScheduling",
-		}.AsSelector(),
-		unversioned.ListOptions{})
+	selector := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.name":      podName,
+		"involvedObject.namespace": ns,
+		"source":                   "scheduler",
+		"reason":                   "FailedScheduling",
+	}.AsSelector()
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	schedEvents, err := c.Events(ns).List(options)
 	expectNoError(err)
 	// If we failed to find event with a capitalized first letter of reason
 	// try looking for one starting with a small one for backward compatibility.
 	// If we don't do it we end up in #15806.
 	// TODO: remove this block when we don't care about supporting v1.0 too much.
 	if len(schedEvents.Items) == 0 {
-		schedEvents, err = c.Events(ns).List(
-			labels.Everything(),
-			fields.Set{
-				"involvedObject.kind":      "Pod",
-				"involvedObject.name":      podName,
-				"involvedObject.namespace": ns,
-				"source":                   "scheduler",
-				"reason":                   "failedScheduling",
-			}.AsSelector(),
-			unversioned.ListOptions{})
+		selector := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      podName,
+			"involvedObject.namespace": ns,
+			"source":                   "scheduler",
+			"reason":                   "failedScheduling",
+		}.AsSelector()
+		options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+		schedEvents, err = c.Events(ns).List(options)
 		expectNoError(err)
 	}
 
@@ -145,7 +142,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 
 func cleanupPods(c *client.Client, ns string) {
 	By("Removing all pods in namespace " + ns)
-	pods, err := c.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	pods, err := c.Pods(ns).List(unversioned.ListOptions{})
 	expectNoError(err)
 	opt := api.NewDeleteOptions(0)
 	for _, p := range pods.Items {
@@ -158,13 +155,13 @@ func waitForStableCluster(c *client.Client) int {
 	timeout := 10 * time.Minute
 	startTime := time.Now()
 
-	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 	expectNoError(err)
 	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
 	for len(currentlyNotScheduledPods) != 0 {
 		time.Sleep(2 * time.Second)
 
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 		expectNoError(err)
 		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
 
@@ -198,7 +195,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
 		var err error
-		nodeList, err = c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodeList, err = c.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err)
 	})
 
@@ -278,7 +275,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		}
 		waitForStableCluster(c)
 
-		pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		pods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
 		expectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]

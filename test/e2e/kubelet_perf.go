@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -105,7 +103,7 @@ var _ = Describe("Kubelet", func() {
 	var resourceMonitor *resourceMonitor
 
 	BeforeEach(func() {
-		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodes, err := framework.Client.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {

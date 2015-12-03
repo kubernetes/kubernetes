@@ -19,8 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -40,8 +38,8 @@ func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
 	return obj.(*api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.PodTemplateList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, label, field), &api.PodTemplateList{})
+func (c *FakePodTemplates) List(opts unversioned.ListOptions) (*api.PodTemplateList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, opts), &api.PodTemplateList{})
 	if obj == nil {
 		return nil, err
 	}

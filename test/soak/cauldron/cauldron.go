@@ -34,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -69,7 +67,7 @@ func main() {
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		nodes, err = c.Nodes().List(unversioned.ListOptions{})
 		if err == nil {
 			break
 		}

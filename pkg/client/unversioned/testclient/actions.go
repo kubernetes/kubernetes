@@ -44,21 +44,37 @@ func NewGetAction(resource, namespace, name string) GetActionImpl {
 	return action
 }
 
-func NewRootListAction(resource string, label labels.Selector, field fields.Selector) ListActionImpl {
+func NewRootListAction(resource string, opts unversioned.ListOptions) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
 	action.Resource = resource
-	action.ListRestrictions = ListRestrictions{label, field}
+	labelSelector := opts.LabelSelector.Selector
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	fieldSelector := opts.FieldSelector.Selector
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
 }
 
-func NewListAction(resource, namespace string, label labels.Selector, field fields.Selector) ListActionImpl {
+func NewListAction(resource, namespace string, opts unversioned.ListOptions) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
 	action.Resource = resource
 	action.Namespace = namespace
-	action.ListRestrictions = ListRestrictions{label, field}
+	labelSelector := opts.LabelSelector.Selector
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	fieldSelector := opts.FieldSelector.Selector
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
 }

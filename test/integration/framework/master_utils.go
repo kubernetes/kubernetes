@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -256,7 +255,8 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
 	hostField := fields.OneTermEqualSelector(client.PodHost, host)
-	pods, err := restClient.Pods(TestNS).List(labels.Everything(), hostField, unversioned.ListOptions{})
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{hostField}}
+	pods, err := restClient.Pods(TestNS).List(options)
 	if err != nil || len(pods.Items) == numPods {
 		return err
 	}
