@@ -19,8 +19,11 @@ package abac
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
+	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -341,6 +344,101 @@ func TestPolicy(t *testing.T) {
 		matches := test.policy.matches(test.attr)
 		if test.matches != matches {
 			t.Errorf("unexpected value for %s, expected: %t, saw: %t", test.name, test.matches, matches)
+		}
+	}
+}
+
+func TestReloadAuthorized(t *testing.T) {
+	contents := `{"readonly": true, "resource": "events"   }
+{"user":"scheduler", "readonly": true, "resource": "pods"}
+{"user":"scheduler", "resource": "bindings" }
+{"user":"kubelet", "readonly": true, "resource": "bindings" }
+{"user":"kubelet", "resource": "events"   }
+{"user":"alice", "namespace": "projectCaribou"}
+{"user":"bob", "readonly": true, "namespace": "projectCaribou"}`
+	f, err := ioutil.TempFile("", "abac_test")
+	if err != nil {
+		t.Fatalf("unexpected error creating policyfile: %v", err)
+	}
+	f.Close()
+	defer os.Remove(f.Name())
+
+	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+		t.Fatalf("unexpected error writing policyfile: %v", err)
+	}
+	if err != nil {
+		t.Fatalf("unable to read policy file: %v", err)
+	}
+	a, err := apiserver.NewAuthorizerFromAuthorizationConfig([]string{"ABAC"}, f.Name())
+	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1"}
+	uAlice := user.DefaultInfo{Name: "alice", UID: "uid2"}
+	uTom := user.DefaultInfo{Name: "tom", UID: "uid3"}
+
+	testCases := []struct {
+		User        user.DefaultInfo
+		Verb        string
+		Resource    string
+		NS          string
+		ExpectAllow bool
+	}{
+		// Scheduler can read pods
+		{User: uScheduler, Verb: "list", Resource: "pods", NS: "ns1", ExpectAllow: true},
+		// Scheduler cannot write pods
+		{User: uScheduler, Verb: "create", Resource: "pods", NS: "ns1", ExpectAllow: false},
+		// alice cannot access namespace projectCaribou
+		{User: uAlice, Verb: "list", Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
+		// tom can access namespace projectCaribou
+		{User: uTom, Verb: "list", Resource: "pods", NS: "projectCaribou", ExpectAllow: false},
+	}
+	for i, tc := range testCases {
+		attr := authorizer.AttributesRecord{
+			User:      &tc.User,
+			Verb:      tc.Verb,
+			Resource:  tc.Resource,
+			Namespace: tc.NS,
+		}
+		t.Logf("tc: %v -> attr %v", tc, attr)
+		err := a.Authorize(attr)
+		actualAllow := bool(err == nil)
+		if tc.ExpectAllow != actualAllow {
+			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
+				i, tc.ExpectAllow, actualAllow, tc)
+		}
+	}
+	time.Sleep(1 * time.Second) // make sure the backend check goroutine already running
+
+	// modifying policy file
+	newContents := strings.Replace(contents,
+		`{"user":"scheduler", "readonly": true, "resource": "pods"}`,
+		`{"user":"scheduler", "readonly": false, "resource": "pods"}`, -1)
+	newContents = strings.Replace(newContents,
+		`{"user":"alice", "namespace": "projectCaribou"}`,
+		`{"user":"tom", "namespace": "projectCaribou"}`, -1)
+	err = os.Truncate(f.Name(), 0)
+	if err != nil {
+		t.Fatalf("unable to truncate policy file: %v", err)
+	}
+	if err = ioutil.WriteFile(f.Name(), []byte(newContents), 0700); err != nil {
+		t.Fatalf("unexpected error rewriting policyfile: %v", err)
+	}
+	time.Sleep(6 * time.Second) // wait more then 5 seconds for reloading policy file
+
+	testCases[1].ExpectAllow = true
+	testCases[2].ExpectAllow = false
+	testCases[3].ExpectAllow = true
+	for i, tc := range testCases {
+		attr := authorizer.AttributesRecord{
+			User:      &tc.User,
+			Verb:      tc.Verb,
+			Resource:  tc.Resource,
+			Namespace: tc.NS,
+		}
+		t.Logf("tc: %v -> attr %v", tc, attr)
+		err := a.Authorize(attr)
+		actualAllow := bool(err == nil)
+		if tc.ExpectAllow != actualAllow {
+			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
+				i, tc.ExpectAllow, actualAllow, tc)
 		}
 	}
 }

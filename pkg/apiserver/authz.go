@@ -19,6 +19,11 @@ package apiserver
 import (
 	"errors"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -92,10 +97,12 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, authoriza
 				return nil, errors.New("ABAC's authorization policy file not passed")
 			}
 			abacAuthorizer, err := abac.NewFromFile(authorizationPolicyFile)
+			authorizerLock := &abac.PolicyAuthorizer{PL: &abacAuthorizer, Lock: &sync.RWMutex{}}
+			go checkAndReloadPolicyFile(authorizerLock, authorizationPolicyFile)
 			if err != nil {
 				return nil, err
 			}
-			authorizers = append(authorizers, abacAuthorizer)
+			authorizers = append(authorizers, authorizerLock)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
 		}
@@ -107,4 +114,37 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, authoriza
 	}
 
 	return union.New(authorizers...), nil
+}
+
+func checkAndReloadPolicyFile(policyAuthz *abac.PolicyAuthorizer, file string) {
+	lastModifyTime := time.Now()
+	for {
+		func() {
+			defer func() {
+				if x := recover(); x != nil {
+					glog.Errorf("APIServer panic'd on checkAndReloadPolicyFile: %s, err: %v", file, x)
+				}
+			}()
+			//var info os.FileInfo
+			info, err := os.Stat(file)
+			if err != nil {
+				glog.Errorf("Stat authorizationPolicyFile: %s fail, err: %v, will retry to reload later", file, err)
+				return
+			}
+			if info.ModTime().After(lastModifyTime) {
+				lastModifyTime = info.ModTime()
+				newPolicyList, err := abac.NewFromFile(file)
+				if err != nil { // file format not correct
+					glog.Errorf("Stat authorizationPolicyFile: %s fail, err: %v, will retry to reload later", file, err)
+					return
+				}
+
+				glog.Infof("authorizationPolicyFile: %s is modified, reload finished, number of policy lines change from %d to %d", file, len(*policyAuthz.PL), len(newPolicyList))
+				policyAuthz.Lock.Lock()
+				*(policyAuthz.PL) = newPolicyList
+				policyAuthz.Lock.Unlock()
+			}
+		}()
+		time.Sleep(5 * time.Second)
+	}
 }
