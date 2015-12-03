@@ -18,16 +18,27 @@ package e2e_node
 
 import (
 	"time"
-
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-type RetryFn func(cl *client.Client) error
+// RetryFn represents a retryable test condition.  It returns an error if the condition is not met
+// otherwise returns nil for success.
+type RetryFn func() error
 
-func Retry(maxWait time.Duration, wait time.Duration, cl *client.Client, retry RetryFn) []error {
+// Retry retries the RetryFn for a maximum of maxWait time.  The wait duration is waited between
+// retries.  If the success condition is not met in maxWait time, the list of encountered errors
+// is returned.  If successful returns an empty list.
+// Example:
+// Expect(Retry(time.Minute*1, time.Second*2, func() error {
+//    if success {
+//      return nil
+//    } else {
+//      return errors.New("Failed")
+//    }
+// }).To(BeNil(), fmt.Sprintf("Failed"))
+func Retry(maxWait time.Duration, wait time.Duration, retry RetryFn) []error {
 	errs := []error{}
 	for start := time.Now(); time.Now().Before(start.Add(maxWait)); {
-		if err := retry(cl); err != nil {
+		if err := retry(); err != nil {
 			errs = append(errs, err)
 		} else {
 			return []error{}
