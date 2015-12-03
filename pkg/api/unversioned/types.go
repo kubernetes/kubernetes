@@ -239,13 +239,13 @@ const (
 	// Details (optional):
 	//   "causes" - The original error
 	// Status code 500
-	StatusReasonInternalError = "InternalError"
+	StatusReasonInternalError StatusReason = "InternalError"
 
 	// StatusReasonExpired indicates that the request is invalid because the content you are requesting
 	// has expired and is no longer available. It is typically associated with watches that can't be
 	// serviced.
 	// Status code 410 (gone)
-	StatusReasonExpired = "Expired"
+	StatusReasonExpired StatusReason = "Expired"
 
 	// StatusReasonServiceUnavailable means that the request itself was valid,
 	// but the requested service is unavailable at this time.
