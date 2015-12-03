@@ -18,50 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Set the host name explicitly
-# See: https://github.com/mitchellh/vagrant/issues/2430
-hostnamectl set-hostname ${MASTER_NAME}
-
-if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
-  # Workaround to vagrant inability to guess interface naming sequence
-  # Tell system to abandon the new naming scheme and use eth* instead
-  rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
-
-  # Disable network interface being managed by Network Manager (needed for Fedora 21+)
-  NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-  if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
-  for if_conf in ${if_to_edit}; do
-    grep -q ^NM_CONTROLLED= ${if_conf} || echo 'NM_CONTROLLED=no' >> ${if_conf}
-    sed -i 's/#^NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${if_conf}
-  done;
-  systemctl restart network
-fi
-
-NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
-
-function release_not_found() {
-  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
-  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
-  echo "Note that this requires having Docker installed.  If you are running " >&2
-  echo "from a release tarball, something is wrong.  Look at " >&2
-  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
-  exit 1
-}
-
-# Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
-for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-  minion=${NODE_NAMES[$i]}
-  ip=${NODE_IPS[$i]}
-  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
-    echo "Adding $minion to hosts file"
-    echo "$ip $minion" >> /etc/hosts
-  fi
-done
-echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
-echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+provision-network
 
 # Configure the master network
-provision-network-master
+provision-flannel-master
+provision-flannel-node
 
 write-salt-config kubernetes-master
 

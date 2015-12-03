@@ -18,46 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Set the host name explicitly
-# See: https://github.com/mitchellh/vagrant/issues/2430
-hostnamectl set-hostname ${NODE_NAME}
-
-if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
-  # Workaround to vagrant inability to guess interface naming sequence
-  # Tell system to abandon the new naming scheme and use eth* instead
-  rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
-
-  # Disable network interface being managed by Network Manager (needed for Fedora 21+)
-  NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-  if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
-  for if_conf in ${if_to_edit}; do
-    grep -q ^NM_CONTROLLED= ${if_conf} || echo 'NM_CONTROLLED=no' >> ${if_conf}
-    sed -i 's/#^NM_CONTROLLED=.*/NM_CONTROLLED=no/' ${if_conf}
-  done;
-  systemctl restart network
-fi
-
-NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
-
-# Setup hosts file to support ping by hostname to master
-if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
-  echo "Adding $MASTER_NAME to hosts file"
-  echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
-fi
-echo "$NODE_IP $NODE_NAME" >> /etc/hosts
-
-# Setup hosts file to support ping by hostname to each minion in the cluster
-for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-  minion=${NODE_NAMES[$i]}
-  ip=${NODE_IPS[$i]}
-  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
-    echo "Adding $minion to hosts file"
-    echo "$ip $minion" >> /etc/hosts
-  fi
-done
-
-# Configure network
-provision-network-minion
+provision-network
+provision-flannel-minion
 
 write-salt-config kubernetes-pool
 
