@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/runtime"
+	"sync"
 )
 
 type REST struct {
@@ -53,11 +54,22 @@ func (rs *REST) NewList() runtime.Object {
 func (rs *REST) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
-	// TODO: This should be parallelized.
+	wait := sync.WaitGroup{}
+	wait.Add(len(servers))
+	statuses := make(chan api.ComponentStatus, len(servers))
+	for k, v := range servers {
+		go func(name string, server apiserver.Server) {
+			defer wait.Done()
+			status := rs.getComponentStatus(name, server)
+			statuses <- *status
+		}(k, v)
+	}
+	wait.Wait()
+	close(statuses)
+
 	reply := []api.ComponentStatus{}
-	for name, server := range servers {
-		status := rs.getComponentStatus(name, server)
-		reply = append(reply, *status)
+	for status := range statuses {
+		reply = append(reply, status)
 	}
 	return &api.ComponentStatusList{Items: reply}, nil
 }
