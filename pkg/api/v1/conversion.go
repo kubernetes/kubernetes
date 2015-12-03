@@ -112,7 +112,8 @@ func addConversionFuncs() {
 				"involvedObject.resourceVersion",
 				"involvedObject.fieldPath",
 				"reason",
-				"source":
+				"source",
+				"type":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
