@@ -113,7 +113,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
 		return err
 	}
 
-	err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil)
+	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
 		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}

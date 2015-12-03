@@ -273,7 +273,7 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	// the json file remains invisible during rbd mount and thus won't be removed accidentally.
 	util.persistRBD(b, globalPDPath)
 
-	if err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil); err != nil {
+	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 	return err
