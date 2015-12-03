@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package im
 
 import (
 	"fmt"
@@ -27,23 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// Manages lifecycle of all images.
-//
-// Implementation is thread-safe.
-type imageManager interface {
-	// Applies the garbage collection policy. Errors include being unable to free
-	// enough space as per the garbage collection policy.
-	GarbageCollect() error
-
-	// Start async garbage collection of images.
-	Start() error
-
-	// TODO(vmarmol): Have this subsume pulls as well.
-}
+const (
+	defaultGCAge = time.Minute * 5
+)
 
 // A policy for garbage collecting images. Policy defines an allowed band in
 // which garbage collection will be run.
@@ -57,7 +46,7 @@ type ImageGCPolicy struct {
 	LowThresholdPercent int
 }
 
-type realImageManager struct {
+type realImageGC struct {
 	// Container runtime
 	runtime container.Runtime
 
@@ -68,6 +57,10 @@ type realImageManager struct {
 	// The image garbage collection policy in use.
 	policy ImageGCPolicy
 
+	// Minimum age at which a image can be garbage collected, zero for no limit.
+	// TODO(mqliang): move it to ImageGCPolicy and make it configurable
+	minAge time.Duration
+
 	// cAdvisor instance.
 	cadvisor cadvisor.Interface
 
@@ -76,15 +69,15 @@ type realImageManager struct {
 
 	// Reference to this node.
 	nodeRef *api.ObjectReference
-
-	// Track initialization
-	initialized bool
 }
 
 // Information about the images we track.
 type imageRecord struct {
 	// Time when this image was first detected.
-	detected time.Time
+	firstDetected time.Time
+
+	// Time when this image was last detected.
+	lastDetected time.Time
 
 	// Time when we last saw this image being used.
 	lastUsed time.Time
@@ -93,7 +86,7 @@ type imageRecord struct {
 	size int64
 }
 
-func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
+func NewImageGC(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (ImageGC, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -104,89 +97,21 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 	if policy.LowThresholdPercent > policy.HighThresholdPercent {
 		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
 	}
-	im := &realImageManager{
+
+	im := &realImageGC{
 		runtime:      runtime,
 		policy:       policy,
+		minAge:       defaultGCAge,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     cadvisorInterface,
 		recorder:     recorder,
 		nodeRef:      nodeRef,
-		initialized:  false,
 	}
 
 	return im, nil
 }
 
-func (im *realImageManager) Start() error {
-	go util.Until(func() {
-		// Initial detection make detected time "unknown" in the past.
-		var ts time.Time
-		if im.initialized {
-			ts = time.Now()
-		}
-		err := im.detectImages(ts)
-		if err != nil {
-			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
-		} else {
-			im.initialized = true
-		}
-	}, 5*time.Minute, util.NeverStop)
-
-	return nil
-}
-
-func (im *realImageManager) detectImages(detected time.Time) error {
-	images, err := im.runtime.ListImages()
-	if err != nil {
-		return err
-	}
-	pods, err := im.runtime.GetPods(true)
-	if err != nil {
-		return err
-	}
-
-	// Make a set of images in use by containers.
-	imagesInUse := sets.NewString()
-	for _, pod := range pods {
-		for _, container := range pod.Containers {
-			imagesInUse.Insert(container.Image)
-		}
-	}
-
-	// Add new images and record those being used.
-	now := time.Now()
-	currentImages := sets.NewString()
-	im.imageRecordsLock.Lock()
-	defer im.imageRecordsLock.Unlock()
-	for _, image := range images {
-		currentImages.Insert(image.ID)
-
-		// New image, set it as detected now.
-		if _, ok := im.imageRecords[image.ID]; !ok {
-			im.imageRecords[image.ID] = &imageRecord{
-				detected: detected,
-			}
-		}
-
-		// Set last used time to now if the image is being used.
-		if isImageUsed(image, imagesInUse) {
-			im.imageRecords[image.ID].lastUsed = now
-		}
-
-		im.imageRecords[image.ID].size = image.Size
-	}
-
-	// Remove old images from our records.
-	for image := range im.imageRecords {
-		if !currentImages.Has(image) {
-			delete(im.imageRecords, image)
-		}
-	}
-
-	return nil
-}
-
-func (im *realImageManager) GarbageCollect() error {
+func (im *realImageGC) GarbageCollect() error {
 	// Get disk usage on disk holding images.
 	fsInfo, err := im.cadvisor.DockerImagesFsInfo()
 	if err != nil {
@@ -222,13 +147,66 @@ func (im *realImageManager) GarbageCollect() error {
 	return nil
 }
 
+func (im *realImageGC) detectImages(detectTime time.Time) error {
+	images, err := im.runtime.ListImages()
+	if err != nil {
+		return err
+	}
+	pods, err := im.runtime.GetPods(true)
+	if err != nil {
+		return err
+	}
+
+	// Make a set of images in use by containers.
+	imagesInUse := sets.NewString()
+	for _, pod := range pods {
+		for _, container := range pod.Containers {
+			imagesInUse.Insert(container.Image)
+		}
+	}
+
+	// Add new images and record those being used.
+	now := time.Now()
+	currentImages := sets.NewString()
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+	for _, image := range images {
+		currentImages.Insert(image.ID)
+
+		// New image, set its first detected time.
+		if _, ok := im.imageRecords[image.ID]; !ok {
+			im.imageRecords[image.ID] = &imageRecord{
+				firstDetected: detectTime,
+			}
+		}
+
+		im.imageRecords[image.ID].lastDetected = detectTime
+
+		// Set last used time to now if the image is being used.
+		if isImageUsed(image, imagesInUse) {
+			im.imageRecords[image.ID].lastUsed = now
+		}
+
+		im.imageRecords[image.ID].size = image.Size
+	}
+
+	// Remove old images from our records.
+	for image := range im.imageRecords {
+		if !currentImages.Has(image) {
+			delete(im.imageRecords, image)
+		}
+	}
+
+	return nil
+}
+
 // Tries to free bytesToFree worth of images on the disk.
 //
 // Returns the number of bytes free and an error if any occurred. The number of
 // bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (im *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
+func (im *realImageGC) freeSpace(bytesToFree int64) (int64, error) {
 	startTime := time.Now()
 	err := im.detectImages(startTime)
 	if err != nil {
@@ -255,6 +233,12 @@ func (im *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 		// Images that are currently in used were given a newer lastUsed.
 		if image.lastUsed.After(startTime) {
 			break
+		}
+
+		// Avoid garbage collect the image if the image is not old enough.
+		// In such a case, the image may has just been pulled down, and will be used by a container right away.
+		if image.firstDetected.Add(im.minAge).After(startTime) {
+			continue
 		}
 
 		// Remove image. Continue despite errors.
@@ -287,7 +271,7 @@ func (ev byLastUsedAndDetected) Swap(i, j int) { ev[i], ev[j] = ev[j], ev[i] }
 func (ev byLastUsedAndDetected) Less(i, j int) bool {
 	// Sort by last used, break ties by detected.
 	if ev[i].lastUsed.Equal(ev[j].lastUsed) {
-		return ev[i].detected.Before(ev[j].detected)
+		return ev[i].firstDetected.Before(ev[j].firstDetected)
 	} else {
 		return ev[i].lastUsed.Before(ev[j].lastUsed)
 	}

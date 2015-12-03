@@ -51,6 +51,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/im"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -185,7 +186,7 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	imageGCPolicy ImageGCPolicy,
+	imageGCPolicy im.ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
 	nodeLabels []string,
@@ -385,6 +386,13 @@ func NewMainKubelet(
 			serializeImagePulls,
 		)
 
+		// setup imageGC
+		imageGC, err := im.NewImageGC(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+		if err != nil {
+			return nil, err
+		}
+		klet.imageGC = imageGC
+
 		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
 	case "rkt":
 		conf := &rkt.Config{
@@ -406,6 +414,10 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
+
+		// setup imageGC
+		klet.imageGC = rkt.NewImageGC(rktRuntime)
+
 		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
 
 		// No Docker daemon to put in a container.
@@ -422,13 +434,6 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.containerGC = containerGC
-
-	// setup imageManager
-	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
-	}
-	klet.imageManager = imageManager
 
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
@@ -560,8 +565,8 @@ type Kubelet struct {
 	// Policy for handling garbage collection of dead containers.
 	containerGC kubecontainer.ContainerGC
 
-	// Manager for images.
-	imageManager imageManager
+	// Policy for handling garbage collection of unused images.
+	imageGC im.ImageGC
 
 	// Diskspace manager.
 	diskSpaceManager diskSpaceManager
@@ -835,7 +840,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 	}, time.Minute, util.NeverStop)
 
 	go util.Until(func() {
-		if err := kl.imageManager.GarbageCollect(); err != nil {
+		if err := kl.imageGC.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
 	}, 5*time.Minute, util.NeverStop)
@@ -869,17 +874,12 @@ func (kl *Kubelet) initializeModules() error {
 		glog.Infof("Running in container %q", kl.resourceContainer)
 	}
 
-	// Step 4: Start the image manager.
-	if err := kl.imageManager.Start(); err != nil {
-		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
-	}
-
-	// Step 5: Start container manager.
+	// Step 4: Start container manager.
 	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 6: Start out of memory watcher.
+	// Step 5: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}

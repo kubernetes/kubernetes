@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/im"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -392,7 +393,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	imageGCPolicy := kubelet.ImageGCPolicy{
+	imageGCPolicy := im.ImageGCPolicy{
 		HighThresholdPercent: s.ImageGCHighThresholdPercent,
 		LowThresholdPercent:  s.ImageGCLowThresholdPercent,
 	}
@@ -702,7 +703,7 @@ func SimpleKubelet(client *client.Client,
 	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency time.Duration,
 	maxPods int,
 	containerManager cm.ContainerManager, clusterDNS net.IP) *KubeletConfig {
-	imageGCPolicy := kubelet.ImageGCPolicy{
+	imageGCPolicy := im.ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
@@ -912,7 +913,7 @@ type KubeletConfig struct {
 	HostPIDSources                 []string
 	HostIPCSources                 []string
 	HTTPCheckFrequency             time.Duration
-	ImageGCPolicy                  kubelet.ImageGCPolicy
+	ImageGCPolicy                  im.ImageGCPolicy
 	KubeClient                     *client.Client
 	ManifestURL                    string
 	ManifestURLHeader              http.Header
