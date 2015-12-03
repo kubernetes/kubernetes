@@ -185,7 +185,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress, "DEPRECATED: see --insecure-bind-address instead")
 	fs.MarkDeprecated("address", "see --insecure-bind-address instead")
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
+		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		"clients. If blank, all interfaces will be used (0.0.0.0).")
 	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
