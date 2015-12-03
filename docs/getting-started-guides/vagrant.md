@@ -322,9 +322,9 @@ export KUBERNETES_PROVIDER=vagrant
 During provision of the cluster, you may see the following message:
 
 ```sh
-Validating minion-1
+Validating node-1
 .............
-Waiting for each minion to be registered with cloud provider
+Waiting for each node to be registered with cloud provider
 error: couldn't read version from server: Get https://10.245.1.2/api: dial tcp 10.245.1.2:443: i/o timeout
 ```
 
@@ -334,9 +334,9 @@ To debug, first verify that the master is binding to the proper IP address:
 
 ```
 $ vagrant ssh master
-$ ifconfig | grep eth1 -C 2 
-eth1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 inet 10.245.1.2 netmask 
-   255.255.255.0 broadcast 10.245.1.255 
+$ ifconfig | grep eth1 -C 2
+eth1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 inet 10.245.1.2 netmask
+   255.255.255.0 broadcast 10.245.1.255
 ```
 
 Then verify that your host machine has a network connection to a bridge that can serve that address:
