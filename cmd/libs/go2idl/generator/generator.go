@@ -62,6 +62,7 @@ type File struct {
 
 type FileType interface {
 	AssembleFile(f *File, path string) error
+	VerifyFile(f *File, path string) error
 }
 
 // Packages is a list of packages to generate.
@@ -158,6 +159,10 @@ type Context struct {
 	// A set of types this context can process. If this is empty or nil,
 	// the default "golang" filetype will be provided.
 	FileTypes map[string]FileType
+
+	// If true, Execute* calls will just verify that the existing output is
+	// correct. (You may set this after calling NewContext.)
+	Verify bool
 }
 
 // NewContext generates a context from the given builder, naming systems, and
