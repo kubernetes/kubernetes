@@ -5,5 +5,5 @@ go:
   - 1.5.1
   - tip
 script:
-  - go test ./...
+  - go test -v ./...
   - go build

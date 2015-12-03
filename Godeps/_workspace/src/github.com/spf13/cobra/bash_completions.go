@@ -60,7 +60,9 @@ __handle_reply()
     __debug "${FUNCNAME}"
     case $cur in
         -*)
-            compopt -o nospace
+            if [[ $(type -t compopt) = "builtin" ]]; then
+                compopt -o nospace
+            fi
             local allflags
             if [ ${#must_have_one_flag[@]} -ne 0 ]; then
                 allflags=("${must_have_one_flag[@]}")
@@ -68,7 +70,9 @@ __handle_reply()
                 allflags=("${flags[*]} ${two_word_flags[*]}")
             fi
             COMPREPLY=( $(compgen -W "${allflags[*]}" -- "$cur") )
-            [[ $COMPREPLY == *= ]] || compopt +o nospace
+            if [[ $(type -t compopt) = "builtin" ]]; then
+                [[ $COMPREPLY == *= ]] || compopt +o nospace
+            fi
             return 0;
             ;;
     esac
@@ -175,11 +179,11 @@ __handle_word()
 {
     if [[ $c -ge $cword ]]; then
         __handle_reply
-	return
+        return
     fi
     __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
     if [[ "${words[c]}" == -* ]]; then
-	__handle_flag
+        __handle_flag
     elif __contains_word "${words[c]}" "${commands[@]}"; then
         __handle_command
     else
@@ -195,7 +199,7 @@ func postscript(out *bytes.Buffer, name string) {
 	fmt.Fprintf(out, "__start_%s()\n", name)
 	fmt.Fprintf(out, `{
     local cur prev words cword
-    if declare -F _init_completions >/dev/null 2>&1; then
+    if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -s || return
     else
         __my_init_completion || return
@@ -216,7 +220,13 @@ func postscript(out *bytes.Buffer, name string) {
 }
 
 `, name)
-	fmt.Fprintf(out, "complete -F __start_%s %s\n", name, name)
+	fmt.Fprintf(out, `if [[ $(type -t compopt) = "builtin" ]]; then
+    complete -F __start_%s %s
+else
+    complete -o nospace -F __start_%s %s
+fi
+
+`, name, name, name, name)
 	fmt.Fprintf(out, "# ex: ts=4 sw=4 et filetype=sh\n")
 }
 
@@ -290,6 +300,12 @@ func writeFlags(cmd *Command, out *bytes.Buffer) {
 
 `)
 	cmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
+		writeFlag(flag, out)
+		if len(flag.Shorthand) > 0 {
+			writeShortFlag(flag, out)
+		}
+	})
+	cmd.InheritedFlags().VisitAll(func(flag *pflag.Flag) {
 		writeFlag(flag, out)
 		if len(flag.Shorthand) > 0 {
 			writeShortFlag(flag, out)
@@ -380,6 +396,11 @@ func (cmd *Command) MarkFlagRequired(name string) error {
 	return MarkFlagRequired(cmd.Flags(), name)
 }
 
+// MarkPersistentFlagRequired adds the BashCompOneRequiredFlag annotation to the named persistent flag, if it exists.
+func (cmd *Command) MarkPersistentFlagRequired(name string) error {
+	return MarkFlagRequired(cmd.PersistentFlags(), name)
+}
+
 // MarkFlagRequired adds the BashCompOneRequiredFlag annotation to the named flag in the flag set, if it exists.
 func MarkFlagRequired(flags *pflag.FlagSet, name string) error {
 	return flags.SetAnnotation(name, BashCompOneRequiredFlag, []string{"true"})
@@ -389,6 +410,12 @@ func MarkFlagRequired(flags *pflag.FlagSet, name string) error {
 // Generated bash autocompletion will select filenames for the flag, limiting to named extensions if provided.
 func (cmd *Command) MarkFlagFilename(name string, extensions ...string) error {
 	return MarkFlagFilename(cmd.Flags(), name, extensions...)
+}
+
+// MarkPersistentFlagFilename adds the BashCompFilenameExt annotation to the named persistent flag, if it exists.
+// Generated bash autocompletion will select filenames for the flag, limiting to named extensions if provided.
+func (cmd *Command) MarkPersistentFlagFilename(name string, extensions ...string) error {
+	return MarkFlagFilename(cmd.PersistentFlags(), name, extensions...)
 }
 
 // MarkFlagFilename adds the BashCompFilenameExt annotation to the named flag in the flag set, if it exists.
