@@ -178,10 +178,10 @@ join a node to a Kubernetes cluster, you as an admin need to make sure proper se
 running in the node. In the future, we plan to automatically provision some node
 services.
 
-In general, node controller is responsible for updating the NodeReady condition of node
-status to ConditionUnknown when a node becomes unreachable (e.g. due to the node being down),
-and then later evicting all the pods from the node (using graceful termination) if the node
-continues to be unreachable. (The current timeouts for those are 40s and 5m, respectively.)
+In general, node controller is responsible for updating the NodeReady condition of node 
+status to ConditionUnknown when a node becomes unreachable (e.g. due to the node being down), 
+and then later evicting all the pods from the node (using graceful termination) if the node 
+continues to be unreachable. (The current timeouts for those are 40s and 5m, respectively.) 
 It also allocates CIDR blocks to the new nodes.
 
 ### Self-Registration of Nodes
