@@ -308,6 +308,7 @@ AWS_REQUIRED_SKIP_TESTS=(
 DISRUPTIVE_TESTS=(
     "DaemonRestart"
     "Etcd\sfailure"
+    "Nodes\sNetwork"
     "Nodes\sResize"
     "Reboot"
     "Services.*restarting"
@@ -320,7 +321,6 @@ GCE_FLAKY_TESTS=(
     "GCE\sL7\sLoadBalancer\sController" # issue: #17518
     "DaemonRestart\sController\sManager" # issue: #17829
     "Resource\susage\sof\ssystem\scontainers" # issue: #13931
-    "allows\sscheduling\sof\spods\son\sa\snode\safter\sit\srejoins\sthe\scluster" # file: resize_nodes.go, issue: #17830
     "NodeOutOfDisk" # issue: 17687
     )
 
