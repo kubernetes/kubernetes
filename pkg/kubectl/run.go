@@ -137,7 +137,7 @@ func getName(params map[string]string) (string, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return "", fmt.Errorf("'name' is a required parameter.")
+			return "", fmt.Error("'name' is a required parameter.")
 		}
 	}
 	return name, nil
@@ -470,7 +470,7 @@ func updatePodPorts(params map[string]string, podSpec *api.PodSpec) (err error) 
 			return err
 		}
 		if hostPort > 0 && port < 0 {
-			return fmt.Errorf("--hostport requires --port to be specified")
+			return fmt.Error("--hostport requires --port to be specified")
 		}
 	}
 
