@@ -48,13 +48,13 @@ function release_not_found() {
   exit 1
 }
 
-# Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
+# Setup hosts file to support ping by hostname to each node in the cluster from apiserver
 for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-  minion=${NODE_NAMES[$i]}
+  node=${NODE_NAMES[$i]}
   ip=${NODE_IPS[$i]}
-  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
-    echo "Adding $minion to hosts file"
-    echo "$ip $minion" >> /etc/hosts
+  if [ ! "$(cat /etc/hosts | grep $node)" ]; then
+    echo "Adding $node to hosts file"
+    echo "$ip $node" >> /etc/hosts
   fi
 done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.

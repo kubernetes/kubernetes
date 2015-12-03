@@ -16,7 +16,7 @@
 
 ## Contains configuration values for interacting with the Vagrant cluster
 
-# Number of minions in the cluster
+# Number of nodes in the cluster
 NUM_NODES=${NUM_NODES-"1"}
 export NUM_NODES
 
@@ -30,7 +30,7 @@ export MASTER_NAME="${INSTANCE_PREFIX}-master"
 # Should the master serve as a node
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
 
-# Map out the IPs, names and container subnets of each minion
+# Map out the IPs, names and container subnets of each node
 export NODE_IP_BASE=${NODE_IP_BASE-"10.245.1."}
 NODE_CONTAINER_SUBNET_BASE="10.246"
 MASTER_CONTAINER_NETMASK="255.255.255.0"
@@ -39,11 +39,11 @@ MASTER_CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.1/24"
 CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.0/16"
 for ((i=0; i < NUM_NODES; i++)) do
   NODE_IPS[$i]="${NODE_IP_BASE}$((i+3))"
-  NODE_NAMES[$i]="${INSTANCE_PREFIX}-minion-$((i+1))"
+  NODE_NAMES[$i]="${INSTANCE_PREFIX}-node-$((i+1))"
   NODE_CONTAINER_SUBNETS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"
   NODE_CONTAINER_ADDRS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1"
   NODE_CONTAINER_NETMASKS[$i]="255.255.255.0"
-  VAGRANT_NODE_NAMES[$i]="minion-$((i+1))"
+  VAGRANT_NODE_NAMES[$i]="node-$((i+1))"
 done
 
 SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
