@@ -48,6 +48,7 @@ spec:
         args:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
+        - -kube_master_url={{ pillar['kubeapi_server'] }} # IP Kubernets Api Server
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
         resources:
