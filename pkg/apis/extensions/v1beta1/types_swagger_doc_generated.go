@@ -116,6 +116,33 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 	return map_DaemonSetStatus
 }
 
+var map_DedicatedMachine = map[string]string{
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec defines the desired behavior of this dedicated machine rule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (DedicatedMachine) SwaggerDoc() map[string]string {
+	return map_DedicatedMachine
+}
+
+var map_DedicatedMachineList = map[string]string{
+	"":         "DedicatedList is a collection of dedicated machines.",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is a list of DedicatedMachines.",
+}
+
+func (DedicatedMachineList) SwaggerDoc() map[string]string {
+	return map_DedicatedMachineList
+}
+
+var map_DedicatedMachineSpec = map[string]string{
+	"labelvalue": "TargetNamespace string `json:\"namespace,omitempty\"`",
+}
+
+func (DedicatedMachineSpec) SwaggerDoc() map[string]string {
+	return map_DedicatedMachineSpec
+}
+
 var map_Deployment = map[string]string{
 	"":         "Deployment enables declarative updates for Pods and ReplicationControllers.",
 	"metadata": "Standard object metadata.",

@@ -1007,6 +1007,44 @@ func deepCopy_extensions_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatu
 	return nil
 }
 
+func deepCopy_extensions_DedicatedMachine(in DedicatedMachine, out *DedicatedMachine, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_extensions_DedicatedMachineSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_extensions_DedicatedMachineList(in DedicatedMachineList, out *DedicatedMachineList, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]DedicatedMachine, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_extensions_DedicatedMachine(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_extensions_DedicatedMachineSpec(in DedicatedMachineSpec, out *DedicatedMachineSpec, c *conversion.Cloner) error {
+	out.LabelValue = in.LabelValue
+	return nil
+}
+
 func deepCopy_extensions_Deployment(in Deployment, out *Deployment, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1636,6 +1674,9 @@ func init() {
 		deepCopy_extensions_DaemonSetList,
 		deepCopy_extensions_DaemonSetSpec,
 		deepCopy_extensions_DaemonSetStatus,
+		deepCopy_extensions_DedicatedMachine,
+		deepCopy_extensions_DedicatedMachineList,
+		deepCopy_extensions_DedicatedMachineSpec,
 		deepCopy_extensions_Deployment,
 		deepCopy_extensions_DeploymentList,
 		deepCopy_extensions_DeploymentSpec,
