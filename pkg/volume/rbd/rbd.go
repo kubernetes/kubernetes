@@ -154,7 +154,7 @@ func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, ma
 				podUID:  podUID,
 				volName: volName,
 				manager: manager,
-				mounter: mounter,
+				mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 				plugin:  plugin,
 			},
 			Mon: make([]string, 0),
@@ -169,7 +169,7 @@ type rbd struct {
 	Image    string
 	ReadOnly bool
 	plugin   *rbdPlugin
-	mounter  mount.Interface
+	mounter  *mount.SafeFormatAndMount
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 }

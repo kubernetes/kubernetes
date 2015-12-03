@@ -156,7 +156,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 
 		device := "/dev/foo"
 		dest := "/mnt/bar"
-		err := mounter.Mount(device, dest, test.fstype, test.mountOptions)
+		err := mounter.FormatAndMount(device, dest, test.fstype, test.mountOptions)
 		if test.expectedError == nil {
 			if err != nil {
 				t.Errorf("unexpected non-error: %v", err)

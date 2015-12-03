@@ -172,7 +172,7 @@ type awsElasticBlockStoreBuilder struct {
 	// Specifies whether the disk will be attached as read-only.
 	readOnly bool
 	// diskMounter provides the interface that is used to mount the actual block device.
-	diskMounter mount.Interface
+	diskMounter *mount.SafeFormatAndMount
 }
 
 var _ volume.Builder = &awsElasticBlockStoreBuilder{}
