@@ -72,7 +72,8 @@ Directory and file conventions
     - Package directories should generally avoid using separators as much as possible (when packages are multiple words, they usually should be in nested subdirectories).
   - Document directories and filenames should use dashes rather than underscores
   - Contrived examples that illustrate system features belong in /docs/user-guide or /docs/admin, depending on whether it is a feature primarily intended for users that deploy applications or cluster administrators, respectively. Actual application examples belong in /examples.
-    - Examples should also illustrate [best practices for using the system](../user-guide/config-best-practices.md)
+    - Examples should also illustrate
+      [best practices for configuration and using the system](../user-guide/config-best-practices.md)
   - Third-party code
     - Third-party Go code is managed using Godeps
     - Other third-party code belongs in /third_party

@@ -125,7 +125,7 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
   * [Downward API: accessing system configuration from a pod](downward-api.md)
   * [Images and registries](images.md)
   * [Migrating from docker-cli to kubectl](docker-cli-to-kubectl.md)
-  * [Tips and tricks when working with config](config-best-practices.md)
+  * [Configuration Best Practices and Tips](config-best-practices.md)
   * [Assign pods to selected nodes](node-selection/)
   * [Perform a rolling update on a running group of pods](update-demo/)
 
