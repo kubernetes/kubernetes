@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"compress/gzip"
 	"crypto/tls"
 	"crypto/x509"
@@ -26,13 +27,234 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"golang.org/x/net/websocket"
 	"k8s.io/kubernetes/pkg/api/rest"
 )
+
+func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
+	chunk := func(data []byte) []byte {
+		out := &bytes.Buffer{}
+		chunker := httputil.NewChunkedWriter(out)
+		for _, b := range data {
+			if _, err := chunker.Write([]byte{b}); err != nil {
+				panic(err)
+			}
+		}
+		chunker.Close()
+		out.Write([]byte("\r\n"))
+		return out.Bytes()
+	}
+
+	zip := func(data []byte) []byte {
+		out := &bytes.Buffer{}
+		zipper := gzip.NewWriter(out)
+		if _, err := zipper.Write(data); err != nil {
+			panic(err)
+		}
+		zipper.Close()
+		return out.Bytes()
+	}
+
+	sampleData := []byte("abcde")
+
+	table := map[string]struct {
+		reqHeaders http.Header
+		reqBody    []byte
+
+		expectedHeaders http.Header
+		expectedBody    []byte
+	}{
+		"content-length": {
+			reqHeaders: http.Header{
+				"Content-Length": []string{"5"},
+			},
+			reqBody: sampleData,
+
+			expectedHeaders: http.Header{
+				"Content-Length":    []string{"5"},
+				"Content-Encoding":  nil, // none set
+				"Transfer-Encoding": nil, // none set
+			},
+			expectedBody: sampleData,
+		},
+
+		"content-length + identity transfer-encoding": {
+			reqHeaders: http.Header{
+				"Content-Length":    []string{"5"},
+				"Transfer-Encoding": []string{"identity"},
+			},
+			reqBody: sampleData,
+
+			expectedHeaders: http.Header{
+				"Content-Length":    []string{"5"},
+				"Content-Encoding":  nil, // none set
+				"Transfer-Encoding": nil, // gets removed
+			},
+			expectedBody: sampleData,
+		},
+
+		"content-length + gzip content-encoding": {
+			reqHeaders: http.Header{
+				"Content-Length":   []string{strconv.Itoa(len(zip(sampleData)))},
+				"Content-Encoding": []string{"gzip"},
+			},
+			reqBody: zip(sampleData),
+
+			expectedHeaders: http.Header{
+				"Content-Length":    []string{strconv.Itoa(len(zip(sampleData)))},
+				"Content-Encoding":  []string{"gzip"},
+				"Transfer-Encoding": nil, // none set
+			},
+			expectedBody: zip(sampleData),
+		},
+
+		"chunked transfer-encoding": {
+			reqHeaders: http.Header{
+				"Transfer-Encoding": []string{"chunked"},
+			},
+			reqBody: chunk(sampleData),
+
+			expectedHeaders: http.Header{
+				"Content-Length":    nil, // none set
+				"Content-Encoding":  nil, // none set
+				"Transfer-Encoding": nil, // Transfer-Encoding gets removed
+			},
+			expectedBody: sampleData, // sample data is unchunked
+		},
+
+		"chunked transfer-encoding + gzip content-encoding": {
+			reqHeaders: http.Header{
+				"Content-Encoding":  []string{"gzip"},
+				"Transfer-Encoding": []string{"chunked"},
+			},
+			reqBody: chunk(zip(sampleData)),
+
+			expectedHeaders: http.Header{
+				"Content-Length":    nil, // none set
+				"Content-Encoding":  []string{"gzip"},
+				"Transfer-Encoding": nil, // gets removed
+			},
+			expectedBody: zip(sampleData), // sample data is unchunked, but content-encoding is preserved
+		},
+
+		// "Transfer-Encoding: gzip" is not supported by go
+		// See http/transfer.go#fixTransferEncoding (https://golang.org/src/net/http/transfer.go#L427)
+		// Once it is supported, this test case should succeed
+		//
+		// "gzip+chunked transfer-encoding": {
+		// 	reqHeaders: http.Header{
+		// 		"Transfer-Encoding": []string{"chunked,gzip"},
+		// 	},
+		// 	reqBody: chunk(zip(sampleData)),
+		//
+		// 	expectedHeaders: http.Header{
+		// 		"Content-Length":    nil, // no content-length headers
+		// 		"Transfer-Encoding": nil, // Transfer-Encoding gets removed
+		// 	},
+		// 	expectedBody: sampleData,
+		// },
+	}
+
+	successfulResponse := "backend passed tests"
+	for k, item := range table {
+		// Start the downstream server
+		downstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// Verify headers
+			for header, v := range item.expectedHeaders {
+				if !reflect.DeepEqual(v, req.Header[header]) {
+					t.Errorf("%s: Expected headers for %s to be %v, got %v", k, header, v, req.Header[header])
+				}
+			}
+
+			// Read body
+			body, err := ioutil.ReadAll(req.Body)
+			if err != nil {
+				t.Errorf("%s: unexpected error %v", k, err)
+			}
+			req.Body.Close()
+
+			// Verify length
+			if req.ContentLength > 0 && req.ContentLength != int64(len(body)) {
+				t.Errorf("%s: ContentLength was %d, len(data) was %d", k, req.ContentLength, len(body))
+			}
+
+			// Verify content
+			if !bytes.Equal(item.expectedBody, body) {
+				t.Errorf("%s: Expected %q, got %q", k, string(item.expectedBody), string(body))
+			}
+
+			// Write successful response
+			w.Write([]byte(successfulResponse))
+		}))
+		defer downstreamServer.Close()
+
+		// Start the proxy server
+		serverURL, _ := url.Parse(downstreamServer.URL)
+		simpleStorage := &SimpleRESTStorage{
+			errors:                    map[string]error{},
+			resourceLocation:          serverURL,
+			expectedResourceNamespace: "default",
+		}
+		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
+		server := httptest.NewServer(namespaceHandler)
+		defer server.Close()
+
+		// Dial the proxy server
+		conn, err := net.Dial(server.Listener.Addr().Network(), server.Listener.Addr().String())
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", err)
+			continue
+		}
+		defer conn.Close()
+
+		// Add standard http 1.1 headers
+		if item.reqHeaders == nil {
+			item.reqHeaders = http.Header{}
+		}
+		item.reqHeaders.Add("Connection", "close")
+		item.reqHeaders.Add("Host", server.Listener.Addr().String())
+
+		// We directly write to the connection to bypass the Go library's manipulation of the Request.Header.
+		// Write the request headers
+		post := fmt.Sprintf("POST /%s/%s/%s/proxy/namespaces/default/foo/id/some/dir HTTP/1.1\r\n", prefix, newGroupVersion.Group, newGroupVersion.Version)
+		if _, err := fmt.Fprint(conn, post); err != nil {
+			t.Fatalf("%s: unexpected error %v", err)
+		}
+		for header, values := range item.reqHeaders {
+			for _, value := range values {
+				if _, err := fmt.Fprintf(conn, "%s: %s\r\n", header, value); err != nil {
+					t.Fatalf("%s: unexpected error %v", err)
+				}
+			}
+		}
+		// Header separator
+		if _, err := fmt.Fprint(conn, "\r\n"); err != nil {
+			t.Fatalf("%s: unexpected error %v", err)
+		}
+		// Body
+		if _, err := conn.Write(item.reqBody); err != nil {
+			t.Fatalf("%s: unexpected error %v", err)
+		}
+
+		// Read response
+		response, err := ioutil.ReadAll(conn)
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", err)
+			continue
+		}
+		if !strings.HasSuffix(string(response), successfulResponse) {
+			t.Errorf("%s: Did not get successful response: %s", k, string(response))
+			continue
+		}
+	}
+}
 
 func TestProxy(t *testing.T) {
 	table := []struct {
@@ -54,7 +276,7 @@ func TestProxy(t *testing.T) {
 	}
 
 	for _, item := range table {
-		proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		downstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			gotBody, err := ioutil.ReadAll(req.Body)
 			if err != nil {
 				t.Errorf("%v - unexpected error %v", item.method, err)
@@ -77,9 +299,9 @@ func TestProxy(t *testing.T) {
 			}
 			fmt.Fprint(out, item.respBody)
 		}))
-		defer proxyServer.Close()
+		defer downstreamServer.Close()
 
-		serverURL, _ := url.Parse(proxyServer.URL)
+		serverURL, _ := url.Parse(downstreamServer.URL)
 		simpleStorage := &SimpleRESTStorage{
 			errors:                    map[string]error{},
 			resourceLocation:          serverURL,
@@ -255,7 +477,7 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 	}
 
 	for _, item := range table {
-		proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		downstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path != item.proxyServerPath {
 				t.Errorf("Unexpected request on path: %s, expected path: %s, item: %v", req.URL.Path, item.proxyServerPath, item)
 			}
@@ -263,9 +485,9 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 				t.Errorf("Unexpected query on url: %s, expected: %s", req.URL.RawQuery, item.query)
 			}
 		}))
-		defer proxyServer.Close()
+		defer downstreamServer.Close()
 
-		serverURL, _ := url.Parse(proxyServer.URL)
+		serverURL, _ := url.Parse(downstreamServer.URL)
 		simpleStorage := &SimpleRESTStorage{
 			errors:                    map[string]error{},
 			resourceLocation:          serverURL,

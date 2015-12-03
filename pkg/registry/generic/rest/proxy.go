@@ -114,6 +114,10 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 	newReq.Header = req.Header
+	newReq.ContentLength = req.ContentLength
+	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
+	// it can determine the TransferEncoding based on ContentLength and the Body.
+	newReq.TransferEncoding = req.TransferEncoding
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
