@@ -323,6 +323,7 @@ update-period
 upgrade-target
 use-kubernetes-cluster-service
 user-whitelist
+verify-only
 watch-cache
 watch-only
 whitelist-override-label

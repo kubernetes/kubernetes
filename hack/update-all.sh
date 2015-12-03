@@ -42,11 +42,12 @@ fi
 
 BASH_TARGETS="codecgen
 	generated-conversions
-	generated-deep-copies 
-	generated-docs 
-	generated-swagger-docs 
+	generated-deep-copies
+	generated-docs
+	generated-swagger-docs
 	swagger-spec
-	api-reference-docs"
+	api-reference-docs
+	codegen"
 
 
 for t in $BASH_TARGETS
