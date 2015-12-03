@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type fakeRL bool
@@ -215,6 +217,83 @@ func TestTimeout(t *testing.T) {
 	sendResponse <- struct{}{}
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
+	}
+}
+
+func TestGetAttribs(t *testing.T) {
+	r := &requestAttributeGetter{api.NewRequestContextMapper(), &RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}}
+
+	testcases := map[string]struct {
+		Verb               string
+		Path               string
+		ExpectedAttributes *authorizer.AttributesRecord
+	}{
+		"non-resource root": {
+			Verb: "POST",
+			Path: "/",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb: "post",
+				Path: "/",
+			},
+		},
+		"non-resource api prefix": {
+			Verb: "GET",
+			Path: "/api/",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb: "get",
+				Path: "/api/",
+			},
+		},
+		"non-resource group api prefix": {
+			Verb: "GET",
+			Path: "/apis/extensions/",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb: "get",
+				Path: "/apis/extensions/",
+			},
+		},
+
+		"resource": {
+			Verb: "POST",
+			Path: "/api/v1/nodes/mynode",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb:            "create",
+				Path:            "/api/v1/nodes/mynode",
+				ResourceRequest: true,
+				Resource:        "nodes",
+			},
+		},
+		"namespaced resource": {
+			Verb: "PUT",
+			Path: "/api/v1/namespaces/myns/pods/mypod",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb:            "update",
+				Path:            "/api/v1/namespaces/myns/pods/mypod",
+				ResourceRequest: true,
+				Namespace:       "myns",
+				Resource:        "pods",
+			},
+		},
+		"API group resource": {
+			Verb: "GET",
+			Path: "/apis/extensions/v1beta1/namespaces/myns/jobs",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb:            "list",
+				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
+				ResourceRequest: true,
+				APIGroup:        "extensions",
+				Namespace:       "myns",
+				Resource:        "jobs",
+			},
+		},
+	}
+
+	for k, tc := range testcases {
+		req, _ := http.NewRequest(tc.Verb, tc.Path, nil)
+		attribs := r.GetAttribs(req)
+		if !reflect.DeepEqual(attribs, tc.ExpectedAttributes) {
+			t.Errorf("%s: expected\n\t%#v\ngot\n\t%#v", k, tc.ExpectedAttributes, attribs)
+		}
 	}
 }
 
