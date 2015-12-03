@@ -73,7 +73,7 @@ func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
 func density30AddonResourceVerifier() map[string]resourceConstraint {
 	constraints := make(map[string]resourceConstraint)
 	constraints["fluentd-elasticsearch"] = resourceConstraint{
-		cpuConstraint:    0.03,
+		cpuConstraint:    0.1,
 		memoryConstraint: 150 * (1024 * 1024),
 	}
 	constraints["elasticsearch-logging"] = resourceConstraint{
