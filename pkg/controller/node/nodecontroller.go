@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -288,6 +288,8 @@ func (nc *NodeController) getCondition(status *api.NodeStatus, conditionType api
 	return nil
 }
 
+var gracefulDeletionVersion = version.MustParse("v1.1.0")
+
 // maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
 // that should not be gracefully terminated.
 func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
@@ -329,7 +331,13 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	// guarantee backwards compatibility of master API to kubelets with
 	// versions less than 1.1.0
 	node := nodeObj.(*api.Node)
-	if strings.HasPrefix(node.Status.NodeInfo.KubeletVersion, "v1.0") {
+	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
+	if err != nil {
+		glog.Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
+		nc.forcefullyDeletePod(pod)
+		return
+	}
+	if gracefulDeletionVersion.GT(v) {
 		nc.forcefullyDeletePod(pod)
 		return
 	}
