@@ -54,7 +54,7 @@ func JobHasDesiredParallelism(c ExtensionsInterface, job *extensions.Job) wait.C
 		}
 
 		// desired parallelism can be either the exact number, in which case return immediately
-		if job.Status.Active == *job.Spec.Parallelism {
+		if job.Spec.Parallelism != nil && job.Status.Active == *job.Spec.Parallelism {
 			return true, nil
 		}
 		// otherwise count successful
