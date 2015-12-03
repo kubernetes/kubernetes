@@ -18,7 +18,6 @@ package extensions
 
 import (
 	"fmt"
-	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
@@ -34,13 +33,13 @@ func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
 	if len(ps.MatchLabels)+len(ps.MatchExpressions) == 0 {
 		return labels.Everything(), nil
 	}
-	selector := labels.LabelSelector{}
+	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		req, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
+		r, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
 		if err != nil {
 			return nil, err
 		}
-		selector = append(selector, *req)
+		selector = selector.Add(*r)
 	}
 	for _, expr := range ps.MatchExpressions {
 		var op labels.Operator
@@ -56,13 +55,12 @@ func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
 		}
-		req, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
 		if err != nil {
 			return nil, err
 		}
-		selector = append(selector, *req)
+		selector = selector.Add(*r)
 	}
-	sort.Sort(labels.ByKey(selector))
 	return selector, nil
 }
 
