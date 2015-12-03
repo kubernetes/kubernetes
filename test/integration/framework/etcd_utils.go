@@ -22,10 +22,9 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 )
 
@@ -40,15 +39,15 @@ func NewEtcdClient() *etcd.Client {
 	return etcd.NewClient([]string{})
 }
 
-func NewEtcdStorage() (storage.Interface, error) {
-	return master.NewEtcdStorage(NewEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+func NewEtcdStorage() storage.Interface {
+	return etcdstorage.NewEtcdStorage(NewEtcdClient(), testapi.Default.Codec(), etcdtest.PathPrefix())
 }
 
-func NewExtensionsEtcdStorage(client *etcd.Client) (storage.Interface, error) {
+func NewExtensionsEtcdStorage(client *etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
 	}
-	return master.NewEtcdStorage(client, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix())
 }
 
 func RequireEtcd() {
