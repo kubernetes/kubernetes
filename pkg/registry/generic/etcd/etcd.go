@@ -188,11 +188,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unvers
 	if options == nil {
 		options = &unversioned.ListOptions{ResourceVersion: "0"}
 	}
-	version, err := storage.ParseWatchResourceVersion(options.ResourceVersion, e.EndpointName)
-	if err != nil {
-		return nil, err
-	}
-	err = e.Storage.List(ctx, e.KeyRootFunc(ctx), version, filterFunc, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filterFunc, list)
 	return list, etcderr.InterpretListError(err, e.EndpointName)
 }
 
@@ -479,10 +475,6 @@ func (e *Etcd) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.I
 
 // WatchPredicate starts a watch for the items that m matches.
 func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
-	version, err := storage.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
-	if err != nil {
-		return nil, err
-	}
 	filterFunc := e.filterAndDecorateFunction(m)
 
 	if name, ok := m.MatchesSingle(); ok {
@@ -490,12 +482,12 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 			if err != nil {
 				return nil, err
 			}
-			return e.Storage.Watch(ctx, key, version, filterFunc)
+			return e.Storage.Watch(ctx, key, resourceVersion, filterFunc)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), version, filterFunc)
+	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filterFunc)
 }
 
 func (e *Etcd) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {

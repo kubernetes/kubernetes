@@ -114,7 +114,7 @@ func TestList(t *testing.T) {
 	result := &api.PodList{}
 	// TODO: We need to pass ResourceVersion of barPod deletion operation.
 	// However, there is no easy way to get it, so it is hardcoded to 8.
-	if err := cacher.List(context.TODO(), "pods/ns", 8, storage.Everything, result); err != nil {
+	if err := cacher.List(context.TODO(), "pods/ns", "8", storage.Everything, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != "8" {
@@ -179,7 +179,7 @@ func TestWatch(t *testing.T) {
 	podFooBis.Spec.NodeName = "anotherFakeNode"
 
 	// Set up Watch for object "podFoo".
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", 1, storage.Everything)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -192,17 +192,19 @@ func TestWatch(t *testing.T) {
 	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
 
 	// Check whether we get too-old error.
-	_, err = cacher.Watch(context.TODO(), "pods/ns/foo", 1, storage.Everything)
+	_, err = cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
 	if err == nil {
 		t.Errorf("Expected 'error too old' error")
 	}
 
 	// Now test watch with initial state.
+	// We want to observe fooCreation too, so need to pass smaller resource version.
 	initialVersion, err := strconv.Atoi(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Incorrect resourceVersion: %s", fooCreated.ResourceVersion)
 	}
-	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", uint64(initialVersion), storage.Everything)
+	initialVersion--
+	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", strconv.Itoa(initialVersion), storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -211,7 +213,7 @@ func TestWatch(t *testing.T) {
 	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
 
 	// Now test watch from "now".
-	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", 0, storage.Everything)
+	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -229,14 +231,14 @@ func TestWatcherTimeout(t *testing.T) {
 	cacher := newTestCacher(etcdStorage)
 
 	// Create a watcher that will not be reading any result.
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", 1, storage.Everything)
+	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", "1", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watcher.Stop()
 
 	// Create a second watcher that will be reading result.
-	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", 1, storage.Everything)
+	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", "1", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -281,11 +283,13 @@ func TestFiltering(t *testing.T) {
 		}
 		return selector.Matches(labels.Set(metadata.Labels()))
 	}
+	// We want to observe fooCreation too, so need to pass smaller resource version.
 	initialVersion, err := strconv.Atoi(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Incorrect resourceVersion: %s", fooCreated.ResourceVersion)
 	}
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", uint64(initialVersion), filter)
+	initialVersion--
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", strconv.Itoa(initialVersion), filter)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
