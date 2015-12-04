@@ -165,6 +165,9 @@ func (self *rawContainerHandler) GetRootNetworkDevices() ([]info.NetInfo, error)
 	return nd, nil
 }
 
+// Nothing to clean up.
+func (self *rawContainerHandler) Cleanup() {}
+
 func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	var spec info.ContainerSpec
 
