@@ -200,3 +200,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	}
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
+
+func NewTestGroup(external, internal unversioned.GroupVersion) TestGroup {
+	return TestGroup{external, internal}
+}

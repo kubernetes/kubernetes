@@ -103,7 +103,7 @@ type $.type|privatePlural$ struct {
 `
 var newStructTemplate = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *ExtensionsClient, namespace string) *$.type|privatePlural$ {
+func new$.type|publicPlural$(c *$.Package$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
 		client: c,
 		ns:     namespace,
@@ -143,7 +143,7 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|
 	if options == nil {
 		return c.client.Delete().Namespace(c.ns).Resource("$.type|privatePlural$").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
 	if err != nil {
 		return err
 	}
