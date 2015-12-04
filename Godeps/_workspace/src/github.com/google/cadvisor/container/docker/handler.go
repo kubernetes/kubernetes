@@ -156,6 +156,10 @@ func newDockerContainerHandler(
 	return handler, nil
 }
 
+func (self *dockerContainerHandler) Cleanup() {
+	self.fsHandler.stop()
+}
+
 func (self *dockerContainerHandler) ContainerReference() (info.ContainerReference, error) {
 	return info.ContainerReference{
 		Name:      self.name,
