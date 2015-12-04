@@ -684,7 +684,7 @@ Therefore, resources supporting auto-generation of unique labels should have a `
 
 Annotations have very different intended usage from labels. We expect them to be primarily generated and consumed by tooling and system extensions. I'm inclined to generalize annotations to permit them to directly store arbitrary json. Rigid names and name prefixes make sense, since they are analogous to API fields.
 
-In fact, experimental API fields, including those used to represent fields of newer alpha/beta API versions in the older stable storage version, may be represented as annotations with the form `something.experimental.kubernetes.io/name`.  For example `net.experimental.kubernetes.io/policy` might represent an experimental network policy field.
+In fact, in-development API fields, including those used to represent fields of newer alpha/beta API versions in the older stable storage version, may be represented as annotations with the form `something.alpha.kubernetes.io/name` or `something.beta.kubernetes.io/name` (depending on our confidence in it).  For example `net.alpha.kubernetes.io/policy` might represent an experimental network policy field.
 
 Other advice regarding use of labels, annotations, and other generic map keys by Kubernetes components and tools:
   - Key names should be all lowercase, with words separated by dashes, such as `desired-replicas`
