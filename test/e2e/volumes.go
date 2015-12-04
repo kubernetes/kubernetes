@@ -584,7 +584,7 @@ var _ = Describe("Volumes [Skipped]", func() {
 			secret := &api.Secret{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
-					APIVersion: "v1beta3",
+					APIVersion: "v1",
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name: config.prefix + "-secret",
