@@ -2338,6 +2338,65 @@ func convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extension
 	return autoconvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in, out, s)
 }
 
+func autoconvert_extensions_DedicatedMachine_To_v1beta1_DedicatedMachine(in *extensions.DedicatedMachine, out *DedicatedMachine, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DedicatedMachine))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_extensions_DedicatedMachineSpec_To_v1beta1_DedicatedMachineSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_extensions_DedicatedMachine_To_v1beta1_DedicatedMachine(in *extensions.DedicatedMachine, out *DedicatedMachine, s conversion.Scope) error {
+	return autoconvert_extensions_DedicatedMachine_To_v1beta1_DedicatedMachine(in, out, s)
+}
+
+func autoconvert_extensions_DedicatedMachineList_To_v1beta1_DedicatedMachineList(in *extensions.DedicatedMachineList, out *DedicatedMachineList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DedicatedMachineList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]DedicatedMachine, len(in.Items))
+		for i := range in.Items {
+			if err := convert_extensions_DedicatedMachine_To_v1beta1_DedicatedMachine(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_extensions_DedicatedMachineList_To_v1beta1_DedicatedMachineList(in *extensions.DedicatedMachineList, out *DedicatedMachineList, s conversion.Scope) error {
+	return autoconvert_extensions_DedicatedMachineList_To_v1beta1_DedicatedMachineList(in, out, s)
+}
+
+func autoconvert_extensions_DedicatedMachineSpec_To_v1beta1_DedicatedMachineSpec(in *extensions.DedicatedMachineSpec, out *DedicatedMachineSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DedicatedMachineSpec))(in)
+	}
+	out.LabelValue = in.LabelValue
+	return nil
+}
+
+func convert_extensions_DedicatedMachineSpec_To_v1beta1_DedicatedMachineSpec(in *extensions.DedicatedMachineSpec, out *DedicatedMachineSpec, s conversion.Scope) error {
+	return autoconvert_extensions_DedicatedMachineSpec_To_v1beta1_DedicatedMachineSpec(in, out, s)
+}
+
 func autoconvert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployment, out *Deployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.Deployment))(in)
@@ -3325,6 +3384,65 @@ func convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSet
 	return autoconvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in, out, s)
 }
 
+func autoconvert_v1beta1_DedicatedMachine_To_extensions_DedicatedMachine(in *DedicatedMachine, out *extensions.DedicatedMachine, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DedicatedMachine))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta1_DedicatedMachineSpec_To_extensions_DedicatedMachineSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1beta1_DedicatedMachine_To_extensions_DedicatedMachine(in *DedicatedMachine, out *extensions.DedicatedMachine, s conversion.Scope) error {
+	return autoconvert_v1beta1_DedicatedMachine_To_extensions_DedicatedMachine(in, out, s)
+}
+
+func autoconvert_v1beta1_DedicatedMachineList_To_extensions_DedicatedMachineList(in *DedicatedMachineList, out *extensions.DedicatedMachineList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DedicatedMachineList))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]extensions.DedicatedMachine, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1beta1_DedicatedMachine_To_extensions_DedicatedMachine(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1beta1_DedicatedMachineList_To_extensions_DedicatedMachineList(in *DedicatedMachineList, out *extensions.DedicatedMachineList, s conversion.Scope) error {
+	return autoconvert_v1beta1_DedicatedMachineList_To_extensions_DedicatedMachineList(in, out, s)
+}
+
+func autoconvert_v1beta1_DedicatedMachineSpec_To_extensions_DedicatedMachineSpec(in *DedicatedMachineSpec, out *extensions.DedicatedMachineSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DedicatedMachineSpec))(in)
+	}
+	out.LabelValue = in.LabelValue
+	return nil
+}
+
+func convert_v1beta1_DedicatedMachineSpec_To_extensions_DedicatedMachineSpec(in *DedicatedMachineSpec, out *extensions.DedicatedMachineSpec, s conversion.Scope) error {
+	return autoconvert_v1beta1_DedicatedMachineSpec_To_extensions_DedicatedMachineSpec(in, out, s)
+}
+
 func autoconvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Deployment))(in)
@@ -4154,6 +4272,9 @@ func init() {
 		autoconvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
 		autoconvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
 		autoconvert_extensions_DaemonSet_To_v1beta1_DaemonSet,
+		autoconvert_extensions_DedicatedMachineList_To_v1beta1_DedicatedMachineList,
+		autoconvert_extensions_DedicatedMachineSpec_To_v1beta1_DedicatedMachineSpec,
+		autoconvert_extensions_DedicatedMachine_To_v1beta1_DedicatedMachine,
 		autoconvert_extensions_DeploymentList_To_v1beta1_DeploymentList,
 		autoconvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
 		autoconvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
@@ -4240,6 +4361,9 @@ func init() {
 		autoconvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		autoconvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,
 		autoconvert_v1beta1_DaemonSet_To_extensions_DaemonSet,
+		autoconvert_v1beta1_DedicatedMachineList_To_extensions_DedicatedMachineList,
+		autoconvert_v1beta1_DedicatedMachineSpec_To_extensions_DedicatedMachineSpec,
+		autoconvert_v1beta1_DedicatedMachine_To_extensions_DedicatedMachine,
 		autoconvert_v1beta1_DeploymentList_To_extensions_DeploymentList,
 		autoconvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
 		autoconvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus,

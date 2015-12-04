@@ -218,6 +218,39 @@ func ValidateDaemonSetName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateDedicatedMachine tests if required fields in the Dedicated are set.
+func ValidateDedicatedMachine(dedicatedmachine *extensions.DedicatedMachine) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&dedicatedmachine.ObjectMeta, true, ValidateDedicatedMachineName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateDedicatedSpec(&dedicatedmachine.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+// ValidateDedicatedMachineUpdate tests if required fields in the Dedicated are set.
+func ValidateDedicatedMachineUpdate(dedicatedmachine, olddedicatedmachine *extensions.DedicatedMachine) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&dedicatedmachine.ObjectMeta, &olddedicatedmachine.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateDedicatedSpec(&dedicatedmachine.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+// ValidateDedicatedSpec tests if required fields in the DedicatedSpec are set.
+func ValidateDedicatedSpec(spec *extensions.DedicatedMachineSpec) validation.ErrorList {
+	allErrs := validation.ErrorList{}
+	var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, validation.LabelValueMaxLength, validation.LabelValueFmt)
+	if !validation.IsValidLabelValue(spec.LabelValue) {
+		allErrs = append(allErrs, validation.NewInvalidError("labelValue", spec.LabelValue, labelValueErrorMsg))
+	}
+	return allErrs
+}
+
+// ValidateDedicatedName can be used to check whether the given dedicated name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateDedicatedMachineName(name string, prefix bool) (bool, string) {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
 // Validates that the given name can be used as a deployment name.
 func ValidateDeploymentName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)

@@ -690,6 +690,111 @@ func TestValidateDaemonSet(t *testing.T) {
 	}
 }
 
+func TestValidateDedicatedMachineUpdate(t *testing.T) {
+	type ddUpdateTest struct {
+		old    extensions.DedicatedMachine
+		update extensions.DedicatedMachine
+	}
+	successCases := []ddUpdateTest{
+		{
+			old: extensions.DedicatedMachine{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DedicatedMachineSpec{
+					LabelValue: "foo",
+				},
+			},
+			update: extensions.DedicatedMachine{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DedicatedMachineSpec{
+					LabelValue: "bar",
+				},
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateDedicatedMachineUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := map[string]ddUpdateTest{
+		"change DedicatedMachine name": {
+			old: extensions.DedicatedMachine{
+				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				Spec: extensions.DedicatedMachineSpec{
+					LabelValue: "foo",
+				},
+			},
+			update: extensions.DedicatedMachine{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: extensions.DedicatedMachineSpec{
+					LabelValue: "foo",
+				},
+			},
+		},
+	}
+	for testName, errorCase := range errorCases {
+		if errs := ValidateDedicatedMachineUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+			t.Errorf("expected failure: %s", testName)
+		}
+	}
+}
+
+func TestValidateDedicatedMachine(t *testing.T) {
+	validLabelValue := "foo"
+	invalidLabelValue := "foo_"
+
+	successCases := []extensions.DedicatedMachine{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			Spec: extensions.DedicatedMachineSpec{
+				LabelValue: validLabelValue,
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateDedicatedMachine(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]extensions.DedicatedMachine{
+		"Invalid Dedicated Machine Name": {
+			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+			Spec: extensions.DedicatedMachineSpec{
+				LabelValue: validLabelValue,
+			},
+		},
+		"Invalid Namespace": {
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceNone},
+			Spec: extensions.DedicatedMachineSpec{
+				LabelValue: validLabelValue,
+			},
+		},
+		"Invalid label value": {
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			Spec: extensions.DedicatedMachineSpec{
+				LabelValue: invalidLabelValue,
+			},
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateDedicatedMachine(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+		for i := range errs {
+			field := errs[i].Field
+			if field != "metadata.name" &&
+				field != "metadata.namespace" &&
+				field != "spec.labelValue" {
+				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
+		}
+	}
+}
+
 func validDeployment() *extensions.Deployment {
 	return &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{

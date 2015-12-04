@@ -407,6 +407,7 @@ var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
+var dedicatedMachineColumns = []string{"NAME", "NAMESPACE", "LABELVALUE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -450,6 +451,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
 	h.Handler(deploymentColumns, printDeployment)
 	h.Handler(deploymentColumns, printDeploymentList)
+	h.Handler(dedicatedMachineColumns, printDedicatedMachine)
+	h.Handler(dedicatedMachineColumns, printDedicatedMachineList)
 	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscaler)
 	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscalerList)
 }
@@ -1373,6 +1376,29 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, withNamespa
 func printDeploymentList(list *extensions.DeploymentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printDeployment(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printDedicatedMachine(dedicatedMachine *extensions.DedicatedMachine, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", dedicatedMachine.Namespace); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", dedicatedMachine.Name, dedicatedMachine.Namespace, dedicatedMachine.Spec.LabelValue); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(dedicatedMachine.Labels, columnLabels))
+	return err
+}
+
+func printDedicatedMachineList(list *extensions.DedicatedMachineList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printDedicatedMachine(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

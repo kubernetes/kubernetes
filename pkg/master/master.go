@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
+	dedicatedmachineetcd "k8s.io/kubernetes/pkg/registry/dedicatedmachine/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
 	"github.com/emicklei/go-restful"
@@ -1072,6 +1073,10 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"), storageDecorator)
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if isEnabled("dedicatedmachines") {
+		dedicatedMachineStorage := dedicatedmachineetcd.NewREST(dbClient("dedicatedmachines"), storageDecorator)
+		storage["dedicatedmachines"] = dedicatedMachineStorage
 	}
 	if isEnabled("deployments") {
 		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"), storageDecorator)

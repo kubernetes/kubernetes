@@ -100,6 +100,7 @@ func expandResourceShortcut(resource string) string {
 		"quota":  "resourcequotas",
 		"rc":     "replicationcontrollers",
 		"ds":     "daemonsets",
+		"dm":     "dedicatedmachines",
 		"svc":    "services",
 		"ing":    "ingresses",
 	}
