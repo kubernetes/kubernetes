@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
+
+import (
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+)
 
 import (
 	"testing"
@@ -26,9 +31,9 @@ import (
 
 func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200,
+	c := &simple.Client{
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
 					{
@@ -48,9 +53,9 @@ func TestListEndpoints(t *testing.T) {
 
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup(t).Endpoints(ns).Get("endpoint-1")
 	c.Validate(t, response, err)
@@ -58,10 +63,10 @@ func TestGetEndpoints(t *testing.T) {
 
 func TestGetEndpointWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{Error: true}
+	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Endpoints(ns).Get("")
-	if (err != nil) && (err.Error() != nameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	if (err != nil) && (err.Error() != simple.NameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
 
 	c.Validate(t, receivedPod, err)
