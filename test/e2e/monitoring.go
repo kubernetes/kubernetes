@@ -233,9 +233,24 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 			return
 		}
 		if time.Since(startTime) >= testTimeout {
+			// temporary workaround to help debug issue #12765
+			printDebugInfo(c)
 			break
 		}
 		time.Sleep(sleepBetweenAttempts)
 	}
 	Failf("monitoring using heapster and influxdb test failed")
+}
+
+func printDebugInfo(c *client.Client) {
+	set := labels.Set{"k8s-app": "heapster"}
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{set.AsSelector()}}
+	podList, err := c.Pods(api.NamespaceSystem).List(options)
+	if err != nil {
+		Logf("Error while listing pods %v", err)
+		return
+	}
+	for _, pod := range podList.Items {
+		Logf("Kubectl output:\n%v", runKubectlOrDie("log", pod.Name, "--namespace=kube-system"))
+	}
 }
