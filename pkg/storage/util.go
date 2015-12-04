@@ -47,8 +47,11 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 	}
 	version, err := strconv.ParseUint(resourceVersion, 10, 64)
 	if err != nil {
-		// TODO: Does this need to be a ErrorList?  I can't convince myself it does.
-		return 0, errors.NewInvalid(kind, "", utilvalidation.ErrorList{utilvalidation.NewInvalidError("resourceVersion", resourceVersion, err.Error())})
+		return 0, errors.NewInvalid(kind, "", utilvalidation.ErrorList{
+			// Validation errors are supposed to return version-specific field
+			// paths, but this is probably close enough.
+			utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("resourceVersion"), resourceVersion, err.Error()),
+		})
 	}
 	return version + 1, nil
 }
