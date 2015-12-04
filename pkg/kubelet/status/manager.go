@@ -30,7 +30,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -186,7 +186,7 @@ func (m *manager) SetContainerReadiness(pod *api.Pod, containerID kubecontainer.
 	oldStatus, found := m.podStatuses[pod.UID]
 	if !found {
 		glog.Warningf("Container readiness changed before pod has synced: %q - %q",
-			kubeletutil.FormatPodName(pod), containerID.String())
+			format.Pod(pod), containerID.String())
 		return
 	}
 	status := oldStatus.status
@@ -201,13 +201,13 @@ func (m *manager) SetContainerReadiness(pod *api.Pod, containerID kubecontainer.
 	}
 	if containerIndex == -1 {
 		glog.Warningf("Container readiness changed for unknown container: %q - %q",
-			kubeletutil.FormatPodName(pod), containerID.String())
+			format.Pod(pod), containerID.String())
 		return
 	}
 
 	if status.ContainerStatuses[containerIndex].Ready == ready {
 		glog.V(4).Infof("Container readiness unchanged (%v): %q - %q", ready,
-			kubeletutil.FormatPodName(pod), containerID.String())
+			format.Pod(pod), containerID.String())
 		return
 	}
 
@@ -229,7 +229,7 @@ func (m *manager) TerminatePods(pods []*api.Pod) bool {
 			}
 		}
 		if sent := m.updateStatusInternal(pod, pod.Status); !sent {
-			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", kubeletutil.FormatPodName(pod))
+			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", format.Pod(pod))
 			allSent = false
 		}
 	}
@@ -244,7 +244,7 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus) bool 
 	// clobbering each other so the phase of a pod progresses monotonically.
 	oldStatus, found := m.podStatuses[pod.UID]
 	if found && isStatusEqual(&oldStatus.status, &status) && pod.DeletionTimestamp == nil {
-		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletutil.FormatPodName(pod), status)
+		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", format.Pod(pod), status)
 		return false // No new status.
 	}
 
@@ -330,30 +330,30 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if err == nil {
 		translatedUID := m.podManager.TranslatePodUID(pod.UID)
 		if len(translatedUID) > 0 && translatedUID != uid {
-			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", kubeletutil.FormatPodName(pod))
+			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", format.Pod(pod))
 			m.deletePodStatus(uid)
 			return
 		}
 		if !m.needsUpdate(pod.UID, status) {
-			glog.V(1).Infof("Status for pod %q is up-to-date; skipping", kubeletutil.FormatPodName(pod))
+			glog.V(1).Infof("Status for pod %q is up-to-date; skipping", format.Pod(pod))
 			return
 		}
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully: %+v", kubeletutil.FormatPodName(pod), status)
+			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
 
 			if pod.DeletionTimestamp == nil {
 				return
 			}
 			if !notRunning(pod.Status.ContainerStatuses) {
-				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", kubeletutil.FormatPodName(pod))
+				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
 			if err := m.kubeClient.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
-				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", kubeletutil.FormatPodName(pod))
+				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
 				return
 			}
@@ -361,7 +361,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	// We failed to update status, wait for periodic sync to retry.
-	glog.Warningf("Failed to updated status for pod %q: %v", kubeletutil.FormatPodName(pod), err)
+	glog.Warningf("Failed to updated status for pod %q: %v", format.Pod(pod), err)
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.
