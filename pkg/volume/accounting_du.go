@@ -30,19 +30,74 @@ type AccountingDu struct {
 }
 
 func (ad *AccountingDu) GetAccounting() (*Accounting, error) {
+	a := NewAccounting()
 	if ad.path == "" {
-		return &Accounting{BytesUsed: unknownSize}, errors.New("No volume path defined for disk usage accounting.")
+		return a, errors.New("No volume path defined for disk usage accounting.")
 	}
+
+	err := ad.runDu(a)
+	if err != nil {
+		return a, err
+	}
+
+	err = ad.runDf(a)
+	if err != nil {
+		return a, err
+	}
+
+	return a, nil
+}
+
+func (ad *AccountingDu) runDu(a *Accounting) error {
 	out, err := exec.Command("du", "-s", ad.path).CombinedOutput()
 	if err != nil {
-		return &Accounting{BytesUsed: unknownSize}, err
+		return err
 	}
 	sbytes := strings.Fields(string(out))[0]
 	ibytes, err := strconv.Atoi(sbytes)
 	if err != nil {
-		return &Accounting{BytesUsed: unknownSize}, err
+		return err
 	}
-	return &Accounting{BytesUsed: ibytes}, nil
+	a.PodBytesUsed = ibytes
+	return nil
+}
+
+func (ad *AccountingDu) runDf(a *Accounting) error {
+	out, err := exec.Command("df", ad.path).CombinedOutput()
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(out), "\n")
+	header := strings.Fields(lines[0])
+	content := strings.Fields(lines[1])
+
+	usedIndex := -1
+	availableIndex := -1
+	for i, v := range header {
+		if v == "Used" {
+			usedIndex = i
+		}
+		if v == "Available" {
+			availableIndex = i
+		}
+	}
+
+	if usedIndex >= 0 {
+		used, err := strconv.Atoi(content[usedIndex])
+		if err != nil {
+			return err
+		}
+		a.SharedBytesUsed = used
+	}
+
+	if availableIndex >= 0 {
+		used, err := strconv.Atoi(content[availableIndex])
+		if err != nil {
+			return err
+		}
+		a.SharedBytesFree = used
+	}
+	return nil
 }
 
 func (ad *AccountingDu) Init(path string) {

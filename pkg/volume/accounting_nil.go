@@ -21,5 +21,5 @@ var _ Accountable = &AccountingNil{}
 type AccountingNil struct{}
 
 func (*AccountingNil) GetAccounting() (*Accounting, error) {
-	return &Accounting{BytesUsed: unknownSize}, nil
+	return NewAccounting(), nil
 }

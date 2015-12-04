@@ -43,7 +43,17 @@ type Accountable interface {
 const unknownSize = -1
 
 type Accounting struct {
-	BytesUsed int
+	PodBytesUsed    int
+	SharedBytesUsed int
+	SharedBytesFree int
+}
+
+func NewAccounting() *Accounting {
+	return &Accounting{
+		PodBytesUsed:    unknownSize,
+		SharedBytesUsed: unknownSize,
+		SharedBytesFree: unknownSize,
+	}
 }
 
 // Attributes represents the attributes of this builder.
