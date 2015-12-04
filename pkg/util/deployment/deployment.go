@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -32,17 +31,17 @@ import (
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.
 func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
 	return GetOldRCsFromLists(deployment, c,
-		func(namespace string, options unversioned.ListOptions) (*api.PodList, error) {
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
 			return c.Pods(namespace).List(options)
 		},
-		func(namespace string, options unversioned.ListOptions) ([]api.ReplicationController, error) {
+		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
 			rcList, err := c.ReplicationControllers(namespace).List(options)
 			return rcList.Items, err
 		})
 }
 
 // GetOldRCsFromLists returns the old RCs targeted by the given Deployment; get PodList and RCList with input functions.
-func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, getPodList func(string, unversioned.ListOptions) (*api.PodList, error), getRcList func(string, unversioned.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, error) {
+func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
 	selector := labels.SelectorFromSet(deployment.Spec.Selector)
@@ -87,7 +86,7 @@ func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, ge
 // Returns nil if the new RC doesnt exist yet.
 func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.ReplicationController, error) {
 	return GetNewRCFromList(deployment, c,
-		func(namespace string, options unversioned.ListOptions) ([]api.ReplicationController, error) {
+		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
 			rcList, err := c.ReplicationControllers(namespace).List(options)
 			return rcList.Items, err
 		})
@@ -95,7 +94,7 @@ func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.Replic
 
 // GetNewRCFromList returns an RC that matches the intent of the given deployment; get RCList with the input function.
 // Returns nil if the new RC doesnt exist yet.
-func GetNewRCFromList(deployment extensions.Deployment, c client.Interface, getRcList func(string, unversioned.ListOptions) ([]api.ReplicationController, error)) (*api.ReplicationController, error) {
+func GetNewRCFromList(deployment extensions.Deployment, c client.Interface, getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	rcList, err := getRcList(namespace, api.ListOptions{})
 	if err != nil {
