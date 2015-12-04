@@ -151,7 +151,7 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="false"
-      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\sUpgrade.*upgrade-master --upgrade-target=${new_version}"
+      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\supgrade.*upgrade-master --upgrade-target=${new_version}"
       ;;
 
     step3)
@@ -180,7 +180,7 @@ function configure_upgrade_step() {
       E2E_UP="false"
       E2E_TEST="true"
       E2E_DOWN="false"
-      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\sUpgrade.*upgrade-cluster --upgrade-target=${new_version}"
+      GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\supgrade.*upgrade-cluster --upgrade-target=${new_version}"
       ;;
 
     step5)
