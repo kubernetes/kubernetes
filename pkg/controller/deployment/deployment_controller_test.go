@@ -194,7 +194,7 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 			client:        fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileOldRCs(allRcs, oldRcs, nil, deployment)
+		scaled, err := controller.reconcileOldRCs(allRcs, oldRcs, nil, deployment, false)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -267,7 +267,7 @@ var alwaysReady = func() bool { return true }
 
 func newDeployment(replicas int) *exp.Deployment {
 	d := exp.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             util.NewUUID(),
 			Name:            "foobar",
