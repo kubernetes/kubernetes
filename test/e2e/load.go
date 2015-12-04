@@ -47,7 +47,7 @@ const (
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = Describe("[Performance] Load capacity [Skipped]", func() {
+var _ = Describe("Load capacity [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var ns string
@@ -100,6 +100,9 @@ var _ = Describe("[Performance] Load capacity [Skipped]", func() {
 
 	for _, testArg := range loadTests {
 		name := fmt.Sprintf("should be able to handle %v pods per node", testArg.podsPerNode)
+		if testArg.podsPerNode == 30 {
+			name = "[Performance] " + name
+		}
 		itArg := testArg
 
 		It(name, func() {
