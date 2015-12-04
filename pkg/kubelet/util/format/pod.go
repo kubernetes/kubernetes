@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package format
 
 import (
 	"fmt"
@@ -23,22 +23,34 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// FormatPodName returns a string representating a pod in a human readable
+type podHandler func(*api.Pod) string
+
+// Pod returns a string representating a pod in a human readable
 // format. This function currently is the same as GetPodFullName in
 // kubelet/containers, but may differ in the future. As opposed to
-// GetPodFullName, FormatPodName is mainly used for logging.
-func FormatPodName(pod *api.Pod) string {
+// GetPodFullName, this function is mainly used for logging.
+func Pod(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
 	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
 }
 
-// FormatPodNames returns a string representating a list of pods in a human
+// PodWithUID returns a string reprenetating a pod in a human readable format,
+// with pod UID as part of the string.
+func PodWithUID(pod *api.Pod) string {
+	return fmt.Sprintf("%s(%s)", Pod(pod), pod.UID)
+}
+
+// Pods returns a string representating a list of pods in a human
 // readable format.
-func FormatPodNames(pods []*api.Pod) string {
+func Pods(pods []*api.Pod) string {
+	return aggregatePods(pods, PodWithUID)
+}
+
+func aggregatePods(pods []*api.Pod, handler podHandler) string {
 	podStrings := make([]string, 0, len(pods))
 	for _, pod := range pods {
-		podStrings = append(podStrings, FormatPodName(pod))
+		podStrings = append(podStrings, handler(pod))
 	}
 	return fmt.Sprintf(strings.Join(podStrings, ", "))
 }
